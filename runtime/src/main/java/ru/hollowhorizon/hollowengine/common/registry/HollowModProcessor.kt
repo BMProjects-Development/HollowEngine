@@ -69,11 +69,14 @@ object HollowModProcessor {
             type.kotlin.objectInstance ?: throw IllegalArgumentException("${type.simpleName} must be an object!")
         }
         registerClassHandler<ReloadListener> { type, listener ->
+            // Must precede objectInstance: resolving INSTANCE loads client-only field types.
+            if (listener.side == Side.CLIENT && !isPhysicalClient) return@registerClassHandler
+
             val instance = type.kotlin.objectInstance as ResourceManagerReloadListener
 
             when (listener.side) {
                 Side.CLIENT -> {
-                    if (isPhysicalClient) RegisterReloadListenersEvent.Client.register {
+                    RegisterReloadListenersEvent.Client.register {
                         it.register(instance)
                     }
                 }
