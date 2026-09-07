@@ -5,19 +5,22 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
-class PrimitiveInstance(
+/**
+ * Defines the shape and appearance of an object attached to a node.
+ */
+class MeshAttachment(
     val primitive: Primitive,
     private val node: RuntimeNode,
     val material: Material,
-) {
-    val matrix: Mat4f get() = node.globalMatrix
+) : Attachment(node) {
+    val matrix: Mat4f get() = globalMatrix
     val morphWeights: FloatArray get() = node.morphWeights
     val isVisible: Boolean get() = node.isVisible
 
     fun skinMatrices(): Array<Mat4f> =
-        node.definition.skin!!.compute(node.globalMatrix, node.jointGetter)
+        node.definition.skin!!.compute(globalMatrix, node.jointGetter)
 
-    fun setupPipeline(pipeline: RenderPipeline) {
+    override fun collectCommands(pipeline: RenderPipeline) {
         primitive.setupPipeline(pipeline, this)
     }
 }

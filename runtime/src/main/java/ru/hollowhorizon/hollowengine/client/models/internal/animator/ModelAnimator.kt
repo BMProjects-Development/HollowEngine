@@ -2,11 +2,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.ProceduralLayerSpec
 
 /**
  * Animator for one model instance: a stack of layers, blended in priority order.
@@ -38,7 +35,7 @@ class ModelAnimator {
         val rebuilt = LinkedHashMap<String, SpecLayer>(specs.size)
         specs.values.forEach { spec ->
             val existing = specLayers[spec.id]?.takeIf { it.reconfigure(spec) }
-            rebuilt[spec.id] = existing ?: layerFor(spec)
+            rebuilt[spec.id] = existing ?: AnimatorLayerFactories.create(spec) ?: return@forEach
         }
         specLayers.clear()
         specLayers.putAll(rebuilt)
@@ -92,12 +89,6 @@ class ModelAnimator {
         lastTicks = nowTicks
         if (previous.isNaN()) return 0f
         return ((nowTicks - previous) / TICKS_PER_SECOND).coerceIn(0f, 1f)
-    }
-
-    private fun layerFor(spec: AnimatorLayerSpec): SpecLayer = when (spec) {
-        is ClipAnimationLayerSpec -> ClipLayer(spec)
-        is AnimationControllerLayerSpec -> ControllerLayer(spec)
-        is ProceduralLayerSpec -> ProceduralLayer(spec)
     }
 
     private companion object {

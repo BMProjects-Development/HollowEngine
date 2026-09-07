@@ -7,7 +7,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.toFloatBuffer
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.PrimitiveInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import kotlin.math.min
 
@@ -181,7 +181,7 @@ class GpuDeformer(private val primitive: Primitive) {
         return textureId
     }
 
-    fun compute(instance: PrimitiveInstance) {
+    fun compute(instance: MeshAttachment) {
         val shaderId: Int
 
         if (primitive.hasSkinning) {

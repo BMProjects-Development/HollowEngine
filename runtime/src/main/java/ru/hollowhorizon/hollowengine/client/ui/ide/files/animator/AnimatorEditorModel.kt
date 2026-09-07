@@ -16,10 +16,14 @@ import ru.hollowhorizon.hollowengine.common.utils.expressions.TokenType
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationDeclarations
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationExpressionLanguage
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerLayerSpec
+import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerType
+import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.ProceduralLayerSpec
+import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
+import ru.hollowhorizon.hollowengine.common.models.AnimatorStateType
+import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
+import ru.hollowhorizon.hollowengine.common.models.UnknownAnimatorLayerSpec
+import ru.hollowhorizon.hollowengine.common.models.UnknownAnimatorStateSpec
 
 /** What the inspector is looking at. */
 sealed interface AnimatorSelection {
@@ -67,10 +71,19 @@ object AnimatorColors {
 
 internal fun animatorText(name: String): String = "hollowengine.gui.animator_editor.$name".lang
 
-fun AnimatorLayerSpec.kindName(): String = when (this) {
-    is AnimationControllerLayerSpec -> "controller"
-    is ClipAnimationLayerSpec -> "clip"
-    is ProceduralLayerSpec -> "procedural"
+fun AnimatorLayerSpec.kindName(): String =
+    AnimatorLayerTypes.of(this)?.title() ?: (this as? UnknownAnimatorLayerSpec)?.typeId ?: "layer"
+
+fun AnimatorLayerType<*>.title(): String = titleOf(titleKey, id)
+
+fun AnimationControllerStateSpec.kindName(): String =
+    AnimatorStateTypes.of(this)?.title() ?: (this as? UnknownAnimatorStateSpec)?.typeId ?: "state"
+
+fun AnimatorStateType<*>.title(): String = titleOf(titleKey, id)
+
+private fun titleOf(titleKey: String, id: String): String {
+    val translated = titleKey.lang
+    return if (translated == titleKey) id.substringAfterLast('/') else translated
 }
 
 val AnimationExpressionCompletions: UiCompletionContributor = UiCompletionContributor { context ->

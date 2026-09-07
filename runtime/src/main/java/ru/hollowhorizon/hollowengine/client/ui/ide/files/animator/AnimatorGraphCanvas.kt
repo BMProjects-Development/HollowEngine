@@ -178,7 +178,7 @@ internal fun AnimatorGraphCanvas(
             id = stateId,
             x = view.toScreenX(point.x),
             y = view.toScreenY(point.y),
-            width = size?.width ?: (nodeWidth(stateId, state?.animation) * view.zoom),
+            width = size?.width ?: (nodeWidth(stateId, state.subtitle()) * view.zoom),
             height = size?.height ?: (NodeHeight * view.zoom),
         )
     }
@@ -275,7 +275,7 @@ internal fun AnimatorGraphCanvas(
                         document.edit {
                             it.withState(
                                 layerId,
-                                AnimationControllerStateSpec(id = id, animation = id),
+                                ClipStateSpec(id = id, animation = id),
                                 at = GraphPoint(
                                     view.toGraphX(canvasSize.width / 2f),
                                     view.toGraphY(canvasSize.height / 2f)
@@ -336,8 +336,8 @@ internal fun AnimatorGraphCanvas(
             val state = controller.states.firstOrNull { it.id == box.id }
             StateNode(
                 box = box,
-                animation = state?.animation,
-                playMode = state?.playMode,
+                subtitle = state.subtitle(),
+                playMode = (state as? ClipStateSpec)?.playMode,
                 isEntry = controller.entryState == box.id,
                 selected = selection == AnimatorSelection.State(layerId, box.id),
                 zoom = view.zoom,
@@ -428,7 +428,7 @@ internal fun AnimatorGraphCanvas(
 @Composable
 private fun StateNode(
     box: NodeBox,
-    animation: String?,
+    subtitle: String?,
     playMode: AnimationPlayMode?,
     isEntry: Boolean,
     selected: Boolean,
@@ -452,7 +452,7 @@ private fun StateNode(
         tags = listOf("animator-node"),
         modifier = Modifier
             .position(box.x.px, box.y.px)
-            .size((nodeWidth(box.id, animation) * zoom).px)
+            .size((nodeWidth(box.id, subtitle) * zoom).px)
             .background(
                 145f,
                 listOf(
@@ -499,7 +499,7 @@ private fun StateNode(
             )
         }
         if (!anyState) {
-            NodeLine(animation.orEmpty(), 8f * zoom, AnimatorColors.Muted)
+            NodeLine(subtitle.orEmpty(), 8f * zoom, AnimatorColors.Muted)
             Row(modifier = Modifier.size(100.percent).gap((3f * zoom).px).alignItems(vertical = UiAlign.CENTER)) {
                 playMode?.let { PlayModeChip(it, zoom) }
                 Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
@@ -721,17 +721,20 @@ private fun CanvasContextMenu(
                 })
 
                 else -> {
-                    add(UiDropdownItem(animatorText("add_state")) {
-                        val id = freeStateId(controller)
-                        document.edit {
-                            it.withState(
-                                layerId,
-                                AnimationControllerStateSpec(id = id, animation = id),
-                                at = GraphPoint(menu.graphX, menu.graphY),
-                            )
-                        }
-                        onSelect(AnimatorSelection.State(layerId, id))
-                    })
+                    val kinds = AnimatorStateTypes.all.filter { it.createDefault != null }
+                    kinds.forEach { type ->
+                        val create = type.createDefault ?: return@forEach
+                        val label = if (kinds.size == 1) animatorText("add_state")
+                        else "${animatorText("add_state")}: ${type.title()}"
+
+                        add(UiDropdownItem(label) {
+                            val id = freeStateId(controller)
+                            document.edit {
+                                it.withState(layerId, create(id), at = GraphPoint(menu.graphX, menu.graphY))
+                            }
+                            onSelect(AnimatorSelection.State(layerId, id))
+                        })
+                    }
                     if (ANY_STATE !in document.animator.nodeLayout(layerId).keys &&
                         controller.transitions.none { it.from == ANY_STATE }
                     ) {
@@ -926,8 +929,14 @@ private fun distanceToSegment(x: Float, y: Float, x1: Float, y1: Float, x2: Floa
 private fun NodeBox.contains(x: Float, y: Float): Boolean =
     x >= this.x && x <= this.x + width && y >= this.y && y <= this.y + height
 
-private fun nodeWidth(stateId: String, animation: String?): Float {
-    val longest = maxOf(stateId.length, animation?.length ?: 0)
+private fun AnimationControllerStateSpec?.subtitle(): String? = when (this) {
+    null -> null
+    is ClipStateSpec -> animation
+    else -> kindName()
+}
+
+private fun nodeWidth(stateId: String, subtitle: String?): Float {
+    val longest = maxOf(stateId.length, subtitle?.length ?: 0)
     return (18f + longest * 5.4f).coerceIn(NodeMinWidth, NodeMaxWidth)
 }
 

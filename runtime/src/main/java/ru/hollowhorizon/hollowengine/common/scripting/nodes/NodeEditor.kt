@@ -149,7 +149,7 @@ internal class EditorProperty<T : Any>(
             storage.current()
         )
     }.onFailure { HollowEngine.LOGGER.error("Cannot show editor property '${key.name}'", it) }.getOrDefault(JsonNull)
-    
+
     fun apply(element: JsonElement): Boolean {
         val decoded =
             runCatching { ScriptEditorJson.decodeFromJsonElement(key.serializer, element) }.getOrElse { return false }

@@ -51,7 +51,7 @@ object StandardPlayerAnimatorPreset {
     )
 
     private fun stateFor(animation: String): AnimationControllerStateSpec =
-        AnimationControllerStateSpec(
+        ClipStateSpec(
             id = animation,
             animation = animation,
             playMode = when (animation) {

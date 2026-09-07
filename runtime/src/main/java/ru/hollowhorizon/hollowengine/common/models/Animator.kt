@@ -22,8 +22,11 @@ data class GraphPoint(val x: Float = 0f, val y: Float = 0f)
 /** Names one state of one layer in [Animator.layout]. */
 fun graphKey(layerId: String, stateId: String): String = "$layerId/$stateId"
 
+/**
+ * One entry of an [Animator]'s stack.
+ */
 @Serializable
-sealed class AnimatorLayerSpec {
+abstract class AnimatorLayerSpec {
     abstract val id: String
     abstract val weight: AnimationExpression
     abstract val priority: Int
@@ -31,6 +34,24 @@ sealed class AnimatorLayerSpec {
     abstract val mask: BoneMask
     abstract val fadeIn: Float
     abstract val fadeOut: Float
+
+    /**
+     * A copy with the shared fields replaced, whichever kind of layer this is.
+     */
+    abstract fun withCommon(
+        id: String = this.id,
+        weight: AnimationExpression = this.weight,
+        priority: Int = this.priority,
+        blendMode: LayerBlendMode = this.blendMode,
+        mask: BoneMask = this.mask,
+        fadeIn: Float = this.fadeIn,
+        fadeOut: Float = this.fadeOut,
+    ): AnimatorLayerSpec
+
+    /**
+     * Every expression this layer evaluates, so the animator bakes them all in one pass.
+     */
+    open fun expressions(): List<AnimationExpression> = listOf(weight)
 }
 
 @Serializable
@@ -50,7 +71,22 @@ data class ClipAnimationLayerSpec(
     val removeOnEnd: Boolean = playMode == AnimationPlayMode.Once,
     val removeAtGameTime: Long? = null,
     val stopAtGameTime: Long? = null,
-) : AnimatorLayerSpec()
+) : AnimatorLayerSpec() {
+    override fun withCommon(
+        id: String,
+        weight: AnimationExpression,
+        priority: Int,
+        blendMode: LayerBlendMode,
+        mask: BoneMask,
+        fadeIn: Float,
+        fadeOut: Float,
+    ) = copy(
+        id = id, weight = weight, priority = priority, blendMode = blendMode,
+        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
+    )
+
+    override fun expressions() = listOf(weight, speed)
+}
 
 @Serializable
 @SerialName("hollowengine:animator/controller")
@@ -65,7 +101,29 @@ data class AnimationControllerLayerSpec(
     override val mask: BoneMask = BoneMask.full(),
     override val fadeIn: Float = 0f,
     override val fadeOut: Float = 0f,
-) : AnimatorLayerSpec()
+) : AnimatorLayerSpec() {
+    override fun withCommon(
+        id: String,
+        weight: AnimationExpression,
+        priority: Int,
+        blendMode: LayerBlendMode,
+        mask: BoneMask,
+        fadeIn: Float,
+        fadeOut: Float,
+    ) = copy(
+        id = id, weight = weight, priority = priority, blendMode = blendMode,
+        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
+    )
+
+    override fun expressions() = buildList {
+        add(weight)
+        states.forEach { addAll(it.expressions()) }
+        transitions.forEach {
+            add(it.condition)
+            add(it.duration)
+        }
+    }
+}
 
 @Serializable
 @SerialName("hollowengine:animator/procedural")
@@ -78,15 +136,59 @@ data class ProceduralLayerSpec(
     override val mask: BoneMask = BoneMask.full(),
     override val fadeIn: Float = 0f,
     override val fadeOut: Float = 0f,
-) : AnimatorLayerSpec()
+) : AnimatorLayerSpec() {
+    override fun withCommon(
+        id: String,
+        weight: AnimationExpression,
+        priority: Int,
+        blendMode: LayerBlendMode,
+        mask: BoneMask,
+        fadeIn: Float,
+        fadeOut: Float,
+    ) = copy(
+        id = id, weight = weight, priority = priority, blendMode = blendMode,
+        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
+    )
 
+    override fun expressions() = buildList {
+        add(weight)
+        transforms.forEach { transform ->
+            listOfNotNull(transform.translation, transform.rotation, transform.scale).forEach {
+                add(it.x)
+                add(it.y)
+                add(it.z)
+            }
+        }
+    }
+}
+
+/**
+ * One of the controller's states: what the model does while in this state.
+ */
 @Serializable
-data class AnimationControllerStateSpec(
-    val id: String,
+abstract class AnimationControllerStateSpec {
+    abstract val id: String
+
+    /** The same state under another name. */
+    abstract fun withId(id: String): AnimationControllerStateSpec
+
+    /** Every expression this state evaluates, so the animator bakes them all in one pass. */
+    open fun expressions(): List<AnimationExpression> = emptyList()
+}
+
+/** Plays one clip for as long as the controller stays in the state. */
+@Serializable
+@SerialName("hollowengine:animator/state/clip")
+data class ClipStateSpec(
+    override val id: String,
     val animation: String,
     val playMode: AnimationPlayMode = AnimationPlayMode.Loop,
     val speed: AnimationExpression = AnimationExpression.ONE,
-)
+) : AnimationControllerStateSpec() {
+    override fun withId(id: String) = copy(id = id)
+
+    override fun expressions() = listOf(speed)
+}
 
 @Serializable
 data class AnimationControllerTransitionSpec(

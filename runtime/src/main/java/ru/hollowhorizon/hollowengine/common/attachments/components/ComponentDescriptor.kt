@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.registry.system.MutableRegistry
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryManager
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryState
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
@@ -56,6 +57,7 @@ object ComponentDescriptorRegistry :
         ensureRegisteringState()
         mutableRegistry.register(descriptor.id) { descriptor }
         mutableRegistry.bake()
+        TagModuleRevision.invalidate()
         return descriptor
     }
 
@@ -79,6 +81,7 @@ object ComponentDescriptorRegistry :
         ensureRegisteringState()
         val removed = mutableRegistry.unregister(id)
         mutableRegistry.bake()
+        TagModuleRevision.invalidate()
         return removed
     }
 

@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.coroutines.scopeAsync
 import ru.hollowhorizon.hollowengine.common.utils.expressions.*
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
@@ -172,6 +173,7 @@ val AnimationExpressionLanguage: Expression<AnimatorEvaluationContext> = Express
 class AnimatorEvaluationContext {
     var entity: Entity? = null
     val living: LivingEntity? get() = entity as? LivingEntity
+    var modelToWorld: TrsTransformF? = null
 
     var partialTick: Float = 0f
     var gameTime: Float = 0f
@@ -260,27 +262,7 @@ object AnimatorExpressionEvaluator {
 
     private fun sourcesOf(layers: List<AnimatorLayerSpec>): List<String> {
         val sources = LinkedHashSet<String>()
-        layers.forEach { layer ->
-            sources += layer.weight.source
-            when (layer) {
-                is ClipAnimationLayerSpec -> sources += layer.speed.source
-                is AnimationControllerLayerSpec -> {
-                    layer.states.forEach { sources += it.speed.source }
-                    layer.transitions.forEach {
-                        sources += it.condition.source
-                        sources += it.duration.source
-                    }
-                }
-
-                is ProceduralLayerSpec -> layer.transforms.forEach { transform ->
-                    listOfNotNull(transform.translation, transform.rotation, transform.scale).forEach {
-                        sources += it.x.source
-                        sources += it.y.source
-                        sources += it.z.source
-                    }
-                }
-            }
-        }
+        layers.forEach { layer -> layer.expressions().forEach { sources += it.source } }
         return sources.filter { it.isNotBlank() && it.toFloatOrNull() == null }
     }
 

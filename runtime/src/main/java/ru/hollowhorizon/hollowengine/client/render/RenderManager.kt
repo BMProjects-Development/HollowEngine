@@ -83,7 +83,13 @@ object RenderManager {
 
             instance.attachment.entity = host as? LivingEntity
             instance.configure(node.animations, node.materials)
-            instance.update(AnimatorEvaluationContext().also { fillAnimationVariables(it, host, partialTick) })
+            val worldTransform = resolveNodeWorldTransform(host, node.transform, partialTick)
+            instance.update(
+                AnimatorEvaluationContext().also {
+                    fillAnimationVariables(it, host, partialTick)
+                    it.modelToWorld = worldTransform
+                }
+            )
 
             if (!instance.attachment.isFrustumCullingEnabled) {
                 frustumCullingDisabledHosts.add(host)
@@ -91,7 +97,6 @@ object RenderManager {
             }
 
             val localBounds = instance.attachment.calculateBounds() ?: return@forEachModelNodeRecord
-            val worldTransform = resolveNodeWorldTransform(host, node.transform, partialTick)
             val worldBounds = buildNodeRenderBounds(localBounds, worldTransform)
             modelCullingBounds.merge(host, worldBounds) { current, added -> current.minmax(added) }
         }
@@ -130,7 +135,12 @@ object RenderManager {
             val attachment = instance.attachment
             attachment.entity = entity as? LivingEntity
             instance.configure(node.animations, node.materials)
-            instance.update(AnimatorEvaluationContext().also { fillAnimationVariables(it, entity, partialTick) })
+            instance.update(
+                AnimatorEvaluationContext().also {
+                    fillAnimationVariables(it, entity, partialTick)
+                    it.modelToWorld = resolveNodeWorldTransform(entity, node.transform, partialTick)
+                }
+            )
 
             val hostYaw = when (entity) {
                 is LivingEntity -> Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)
@@ -157,6 +167,9 @@ object RenderManager {
                     openedBatchedRenderTypes = openedBatchedRenderTypes,
                 )
             )
+            if (DebugSkeletonRenderer.isEnabled) {
+                DebugSkeletonRenderer.render(attachment, poseStack, bufferSource)
+            }
             poseStack.popPose()
             renderedAny = true
         }

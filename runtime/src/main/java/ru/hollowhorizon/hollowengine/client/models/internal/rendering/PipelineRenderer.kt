@@ -13,7 +13,7 @@ import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.client.models.internal.*
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.toFloatBuffer
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.PrimitiveInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.utils.areShadersEnabled
 import ru.hollowhorizon.hollowengine.client.utils.instancingEntityInfo
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
@@ -333,7 +333,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
 
     override fun setupPipeline(
         pipeline: RenderPipeline,
-        instance: PrimitiveInstance,
+        instance: MeshAttachment,
     ) {
         if (isDynamic && deformer != null) {
             pipeline.addSkinnable {
@@ -361,7 +361,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         }
     }
 
-    private fun RenderContext.captureInstance(instance: PrimitiveInstance): SubmittedInstance {
+    private fun RenderContext.captureInstance(instance: MeshAttachment): SubmittedInstance {
         val nodeMatrix = instance.matrix.asMatrix4f()
 
         val modelView = Matrix4f(RenderSystem.getModelViewMatrix())
@@ -548,7 +548,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         buffer.put(matrix.m20()).put(matrix.m21()).put(matrix.m22())
     }
 
-    private fun RenderContext.renderVAO(instance: PrimitiveInstance) {
+    private fun RenderContext.renderVAO(instance: MeshAttachment) {
         val shader = RenderSystem.getShader() ?: return
         val nodeMatrix = instance.matrix.asMatrix4f()
 

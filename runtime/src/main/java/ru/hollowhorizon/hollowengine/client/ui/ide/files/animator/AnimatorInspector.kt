@@ -94,6 +94,11 @@ private fun LayerSection(
             layer.transforms.forEach { transform -> Readonly(animatorText("bone"), transform.bone) }
             if (layer.transforms.isEmpty()) Hint(animatorText("no_transforms"))
         }
+
+        else -> Section(layer.kindName()) {
+            if (layer is UnknownAnimatorLayerSpec) Hint(animatorText("unknown_layer"))
+            else Hint(animatorText("no_layer_editor"))
+        }
     }
 }
 
@@ -116,20 +121,31 @@ private fun StateSection(
     val state = controller.states.firstOrNull { it.id == selection.stateId } ?: return Hint(animatorText("state_removed"))
 
     Section(animatorText("section_state")) {
+        Readonly(animatorText("kind"), state.kindName())
         NameRow(animatorText("name"), state.id) { value ->
             if (controller.states.none { it.id == value }) {
                 document.edit { it.withStateRenamed(layerId, state.id, value) }
                 onSelect(AnimatorSelection.State(layerId, value))
             }
         }
-        TextRow(animatorText("animation"), state.animation) { value ->
-            document.edit { it.withState(layerId, state.copy(animation = value)) }
-        }
-        PlayModeRow(state.playMode) { mode ->
-            document.edit { it.withState(layerId, state.copy(playMode = mode)) }
-        }
-        ExpressionField(animatorText("speed"), state.speed.source) { value ->
-            document.edit { it.withState(layerId, state.copy(speed = AnimationExpression(value))) }
+
+        when (state) {
+            is ClipStateSpec -> {
+                TextRow(animatorText("animation"), state.animation) { value ->
+                    document.edit { it.withState(layerId, state.copy(animation = value)) }
+                }
+                PlayModeRow(state.playMode) { mode ->
+                    document.edit { it.withState(layerId, state.copy(playMode = mode)) }
+                }
+                ExpressionField(animatorText("speed"), state.speed.source) { value ->
+                    document.edit { it.withState(layerId, state.copy(speed = AnimationExpression(value))) }
+                }
+            }
+
+            // A state this build has no editor for: an addon's own kind, or one whose addon is missing.
+            is UnknownAnimatorStateSpec -> Hint(animatorText("unknown_state"))
+
+            else -> Hint(animatorText("no_state_editor"))
         }
     }
 

@@ -51,9 +51,11 @@ open class RuntimeNode(
 
     val morphWeights: FloatArray = baseMorphWeights.copyOf()
 
-    private val primitiveInstances = definition.mesh?.primitives?.map { primitive ->
-        PrimitiveInstance(primitive, this, materialResolver(primitive.material))
-    }.orEmpty()
+    init {
+        definition.mesh?.primitives?.forEach { primitive ->
+            attachments += MeshAttachment(primitive, this, materialResolver(primitive.material))
+        }
+    }
 
     val children = definition.children.map {
         RuntimeNode(it, this, materialResolver)
@@ -65,7 +67,6 @@ open class RuntimeNode(
 
     override fun collectCommands(pipeline: RenderPipeline) {
         super.collectCommands(pipeline)
-        primitiveInstances.forEach { it.setupPipeline(pipeline) }
         attachments.forEach {
             it.collectCommands(pipeline)
         }

@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.models.internal.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.PrimitiveInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.utils.*
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat3f
@@ -22,7 +22,7 @@ class BatchingRenderer(
 
     override fun setupPipeline(
         pipeline: RenderPipeline,
-        instance: PrimitiveInstance,
+        instance: MeshAttachment,
     ) {
         val indices = primitive.indices
         val positions = primitive.positions
@@ -57,7 +57,7 @@ class BatchingRenderer(
     }
 
     private fun putVertex(
-        instance: PrimitiveInstance,
+        instance: MeshAttachment,
         index: Int,
         consumer: VertexConsumer,
         pose: Matrix4f,

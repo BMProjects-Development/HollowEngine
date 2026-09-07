@@ -3,33 +3,6 @@ package ru.hollowhorizon.hollowengine.common.models
 /** The layer with this id, or null. */
 fun Animator.layer(layerId: String): AnimatorLayerSpec? = layers.firstOrNull { it.id == layerId }
 
-/**
- * Changes what every layer has, whichever kind this one is.
- */
-fun AnimatorLayerSpec.withCommon(
-    weight: AnimationExpression = this.weight,
-    priority: Int = this.priority,
-    blendMode: LayerBlendMode = this.blendMode,
-    mask: BoneMask = this.mask,
-    fadeIn: Float = this.fadeIn,
-    fadeOut: Float = this.fadeOut,
-): AnimatorLayerSpec = when (this) {
-    is ClipAnimationLayerSpec -> copy(
-        weight = weight, priority = priority, blendMode = blendMode,
-        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
-    )
-
-    is AnimationControllerLayerSpec -> copy(
-        weight = weight, priority = priority, blendMode = blendMode,
-        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
-    )
-
-    is ProceduralLayerSpec -> copy(
-        weight = weight, priority = priority, blendMode = blendMode,
-        mask = mask, fadeIn = fadeIn, fadeOut = fadeOut,
-    )
-}
-
 fun Animator.controller(layerId: String): AnimationControllerLayerSpec? =
     layer(layerId) as? AnimationControllerLayerSpec
 
@@ -48,11 +21,7 @@ fun Animator.withLayerRenamed(layerId: String, name: String): Animator {
     if (target.isEmpty() || target == layerId) return this
     if (layers.any { it.id == target }) return this
 
-    val renamed = when (layer) {
-        is ClipAnimationLayerSpec -> layer.copy(id = target)
-        is AnimationControllerLayerSpec -> layer.copy(id = target)
-        is ProceduralLayerSpec -> layer.copy(id = target)
-    }
+    val renamed = layer.withCommon(id = target)
     val prefix = "$layerId/"
     return copy(
         layers = layers.map { if (it.id == layerId) renamed else it },
@@ -104,7 +73,7 @@ fun Animator.withStateRenamed(layerId: String, stateId: String, name: String): A
     val point = nodeAt(layerId, stateId)
     return withLayer(
         controller.copy(
-            states = controller.states.map { if (it.id == stateId) it.copy(id = target) else it },
+            states = controller.states.map { if (it.id == stateId) it.withId(target) else it },
             transitions = controller.transitions.map { transition ->
                 transition.copy(
                     from = if (transition.from == stateId) target else transition.from,

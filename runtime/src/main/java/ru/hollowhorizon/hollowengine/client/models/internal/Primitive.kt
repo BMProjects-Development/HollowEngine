@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.MeshRender
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.PipelineRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.GeometryUtils
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.PrimitiveInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import kotlin.math.max
 import kotlin.math.min
 
@@ -81,7 +81,7 @@ class Primitive(
 
     fun setupPipeline(
         pipeline: RenderPipeline,
-        instance: PrimitiveInstance,
+        instance: MeshAttachment,
     ) {
         init()
         renderer?.setupPipeline(pipeline, instance)

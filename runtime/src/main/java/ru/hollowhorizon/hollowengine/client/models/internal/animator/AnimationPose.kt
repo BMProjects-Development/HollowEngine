@@ -102,6 +102,7 @@ fun applyAnimationPose(
             LayerBlendMode.Override -> transform.applyOverride(bonePose, base, clampedWeight)
             LayerBlendMode.Additive -> transform.applyAdditive(bonePose, reference, clampedWeight)
         }
+        transform.markDirty()
 
         bonePose.weights?.let { weights ->
             blendWeights(

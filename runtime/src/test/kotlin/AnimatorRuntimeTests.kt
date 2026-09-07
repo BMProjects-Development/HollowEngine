@@ -165,8 +165,8 @@ class AnimatorRuntimeTests {
 
         val runTransition = controller.transitions.single { it.to == "run" }
         val idleTransition = controller.transitions.single { it.to == "idle" }
-        val walkState = controller.states.single { it.id == "walk" }
-        val runState = controller.states.single { it.id == "run" }
+        val walkState = controller.states.single { it.id == "walk" } as ClipStateSpec
+        val runState = controller.states.single { it.id == "run" } as ClipStateSpec
         val headTransform = procedural.transforms.single { it.bone == "Head" }
         val leftEyeTransform = procedural.transforms.single { it.bone == "LeftEye" }
         val rightEyeTransform = procedural.transforms.single { it.bone == "RightEye" }
@@ -244,7 +244,7 @@ class AnimatorRuntimeTests {
         val animator = ModelAnimator()
         val layer = AnimationControllerLayerSpec(
             id = "controller:preview",
-            states = listOf(AnimationControllerStateSpec(id = "wave", animation = "wave")),
+            states = listOf(ClipStateSpec(id = "wave", animation = "wave")),
             entryState = "wave",
         )
         animator.configure(model = Animator(layers = listOf(layer)), animations = null)
@@ -316,8 +316,8 @@ class AnimatorRuntimeTests {
             id = "controller:crate",
             entryState = "closed",
             states = listOf(
-                AnimationControllerStateSpec(id = "closed", animation = "wave"),
-                AnimationControllerStateSpec(
+                ClipStateSpec(id = "closed", animation = "wave"),
+                ClipStateSpec(
                     id = "opening",
                     animation = "wave",
                     playMode = AnimationPlayMode.ClampForever,
@@ -354,8 +354,8 @@ class AnimatorRuntimeTests {
             id = "controller:locomotion",
             entryState = "run",
             states = listOf(
-                AnimationControllerStateSpec(id = "walk", animation = "walk"),
-                AnimationControllerStateSpec(id = "run", animation = "run"),
+                ClipStateSpec(id = "walk", animation = "walk"),
+                ClipStateSpec(id = "run", animation = "run"),
             ),
             transitions = listOf(
                 AnimationControllerTransitionSpec(

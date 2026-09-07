@@ -203,18 +203,14 @@ private fun LayerList(
         ContextMenu(
             id = "animator-add-layer",
             anchorBounds = addButton,
-            items = listOf(
-                UiDropdownItem(animatorText("add_controller")) {
-                    val id = freeLayerId(document.animator, "controller")
-                    document.edit { it.withLayer(AnimationControllerLayerSpec(id = id)) }
+            items = AnimatorLayerTypes.all.mapNotNull { type ->
+                val createDefault = type.createDefault ?: return@mapNotNull null
+                UiDropdownItem(type.title()) {
+                    val id = freeLayerId(document.animator, type.id.substringAfterLast('/'))
+                    document.edit { it.withLayer(createDefault().withCommon(id = id)) }
                     onOpen(id)
-                },
-                UiDropdownItem(animatorText("add_clip")) {
-                    val id = freeLayerId(document.animator, "clip")
-                    document.edit { it.withLayer(ClipAnimationLayerSpec(id = id, animation = "idle")) }
-                    onOpen(id)
-                },
-            ),
+                }
+            },
             onExpandedChange = { if (!it) addMenuOpen = false },
         )
     }

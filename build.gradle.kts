@@ -127,6 +127,11 @@ fun Project.configureHollowAddon() {
     tasks.withType<JavaCompile>().configureEach {
         options.release.set(21)
     }
+    tasks.withType<Test>().configureEach {
+        val sandbox = layout.buildDirectory.dir("test-workdir")
+        workingDir = sandbox.get().asFile
+        doFirst { workingDir.mkdirs() }
+    }
 }
 
 val specializedAddonProjectPaths = setOf(":addons:compiler")

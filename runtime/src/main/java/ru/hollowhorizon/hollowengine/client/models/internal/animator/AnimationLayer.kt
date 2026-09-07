@@ -209,6 +209,14 @@ class ClipPlayback {
     var endElapsed: Float = 0f
         private set
 
+    /** Back to the first frame, which is where a state starts every time it is entered. */
+    fun reset() {
+        time = 0f
+        reversed = false
+        ended = false
+        endElapsed = 0f
+    }
+
     fun advance(duration: Float, playMode: AnimationPlayMode, speed: Float, deltaTime: Float): Float {
         if (duration <= 0f) return 0f
         if (ended && playMode == AnimationPlayMode.Once) {
