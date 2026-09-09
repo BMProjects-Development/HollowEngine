@@ -2,6 +2,10 @@ import ru.hollowhorizon.hollowengine.addons.physics.matrixOf
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollStateSpec
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPlan
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPose
+import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachment
+import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachmentSpec
+import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachment
+import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
@@ -150,6 +154,49 @@ class RagdollPoseTests {
             assertTrue(
                 MutableVec3f(actual).subtract(expected).length() < 0.001f,
                 "Node $index should have stayed at $expected, but the seed pose put it at $actual",
+            )
+        }
+    }
+
+    @Test
+    fun `a bone hanging through a bone nobody simulates lands where physics put it`() {
+        val head = NodeDefinition(index = 3, name = "head", children = mutableListOf(), transform = offset(0.25f))
+        val helper = NodeDefinition(index = 2, name = "helper", children = mutableListOf(head), transform = offset(0.5f))
+        val chest = NodeDefinition(index = 1, name = "chest", children = mutableListOf(helper), transform = offset(1f))
+        head.parent = helper
+        helper.parent = chest
+
+        val target = PoseTarget(listOf(RuntimeNode(chest, parent = null)).byIndex(), emptyMap())
+        listOf("chest", "head").forEach { name ->
+            val node = requireNotNull(target.node(name))
+            node.attachments += RigidBodyAttachment(RigidBodyAttachmentSpec(), node)
+        }
+        requireNotNull(target.node("head")).let {
+            it.attachments += JointAttachment(JointAttachmentSpec(parent = "chest"), it)
+        }
+
+        val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
+        assertEquals(listOf("chest", "head"), plan.bones.map { it.name })
+
+        val animated = RagdollPose.globals(plan.order, AnimationPose(), HashMap())
+        val simulated = mapOf(
+            1 to matrixOf(QuatF.IDENTITY, Vec3f(1f, 1f, 0f)) as Mat4f,
+            3 to matrixOf(QuatF.IDENTITY, Vec3f(1f, 1.75f, 0f)) as Mat4f,
+        )
+
+        val pose = RagdollPose.write(plan, target, simulated, animated)
+        target.apply(pose, LayerBlendMode.Override, weight = 1f)
+        target.nodesByIndex.values.forEach { it.updateHierarchyMatrices() }
+
+        val drawn = globalsOf(target)
+        plan.bones.forEach { bone ->
+            val expected = MutableVec3f()
+            val actual = MutableVec3f()
+            requireNotNull(simulated[bone.nodeIndex]).decompose(expected, null, null)
+            requireNotNull(drawn[bone.nodeIndex]).decompose(actual, null, null)
+            assertTrue(
+                MutableVec3f(actual).subtract(expected).length() < 0.001f,
+                "Bone ${bone.name} was asked to be at $expected but the model puts it at $actual",
             )
         }
     }

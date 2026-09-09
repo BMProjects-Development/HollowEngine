@@ -262,7 +262,7 @@ class HollowUiRuntime(
             } ?: layoutPipeline.compute(root, width, height, scrollState, profile)
         }
         lastLayout = layout
-        lastLayoutKey = layoutKey.copy(scrollRevision = scrollState.revision)
+        lastLayoutKey = layoutKey
         dispatchPlacementCallbacks(layout)
         dispatchTextLayoutCallbacks(layout)
         dispatchResolvedStyleCallbacks(layout)

@@ -17,6 +17,10 @@ import ru.hollowhorizon.hollowengine.common.models.ProceduralLayerSpec
 class PoseTarget(
     val nodesByIndex: Map<Int, RuntimeNode>,
     val animations: Map<String, AnimationClip>,
+    /**
+     * Bone name by another name it answers to, from the model's rig.
+     */
+    val aliases: Map<String, String> = emptyMap(),
 ) {
     private val masks = HashMap<BoneMask, Set<Int>>()
 
@@ -26,6 +30,7 @@ class PoseTarget(
                 putIfAbsent(node.name, node)
                 putIfAbsent(node.definition.path, node)
             }
+            aliases.forEach { (alias, name) -> this[name]?.let { putIfAbsent(alias, it) } }
         }
     }
 

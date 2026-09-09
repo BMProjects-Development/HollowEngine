@@ -52,6 +52,9 @@ internal object ComponentLabels {
             )
         }
 
+    fun isBone(descriptor: SerialDescriptor, index: Int): Boolean =
+        descriptor.getElementAnnotations(index).any { it is EditorBone }
+
     fun isMultiline(descriptor: SerialDescriptor, index: Int): Boolean =
         descriptor.getElementAnnotations(index).any { it is EditorMultiline }
 

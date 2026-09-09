@@ -11,6 +11,10 @@ import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollBone
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollInstance
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollStateSpec
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPlan
+import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollShape
+import ru.hollowhorizon.hollowengine.addons.physics.rig.AxisLimit
+import ru.hollowhorizon.hollowengine.addons.physics.rig.BodyCollision
+import ru.hollowhorizon.hollowengine.addons.physics.rig.JointLimits
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollTemplate
 import ru.hollowhorizon.hollowengine.addons.physics.toJolt
 import ru.hollowhorizon.hollowengine.addons.physics.world.PhysicsWorld
@@ -37,12 +41,11 @@ class RagdollSimulationTests {
                 modelParent = if (index == 0) null else index - 1,
                 bindPosition = Vec3f(0f, index * 0.5f, 0f),
                 bindRotation = QuatF.IDENTITY,
-                axis = Vec3f.Y_AXIS,
-                length = 0.5f,
-                radius = 0.1f,
+                shape = RagdollShape.alongBone(Vec3f.Y_AXIS, length = 0.5f, radius = 0.1f),
+                pivot = Vec3f.ZERO,
                 density = spec.density,
-                twistAngle = spec.twistAngle,
-                swingAngle = spec.swingAngle,
+                collision = BodyCollision(),
+                limits = JointLimits(x = AxisLimit.of(spec.twistAngle), y = AxisLimit.of(spec.swingAngle), z = AxisLimit.of(spec.swingAngle)),
             )
         }
         return RagdollPlan(bones, emptyList())

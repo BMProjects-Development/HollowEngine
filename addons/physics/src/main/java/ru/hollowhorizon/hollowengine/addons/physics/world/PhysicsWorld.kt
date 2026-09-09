@@ -17,6 +17,9 @@ class PhysicsWorld(val level: Level) : AutoCloseable {
     val bodies: BodyInterface by lazy { system.bodyInterface }
     val blocks = BlockColliders(this)
 
+    /** What lets some bodies give way instead of shoving; see [SoftContacts]. */
+    private val contacts = SoftContacts().also { it.listenTo(system) }
+
     private val liveRagdolls = LinkedHashMap<Any, RagdollInstance>()
 
     val ragdolls: Collection<RagdollInstance> get() = liveRagdolls.values
@@ -32,13 +35,20 @@ class PhysicsWorld(val level: Level) : AutoCloseable {
         }
 
         val created = create() ?: return null
+        contacts.remember(created.softBodies())
         created.lastUsed = now
         liveRagdolls[key] = created
         return created
     }
 
     fun forget(key: Any) {
-        liveRagdolls.remove(key)?.close()
+        liveRagdolls.remove(key)?.let(::retire)
+    }
+
+    /** Gives a ragdoll's bodies back, and forgets everything that was remembered about them. */
+    private fun retire(instance: RagdollInstance) {
+        contacts.forget(instance.bodyIds.toList())
+        instance.close()
     }
 
     /**
@@ -75,13 +85,13 @@ class PhysicsWorld(val level: Level) : AutoCloseable {
         while (iterator.hasNext()) {
             val instance = iterator.next().value
             if (now - instance.lastUsed < IDLE_SECONDS) continue
-            instance.close()
+            retire(instance)
             iterator.remove()
         }
     }
 
     override fun close() {
-        liveRagdolls.values.forEach(RagdollInstance::close)
+        liveRagdolls.values.forEach(::retire)
         liveRagdolls.clear()
         blocks.close()
         system.removeAllBodies()

@@ -3,7 +3,12 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.panels
 import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
+import ru.hollowhorizon.hollowengine.common.utils.nbt.save
+import java.io.ByteArrayOutputStream
 
 private const val GridIcon = "hollowengine:textures/gui/icons/graph.svg"
 private const val WireframeIcon = "hollowengine:textures/gui/icons/layers.svg"
@@ -14,6 +19,7 @@ private const val PauseIcon = "hollowengine:textures/gui/icons/pause.svg"
 private const val VisibleIcon = "hollowengine:textures/gui/icons/visible.svg"
 private const val InvisibleIcon = "hollowengine:textures/gui/icons/invisible.svg"
 private const val NodeIcon = "hollowengine:textures/gui/icons/file_model.svg"
+private const val RigIcon = "hollowengine:textures/gui/icons/graph.svg"
 
 private fun String.toModelId(): String = substringAfter("assets/").replaceFirst("/", ":")
 
@@ -44,7 +50,7 @@ internal fun ModelEditorPanel(path: String) {
         Box(tags = listOf("model-viewer-pane")) {
             Model(viewer, modifier = Modifier.size(100.percent, 100.percent))
             Text(viewer.model, tags = listOf("model-title"))
-            ModelToolbar(viewer)
+            ModelToolbar(viewer, path)
             ModelAnimationBar(viewer, frameTick)
         }
         SidebarSplitter(sidebarWidth) { sidebarWidth = it }
@@ -72,13 +78,20 @@ private fun SidebarSplitter(width: Float, onWidthChange: (Float) -> Unit) {
 }
 
 @Composable
-private fun ModelToolbar(viewer: ModelViewerState) {
+private fun ModelToolbar(viewer: ModelViewerState, path: String) {
     Column(tags = listOf("model-toolbar")) {
         ToggleChip(GridIcon, viewer.showGrid) { viewer.showGrid = !viewer.showGrid }
         ToggleChip(WireframeIcon, viewer.showWireframe) { viewer.showWireframe = !viewer.showWireframe }
         ToggleChip(BoundingBoxIcon, viewer.showBoundingBox) { viewer.showBoundingBox = !viewer.showBoundingBox }
         ToggleChip(AutoRotateIcon, viewer.autoRotate) { viewer.autoRotate = !viewer.autoRotate }
+        ToggleChip(RigIcon, false) { HollowIdeOverlay.openOrCreate("$path.rig", ::emptyRig) }
     }
+}
+
+/** An empty rig, which is what a model that has never been rigged starts from. */
+private fun emptyRig(): ByteArray {
+    val tag = NBTFormat.serialize(ModelRig.serializer(), ModelRig.EMPTY)
+    return ByteArrayOutputStream().also { tag.save(it) }.toByteArray()
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
  * A model as it came out of a loader: the node hierarchy, its materials and its animation clips.
@@ -19,6 +20,14 @@ data class Model(
 
     /** Every node of every scene, flattened once. */
     val nodes: List<NodeDefinition> by lazy { walkNodes().toList() }
+
+    /**
+     * How much room each bone's geometry takes up, in the bone's own space; see [BoneGeometry].
+     *
+     * Measured here rather than on demand: a primitive hands its vertices to the driver the first time
+     * it is drawn, and nothing can measure them afterwards.
+     */
+    val boneBounds: Map<Int, Pair<Vec3f, Vec3f>> = BoneGeometry.of(this)
 
     fun walkNodes(): Sequence<NodeDefinition> {
         return sequence {

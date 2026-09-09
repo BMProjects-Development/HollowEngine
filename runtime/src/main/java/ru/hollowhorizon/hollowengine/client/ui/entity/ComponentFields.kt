@@ -9,6 +9,7 @@ import kotlinx.serialization.json.*
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -45,6 +46,7 @@ internal fun ComponentFields(
                     range = ComponentLabels.range(descriptor, index),
                     multiline = ComponentLabels.isMultiline(descriptor, index),
                     asset = ComponentLabels.asset(descriptor, index),
+                    bone = ComponentLabels.isBone(descriptor, index),
                 ),
                 value = current,
                 path = "$path/$name",
@@ -54,12 +56,36 @@ internal fun ComponentFields(
     }
 }
 
+@Composable
+internal fun FieldLabel(label: String?, description: String?) {
+    if (label == null) return FieldHelp(description)
+
+    Row(tags = listOf("ee-field-head")) {
+        Text(label, tags = listOf("ee-label"), modifier = Modifier.grow(1f))
+        FieldHelp(description)
+    }
+}
+
+@Composable
+internal fun FieldHelp(description: String?) {
+    val text = description ?: return
+
+    Image(
+        HelpIcon,
+        tags = listOf("ee-help"),
+        modifier = Modifier.size(9.px, 9.px).input(hoverable = true).tooltipOnHover(text),
+    )
+}
+
+private const val HelpIcon = "hollowengine:textures/gui/icons/docs.svg"
+
 internal data class FieldRange(val min: Double, val max: Double, val slider: Boolean)
 
 internal data class FieldHints(
     val range: FieldRange? = null,
     val multiline: Boolean = false,
     val asset: List<String> = emptyList(),
+    val bone: Boolean = false,
 )
 
 private fun matchesQuery(query: String, vararg candidates: String): Boolean {
@@ -94,7 +120,7 @@ internal fun ValueEditor(
 
         SerialKind.ENUM -> EnumField(label, description, descriptor, value, onChange)
 
-        StructureKind.LIST -> ListField(label, owner, descriptor, value, path, onChange)
+        StructureKind.LIST -> ListField(label, owner, descriptor, hints, value, path, onChange)
 
         StructureKind.MAP -> MapField(label, owner, descriptor, value, path, onChange)
 
@@ -128,6 +154,7 @@ private fun NullableEditor(
     Column(tags = listOf("ee-field")) {
         Row(tags = listOf("ee-field-head")) {
             if (label != null) Text(label, tags = listOf("ee-label"), modifier = Modifier.grow(1f))
+            FieldHelp(description)
             Checkbox(
                 checked = present,
                 onCheckedChange = { checked ->
@@ -158,10 +185,14 @@ private fun BooleanField(
             modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
                 .onClick { onChange(JsonPrimitive(!checked)) },
         ) {
-            Checkbox(checked = checked, tags = listOf("ee-checkbox"))
-            if (label != null) Text(label, tags = listOf("ee-check-label"))
+            Checkbox(
+                checked = checked,
+                onCheckedChange = { onChange(JsonPrimitive(it)) },
+                tags = listOf("ee-checkbox"),
+            )
+            if (label != null) Text(label, tags = listOf("ee-check-label"), modifier = Modifier.grow(1f))
+            FieldHelp(description)
         }
-        description?.let { Text(it, tags = listOf("ee-hint")) }
     }
 }
 
@@ -175,13 +206,15 @@ private fun StringField(
     onChange: (JsonElement) -> Unit,
 ) {
     val text = (value as? JsonPrimitive)?.contentOrNull.orEmpty()
+    if (hints.bone) return BoneField(label, description, text) { onChange(JsonPrimitive(it)) }
+
     val session = LocalEntityEditorSession.current
     val candidates = if (hints.asset.isEmpty()) emptyList() else remember(hints.asset, session) {
         session?.assets(hints.asset).orEmpty()
     }
 
     Column(tags = listOf("ee-field")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description)
         Row(tags = listOf("ee-input-row")) {
             TextField(
                 value = text,
@@ -201,7 +234,6 @@ private fun StringField(
                 }
             }
         }
-        description?.let { Text(it, tags = listOf("ee-hint")) }
     }
 }
 
@@ -231,7 +263,7 @@ private fun NumberField(
     val range = hints.range
 
     Column(tags = listOf("ee-field")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description)
         if (range != null && range.slider && range.min.isFinite() && range.max.isFinite()) {
             Row(tags = listOf("ee-input-row")) {
                 Slider(
@@ -254,7 +286,6 @@ private fun NumberField(
                 onChange(numberJson(kind, clamped))
             }
         }
-        description?.let { Text(it, tags = listOf("ee-hint")) }
     }
 }
 
@@ -297,13 +328,12 @@ private fun EnumField(
 ) {
     val current = (value as? JsonPrimitive)?.contentOrNull
     Column(tags = listOf("ee-field")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description)
         PillFlow {
             descriptor.elementNames.forEach { name ->
                 EditorPill(ComponentLabels.prettify(name), name == current) { onChange(JsonPrimitive(name)) }
             }
         }
-        description?.let { Text(it, tags = listOf("ee-hint")) }
     }
 }
 
@@ -318,7 +348,7 @@ private fun VectorField(
 ) {
     val body = value as? JsonObject ?: JsonObject(emptyMap())
     Column(tags = listOf("ee-field")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description)
         Row(tags = listOf("ee-vector")) {
             for (index in 0 until descriptor.elementsCount) {
                 val name = descriptor.getElementName(index)
@@ -333,7 +363,6 @@ private fun VectorField(
                 }
             }
         }
-        description?.let { Text(it, tags = listOf("ee-hint")) }
     }
 }
 
@@ -370,6 +399,7 @@ private fun ListField(
     label: String?,
     owner: ResourceLocation?,
     descriptor: SerialDescriptor,
+    hints: FieldHints,
     value: JsonElement,
     path: String,
     onChange: (JsonElement) -> Unit,
@@ -394,7 +424,7 @@ private fun ListField(
                                 description = null,
                                 owner = owner,
                                 descriptor = element,
-                                hints = FieldHints(),
+                                hints = hints,
                                 value = item,
                                 path = "$path[$index]",
                                 onChange = { onChange(items.withItem(index, it)) },
@@ -481,7 +511,7 @@ private fun PolymorphicField(
     val selected = alternatives.firstOrNull { it.serialName == current } ?: alternatives.firstOrNull()
 
     Column(tags = listOf("ee-nested")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description = null)
         PillFlow {
             alternatives.forEach { alternative ->
                 val name = alternative.serialName
@@ -501,7 +531,7 @@ private fun PolymorphicField(
 @Composable
 private fun UnsupportedField(label: String?, descriptor: SerialDescriptor) {
     Column(tags = listOf("ee-field")) {
-        label?.let { Text(it, tags = listOf("ee-label")) }
+        FieldLabel(label, description = null)
         Text(EntityEditorLang.unsupported(descriptor.serialName), tags = listOf("ee-hint"))
     }
 }

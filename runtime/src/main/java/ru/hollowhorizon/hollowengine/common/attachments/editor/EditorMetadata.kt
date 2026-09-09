@@ -45,6 +45,10 @@ annotation class EditorRange(
     val slider: Boolean = false,
 )
 
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorBone
+
 /** A string field that deserves more than one line. */
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)

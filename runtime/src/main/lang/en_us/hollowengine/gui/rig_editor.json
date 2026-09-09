@@ -1,0 +1,23 @@
+{
+  "parameters": "Parameters",
+  "section_bone": "Bone",
+  "name": "Name",
+  "alias": "Alias",
+  "visible": "visible",
+  "hidden": "hidden",
+  "bones": "Bones",
+  "no_bones": "This model has no bones.",
+  "add_attachment": "+ Attach",
+  "remove_attachment": "Remove",
+  "unknown_attachment": "This comes from an addon that is not loaded. It is kept as it is and does nothing.",
+  "no_attachment_editor": "This kind of attachment cannot be shown here.",
+  "unknown_kind": "Unknown",
+  "toggle_skeleton": "Show the skeleton",
+  "toggle_colliders": "Show the colliders",
+  "start_physics": "Drop the rig and see what it does",
+  "stop_physics": "Stop the simulation",
+  "kind_item": "Item",
+  "kind_rigid_body": "Rigid body",
+  "kind_joint": "Joint",
+  "generate_ragdoll": "Fill in bodies from the model's geometry"
+}

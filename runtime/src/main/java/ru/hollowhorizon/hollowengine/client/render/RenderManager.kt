@@ -3,35 +3,39 @@ package ru.hollowhorizon.hollowengine.client.render
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
 import net.minecraft.client.renderer.texture.OverlayTexture
+import net.minecraft.core.BlockPos
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import org.joml.Quaternionf
-import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.AnimatorAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
+import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderEntityEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStageEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderPlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
-import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.models.StandardPlayerAnimatorPreset
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import java.util.Collections
-import java.util.IdentityHashMap
+import java.util.*
 
 @ClientOnly
 object RenderManager {
@@ -57,10 +61,12 @@ object RenderManager {
                 InstanceBatchManager.flush()
                 InstanceBatchManager.clear()
             }
+
             RenderStage.AFTER_LEVEL -> {
                 InstanceBatchManager.flush()
                 InstanceBatchManager.clear()
             }
+
             else -> {}
         }
     }
@@ -135,12 +141,14 @@ object RenderManager {
             val attachment = instance.attachment
             attachment.entity = entity as? LivingEntity
             instance.configure(node.animations, node.materials)
+            val worldTransform = resolveNodeWorldTransform(entity, node.transform, partialTick)
             instance.update(
                 AnimatorEvaluationContext().also {
                     fillAnimationVariables(it, entity, partialTick)
-                    it.modelToWorld = resolveNodeWorldTransform(entity, node.transform, partialTick)
+                    it.modelToWorld = worldTransform
                 }
             )
+            val light = lightAt(level, entity, attachment, worldTransform, packedLight)
 
             val hostYaw = when (entity) {
                 is LivingEntity -> Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)
@@ -160,7 +168,7 @@ object RenderManager {
                 RenderContext(
                     poseStack,
                     bufferSource,
-                    packedLight,
+                    light,
                     (entity as? LivingEntity)?.let { LivingEntityRenderer.getOverlayCoords(it, 0f) }
                         ?: OverlayTexture.NO_OVERLAY,
                     allowInstancing = allowInstancing,
@@ -178,6 +186,29 @@ object RenderManager {
             (bufferSource as? MultiBufferSource.BufferSource)
                 ?.let { flushable -> openedBatchedRenderTypes.forEach(flushable::endBatch) }
         }
+    }
+
+    private fun lightAt(
+        level: Level,
+        entity: Entity,
+        attachment: ModelAttachment,
+        worldTransform: TrsTransformF,
+        packedLight: Int,
+    ): Int {
+        val (min, max) = attachment.calculateBounds() ?: return packedLight
+        val centre = MutableVec3f()
+        worldTransform.matrixF.transform((min + max) * 0.5f, 1f, centre)
+
+        val position = BlockPos.containing(centre.x.toDouble(), centre.y.toDouble(), centre.z.toDouble())
+        if (position == entity.blockPosition()) return packedLight
+        if (!level.getBlockState(position).isAir) {
+            val above = position.above()
+
+            return if (!level.getBlockState(above).isAir) packedLight
+            else LevelRenderer.getLightColor(level, above)
+        }
+
+        return LevelRenderer.getLightColor(level, position)
     }
 
     private fun shouldAllowInstancingInCurrentPass(): Boolean = true

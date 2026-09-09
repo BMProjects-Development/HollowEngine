@@ -54,6 +54,32 @@ class RagdollInstance private constructor(
         if (velocity.sqrLength() > 0f) ragdoll.addLinearVelocity(velocity.toJolt())
     }
 
+    /** Jolt ids for this ragdoll's body, in the order in which its bones are listed in the plan. */
+    val bodyIds: IntArray get() = if (isAlive) ragdoll.bodyIds else IntArray(0)
+
+    /**
+     * Force with each body pushes whatever it touches, depending on the body's Jolt id; see [ru.hollowhorizon.hollowengine.addons.physics.world.SoftContacts].
+     */
+    fun softBodies(): Map<Int, Float> {
+        if (!isAlive) return emptyMap()
+
+        val ids = ragdoll.bodyIds
+        return RagdollCollisions.softBodies(template.plan.bones)
+            .mapNotNull { (index, push) -> ids.getOrNull(index)?.let { it to push } }
+            .toMap()
+    }
+
+    /**
+     * Pushes the body in the specified direction.
+     */
+    fun push(velocity: Vec3f) {
+        if (!isAlive) return
+
+        ragdoll.addLinearVelocity(velocity.toJolt())
+        val bodies = ragdoll.physicsSystem.bodyInterface
+        ragdoll.bodyIds.forEach(bodies::activateBody)
+    }
+
     /** Retrieves the blocks currently containing the ragdoll; see [PhysicsWorld.stepOnce]. */
     fun beforeStep() {
         if (!isAlive) return

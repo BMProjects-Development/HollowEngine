@@ -12,9 +12,11 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.max
@@ -60,6 +62,23 @@ class ModelAttachment(
     val pipeline: RenderPipeline get() = renderPipeline
     val isFrustumCullingEnabled: Boolean get() = HollowModelManager.metadata(location).frustumCulling
 
+    /**
+     * What is authored onto this model's bones.
+     */
+    var rig: ModelRig
+        get() = currentRig
+        set(value) {
+            authoredRig = value
+            if (currentRig == value) return
+
+            currentRig = value
+            builtFor?.let(::rebuild)
+        }
+
+    private var currentRig: ModelRig = RigAssets.of(location)
+
+    private var authoredRig: ModelRig? = null
+
     val triangles get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.positionsCount / 3 } ?: 0 }
     val shapekeys get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.morphTargets.size } ?: 0 }
 
@@ -100,6 +119,7 @@ class ModelAttachment(
     fun poseTarget(): PoseTarget = target ?: PoseTarget(
         nodesByIndex = nodesByIndex,
         animations = model.animationsByName,
+        aliases = rig.boneByAlias,
     ).also { target = it }
 
     /**
@@ -111,6 +131,7 @@ class ModelAttachment(
 
     private fun rebuild(model: Model) {
         builtFor = model
+        currentRig = authoredRig ?: RigAssets.of(location)
         runtimeMaterials = ModelInstanceMaterials(model)
         runtimeNodes = model.scenes.getOrNull(model.scene)?.nodes?.map {
             RuntimeNode(it, this, runtimeMaterials::resolve)
@@ -123,11 +144,24 @@ class ModelAttachment(
         modelChangeListeners.forEach { it() }
     }
 
+    /**
+     * Hangs on the node whatever the rig says belongs there.
+     */
     private fun customizeNode(node: RuntimeNode) {
-        when (node.name) {
-            "RightHandItem" -> node.attachments.add(ItemNode({ entity }, EquipmentSlot.MAINHAND, node))
-            "LeftHandItem" -> node.attachments.add(ItemNode({ entity }, EquipmentSlot.OFFHAND, node))
+        val bone = rig.bone(node.name)
+        if (bone == null) {
+            when (node.name) {
+                "RightHandItem" -> node.attachments.add(ItemNode({ entity }, EquipmentSlot.MAINHAND, node))
+                "LeftHandItem" -> node.attachments.add(ItemNode({ entity }, EquipmentSlot.OFFHAND, node))
+            }
+            return
         }
+
+        val context = RigAttachmentContext(node) { entity }
+        bone.attachments.forEach { spec ->
+            RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
+        }
+        if (bone.hidden) node.isVisible = false
     }
 
 

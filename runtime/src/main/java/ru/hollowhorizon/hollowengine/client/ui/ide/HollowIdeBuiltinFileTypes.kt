@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeSoundsDocument
 
 internal const val SoundsFileName = "sounds.json"
@@ -12,8 +13,18 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     videoEditor: HollowIdeFileEditor,
     soundsEditor: HollowIdeFileEditor,
     animatorEditor: HollowIdeFileEditor,
+    rigEditor: HollowIdeFileEditor,
     textEditor: HollowIdeFileEditor,
 ) {
+    register(
+        HollowIdeFileType.extensions(
+            id = "rig",
+            extensions = listOf(".rig"),
+            priority = 270,
+            loader = { _, bytes -> HollowIdeRigDocument(bytes) },
+            editor = rigEditor,
+        ),
+    )
     register(
         HollowIdeFileType.extensions(
             id = "animator",

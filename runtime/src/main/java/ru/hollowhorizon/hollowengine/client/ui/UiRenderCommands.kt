@@ -891,6 +891,7 @@ class UiHitTester {
                 is HitTestTask.Test -> {
                     val current = task.node
                     val style = resolved[current]
+                    if (style.inputTransparent) continue
                     if (!style.hoverable && !style.clickable && !style.focusable && !style.draggable && !style.scrollable) {
                         continue
                     }

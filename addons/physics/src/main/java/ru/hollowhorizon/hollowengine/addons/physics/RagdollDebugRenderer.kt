@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.addons.physics
 
 import net.minecraft.client.Minecraft
+import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.shape
 import ru.hollowhorizon.hollowengine.addons.physics.world.PhysicsWorlds
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -32,11 +33,7 @@ object RagdollDebugRenderer {
         poseStack.translate(-camera.x, -camera.y, -camera.z)
         val lines = DebugLines.batch(buffers, poseStack)
         world.ragdolls.forEach { ragdoll ->
-            ragdoll.forEachBody { bone, position, rotation ->
-                val axis: Vec3f = bone.axis.rotated(rotation)
-                val tip = (bone.length - bone.radius).coerceAtLeast(bone.radius)
-                lines.capsule(position + axis * bone.radius, position + axis * tip, bone.radius, BODY_COLOR)
-            }
+            ragdoll.forEachBody { bone, position, rotation -> lines.shape(bone.shape, position, rotation, BODY_COLOR) }
         }
         poseStack.popPose()
 

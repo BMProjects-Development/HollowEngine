@@ -15,23 +15,26 @@ import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.client.render.CUSTOM_IMGUI_LIGHT_0
-import ru.hollowhorizon.hollowengine.client.render.CUSTOM_IMGUI_LIGHT_1
-import ru.hollowhorizon.hollowengine.client.render.OpenGLUtils
+import ru.hollowhorizon.hollowengine.client.render.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
+import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
+import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
+import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
+import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import kotlin.math.hypot
 import kotlin.math.min
 
 /**
@@ -70,6 +73,9 @@ class ModelViewerState(model: String) {
     var nodeVisibilityRevision by mutableStateOf(0)
         private set
 
+    var debugDraw: ((DebugLines.Batch) -> Unit)? = null
+    private var lastRect = UiRect.Zero
+
     val modelFlow: StateFlow<Model> get() = attachment.flow
 
     /** The model's runtime node hierarchy (roots), for inspection UIs. */
@@ -104,8 +110,10 @@ class ModelViewerState(model: String) {
         get() {
             val animation = currentAnimation ?: return 0f
             if (animation.duration <= 0f) return 0f
-            return ((instance.animator.layerTime(previewLayerId(animation.name)) ?: 0f) / animation.duration)
-                .coerceIn(0f, 1f)
+            return ((instance.animator.layerTime(previewLayerId(animation.name)) ?: 0f) / animation.duration).coerceIn(
+                    0f,
+                    1f
+                )
         }
 
     fun isPlaying(index: Int): Boolean = index in playing
@@ -113,17 +121,6 @@ class ModelViewerState(model: String) {
     /** Whether anything is still moving (auto-rotate, active playback, or a weight still fading). */
     fun isAnimating(): Boolean =
         autoRotate || playing.isNotEmpty() || animationWeights.values.any { it > ANIMATION_WEIGHT_EPSILON }
-
-    fun changeModel(model: String) {
-        this.model = model
-        instance = loadInstance(model)
-        selectedAnimation = 0
-        playing.clear()
-        animationWeights.clear()
-        animationContext.variables.clear()
-        configuredAnimationNames = emptyList()
-        animationWeightVariables = emptyList()
-    }
 
     fun selectAnimation(index: Int) {
         val count = animations.size
@@ -151,8 +148,48 @@ class ModelViewerState(model: String) {
         nodeVisibilityRevision++
     }
 
+    /**
+     * Where a point of the model lands on screen, relative to the panel.
+     */
+    fun project(point: Vec3f): Vec3f = MutableVec3f().also { viewMatrix().transform(point, 1f, it) }
+
+    /**
+     * The bones under the pointer, nearest first.
+     */
+    fun bonesAt(x: Float, y: Float, radius: Float = PICK_RADIUS): List<RuntimeNode> {
+        val matrix = viewMatrix()
+        val head = MutableVec3f()
+        val tail = MutableVec3f()
+
+        return SkeletonLayout.of(attachment).mapNotNull { bone ->
+                matrix.transform(bone.head, 1f, head)
+                matrix.transform(bone.tail, 1f, tail)
+                val distance = distanceToSegment(x, y, head, tail)
+                if (distance <= radius) bone.node to distance else null
+            }.sortedBy { it.second }.map { it.first }
+    }
+
+    private fun distanceToSegment(x: Float, y: Float, head: Vec3f, tail: Vec3f): Float {
+        val dx = tail.x - head.x
+        val dy = tail.y - head.y
+        val lengthSquared = dx * dx + dy * dy
+        if (lengthSquared < 1.0e-6f) return hypot(head.x - x, head.y - y)
+
+        val along = (((x - head.x) * dx + (y - head.y) * dy) / lengthSquared).coerceIn(0f, 1f)
+        return hypot(head.x + dx * along - x, head.y + dy * along - y)
+    }
+
+    private fun viewMatrix(): Mat4f {
+        val baseSize = min(lastRect.width, lastRect.height)
+        val scale = baseSize * zoom
+        return MutableMat4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
+            .scale(Vec3f(scale, -scale, scale)).rotate(pitch.deg, Vec3f.X_AXIS)
+            .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS)
+    }
+
     /** Renders the model into [rect] using [stack]; called from a `drawGl` block on the render thread. */
     fun render(rect: UiRect, stack: PoseStack) {
+        lastRect = rect
         if (autoRotate) yaw = (yaw + 20f * TickHandler.deltaFrameTime) % 360f
 
         val step = (TickHandler.deltaFrameTime / AnimBlendTime).coerceIn(0f, 1f)
@@ -175,8 +212,7 @@ class ModelViewerState(model: String) {
         fillAnimationVariables(animationContext, null, TickHandler.partialTick)
         animationContext.time = TickHandler.gameTime
         animations.indices.forEach { index ->
-            animationContext.variables[animationWeightVariables[index]] =
-                animationWeights[animations[index].name] ?: 0f
+            animationContext.variables[animationWeightVariables[index]] = animationWeights[animations[index].name] ?: 0f
         }
         instance.update(animationContext)
 
@@ -220,21 +256,23 @@ class ModelViewerState(model: String) {
         bounds?.let { (minCorner, maxCorner) ->
             OpenGLUtils.renderBoundingBox(stack, minCorner, maxCorner, Color.WHITE.withAlpha(0.75f))
         }
+
+        debugDraw?.let { draw ->
+            draw(DebugLines.batch(bufferSource, stack, DebugLines.PANEL))
+            bufferSource.endBatch(DebugLines.PANEL)
+        }
     }
 
     /** Rebuilds only when the loaded model's animation set changes, including resource hot reloads. */
     private fun configurePreviewAnimator(animations: List<AnimationClip>) {
-        if (animations.size == configuredAnimationNames.size &&
-            animations.indices.all { animations[it].name == configuredAnimationNames[it] }
-        ) return
+        if (animations.size == configuredAnimationNames.size && animations.indices.all { animations[it].name == configuredAnimationNames[it] }) return
 
         val names = animations.map { it.name }
         configuredAnimationNames = names
         animationWeightVariables = names.indices.map(::previewWeightVariable)
         animationContext.variables.clear()
         instance.animator.configure(
-            model = null,
-            animations = AnimationsComponent(
+            model = null, animations = AnimationsComponent(
                 clips = names.mapIndexed { index, animation ->
                     ClipAnimationLayerSpec(
                         id = previewLayerId(animation),
@@ -250,12 +288,11 @@ class ModelViewerState(model: String) {
 
     private fun loadInstance(model: String): ModelInstance = ModelInstance(
         try {
-            require(model.isValidRL()) { "Invalid model id: $model" }
-            ModelAttachment(model)
-        } catch (_: Exception) {
-            ModelAttachment(ModelLoader.FALLBACK_MODEL)
-        }
-    )
+        require(model.isValidRL()) { "Invalid model id: $model" }
+        ModelAttachment(model)
+    } catch (_: Exception) {
+        ModelAttachment(ModelLoader.FALLBACK_MODEL)
+    })
 
     companion object {
         private const val PREVIEW_FRONT_YAW = 180f
@@ -270,6 +307,8 @@ private fun previewWeightVariable(index: Int): String = "preview_animation_${ind
 private const val AnimBlendTime = 0.25f
 private const val ANIMATION_WEIGHT_EPSILON = 0.001f
 
+private const val PICK_RADIUS = 7f
+
 private const val ModelGridSpacing = 36f
 private val ModelGridColor = UiColor(0.62f, 0.7f, 0.85f, 0.14f)
 
@@ -283,15 +322,15 @@ fun Model(
     id: String? = null,
     tags: Iterable<String> = emptyList(),
     modifier: Modifier? = null,
+    onDrag: ((UiEvent) -> Boolean)? = null,
 ) {
     Box(
         id = id,
         tags = tags,
-        modifier = Modifier
-            .input(hoverable = true, draggable = true)
-            .cursor(UiCursorShape.HAND)
-            .onDrag { event ->
-                if (event.button == 1) {
+        modifier = Modifier.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).onDrag { event ->
+                if (onDrag?.invoke(event) == true) {
+                    event.consume()
+                } else if (event.button == 1) {
                     val scale = state.zoom.coerceAtLeast(0.0001f)
                     state.offsetX += event.deltaX / scale
                     state.offsetY += event.deltaY / scale
@@ -300,17 +339,14 @@ fun Model(
                     state.pitch = (state.pitch + event.deltaY / 3f).coerceIn(-90f, 90f)
                 }
                 event.consume()
-            }
-            .onScroll { event ->
+            }.onScroll { event ->
                 val factor = if (event.scrollY > 0f) 0.9f else 1.1f
                 state.zoom = (state.zoom * factor).coerceIn(0.1f, 10f)
                 event.consume()
-            }
-            .drawBehind(key = state) {
+            }.drawBehind(key = state) {
                 if (state.showGrid) drawGrid(state)
                 drawGl { state.render(rect, poseStack) }
-            }
-            .then(modifier ?: Modifier),
+            }.then(modifier ?: Modifier),
     )
 }
 

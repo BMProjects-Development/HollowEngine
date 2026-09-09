@@ -1,4 +1,8 @@
 {
+  "bone.none": "not set",
+  "bone.search": "Find a bone",
+  "bone.clear": "Leave it unset",
+  "bone.no_matches": "No bone by that name.",
   "add": "Add",
   "add_component": "Add component",
   "all_added": "Every component is already here",

@@ -142,13 +142,15 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         val supportedFormats = loaders.flatMap { it.supportedFormats }.toSet()
         metadata.clear()
 
-        manager.listResources("models") { path ->
+        val models = manager.listResources("models") { path ->
             path.path.substringAfter('.') in supportedFormats
-        }.keys.forEach { location ->
+        }.keys
+        models.forEach { location ->
             val resource = manager.getResource(location.withSuffix(".hemeta")).orElse(null) ?: return@forEach
             val source = runCatching { resource.open().use { it.readBytes().decodeToString() } }.getOrDefault("")
             metadata[location] = ModelMetadata.parse(source, location.toString())
         }
+        RigAssets.reload(manager, models)
 
         return metadata.filterValues(ModelMetadata::preload).keys
     }

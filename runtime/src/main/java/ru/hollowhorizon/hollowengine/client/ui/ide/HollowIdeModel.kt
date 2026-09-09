@@ -177,6 +177,20 @@ internal class HollowIdeModel(
         return if (path in selectedTreePaths) selectedTreePaths.toList() else listOf(path)
     }
 
+    /**
+     * Writes [bytes] to [path] unless something is already there.
+     */
+    fun createIfMissing(path: String, bytes: ByteArray): Boolean {
+        val file = path.fromReadablePath()
+        if (file.isFile) return true
+
+        return runCatching {
+            file.parentFile?.mkdirs()
+            writeIdeFile(file.toPath(), bytes)
+            tree.refresh()
+        }.isSuccess
+    }
+
     fun createFile(parentPath: String, name: String): HollowIdeFileOperationResult {
         val cleanName = name.trim().replace('\\', '/').trim('/')
         if (cleanName.isBlank()) return HollowIdeFileOperationResult.InvalidName

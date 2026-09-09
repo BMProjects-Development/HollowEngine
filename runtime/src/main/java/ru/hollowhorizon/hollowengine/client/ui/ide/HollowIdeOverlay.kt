@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeSoundsEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeConsolePanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeUiProfilerPanel
@@ -89,6 +90,7 @@ object HollowIdeOverlay {
             },
             soundsEditor = { file -> HollowIdeSoundsEditor(file) },
             animatorEditor = { file -> HollowIdeAnimatorEditor(file) },
+            rigEditor = { file -> RigEditorPanel(file) },
             textEditor = { file -> FileEditor(file) },
         )
         registerAssetFileTypes(
@@ -203,6 +205,10 @@ object HollowIdeOverlay {
         openFileDockItem(result.file)
         return true
     }
+
+    /** Opens [path], starting it from [initial] when there is no such file yet. */
+    fun openOrCreate(path: String, initial: () -> ByteArray): Boolean =
+        model.createIfMissing(path, initial()) && openPath(path)
 
     /** While Windows owns the gesture the IDE must not act on the input it keeps receiving. */
     private val nativeFileDragActive: Boolean

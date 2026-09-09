@@ -1,0 +1,23 @@
+{
+  "parameters": "Параметры",
+  "section_bone": "Кость",
+  "name": "Имя",
+  "alias": "Алиас",
+  "visible": "видима",
+  "hidden": "скрыта",
+  "bones": "Кости",
+  "no_bones": "У этой модели нет костей.",
+  "add_attachment": "+ Прикрепить",
+  "remove_attachment": "Удалить",
+  "unknown_attachment": "Это из аддона, который не загружен. Сохраняется как есть и ничего не делает.",
+  "no_attachment_editor": "Этот вид attachment'ов здесь показать нельзя.",
+  "unknown_kind": "Неизвестно",
+  "toggle_skeleton": "Показать скелет",
+  "toggle_colliders": "Показать коллайдеры",
+  "start_physics": "Уронить риг и посмотреть, что будет",
+  "stop_physics": "Остановить симуляцию",
+  "kind_item": "Предмет",
+  "kind_rigid_body": "Физическое тело",
+  "kind_joint": "Сустав",
+  "generate_ragdoll": "Построить тела по геометрии модели"
+}

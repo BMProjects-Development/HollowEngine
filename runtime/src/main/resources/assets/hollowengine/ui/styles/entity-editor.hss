@@ -295,6 +295,16 @@
     font-size: 9px;
 }
 
+.ee-help {
+    size: 9px 9px;
+    opacity: 0.45;
+    cursor: hand;
+}
+
+.ee-help:hover {
+    opacity: 1;
+}
+
 .ee-hint {
     size: 100% fit;
     foreground: #5F6677;
@@ -631,4 +641,34 @@
 .ee-busy {
     size: 14px 14px;
     tint: #D77F1C;
+}
+
+.ee-bone {
+    padding: 4px 6px;
+    gap: 4px;
+    background: #16181C;
+    border-radius: 4px;
+    border: 1px #31343D;
+    foreground: #C4CBDA;
+    transition: border 140ms ease-out;
+}
+
+.ee-bone:hover { border: 1px #D77F1C; }
+
+.ee-bone.empty .ee-bone-label { foreground: #5F6677; }
+
+.ee-bone-label {
+    font-size: 9px;
+}
+
+.ee-bone-popup {
+    size: 190px fit;
+    max-height: 220px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.ee-bone-list {
+    size: 100% fit;
+    max-height: 180px;
 }

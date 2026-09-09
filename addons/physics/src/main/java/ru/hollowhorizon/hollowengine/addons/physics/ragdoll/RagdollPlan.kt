@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.physics.ragdoll
 
+import ru.hollowhorizon.hollowengine.addons.physics.rig.*
 import ru.hollowhorizon.hollowengine.addons.physics.rotatedInverse
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
@@ -17,15 +18,17 @@ class RagdollBone(
     val modelParent: Int?,
     val bindPosition: Vec3f,
     val bindRotation: QuatF,
-    val axis: Vec3f,
-    val length: Float,
-    val radius: Float,
+    val shape: RagdollShape,
+    /** Where joint to the parent sits on this bone, in the bone's own space. */
+    val pivot: Vec3f,
     val density: Float,
-    val twistAngle: Float,
-    val swingAngle: Float,
+    /** How this body gets on with other bodies of rig; see [BodyCollision]. */
+    val collision: BodyCollision,
+    /** How far this bone may move relative to its parent; see [JointLimits]. */
+    val limits: JointLimits,
 ) {
-    /** Where the capsule's center of mass sits relative to the joint, in the bone's own space. */
-    val centreOfMass: Vec3f = axis * (length * 0.5f)
+    /** Where the body's center of mass sits relative to the joint, in the bone's own space. */
+    val centreOfMass: Vec3f get() = shape.center
 }
 
 /**
@@ -43,22 +46,62 @@ class RagdollPlan(
          * [allowed] is what remains after applying the layer mask, so a controller responsible only for the upper body
          * passes only the upper body to the physics system.
          *
-         * Returns null if there is nothing left to simulate: an empty mask, a nonexistent root bone,
-         * or a model that has no skeleton at all.
+         * Returns null if there is nothing left to simulate.
          */
         fun build(target: PoseTarget, spec: RagdollStateSpec, allowed: Set<Int>): RagdollPlan? {
             val order = walkParentsFirst(target)
             if (order.isEmpty()) return null
 
+            val bindGlobals = bindGlobalsOf(order)
+            return fromRig(order, bindGlobals, allowed) ?: fromSkeleton(target, spec, order, bindGlobals, allowed)
+        }
+
+        private fun fromRig(
+            order: List<RuntimeNode>,
+            bindGlobals: Map<Int, Mat4f>,
+            allowed: Set<Int>,
+        ): RagdollPlan? {
+            val bodies = order.filter { it.definition.index in allowed && it.rigidBody() != null }
+            if (bodies.isEmpty()) return null
+
+            val byName = bodies.associateBy { it.name }
+            val parents = bodies.associateWith { node -> node.physicalParent(byName, bodies.toSet()) }
+            val sorted = parentsFirst(bodies, parents)
+
+            val positionByNode = HashMap<Int, Int>(sorted.size)
+            sorted.forEachIndexed { position, node -> positionByNode[node.definition.index] = position }
+
+            val bones = sorted.mapIndexed { position, node ->
+                val body = requireNotNull(node.rigidBody()).spec
+                val joint = node.joint()?.spec
+                val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
+
+                RagdollBone(
+                    nodeIndex = node.definition.index,
+                    name = node.name,
+                    parent = parents[node]?.let { positionByNode[it.definition.index] ?: -1 } ?: -1,
+                    modelParent = node.parentNode()?.definition?.index,
+                    bindPosition = bindPosition,
+                    bindRotation = bindRotation,
+                    shape = RagdollShape.of(body.shape),
+                    pivot = joint?.pivot?.toVec3f() ?: Vec3f.ZERO,
+                    density = body.density,
+                    collision = body.collision,
+                    limits = joint?.limits ?: JointLimits.FIXED,
+                ).also { check(it.parent < position) { "Bone ${it.name} is ordered before its parent" } }
+            }
+            return RagdollPlan(bones, order)
+        }
+
+        private fun fromSkeleton(
+            target: PoseTarget,
+            spec: RagdollStateSpec,
+            order: List<RuntimeNode>,
+            bindGlobals: Map<Int, Mat4f>,
+            allowed: Set<Int>,
+        ): RagdollPlan? {
             val root = spec.rootBone?.let { target.node(it) }
             if (spec.rootBone != null && root == null) return null
-
-            val bindGlobals = HashMap<Int, Mat4f>(order.size)
-            order.forEach { node ->
-                val local = node.definition.baseTransform.matrixF
-                val parent = node.parentNode()?.let { bindGlobals[it.definition.index] }
-                bindGlobals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: local
-            }
 
             val chosenByHand = root != null || allowed.size < target.nodesByIndex.size
             val candidates = if (chosenByHand) target.nodesByIndex.keys else boneNodes(target)
@@ -85,10 +128,7 @@ class RagdollPlan(
             boneByNode: Map<Int, Int>,
         ): RagdollBone {
             val overrides = spec.boneSpec(node.name)
-            val global = bindGlobals.getValue(node.definition.index)
-            val bindPosition = MutableVec3f()
-            val bindRotation = MutableQuatF()
-            global.decompose(bindPosition, bindRotation, null)
+            val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
 
             val children =
                 node.children.filter { boneByNode.containsKey(it.definition.index) }.ifEmpty { node.children }
@@ -104,7 +144,7 @@ class RagdollPlan(
             val inBoneSpace = towards.rotatedInverse(bindRotation)
             val measured = inBoneSpace.length()
             val length = if (measured > MIN_BONE_LENGTH) measured else spec.leafBoneLength
-            val axis = if (measured > MIN_BONE_LENGTH) inBoneSpace.normed() else Vec3f.Y_AXIS
+            val axis = if (measured > MIN_BONE_LENGTH) Vec3f(inBoneSpace.normed()) else Vec3f.Y_AXIS
 
             val radius =
                 overrides?.radius ?: (length * spec.boneRadiusRatio).coerceIn(spec.minBoneRadius, spec.maxBoneRadius)
@@ -114,14 +154,17 @@ class RagdollPlan(
                 name = node.name,
                 parent = node.simulatedAncestor(boneByNode),
                 modelParent = node.parentNode()?.definition?.index,
-                bindPosition = Vec3f(bindPosition),
-                bindRotation = QuatF(bindRotation),
-                axis = Vec3f(axis),
-                length = length,
-                radius = radius.coerceAtLeast(spec.minBoneRadius),
+                bindPosition = bindPosition,
+                bindRotation = bindRotation,
+                shape = RagdollShape.alongBone(axis, length, radius.coerceAtLeast(spec.minBoneRadius)),
+                pivot = Vec3f.ZERO,
                 density = overrides?.density ?: spec.density,
-                twistAngle = overrides?.twistAngle ?: spec.twistAngle,
-                swingAngle = overrides?.swingAngle ?: spec.swingAngle,
+                collision = BodyCollision(),
+                limits = JointLimits(
+                    x = AxisLimit.of(overrides?.twistAngle ?: spec.twistAngle),
+                    y = AxisLimit.of(overrides?.swingAngle ?: spec.swingAngle),
+                    z = AxisLimit.of(overrides?.swingAngle ?: spec.swingAngle),
+                ),
             ).also { check(it.parent < position) { "Bone ${it.name} is ordered before its parent" } }
         }
 
@@ -139,6 +182,23 @@ class RagdollPlan(
 
         private const val MODEL_ROOT = 0
 
+        private fun bindGlobalsOf(order: List<RuntimeNode>): Map<Int, Mat4f> {
+            val bindGlobals = HashMap<Int, Mat4f>(order.size)
+            order.forEach { node ->
+                val local = node.definition.baseTransform.matrixF
+                val parent = node.parentNode()?.let { bindGlobals[it.definition.index] }
+                bindGlobals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: local
+            }
+            return bindGlobals
+        }
+
+        private fun Map<Int, Mat4f>.decomposeOf(node: RuntimeNode): Pair<Vec3f, QuatF> {
+            val position = MutableVec3f()
+            val rotation = MutableQuatF()
+            getValue(node.definition.index).decompose(position, rotation, null)
+            return Vec3f(position) to QuatF(rotation)
+        }
+
         private fun walkParentsFirst(target: PoseTarget): List<RuntimeNode> {
             val nodes = target.nodesByIndex.values
             val depths = HashMap<Int, Int>(nodes.size)
@@ -150,11 +210,44 @@ class RagdollPlan(
             return nodes.sortedBy(::depth)
         }
 
+        private fun parentsFirst(
+            bodies: List<RuntimeNode>,
+            parents: Map<RuntimeNode, RuntimeNode?>,
+        ): List<RuntimeNode> {
+            val sorted = ArrayList<RuntimeNode>(bodies.size)
+            val placed = HashSet<RuntimeNode>(bodies.size)
+            val visiting = HashSet<RuntimeNode>()
+
+            fun place(node: RuntimeNode) {
+                if (node in placed || node in visiting) return
+                visiting += node
+                parents[node]?.let(::place)
+                visiting -= node
+                if (placed.add(node)) sorted += node
+            }
+
+            bodies.forEach(::place)
+            return sorted
+        }
+
         private const val MIN_BONE_LENGTH = 1.0e-4f
     }
 }
 
 private fun RuntimeNode.parentNode(): RuntimeNode? = parent as? RuntimeNode
+
+private fun RuntimeNode.physicalParent(byName: Map<String, RuntimeNode>, bodies: Set<RuntimeNode>): RuntimeNode? {
+    joint()?.spec?.parent?.takeIf { it.isNotBlank() }?.let { named ->
+        return byName[named]?.takeIf { it !== this }
+    }
+
+    var current = parentNode()
+    while (current != null) {
+        if (current in bodies) return current
+        current = current.parentNode()
+    }
+    return null
+}
 
 private fun RuntimeNode.isUnder(ancestor: RuntimeNode): Boolean {
     var current: RuntimeNode? = this
@@ -173,4 +266,3 @@ private fun RuntimeNode.simulatedAncestor(boneByNode: Map<Int, Int>): Int {
     }
     return -1
 }
-

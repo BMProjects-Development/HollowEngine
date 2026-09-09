@@ -34,6 +34,16 @@
     background: #FFFFFF14;
 }
 
+.animator-icon-button.active {
+    background: #D77F1C33;
+    border: 1px #D77F1C;
+    tint: #E9A44A;
+}
+
+.animator-icon-button.active:hover {
+    background: #D77F1C4D;
+}
+
 .animator-pill {
     padding: 5px 3px;
     background: #2E323C;

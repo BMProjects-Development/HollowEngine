@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
@@ -44,6 +45,7 @@ internal val TagModule
         VirtualComponentRegistry.registerSerializers(this)
         AnimatorLayerTypes.registerInto(this)
         AnimatorStateTypes.registerInto(this)
+        RigAttachmentTypes.registerInto(this)
 
         polymorphic(Tag::class) {
             subclass(ByteTag::class, ForByteNBT)

@@ -13,7 +13,7 @@ import ru.hollowhorizon.hollowengine.client.utils.vertex
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import java.util.OptionalDouble
+import java.util.*
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -23,8 +23,11 @@ import kotlin.math.sin
  */
 @ClientOnly
 object DebugLines {
-    val OVERLAY: RenderType = RenderType.create(
-        "hollowengine:debug_overlay_lines",
+    val OVERLAY: RenderType = overlayLines("hollowengine:debug_overlay_lines", RenderStateShard.ITEM_ENTITY_TARGET)
+    val PANEL: RenderType = overlayLines("hollowengine:debug_panel_lines", RenderStateShard.MAIN_TARGET)
+
+    private fun overlayLines(name: String, target: RenderStateShard.OutputStateShard) = RenderType.create(
+        name,
         DefaultVertexFormat.POSITION_COLOR_NORMAL,
         VertexFormat.Mode.LINES,
         1536,
@@ -35,15 +38,15 @@ object DebugLines {
             .setLineState(RenderStateShard.LineStateShard(OptionalDouble.of(2.0)))
             .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
             .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-            .setOutputState(RenderStateShard.ITEM_ENTITY_TARGET)
+            .setOutputState(target)
             .setWriteMaskState(RenderStateShard.COLOR_WRITE)
             .setCullState(RenderStateShard.NO_CULL)
             .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
             .createCompositeState(false),
     )
 
-    fun batch(buffers: MultiBufferSource, poseStack: PoseStack): Batch =
-        Batch(buffers.getBuffer(OVERLAY), poseStack.last())
+    fun batch(buffers: MultiBufferSource, poseStack: PoseStack, type: RenderType = OVERLAY): Batch =
+        Batch(buffers.getBuffer(type), poseStack.last())
 
     class Batch(private val consumer: VertexConsumer, private val pose: PoseStack.Pose) {
         fun line(start: Vec3f, end: Vec3f, color: Int) {
@@ -99,18 +102,64 @@ object DebugLines {
             halfCircle(end, axis, forward, radius, color)
         }
 
-        fun ring(centre: Vec3f, normal: Vec3f, radius: Float, color: Int) {
-            val right = perpendicular(normal, Vec3f.Y_AXIS)
-            val forward = normal.cross(right, MutableVec3f()).norm()
-            arc(centre, right, forward, radius, TAU, RING_SEGMENTS, color)
+        fun box(center: Vec3f, x: Vec3f, y: Vec3f, z: Vec3f, color: Int) {
+            val corners = List(CORNERS) { index ->
+                center + x * index.sign(X_BIT) + y * index.sign(Y_BIT) + z * index.sign(Z_BIT)
+            }
+            corners.indices.forEach { from ->
+                listOf(X_BIT, Y_BIT, Z_BIT).forEach { bit ->
+                    if (from and bit == 0) line(corners[from], corners[from or bit], color)
+                }
+            }
         }
 
-        private fun halfCircle(centre: Vec3f, over: Vec3f, across: Vec3f, radius: Float, color: Int) {
-            arc(centre, across, over, radius, TAU / 2f, CAP_SEGMENTS, color)
+        fun sphere(center: Vec3f, radius: Float, color: Int) {
+            ring(center, Vec3f.X_AXIS, radius, color)
+            ring(center, Vec3f.Y_AXIS, radius, color)
+            ring(center, Vec3f.Z_AXIS, radius, color)
+        }
+
+        private fun Int.sign(bit: Int): Float = if (this and bit == 0) -1f else 1f
+
+        fun ring(center: Vec3f, normal: Vec3f, radius: Float, color: Int) {
+            val right = perpendicular(normal, Vec3f.Y_AXIS)
+            val forward = normal.cross(right, MutableVec3f()).norm()
+            arc(center, right, forward, radius, TAU, RING_SEGMENTS, color)
+        }
+
+        fun sector(
+            center: Vec3f,
+            axis: Vec3f,
+            zero: Vec3f,
+            from: Float,
+            to: Float,
+            radius: Float,
+            color: Int,
+        ) {
+            val start = perpendicular(axis, zero)
+            val across = axis.cross(start, MutableVec3f()).norm()
+            val begin = from * RADIANS
+            val sweep = ((to - from) * RADIANS).coerceIn(-TAU, TAU)
+
+            fun at(angle: Float) = center + start * (cos(angle) * radius) + across * (sin(angle) * radius)
+
+            line(center, at(begin), color)
+            line(center, at(begin + sweep), color)
+
+            var previous = at(begin)
+            (1..SECTOR_SEGMENTS).forEach { step ->
+                val point = at(begin + sweep * step / SECTOR_SEGMENTS)
+                line(previous, point, color)
+                previous = point
+            }
+        }
+
+        private fun halfCircle(center: Vec3f, over: Vec3f, across: Vec3f, radius: Float, color: Int) {
+            arc(center, across, over, radius, TAU / 2f, CAP_SEGMENTS, color)
         }
 
         private fun arc(
-            centre: Vec3f,
+            center: Vec3f,
             from: Vec3f,
             towards: Vec3f,
             radius: Float,
@@ -118,10 +167,10 @@ object DebugLines {
             segments: Int,
             color: Int,
         ) {
-            var previous = centre + from * radius
+            var previous = center + from * radius
             (1..segments).forEach { step ->
                 val angle = step * sweep / segments
-                val point = centre + from * (cos(angle) * radius) + towards * (sin(angle) * radius)
+                val point = center + from * (cos(angle) * radius) + towards * (sin(angle) * radius)
                 line(previous, point, color)
                 previous = point
             }
@@ -142,9 +191,16 @@ object DebugLines {
 
     private fun fallbackFor(axis: Vec3f): Vec3f = if (abs(axis.y) < 0.9f) Vec3f.Y_AXIS else Vec3f.X_AXIS
 
+    private const val X_BIT = 1
+    private const val Y_BIT = 2
+    private const val Z_BIT = 4
+    private const val CORNERS = 8
+
     private const val EPSILON = 1.0e-6f
     private const val TAU = 2f * Math.PI.toFloat()
     private const val RING_SEGMENTS = 12
+    private const val SECTOR_SEGMENTS = 16
+    private const val RADIANS = (Math.PI / 180.0).toFloat()
     private const val CAP_SEGMENTS = 6
 
     private const val BONE_SHOULDER = 0.15f

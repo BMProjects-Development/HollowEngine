@@ -52,10 +52,12 @@ internal object RagdollPose {
         val translation = MutableVec3f()
         val rotation = MutableQuatF()
 
+        val drawn = drawnGlobals(plan, simulated, animated)
+
         plan.bones.forEach { bone ->
             val global = simulated[bone.nodeIndex] ?: return@forEach
             val node = target.nodesByIndex[bone.nodeIndex] ?: return@forEach
-            val local = localOf(bone, global, simulated, animated) ?: return@forEach
+            val local = localOf(bone, global, drawn) ?: return@forEach
             local.decompose(translation, rotation, null)
 
             val base = node.definition.baseTransform
@@ -66,13 +68,39 @@ internal object RagdollPose {
         return pose
     }
 
-    private fun localOf(
-        bone: RagdollBone,
-        global: Mat4f,
+    /**
+     * Where each node will end up after the renderer applies the pose and reorganizes the hierarchy.
+     */
+    private fun drawnGlobals(
+        plan: RagdollPlan,
         simulated: Map<Int, Mat4f>,
         animated: Map<Int, Mat4f>,
-    ): Mat4f? {
-        val parent = bone.modelParent?.let { simulated[it] ?: animated[it] } ?: return global
+    ): Map<Int, Mat4f> {
+        val drawn = HashMap<Int, Mat4f>(plan.order.size)
+
+        plan.order.forEach { node ->
+            val index = node.definition.index
+            simulated[index]?.let { drawn[index] = it; return@forEach }
+
+            val parent = node.parent as? RuntimeNode
+            val parentDrawn = parent?.definition?.index?.let { drawn[it] }
+            val local = localInPose(node, parent, animated)
+            drawn[index] = parentDrawn?.mul(local, MutableMat4f()) ?: local
+        }
+        return drawn
+    }
+
+    private fun localInPose(node: RuntimeNode, parent: RuntimeNode?, animated: Map<Int, Mat4f>): Mat4f {
+        val global = animated[node.definition.index] ?: return node.definition.baseTransform.matrixF
+        val parentGlobal = parent?.definition?.index?.let { animated[it] } ?: return global
+
+        val inverse = MutableMat4f().set(parentGlobal)
+        if (!inverse.invert()) return node.definition.baseTransform.matrixF
+        return inverse.mul(global, MutableMat4f())
+    }
+
+    private fun localOf(bone: RagdollBone, global: Mat4f, drawn: Map<Int, Mat4f>): Mat4f? {
+        val parent = bone.modelParent?.let { drawn[it] } ?: return global
 
         val inverse = MutableMat4f().set(parent)
         if (!inverse.invert()) return null
