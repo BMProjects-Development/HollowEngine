@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/0mods/HollowEngineDocumentation/refs/heads/master/static/img/headers/welcome2.webp"
+  <img src="https://raw.githubusercontent.com/HollowHorizon/HollowEngine/refs/heads/dev/docs/assets/titles/welcome.webp"
        style="background-color: #110E11; padding: 0 20%; width: 100%; box-sizing: border-box;" alt="Logo">
   <h1 align="center">Hollow Engine</h1>
 </p>
