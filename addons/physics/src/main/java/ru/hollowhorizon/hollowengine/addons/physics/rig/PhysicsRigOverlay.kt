@@ -53,7 +53,7 @@ object PhysicsRigOverlay : RigOverlay {
             if (limit.isLocked) return@forEachIndexed
 
             lines.sector(
-                centre = origin,
+                center = origin,
                 axis = axis.rotated(rotation),
                 zero = AXES[(index + 1) % AXES.size].rotated(rotation),
                 from = limit.min,
