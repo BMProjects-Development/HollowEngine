@@ -13,7 +13,12 @@ The resulting platform artifacts are collected in `build/addon-jars/`:
 - `*-fabric.jar` is remapped to Fabric's intermediary namespace.
 - `*-neoforge.jar` uses the official namespace used by NeoForge.
 
-Copy the artifact for the active loader to the game's `hollowengine/addons/` directory. The runtime watches this directory and reloads changed jars.
+Copy the artifact for the active loader to either of these directories:
+
+- `mods/` - the usual choice for distributed addons and modpacks;
+- `hollowengine/addons/`- useful during development or when you want to keep addons separate from mods.
+
+The runtime scans and watches both directories. If the same addon id is present in both at startup, the newest version wins; when the versions are equal, the copy in `hollowengine/addons/` has priority. Do not keep duplicate copies unless you are deliberately testing version selection.
 
 Runtime diagnostics and lifecycle controls are available to operators:
 

@@ -49,7 +49,7 @@ HollowEngine is a content creation engine for Minecraft. It combines Kotlin scri
 ## Quick Start
 
 1. Install the HollowEngine jar into your `mods/` folder. One jar covers both Fabric and NeoForge.
-2. If you use the compiler, install `HollowEngineCompiler-*.jar` as well. Addons work from `mods/` like any other mod, or from `hollowengine/addons/` if you prefer to keep them apart.
+2. If you use scripting, install `HollowEngineCompiler-*.jar` as well. Addons work from `mods/` like any other mod, or from `hollowengine/addons/` if you prefer to keep them apart. If both folders contain the same addon id, the newest version is selected at startup.
 3. Start Minecraft.
 4. Open the in-game editor and begin creating content.
 

@@ -10,6 +10,8 @@ with an independent simulation. They work without a loaded world. Positions and 
 pixels, velocities use pixels per second, and lifetimes use seconds. Vanilla world physics,
 block collisions, world lighting and particle-provider side effects are not executed.
 
+## Background
+
 ```kotlin
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -33,14 +35,22 @@ fun SmokePanel() {
 }
 ```
 
-`particleBackground` draws above the styled background and below content. Within
-`Modifier.drawBehind` or `Modifier.draw`, call `drawParticles(system, rect = bounds)`.
+`particleBackground` draws above the styled background and below content. Create a separate
+system for each independent area. Remember emitter definitions and callbacks; changing the
+definitions passed to `rememberUiParticleSystem` starts a new simulation.
+
+## `drawBehind` and `draw`
+
+Within `Modifier.drawBehind` or `Modifier.draw`, call `drawParticles(system, rect = bounds)`.
 The rectangle is node-local. Sprites and their UVs are cropped to that rectangle before
 applying node transforms. Parent clipping, opacity and framebuffer filters use the normal
 UI renderer. Use node `clip`/`clipShape` for an additional shaped boundary.
 
-Create a separate system for each independent area. Remember emitter definitions and callbacks;
-changing the definitions passed to `rememberUiParticleSystem` starts a new simulation.
+```kotlin
+Modifier.drawBehind(smoke) {
+    drawParticles(smoke, UiRect(8f, 8f, size.width - 16f, size.height - 16f))
+}
+```
 
 ## Emitter configuration
 

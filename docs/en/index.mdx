@@ -15,23 +15,29 @@ hidden: false
 HollowEngine is a full-featured platform for creating content within Minecraft:
 
 - Internal IDE on top of the game client;
-- Katari scripts `.ktr` with support for asynchronous code, interaction with the game world, and script state saving;
+- Kotlin scripts (`.kts`) with coroutines, access to the game world, and persistent script state;
 - NPCs, 3D models, animation controllers, and highly customizable light sources;
 
 ## Installation
 
-Currently, NeoForge and Fabric are supported for version 1.21.1; no additional mods are required.
-The latest versions of the mod are available on [GitHub](https://github.com/HollowHorizon/HollowEngine/releases/tag/latest-1.21.1).
+HollowEngine supports NeoForge and Fabric for Minecraft 1.21.1. The latest release is available on [GitHub](https://github.com/HollowHorizon/HollowEngine/releases/tag/latest-1.21.1).
+
+Install the HollowEngine jar into the regular `mods` folder. To write or compile scripts, also install the `HollowEngineCompiler` addon from the same release.
+
+Addons can be placed either in `mods` beside HollowEngine or in `hollowengine/addons`. The engine scans both directories. If both contain the same addon id, the newest version is selected at startup; when versions match, the copy in `hollowengine/addons` has priority.
 
 ## Where should I start?
 
 If this is your first time opening the mod, you may have already noticed the gear icon in the upper-left corner of the screen. Clicking it will open the mod’s main panel, which contains several tabs:
+
 - File: A section with useful functions, such as opening the mod folder and reloading client and server resources.
 - Windows: A section with various engine windows; this is where the engine’s main functionality is located: Project Files, Cutscenes, Editors, etc.
 - Tools: A section with auxiliary functions; currently, it only includes model transformation controls.
 - Help: A section with useful information, such as links to the project community or documentation.
 
-For project files and resource paths, start with [Assets](/docs/hollowengine/assets). It explains where to put models, UI layouts, HSS styles, textures, sounds, and scripts.
+![HollowEngine IDE workspace](/hollowengine/pictures/ide/workspace.webp)
+
+Read [Working with the IDE](/docs/hollowengine/ide) for the toolbar, project tree, editor, search, docking, and recovery of a hidden toolbar. For project files and resource paths, continue with [Assets](/docs/hollowengine/assets).
 
 ## Work directory
 
@@ -46,7 +52,8 @@ hollowengine/
 │  ├─ hollowengine/     # Resources for HollowEngine
 │  └─ project/          # Resources for project with mod id project
 ├─ scripts/           # Directory for your scripts
-│  └─ example.ktr       # Example script name
+│  └─ example.kts       # Example script name
+└─ addons/            # Optional directory for HollowEngine addons
 ```
 
 Script paths are relative to `hollowengine/scripts/`. Resource files are referenced through resource locations such as `project:models/npc.gltf`, which points to `hollowengine/assets/project/models/npc.gltf`.

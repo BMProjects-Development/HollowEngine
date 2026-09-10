@@ -7,8 +7,6 @@ order: 8
 
 *Небольшие вспомогательные функции для `NpcEntity`, которые не относятся к более крупной теме.*
 
-![NPC Methods](/docs/title-npc-methods.webp)
-
 ---
 
 Про движение, взгляд, использование блоков и взаимодействие с сущностями смотри [Движение и взаимодействие](/docs/hollowengine/scripting/npc/movement).
@@ -144,3 +142,13 @@ namedStick.set(DataComponents.CUSTOM_NAME, "Magic Stick".literal)
 ```kotlin
 val id = uuid("00000000-0000-0000-0000-000000000000")
 ```
+
+---
+
+## Что больше не считается основным API
+
+Старые методы из Katari/block-документации - например, `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)` и отдельные обёртки `attack(...)` не относятся к основному API v2.3.
+
+- Для анимаций используй [`play`](/docs/hollowengine/scripting/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- Для предметов в руках используй Minecraft API `setItemInHand(...)` или [`equip`](/docs/hollowengine/scripting/npc/inventory).
+- Для внешнего вида используй [`entity.materials`](/docs/hollowengine/scripting/models).

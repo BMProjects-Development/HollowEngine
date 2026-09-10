@@ -1,0 +1,93 @@
+---
+title: Working with the IDE
+order: 4
+---
+
+<center><h1>Working with the IDE</h1></center>
+
+*Open project files, arrange tools, edit scripts, and recover the toolbar if it was hidden.*
+
+## Opening and arranging the workspace
+
+The HollowEngine logo in the upper-left corner controls the IDE overlay. Left-click it to expand or collapse the workspace. The expanded toolbar contains four menus:
+
+- **File** - project folder and resource reload actions;
+- **Windows** - Project, Asset Manager, Console, Cutscenes, editors, and other panels;
+- **Tools** - model transformation and other context tools;
+- **Help** - documentation and community links.
+
+Panels open as docked tabs. Drag a tab to rearrange the workspace, drop it near an edge to split the area, or drag separators to resize neighboring panels. `Ctrl + W` closes the focused tab.
+
+![IDE workspace and docking](/hollowengine/pictures/ide/workspace.webp)
+
+## Project tree
+
+Open **Windows > Project** to browse the `hollowengine` work directory. A double-click opens a supported file. Right-click a file or folder for create, rename, copy, move, delete, and **Show in Explorer** actions. Files can also be dragged between project folders or imported from the operating system.
+
+When the Project panel is focused, these shortcuts are available:
+
+| Shortcut                           | Action                        |
+|------------------------------------|-------------------------------|
+| `Ctrl + F`                         | Open the folder / file filter |
+| `Ctrl + C`, `Ctrl + X`, `Ctrl + V` | Copy, cut, and paste          |
+| `F2`                               | Rename the selected path      |
+| `Delete`                           | Delete the selection          |
+| `Alt + Insert`                     | Create a file                 |
+| `Alt + Shift + Insert`             | Create a folder               |
+
+![Project tree and context menu](/hollowengine/pictures/ide/project-tree.webp)
+
+## Code editor
+
+Opening `.kts`, `.story`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics are shown in the editor and in a resizable problems panel.
+
+Useful editor shortcuts:
+
+| Shortcut           | Action                                                                    |
+|--------------------|---------------------------------------------------------------------------|
+| `Ctrl + S`         | Save the focused file                                                     |
+| `Ctrl + F`         | Find in the focused file                                                  |
+| `Ctrl + R`         | Find and replace                                                          |
+| `F3`, `Shift + F3` | Next or previous match                                                    |
+| `F4`               | Go to definition                                                          |
+| `Ctrl + Alt + L`   | Format the focused file                                                   |
+| `Ctrl + N`         | Search across the project; selected editor text becomes the initial query |
+
+![Completion and diagnostics in the code editor](/hollowengine/pictures/ide/code-editor.webp)
+
+## Reloading changes
+
+Saving a file writes it to the `hollowengine` directory. What must be reloaded depends on the file:
+
+- use **File > Reload Client Resources** or `F3 + T` for models, textures, HSS, UI declarations, and other client resources;
+- use **File > Reload Server Resources** or `/reload` for datapack content and reloadable server scripts;
+- ordinary `.kts` scripts are started explicitly with `/hollowengine scripting run <path>`.
+
+The compiler addon is required to compile edited scripts. A modpack can instead ship scripts that were compiled ahead of time.
+
+## Collapsing and hiding the toolbar
+
+Left-clicking the HollowEngine logo only collapses the workspace; the logo remains available and another left-click opens it again.
+
+Right-clicking the logo opens visibility options:
+
+- **Show always** - keep the logo available;
+- **Collapse** - close the workspace but keep the logo;
+- **Hide** - disable the logo and toolbar;
+- **Show only in chat menu** - show the logo while chat is open.
+
+The **Hide** action asks for confirmation and explains how to recover the toolbar. Select **Don't show again** only if you do not want this warning on later hides.
+
+![Toolbar visibility menu and hide confirmation](/hollowengine/pictures/ide/toolbar-visibility.webp)
+
+If the toolbar is already hidden, open `config/hollowengine.toml` and set:
+
+```toml
+edit_mode = "ENABLED"
+```
+
+To restore the confirmation dialog as well, set:
+
+```toml
+show_toolbar_hide_confirmation = true
+```
