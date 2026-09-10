@@ -296,6 +296,62 @@
     gap: 3px;
 }
 
+.ide-hide-toolbar-dialog {
+    padding: 12px;
+}
+
+.ide-hide-toolbar-dialog-content {
+    gap: 10px;
+}
+
+.ide-hide-toolbar-dialog-title {
+    foreground: #F0F3F8;
+    font-size: 14px;
+}
+
+.ide-hide-toolbar-dialog-message {
+    foreground: #B9C1CF;
+    font-size: 11px;
+    line-spacing: 2px;
+}
+
+.ide-hide-toolbar-dialog-checkbox-row {
+    gap: 7px;
+    foreground: #D7DEEA;
+}
+
+.ide-hide-toolbar-dialog-actions {
+    gap: 6px;
+}
+
+.ide-hide-toolbar-dialog-button {
+    border-radius: 4px;
+    border: 1px #E7EBF2;
+    background: #3A3F49;
+    transition: background 80ms ease-out;
+}
+
+.ide-hide-toolbar-dialog-button:hover {
+    background: #4A515E;
+}
+
+.ide-hide-toolbar-dialog-button:active {
+    background: #303640;
+}
+
+.ide-hide-toolbar-dialog-button.primary {
+    background: #5F8CCD;
+    foreground: #FFFFFF;
+}
+
+.ide-hide-toolbar-dialog-button.primary:hover {
+    background: #6E9BDC;
+}
+
+.ide-hide-toolbar-dialog-button.primary:active {
+    background: #4D78B8;
+}
+
 .ide-editor-stack {
     size: 100% 100%;
 }

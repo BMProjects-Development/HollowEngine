@@ -10,6 +10,10 @@ object HollowEngineConfig : Config() {
     @PropertyName("edit_mode")
     var editMode by property(EditMode.ENABLED)
 
+    @PropertyComment("Show a confirmation dialog before hiding the HollowEngine toolbar")
+    @PropertyName("show_toolbar_hide_confirmation")
+    var showToolbarHideConfirmation by property(true)
+
     @PropertyComment("Font size used by the Hollow IDE code editor")
     @PropertyName("ide_editor_font_size")
     @PropertyRange(6.0f, 36.0f)

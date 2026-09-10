@@ -110,6 +110,7 @@ object HollowIdeOverlay {
     private var initialized = false
     private var activeButton: Int? = null
     private var collapsed by mutableStateOf(true)
+    private var hideToolbarConfirmationVisible by mutableStateOf(false)
     private val projectFilter = UiTreeFilterState(ProjectFilterInputId)
     private var openDropdown by mutableStateOf<String?>(null)
     private var statusText by mutableStateOf("")
@@ -506,6 +507,11 @@ object HollowIdeOverlay {
                     EditorColorPickerPopup()
                     UiDragGhost(dragAndDrop)
                 }
+                HollowIdeHideToolbarDialog(
+                    visible = hideToolbarConfirmationVisible,
+                    onConfirm = ::hideToolbar,
+                    onCancel = { hideToolbarConfirmationVisible = false },
+                )
             }
         }
     }
@@ -547,13 +553,27 @@ object HollowIdeOverlay {
                         }
                     },
                     UiDropdownItem("Hide") {
-                        HollowEngineConfig.editMode = EditMode.DISABLED
+                        requestToolbarHide()
                     },
                     UiDropdownItem("Show only in chat menu") {
                         HollowEngineConfig.editMode = EditMode.CHAT_ONLY
                     }
                 )) { popup = it }
         }
+    }
+
+    private fun requestToolbarHide() {
+        if (HollowEngineConfig.showToolbarHideConfirmation) {
+            hideToolbarConfirmationVisible = true
+        } else {
+            hideToolbar(false)
+        }
+    }
+
+    private fun hideToolbar(doNotShowAgain: Boolean) {
+        hideToolbarConfirmationVisible = false
+        if (doNotShowAgain) HollowEngineConfig.showToolbarHideConfirmation = false
+        HollowEngineConfig.editMode = EditMode.DISABLED
     }
 
     @Composable

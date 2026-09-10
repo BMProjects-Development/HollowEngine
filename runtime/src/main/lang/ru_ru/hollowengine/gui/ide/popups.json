@@ -6,6 +6,10 @@
   "create_folder": "Введите название папки:",
   "create_folder_hint": "Имя папки",
   "delete": "Вы уверены, что хотите удалить?",
+  "do_not_show_again": "Больше не показывать",
+  "hide": "Скрыть",
+  "hide_toolbar_message": "Панель и иконка HollowEngine исчезнут. Чтобы вернуть их, установите edit_mode = \"ENABLED\" в файле config/hollowengine.toml.",
+  "hide_toolbar_title": "Скрыть панель HollowEngine?",
   "rename": "Введите новое название:",
   "rename_hint": "Новое название"
 }

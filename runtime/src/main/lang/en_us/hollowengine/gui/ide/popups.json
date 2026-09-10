@@ -6,6 +6,10 @@
   "create_folder": "Enter folder name:",
   "create_folder_hint": "Folder name",
   "delete": "Are you sure you want to delete?",
+  "do_not_show_again": "Don't show again",
+  "hide": "Hide",
+  "hide_toolbar_message": "The toolbar and HollowEngine icon will disappear. To show them again, set edit_mode = \"ENABLED\" in config/hollowengine.toml.",
+  "hide_toolbar_title": "Hide the HollowEngine toolbar?",
   "rename": "Enter new name:",
   "rename_hint": "New name"
 }
