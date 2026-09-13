@@ -25,7 +25,7 @@ jobs:
             exit 1
           fi
           curl --fail-with-body --request POST \
-            --url "https://api.github.com/repos/0mods/0mods-web/dispatches" \
+            --url "https://api.github.com/repos/BMProjects-Development/0mods-web/dispatches" \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $WEBSITE_DEPLOY_TOKEN" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
