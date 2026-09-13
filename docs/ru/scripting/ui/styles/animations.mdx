@@ -5,7 +5,7 @@ order: 3
 
 <center><h1>Анимации и трансформации</h1></center>
 
-Для переходов, keyframes, трансформаций и фильтров используй API модификаторов и HSS. Движок стилей не изменился; удалён только старый синтаксис XML-атрибутов.
+Для переходов, keyframes, трансформаций и фильтров используйте API модификаторов и HSS. Движок стилей не изменился; удалён только старый синтаксис XML-атрибутов.
 
 ## Переходы
 
@@ -20,7 +20,7 @@ Kotlin-эквивалент: `Modifier.transition(UiTransition("scale", 120, Tra
 
 ## Keyframes
 
-Для повторяющейся или многоэтапной анимации используй `@keyframes`:
+Для повторяющейся или многоэтапной анимации используйте `@keyframes`:
 
 ```css
 @keyframes attention {
@@ -33,7 +33,7 @@ Kotlin-эквивалент: `Modifier.transition(UiTransition("scale", 120, Tra
 
 Кадр может задавать одну ось (`translate-y`, `scale-x`, `rotate-z`), оставляя две другие такими, какими их выставил базовый стиль.
 
-Из Kotlin ту же именованную анимацию запускай явно:
+Из Kotlin ту же именованную анимацию запускайте явно:
 
 ```kotlin
 Box(modifier = Modifier.animation("attention", durationMillis = 700, iterationCount = Float.POSITIVE_INFINITY)) {
@@ -45,4 +45,4 @@ Box(modifier = Modifier.animation("attention", durationMillis = 700, iterationCo
 
 `translate`, `rotate`, `scale`, `perspective` и `pivot` объединяются в трансформацию. В HSS им соответствуют `translate`, `rotate`, `scale`, `perspective`, `transform-origin` и `backface-visibility`. `filter` и `backdrop-filter` поддерживают blur, grayscale и shader-эффекты.
 
-Анимируй только видимые узлы и сохраняй стабильные id элементов в списках. Для движения интерфейса используй transition, keyframe или текстовый эффект. `rebuildEveryFrame` перекомпоновывает всю поверхность и предназначен для содержимого, которое читает игровое состояние в каждом кадре.
+Анимируйте только видимые узлы и сохраняйте стабильные id элементов в списках. Для движения интерфейса используйте transition, keyframe или текстовый эффект. `rebuildEveryFrame` перекомпоновывает всю поверхность и предназначен для содержимого, которое читает игровое состояние в каждом кадре.

@@ -9,9 +9,9 @@ order: 8
 
 ---
 
-Про движение, взгляд, использование блоков и взаимодействие с сущностями смотри [Движение и взаимодействие](/docs/hollowengine/scripting/npc/movement).
-Про выдачу, изъятие и сбор предметов смотри [Инвентарь и сбор предметов](/docs/hollowengine/scripting/npc/inventory).
-Про поиск игроков, NPC и предметов рядом смотри [Поиск сущностей и предметов](/docs/hollowengine/scripting/npc/search).
+Про движение, взгляд, использование блоков и взаимодействие с сущностями смотрите в разделе [Движение и взаимодействие](/docs/hollowengine/scripting/npc/movement).
+Про выдачу, изъятие и сбор предметов смотрите в разделе [Инвентарь и сбор предметов](/docs/hollowengine/scripting/npc/inventory).
+Про поиск игроков, NPC и предметов рядом смотрите в разделе [Поиск сущностей и предметов](/docs/hollowengine/scripting/npc/search).
 
 ## `npc.dropItem(item)`
 
@@ -104,7 +104,7 @@ wait(20)      // 1 секунда
 wait(5.sec)  // 5 секунд
 ```
 
-Для ожиданий, которые должны продолжать отсчёт даже после перезапуска сервера, смотри раздел "Ожидание, переживающее перезапуск" в [Стейтах и корутинах](/docs/hollowengine/scripting/node/states#ожидание-переживающее-перезапуск).
+Для ожиданий, которые должны продолжать отсчёт даже после перезапуска сервера, смотрите раздел "Ожидание, переживающее перезапуск" в [Стейтах и корутинах](/docs/hollowengine/scripting/node/states#ожидание-переживающее-перезапуск).
 
 ### `Int.sec` / `Double.sec`
 
@@ -125,7 +125,7 @@ val stick = item("minecraft:stick")
 ```
 
 :::warning
-Старой перегрузки `item(id, count, nbt: String)`, принимавшей строку с сырым NBT, больше нет (вызов теперь приводит к ошибке компиляции). Данные предмета описываются через компоненты данных Minecraft. Чтобы настроить предмет после создания, используй `ItemStack.set(...)`:
+Старой перегрузки `item(id, count, nbt: String)`, принимавшей строку с сырым NBT, больше нет (вызов теперь приводит к ошибке компиляции). Данные предмета описываются через компоненты данных Minecraft. Чтобы настроить предмет после создания, используйте `ItemStack.set(...)`:
 
 ```kotlin
 import net.minecraft.core.component.DataComponents
@@ -149,6 +149,6 @@ val id = uuid("00000000-0000-0000-0000-000000000000")
 
 Старые методы из Katari/block-документации - например, `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)` и отдельные обёртки `attack(...)` не относятся к основному API v2.3.
 
-- Для анимаций используй [`play`](/docs/hollowengine/scripting/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
-- Для предметов в руках используй Minecraft API `setItemInHand(...)` или [`equip`](/docs/hollowengine/scripting/npc/inventory).
-- Для внешнего вида используй [`entity.materials`](/docs/hollowengine/scripting/models).
+- Для анимаций используйте [`play`](/docs/hollowengine/scripting/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- Для предметов в руках используйте Minecraft API `setItemInHand(...)` или [`equip`](/docs/hollowengine/scripting/npc/inventory).
+- Для внешнего вида используйте [`entity.materials`](/docs/hollowengine/scripting/models).

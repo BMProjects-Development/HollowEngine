@@ -48,7 +48,7 @@ suspend fun main() {
 Этот пример делает всё по очереди, и для простых сцен этого вполне достаточно. Но NPC также умеет **одновременно** идти, оглядываться по сторонам и работать руками, сам собирать предметы, носить инвентарь и запоминать свои данные - подробнее об этом в [Действиях и параллельности](/docs/hollowengine/scripting/npc/actions).
 
 :::advice
-`move(...)`, `lookAt(...)`, `useBlock(...)` и `destroyBlock(...)` - `suspend`-функции. Вызывай их из `@State suspend fun`, `async { ... }` или другой корутины.
+`move(...)`, `lookAt(...)`, `useBlock(...)` и `destroyBlock(...)` - `suspend`-функции. Вызывайте их из `@State suspend fun`, `async { ... }` или другой корутины.
 :::
 
 ## Жизненный цикл
@@ -63,11 +63,11 @@ suspend fun main() {
 }
 ```
 
-Если NPC должен переживать перезагрузку мира или reload скриптов, сохраняй его UUID через `stateTag()` или свою сериализацию в `onSave` / `onLoad`, а после загрузки восстанавливай ссылку через `entityRef<NpcEntity>(uuid)`.
+Если NPC должен переживать перезагрузку мира или reload скриптов, сохраняйте его UUID через `stateTag()` или свою сериализацию в `onSave` / `onLoad`, а после загрузки восстанавливайте ссылку через `entityRef<NpcEntity>(uuid)`.
 
 ## Прикрепление постоянного поведения
 
-Для поведения, которое должно жить вместе с самим NPC, а не с сюжетным стейтом, прикрепи [node-скрипт](/docs/hollowengine/scripting/node) прямо к сущности через `@file:Attach`:
+Для поведения, которое должно жить вместе с самим NPC, а не с сюжетным стейтом, прикрепите [node-скрипт](/docs/hollowengine/scripting/node) прямо к сущности через `@file:Attach`:
 
 ```kotlin
 @file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)

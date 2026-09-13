@@ -101,20 +101,20 @@ npc.set(HitboxComponent(HitboxMode.BLOCKING))
 npc.set(StandardPlayerAnimatorPreset.create())
 ```
 
-Для анимаций смотри раздел [Анимации](/docs/hollowengine/scripting/animations).
+Для анимаций смотрите раздел [Анимации](/docs/hollowengine/scripting/animations).
 
 ---
 
 ## Сохранение ссылок на NPC
 
-Не сохраняй сам объект `NpcEntity` между перезагрузками. Сохраняй UUID:
+Не сохраняйте сам объект `NpcEntity` между перезагрузками. Сохраняйте UUID:
 
 ```kotlin
 val tag = stateTag()
 tag.putUUID("guide", npc.uuid)
 ```
 
-После загрузки используй `entityRef<NpcEntity>(uuid)` (параметр типа обязателен):
+После загрузки используйте `entityRef<NpcEntity>(uuid)` (параметр типа обязателен):
 
 ```kotlin
 val guideRef = entityRef<NpcEntity>(tag.getUUID("guide"))
@@ -126,7 +126,7 @@ val guide = guideRef.resolve()
 
 ## Неймплейты
 
-Используй API HollowEngine для неймплейта вместо ручного сочетания `customName` и `isCustomNameVisible`. Он работает с `NpcEntity` и другими сущностями, синхронизируется с клиентами и сохраняется вместе с сущностью.
+Используйте API HollowEngine для неймплейта вместо ручного сочетания `customName` и `isCustomNameVisible`. Он работает с `NpcEntity` и другими сущностями, синхронизируется с клиентами и сохраняется вместе с сущностью.
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.entities.nameplateMode

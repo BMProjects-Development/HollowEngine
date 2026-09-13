@@ -7,7 +7,7 @@ order: 2
 
 *Куда класть модели, текстуры, UI, звуки, скрипты и другие ресурсы проекта.*
 
-![Ассеты и скрипты в дереве проекта](/hollowengine/pictures/ide/project-tree.webp)
+![Ассеты](/docs/title-assets.webp)
 
 HollowEngine загружает пользовательский контент из папки `hollowengine/` в директории игры. Все файлы, которые указываются через resource location, используют обычную структуру Minecraft: `assets/<namespace>/`.
 
@@ -32,7 +32,7 @@ hollowengine/
 | `assets/project/sounds/` | Пользовательские звуки | `project:sounds/voice/hello.ogg` |
 | `scripts/` | Kotlin-скрипты и диалоги `.story` | `quest/intro.node.kts` |
 
-Держи связанные файлы рядом. UI объявляется Kotlin-скриптом в `hollowengine/scripts`, а HSS и текстуры лежат в `hollowengine/assets` и доступны через resource location:
+Держите связанные файлы рядом. UI объявляется Kotlin-скриптом в `hollowengine/scripts`, а HSS и текстуры лежат в `hollowengine/assets` и доступны через resource location:
 
 ```text
 hollowengine/
@@ -44,7 +44,7 @@ hollowengine/
 
 ## Как ссылаться на ассеты
 
-В Kotlin UI, HSS и скриптах используй полные resource location:
+В Kotlin UI, HSS и скриптах используйте полные resource location:
 
 ```kotlin
 Column(modifier = Modifier.style("project:ui/dialogs/quest.hss")) {
@@ -69,11 +69,11 @@ val guide = npc(
 
 ## Практические правила
 
-- Переиспользуемые UI-стили складывай в `assets/project/ui/components/`, а общий Kotlin-код интерфейсов — в `scripts/ui/`.
-- Общие UI-текстуры держи в `assets/project/textures/ui/`, а локальные для одного экрана можно хранить рядом с этим экраном.
-- Используй resource location вместо абсолютных путей.
-- Текстуры модели держи в том же namespace, что и модель.
+- Переиспользуемые UI-стили складывайте в `assets/project/ui/components/`, а общий Kotlin-код интерфейсов — в `scripts/ui/`.
+- Общие UI-текстуры держите в `assets/project/textures/ui/`, а локальные для одного экрана можно хранить рядом с этим экраном.
+- Используйте resource location вместо абсолютных путей.
+- Текстуры модели держите в том же namespace, что и модель.
 - Рядом с моделью может лежать `<модель>.hemeta`, см. [Модели и материалы](/docs/hollowengine/scripting/models).
-- В путях используй нижний регистр и символы `a-z`, `0-9`, `_`, `-`, `.`, `/`.
+- В путях используйте нижний регистр и символы `a-z`, `0-9`, `_`, `-`, `.`, `/`.
 
-Если ассет используется из `.ui.kts` или `.hss`, укажи это рядом с документацией интерфейса, чтобы при изменениях не искать связь по всем скриптам.
+Если ассет используется из `.ui.kts` или `.hss`, укажите это рядом с документацией интерфейса, чтобы при изменениях не искать связь по всем скриптам.

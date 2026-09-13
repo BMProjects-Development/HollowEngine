@@ -20,7 +20,7 @@ order: 4
 
 ### Серверный скрипт
 
-Открой UI и объяви две зоны:
+Откройте UI и объявите две зоны:
 
 ```kotlin
 player.openUi("mypack:npc_backpack") {
@@ -44,7 +44,7 @@ player.openUi("mypack:npc_backpack") {
 
 ### Клиентский скрипт
 
-Создай `hollowengine/scripts/ui/npc_backpack.ui.kts`:
+Создайте `hollowengine/scripts/ui/npc_backpack.ui.kts`:
 
 ```kotlin
 screen("mypack:npc_backpack") {
@@ -136,7 +136,7 @@ quickMove(
 | `SimpleSlotSource(size)` | Небольшой инвентарь, созданный скриптом или игровой системой |
 | `source.range(from, size)` | Часть другого источника |
 
-Для экранов NPC используй:
+Для экранов NPC используйте:
 
 ```kotlin
 NpcInventorySource(npc)
@@ -165,7 +165,7 @@ EquipmentSource.All
 
 ## Инвентарь игрока
 
-Добавь зоны игрока на сервере:
+Добавьте зоны игрока на сервере:
 
 ```kotlin
 playerZones(player)
@@ -179,7 +179,7 @@ playerZones(player)
 | `armor` | Четыре слота брони |
 | `offhand` | Слот второй руки |
 
-Нарисуй их на клиенте:
+Нарисуйте их на клиенте:
 
 ```kotlin
 PlayerInventory()
@@ -274,7 +274,7 @@ allowInsert { _, inserted ->
 
 Стак в `allowInsert` и `allowExtract` содержит количество, перемещённое этим кликом.
 
-Для действий, которые должны произойти только после перемещения, используй `afterInsert` и `afterExtract`:
+Для действий, которые должны произойти только после перемещения, используйте `afterInsert` и `afterExtract`:
 
 ```kotlin
 zone("reward", source) {
@@ -298,7 +298,7 @@ Slots {
 
 `Slots` обрабатывает стак на курсоре, подсказки, клавишу `Q`, перетаскивание и клики вне окна.
 
-Установи `dropOutside = false`, если клик за пределами панели не должен выбрасывать стак:
+Установите `dropOutside = false`, если клик за пределами панели не должен выбрасывать стак:
 
 ```kotlin
 Slots(dropOutside = false) {

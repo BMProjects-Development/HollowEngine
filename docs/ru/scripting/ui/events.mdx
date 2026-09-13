@@ -27,11 +27,11 @@ Box(
     modifier = Modifier
         .cursor(UiCursorShape.HAND)
         .onClick { send { putString("action", "accept") } }
-        .onHover { /* при необходимости обнови локальный Compose state */ },
+        .onHover { /* при необходимости обновите локальный Compose state */ },
 ) { Text("Принять") }
 ```
 
-Для специальных случаев есть `onPress`, `onRelease`, `onDrag`, `onScroll` и обработчики клавиатуры. Для обычных элементов используй высокоуровневые `Slider`, `Checkbox` и `TextField`.
+Для специальных случаев есть `onPress`, `onRelease`, `onDrag`, `onScroll` и обработчики клавиатуры. Для обычных элементов используйте высокоуровневые `Slider`, `Checkbox` и `TextField`.
 
 ## События клиент → сервер
 
@@ -46,7 +46,7 @@ Box(modifier = Modifier.onClick {
 }) { Text("Купить") }
 ```
 
-На сервере payload обрабатывается `UiSession.onEvent`. Событие UI является запросом от клиента, а не подтверждением прав. Проверяй его перед изменением игрового состояния.
+На сервере payload обрабатывается `UiSession.onEvent`. Событие UI является запросом от клиента, а не подтверждением прав. Проверяйте его перед изменением игрового состояния.
 
 ## Observable-данные
 
@@ -56,4 +56,4 @@ val Progress = dataKey<Int>("progress") { 0 }
 content { Text("Прогресс: ${data[Progress]}") }
 ```
 
-Сервер меняет значение через `session.put(Progress, value)`. Патч обновит клиент и перекомпонует читателей `Progress`. Для временного клиентского состояния используй Compose state (`remember { mutableStateOf(...) }`), а не сетевой обмен для hover и анимации.
+Сервер меняет значение через `session.put(Progress, value)`. Патч обновит клиент и перекомпонует читателей `Progress`. Для временного клиентского состояния используйте Compose state (`remember { mutableStateOf(...) }`), а не сетевой обмен для hover и анимации.
