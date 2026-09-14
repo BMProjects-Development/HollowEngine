@@ -11,34 +11,57 @@ order: 1
 
 The HollowEngine event system lets you inject custom logic into specific in-game actions, including player actions, entity actions, block updates, and more.
 
+## Which side an event fires on
+
+Minecraft is split into two sides: the **server** runs the world and the players, the **client** draws the picture and takes input. Even singleplayer runs a separate server inside. That is why every event in this section states its side, and it has to be listened to from a matching script:
+
+| Side             | Where to listen                                                                   |
+|------------------|-----------------------------------------------------------------------------------|
+| **Server**       | a plain `.reload.kts`                                                             |
+| **Client**       | a `.reload.kts` with `@file:ClientSide`                                           |
+| **Both sides**   | either of them: a server script gets the server copy of the event, a client script the client copy |
+| **Game startup** | only `.startup.kts`: the event fires once, before any reloadable script exists    |
+
+If you subscribe to an event from the wrong side, the engine logs an error when the script starts. That makes it easy to see why a handler "does not fire on the server".
+
+:::advice
+`.startup.kts` scripts and addons are not bound to a side and receive events of both sides. When such code listens to a "both sides" event, check the side yourself, for example with `event.player.level().isClientSide`.
+:::
+
 ## Creating a handler
 
-There are two ways to create a handler: automatically (see [reloadable scripts](/docs/hollowengine/scripting/reload)) or manually by creating and registering a function:
+The simplest way to subscribe is the `@SubscribeEvent` annotation in a [reloadable script](/docs/hollowengine/scripting/reload). If a handler has to be added from code, for example only under some condition, subscribe through the script's scope:
 
 ```kotlin
 fun onPlayerJoin(event: PlayerEvent.Join) {
     event.player.send("Welcome back!")
 }
 
-val handle = PlayerEvent.Join.register(::onPlayerJoin) // Start listening for the event and store the handler
-PlayerEvent.Join.unregister(handle) // Stop listening for the event (the method will no longer be called)
+PlayerEvent.Join.subscribe(this, listener = ::onPlayerJoin)
 
 // You can also pass a lambda instead of a function:
-PlayerEvent.Join.register { event ->
+PlayerEvent.Join.subscribe(this) { event ->
     event.player.send("Welcome back!")
 }
 ```
 
+`this` here is the reloadable script itself: the subscription lives as long as the script and is removed when it restarts. It respects the script's side just like `@SubscribeEvent`.
+
+:::warning
+`PlayerEvent.Join.register { ... }` without a scope subscribes forever, until the game exits. In scripts such a handler is not removed on `/reload` and fires once more after every restart.
+:::
+
 ## Priorities
 
 Sometimes an event needs to run before other handlers, especially if it may cancel the event.
-You can change the handler order by configuring its priority:
+Pass a priority: the higher it is, the earlier the handler runs. The default priority is zero.
 
 ```kotlin
-val handler = eventListenerOf(10, ::onPlayerJoin)
+@SubscribeEvent(10)
+fun onPlayerJoin(event: PlayerEvent.Join) { }
 
-PlayerEvent.Join.register(handler)
-PlayerEvent.Join.unregister(handler)
+// Or when subscribing from code:
+PlayerEvent.Join.subscribe(this, priority = 10) { event -> }
 ```
 
 ## Canceling events
@@ -46,7 +69,8 @@ PlayerEvent.Join.unregister(handler)
 Some events are cancelable, meaning their default action can be prevented. For example:
 
 ```kotlin
-BlockEvent.Break.register { event ->
+@SubscribeEvent
+fun onBreak(event: BlockEvent.Break) {
     event.player.send("You cannot break blocks!")
     event.isCanceled = true
 }

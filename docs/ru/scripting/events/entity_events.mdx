@@ -11,6 +11,8 @@ order: 4
 
 ## Спавн в мире
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onEntitySpawn(event: EntityLoadedEvent) {
@@ -22,6 +24,8 @@ fun onEntitySpawn(event: EntityLoadedEvent) {
 - `event.uuid` (UUID) - уникальный идентификатор сущности.
 
 ## Смерть сущности
+
+**Сторона:** сервер
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -36,6 +40,8 @@ fun onEntitySpawn(event: LivingEntityDeathEvent) {
 - `event.source` (DamageSource) - источник и тип нанесённого урона.
 
 ## Перемещение между измерениями
+
+**Сторона:** сервер
 
 ```kotlin
 @SubscribeEvent
@@ -55,6 +61,8 @@ fun onEntityTeleport(event: EntityEvent.ChangeDimension) {
 
 ## Получение урона
 
+**Сторона:** сервер
+
 *Это событие можно отменить (`event.isCanceled = true`).*
 
 ```kotlin
@@ -69,6 +77,8 @@ fun onEntityHurt(event: EntityEvent.Hurt) {
 - `event.amount` (Float) - количество нанесённого урона. (можно изменить)
 
 ## Размножение сущностей
+
+**Сторона:** сервер
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 

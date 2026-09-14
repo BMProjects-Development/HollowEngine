@@ -13,6 +13,8 @@ order: 2
 
 ### Joining the server
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerJoin(event: PlayerEvent.Join) {
@@ -24,6 +26,8 @@ fun onPlayerJoin(event: PlayerEvent.Join) {
 
 ### Leaving the server
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerLeave(event: PlayerEvent.Leave) {
@@ -34,6 +38,8 @@ fun onPlayerLeave(event: PlayerEvent.Leave) {
 - `event.player` (Player) - the player who left the server.
 
 ### Changing dimension
+
+**Side:** server
 
 ```kotlin
 @SubscribeEvent
@@ -48,6 +54,8 @@ fun onPlayerChangeDimension(event: PlayerEvent.ChangeDimension) {
 
 ### Respawning
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerRespawn(event: PlayerEvent.Respawn) {
@@ -59,6 +67,8 @@ fun onPlayerRespawn(event: PlayerEvent.Respawn) {
 - `event.isReturnFromEnd` (Boolean) - whether the player returned from the End. (the game treats this as a respawn)
 
 ### Cloning
+
+**Side:** server
 
 This event fires shortly before `PlayerEvent.Respawn` and still contains data from the previous player object. If you need to restore player data after death, do it here.
 
@@ -81,6 +91,8 @@ If what needs to survive death is typed [`player.data`](/docs/hollowengine/scrip
 
 ### Going to sleep
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerSleep(event: PlayerEvent.SleepInBed) {
@@ -94,6 +106,8 @@ fun onPlayerSleep(event: PlayerEvent.SleepInBed) {
 
 ### Waking up
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerWakeup(event: PlayerEvent.Wakeup) {
@@ -106,6 +120,8 @@ fun onPlayerWakeup(event: PlayerEvent.Wakeup) {
 - `event.updateLevelForSleepingPlayers` (Boolean) - whether the server should be notified that the number of sleeping players has changed. If `true`, the server recalculates the night-skip timer by checking how many players remain in beds.
 
 ### Interacting with an entity
+
+**Side:** both sides
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -121,22 +137,20 @@ fun onPlayerInteract(event: PlayerInteractEvent.EntityInteract) {
 - `event.entity` (Entity) - the entity the player interacted with.
 
 :::advice
-This event usually fires 4 times for a single interaction:
-- left hand on the server
-- left hand on the client
-- right hand on the server
-- right hand on the client
-
-In most cases you need an additional check:
+The event fires on both sides and separately for each hand. A server script only gets the server calls, but one for the main hand and one for the off hand, so this check is usually enough:
 
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
+if (event.hand == InteractionHand.MAIN_HAND) {
    // The action that will run only once
 }
 ```
+
+In `.startup.kts` and addons, which hear both sides, also check `!event.player.level().isClientSide`.
 :::
 
 ### Interacting with a block
+
+**Side:** both sides
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -152,22 +166,20 @@ fun onPlayerInteract(event: PlayerInteractEvent.BlockInteract) {
 - `event.state` (BlockHitResult) - the block hit result, including the block, its position, and other information.
 
 :::advice
-This event usually fires 4 times for a single interaction:
-- left hand on the server
-- left hand on the client
-- right hand on the server
-- right hand on the client
-
-In most cases you need an additional check:
+The event fires on both sides and separately for each hand. A server script only gets the server calls, but one for the main hand and one for the off hand, so this check is usually enough:
 
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
+if (event.hand == InteractionHand.MAIN_HAND) {
    // The action that will run only once
 }
 ```
+
+In `.startup.kts` and addons, which hear both sides, also check `!event.player.level().isClientSide`.
 :::
 
 ### Using an item
+
+**Side:** both sides
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -183,22 +195,20 @@ fun onPlayerInteract(event: PlayerInteractEvent.ItemInteract) {
 - `event.itemStack` (ItemStack) - the item the player used.
 
 :::advice
-This event usually fires 4 times for a single interaction:
-- left hand on the server
-- left hand on the client
-- right hand on the server
-- right hand on the client
-
-In most cases you need an additional check:
+The event fires on both sides and separately for each hand. A server script only gets the server calls, but one for the main hand and one for the off hand, so this check is usually enough:
 
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
+if (event.hand == InteractionHand.MAIN_HAND) {
    // The action that will run only once
 }
 ```
+
+In `.startup.kts` and addons, which hear both sides, also check `!event.player.level().isClientSide`.
 :::
 
 ### Writing in chat
+
+**Side:** server
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -226,6 +236,8 @@ npc.say("So your final choice is '$text'?")
 
 ### Dropping an item
 
+**Side:** server
+
 *This event can be canceled (`event.isCanceled = true`).*
 
 ```kotlin
@@ -239,6 +251,8 @@ fun onDropItem(event: ItemEntityEvent.Toss) {
 - `event.entity` (ItemEntity) - the dropped item as an entity.
 
 ### Drawing a bow
+
+**Side:** both sides
 
 ```kotlin
 @SubscribeEvent
@@ -254,6 +268,8 @@ fun onNock(event: ArrowEvent.Nock) {
 - `event.hasAmmo` (Boolean) - whether the player has ammo / arrows.
 
 ### Releasing an arrow
+
+**Side:** both sides
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -276,6 +292,8 @@ These events fire when a player starts tracking specific entities, meaning the p
 
 ### Starts tracking
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onStartTracking(event: EntityTrackingEvent.Start) {
@@ -287,6 +305,8 @@ fun onStartTracking(event: EntityTrackingEvent.Start) {
 - `event.entity` (Entity) - the tracked entity.
 
 ### Stops tracking
+
+**Side:** server
 
 ```kotlin
 @SubscribeEvent

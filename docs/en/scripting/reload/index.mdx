@@ -11,16 +11,56 @@ order: 1
 
 # Reloadable Scripts
 
-To create a reloadable script, give it the `*.reload.kts` suffix so the engine can recognize its type and know which variables and functions are available.
+A reloadable script is a file with the `*.reload.kts` suffix. The suffix tells the engine the script type and which variables and functions it has.
 You will mainly use it to subscribe to events and run your logic when they fire.
+
+The script restarts as a whole: on every restart the engine drops all handlers and coroutines of the previous run and executes the file again. That is why you never need to rejoin the game after editing it.
+
+## Server and client scripts
+
+Every reloadable script runs on one side. The side is set by an annotation at the very top of the file:
+
+| Annotation                  | Runs on                                              | Restarted                                               |
+|-----------------------------|------------------------------------------------------|---------------------------------------------------------|
+| none or `@file:ServerSide`  | the server (including the singleplayer built-in server) | when a world opens and on `/reload`                   |
+| `@file:ClientSide`          | only in the player's game, never on a dedicated server | at game start, on `F3 + T`, and on resource pack changes |
+
+Server scripts handle game logic: players, entities, blocks, commands. Client scripts handle what one particular player sees and hears: the HUD, screens, rendering, keys.
+
+```kotlin
+@file:ClientSide
+
+import ru.hollowhorizon.hollowengine.common.events.client.render.RenderHudEvent
+
+@SubscribeEvent
+fun onHud(event: RenderHudEvent) {
+    event.guiGraphics.drawString(minecraft.font, "Hello!", 4, 4, 0xFFFFFF)
+}
+```
+
+![A client script drawing text on the HUD](/hollowengine/pictures/ide/client-reload-script.webp)
+
+:::warning
+A dedicated server does not compile client scripts at all, and in multiplayer the client only takes scripts from its own `hollowengine/scripts` folder. Client scripts have to be installed on the players' side, for example as part of the modpack.
+:::
+
+A file cannot have both annotations. If a server and a client script need shared code, move it into a plain `.kts` and pull it into both with [`@Import`](/docs/hollowengine/scripting/imports).
 
 ## Available variables
 
 ```kotlin
-context.server // MinecraftServer? if available
-context.resources // ResourceManager - for reading data from datapacks
-context.recipeManager // RecipeManager - for working with recipes
+resources // ResourceManager: datapacks on the server, resource packs on the client
+
+// Server scripts only
+recipeManager // RecipeManager - for working with recipes
+
+// Client scripts only
+minecraft // Minecraft - the game client
 ```
+
+:::advice
+A server script runs before the server exists, while the world's datapacks load, so it has no `server` variable. Inside handlers the server is almost always reachable from the event itself: `event.player.server`, `event.level.server`, `event.server`.
+:::
 
 ## Subscribing to an event
 
@@ -35,14 +75,55 @@ fun onPlayerJoin(event: PlayerEvent.Join) {
 
 The function can have any name. The important parts are the annotation and a parameter with the required event type.
 
+A script only receives events of its own side. If an event only happens on the other side (for example the client `RenderHudEvent` in a server script), the engine logs an error when subscribing instead of silently never calling the handler. The [event list](/docs/hollowengine/scripting/events) states the side of every event.
+
 :::advice
 Sometimes you may need your event handler to run before others, especially if it needs to cancel the event.
 To change the handler order, pass a priority to the annotation: `@SubscribeEvent(10)`.
 The default priority is zero.
 :::
 
+## Coroutines
+
+The script itself is a `CoroutineScope`, so `launch` and `delay` work right away. Coroutines run on the thread of the script's side and are cancelled when the script restarts, so old tasks do not keep running after `/reload`.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+
+@SubscribeEvent
+fun onPlayerJoin(event: PlayerEvent.Join) {
+    launch {
+        delay(3000) // 3 seconds
+        event.player.send("Hello, ${event.player.name.string}!")
+    }
+}
+```
+
+## Commands
+
+A server script can add its own commands through `RegisterCommandsEvent`. The engine posts it after the scripts have run, so the commands appear as soon as a world opens and update together with the script on `/reload`.
+
+```kotlin
+import net.minecraft.commands.Commands
+import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
+
+@SubscribeEvent
+fun onCommands(event: RegisterCommandsEvent) {
+    event.dispatcher.register(
+        Commands.literal("hello").executes { context ->
+            context.source.sendSuccess({ "Hello!".literal }, false)
+            1
+        }
+    )
+}
+```
+
+## Applying changes
+
+- Server script: `/reload`, **File > Reload Server Resources** in the IDE, or reopening the world.
+- Client script: `F3 + T` or **File > Reload Client Resources**.
+
+When an addon is enabled or disabled, the engine reloads the datapacks of every running server by itself, so the addon's scripts and commands appear and disappear without a manual `/reload`.
+
 You can find the list of available events and their descriptions in this [section](/docs/hollowengine/scripting/events).
-
-## Editing events
-
-If an event handler is already running and you change it, restart the script with `/reload` for the changes to take effect.

@@ -5,6 +5,23 @@ order: 6
 
 *События, позволяющие интегрироваться с Just Enough Items (JEI), регистрировать категории, рецепты, скрывать их или добавлять описания к предметам.*
 
+**Сторона:** клиент (все события на этой странице)
+
+:::warning
+JEI работает только в игре у игрока, поэтому слушать эти события нужно из клиентского скрипта: добавьте `@file:ClientSide` в начало `.reload.kts`. Серверный скрипт на них подписаться не сможет, и движок напишет об этом ошибку в лог.
+:::
+
+```kotlin
+@file:ClientSide
+
+import ru.hollowhorizon.hollowengine.common.events.ModifyRecipeViewerEvent
+
+@SubscribeEvent
+fun onRuntimeAvailable(event: ModifyRecipeViewerEvent.RegisterOnRuntimeAvailable) {
+    // ...
+}
+```
+
 ## Регистрация подтипов и ингредиентов
 
 ### Регистрация подтипов предметов

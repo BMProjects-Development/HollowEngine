@@ -1,0 +1,121 @@
+---
+title: Items
+order: 2
+---
+
+<center><h1>Items</h1></center>
+
+*Add an item of your own: registration, texture, name, and behavior.*
+
+In this tutorial we add a ruby. All paths below are relative to the `hollowengine` folder, and the namespace is `mypack` (see the [introduction](/docs/hollowengine/scripting/startup) for how to set it).
+
+## Registration
+
+Create the file `scripts/items.startup.kts` (in the IDE: right-click the `scripts` folder → **New Script** → **Startup Script**) and register the item:
+
+```kotlin
+val RUBY by register("ruby") {
+    Item(Item.Properties())
+}
+```
+
+`register` creates the item with the id `mypack:ruby` and generates a model for it right away. The `RUBY` variable lets you refer to the item from the same script, for example when creating a [creative tab](/docs/hollowengine/scripting/startup/creative-tabs).
+
+## Texture and name
+
+The item model points to the texture `mypack:item/ruby`, so put a 16×16 image here:
+
+```text
+hollowengine/
+├── assets/
+│   └── mypack/
+│       ├── lang/
+│       │   ├── en_us.json
+│       │   └── ru_ru.json
+│       └── textures/
+│           └── item/
+│               └── ruby.png
+└── scripts/
+    └── items.startup.kts
+```
+
+The name comes from the translation files:
+
+```json
+{
+  "item.mypack.ruby": "Ruby"
+}
+```
+
+![Item files in the project tree](/hollowengine/pictures/startup/item-files.webp)
+
+Restart the game and get the item with `/give @s mypack:ruby`.
+
+![The ruby in the inventory](/hollowengine/pictures/startup/item-in-game.webp)
+
+:::advice
+Textures and translations are ordinary resources and change without a restart: `F3 + T` is enough. A restart is only needed after editing the script itself.
+:::
+
+## Model
+
+The second parameter of `register` chooses which model to generate:
+
+| Value                                  | Model                                              |
+|----------------------------------------|----------------------------------------------------|
+| `AutoModelType.DEFAULT` (the default)  | a flat item, like the ruby                         |
+| `AutoModelType.HANDHELD`               | held in hand like a tool or a sword                |
+| `null`                                 | generate nothing: the model lives in `assets/mypack/models/item/<name>.json` |
+
+```kotlin
+val RUBY_SWORD by register("ruby_sword", AutoModelType.HANDHELD) {
+    Item(Item.Properties().stacksTo(1))
+}
+```
+
+## Item properties
+
+`Item.Properties` describes the behavior every Minecraft item has:
+
+```kotlin
+import net.minecraft.world.food.FoodProperties
+import net.minecraft.world.item.Rarity
+
+val RUBY_APPLE by register("ruby_apple") {
+    Item(
+        Item.Properties()
+            .stacksTo(16) // Stack size
+            .rarity(Rarity.RARE) // Name color
+            .fireResistant() // Survives lava
+            .food(FoodProperties.Builder().nutrition(6).saturationModifier(1.2f).alwaysEdible().build())
+    )
+}
+```
+
+## Custom behavior
+
+To make an item do something, extend `Item` and override the method you need. For example, a magic wand that writes to chat when used:
+
+```kotlin
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.Level
+
+val MAGIC_WAND by register("magic_wand", AutoModelType.HANDHELD) {
+    object : Item(Item.Properties().stacksTo(1)) {
+        override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder<ItemStack> {
+            if (!level.isClientSide) {
+                player.sendSystemMessage("Whoosh!".literal)
+            }
+            return InteractionResultHolder.success(player.getItemInHand(hand))
+        }
+    }
+}
+```
+
+`use` is called on both sides, so run game logic (messages, changes to the world) on the server only: `!level.isClientSide`.
+
+:::advice
+Reacting to ordinary items, not only your own, needs no startup script: subscribe to `PlayerInteractEvent.ItemInteract` in a [reloadable script](/docs/hollowengine/scripting/reload) and check `event.itemStack.item`.
+:::

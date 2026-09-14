@@ -13,6 +13,8 @@ order: 2
 
 ### При входе на сервер
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerJoin(event: PlayerEvent.Join) {
@@ -24,6 +26,8 @@ fun onPlayerJoin(event: PlayerEvent.Join) {
 
 ### При выходе с сервера
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerLeave(event: PlayerEvent.Leave) {
@@ -34,6 +38,8 @@ fun onPlayerLeave(event: PlayerEvent.Leave) {
 - `event.player` (Player) - вышедший с сервера игрок.
 
 ### При смене измерения
+
+**Сторона:** сервер
 
 ```kotlin
 @SubscribeEvent
@@ -48,6 +54,8 @@ fun onPlayerChangeDimension(event: PlayerEvent.ChangeDimension) {
 
 ### При респавне
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerRespawn(event: PlayerEvent.Respawn) {
@@ -59,6 +67,8 @@ fun onPlayerRespawn(event: PlayerEvent.Respawn) {
 - `event.isReturnFromEnd` (Boolean) - игрок вернулся из энда. (игра это воспринимает как респавн)
 
 ### При клонировании
+
+**Сторона:** сервер
 
 Это событие срабатывает незадолго до `PlayerEvent.Respawn`, в ней есть ещё данные прошлого объекта игрока. То есть если вам нужно восстановить какие-то данные игрока при смерти это нужно делать тут.
 
@@ -81,6 +91,8 @@ fun onPlayerClone(event: PlayerEvent.Clone) {
 
 ### Ложится спать
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerSleep(event: PlayerEvent.SleepInBed) {
@@ -94,6 +106,8 @@ fun onPlayerSleep(event: PlayerEvent.SleepInBed) {
 
 ### Просыпается
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onPlayerWakeup(event: PlayerEvent.Wakeup) {
@@ -106,6 +120,8 @@ fun onPlayerWakeup(event: PlayerEvent.Wakeup) {
 - `event.updateLevelForSleepingPlayers` (Boolean) - указывает, нужно ли уведомить сервер о том, что количество спящих игроков изменилось. Если `true`, сервер пересчитывает таймер пропуска ночи, проверяя, сколько игроков осталось в кроватях.
 
 ### Взаимодействует с сущностью
+
+**Сторона:** обе стороны
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -121,20 +137,18 @@ fun onPlayerInteract(event: PlayerInteractEvent.EntityInteract) {
 - `event.entity` (Entity) - сущность, с которой игрок взаимодействует.
 
 :::advice
-Это событие обычно при одном взаимодействии срабатывает 4 раза:
-- левая рука на сервере
-- левая рука на клиенте
-- правая рука на сервере
-- правая рука на клиенте
-То есть чаще всего вам нужно сделать дополнительную проверку:
+Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
-   // Уже действие, которое сработает 1 раз
+if (event.hand == InteractionHand.MAIN_HAND) {
+   // Действие, которое сработает 1 раз
 }
 ```
+В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
 ### Взаимодействует с блоком
+
+**Сторона:** обе стороны
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -150,20 +164,18 @@ fun onPlayerInteract(event: PlayerInteractEvent.BlockInteract) {
 - `event.state` (BlockHitResult) - результат нажатия по блоку (содержит блок, его координаты и другую информацию).
 
 :::advice
-Это событие обычно при одном взаимодействии срабатывает 4 раза:
-- левая рука на сервере
-- левая рука на клиенте
-- правая рука на сервере
-- правая рука на клиенте
-То есть чаще всего вам нужно сделать дополнительную проверку:
+Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
-   // Уже действие, которое сработает 1 раз
+if (event.hand == InteractionHand.MAIN_HAND) {
+   // Действие, которое сработает 1 раз
 }
 ```
+В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
 ### Использует предмет
+
+**Сторона:** обе стороны
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -179,20 +191,18 @@ fun onPlayerInteract(event: PlayerInteractEvent.ItemInteract) {
 - `event.itemStack` (ItemStack) - предмет, который игрок использует.
 
 :::advice
-Это событие обычно при одном взаимодействии срабатывает 4 раза:
-- левая рука на сервере
-- левая рука на клиенте
-- правая рука на сервере
-- правая рука на клиенте
-То есть чаще всего вам нужно сделать дополнительную проверку:
+Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
 ```kotlin
-if (event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide) {
-   // Уже действие, которое сработает 1 раз
+if (event.hand == InteractionHand.MAIN_HAND) {
+   // Действие, которое сработает 1 раз
 }
 ```
+В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
 ### Пишет в чат
+
+**Сторона:** сервер
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -219,6 +229,8 @@ npc.say("Значит твой окончательный выбор - '$text'?"
 
 ### Выбрасывает предмет
 
+**Сторона:** сервер
+
 *Это событие можно отменить (`event.isCanceled = true`).*
 
 ```kotlin
@@ -232,6 +244,8 @@ fun onDropItem(event: ItemEntityEvent.Toss) {
 - `event.entity` (ItemEntity) - выброшенный предмет (как сущность).
 
 ### Натягивает лук
+
+**Сторона:** обе стороны
 
 ```kotlin
 @SubscribeEvent
@@ -247,6 +261,8 @@ fun onNock(event: ArrowEvent.Nock) {
 - `event.hasAmmo` (Boolean) - есть ли патроны / стрелы.
 
 ### Выпускает стрелу
+
+**Сторона:** обе стороны
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -269,6 +285,8 @@ fun onLoose(event: ArrowEvent.Loose) {
 
 ### Начинает отслеживать
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onStartTracking(event: EntityTrackingEvent.Start) {
@@ -280,6 +298,8 @@ fun onStartTracking(event: EntityTrackingEvent.Start) {
 - `event.entity` (Entity) - отслеживаемая сущность.
 
 ### Прекращает отслеживать
+
+**Сторона:** сервер
 
 ```kotlin
 @SubscribeEvent

@@ -15,6 +15,8 @@ If you need to run logic when the server starts or stops, use the following even
 
 ### On start
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onServerStart(event: ServerEvent.Starting) {
@@ -22,22 +24,32 @@ fun onServerStart(event: ServerEvent.Starting) {
 }
 ```
 
+:::advice
+A server `.reload.kts` runs before the server itself, so when a world opens this event reaches it. After `/reload`, however, the server is already running and the event does not fire again.
+:::
+
 ### On stop
+
+**Side:** server
 
 ```kotlin
 @SubscribeEvent
-fun onServerStop(event: ServerEvent.Stopping) {
+fun onServerStop(event: ServerEvent.Stoping) {
     val server = event.server
 }
 ```
 
 ## Ticks
 
+### Server tick
+
+**Side:** server
+
 If you need to run logic every server tick (20 ticks per second), use the `TickEvent.Server` event:
 
 ```kotlin
 @SubscribeEvent
-fun onServerStop(event: TickEvent.Server) {
+fun onServerTick(event: TickEvent.Server) {
     val server = event.server
 }
 ```
@@ -49,11 +61,40 @@ If you need to run logic every `X` ticks, you can create a simple counter:
 var ticker = 0
 
 @SubscribeEvent
-fun onServerStop(event: TickEvent.Server) {
-    val server = event.server
-    if (ticker++ % 5) { // Every 5 ticks
-        server.doSomething()
+fun onServerTick(event: TickEvent.Server) {
+    if (ticker++ % 5 == 0) { // Every 5 ticks
+        event.server.doSomething()
     }
 }
 ```
 :::
+
+### Client tick
+
+**Side:** client
+
+The same for the game client: fires 20 times per second, even in the main menu.
+
+```kotlin
+@file:ClientSide
+
+@SubscribeEvent
+fun onClientTick(event: TickEvent.Client) {
+    val minecraft = event.minecraft
+}
+```
+
+### Entity tick
+
+**Side:** both sides
+
+Fires every tick for every living entity.
+
+```kotlin
+@SubscribeEvent
+fun onEntityTick(event: TickEvent.Entity) {
+    val entity = event.entity
+}
+```
+
+- `event.entity` (LivingEntity) - the entity being updated.

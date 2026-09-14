@@ -37,6 +37,26 @@ When the Project panel is focused, these shortcuts are available:
 
 ![Project tree and context menu](/hollowengine/pictures/ide/project-tree.webp)
 
+## Creating scripts
+
+Right-clicking the `scripts` folder or any folder inside it shows the **New Script** item. Hover over it and pick a type:
+
+| Item                     | File                                  | What it contains                                   |
+|--------------------------|---------------------------------------|----------------------------------------------------|
+| **Script**               | `.kts`                                | a function and a call to it                        |
+| **Server Reload Script** | `.reload.kts`                         | a chat greeting for joining players                |
+| **Client Reload Script** | `.reload.kts` with `@file:ClientSide` | a line of text on the HUD                          |
+| **Startup Script**       | `.startup.kts`                        | an item registered under the file's name           |
+| **Node Script**          | `.node.kts`                           | start, stop, and once-a-second handlers            |
+| **UI Script**            | `.ui.kts`                             | a simple screen                                    |
+| **Dialogue**             | `.story`                              | a dialogue with two answers                        |
+
+Then enter the file name. The extension can be omitted, the IDE adds it. The new file opens in the editor right away with a working example to start from.
+
+![The new script menu](/hollowengine/pictures/ide/new-script-menu.webp)
+
+The item is only offered inside `scripts`, because the engine loads scripts and dialogues from there only.
+
 ## Code editor
 
 Opening `.kts`, `.story`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics are shown in the editor and in a resizable problems panel.
@@ -59,8 +79,9 @@ Useful editor shortcuts:
 
 Saving a file writes it to the `hollowengine` directory. What must be reloaded depends on the file:
 
-- use **File > Reload Client Resources** or `F3 + T` for models, textures, HSS, UI declarations, and other client resources;
-- use **File > Reload Server Resources** or `/reload` for datapack content and reloadable server scripts;
+- use **File > Reload Client Resources** or `F3 + T` for models, textures, HSS, UI declarations, client reloadable scripts (`@file:ClientSide`), and other client resources;
+- use **File > Reload Server Resources** or `/reload` for datapack content and server reloadable scripts;
+- `.startup.kts` changes only apply after restarting the game;
 - ordinary `.kts` scripts are started explicitly with `/hollowengine scripting run <path>`.
 
 The compiler addon is required to compile edited scripts. A modpack can instead ship scripts that were compiled ahead of time.

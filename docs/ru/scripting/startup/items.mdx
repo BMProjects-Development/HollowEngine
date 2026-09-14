@@ -1,0 +1,121 @@
+---
+title: Предметы
+order: 2
+---
+
+<center><h1>Предметы</h1></center>
+
+*Добавляем свой предмет: регистрация, текстура, название и поведение.*
+
+В этом уроке мы добавим рубин. Все пути ниже указаны от папки `hollowengine`, а пространство имён - `mypack` (как его задать, см. [введение](/docs/hollowengine/scripting/startup)).
+
+## Регистрация
+
+Создайте файл `scripts/items.startup.kts` (в IDE: правый клик по папке `scripts` → **New Script** → **Startup Script**) и зарегистрируйте предмет:
+
+```kotlin
+val RUBY by register("ruby") {
+    Item(Item.Properties())
+}
+```
+
+`register` создаёт предмет с идентификатором `mypack:ruby` и сразу генерирует для него модель. Переменная `RUBY` пригодится, чтобы ссылаться на предмет из этого же скрипта, например при создании [вкладки творческого режима](/docs/hollowengine/scripting/startup/creative-tabs).
+
+## Текстура и название
+
+Модель предмета ссылается на текстуру `mypack:item/ruby`, поэтому положите картинку 16×16 сюда:
+
+```text
+hollowengine/
+├── assets/
+│   └── mypack/
+│       ├── lang/
+│       │   ├── en_us.json
+│       │   └── ru_ru.json
+│       └── textures/
+│           └── item/
+│               └── ruby.png
+└── scripts/
+    └── items.startup.kts
+```
+
+Название задаётся в файлах перевода:
+
+```json
+{
+  "item.mypack.ruby": "Рубин"
+}
+```
+
+![Файлы предмета в дереве проекта](/hollowengine/pictures/startup/item-files.webp)
+
+Перезапустите игру и найдите предмет командой `/give @s mypack:ruby`.
+
+![Рубин в инвентаре](/hollowengine/pictures/startup/item-in-game.webp)
+
+:::advice
+Текстуры и переводы - обычные ресурсы, их можно менять без перезапуска: достаточно `F3 + T`. Перезапуск нужен только после правки самого скрипта.
+:::
+
+## Модель
+
+Второй параметр `register` выбирает, какую модель сгенерировать:
+
+| Значение                          | Модель                                            |
+|-----------------------------------|---------------------------------------------------|
+| `AutoModelType.DEFAULT` (по умолчанию) | плоский предмет, как рубин                   |
+| `AutoModelType.HANDHELD`          | предмет в руке держится как инструмент или меч    |
+| `null`                            | ничего не генерировать: модель лежит в `assets/mypack/models/item/<имя>.json` |
+
+```kotlin
+val RUBY_SWORD by register("ruby_sword", AutoModelType.HANDHELD) {
+    Item(Item.Properties().stacksTo(1))
+}
+```
+
+## Свойства предмета
+
+`Item.Properties` описывает поведение, которое есть у всех предметов Minecraft:
+
+```kotlin
+import net.minecraft.world.food.FoodProperties
+import net.minecraft.world.item.Rarity
+
+val RUBY_APPLE by register("ruby_apple") {
+    Item(
+        Item.Properties()
+            .stacksTo(16) // Размер стака
+            .rarity(Rarity.RARE) // Цвет названия
+            .fireResistant() // Не сгорает в лаве
+            .food(FoodProperties.Builder().nutrition(6).saturationModifier(1.2f).alwaysEdible().build())
+    )
+}
+```
+
+## Своё поведение
+
+Чтобы предмет что-то делал, унаследуйтесь от `Item` и переопределите нужный метод. Например, волшебная палочка, которая пишет в чат при использовании:
+
+```kotlin
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.InteractionResultHolder
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.Level
+
+val MAGIC_WAND by register("magic_wand", AutoModelType.HANDHELD) {
+    object : Item(Item.Properties().stacksTo(1)) {
+        override fun use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder<ItemStack> {
+            if (!level.isClientSide) {
+                player.sendSystemMessage("Вжух!".literal)
+            }
+            return InteractionResultHolder.success(player.getItemInHand(hand))
+        }
+    }
+}
+```
+
+`use` вызывается на обеих сторонах, поэтому игровую логику (сообщения, изменение мира) выполняйте только на сервере: `!level.isClientSide`.
+
+:::advice
+Для реакции на обычные предметы, не только свои, не нужен startup-скрипт: подпишитесь на `PlayerInteractEvent.ItemInteract` в [перезагружаемом скрипте](/docs/hollowengine/scripting/reload) и проверьте `event.itemStack.item`.
+:::

@@ -11,6 +11,8 @@ order: 3
 
 ## Placement
 
+**Side:** both sides
+
 *This event can be canceled (`event.isCanceled = true`).*
 
 ```kotlin
@@ -25,6 +27,8 @@ fun onBlockPlace(event: BlockEvent.Placed) {
 - `event.player` (Player) - the player who placed the block.
 
 ## Breaking
+
+**Side:** server
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -41,6 +45,8 @@ fun onBlockBreak(event: BlockEvent.Break) {
 - `event.level` (Level) - the world where the block was broken.
 
 ## Updates
+
+**Side:** server
 
 *This event can be canceled (`event.isCanceled = true`).*
 

@@ -1,0 +1,45 @@
+---
+title: Creative Tabs
+order: 4
+---
+
+<center><h1>Creative Tabs</h1></center>
+
+*Gather your items and blocks on a tab of their own.*
+
+New items do not appear on any creative mode tab by themselves. Let's create a tab for them in the same startup script where the [items](/docs/hollowengine/scripting/startup/items) and [blocks](/docs/hollowengine/scripting/startup/blocks) are registered.
+
+## Creating a tab
+
+```kotlin
+val RUBY by register("ruby") {
+    Item(Item.Properties())
+}
+
+val RUBY_BLOCK by block("ruby_block") {
+    Block(BlockBehaviour.Properties.of().strength(5f, 6f).sound(SoundType.METAL))
+}
+
+val GEMS by creativeTab("gems") {
+    icon { RUBY.defaultInstance }
+    displayItems { _, output ->
+        output.accept(RUBY)
+        output.accept(RUBY_BLOCK)
+    }
+}
+```
+
+- `icon { ... }` - the item drawn on the tab;
+- `displayItems { _, output -> ... }` - the tab contents, in the order you call `output.accept`.
+
+The tab gets the id `mypack:gems`, and its name comes from the translation key `itemGroup.gems`:
+
+```json
+{
+  "itemGroup.gems": "Gems"
+}
+```
+
+:::advice
+The tab name key has no namespace. To avoid clashing with another mod's tab, give it a prefixed name, for example `creativeTab("mypack_gems")` with the key `itemGroup.mypack_gems`.
+:::

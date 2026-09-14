@@ -11,6 +11,8 @@ order: 3
 
 ## Размещение
 
+**Сторона:** обе стороны
+
 *Это событие можно отменить (`event.isCanceled = true`).*
 
 ```kotlin
@@ -25,6 +27,8 @@ fun onBlockPlace(event: BlockEvent.Placed) {
 - `event.player` (Player) - игрок, поставивший блок.
 
 ## Ломание
+
+**Сторона:** сервер
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 
@@ -41,6 +45,8 @@ fun onBlockBreak(event: BlockEvent.Break) {
 - `event.level` (Level) - мир, где был сломан блок.
 
 ## Обновление
+
+**Сторона:** сервер
 
 *Это событие можно отменить (`event.isCanceled = true`).*
 

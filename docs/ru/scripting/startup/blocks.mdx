@@ -1,0 +1,135 @@
+---
+title: Блоки
+order: 3
+---
+
+<center><h1>Блоки</h1></center>
+
+*Добавляем свой блок вместе с предметом, дропом и инструментом для добычи.*
+
+Продолжим пример с рубином и добавим рубиновый блок. Пути указаны от папки `hollowengine`, пространство имён - `mypack`.
+
+## Регистрация
+
+Блок регистрируется функцией `block`. Она сразу создаёт и сам блок, и предмет, которым его ставят, с тем же идентификатором:
+
+```kotlin
+val RUBY_BLOCK by block("ruby_block") {
+    Block(
+        BlockBehaviour.Properties.of()
+            .strength(5f, 6f) // Прочность и взрывоустойчивость
+            .requiresCorrectToolForDrops() // Без подходящего инструмента ничего не выпадет
+            .sound(SoundType.METAL)
+    )
+}
+```
+
+По умолчанию блок получает модель куба, одинакового со всех сторон, а предмет выглядит как сам блок. Свойства предмета можно передать отдельно: `block("ruby_block", itemProperties = Item.Properties().fireResistant()) { ... }`.
+
+## Текстура и название
+
+Модель блока ссылается на текстуру `mypack:block/ruby_block`:
+
+```text
+hollowengine/
+├── assets/
+│   └── mypack/
+│       ├── lang/
+│       │   └── ru_ru.json
+│       └── textures/
+│           └── block/
+│               └── ruby_block.png
+└── data/
+    ├── minecraft/
+    │   └── tags/
+    │       └── block/
+    │           ├── mineable/
+    │           │   └── pickaxe.json
+    │           └── needs_iron_tool.json
+    └── mypack/
+        └── loot_table/
+            └── blocks/
+                └── ruby_block.json
+```
+
+У блока и его предмета одно название:
+
+```json
+{
+  "block.mypack.ruby_block": "Рубиновый блок"
+}
+```
+
+## Дроп
+
+Без таблицы добычи сломанный блок ничего не оставит. Чтобы он выпадал сам собой, создайте `data/mypack/loot_table/blocks/ruby_block.json`:
+
+```json
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [{ "type": "minecraft:item", "name": "mypack:ruby_block" }],
+      "conditions": [{ "condition": "minecraft:survives_explosion" }]
+    }
+  ]
+}
+```
+
+## Инструмент
+
+Раз блок требует подходящий инструмент, нужно сказать игре, какой. Для этого блок добавляется в теги Minecraft. Кирка:
+
+```json
+// data/minecraft/tags/block/mineable/pickaxe.json
+{
+  "values": ["mypack:ruby_block"]
+}
+```
+
+И минимальный уровень кирки, например железной:
+
+```json
+// data/minecraft/tags/block/needs_iron_tool.json
+{
+  "values": ["mypack:ruby_block"]
+}
+```
+
+:::advice
+Таблицы добычи, теги и рецепты - это датапак. Их можно менять без перезапуска игры: хватит `/reload`.
+:::
+
+Перезапустите игру и поставьте блок из инвентаря (`/give @s mypack:ruby_block`).
+
+## Своя модель
+
+Если блок не куб (например, у него разные стороны или сложная форма), передайте `model = null`. Тогда модели не генерируются, и движок ожидает их в ресурсах:
+
+```kotlin
+val RUBY_LAMP by block("ruby_lamp", model = null) {
+    Block(BlockBehaviour.Properties.of().lightLevel { 15 })
+}
+```
+
+```text
+assets/mypack/blockstates/ruby_lamp.json
+assets/mypack/models/block/ruby_lamp.json
+assets/mypack/models/item/ruby_lamp.json
+```
+
+Эти файлы устроены так же, как в любом ресурспаке Minecraft.
+
+## Рецепт
+
+Рецепты тоже живут в датапаке. Например, девять рубинов в блок, `data/mypack/recipe/ruby_block.json`:
+
+```json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["###", "###", "###"],
+  "key": { "#": { "item": "mypack:ruby" } },
+  "result": { "id": "mypack:ruby_block", "count": 1 }
+}
+```

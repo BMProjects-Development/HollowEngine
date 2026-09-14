@@ -1,0 +1,114 @@
+---
+title: Introduction to Startup Scripts
+order: 1
+---
+
+<center><h1>Introduction to Startup Scripts</h1></center>
+
+*Add your own items, blocks, and everything else Minecraft only accepts while it loads.*
+
+![Startup script in the IDE](/hollowengine/pictures/startup/startup-script.webp)
+
+## What is a startup script?
+
+A startup script is a file with the `.startup.kts` suffix. It runs **once while the game starts**, before the main menu, while Minecraft still accepts new content. Later on an item or a block can no longer be added, so all such content lives here:
+
+- items and blocks;
+- creative mode tabs;
+- events that only fire at startup: key bindings, entity renderers, particles, entity attributes.
+
+For game logic you want to edit without restarting, use [reloadable scripts](/docs/hollowengine/scripting/reload).
+
+:::warning
+Changes to a startup script only apply after **restarting the game**. `/reload` and `F3 + T` do not rerun it.
+:::
+
+## Where it runs
+
+A startup script runs both on the client and on a dedicated server. This matters: items and blocks have to be registered identically on both sides, otherwise the server will not let the player in. That is why startup scripts with content have to be installed both for the players and on the server.
+
+If part of the code only needs one side, check the `isClientSide` variable:
+
+```kotlin
+if (isClientSide) {
+    println("The game runs on the client")
+}
+```
+
+:::warning
+A dedicated server compiles startup scripts without Minecraft's client classes. If a script refers to client code (for example `KeyMapping` or renderers), the whole script fails to compile on the server, even when that code sits inside `if (isClientSide)`. Move such registrations into a separate startup script that is not installed on the server.
+:::
+
+## Namespace
+
+Everything a script registers gets an id of the form `namespace:name`. When you only give the name, the script uses the namespace of its folder:
+
+- for scripts in `hollowengine/scripts` it is `hollowengine-sandbox` until you set your own;
+- for addon scripts it is the addon id.
+
+Your own namespace for the `hollowengine` folder is set in `hollowengine/META-INF/plugin.properties`:
+
+```properties
+id=mypack
+```
+
+After that `register("ruby")` creates the item `mypack:ruby`, and its textures and translations live in `hollowengine/assets/mypack/`. A full id works too: `register("othermod:ruby")`.
+
+## Startup events
+
+A startup script subscribes to events the same way a reloadable one does, with `@SubscribeEvent`. The subscriptions last until the game exits. Besides the usual events, the events that only fire at startup are available here:
+
+| Event                                 | Side        | Used for                               |
+|---------------------------------------|-------------|----------------------------------------|
+| `RegisterKeyBindingsEvent`            | client      | key bindings                           |
+| `RegisterEntityRenderersEvent`        | client      | entity renderers                       |
+| `RegisterBlockEntityRenderersEvent`   | client      | block entity renderers                 |
+| `RegisterParticlesEvent`              | client      | particle providers                     |
+| `RegisterReloadListenersEvent.Client` | client      | your own resource reload listeners     |
+| `RegisterEntityAttributesEvent`       | both sides  | attributes of your own entities        |
+
+For example, a key binding of your own (this file is client-only):
+
+```kotlin
+import net.minecraft.client.KeyMapping
+import org.lwjgl.glfw.GLFW
+
+@SubscribeEvent
+fun onKeys(event: RegisterKeyBindingsEvent) {
+    event.registerKeyMapping(KeyMapping("key.mypack.journal", GLFW.GLFW_KEY_J, "key.categories.mypack"))
+}
+```
+
+Presses are easy to check from a client reloadable script:
+
+```kotlin
+@file:ClientSide
+
+import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+
+@SubscribeEvent
+fun onTick(event: TickEvent.Client) {
+    val journal = minecraft.options.keyMappings.first { it.name == "key.mypack.journal" }
+    while (journal.consumeClick()) {
+        // open the journal
+    }
+}
+```
+
+## When a script fails
+
+An error in a startup script does not stop the game from starting: it is written to the log, and the game shows a notification listing the failed scripts. Fix the script in the built-in IDE and restart the game.
+
+:::advice
+If the script failed before registering its items, they do not exist in this game session. Do not open worlds in it where those items already lie in chests or inventories: the game may remove items it does not know while loading.
+:::
+
+## Addons
+
+An addon may contain startup scripts too. If such an addon is enabled or updated while the game is already running, it gets the "restart required" status and loads on the next game start.
+
+## What's next
+
+- [Items](/docs/hollowengine/scripting/startup/items)
+- [Blocks](/docs/hollowengine/scripting/startup/blocks)
+- [Creative tabs](/docs/hollowengine/scripting/startup/creative-tabs)

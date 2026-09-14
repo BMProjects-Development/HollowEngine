@@ -1,0 +1,135 @@
+---
+title: Blocks
+order: 3
+---
+
+<center><h1>Blocks</h1></center>
+
+*Add a block of your own together with its item, drop, and mining tool.*
+
+Let's continue the ruby example and add a ruby block. Paths are relative to the `hollowengine` folder, the namespace is `mypack`.
+
+## Registration
+
+A block is registered with the `block` function. It creates both the block and the item that places it, under the same id:
+
+```kotlin
+val RUBY_BLOCK by block("ruby_block") {
+    Block(
+        BlockBehaviour.Properties.of()
+            .strength(5f, 6f) // Hardness and blast resistance
+            .requiresCorrectToolForDrops() // Nothing drops without a suitable tool
+            .sound(SoundType.METAL)
+    )
+}
+```
+
+By default the block gets a cube model that looks the same from every side, and the item looks like the block. Item properties can be passed separately: `block("ruby_block", itemProperties = Item.Properties().fireResistant()) { ... }`.
+
+## Texture and name
+
+The block model points to the texture `mypack:block/ruby_block`:
+
+```text
+hollowengine/
+├── assets/
+│   └── mypack/
+│       ├── lang/
+│       │   └── en_us.json
+│       └── textures/
+│           └── block/
+│               └── ruby_block.png
+└── data/
+    ├── minecraft/
+    │   └── tags/
+    │       └── block/
+    │           ├── mineable/
+    │           │   └── pickaxe.json
+    │           └── needs_iron_tool.json
+    └── mypack/
+        └── loot_table/
+            └── blocks/
+                └── ruby_block.json
+```
+
+The block and its item share one name:
+
+```json
+{
+  "block.mypack.ruby_block": "Block of Ruby"
+}
+```
+
+## Drops
+
+Without a loot table a broken block leaves nothing behind. To make it drop itself, create `data/mypack/loot_table/blocks/ruby_block.json`:
+
+```json
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [{ "type": "minecraft:item", "name": "mypack:ruby_block" }],
+      "conditions": [{ "condition": "minecraft:survives_explosion" }]
+    }
+  ]
+}
+```
+
+## Tool
+
+Since the block requires a suitable tool, the game has to know which one. For that the block is added to Minecraft tags. The pickaxe:
+
+```json
+// data/minecraft/tags/block/mineable/pickaxe.json
+{
+  "values": ["mypack:ruby_block"]
+}
+```
+
+And the minimum pickaxe tier, for example iron:
+
+```json
+// data/minecraft/tags/block/needs_iron_tool.json
+{
+  "values": ["mypack:ruby_block"]
+}
+```
+
+:::advice
+Loot tables, tags, and recipes are datapack content. They change without restarting the game: `/reload` is enough.
+:::
+
+Restart the game and place the block from the inventory (`/give @s mypack:ruby_block`).
+
+## Custom model
+
+If the block is not a plain cube (different sides or a complex shape), pass `model = null`. Then no models are generated, and the engine expects them in resources:
+
+```kotlin
+val RUBY_LAMP by block("ruby_lamp", model = null) {
+    Block(BlockBehaviour.Properties.of().lightLevel { 15 })
+}
+```
+
+```text
+assets/mypack/blockstates/ruby_lamp.json
+assets/mypack/models/block/ruby_lamp.json
+assets/mypack/models/item/ruby_lamp.json
+```
+
+These files work exactly as in any Minecraft resource pack.
+
+## Recipe
+
+Recipes live in the datapack too. For example, nine rubies into a block, `data/mypack/recipe/ruby_block.json`:
+
+```json
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["###", "###", "###"],
+  "key": { "#": { "item": "mypack:ruby" } },
+  "result": { "id": "mypack:ruby_block", "count": 1 }
+}
+```

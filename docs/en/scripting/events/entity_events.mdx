@@ -11,6 +11,8 @@ order: 4
 
 ## Spawned in the world
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onEntitySpawn(event: EntityLoadedEvent) {
@@ -22,6 +24,8 @@ fun onEntitySpawn(event: EntityLoadedEvent) {
 - `event.uuid` (UUID) - the entity's unique identifier.
 
 ## Entity death
+
+**Side:** server
 
 *This event can be canceled (`event.isCanceled = true`).*
 
@@ -36,6 +40,8 @@ fun onEntitySpawn(event: LivingEntityDeathEvent) {
 - `event.source` (DamageSource) - the source and type of the damage dealt.
 
 ## Moving between dimensions
+
+**Side:** server
 
 ```kotlin
 @SubscribeEvent
@@ -55,6 +61,8 @@ Typed [`.data`](/docs/hollowengine/scripting/npc/data) carries over on its own, 
 
 ## Taking damage
 
+**Side:** server
+
 *This event can be canceled (`event.isCanceled = true`).*
 
 ```kotlin
@@ -69,6 +77,8 @@ fun onEntityHurt(event: EntityEvent.Hurt) {
 - `event.amount` (Float) - the amount of damage dealt. (can be changed)
 
 ## Entity breeding
+
+**Side:** server
 
 *This event can be canceled (`event.isCanceled = true`).*
 

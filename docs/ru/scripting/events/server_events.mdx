@@ -15,6 +15,8 @@ order: 1
 
 ### При запуске
 
+**Сторона:** сервер
+
 ```kotlin
 @SubscribeEvent
 fun onServerStart(event: ServerEvent.Starting) {
@@ -22,22 +24,32 @@ fun onServerStart(event: ServerEvent.Starting) {
 }
 ```
 
+:::advice
+Серверный `.reload.kts` запускается раньше самого сервера, поэтому при открытии мира это событие до него дойдёт. А вот после `/reload` сервер уже работает, и событие повторно не сработает.
+:::
+
 ### При остановке
+
+**Сторона:** сервер
 
 ```kotlin
 @SubscribeEvent
-fun onServerStop(event: ServerEvent.Stopping) {
+fun onServerStop(event: ServerEvent.Stoping) {
     val server = event.server
 }
 ```
 
 ## Тики
 
+### Тик сервера
+
+**Сторона:** сервер
+
 Если вам нужно выполнять действие каждый тик сервера (20 тиков в секунду), то вам подойдёт событие `TickEvent.Server`:
 
 ```kotlin
 @SubscribeEvent
-fun onServerStop(event: TickEvent.Server) {
+fun onServerTick(event: TickEvent.Server) {
     val server = event.server
 }
 ```
@@ -48,12 +60,40 @@ fun onServerStop(event: TickEvent.Server) {
 var ticker = 0
 
 @SubscribeEvent
-fun onServerStop(event: TickEvent.Server) {
-    val server = event.server
-    if (ticker++ % 5) { // Каждые 5 тиков
-        server.doSomething()
+fun onServerTick(event: TickEvent.Server) {
+    if (ticker++ % 5 == 0) { // Каждые 5 тиков
+        event.server.doSomething()
     }
 }
 ```
 :::
 
+### Тик клиента
+
+**Сторона:** клиент
+
+То же самое для клиента игры: срабатывает 20 раз в секунду, даже в главном меню.
+
+```kotlin
+@file:ClientSide
+
+@SubscribeEvent
+fun onClientTick(event: TickEvent.Client) {
+    val minecraft = event.minecraft
+}
+```
+
+### Тик сущности
+
+**Сторона:** обе стороны
+
+Срабатывает каждый тик каждой живой сущности.
+
+```kotlin
+@SubscribeEvent
+fun onEntityTick(event: TickEvent.Entity) {
+    val entity = event.entity
+}
+```
+
+- `event.entity` (LivingEntity) - обновляемая сущность.

@@ -11,10 +11,12 @@ order: 5
 
 ## Saving
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
 fun onSave(event: LevelEvent.Save) {
-    val entity = event.entity
+    val level = event.level
 }
 ```
 
@@ -22,10 +24,12 @@ fun onSave(event: LevelEvent.Save) {
 
 ## Loading
 
+**Side:** server
+
 ```kotlin
 @SubscribeEvent
-fun onSave(event: LevelEvent.Load) {
-    val entity = event.entity
+fun onLoad(event: LevelEvent.Load) {
+    val level = event.level
 }
 ```
 

@@ -1,0 +1,45 @@
+---
+title: Вкладки творческого режима
+order: 4
+---
+
+<center><h1>Вкладки творческого режима</h1></center>
+
+*Собираем свои предметы и блоки на отдельной вкладке.*
+
+Сами по себе новые предметы не попадают ни на одну вкладку творческого режима. Создадим для них свою вкладку в том же startup-скрипте, где зарегистрированы [предметы](/docs/hollowengine/scripting/startup/items) и [блоки](/docs/hollowengine/scripting/startup/blocks).
+
+## Создание вкладки
+
+```kotlin
+val RUBY by register("ruby") {
+    Item(Item.Properties())
+}
+
+val RUBY_BLOCK by block("ruby_block") {
+    Block(BlockBehaviour.Properties.of().strength(5f, 6f).sound(SoundType.METAL))
+}
+
+val GEMS by creativeTab("gems") {
+    icon { RUBY.defaultInstance }
+    displayItems { _, output ->
+        output.accept(RUBY)
+        output.accept(RUBY_BLOCK)
+    }
+}
+```
+
+- `icon { ... }` - предмет, который нарисован на вкладке;
+- `displayItems { _, output -> ... }` - содержимое вкладки в том порядке, в котором вы вызываете `output.accept`.
+
+Вкладка получает идентификатор `mypack:gems`, а её название берётся из перевода по ключу `itemGroup.gems`:
+
+```json
+{
+  "itemGroup.gems": "Самоцветы"
+}
+```
+
+:::advice
+Ключ названия вкладки не содержит пространства имён. Чтобы не столкнуться с вкладкой другого мода, давайте ей имя с префиксом, например `creativeTab("mypack_gems")` и ключ `itemGroup.mypack_gems`.
+:::
