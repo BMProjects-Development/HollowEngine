@@ -10,7 +10,7 @@
   <a href="https://github.com/HollowHorizon/HollowEngine/graphs/contributors"><img src="https://img.shields.io/github/contributors/HollowHorizon/HollowEngine.svg?style=for-the-badge&labelColor=a39774&color=ccac4b" alt="Contributors"></a>
   <a href="https://github.com/HollowHorizon/HollowEngine/releases"><img src="https://img.shields.io/github/downloads/HollowHorizon/HollowEngine/total?style=for-the-badge&labelColor=a39774&color=ccac4b" alt="Downloads"></a>
   <a href="https://discord.gg/qKpPhkwGCY"><img src="https://img.shields.io/discord/1081609215484887051?style=for-the-badge&label=Discord&logo=discord&logoColor=d9e0ee&labelColor=a39774&color=ccac4b" alt="Discord"></a>
-  <img src="https://img.shields.io/codefactor/grade/github/HollowHorizon/HollowEngine?style=for-the-badge&labelColor=a39774&color=ccac4b" alt="CodeFactor">
+  <img src="https://img.shields.io/codefactor/grade/github/BMProjects-Development/HollowEngine?style=for-the-badge&labelColor=a39774&color=ccac4b" alt="CodeFactor">
 </p>
 
 ---
