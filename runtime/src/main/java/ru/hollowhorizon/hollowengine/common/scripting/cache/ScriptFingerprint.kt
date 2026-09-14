@@ -108,6 +108,10 @@ object ScriptFingerprint {
             provider.defaultImports.forEach { append(it).append(',') }
             append('|')
             provider.implicitReceivers.forEach { append(it.qualifiedName).append(',') }
+            provider.clientSideReceivers?.let { receivers ->
+                append('|')
+                receivers.forEach { append(it).append(',') }
+            }
         }
     }
 

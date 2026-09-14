@@ -7,12 +7,16 @@ import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.scripting.annotations.Import
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ReloadScript
+import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadContext
+import ru.hollowhorizon.hollowengine.common.scripting.startup.StartupScript
 import ru.hollowhorizon.hollowengine.common.scripting.ui.UiScript
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider as Provider
 
 const val NODE_SCRIPT_EXTENSION = "node.kts"
 const val UI_SCRIPT_EXTENSION = "ui.kts"
 const val RELOAD_SCRIPT_EXTENSION = "reload.kts"
+const val STARTUP_SCRIPT_EXTENSION = "startup.kts"
+private const val CLIENT_RELOAD_CONTEXT = "ru.hollowhorizon.hollowengine.client.scripting.ClientReloadContext"
 
 object DefaultScriptDefinitions {
     private val definitions by lazy(::createProviders)
@@ -41,6 +45,8 @@ object DefaultScriptDefinitions {
                     "net.minecraft.core.component.DataComponentPatch",
                     SubscribeEvent::class.qualifiedName!!,
                     Import::class.qualifiedName!!,
+                    "kotlinx.coroutines.launch",
+                    "kotlinx.coroutines.delay",
                     "ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.item",
                     "ru.hollowhorizon.hollowengine.common.utils.rl",
                     "ru.hollowhorizon.hollowengine.common.utils.literal",
@@ -52,7 +58,29 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.dialogue.lang.number",
                     "ru.hollowhorizon.hollowengine.common.dialogue.lang.signature",
                     "ru.hollowhorizon.hollowengine.common.dialogue.lang.string",
-                )
+                ),
+                implicitReceivers = listOf(ServerReloadContext::class),
+                clientSideReceivers = listOf(CLIENT_RELOAD_CONTEXT),
+            )
+            this += Provider(
+                extension = STARTUP_SCRIPT_EXTENSION,
+                baseClass = StartupScript::class.qualifiedName!!,
+                defaultImports = listOf(
+                    "ru.hollowhorizon.hollowengine.common.scripting.annotations.*",
+                    "ru.hollowhorizon.hollowengine.common.events.registry.*",
+                    "ru.hollowhorizon.hollowengine.common.registry.getValue",
+                    "ru.hollowhorizon.hollowengine.api.AutoModelType",
+                    "net.minecraft.world.item.Item",
+                    "net.minecraft.world.item.CreativeModeTab",
+                    "net.minecraft.world.level.block.Block",
+                    "net.minecraft.world.level.block.state.BlockBehaviour",
+                    ResourceLocation::class.qualifiedName!!,
+                    ItemStack::class.qualifiedName!!,
+                    SubscribeEvent::class.qualifiedName!!,
+                    Import::class.qualifiedName!!,
+                    "ru.hollowhorizon.hollowengine.common.utils.rl",
+                    "ru.hollowhorizon.hollowengine.common.utils.literal",
+                ),
             )
             this += Provider(
                 extension = UI_SCRIPT_EXTENSION,

@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.registry.getSubTypes
 import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationEnvironment
 import ru.hollowhorizon.hollowengine.common.runtime.loadBootstrapOrRuntimeClass
 import ru.hollowhorizon.hollowengine.common.runtime.resolve
+import ru.hollowhorizon.hollowengine.common.scripting.startup.StartupScripts
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 object CoreInitialization {
@@ -42,6 +43,7 @@ object CoreInitialization {
 
         HollowModProcessor
         HollowAddonManager.initializeAll()
+        StartupScripts.run()
 
         // Очищаем старые результаты сканирования, они в среднем жрут 500мб памяти, так что регистрация аннотаций должна быть одноразовой
         getSubTypes = { emptySet() }

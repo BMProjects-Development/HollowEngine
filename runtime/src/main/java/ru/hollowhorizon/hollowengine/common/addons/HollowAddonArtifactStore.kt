@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.common.addons
 
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
+import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -18,6 +20,7 @@ internal data class HollowAddonCandidate(
     val fingerprint: String,
     val descriptor: HollowAddonDescriptor,
     val requiresBootstrapLibraries: Boolean,
+    val hasStartupScripts: Boolean,
 )
 
 internal class HollowAddonArtifactStore(
@@ -70,6 +73,7 @@ internal class HollowAddonArtifactStore(
             fingerprint = fingerprint,
             descriptor = descriptor.copy(mappingNamespace = runtimeNamespace),
             requiresBootstrapLibraries = containsBootstrapLibraries(stagedFile),
+            hasStartupScripts = containsStartupScripts(classesFile),
         )
     }
 
@@ -111,6 +115,18 @@ internal class HollowAddonArtifactStore(
             !entry.isDirectory &&
                 entry.name.startsWith(AddonBootstrapContract.BOOTSTRAP_LIBRARY_PATH) &&
                 entry.name.endsWith(".jar")
+        }
+    }
+
+    private fun containsStartupScripts(file: File): Boolean = JarFile(file).use { jar ->
+        val source = ".$STARTUP_SCRIPT_EXTENSION"
+        val compiled = source + AddonScriptSource.COMPILED_SUFFIX
+        jar.entries().asSequence().any { entry ->
+            val name = entry.name
+            !entry.isDirectory && (
+                name.startsWith(AddonScriptSource.SOURCE_PREFIX) && name.endsWith(source) ||
+                    name.startsWith(AddonScriptSource.COMPILED_PREFIX) && name.endsWith(compiled)
+                )
         }
     }
 

@@ -1,0 +1,53 @@
+package ru.hollowhorizon.hollowengine.common.scripting.startup
+
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.scripting.StartupScriptNotice
+import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptEventHandlers
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
+import kotlin.script.experimental.api.constructorArgs
+
+/**
+ * Runs every `.startup.kts` once, right after addons are initialized and before mod loader fires its
+ * registration events.
+ */
+object StartupScripts {
+    private val scope = CoroutineScope(SupervisorJob() + CoroutineName("Startup scripts"))
+
+    fun run() {
+        val failed = orderedScripts().filterNot(::load)
+        if (failed.isNotEmpty() && isPhysicalClient) {
+            StartupScriptNotice.show(failed.map(ScriptRegistry::display))
+        }
+    }
+
+    private fun load(id: ScriptId): Boolean = ScriptLoader.execute<StartupScript>(id) {
+        constructorArgs(isPhysicalClient, id.namespace)
+    }.onSuccess { script ->
+        ScriptEventHandlers.subscribe(id, script, scope)
+    }.onFailure { error ->
+        HollowEngine.LOGGER.error("Failed to execute startup script: {}", ScriptRegistry.display(id), error)
+    }.isSuccess
+
+    private fun orderedScripts(): List<ScriptId> {
+        val sources = ScriptRegistry.sources().associateBy { it.namespace }
+        val ordered = LinkedHashSet<String>()
+        fun visit(namespace: String, path: Set<String>) {
+            if (namespace in ordered || namespace in path) return
+            val source = sources[namespace] ?: return
+            source.dependencies.forEach { dependency -> visit(dependency, path + namespace) }
+            ordered += namespace
+        }
+        sources.keys.forEach { namespace -> visit(namespace, emptySet()) }
+
+        return ordered.flatMap { namespace ->
+            ScriptRegistry.listIn(namespace, ".$STARTUP_SCRIPT_EXTENSION").sortedBy(ScriptId::path)
+        }
+    }
+}

@@ -4,13 +4,13 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeRuntime
-import ru.hollowhorizon.hollowengine.common.scripting.reload.ReloadScriptManager
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 /**
  * Keeps everything that runs scripts in step with the namespaces that provide them. Enabling an addon
- * starts its nodes back up and re-registers its UI and reload declarations; disabling one stops its
- * nodes without discarding their saved state.
+ * starts its nodes back up and has the client run its UI and reload scripts again; disabling one stops its
+ * nodes without discarding their saved state. Server reload scripts follow the datapack reload that the
+ * addon runtime starts on every change of the loaded addons.
  */
 object ScriptSourceLifecycle : ScriptSourceListener {
     @Volatile
@@ -37,22 +37,23 @@ object ScriptSourceLifecycle : ScriptSourceListener {
             else EntityNodeRuntime.suspendNamespace(namespace)
         }.onFailure { HollowEngine.LOGGER.error("Failed to update entity nodes of '$namespace'", it) }
 
-        runCatching { ReloadScriptManager.rerun() }
-            .onFailure { HollowEngine.LOGGER.error("Failed to rerun reload scripts after '$namespace' changed", it) }
-
         if (isPhysicalClient) {
-            runCatching { reloadUiScripts() }
-                .onFailure { HollowEngine.LOGGER.error("Failed to reload UI scripts after '$namespace' changed", it) }
+            runCatching { reloadClientScripts() }
+                .onFailure { HollowEngine.LOGGER.error("Failed to reload client scripts after '$namespace' changed", it) }
         }
     }
 
     /**
-     * Loaded reflectively: the UI loader is client-only code and this object also runs on a dedicated
-     * server, where the class is not present at all.
+     * Loaded reflectively: the loaders are client-only code and this object also runs on a dedicated
+     * server, where the classes are not present at all.
      */
-    private fun reloadUiScripts() {
-        val loader = Class.forName("ru.hollowhorizon.hollowengine.client.ui.script.UiScriptLoader")
-        val instance = loader.getDeclaredField("INSTANCE").get(null)
-        loader.getMethod("reload").invoke(instance)
+    private fun reloadClientScripts() {
+        listOf(
+            "ru.hollowhorizon.hollowengine.client.ui.script.UiScriptLoader" to "reload",
+            "ru.hollowhorizon.hollowengine.client.scripting.ClientReloadScripts" to "rerun",
+        ).forEach { (className, method) ->
+            val loader = Class.forName(className)
+            loader.getMethod(method).invoke(loader.getDeclaredField("INSTANCE").get(null))
+        }
     }
 }

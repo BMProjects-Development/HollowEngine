@@ -85,6 +85,7 @@ import ru.hollowhorizon.hollowengine.common.compat.util.recipeManagerProtected
 import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
+import ru.hollowhorizon.hollowengine.common.coroutines.ServerThreadDispatcher
 import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewPotionEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewedPlayerPotionEvent
@@ -98,7 +99,6 @@ import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractEvent
 import ru.hollowhorizon.hollowengine.common.events.item.ArrowEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
-import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterParticlesEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterResourcePacksEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterTagsEvent
@@ -113,6 +113,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArmsCom
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.MaterialSources
 import ru.hollowhorizon.hollowengine.common.registry.CommonRegistryHelper
 import ru.hollowhorizon.hollowengine.common.registry.CommonRegistryProvider
+import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScripts
 import ru.hollowhorizon.hollowengine.common.runtime.EmptyRuntimeAnnotationIndex
 import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationEnvironment
 import ru.hollowhorizon.hollowengine.common.utils.*
@@ -502,6 +503,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onServerCreated(server: MinecraftServer, serverThread: Thread, levelRoot: Path) {
         currentServer = server
         RuntimeDispatcherState.createServer(server, serverThread)
+        ServerThreadDispatcher.onServerCreated(server)
         ServerRuntimeState.create(server, levelRoot)
     }
 
@@ -525,7 +527,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onServerStopped(server: MinecraftServer) {
-        RegisterCommandsEvent.clearReplay()
+        ServerReloadScripts.stop()
         RuntimeDispatcherState.stopServer(server)
         ServerRuntimeState.remove(server)
         clearCurrentServer(server)

@@ -37,6 +37,8 @@ object RuntimeDispatcherState {
 
     fun serverDispatcher(server: MinecraftServer) = server(server).dispatcher
 
+    fun serverDispatcherOrNull(server: MinecraftServer): SingleThreadDispatcher? = serverStates[server]?.dispatcher
+
     fun serverScope(server: MinecraftServer) = server(server).scope
 
     fun createClient(client: Minecraft) {

@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEntrypoint
 import ru.hollowhorizon.hollowengine.common.addons.publish
 import ru.hollowhorizon.hollowengine.common.compiler.ScriptingCompilerImpl
 import ru.hollowhorizon.hollowengine.common.compiler.configuration.HollowScriptConfiguration
+import ru.hollowhorizon.hollowengine.common.compiler.configuration.clientSideImplicitReceivers
 import ru.hollowhorizon.hollowengine.common.ide.session.AnalysisEnvironment
 import ru.hollowhorizon.hollowengine.common.ide.session.EmptyLogger
 import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
@@ -105,14 +106,17 @@ class ScriptingEnvironmentImpl(
         getScriptingClass(JvmGetScriptingClass())
         configurationDependencies(JvmDependency(hostClasspath))
     }
-    val scriptDefinitions = scriptTypes.map { (extension, path, imports, receivers) ->
+    val scriptDefinitions = scriptTypes.map { provider ->
         ScriptDefinition.FromConfigurations(
             scriptHostConfig,
             HollowScriptConfiguration(classpath) {
-                baseClass.replaceOnlyDefault(KotlinType(path))
-                fileExtension.replaceOnlyDefault(extension)
-                defaultImports(imports)
-                implicitReceivers(receivers.map { KotlinType(it) })
+                baseClass.replaceOnlyDefault(KotlinType(provider.baseClass))
+                fileExtension.replaceOnlyDefault(provider.extension)
+                defaultImports(provider.defaultImports)
+                implicitReceivers(provider.implicitReceivers.map { KotlinType(it) })
+                provider.clientSideReceivers?.let { receivers ->
+                    clientSideImplicitReceivers(receivers.map { KotlinType(it) })
+                }
             },
             ScriptEvaluationConfiguration()
         )

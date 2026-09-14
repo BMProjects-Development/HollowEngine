@@ -34,12 +34,13 @@ open class HollowRegistry(val modId: String = MODID) {
         ) as RegistryHolder<T>
     }
 
+    /** A plain [id] lands in [modId]; a full `namespace:path` is used as written. */
     inline fun <reified T : Any> register(
         id: String,
         autoModel: AutoModelType? = AutoModelType.DEFAULT,
         registry: Registry<in T>? = null,
         noinline registryEntry: (ResourceLocation) -> T,
-    ): RegistryHolder<T> = register("$modId:$id".rl, autoModel, registry, registryEntry)
+    ): RegistryHolder<T> = register(if (':' in id) id.rl else "$modId:$id".rl, autoModel, registry, registryEntry)
 
     fun creativeTab(name: String, block: CreativeModeTab.Builder.() -> Unit = {}) = register(name) {
         HollowCreativeTab.builder()

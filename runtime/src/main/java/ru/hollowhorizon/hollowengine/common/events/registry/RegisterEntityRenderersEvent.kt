@@ -6,11 +6,12 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.entity.BlockEntityType
-import ru.hollowhorizon.hollowengine.common.events.Event
+import ru.hollowhorizon.hollowengine.common.events.ClientEvent
+import ru.hollowhorizon.hollowengine.common.events.StartupEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
 class RegisterEntityRenderersEvent(private val consumer: (EntityType<out Entity>, EntityRendererProvider<Entity>) -> Unit) :
-    Event {
+    ClientEvent, StartupEvent {
     companion object : EventHandler<RegisterEntityRenderersEvent>()
 
     fun <T : Entity> registerEntity(entity: EntityType<out T>, provider: EntityRendererProvider<T>) {
@@ -19,7 +20,7 @@ class RegisterEntityRenderersEvent(private val consumer: (EntityType<out Entity>
 }
 
 class RegisterBlockEntityRenderersEvent(private val consumer: (BlockEntityType<out BlockEntity>, BlockEntityRendererProvider<BlockEntity>) -> Unit) :
-    Event {
+    ClientEvent, StartupEvent {
     companion object : EventHandler<RegisterBlockEntityRenderersEvent>()
 
     fun <T : BlockEntity> registerEntity(entity: BlockEntityType<out T>, provider: BlockEntityRendererProvider<T>) {

@@ -36,6 +36,7 @@ import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.item.BuildTabContentsEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.*
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScripts
 import java.util.function.BiConsumer
 import java.util.function.Consumer
 
@@ -98,7 +99,7 @@ object EventBridgeImpl : EventBridge {
         ctx: CommandBuildContext,
         environment: Commands.CommandSelection,
     ) {
-        RegisterCommandsEvent.post(RegisterCommandsEvent(dispatcher, ctx, environment))
+        ServerReloadScripts.onCommandsCreated(RegisterCommandsEvent(dispatcher, ctx, environment))
     }
 
     override fun onClientCommandRegistration(

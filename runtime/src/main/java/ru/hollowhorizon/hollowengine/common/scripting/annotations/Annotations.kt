@@ -30,5 +30,20 @@ annotation class SharedScript
 @Target(AnnotationTarget.FILE)
 annotation class Attach(val value: KClass<*>)
 
+/**
+ * Makes a `*.reload.kts` a client script: it runs only on the physical client, is restarted by every
+ * client resource reload (F3+T, a resource pack change) and gets `minecraft` instead of `recipeManager`.
+ * A dedicated server does not even compile it.
+ */
+@Target(AnnotationTarget.FILE)
+annotation class ClientSide
+
+/**
+ * Makes a `*.reload.kts` a server script, which it is without any annotation: it runs on the logical server
+ * and is restarted by every datapack load, the opening of a world and `/reload`.
+ */
+@Target(AnnotationTarget.FILE)
+annotation class ServerSide
+
 @Target(AnnotationTarget.FUNCTION)
 annotation class State(val name: String = "")

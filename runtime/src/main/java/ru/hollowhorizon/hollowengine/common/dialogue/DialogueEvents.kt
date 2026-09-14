@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.dialogue
 
 import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.common.events.Event
+import ru.hollowhorizon.hollowengine.common.events.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
 /**
@@ -65,7 +66,7 @@ open class DialogueEvent(val session: DialogueSession) : Event {
  * same overload twice and the registry rejects it. Use event's priority & [StoryFunctionRegistry.unregister] first if a
  * script means to replace a built-in.
  */
-class RegisterStoryFunctionsEvent(val functions: StoryFunctionRegistry) : Event {
+class RegisterStoryFunctionsEvent(val functions: StoryFunctionRegistry) : ServerEvent {
     companion object : EventHandler<RegisterStoryFunctionsEvent>()
 }
 

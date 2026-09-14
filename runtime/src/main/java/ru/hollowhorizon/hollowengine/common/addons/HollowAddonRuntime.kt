@@ -8,9 +8,11 @@ import org.koin.dsl.module
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonVersions
+import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptSourceLifecycle
+import ru.hollowhorizon.hollowengine.common.scripting.startup.StartupScripts
 import ru.hollowhorizon.hollowengine.network.HollowAddonPacketRegistry
 import java.io.File
 
@@ -310,6 +312,16 @@ internal class HollowAddonRuntime(
             HollowAddonNotifications.restartRequired(descriptor)
             return false
         }
+        if (candidate.hasStartupScripts && StartupScripts.hasRun) {
+            restartRequiredAddons[descriptor.id] = descriptor
+            restartRequiredSnapshot = restartRequiredAddons.values.toList()
+            HollowEngine.LOGGER.warn(
+                "Addon '{}' contains startup scripts and was added or updated after startup; it is disabled for this session.",
+                descriptor.id,
+            )
+            HollowAddonNotifications.restartRequired(descriptor)
+            return false
+        }
         val runtimeNamespace = HollowAddonRuntimeEnvironment.mappingNamespace()
         if (descriptor.mappingNamespace != HollowAddonMappingNamespace.AGNOSTIC && descriptor.mappingNamespace != runtimeNamespace) {
             HollowEngine.LOGGER.error(
@@ -349,7 +361,11 @@ internal class HollowAddonRuntime(
         }
         val details = when (state) {
             HollowAddonState.WAITING_FOR_DEPENDENCIES -> "Missing dependencies: ${missingDependencies.joinToString()}."
-            HollowAddonState.RESTART_REQUIRED -> "Restart Minecraft to load bootstrap/native libraries."
+            HollowAddonState.RESTART_REQUIRED -> if (candidate.requiresBootstrapLibraries) {
+                "Restart Minecraft to load bootstrap/native libraries."
+            } else {
+                "Restart Minecraft to run its startup scripts."
+            }
             HollowAddonState.REJECTED -> "Bundled libraries failed bootstrap safety validation."
             HollowAddonState.INACTIVE -> "Check environment, mapping namespace, required classes, and the log."
             else -> null
@@ -526,10 +542,23 @@ internal class HollowAddonRuntime(
 
     private suspend fun <T> locked(block: suspend () -> T): T {
         mutex.lock()
+        val loadedBefore = loadedSnapshot
         return try {
             block()
         } finally {
             mutex.unlock()
+            if (loadedSnapshot !== loadedBefore) reloadRunningServers()
+        }
+    }
+
+    private fun reloadRunningServers() {
+        ServerRuntimeState.servers().forEach { server ->
+            server.execute {
+                server.reloadResources(server.packRepository.selectedIds).exceptionally { error ->
+                    HollowEngine.LOGGER.error("Failed to reload datapacks after the set of addons changed", error)
+                    null
+                }
+            }
         }
     }
 

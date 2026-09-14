@@ -44,7 +44,7 @@ fun File.loadKotlinCompiledScriptFromJar(baseClassLoader: ClassLoader? = null): 
 
 internal class KotlinCompiledScriptJar(
     override val name: String,
-    private val script: KotlinCompiledScript,
+    private val script: KJvmCompiledScriptFromJar,
     private val evaluationConfiguration: ScriptEvaluationConfiguration,
 ) : CompiledScript {
     private val evaluator = HollowEngineScriptEvaluator()
@@ -62,6 +62,10 @@ internal class KotlinCompiledScriptJar(
             scriptClass.value
             return script.compilationConfiguration[ScriptCompilationConfiguration.implicitReceivers]?.size ?: 0
         }
+
+    override val isClientSide: Boolean
+        get() = script.metadata(evaluationConfiguration)
+            .compilationConfiguration[ScriptCompilationConfiguration.isClientSideScript] == true
 
     override fun <T> execute(body: ScriptEvaluationConfiguration.Builder.() -> Unit): Result<T> {
         val result = try {
@@ -86,6 +90,9 @@ internal val JvmScriptEvaluationConfigurationKeys.actualClassLoader by Propertie
 
 /** Whether this compiled script opted into instance sharing with `@file:SharedScript`. */
 val ScriptCompilationConfigurationKeys.isSharedScript by PropertiesCollection.key<Boolean>()
+
+/** Whether this compiled script declared `@file:ClientSide`. */
+val ScriptCompilationConfigurationKeys.isClientSideScript by PropertiesCollection.key<Boolean>()
 
 open class HollowEngineScriptEvaluator : ScriptEvaluator {
     companion object {
@@ -239,25 +246,31 @@ internal class KJvmCompiledScriptFromJar(
     private fun getScriptOrFail(): KJvmCompiledScript =
         loadedScript ?: throw IllegalStateException("Compiled script is not loaded yet")
 
-    override suspend fun getClass(scriptEvaluationConfiguration: ScriptEvaluationConfiguration?): ResultWithDiagnostics<KClass<*>> {
-        if (loadedScript != null) return getScriptOrFail().getClass(scriptEvaluationConfiguration)
+    override suspend fun getClass(scriptEvaluationConfiguration: ScriptEvaluationConfiguration?): ResultWithDiagnostics<KClass<*>> =
+        metadata(scriptEvaluationConfiguration).getClass(scriptEvaluationConfiguration)
+
+    /**
+     * The serialized description of the script, read without defining the script class.
+     */
+    fun metadata(scriptEvaluationConfiguration: ScriptEvaluationConfiguration?): KJvmCompiledScript {
+        loadedScript?.let { return it }
 
         val actualEvaluationConfiguration = scriptEvaluationConfiguration ?: ScriptEvaluationConfiguration()
         val baseClassLoader = actualEvaluationConfiguration[ScriptEvaluationConfiguration.jvm.baseClassLoader]
             ?: Thread.currentThread().contextClassLoader
         val entries = readJarEntries()
         val classLoader = MemoryClassLoader(entries, baseClassLoader)
-        loadedScript = createScriptFromClassLoader(scriptClassName, classLoader)
+        val script = createScriptFromClassLoader(scriptClassName, classLoader)
         classLoader.shareClassesOf(
             SharedScriptClasses.loadersFor(
-                getScriptOrFail().otherScripts,
+                script.otherScripts,
                 entries,
                 baseClassLoader,
                 ScriptCache.sharedScriptsOf(file),
             ),
         )
-
-        return getScriptOrFail().getClass(scriptEvaluationConfiguration)
+        loadedScript = script
+        return script
     }
 
     override val compilationConfiguration: ScriptCompilationConfiguration

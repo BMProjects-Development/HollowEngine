@@ -51,6 +51,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.removeNode
 import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.RELOAD_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.UI_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
 import ru.hollowhorizon.hollowengine.common.commands.arguments.ScriptPathArgument
@@ -489,10 +490,10 @@ private fun listEntityNodes(source: CommandSourceStack, entity: net.minecraft.wo
 
 internal fun isNodeScriptPath(path: String): Boolean = path.endsWith(".$NODE_SCRIPT_EXTENSION")
 
-/** A `.kts` with no special role not a node, UI or reload script, so running it just runs it. */
+/** A `.kts` with no special role not a node, UI, reload or startup script, so running it just runs it. */
 internal fun isPlainScriptPath(path: String): Boolean {
     if (!path.endsWith(".kts")) return false
-    return listOf(NODE_SCRIPT_EXTENSION, UI_SCRIPT_EXTENSION, RELOAD_SCRIPT_EXTENSION)
+    return listOf(NODE_SCRIPT_EXTENSION, UI_SCRIPT_EXTENSION, RELOAD_SCRIPT_EXTENSION, STARTUP_SCRIPT_EXTENSION)
         .none { path.endsWith(".$it") }
 }
 

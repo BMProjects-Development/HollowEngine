@@ -1,89 +1,30 @@
 package ru.hollowhorizon.hollowengine.common.events.registry
 
 import com.mojang.brigadier.CommandDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import net.minecraft.commands.CommandBuildContext
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.commands.SharedSuggestionProvider
-import ru.hollowhorizon.hollowengine.common.commands.ScopedCommandRegistration
-import ru.hollowhorizon.hollowengine.common.events.Event
-import ru.hollowhorizon.hollowengine.common.events.EventListener
+import ru.hollowhorizon.hollowengine.common.events.ClientEvent
+import ru.hollowhorizon.hollowengine.common.events.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
-import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
 
+/**
+ * Fires on every datapack load, after the server reload scripts have been run, with the command tree the
+ * server switches to once the load completes.
+ */
 class RegisterCommandsEvent(
     val dispatcher: CommandDispatcher<CommandSourceStack>,
     val registryAccess: CommandBuildContext,
     val environment: Commands.CommandSelection,
-) : Event {
-    companion object : EventHandler<RegisterCommandsEvent>() {
-        @Volatile
-        private var current: RegisterCommandsEvent? = null
-
-        @Synchronized
-        override fun register(
-            scope: CoroutineScope,
-            listener: EventListener<RegisterCommandsEvent>,
-        ): EventListener<RegisterCommandsEvent> {
-            val registration = ScopedCommandRegistration<CommandSourceStack>(scope, ::executeCommandMutation)
-            val trackedListener = object : EventListener<RegisterCommandsEvent> {
-                override val priority = listener.priority
-
-                override fun invoke(event: RegisterCommandsEvent) {
-                    registration.register(event.dispatcher) { listener(event) }
-                }
-            }
-            val registered = super.register(scope, trackedListener)
-            val job = requireNotNull(scope.coroutineContext[Job])
-            current?.let { event ->
-                executeCommandMutation {
-                    if (job.isActive) trackedListener(event)
-                }
-            }
-            return registered
-        }
-
-        @Synchronized
-        override fun post(event: RegisterCommandsEvent): RegisterCommandsEvent {
-            current = event
-            return super.post(event)
-        }
-
-        @Synchronized
-        fun clearReplay() {
-            current = null
-        }
-
-        private fun executeCommandMutation(mutation: () -> Unit) {
-            val server = currentServerOrNull()
-            if (server == null) {
-                mutation()
-                return
-            }
-
-            val mutationWithClientSync = {
-                mutation()
-                if (!server.isStopped) {
-                    server.playerList.players.forEach { player ->
-                        server.commands.sendCommands(player)
-                    }
-                }
-            }
-
-            if (server.isStopped || server.isSameThread) {
-                mutationWithClientSync()
-            } else {
-                server.execute(mutationWithClientSync)
-            }
-        }
-    }
+) : ServerEvent {
+    companion object : EventHandler<RegisterCommandsEvent>()
 }
 
+/** Fires whenever the client rebuilds its command tree, which happens when it joins a world. */
 class RegisterClientCommandsEvent(
     val dispatcher: CommandDispatcher<SharedSuggestionProvider>,
     val registryAccess: CommandBuildContext,
-) : Event {
+) : ClientEvent {
     companion object : EventHandler<RegisterClientCommandsEvent>()
 }

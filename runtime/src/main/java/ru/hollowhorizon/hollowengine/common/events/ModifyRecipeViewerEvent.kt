@@ -18,7 +18,7 @@ import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.mcTranslate
 
-open class ModifyRecipeViewerEvent : Event {
+open class ModifyRecipeViewerEvent : ClientEvent {
     class RegisterItemSubtypes(val reg: ISubtypeRegistration) : ModifyRecipeViewerEvent() {
         companion object : EventHandler<RegisterItemSubtypes>()
     }

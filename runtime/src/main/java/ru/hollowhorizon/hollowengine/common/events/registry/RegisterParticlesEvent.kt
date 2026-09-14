@@ -4,10 +4,11 @@ import net.minecraft.client.particle.ParticleEngine
 import net.minecraft.client.particle.ParticleProvider
 import net.minecraft.core.particles.ParticleOptions
 import net.minecraft.core.particles.ParticleType
-import ru.hollowhorizon.hollowengine.common.events.Event
+import ru.hollowhorizon.hollowengine.common.events.ClientEvent
+import ru.hollowhorizon.hollowengine.common.events.StartupEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
-class RegisterParticlesEvent(val particleEngine: ParticleEngine) : Event {
+class RegisterParticlesEvent(val particleEngine: ParticleEngine) : ClientEvent, StartupEvent {
     companion object : EventHandler<RegisterParticlesEvent>()
 
     fun <T : ParticleOptions> registerSpecial(type: ParticleType<T>, provider: ParticleProvider<T>) {

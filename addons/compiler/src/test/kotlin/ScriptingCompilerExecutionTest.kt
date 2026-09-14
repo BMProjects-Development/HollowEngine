@@ -26,7 +26,76 @@ abstract class ImportingScript(val output: MutableList<String>)
 
 data class ImportReceiver(val prefix: String)
 
+abstract class SidedScript(val output: MutableList<String>)
+
+class ServerSideReceiver(val serverName: String)
+
+class ClientSideReceiver(val clientName: String)
+
 class ScriptingCompilerExecutionTest {
+    @Test
+    fun `client side annotation swaps the implicit receivers and is recorded in the compiled script`() {
+        val environment = ScriptingEnvironmentImpl(
+            javaHome = File(System.getProperty("java.home")),
+            classpath = testClasspath(),
+            scriptTypes = listOf(
+                ScriptClassProvider(
+                    extension = ".sided.kts",
+                    baseClass = SidedScript::class.qualifiedName!!,
+                    implicitReceivers = listOf(ServerSideReceiver::class),
+                    clientSideReceivers = listOf(ClientSideReceiver::class.qualifiedName!!),
+                ),
+                ScriptClassProvider(
+                    extension = ".hello.kts",
+                    baseClass = HelloWorldScript::class.qualifiedName!!,
+                ),
+            ),
+            mappings = Mappings.EMPTY,
+        )
+
+        try {
+            ScriptingEnvironment.INSTANCE = environment
+            val output = mutableListOf<String>()
+
+            val server = environment.compiler.compile("server.sided.kts", "output += serverName").getOrThrow()
+            val explicitServer = environment.compiler.compile(
+                "explicit.sided.kts",
+                "@file:ServerSide\noutput += serverName",
+            ).getOrThrow()
+            val client = environment.compiler.compile(
+                "client.sided.kts",
+                "@file:ClientSide\noutput += clientName",
+            ).getOrThrow()
+
+            listOf(server, explicitServer).forEach { script ->
+                assertEquals(false, script.isClientSide)
+                script.execute<Any> {
+                    constructorArgs(output as Any)
+                    implicitReceivers(ServerSideReceiver("server"))
+                }.getOrThrow()
+            }
+            assertEquals(true, client.isClientSide)
+            client.execute<Any> {
+                constructorArgs(output as Any)
+                implicitReceivers(ClientSideReceiver("client"))
+            }.getOrThrow()
+            assertEquals(listOf("server", "server", "client"), output)
+
+            assertTrue(
+                environment.compiler.compile("both.sided.kts", "@file:ClientSide\n@file:ServerSide\n").isFailure,
+                "a script cannot declare both sides",
+            )
+            assertTrue(
+                environment.compiler.compile("sideless.hello.kts", "@file:ClientSide\noutput += \"\"").isFailure,
+                "a script type without sides rejects the annotation",
+            )
+        } finally {
+            ScriptingEnvironment.clear()
+            environment.close()
+            File("hollowengine").deleteRecursively()
+        }
+    }
+
     @Test
     fun `class literal attachment resolves default imports explicit imports and aliases`() {
         val environment = ScriptingEnvironmentImpl(
