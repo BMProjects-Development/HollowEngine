@@ -18,13 +18,24 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.synchronized
 import kotlin.with
 
+/**
+ * Runs coroutines on [thread], one batch per [runTasks] call. The thread may be bound later with [bind]:
+ * until then everything dispatched simply waits in the queue.
+ */
 @OptIn(InternalCoroutinesApi::class)
-class SingleThreadDispatcher(private val name: String, private val thread: Thread) : CoroutineDispatcher(), Delay {
+class SingleThreadDispatcher(private val name: String, thread: Thread?) : CoroutineDispatcher(), Delay {
     private val lock = Any()
     private val queue = ArrayDeque<Runnable>()
     private val delayedQueue = PriorityQueue<ScheduledTask>()
     private var currentTick = 0L
     private var isShutdown = false
+
+    @Volatile
+    private var thread: Thread? = thread
+
+    fun bind(thread: Thread) {
+        this.thread = thread
+    }
 
     override fun dispatch(context: CoroutineContext, block: Runnable) {
         synchronized(lock) {
@@ -34,7 +45,7 @@ class SingleThreadDispatcher(private val name: String, private val thread: Threa
     }
 
     override fun isDispatchNeeded(context: CoroutineContext): Boolean {
-        return Thread.currentThread() != thread
+        return Thread.currentThread() !== thread
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -20,7 +20,15 @@ import kotlin.script.experimental.api.constructorArgs
 object StartupScripts {
     private val scope = CoroutineScope(SupervisorJob() + CoroutineName("Startup scripts"))
 
+    /** Once set, a newly appearing startup script can only run after a restart. */
+    @Volatile
+    var hasRun: Boolean = false
+        private set
+
     fun run() {
+        if (hasRun) return
+        hasRun = true
+
         val failed = orderedScripts().filterNot(::load)
         if (failed.isNotEmpty() && isPhysicalClient) {
             StartupScriptNotice.show(failed.map(ScriptRegistry::display))

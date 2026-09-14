@@ -85,7 +85,6 @@ import ru.hollowhorizon.hollowengine.common.compat.util.recipeManagerProtected
 import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
-import ru.hollowhorizon.hollowengine.common.coroutines.ServerThreadDispatcher
 import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewPotionEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewedPlayerPotionEvent
@@ -503,7 +502,6 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onServerCreated(server: MinecraftServer, serverThread: Thread, levelRoot: Path) {
         currentServer = server
         RuntimeDispatcherState.createServer(server, serverThread)
-        ServerThreadDispatcher.onServerCreated(server)
         ServerRuntimeState.create(server, levelRoot)
     }
 

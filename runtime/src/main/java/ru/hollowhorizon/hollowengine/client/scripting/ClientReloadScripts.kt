@@ -24,6 +24,15 @@ object ClientReloadScripts : ResourceManagerReloadListener {
 
     override fun onResourceManagerReload(resourceManager: ResourceManager) = run(resourceManager)
 
+    /**
+     * Runs the scripts again against the resources of the last reload, for when the set of scripts changes
+     * without one. Does nothing before the first reload, which is still coming.
+     */
+    fun rerun() {
+        val minecraft = Minecraft.getInstance() ?: return
+        minecraft.execute { run(resources ?: return@execute) }
+    }
+
     private fun run(resourceManager: ResourceManager) {
         resources = resourceManager
         val minecraft = Minecraft.getInstance()

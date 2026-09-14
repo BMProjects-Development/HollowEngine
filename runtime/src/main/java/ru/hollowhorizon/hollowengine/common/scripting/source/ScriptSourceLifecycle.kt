@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.scripting.ClientReloadScripts
+import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptLoader
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeRuntime
@@ -38,22 +40,10 @@ object ScriptSourceLifecycle : ScriptSourceListener {
         }.onFailure { HollowEngine.LOGGER.error("Failed to update entity nodes of '$namespace'", it) }
 
         if (isPhysicalClient) {
-            runCatching { reloadClientScripts() }
-                .onFailure { HollowEngine.LOGGER.error("Failed to reload client scripts after '$namespace' changed", it) }
-        }
-    }
-
-    /**
-     * Loaded reflectively: the loaders are client-only code and this object also runs on a dedicated
-     * server, where the classes are not present at all.
-     */
-    private fun reloadClientScripts() {
-        listOf(
-            "ru.hollowhorizon.hollowengine.client.ui.script.UiScriptLoader" to "reload",
-            "ru.hollowhorizon.hollowengine.client.scripting.ClientReloadScripts" to "rerun",
-        ).forEach { (className, method) ->
-            val loader = Class.forName(className)
-            loader.getMethod(method).invoke(loader.getDeclaredField("INSTANCE").get(null))
+            runCatching {
+                UiScriptLoader.reload()
+                ClientReloadScripts.rerun()
+            }.onFailure { HollowEngine.LOGGER.error("Failed to reload client scripts after '$namespace' changed", it) }
         }
     }
 }

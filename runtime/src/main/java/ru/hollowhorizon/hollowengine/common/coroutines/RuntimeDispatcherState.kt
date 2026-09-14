@@ -5,6 +5,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import net.minecraft.client.Minecraft
 import net.minecraft.server.MinecraftServer
+import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
 import java.util.*
 
 private data class DispatcherState(
@@ -16,13 +17,29 @@ object RuntimeDispatcherState {
     private val serverStates = Collections.synchronizedMap(WeakHashMap<MinecraftServer, DispatcherState>())
     private val clientStates = Collections.synchronizedMap(WeakHashMap<Minecraft, DispatcherState>())
 
+    /** Handed out while the datapacks of a world load, before its server exists; that server adopts it. */
+    private var upcomingServer: SingleThreadDispatcher? = null
+
     fun createServer(server: MinecraftServer, serverThread: Thread) {
+        val dispatcher = takeUpcomingServer()?.also { it.bind(serverThread) }
+            ?: SingleThreadDispatcher(SERVER_DISPATCHER, serverThread)
         serverStates.computeIfAbsent(server) {
-            val dispatcher = SingleThreadDispatcher("MinecraftServer.dispatcher", serverThread)
-            val scope = CoroutineScope(SupervisorJob() + dispatcher)
-            DispatcherState(dispatcher, scope)
+            DispatcherState(dispatcher, CoroutineScope(SupervisorJob() + dispatcher))
         }
     }
+
+    /**
+     * The dispatcher of the server whose datapacks are loading: the running one on `/reload`, or the one
+     * about to be created while a world opens. Work dispatched to the latter runs once that server ticks.
+     */
+    @Synchronized
+    fun loadingServerDispatcher(): SingleThreadDispatcher {
+        currentServerOrNull()?.let { server -> serverStates[server]?.let { return it.dispatcher } }
+        return upcomingServer ?: SingleThreadDispatcher(SERVER_DISPATCHER, thread = null).also { upcomingServer = it }
+    }
+
+    @Synchronized
+    private fun takeUpcomingServer(): SingleThreadDispatcher? = upcomingServer.also { upcomingServer = null }
 
     fun runServerTasks(server: MinecraftServer) {
         server(server).dispatcher.runTasks()
@@ -36,8 +53,6 @@ object RuntimeDispatcherState {
     }
 
     fun serverDispatcher(server: MinecraftServer) = server(server).dispatcher
-
-    fun serverDispatcherOrNull(server: MinecraftServer): SingleThreadDispatcher? = serverStates[server]?.dispatcher
 
     fun serverScope(server: MinecraftServer) = server(server).scope
 
@@ -71,4 +86,6 @@ object RuntimeDispatcherState {
 
     private fun client(client: Minecraft) =
         clientStates[client] ?: error("Client dispatcher state is not initialized for $client")
+
+    private const val SERVER_DISPATCHER = "MinecraftServer.dispatcher"
 }
