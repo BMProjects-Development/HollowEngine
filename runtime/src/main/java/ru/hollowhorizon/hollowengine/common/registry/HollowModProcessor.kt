@@ -146,8 +146,9 @@ object HollowModProcessor {
 
     private inline fun <reified T> registerClassInitializers() {
         getSubTypes(T::class.java).forEach {
-            HollowEngine.LOGGER.info("Registering initializer: ${it.simpleName}")
-            it.kotlin.objectInstance ?: throw IllegalArgumentException("${T::class.java.simpleName} must be an object!")
+            it.kotlin.objectInstance?.apply {
+                HollowEngine.LOGGER.info("Registering initializer: ${it.simpleName}")
+            }
         }
     }
 
