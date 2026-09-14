@@ -1,0 +1,10 @@
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+
+// A server reload script. It runs on the server when a world opens and again after every /reload;
+// each run replaces the event handlers of the previous one.
+
+@SubscribeEvent
+fun onPlayerJoin(event: PlayerEvent.Join) {
+    event.player.send("Hello, ${event.player.name.string}!")
+}

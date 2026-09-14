@@ -1,0 +1,11 @@
+// A dialogue. Start it from a Kotlin script:
+//     DialogueController("{{path}}").start(player)
+
+# Start
+
+Guide: Hello! Edit this file to write your own scene.
+
+@choice "Tell me more" id=more
+    Guide: Each @choice is an answer, and the indented lines below it play when it is picked.
+@choice "Goodbye" id=bye
+    Guide: See you later!

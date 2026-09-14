@@ -1,0 +1,11 @@
+// A UI script. It declares screens and overlays on the client; nothing appears until a server
+// script opens one, for example with player.openUi("{{namespace}}:{{id}}").
+
+screen("{{namespace}}:{{id}}") {
+    title = "{{name}}"
+    content {
+        Column(modifier = Modifier.padding(12.px).gap(6.px)) {
+            Text("Hello from {{name}}!")
+        }
+    }
+}

@@ -1,0 +1,11 @@
+@file:ClientSide
+
+import ru.hollowhorizon.hollowengine.common.events.client.render.RenderHudEvent
+
+// A client reload script. It runs only in the player's game, never on a dedicated server,
+// and restarts after F3+T or a resource pack change.
+
+@SubscribeEvent
+fun onHud(event: RenderHudEvent) {
+    event.guiGraphics.drawString(minecraft.font, "Hello from {{name}}!", 4, 4, 0xFFFFFF)
+}

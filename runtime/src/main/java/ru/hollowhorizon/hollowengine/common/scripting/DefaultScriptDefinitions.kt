@@ -73,6 +73,7 @@ object DefaultScriptDefinitions {
                     "net.minecraft.world.item.Item",
                     "net.minecraft.world.item.CreativeModeTab",
                     "net.minecraft.world.level.block.Block",
+                    "net.minecraft.world.level.block.SoundType",
                     "net.minecraft.world.level.block.state.BlockBehaviour",
                     ResourceLocation::class.qualifiedName!!,
                     ItemStack::class.qualifiedName!!,

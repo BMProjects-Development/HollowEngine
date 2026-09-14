@@ -191,14 +191,14 @@ internal class HollowIdeModel(
         }.isSuccess
     }
 
-    fun createFile(parentPath: String, name: String): HollowIdeFileOperationResult {
+    fun createFile(parentPath: String, name: String, content: String = ""): HollowIdeFileOperationResult {
         val cleanName = name.trim().replace('\\', '/').trim('/')
         if (cleanName.isBlank()) return HollowIdeFileOperationResult.InvalidName
         val parent = targetDirectory(parentPath)
         val target = parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
         Files.createDirectories(target.parent)
-        Files.createFile(target)
+        writeIdeFile(target, content.toByteArray(Charsets.UTF_8))
         tree.refresh()
         selectPath(target.toReadablePathInsideRoot())
         return HollowIdeFileOperationResult.Success

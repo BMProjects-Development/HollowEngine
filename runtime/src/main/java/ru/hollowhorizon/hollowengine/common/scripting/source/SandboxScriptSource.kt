@@ -21,6 +21,10 @@ class SandboxScriptSource(
     dependencies = descriptor.dependencies,
     fingerprint = "sandbox",
 ) {
+    init {
+        directory.mkdirs()
+    }
+
     val scriptsDirectory: File get() = directory
 
     data class SandboxDescriptor(val id: String, val dependencies: List<String>)

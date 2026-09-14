@@ -42,6 +42,7 @@ internal class HollowIdeProjectController(
                 path = item.payload.path,
                 x = event.x,
                 y = event.y,
+                canCreateScripts = isInsideScripts(item.payload.path),
                 canCreateSoundEvents = canCreateSoundEvents(item.payload),
             )
             nameDialog = null
@@ -74,6 +75,9 @@ internal class HollowIdeProjectController(
 
     fun openCreateFileDialog(path: String) = openNameDialog(ProjectNameAction.CreateFile, path)
 
+    fun openCreateScriptDialog(path: String, template: ScriptTemplate) =
+        openNameDialog(ProjectNameAction.CreateFile, path, template)
+
     fun openCreateFolderDialog(path: String) = openNameDialog(ProjectNameAction.CreateFolder, path)
 
     fun openRenameDialog(path: String) = openNameDialog(ProjectNameAction.Rename, path)
@@ -84,13 +88,26 @@ internal class HollowIdeProjectController(
 
     fun applyNameDialog() {
         val dialog = nameDialog ?: return
-        val result = when (dialog.action) {
-            ProjectNameAction.CreateFile -> model.createFile(dialog.path, dialog.name)
-            ProjectNameAction.CreateFolder -> model.createFolder(dialog.path, dialog.name)
-            ProjectNameAction.Rename -> rename(dialog)
+        val template = dialog.template
+        val result = when {
+            template != null -> createScript(dialog, template)
+            dialog.action == ProjectNameAction.CreateFile -> model.createFile(dialog.path, dialog.name)
+            dialog.action == ProjectNameAction.CreateFolder -> model.createFolder(dialog.path, dialog.name)
+            else -> rename(dialog)
         }
         setStatus(result.statusText())
         if (result == HollowIdeFileOperationResult.Success) nameDialog = null
+    }
+
+    private fun createScript(dialog: ProjectNameDialog, template: ScriptTemplate): HollowIdeFileOperationResult {
+        val name = template.fileName(dialog.name)
+        val directory = if (dialog.path.fromReadablePath().isDirectory) dialog.path else dialog.path.substringBeforeLast('/', "")
+        val path = if (directory.isBlank()) name else "$directory/$name"
+        val result = model.createFile(dialog.path, name, template.render(path))
+        if (result == HollowIdeFileOperationResult.Success) {
+            (model.openFile(model.selectedTreePath) as? HollowIdeOpenResult.File)?.let { openFile(it.file) }
+        }
+        return result
     }
 
     fun cancelNameDialog() {
@@ -211,10 +228,10 @@ internal class HollowIdeProjectController(
         return result
     }
 
-    private fun openNameDialog(action: ProjectNameAction, path: String) {
+    private fun openNameDialog(action: ProjectNameAction, path: String, template: ScriptTemplate? = null) {
         val defaultName = when (action) {
             ProjectNameAction.Rename -> path.substringAfterLast('/')
-            ProjectNameAction.CreateFile -> "new_file.kts"
+            ProjectNameAction.CreateFile -> template?.suggestedFileName ?: "new_file.kts"
             ProjectNameAction.CreateFolder -> "new_folder"
         }
         val menu = contextMenu
@@ -225,6 +242,7 @@ internal class HollowIdeProjectController(
             name = defaultName,
             x = menu?.x ?: pointerX(),
             y = menu?.y ?: pointerY(),
+            template = template,
         )
     }
 

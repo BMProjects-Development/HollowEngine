@@ -1,0 +1,9 @@
+// A startup script. It runs once while the game starts, on the client and on the server alike,
+// so everything it registers exists on both sides. Changes apply after restarting the game.
+//
+// Texture: assets/{{namespace}}/textures/item/{{id}}.png
+// Name:    "item.{{namespace}}.{{id}}" in assets/{{namespace}}/lang/en_us.json
+
+val {{constant}} by register("{{id}}") {
+    Item(Item.Properties())
+}

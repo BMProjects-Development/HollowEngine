@@ -711,6 +711,7 @@ object HollowIdeOverlay {
                 menu = project.contextMenu,
                 onCreateFile = project::openCreateFileDialog,
                 onCreateFolder = project::openCreateFolderDialog,
+                onCreateScript = project::openCreateScriptDialog,
                 onCreateSoundEvents = project::createSoundEvents,
                 onRename = project::openRenameDialog,
                 onCopy = { project.copy(it, cut = false) },

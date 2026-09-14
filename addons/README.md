@@ -31,7 +31,7 @@ Runtime diagnostics and lifecycle controls are available to operators:
 
 Disabled ids are persisted in `hollowengine/addons/.disabled-addons`. The `debug-command` example has no bootstrap libraries and can therefore be copied and loaded while Minecraft is running. It directly handles `RegisterCommandsEvent` and adds `/he addon-text <text>`.
 
-Command addons use Brigadier directly from `@SubscribeEvent`. `RegisterCommandsEvent` replays the active dispatcher for a hot-loaded addon, and command nodes added by that scoped listener are removed automatically when the addon is disabled or reloaded. The video addon demonstrates the same mechanism with `/he video <local-path-or-url>`.
+Command addons use Brigadier directly from `@SubscribeEvent`. `RegisterCommandsEvent` fires on every datapack load, and enabling, disabling or reloading an addon reloads the datapacks of every running server, so the command tree is rebuilt with the addon's commands added or gone. The video addon demonstrates the same mechanism with `/he video <local-path-or-url>`.
 
 An addon's `build.gradle.kts` only needs its own settings and libraries. Dependencies added to `addonLibraries` are available during compilation, embedded as nested jars, and loaded in the addon's isolated classloader. Pure Java runtime-only libraries belong in `addonRuntimeLibraries`.
 

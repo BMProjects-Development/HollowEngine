@@ -1,0 +1,14 @@
+// A node script. Start it on the server with /hollowengine scripting run {{path}}
+// or attach it to an entity by adding @file:Attach(...) at the top of the file.
+
+onStart {
+    println("{{name}} started")
+}
+
+onUpdate(every = 20.ticks) {
+    // Runs once a second while the node is running.
+}
+
+onStop {
+    println("{{name}} stopped")
+}
