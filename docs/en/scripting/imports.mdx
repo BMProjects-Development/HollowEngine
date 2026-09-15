@@ -69,6 +69,61 @@ fun sayLine(player: Player, text: String) {
 sayLine(player, "The bridge is closed.")
 ```
 
+## Equal names
+
+The declarations of all imported scripts end up in one space. When two scripts declare something with the same name, the declarations themselves are fine, but a reference to that name does not compile (`Overload resolution ambiguity`): the compiler cannot tell which of the two you mean.
+
+```kotlin
+// common/dialogue.kts
+val title = "Dialogue"
+```
+
+```kotlin
+// common/rewards.kts
+val title = "Rewards"
+```
+
+```kotlin
+@file:Import("../common/dialogue.kts", "../common/rewards.kts")
+
+println(title) // Error: which of the two `title`s?
+```
+
+The simplest fix is to give the declarations different names. When that is inconvenient, give each script a package of its own with a `package` line, as in a regular Kotlin file:
+
+```kotlin
+// common/dialogue.kts
+package mypack.dialogue
+
+val title = "Dialogue"
+```
+
+```kotlin
+// common/rewards.kts
+package mypack.rewards
+
+val title = "Rewards"
+```
+
+After that the script's declarations are reached by their full name or through a regular `import`, including one under another name:
+
+```kotlin
+@file:Import("../common/dialogue.kts", "../common/rewards.kts")
+
+import mypack.dialogue.title as dialogueTitle
+import mypack.rewards.*
+
+println(dialogueTitle) // Dialogue
+println(title) // Rewards, brought in by `import mypack.rewards.*`
+println(mypack.dialogue.title) // Dialogue
+```
+
+:::warning
+The top of a file goes in this order: `@file:...` annotations first, then `package`, then the regular `import`s.
+:::
+
+A script's package is only a name for Kotlin. It changes neither the path in `@file:Import` nor the namespace of the items and blocks a startup script registers.
+
 ## Sharing scripts
 
 By default, an imported script runs separately from the script into which it is imported. In other words, if you create a variable and modify it in one script, by default it will not change in the other script. You can change this by adding `@file:SharedScript` if you want the script to be shared when imported into any other scripts:
@@ -87,6 +142,8 @@ fun sayLine(text: String) {
 In that case, all scripts that import `common/dialogue.kts` will access the same instance and the shared `dialogueHistory`. This is useful for services that share state during gameplay—for example, a dialogue system that is read from `.reload.kts` and modified within `.node.kts`.
 
 `SharedScript` is imported by default, meaning a separate `import ...` statement is not required for it. The annotation must be placed at the beginning of the file, before the regular imports.
+
+[Startup scripts](/docs/hollowengine/scripting/startup#using-it-from-other-scripts) are always shared, even without the annotation: an import hands over the instance that ran while the game started, and it is not reset when you leave a world.
 
 A shared script is compiled once into a cache artifact of its own instead of being copied into every importer. Its instance is created once per game and lives until the world is closed.
 

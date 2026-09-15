@@ -71,6 +71,61 @@ fun sayLine(player: Player, text: String) {
 sayLine(player, "The bridge is closed.")
 ```
 
+## Одинаковые имена
+
+Объявления всех импортированных скриптов попадают в одно пространство. Если два скрипта объявляют что-то с одним именем, то само объявление не мешает, но обращение к нему не скомпилируется (`Overload resolution ambiguity`): компилятор не знает, какое из двух имеется в виду.
+
+```kotlin
+// common/dialogue.kts
+val title = "Диалоги"
+```
+
+```kotlin
+// common/rewards.kts
+val title = "Награды"
+```
+
+```kotlin
+@file:Import("../common/dialogue.kts", "../common/rewards.kts")
+
+println(title) // Ошибка: непонятно, какой из двух `title` вы написали
+```
+
+Проще всего дать объявлениям разные имена. Если это неудобно, задайте каждому скрипту свой пакет строкой `package`, как в обычном Kotlin-файле:
+
+```kotlin
+// common/dialogue.kts
+package mypack.dialogue
+
+val title = "Диалоги"
+```
+
+```kotlin
+// common/rewards.kts
+package mypack.rewards
+
+val title = "Награды"
+```
+
+После этого объявления скрипта доступны только по полному имени или через обычный `import`, в том числе под другим именем:
+
+```kotlin
+@file:Import("../common/dialogue.kts", "../common/rewards.kts")
+
+import mypack.dialogue.title as dialogueTitle
+import mypack.rewards.*
+
+println(dialogueTitle) // Диалоги
+println(title) // Награды, пришёл из `import mypack.rewards.*`
+println(mypack.dialogue.title) // Диалоги
+```
+
+:::warning
+Порядок в начале файла такой: сначала аннотации `@file:...`, затем `package`, затем обычные `import`.
+:::
+
+Пакет скрипта - это только имя для Kotlin. Он не влияет ни на путь в `@file:Import`, ни на пространство имён предметов и блоков, которые регистрирует startup-скрипт.
+
 
 ## Общие скрипты
 
@@ -90,6 +145,8 @@ fun sayLine(text: String) {
 Тогда все скрипты, импортирующие `common/dialogue.kts`, будут обращаться к одному и тому же экземпляру и общей `dialogueHistory`. Это удобно для сервисов с общим состоянием во время работы игры, например, для системы диалогов, которая бы читалась в `.reload.kts`, а изменялась внутри `.node.kts`.
 
 `SharedScript` импортирован по умолчанию, т.е. отдельный `import ...` для него не нужен. Аннотация должна находиться в начале файла, до обычных импортов.
+
+[Startup-скрипты](/docs/hollowengine/scripting/startup#using-it-from-other-scripts) общие всегда, даже без аннотации: импорт отдаёт экземпляр, который выполнился при запуске игры, и он не сбрасывается при выходе из мира.
 
 :::warning
 При изменении общего скрипта в работающем мире / игре может вызвать проблемы! Скрипты, которые уже успели запуститься, останутся со старыми классами, а перечитанные получат новые.

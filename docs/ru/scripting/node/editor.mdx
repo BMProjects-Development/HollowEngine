@@ -84,7 +84,7 @@ onInteract { event ->
 @Serializable
 data class Reward(
     @EditorName("Предмет") val item: String = "minecraft:bread",
-    @EditorRange("1", "64") val count: Int = 1,
+    @EditorRange(1.0, 64.0) val count: Int = 1,
 )
 
 val rewards by editor.property<List<Reward>>("Награды за квест") { emptyList() }

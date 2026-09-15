@@ -95,6 +95,76 @@ fun onTick(event: TickEvent.Client) {
 }
 ```
 
+## Using it from other scripts
+
+A startup script can be [imported](/docs/hollowengine/scripting/imports) into any other script, for example to hand out a registered item from a reloadable script:
+
+```kotlin
+// items.startup.kts
+val RUBY by register("ruby") {
+    Item(Item.Properties())
+}
+```
+
+```kotlin
+// rewards.reload.kts
+@file:Import("items.startup.kts")
+
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+
+@SubscribeEvent
+fun onJoin(event: PlayerEvent.Join) {
+    event.player.addItem(ItemStack(RUBY))
+}
+```
+
+Startup scripts are always [shared](/docs/hollowengine/scripting/imports#sharing-scripts), there is no need to write `@file:SharedScript`. An import does not run the script again: it hands over the very instance that ran while the game started, so its items are already registered and its variables hold what they were given at startup. The instance lives until the game exits and is not reset when you leave a world.
+
+Only what the imported script declares is available from it: variables, functions and classes. Members of the startup script itself (`isClientSide`, `register`) are not visible from outside.
+
+Startup scripts may import each other. The imported one then runs first.
+
+:::warning
+Only a startup script that ran while this game started can be imported. If it failed, or was added or changed after the game started, the importing script does not run and reports `Cannot import '...startup.kts'`. Fix the startup script and restart the game.
+
+For the same reason a server script on a dedicated server cannot import a startup script that is installed only for the players.
+:::
+
+### Equal names
+
+If two imported startup scripts declare a variable with the same name, say `CUSTOM_ITEM`, a reference to it does not compile: it is unclear which of the two is meant. To tell them apart, give each script a package of its own:
+
+```kotlin
+// weapons.startup.kts
+package mypack.weapons
+
+val CUSTOM_ITEM by register("ruby_sword") {
+    Item(Item.Properties().stacksTo(1))
+}
+```
+
+```kotlin
+// food.startup.kts
+package mypack.food
+
+val CUSTOM_ITEM by register("ruby_apple") {
+    Item(Item.Properties())
+}
+```
+
+Now the variable can be taken by its full name or imported under another name:
+
+```kotlin
+@file:Import("weapons.startup.kts", "food.startup.kts")
+
+import mypack.food.CUSTOM_ITEM as RUBY_APPLE
+
+val sword = ItemStack(mypack.weapons.CUSTOM_ITEM)
+val apple = ItemStack(RUBY_APPLE)
+```
+
+See [equal names](/docs/hollowengine/scripting/imports#equal-names) in the imports guide for details.
+
 ## When a script fails
 
 An error in a startup script does not stop the game from starting: it is written to the log, and the game shows a notification listing the failed scripts. Fix the script in the built-in IDE and restart the game.
