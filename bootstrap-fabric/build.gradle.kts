@@ -114,7 +114,9 @@ dependencies {
     })
 
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
+    val fabricApi = "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion"
+    modImplementation(fabricApi)
+    include(fabricApi)
     modImplementation("lib:iris-fabric:1.8.8+mc1.21.1")
     modImplementation("lib:sodium-fabric:0.6.13+mc1.21.1")
     val mixinExtras = "io.github.llamalad7:mixinextras-fabric:0.4.1"

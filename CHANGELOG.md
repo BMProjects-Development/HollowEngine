@@ -1,4 +1,12 @@
-Since 2.3.0:
-- Added Component & Scripts Editor for NPCs;
-- Fixed NPC Tool;
-- Fixed Entities depth masks in UI framework.
+Since 2.3.0.3:
+- One jar for both Fabric and NeoForge;
+- Added startup scripts (`.startup.kts`): items, blocks, creative tabs and startup-only events;
+- Added `@file:ClientSide` and `@file:ServerSide` for reload scripts, events now reach only their side;
+- Added a "New Script" menu with templates to the IDE;
+- Added the Rig Editor;
+- Added editable node script properties in the Entity Editor;
+- Animator layers and states can be extended;
+- `@EditorRange` takes numbers instead of strings;
+- Added a confirmation before hiding the IDE toolbar;
+- Fixed timing of server reload scripts on world load;
+- Fixed client-only reload listeners on dedicated servers.

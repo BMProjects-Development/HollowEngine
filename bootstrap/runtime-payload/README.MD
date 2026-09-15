@@ -46,6 +46,19 @@ The nested jar is produced by the `embedRuntimeJar` task in
 which copies the output of the `:runtime` subproject into
 `META-INF/hollowengine/runtime/`.
 
+## Other nested jars
+
+The same jar is a mod for both NeoForge and Fabric: it carries `META-INF/neoforge.mods.toml` and
+`fabric.mod.json`, and each loader reads only its own descriptor.
+
+`META-INF/jars/` holds unmodified upstream libraries, bundled through each loader's standard jar-in-jar, so
+players do not have to install them separately. Each loader loads only the jars its own descriptor lists:
+`"jars"` in `fabric.mod.json` for Fabric, `META-INF/jarjar/metadata.json` for NeoForge.
+
+* **Fabric API** (Apache 2.0, https://github.com/FabricMC/fabric), Fabric only. If a newer Fabric API is
+  installed, Fabric Loader uses that one instead.
+* **MixinExtras** (MIT, https://github.com/LlamaLad7/MixinExtras), a Fabric and a NeoForge build.
+
 ## What happens at runtime?
 
 On startup, the bootstrap reads the checksum next to this file, extracts the
