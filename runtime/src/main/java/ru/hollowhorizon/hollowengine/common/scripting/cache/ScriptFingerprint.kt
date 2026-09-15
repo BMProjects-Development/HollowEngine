@@ -56,11 +56,11 @@ object ScriptFingerprint {
         updateBoth("kotlin=${HollowEngineBuild.KOTLIN_VERSION}")
         updateBoth("minecraft=${HollowEngineBuild.MINECRAFT_VERSION}")
         updateBoth("runtime=$currentRuntimeIdentity")
-        updateBoth("definition=${definitionIdentity(id)}")
         updateBoth("source=${ScriptRegistry.source(id.namespace)?.fingerprint.orEmpty()}")
         sources.forEach { (member, file) ->
             val bytes = file.readBytes()
             updateBoth("script=${member.qualified}")
+            updateBoth("definition=${definitionIdentity(member)}")
             code.updateText(ScriptText.normalize(String(bytes, Charsets.UTF_8)))
             layout.update(bytes)
         }
@@ -99,6 +99,7 @@ object ScriptFingerprint {
     /**
      * The script definition a file is compiled with its base class, default imports and implicit
      * receivers all end up in the generated constructor, so changing them invalidates old bytecode.
+     * Sharing decides whether importers carry the script's classes at all.
      */
     private fun definitionIdentity(id: ScriptId): String {
         val provider = providers.firstOrNull { id.fileName.endsWith(it.extension) } ?: return "unknown"
@@ -112,6 +113,7 @@ object ScriptFingerprint {
                 append('|')
                 receivers.forEach { append(it).append(',') }
             }
+            if (provider.shared) append("|shared")
         }
     }
 

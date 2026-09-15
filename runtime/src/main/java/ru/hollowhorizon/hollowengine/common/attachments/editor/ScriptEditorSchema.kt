@@ -26,8 +26,8 @@ data class ScriptField(
     val label: String = "",
     val description: String = "",
     val icon: String = "",
-    val min: String = "",
-    val max: String = "",
+    val min: Double? = null,
+    val max: Double? = null,
     val slider: Boolean = false,
     val multiline: Boolean = false,
     val assets: List<String> = emptyList(),
@@ -106,8 +106,8 @@ object ScriptSchema {
             label = annotations.filterIsInstance<EditorName>().firstOrNull()?.name.orEmpty(),
             description = annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description.orEmpty(),
             icon = annotations.filterIsInstance<EditorIcon>().firstOrNull()?.icon.orEmpty(),
-            min = range?.min.orEmpty(),
-            max = range?.max.orEmpty(),
+            min = range?.min?.takeIf(Double::isFinite),
+            max = range?.max?.takeIf(Double::isFinite),
             slider = range?.slider ?: false,
             multiline = annotations.any { it is EditorMultiline },
             assets = annotations.filterIsInstance<EditorAsset>().flatMap { it.extensions.toList() }.distinct(),
@@ -156,7 +156,9 @@ private fun ScriptField.annotations(): List<Annotation> = buildList {
     if (label.isNotBlank()) add(EditorName(label))
     if (description.isNotBlank()) add(EditorDescription(description))
     if (icon.isNotBlank()) add(EditorIcon(icon))
-    if (min.isNotBlank() || max.isNotBlank() || slider) add(EditorRange(min, max, slider))
+    if (min != null || max != null || slider) {
+        add(EditorRange(min ?: Double.NEGATIVE_INFINITY, max ?: Double.POSITIVE_INFINITY, slider))
+    }
     if (multiline) add(EditorMultiline())
     if (assets.isNotEmpty()) add(EditorAsset(*assets.toTypedArray()))
     if (hidden) add(EditorHidden())

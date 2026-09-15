@@ -20,6 +20,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.isSharedScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.CommonEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.logI
@@ -106,7 +107,7 @@ class ScriptingEnvironmentImpl(
         getScriptingClass(JvmGetScriptingClass())
         configurationDependencies(JvmDependency(hostClasspath))
     }
-    val scriptDefinitions = scriptTypes.map { provider ->
+    val scriptDefinitions = scriptTypes.sortedByDescending { it.extension.length }.map { provider ->
         ScriptDefinition.FromConfigurations(
             scriptHostConfig,
             HollowScriptConfiguration(classpath) {
@@ -117,6 +118,7 @@ class ScriptingEnvironmentImpl(
                 provider.clientSideReceivers?.let { receivers ->
                     clientSideImplicitReceivers(receivers.map { KotlinType(it) })
                 }
+                if (provider.shared) isSharedScript(true)
             },
             ScriptEvaluationConfiguration()
         )

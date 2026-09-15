@@ -422,6 +422,25 @@ class ScriptingAnalysisEnvironmentTest {
     }
 
     @Test
+    fun `packages tell apart equal names from two imported scripts`() {
+        withEnvironment { environment ->
+            writeSandboxScript("first.analysis.kts", "package mypack.first\nval CUSTOM_ITEM = \"first\"")
+            writeSandboxScript("second.analysis.kts", "package mypack.second\nval CUSTOM_ITEM = \"second\"")
+            val text = """
+                @file:Import("first.analysis.kts", "second.analysis.kts")
+
+                import mypack.first.CUSTOM_ITEM as FIRST_ITEM
+
+                val both = FIRST_ITEM + mypack.second.CUSTOM_ITEM
+            """.trimIndent()
+
+            val diagnostics = environment.analyzer.diagnostic("scripts/main.analysis.kts", text)
+
+            assertFalse(diagnostics.any { it.severity.isError() }, diagnostics.toString())
+        }
+    }
+
+    @Test
     fun `highlight provides hints for declarations using imported scripts`() {
         withEnvironment { environment ->
             writeSandboxScript("shared.analysis.kts", "val importedValue = 21")

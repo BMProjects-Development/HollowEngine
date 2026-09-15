@@ -8,6 +8,7 @@ import java.io.File
 import kotlin.script.experimental.jvm.impl.KJvmCompiledModuleInMemory
 import kotlin.script.experimental.jvm.impl.KJvmCompiledScript
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 abstract class ComposeUiTestScript
@@ -68,6 +69,40 @@ class ScriptingComposePluginTest {
     }
 
     @Test
+    fun `serial info annotations with numeric arguments compile and keep their values`() {
+        withCompiledScript(
+            extension = ".shared.kts",
+            code = """
+            @file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
+            import kotlinx.serialization.Serializable
+            import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
+
+            @Serializable
+            data class Reward(
+                @EditorRange(1.0, 64.0) val count: Int = 1,
+                @EditorRange(max = 0.5, slider = true) val chance: Float = 0f,
+            )
+
+            val descriptor = kotlinx.serialization.serializer<Reward>().descriptor
+            val annotations = (0 until descriptor.elementsCount).map {
+                descriptor.getElementAnnotations(it).joinToString()
+            }
+            """.trimIndent()
+        ) { compiled ->
+            val script = compiled.execute<Any> {}.getOrThrow()
+            val annotations = script.javaClass.getDeclaredField("annotations").apply { isAccessible = true }.get(script)
+            assertEquals(
+                listOf(
+                    "@ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange(min=1.0, max=64.0, slider=false)",
+                    "@ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange(min=-Infinity, max=0.5, slider=true)",
+                ),
+                annotations,
+            )
+        }
+    }
+
+    @Test
     fun `plain kts scripts also get the compose plugin`() {
         withComposeScript(
             extension = ".shared.kts",
@@ -90,6 +125,13 @@ class ScriptingComposePluginTest {
         extension: String = ".ui.kts",
         baseClass: String = ComposeUiTestScript::class.qualifiedName!!,
         assertions: (Map<String, ByteArray>) -> Unit,
+    ) = withCompiledScript(code, extension, baseClass) { assertions(it.compiledClasses()) }
+
+    private fun withCompiledScript(
+        code: String,
+        extension: String,
+        baseClass: String = ComposeUiTestScript::class.qualifiedName!!,
+        assertions: (CompiledScript) -> Unit,
     ) {
         val environment = ScriptingEnvironmentImpl(
             javaHome = File(System.getProperty("java.home")),
@@ -109,8 +151,7 @@ class ScriptingComposePluginTest {
 
         try {
             ScriptingEnvironment.INSTANCE = environment
-            val compiled = environment.compiler.compile("compose_test$extension", code).getOrThrow()
-            assertions(compiled.compiledClasses())
+            assertions(environment.compiler.compile("compose_test$extension", code).getOrThrow())
         } finally {
             ScriptingEnvironment.clear()
             File("hollowengine").deleteRecursively()

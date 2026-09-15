@@ -29,6 +29,7 @@ object SharedScriptClasses {
 
     private val loaders = HashMap<String, Entry>()
     private val instances = HashMap<KClass<*>, EvaluationResult>()
+    private val kept = HashSet<KClass<*>>()
     private val reportedMismatches = HashSet<String>()
 
     /**
@@ -64,9 +65,13 @@ object SharedScriptClasses {
 
         // No stable identity means no safe sharing: better a private copy than a wrong one.
         val reference = declared[name] ?: referenceOf(script) ?: return
+        val existing = loaders[name]
+        if (existing != null && existing.identity == reference.fingerprint) {
+            result[name] = existing.loader
+            return
+        }
         val classes = classesOf(reference, entries) ?: return
 
-        val existing = loaders[name]
         val entry = if (existing != null && existing.identity == classes.identity) {
             existing
         } else {
@@ -77,6 +82,23 @@ object SharedScriptClasses {
             }
         }
         result[name] = entry.loader
+    }
+
+    /**
+     * Makes the classes of a shared script that runs on its own the ones its importers link against, so
+     * they get the instance it created. Without this the root and an importer would each define their own
+     * class for one file, and an instance remembered for one is invisible to the other.
+     */
+    @Synchronized
+    fun adopt(script: CompiledScript, scriptClass: KClass<*>) {
+        val identity = when (script) {
+            is KJvmCompiledScriptFromJar -> script.fingerprint
+            is KJvmCompiledScript -> referenceOf(script)?.fingerprint
+            else -> null
+        } ?: return
+        val name = scriptClass.java.name
+        if (loaders[name]?.identity == identity) return
+        loaders[name] = Entry(identity, scriptClass.java.classLoader)
     }
 
     private fun referenceOf(script: KJvmCompiledScript): SharedScriptRef? {
@@ -147,8 +169,15 @@ object SharedScriptClasses {
         instances[scriptClass] = result
     }
 
+    /** Keeps the instance of [scriptClass] through [clearInstances], for scripts that cannot run twice. */
+    @Synchronized
+    fun keepInstance(scriptClass: KClass<*>) {
+        kept += scriptClass
+    }
+
+    /** Forgets the state of shared scripts, so it does not move into the next world. */
     @Synchronized
     fun clearInstances() {
-        instances.clear()
+        instances.keys.retainAll(kept)
     }
 }

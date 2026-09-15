@@ -45,11 +45,7 @@ internal object ComponentLabels {
 
     fun range(descriptor: SerialDescriptor, index: Int): FieldRange? =
         descriptor.getElementAnnotations(index).filterIsInstance<EditorRange>().firstOrNull()?.let {
-            FieldRange(
-                min = it.min.toDoubleOrNull() ?: Double.NEGATIVE_INFINITY,
-                max = it.max.toDoubleOrNull() ?: Double.POSITIVE_INFINITY,
-                slider = it.slider,
-            )
+            FieldRange(min = it.min, max = it.max, slider = it.slider)
         }
 
     fun isBone(descriptor: SerialDescriptor, index: Int): Boolean =

@@ -11,4 +11,5 @@ data class ScriptClassProvider(
     val defaultImports: List<String> = emptyList(),
     val implicitReceivers: List<KClass<*>> = emptyList(),
     val clientSideReceivers: List<String>? = null,
+    val shared: Boolean = false,
 )

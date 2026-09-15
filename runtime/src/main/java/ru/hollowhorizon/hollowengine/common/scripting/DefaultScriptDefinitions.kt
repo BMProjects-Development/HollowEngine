@@ -82,6 +82,7 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.utils.rl",
                     "ru.hollowhorizon.hollowengine.common.utils.literal",
                 ),
+                shared = true,
             )
             this += Provider(
                 extension = UI_SCRIPT_EXTENSION,

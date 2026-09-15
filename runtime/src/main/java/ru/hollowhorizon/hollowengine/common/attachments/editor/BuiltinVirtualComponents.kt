@@ -29,8 +29,8 @@ data class EntityPlacement(
     val x: Double = 0.0,
     val y: Double = 0.0,
     val z: Double = 0.0,
-    @EditorRange("-180", "180", slider = true) val yaw: Float = 0f,
-    @EditorRange("-90", "90", slider = true) val pitch: Float = 0f,
+    @EditorRange(-180.0, 180.0, slider = true) val yaw: Float = 0f,
+    @EditorRange(-90.0, 90.0, slider = true) val pitch: Float = 0f,
 )
 
 

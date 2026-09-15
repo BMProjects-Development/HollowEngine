@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.scripting.compiling
 
 import kotlinx.coroutines.runBlocking
+import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import java.io.File
@@ -102,6 +103,12 @@ open class HollowEngineScriptEvaluator : ScriptEvaluator {
     override suspend operator fun invoke(
         compiledScript: KotlinCompiledScript,
         scriptEvaluationConfiguration: ScriptEvaluationConfiguration,
+    ): ResultWithDiagnostics<EvaluationResult> = evaluate(compiledScript, scriptEvaluationConfiguration, imported = false)
+
+    private suspend fun evaluate(
+        compiledScript: KotlinCompiledScript,
+        scriptEvaluationConfiguration: ScriptEvaluationConfiguration,
+        imported: Boolean,
     ): ResultWithDiagnostics<EvaluationResult> = try {
         compiledScript.getClass(scriptEvaluationConfiguration).onSuccess evaluation@{ scriptClass ->
             val sharedConfiguration = scriptEvaluationConfiguration.getOrPrepareShared(scriptClass.java.classLoader)
@@ -115,11 +122,12 @@ open class HollowEngineScriptEvaluator : ScriptEvaluator {
                 compiledScript.compilationConfiguration[ScriptCompilationConfiguration.isSharedScript] == true
 
             if (canShareInstance) {
+                if (!imported) SharedScriptClasses.adopt(compiledScript, scriptClass)
                 SharedScriptClasses.instanceOf(scriptClass)?.asSuccess()?.let { return@evaluation it }
             }
 
             compiledScript.otherScripts.mapSuccess {
-                invoke(it, configurationForOtherScripts)
+                evaluate(it, configurationForOtherScripts, imported = true)
             }.onSuccess { importedScriptsEvalResults ->
                 importedScriptsEvalResults.firstOrNull { it.returnValue is ResultValue.Error }?.let {
                     return@onSuccess it.asSuccess()
@@ -128,10 +136,11 @@ open class HollowEngineScriptEvaluator : ScriptEvaluator {
                 val refinedEvalConfiguration = sharedConfiguration.with {
                     compilationConfiguration(compiledScript.compilationConfiguration)
                 }.refineBeforeEvaluation(compiledScript).valueOr {
-                    return@invoke ResultWithDiagnostics.Failure(it.reports)
+                    return@evaluate ResultWithDiagnostics.Failure(it.reports)
                 }
 
                 val resultValue = try {
+                    if (imported) checkCreatableByImporter(compiledScript, scriptClass, canShareInstance)
                     val instance = scriptClass.evalWithConfigAndOtherScriptsResults(
                         refinedEvalConfiguration, importedScriptsEvalResults
                     )
@@ -166,6 +175,24 @@ open class HollowEngineScriptEvaluator : ScriptEvaluator {
         ResultWithDiagnostics.Failure(
             e.asDiagnostics(path = compiledScript.sourceLocationId)
         )
+    }
+
+    /**
+     * An importer passes no constructor arguments to its imports, so a script whose base class needs them
+     * can only be imported as a shared script, once whoever runs it has created the instance.
+     */
+    private fun checkCreatableByImporter(compiledScript: KotlinCompiledScript, scriptClass: KClass<*>, shared: Boolean) {
+        val base = scriptClass.java.superclass ?: return
+        if (base.constructors.isEmpty() || base.constructors.any { it.parameterCount == 0 }) return
+        val name = compiledScript.sourceLocationId?.substringAfterLast('/')?.substringAfterLast('\\')
+            ?: scriptClass.java.name
+        val reason = when {
+            !shared -> "its base class ${base.simpleName} takes constructor arguments that only the engine passes"
+            name.endsWith(STARTUP_SCRIPT_EXTENSION) ->
+                "it runs once while the game starts, and this version of it has not run. If it failed, or was added or changed after the game started, restart the game"
+            else -> "it has to run on its own before anything imports it, and it has not"
+        }
+        throw IllegalStateException("Cannot import '$name': $reason")
     }
 
     private fun KClass<*>.evalWithConfigAndOtherScriptsResults(
@@ -245,6 +272,9 @@ internal class KJvmCompiledScriptFromJar(
 
     private fun getScriptOrFail(): KJvmCompiledScript =
         loadedScript ?: throw IllegalStateException("Compiled script is not loaded yet")
+
+    /** The fingerprint of the sources this jar was built from, as stamped into it. */
+    val fingerprint: String? by lazy { ScriptCache.hashOf(file) }
 
     override suspend fun getClass(scriptEvaluationConfiguration: ScriptEvaluationConfiguration?): ResultWithDiagnostics<KClass<*>> =
         metadata(scriptEvaluationConfiguration).getClass(scriptEvaluationConfiguration)

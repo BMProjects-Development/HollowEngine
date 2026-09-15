@@ -33,15 +33,14 @@ annotation class EditorCategory(val category: String)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 annotation class EditorHidden
 
-// TODO: Fix float / double in annotations...
 /**
- * Bounds a numeric field, and turns it into a slider when [slider] is set.
+ * Bounds a numeric field, and turns it into a slider when [slider] is set. An infinite bound is no bound.
  */
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorRange(
-    val min: String = "",
-    val max: String = "",
+    val min: Double = Double.NEGATIVE_INFINITY,
+    val max: Double = Double.POSITIVE_INFINITY,
     val slider: Boolean = false,
 )
 
