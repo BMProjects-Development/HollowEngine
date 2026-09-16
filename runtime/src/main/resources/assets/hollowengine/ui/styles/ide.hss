@@ -322,11 +322,8 @@
     tint: #ffffff;
 }
 
-.project-dialog {
-    padding: 12px;
-}
-
 .project-dialog-content {
+    margin: 6px;
     gap: 7px;
 }
 
