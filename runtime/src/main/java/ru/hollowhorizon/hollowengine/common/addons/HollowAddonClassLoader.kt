@@ -34,6 +34,7 @@ internal class HollowAddonClassLoader(
         "kotlin.ranges.",
         "kotlin.sequences.",
         "kotlin.script.experimental.api.",
+        "kotlin.script.experimental.host.",
         "kotlin.script.experimental.util.",
         "kotlin.text.",
         "kotlin.time.",

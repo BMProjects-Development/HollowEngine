@@ -21,7 +21,7 @@ class ScriptCacheTests {
     @Test
     fun `a stamped artifact reports the fingerprint it was built for`(@TempDir directory: File) {
         val jar = directory.resolve("script.jar")
-        val fingerprint = ScriptFingerprint.Fingerprint(code = "abc123", layout = "def456")
+        val fingerprint = ScriptFingerprint.Fingerprint(code = "abc123", layout = "def456", runtime = RUNTIME)
         writeStampedJar(jar, fingerprint)
 
         assertEquals("abc123", ScriptCache.hashOf(jar))
@@ -32,11 +32,22 @@ class ScriptCacheTests {
     }
 
     @Test
+    fun `bytecode mapped for another runtime is not usable even from the same code`(@TempDir directory: File) {
+        val jar = directory.resolve("script.jar")
+        val fingerprint = ScriptFingerprint.Fingerprint(code = "abc123", layout = "def456", runtime = RUNTIME)
+        writeStampedJar(jar, fingerprint)
+
+        val onFabric = fingerprint.copy(runtime = "fabric/intermediary/production")
+        assertFalse(ScriptCache.isValid(jar, onFabric))
+        assertFalse(ScriptCache.isCurrent(jar, onFabric))
+    }
+
+    @Test
     fun `an artifact built from the same code laid out differently is usable but not current`(
         @TempDir directory: File,
     ) {
         val jar = directory.resolve("script.jar")
-        val fingerprint = ScriptFingerprint.Fingerprint(code = "abc123", layout = "def456")
+        val fingerprint = ScriptFingerprint.Fingerprint(code = "abc123", layout = "def456", runtime = RUNTIME)
         writeStampedJar(jar, fingerprint)
 
         val reformatted = fingerprint.copy(layout = "reformatted")
@@ -51,7 +62,7 @@ class ScriptCacheTests {
 
         assertNull(ScriptCache.hashOf(unstamped))
         assertNull(ScriptCache.hashOf(directory.resolve("absent.jar")))
-        assertFalse(ScriptCache.isValid(unstamped, ScriptFingerprint.Fingerprint("abc123", "def456")))
+        assertFalse(ScriptCache.isValid(unstamped, ScriptFingerprint.Fingerprint("abc123", "def456", RUNTIME)))
     }
 
     @Test
@@ -80,7 +91,7 @@ class ScriptCacheTests {
         listOf(known, orphan, untouched).forEach { id ->
             val file = ScriptCache.artifact(id)
             file.parentFile.mkdirs()
-            writeStampedJar(file, ScriptFingerprint.Fingerprint("hash", "layout"))
+            writeStampedJar(file, ScriptFingerprint.Fingerprint("hash", "layout", RUNTIME))
         }
 
         try {
@@ -152,19 +163,19 @@ class ScriptCacheTests {
     }
 
     @Test
-    fun `the fingerprint names the runtime the artifact was built for`(@TempDir root: File) {
+    fun `the runtime is named beside the code hash, so remapping does not need the sources`(@TempDir root: File) {
         root.resolve("main.node.kts").writeText("val body = 1")
 
         withSource(root, "identity-demo") {
             val id = ScriptId("identity-demo", "main.node.kts")
             try {
                 ScriptFingerprint.runtimeIdentity = "fabric/intermediary/production"
-                val fabric = ScriptFingerprint.compute(id)
-                ScriptFingerprint.runtimeIdentity = "neoforge/official/production"
-                val neoforge = ScriptFingerprint.compute(id)
+                val fabric = assertNotNull(ScriptFingerprint.compute(id))
+                ScriptFingerprint.runtimeIdentity = RUNTIME
+                val neoforge = assertNotNull(ScriptFingerprint.compute(id))
 
-                assertNotNull(fabric)
-                assertNotEquals(fabric, neoforge)
+                assertEquals(fabric.code, neoforge.code)
+                assertNotEquals(fabric.runtime, neoforge.runtime)
             } finally {
                 ScriptFingerprint.runtimeIdentity = null
             }
@@ -193,10 +204,13 @@ class ScriptCacheTests {
     private fun writeStampedJar(file: File, fingerprint: ScriptFingerprint.Fingerprint) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
-            mainAttributes.putValue(ScriptCache.HASH_ATTRIBUTE, fingerprint.code)
-            mainAttributes.putValue(ScriptCache.LAYOUT_ATTRIBUTE, fingerprint.layout)
+            ScriptCache.stamp(mainAttributes, fingerprint)
         }
         file.parentFile?.mkdirs()
         JarOutputStream(file.outputStream(), manifest).use { }
+    }
+
+    private companion object {
+        const val RUNTIME = ScriptFingerprint.NAMED_PRODUCTION_RUNTIME
     }
 }

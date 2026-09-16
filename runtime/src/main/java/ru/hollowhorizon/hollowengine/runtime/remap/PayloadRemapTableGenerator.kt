@@ -22,20 +22,38 @@ object PayloadRemapTableGenerator {
         to: String,
         output: File,
         relocation: PrefixRelocation = PrefixRelocation.NONE,
+        keep: Set<String> = emptySet(),
     ): Result = RemappingClasspath(classpath + payload).use { lookup ->
-        val recorder = RecordingRemapper(
-            delegate = MappingsRemapper(mappings, from, to, loader = lookup::findClass),
-            declarations = DeclarationIndex(lookup::findClass),
-            mappedClasses = mappings.classNames(from),
+        val recording = Recording(from, to)
+        val mappedClasses = mappings.classNames(from)
+        val payloadClasses = classNames(payload) + keep
+
+        var scriptClasses: Map<String, ByteArray> = emptyMap()
+        val loader: (String) -> ByteArray? = { name -> scriptClasses[name] ?: lookup.findClass(name) }
+        val delegate = MappingsRemapper(mappings, from, to, loader = loader)
+        fun recorder(ownClasses: Set<String>) = RecordingRemapper(
+            delegate = delegate,
+            declarations = DeclarationIndex(loader),
+            mappedClasses = mappedClasses,
             relocation = relocation,
-            payloadClasses = classNames(payload),
-            from = from,
-            to = to,
+            ownClasses = ownClasses,
+            recording = recording,
         )
 
-        remapPayload(payload, output, recorder)
+        val payloadRecorder = recorder(payloadClasses)
+        remapPayload(
+            payload,
+            output,
+            PayloadRewrite(
+                classes = payloadRecorder,
+                forArtifact = { classes ->
+                    scriptClasses = classes
+                    recorder(payloadClasses + classes.keys)
+                },
+            ),
+        )
 
-        Result(recorder.toTable(), recorder.toShippedTable(), output)
+        Result(recording.toTable(), recording.toShippedTable(), output)
     }
 
     private fun Mappings.classNames(namespace: String): Set<String> {
@@ -44,10 +62,25 @@ object PayloadRemapTableGenerator {
         return classes.mapTo(HashSet()) { it.names[index] }
     }
 
-    private fun classNames(jar: File): Set<String> = java.util.jar.JarFile(jar).use { archive ->
+    fun classNames(jar: File): Set<String> = java.util.jar.JarFile(jar).use { archive ->
         archive.entries().asSequence()
             .filter { !it.isDirectory && it.name.endsWith(".class") }
             .mapTo(HashSet()) { it.name.removeSuffix(".class") }
+    }
+}
+
+private class Recording(private val from: String, private val to: String) {
+    val classes = HashMap<String, String>()
+    val methods = HashMap<String, String>()
+    val fields = HashMap<String, String>()
+    val relocations = HashMap<String, String>()
+
+    fun toTable() = PayloadRemapTable(from, to, classes, methods, fields)
+
+    fun toShippedTable(): PayloadRemapTable {
+        val collisions = relocations.keys.intersect(classes.keys)
+        check(collisions.isEmpty()) { "Relocation overlaps mapped classes: $collisions" }
+        return PayloadRemapTable(from, to, classes + relocations, methods, fields)
     }
 }
 
@@ -56,23 +89,17 @@ private class RecordingRemapper(
     private val declarations: DeclarationIndex,
     private val mappedClasses: Set<String>,
     private val relocation: PrefixRelocation,
-    private val payloadClasses: Set<String>,
-    private val from: String,
-    private val to: String,
+    /** Classes that travel with what is being rewritten and therefore are never relocated. */
+    private val ownClasses: Set<String>,
+    private val recording: Recording,
 ) : TrackingRemapper() {
-    private val classes = HashMap<String, String>()
-    private val methods = HashMap<String, String>()
-    private val fields = HashMap<String, String>()
-
-    private val relocations = HashMap<String, String>()
-
     override fun map(internalName: String): String {
         val mapped = delegate.map(internalName)
-        if (mapped != internalName) classes[internalName] = mapped
+        if (mapped != internalName) recording.classes[internalName] = mapped
 
-        if (mapped !in payloadClasses) {
+        if (mapped !in ownClasses) {
             val relocated = relocation.relocate(mapped)
-            if (relocated != mapped) relocations[internalName] = relocated
+            if (relocated != mapped) recording.relocations[internalName] = relocated
         }
 
         return track(internalName, mapped)
@@ -84,7 +111,7 @@ private class RecordingRemapper(
         if (ownsUninheritedMethod(owner, name, descriptor)) return name
 
         val mapped = delegate.mapMethodName(owner, name, descriptor)
-        if (mapped != name) methods["$owner.$name$descriptor"] = mapped
+        if (mapped != name) recording.methods["$owner.$name$descriptor"] = mapped
         return track(name, mapped)
     }
 
@@ -92,7 +119,7 @@ private class RecordingRemapper(
         if (ownsField(owner, name)) return name
 
         val mapped = delegate.mapFieldName(owner, name, descriptor)
-        if (mapped != name) fields["$owner.$name"] = mapped
+        if (mapped != name) recording.fields["$owner.$name"] = mapped
         return track(name, mapped)
     }
 
@@ -110,14 +137,6 @@ private class RecordingRemapper(
 
     private fun ownsField(owner: String, name: String): Boolean =
         owner !in mappedClasses && declarations.declaresField(owner, name)
-
-    fun toTable() = PayloadRemapTable(from, to, classes, methods, fields)
-
-    fun toShippedTable(): PayloadRemapTable {
-        val collisions = relocations.keys.intersect(classes.keys)
-        check(collisions.isEmpty()) { "Relocation overlaps mapped classes: $collisions" }
-        return PayloadRemapTable(from, to, classes + relocations, methods, fields)
-    }
 }
 
 private class DeclarationIndex(private val loader: (String) -> ByteArray?) {

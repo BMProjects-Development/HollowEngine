@@ -176,7 +176,7 @@ open class Config {
         private const val FILE_STABLE_MAX_WAIT_MS = 3000L
         private val BACKUP_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
 
-        val CONFIG_DIR = Paths.get("config")
+        val CONFIG_DIR: Path = Paths.get("config").toAbsolutePath()
 
         private val fileWatcher = FileSystems.getDefault().newWatchService()
         private val configRegistrations = ConcurrentHashMap<WatchKey, FileWatcherEntry>()

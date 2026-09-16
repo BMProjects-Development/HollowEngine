@@ -8,9 +8,9 @@ import java.nio.file.Path
 
 object DirectoryManager {
     val HOLLOW_ENGINE: Path by lazy {
-        File("").resolve("hollowengine").apply {
+        File("hollowengine").absoluteFile.apply {
             if (!exists()) mkdirs()
-        }.toPath()
+        }.toPath().normalize()
     }
 
     /** Compiled script artifacts, one self-contained jar per root script. */
@@ -29,7 +29,7 @@ object DirectoryManager {
 
     @JvmStatic
     fun Path.toReadablePath(): String {
-        return HOLLOW_ENGINE.relativize(this).toString().replace("\\", "/")
+        return HOLLOW_ENGINE.relativize(toAbsolutePath().normalize()).toString().replace("\\", "/")
     }
 
     @JvmStatic

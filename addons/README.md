@@ -8,12 +8,9 @@ Build every addon with:
 ./gradlew buildAddons
 ```
 
-The resulting platform artifacts are collected in `build/addon-jars/`:
+The resulting jars are collected in `build/addon-jars/`. One jar works with both mod loaders.
 
-- `*-fabric.jar` is remapped to Fabric's intermediary namespace.
-- `*-neoforge.jar` uses the official namespace used by NeoForge.
-
-Copy the artifact for the active loader to either of these directories:
+Copy the jar to either of these directories:
 
 - `mods/` - the usual choice for distributed addons and modpacks;
 - `hollowengine/addons/`- useful during development or when you want to keep addons separate from mods.
@@ -58,7 +55,19 @@ version=${version}
 entry=com.example.myaddon.MyAddon
 dependsOn=another-addon
 environment=common
+description=What the addon does
+authors=Me, Someone Else
+license=MIT
+icon=assets/my-addon/icon.png
 ```
+
+`entry` may be left out by an addon made only of scripts and resources. `description`, `authors`, `license` and `icon` go into the `fabric.mod.json` and `neoforge.mods.toml` the build generates, which is what mod lists show.
+
+## Assets and data
+
+An addon carries `assets/` and `data/` in `src/main/resources` exactly like a mod, and the build adds the `pack.mcmeta` both loaders need. From `mods` the loader serves them. From `hollowengine/addons` the engine does, below the `hollowengine` folder's own resources, so the project can still override anything an addon ships. Enabling, disabling or reloading such an addon reloads the datapacks and, when it has assets, the client's resources.
+
+Disabling an addon that lives in `mods` stops its code and scripts, but not its resources: those belong to the loader, which keeps serving them until the jar is removed.
 
 Entrypoints receive a lifecycle `CoroutineScope`. Public `@SubscribeEvent` methods declared on the entrypoint, a Kotlin `object`, or as static/top-level functions are discovered automatically. HollowEngine registers them in that scope; cancelling the scope during unload removes all of them.
 
@@ -77,7 +86,7 @@ class MyAddon : HollowAddonEntrypoint {
 
 ## Scripts
 
-An addon can ship `.kts` scripts of its own in `src/main/resources/scripts`. The build compiles them with the same compiler and the same remapping the game uses, and packs both the sources and the compiled artifacts into the platform variants of the addon jar, so the scripts run in a modpack that never installs the compiler addon. A compilation error fails the build. `debug-command` carries one as an example.
+An addon can ship `.kts` scripts of its own in `src/main/resources/scripts`. The build compiles them with the same compiler the game uses and packs both the sources and the compiled artifacts into the addon jar; the remap table covers the compiled scripts too, so they run in a modpack that never installs the compiler addon. A compilation error fails the build. `debug-command` carries one as an example.
 
 Scripts belong to the namespace named by the addon's `id`, and are addressed with it everywhere a script path is accepted:
 
@@ -104,3 +113,7 @@ To ship compiled scripts without their sources, build the addon with:
 ```shell
 ./gradlew buildAddons -Phollowengine.scripts.includeSources=false
 ```
+
+## Exporting the `hollowengine` folder
+
+The project panel of the in-game editor turns the `hollowengine` folder into the same kind of jar: its scripts, compiled as above, its `assets/`, `data/` and `META-INF/plugin.properties`. The folder needs an id of its own for that, set in the project settings; `hollowengine-sandbox` cannot be exported. An export made with its sources can be imported back into the folder of another game, replacing the project there after zipping it into `hollowengine/backups`.

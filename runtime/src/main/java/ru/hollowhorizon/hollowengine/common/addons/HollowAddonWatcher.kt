@@ -32,9 +32,10 @@ internal class HollowAddonWatcher(
     }
 
     private suspend fun scan() {
-        val filesByPath = directory.listFiles { file ->
+        val files = directory.listFiles { file ->
             file.isFile && file.extension.equals("jar", ignoreCase = true)
-        }.orEmpty().filter(::isAddon).associateBy { it.canonicalPath }
+        } ?: return
+        val filesByPath = files.filter(::isAddon).associateBy { it.canonicalPath }
 
         filesByPath.forEach { (path, file) ->
             val oldCandidate = tracked[path]

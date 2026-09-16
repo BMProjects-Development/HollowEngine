@@ -10,20 +10,18 @@ val engineScriptFiles = fileTree(engineScriptsDirectory) { include("**/*.kts") }
 
 if (!engineScriptFiles.isEmpty) evaluationDependsOn(":addons:compiler")
 
-val minecraftVersion = rootProject.property("minecraftVersion") as String
 val kotlinVersion = rootProject.property("kotlinVersion") as String
 val modVersion = property("modVersion") as String
 val sourceSets = extensions.getByType<SourceSetContainer>()
 
-fun registerEngineScriptCompilation(
-    variant: String,
-    identity: String,
-    remap: Boolean,
-): TaskProvider<JavaExec> {
-    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/$variant")
+/**
+ * Compiles the engine's own scripts against Mojang names. On Fabric the bootstrap remaps them together
+ * with the rest of the engine jar, from the same table.
+ */
+fun registerEngineScriptCompilation(): TaskProvider<JavaExec> {
+    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/named")
     val compilerProject = rootProject.project(":addons:compiler")
-    val mappings = rootProject.file("addons/compiler/src/main/resources/mappings-$minecraftVersion.tiny")
-    val toolClasspath = configurations.maybeCreate("hollowengineScriptCompiler$variant").apply {
+    val toolClasspath = configurations.maybeCreate("hollowengineScriptCompiler").apply {
         isCanBeResolved = true
         isCanBeConsumed = false
         isTransitive = true
@@ -40,9 +38,9 @@ fun registerEngineScriptCompilation(
     ).forEach { notation -> dependencies.add(toolClasspath.name, notation) }
 
     val mainSources = sourceSets.named("main")
-    return tasks.register<JavaExec>("compile${variant.replaceFirstChar(Char::titlecase)}EngineScripts") {
+    return tasks.register<JavaExec>("compileNamedEngineScripts") {
         group = "build"
-        description = "Compiles the engine's own scripts for the $variant mapping namespace."
+        description = "Compiles the engine's own scripts against Mojang names."
         mainClass.set("ru.hollowhorizon.hollowengine.common.compiler.tools.ScriptPrecompiler")
         classpath = files(
             mainSources.map { it.output },
@@ -59,72 +57,14 @@ fun registerEngineScriptCompilation(
                 "--output", outputDirectory.get().asFile.absolutePath,
                 "--namespace", "hollowengine",
                 "--fingerprint", modVersion,
-                "--identity", identity,
-                "--remap", remap.toString(),
-                "--mappings", if (remap) mappings.absolutePath else "",
+                "--identity", "neoforge/official/production",
+                "--remap", "false",
+                "--mappings", "",
             )
         })
         doFirst {
             workingDir.mkdirs()
         }
-    }
-}
-
-fun registerEngineScriptRemapping(
-    variant: String,
-    identity: String,
-    input: TaskProvider<JavaExec>,
-): TaskProvider<JavaExec> {
-    val inputDirectory = layout.buildDirectory.dir("hollowengine/scripts/named")
-    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/$variant")
-    val compilerProject = rootProject.project(":addons:compiler")
-    val mappings = rootProject.file("addons/compiler/src/main/resources/mappings-$minecraftVersion.tiny")
-    val toolClasspath = configurations.maybeCreate("hollowengineScriptCompiler$variant").apply {
-        isCanBeResolved = true
-        isCanBeConsumed = false
-        isTransitive = true
-    }
-    dependencies.add(
-        toolClasspath.name,
-        files(compilerProject.tasks.named<Jar>("shadowJar").flatMap { it.archiveFile }),
-    )
-    listOf(
-        "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion",
-        "org.jetbrains.kotlin:kotlin-metadata-jvm:$kotlinVersion",
-        "org.apache.logging.log4j:log4j-core:2.23.1",
-        "org.ow2.asm:asm-commons:9.7.1",
-    ).forEach { notation -> dependencies.add(toolClasspath.name, notation) }
-
-    val mainSources = sourceSets.named("main")
-    return tasks.register<JavaExec>("compile${variant.replaceFirstChar(Char::titlecase)}EngineScripts") {
-        group = "build"
-        description = "Remaps the engine's compiled scripts for the $variant mapping namespace."
-        dependsOn(input)
-        mainClass.set("ru.hollowhorizon.hollowengine.common.compiler.tools.ScriptArtifactRemapper")
-        classpath = files(
-            mainSources.map { it.output },
-            mainSources.map { it.compileClasspath },
-            mainSources.map { it.runtimeClasspath },
-            toolClasspath,
-        )
-        workingDir = layout.buildDirectory.dir("hollowengine/precompiler").get().asFile
-        inputs.files(engineScriptFiles).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.file(mappings).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.property("identity", identity)
-        outputs.dir(outputDirectory)
-        argumentProviders.add(CommandLineArgumentProvider {
-            listOf(
-                "--scripts", engineScriptsDirectory.absolutePath,
-                "--input", inputDirectory.get().asFile.absolutePath,
-                "--output", outputDirectory.get().asFile.absolutePath,
-                "--namespace", "hollowengine",
-                "--fingerprint", modVersion,
-                "--identity", identity,
-                "--mappings", mappings.absolutePath,
-            )
-        })
-        doFirst { workingDir.mkdirs() }
     }
 }
 
@@ -143,11 +83,5 @@ val generateEngineScriptIndex = tasks.register("generateEngineScriptIndex") {
 }
 
 if (!engineScriptFiles.isEmpty) {
-    val compileNamedEngineScripts =
-        registerEngineScriptCompilation("named", "neoforge/official/production", remap = false)
-    registerEngineScriptRemapping(
-        "intermediary",
-        "fabric/intermediary/production",
-        compileNamedEngineScripts,
-    )
+    registerEngineScriptCompilation()
 }

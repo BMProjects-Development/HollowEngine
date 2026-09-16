@@ -17,18 +17,20 @@ import java.security.MessageDigest
  * The identity of a compiled script artifact.
  *
  * A cached jar holds bytecode produced for one engine build, one Kotlin version, one Minecraft
- * version, one mapping namespace and one exact set of sources, so all of that goes into the hash. A
- * mismatch means the artifact has to be rebuilt or, when no compiler is installed, used anyway and
- * reported.
+ * version and one exact set of sources, so all of that goes into the hash.
  */
 object ScriptFingerprint {
     /** Bumped whenever the layout of a cached artifact changes in a way older jars cannot satisfy. */
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
+
+    /** What a build compiles addon scripts for: Mojang names, which is what NeoForge runs on. */
+    const val NAMED_PRODUCTION_RUNTIME = "neoforge/official/production"
 
     /**
-     * What an artifact was built from, at two levels of detail.
+     * What an artifact was built from, at two levels of detail, and the runtime its bytecode is mapped
+     * for.
      */
-    data class Fingerprint(val code: String, val layout: String)
+    data class Fingerprint(val code: String, val layout: String, val runtime: String)
 
     /**
      * Hash of [id] and everything it is built from, or `null` when the script has no sources to hash
@@ -55,7 +57,6 @@ object ScriptFingerprint {
         updateBoth("engine=${HollowEngineBuild.VERSION}")
         updateBoth("kotlin=${HollowEngineBuild.KOTLIN_VERSION}")
         updateBoth("minecraft=${HollowEngineBuild.MINECRAFT_VERSION}")
-        updateBoth("runtime=$currentRuntimeIdentity")
         updateBoth("source=${ScriptRegistry.source(id.namespace)?.fingerprint.orEmpty()}")
         sources.forEach { (member, file) ->
             val bytes = file.readBytes()
@@ -64,7 +65,7 @@ object ScriptFingerprint {
             code.updateText(ScriptText.normalize(String(bytes, Charsets.UTF_8)))
             layout.update(bytes)
         }
-        return Fingerprint(code.digest().toHexString(), layout.digest().toHexString())
+        return Fingerprint(code.digest().toHexString(), layout.digest().toHexString(), currentRuntimeIdentity)
     }
 
     /**
@@ -80,7 +81,7 @@ object ScriptFingerprint {
     fun runtimeIdentity(platform: String, mappingNamespace: String, production: Boolean): String =
         "$platform/$mappingNamespace/${if (production) "production" else "development"}"
 
-    private val currentRuntimeIdentity: String
+    val currentRuntimeIdentity: String
         get() = runtimeIdentity ?: runtimeIdentity(
             platform = runCatching { HollowAddonRuntimeEnvironment.platform.id() }.getOrDefault("unknown"),
             mappingNamespace = runCatching { HollowAddonRuntimeEnvironment.mappingNamespace().id }.getOrDefault("unknown"),

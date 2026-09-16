@@ -1,9 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.common.addons.project.ProjectProperties
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import java.io.File
-import java.util.Properties
 
 /**
  * The `hollowengine` directory treated as an unpacked addon: scripts live in `hollowengine/scripts`
@@ -19,7 +19,7 @@ class SandboxScriptSource(
     directory = root.resolve(SCRIPTS_DIRECTORY),
     classLoader = HollowEngine::class.java.classLoader,
     dependencies = descriptor.dependencies,
-    fingerprint = "sandbox",
+    fingerprint = descriptor.version,
 ) {
     init {
         directory.mkdirs()
@@ -27,36 +27,28 @@ class SandboxScriptSource(
 
     val scriptsDirectory: File get() = directory
 
-    data class SandboxDescriptor(val id: String, val dependencies: List<String>)
+    data class SandboxDescriptor(val id: String, val dependencies: List<String>, val version: String)
 
     companion object {
-        const val DESCRIPTOR_PATH = "META-INF/plugin.properties"
+        const val DESCRIPTOR_PATH = ProjectProperties.PATH
         const val SCRIPTS_DIRECTORY = "scripts"
 
         fun readDescriptor(file: File): SandboxDescriptor {
-            val fallback = SandboxDescriptor(DEFAULT_SANDBOX_NAMESPACE, emptyList())
-            if (!file.isFile) return fallback
-            val properties = runCatching {
-                Properties().apply { file.inputStream().use(::load) }
-            }.onFailure {
+            val fallback = SandboxDescriptor(DEFAULT_SANDBOX_NAMESPACE, emptyList(), ProjectProperties.DEFAULT_VERSION)
+            val properties = runCatching { ProjectProperties.read(file) }.onFailure {
                 HollowEngine.LOGGER.error("Failed to read {}; falling back to the default namespace", file, it)
             }.getOrNull() ?: return fallback
 
-            val id = properties.getProperty("id")?.trim()?.takeIf(String::isNotEmpty) ?: DEFAULT_SANDBOX_NAMESPACE
-            if (!id.matches(NAMESPACE_PATTERN)) {
+            if (!properties.id.matches(NAMESPACE_PATTERN)) {
                 HollowEngine.LOGGER.error(
                     "Invalid namespace '{}' in {}; falling back to '{}'",
-                    id,
+                    properties.id,
                     file,
                     DEFAULT_SANDBOX_NAMESPACE,
                 )
-                return fallback
+                return fallback.copy(version = properties.version)
             }
-            val dependencies = properties.getProperty("dependsOn", "")
-                .split(',')
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-            return SandboxDescriptor(id, dependencies)
+            return SandboxDescriptor(properties.id, properties.dependsOn, properties.version)
         }
     }
 }

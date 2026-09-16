@@ -7,7 +7,7 @@ import java.nio.file.Files
 import java.util.jar.JarFile
 import kotlin.io.path.exists
 
-private val cacheMods = File("hollowengine/.cache/mods/").apply {
+private val cacheMods = File("hollowengine/.cache/mods/").absoluteFile.apply {
     if (!exists()) this.mkdirs()
 }.toPath()
 

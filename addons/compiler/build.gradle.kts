@@ -263,15 +263,13 @@ val addonJar = tasks.register<Jar>("addonJar") {
     dependsOn(processAddonResources, compilerClassesJar, addonModMetadata)
     archiveClassifier.set("")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest.attributes(
-        "HollowEngine-Addon-Format" to "2",
-        "HollowEngine-Variant-Common-Agnostic" to "META-INF/hollowengine/variants/agnostic.jar",
-    )
+    includeEmptyDirs = false
+    manifest.attributes("HollowEngine-Addon-Format" to "3")
     from(processAddonResources)
     from(addonModMetadata)
-    from(compilerClassesJar.flatMap { it.archiveFile }) {
-        into("META-INF/hollowengine/variants")
-        rename { "agnostic.jar" }
+    from(compilerClassesJar) {
+        into("META-INF/hollowengine")
+        rename { "classes.jar" }
     }
 }
 

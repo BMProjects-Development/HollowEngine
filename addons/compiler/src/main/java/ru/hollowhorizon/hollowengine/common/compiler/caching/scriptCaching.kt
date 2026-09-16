@@ -46,7 +46,7 @@ fun KJvmCompiledScript.saveScriptToJar(outputJar: File, fingerprint: Fingerprint
     val module = (getCompiledModule() as? KJvmCompiledModuleInMemory)
         ?: throw IllegalArgumentException("Unsupported module type ${getCompiledModule()}")
 
-    val shared = collectSharedScripts(module.compilerOutputFiles)
+    val shared = collectSharedScripts(module.compilerOutputFiles, fingerprint.runtime)
     shared.forEach { script -> writeSharedArtifact(script, sharedDirectory) }
     val ownClasses = module.compilerOutputFiles.filterKeys { path -> shared.none { it.owns(path) } }
 
@@ -55,8 +55,7 @@ fun KJvmCompiledScript.saveScriptToJar(outputJar: File, fingerprint: Fingerprint
             mainAttributes.apply {
                 putValue("Manifest-Version", "1.0")
                 putValue("Created-By", "HollowEngine ScriptingEngine")
-                putValue(ScriptCache.HASH_ATTRIBUTE, fingerprint.code)
-                putValue(ScriptCache.LAYOUT_ATTRIBUTE, fingerprint.layout)
+                ScriptCache.stamp(this, fingerprint)
                 putValue("Main-Class", scriptClassFQName)
                 if (shared.isNotEmpty()) {
                     putValue(
@@ -89,7 +88,7 @@ fun KJvmCompiledScript.saveScriptToJar(outputJar: File, fingerprint: Fingerprint
 /**
  * The shared scripts this compilation produced classes for.
  */
-private fun KJvmCompiledScript.collectSharedScripts(output: Map<String, ByteArray>): List<SharedScript> {
+private fun KJvmCompiledScript.collectSharedScripts(output: Map<String, ByteArray>, runtime: String): List<SharedScript> {
     val found = LinkedHashMap<String, SharedScript>()
 
     fun visit(script: CompiledScript) {
@@ -101,7 +100,7 @@ private fun KJvmCompiledScript.collectSharedScripts(output: Map<String, ByteArra
 
         val source = jvmScript.sourceLocationId?.let(::File)?.takeIf(File::isFile) ?: return
         val id = ScriptRegistry.idOf(source) ?: return
-        val fingerprint = runCatching { ScriptFingerprint.compute(id) }.getOrNull() ?: return
+        val fingerprint = runCatching { ScriptFingerprint.compute(id) }.getOrNull()?.copy(runtime = runtime) ?: return
 
         val prefix = name.replace('.', '/')
         val classes = output.filterKeys { it == "$prefix.class" || it.startsWith("$prefix$") }
@@ -127,8 +126,7 @@ private fun writeSharedArtifact(script: SharedScript, directory: File?) {
             mainAttributes.apply {
                 putValue("Manifest-Version", "1.0")
                 putValue("Created-By", "HollowEngine ScriptingEngine")
-                putValue(ScriptCache.HASH_ATTRIBUTE, script.fingerprint.code)
-                putValue(ScriptCache.LAYOUT_ATTRIBUTE, script.fingerprint.layout)
+                ScriptCache.stamp(this, script.fingerprint)
             }
         }
 

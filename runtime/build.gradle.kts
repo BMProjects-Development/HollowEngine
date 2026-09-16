@@ -233,10 +233,7 @@ val runtimeShadowJar = tasks.named<ShadowJar>("shadowJar") {
     if (hasEngineScripts) {
         from(engineScriptsDirectory) { into("scripts") }
         from(tasks.named("compileNamedEngineScripts")) {
-            into("META-INF/hollowengine/scripts/named")
-        }
-        from(tasks.named("compileIntermediaryEngineScripts")) {
-            into("META-INF/hollowengine/scripts/intermediary")
+            into("META-INF/hollowengine/scripts")
         }
         from(tasks.named("generateEngineScriptIndex"))
     }

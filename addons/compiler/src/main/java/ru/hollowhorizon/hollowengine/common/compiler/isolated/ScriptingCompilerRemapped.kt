@@ -41,6 +41,7 @@ class ScriptJvmCompilerRemapped(
     definitions: List<ScriptDefinition>,
     hostConfiguration: ScriptingHostConfiguration,
     private val remappingClasspath: Lazy<RemappingClasspath>,
+    private val remapToRuntime: Boolean = true,
 ) : ScriptCompilerProxy {
     private val delegate = HollowEngineScriptCompiler(definitions, hostConfiguration)
 
@@ -61,7 +62,7 @@ class ScriptJvmCompilerRemapped(
         val jvmScript = script as? KJvmCompiledScript ?: return script
         val module = jvmScript.getCompiledModule() as? KJvmCompiledModuleInMemory ?: return jvmScript
         val outputFiles = module.compilerOutputFiles
-        val remappingSession = if (isProduction && !NeoForgeEnvironmentSetup.isAvailable()) {
+        val remappingSession = if (remapToRuntime && isProduction && !NeoForgeEnvironmentSetup.isAvailable()) {
             val environment = ScriptingEnvironment.INSTANCE
             ClassRemappingSession(
                 environment.mappings,

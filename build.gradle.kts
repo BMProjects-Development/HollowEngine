@@ -106,14 +106,12 @@ fun Project.configureHollowAddon() {
         add("testImplementation", kotlin("test"))
     }
 
-    val namedClassesJar = tasks.named<Jar>("jar") {
+    tasks.named<Jar>("jar") {
         archiveClassifier.set("classes-named")
         include("**/*.class")
     }
     tasks.named<RemapJarTask>("remapJar") {
-        dependsOn(namedClassesJar)
-        inputFile.set(namedClassesJar.flatMap { it.archiveFile })
-        archiveClassifier.set("classes-intermediary")
+        enabled = false
     }
 
     apply(from = rootProject.file("gradle/addon-packaging.gradle.kts"))

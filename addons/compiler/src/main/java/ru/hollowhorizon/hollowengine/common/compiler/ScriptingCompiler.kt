@@ -30,7 +30,7 @@ class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : Scripti
     override fun compile(file: File, context: ScriptCompilationContext): Result<CompiledScript.WithFile> {
         val definition = environment.scriptDefinitions.getDefinitionFor(file.name)
         val result = runScriptingBlocking {
-            newCompiler(definition)(
+            newCompiler(definition, context.remapToRuntime)(
                 FileScriptSource(file),
                 definition.compilationConfiguration.withClasspath(context.extraClasspath),
             )
@@ -72,12 +72,13 @@ class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : Scripti
         }
     }
 
-    private fun newCompiler(definition: ScriptDefinition) = JvmScriptCompiler(
+    private fun newCompiler(definition: ScriptDefinition, remapToRuntime: Boolean = true) = JvmScriptCompiler(
         definition.hostConfiguration,
         ScriptJvmCompilerRemapped(
             environment.scriptDefinitions,
             definition.hostConfiguration,
             remappingClasspath,
+            remapToRuntime,
         ),
     )
 

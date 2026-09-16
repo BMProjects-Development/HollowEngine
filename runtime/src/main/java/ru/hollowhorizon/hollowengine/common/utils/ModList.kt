@@ -36,7 +36,7 @@ fun getModFile(modId: String): File {
 
         val copy = Files.newInputStream(path)
 
-        val newFile = File("hollowengine/.cache/mods/$fileName").apply {
+        val newFile = File("hollowengine/.cache/mods/$fileName").absoluteFile.apply {
             if (!this.parentFile.exists()) this.parentFile.mkdirs()
         }
 

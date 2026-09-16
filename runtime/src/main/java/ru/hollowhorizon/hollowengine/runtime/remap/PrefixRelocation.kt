@@ -10,6 +10,8 @@ class PrefixRelocation(rules: Map<String, String>) {
 
     val isEmpty: Boolean get() = rules.isEmpty()
 
+    fun reversed(): PrefixRelocation = PrefixRelocation(rules.associate { (from, to) -> to to from })
+
     fun relocate(internalName: String): String {
         for ((from, to) in rules) {
             if (internalName == from || internalName.startsWith("$from/")) {

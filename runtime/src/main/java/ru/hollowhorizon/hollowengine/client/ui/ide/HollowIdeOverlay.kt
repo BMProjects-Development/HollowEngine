@@ -122,7 +122,8 @@ object HollowIdeOverlay {
         },
         shortcutsActive = {
             dock.focusedItemId == ProjectTreeId &&
-                    surface.runtime.focusedKey != ProjectFilterInputId
+                    surface.runtime.focusedKey != ProjectFilterInputId &&
+                    !packaging.hasOpenDialog
         },
         closeDockItem = { dock.close(it) },
         openFile = { openFileDockItem(it) },
@@ -130,6 +131,7 @@ object HollowIdeOverlay {
         pointerX = { surface.runtime.mouseX },
         pointerY = { surface.runtime.mouseY },
     )
+    private val packaging = HollowIdeProjectPackaging(model) { statusText = it }
     private val diagnosticsPanels = mutableStateMapOf<String, Boolean>()
     private val diagnosticsPanelHeights = mutableStateMapOf<String, Float>()
     private var editorAnalysisRevision by mutableStateOf(0)
@@ -471,7 +473,8 @@ object HollowIdeOverlay {
                 .focusScope()
                 .onKeyInput { input ->
                     val handled = !input.repeat && (
-                            input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() ||
+                            input.key == GLFW.GLFW_KEY_ESCAPE && packaging.closeDialogs() ||
+                                    input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() ||
                                     handleHollowIdeSearchKey(search, input.key, input.modifiers, ::openSearchResult) ||
                                     project.handleNameDialogKey(input.key) ||
                                     handleSearchOverlayShortcut(input.key, input.modifiers) ||
@@ -495,6 +498,7 @@ object HollowIdeOverlay {
                             id = "ide-dock",
                             modifier = Modifier.size(100.percent, 0.px)
                                 .grow(1f),
+                            tabBarActions = { item -> if (item.id == ProjectTreeId) HollowIdeProjectActions(packaging) },
                             content = { item -> DockContent(item) },
                         )
                     }
@@ -504,6 +508,7 @@ object HollowIdeOverlay {
                         onDismiss = { fileContextMenu = null },
                     )
                     HollowIdeSearchDialog(search, ::openSearchResult)
+                    HollowIdeProjectDialogs(packaging)
                     EditorColorPickerPopup()
                     UiDragGhost(dragAndDrop)
                 }
@@ -674,7 +679,7 @@ object HollowIdeOverlay {
                 ),
         ) {
             UiTreeView(
-                items = model.visibleTreeItems(projectFilter.query),
+                items = model.visibleTreeItems(projectFilter.query, rootLabel = packaging.properties.displayName),
                 onToggle = project::toggle,
                 onSelect = project::select,
                 filterState = projectFilter,

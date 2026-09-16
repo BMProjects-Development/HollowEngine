@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptSourceLifecycle
 import ru.hollowhorizon.hollowengine.common.scripting.startup.StartupScripts
+import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 import ru.hollowhorizon.hollowengine.network.HollowAddonPacketRegistry
 import java.io.File
 
@@ -43,6 +44,13 @@ internal class HollowAddonRuntime(
     var restartRequiredSnapshot: List<HollowAddonDescriptor> = emptyList()
         private set
 
+    @Volatile
+    var resourcePackSnapshot: List<HollowAddonResourcePack> = emptyList()
+        private set
+
+    @Volatile
+    private var started = false
+
     suspend fun start() {
         withContext(Dispatchers.IO) {
             addonsDirectory.mkdirs()
@@ -71,6 +79,7 @@ internal class HollowAddonRuntime(
         watcherJobs = sources.mapIndexed { index, source ->
             HollowAddonWatcher(source, artifactStore, this, runtimeScope).start(candidatesBySource[index])
         }
+        started = true
     }
 
     private fun select(found: List<Pair<Int, HollowAddonCandidate>>): HollowAddonCandidate {
@@ -407,9 +416,10 @@ internal class HollowAddonRuntime(
         var addonJob: Job? = null
         return runCatching {
             descriptor.requiredClasses.forEach { className -> Class.forName(className, false, classLoader) }
-            val entrypoint =
-                Class.forName(descriptor.entrypoint, true, classLoader).asSubclass(HollowAddonEntrypoint::class.java)
+            val entrypoint = descriptor.entrypoint?.let { className ->
+                Class.forName(className, true, classLoader).asSubclass(HollowAddonEntrypoint::class.java)
                     .getDeclaredConstructor().newInstance()
+            } ?: NoEntrypoint
             val bridgeModule = module {
                 single<HollowAddonHostServices> { hostServices }
                 single { descriptor }
@@ -538,28 +548,57 @@ internal class HollowAddonRuntime(
 
     private fun refreshSnapshot() {
         loadedSnapshot = loadedAddons.values.map { it.candidate.descriptor }
+        val addonsFolder = addonsDirectory.canonicalFile
+        resourcePackSnapshot = loadedAddons.values.toList().asReversed()
+            .map(LoadedHollowAddon::candidate)
+            .filter { candidate ->
+                (candidate.hasAssets || candidate.hasData) && candidate.sourceFile.parentFile?.canonicalFile == addonsFolder
+            }
+            .map { candidate ->
+                HollowAddonResourcePack(
+                    addonId = candidate.descriptor.id,
+                    name = candidate.descriptor.name,
+                    file = candidate.artifactFile,
+                    hasAssets = candidate.hasAssets,
+                )
+            }
     }
 
     private suspend fun <T> locked(block: suspend () -> T): T {
         mutex.lock()
         val loadedBefore = loadedSnapshot
+        val packsBefore = resourcePackSnapshot
         return try {
             block()
         } finally {
             mutex.unlock()
             if (loadedSnapshot !== loadedBefore) reloadRunningServers()
+            if (started && assetsOf(packsBefore) != assetsOf(resourcePackSnapshot)) reloadClientResources()
         }
     }
+
+    private fun assetsOf(packs: List<HollowAddonResourcePack>): List<File> =
+        packs.filter(HollowAddonResourcePack::hasAssets).map(HollowAddonResourcePack::file)
 
     private fun reloadRunningServers() {
         ServerRuntimeState.servers().forEach { server ->
             server.execute {
+                server.packRepository.reload()
                 server.reloadResources(server.packRepository.selectedIds).exceptionally { error ->
                     HollowEngine.LOGGER.error("Failed to reload datapacks after the set of addons changed", error)
                     null
                 }
             }
         }
+    }
+
+    private fun reloadClientResources() {
+        if (isPhysicalClient) ClientResources.reload()
+    }
+
+    /** Stands in for the entrypoint of an addon made only of scripts and resources. */
+    private object NoEntrypoint : HollowAddonEntrypoint {
+        override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) = Unit
     }
 
     private data class LoadedHollowAddon(

@@ -296,6 +296,152 @@
     gap: 3px;
 }
 
+.project-actions {
+    size: fit 20px;
+    padding: 0px 3px;
+    gap: 1px;
+}
+
+.project-action {
+    size: 20px 20px;
+    border-radius: 3px;
+    background: #00000000;
+    transition: background 110ms ease-out;
+}
+
+.project-action:hover {
+    background: #414653;
+}
+
+.project-action-icon {
+    size: 13px 13px;
+    tint: #aeb8ca;
+}
+
+.project-action:hover .project-action-icon {
+    tint: #ffffff;
+}
+
+.project-dialog {
+    padding: 12px;
+}
+
+.project-dialog-content {
+    gap: 7px;
+}
+
+.project-dialog-title {
+    foreground: #F0F3F8;
+    font-size: 14px;
+}
+
+.project-dialog-field {
+    gap: 2px;
+}
+
+.project-dialog-label {
+    foreground: #8f9bad;
+    font-size: 10px;
+}
+
+.project-dialog-input {
+    padding: 2px 5px;
+    background: #1E2127;
+    border: 1px #4b5362;
+    border-radius: 3px;
+    caret-color: #f0f6ff;
+    selection-color: rgba(95, 140, 205, 0.46);
+}
+
+.project-dialog-dropdown {
+    height: 22px;
+    padding: 0px 6px;
+    background: #1E2127;
+    border: 1px #4b5362;
+    border-radius: 3px;
+}
+
+.project-dialog-dependencies {
+    padding: 3px 5px;
+    gap: 2px;
+    background: #1E2127;
+    border-radius: 3px;
+    scrollbar: 6px;
+    scrollbar-thumb: rgba(155, 169, 194, 0.42);
+    scrollbar-thumb-radius: 3px;
+}
+
+.project-dialog-checkbox-row {
+    gap: 7px;
+    foreground: #D7DEEA;
+}
+
+.project-dialog-text {
+    foreground: #D7DEEA;
+    font-size: 11px;
+    line-spacing: 2px;
+}
+
+.project-dialog-hint, .project-dialog-progress {
+    foreground: #8f9bad;
+    font-size: 10px;
+    line-spacing: 2px;
+}
+
+.project-dialog-warning {
+    foreground: #ffc266;
+    font-size: 11px;
+    line-spacing: 2px;
+}
+
+.project-dialog-error {
+    foreground: #ff8787;
+    font-size: 11px;
+    line-spacing: 2px;
+}
+
+.project-dialog-path-row {
+    gap: 6px;
+}
+
+.project-dialog-path {
+    foreground: #aeb8ca;
+    font-size: 10px;
+}
+
+.project-dialog-actions {
+    gap: 6px;
+    margin-top: 3px;
+}
+
+.project-dialog-button {
+    min-width: 72px;
+    padding: 0px 10px;
+    border-radius: 4px;
+    border: 1px #E7EBF2;
+    background: #3A3F49;
+    transition: background 80ms ease-out;
+}
+
+.project-dialog-button:hover {
+    background: #4A515E;
+}
+
+.project-dialog-button.primary {
+    background: #5F8CCD;
+    foreground: #FFFFFF;
+}
+
+.project-dialog-button.primary:hover {
+    background: #6E9BDC;
+}
+
+.project-dialog-button.disabled, .project-dialog-button.disabled:hover {
+    background: #2C3038;
+    foreground: #687588;
+    border: 1px #4b5362;
+}
+
 .ide-hide-toolbar-dialog {
     padding: 12px;
 }

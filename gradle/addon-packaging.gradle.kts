@@ -5,7 +5,6 @@ import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.TaskProvider
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
 import org.gradle.jvm.tasks.Jar
 import org.gradle.language.jvm.tasks.ProcessResources
 import org.gradle.process.CommandLineArgumentProvider
@@ -13,16 +12,17 @@ import java.util.Properties
 
 val hollowScriptsDirectory = "scripts"
 val hollowCompiledScriptsPath = "META-INF/hollowengine/scripts"
+val hollowAddonClassesJar = "META-INF/hollowengine/classes.jar"
+val hollowAddonRemapTablePath = "META-INF/hollowengine/remap-fabric.tbl.gz"
 val hollowScriptPrecompiler = "ru.hollowhorizon.hollowengine.common.compiler.tools.ScriptPrecompiler"
-val hollowScriptArtifactRemapper = "ru.hollowhorizon.hollowengine.common.compiler.tools.ScriptArtifactRemapper"
+val hollowRemapTableTool = "ru.hollowhorizon.hollowengine.runtime.remap.PayloadRemapTool"
 val hollowScriptCompilerConfiguration = "hollowengineScriptCompiler"
 
 /**
- * Runtime a precompiled script artifact is valid for. It has to match what the game computes, otherwise
- * the artifact is ignored and the script is compiled again on first use.
+ * Runtime a precompiled script artifact is stamped for. Addons ship Mojang-named bytecode, which is what
+ * NeoForge runs; on Fabric the game restamps it while applying the remap table.
  */
-val neoforgeScriptIdentity = "neoforge/official/production"
-val fabricScriptIdentity = "fabric/intermediary/production"
+val namedScriptIdentity = "neoforge/official/production"
 
 /** Whether a project ships the sources of its scripts next to the compiled artifacts. */
 fun Project.shipsScriptSources(): Boolean =
@@ -88,24 +88,19 @@ fun Project.hollowScriptCompilerClasspath(): FileCollection {
 }
 
 /**
- * Compiles `src/main/resources/scripts` with the same compiler and remapping the game uses, so the
- * artifacts are usable by players who never install the compiler addon.
+ * Compiles `src/main/resources/scripts` with the same compiler the game uses, into Mojang-named
+ * artifacts that players who never install the compiler addon can run.
  */
 fun Project.registerHollowScriptCompilation(
-    variant: String,
     scriptsDirectory: File,
     namespace: String,
     fingerprint: String,
-    identity: String,
-    remap: Boolean,
 ): TaskProvider<JavaExec> {
-    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/$variant")
+    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/named")
     val scriptFiles = fileTree(scriptsDirectory) { include("**/*.kts") }
-    val gameVersion = rootProject.property("minecraftVersion") as String
-    val mappings = rootProject.file("addons/compiler/src/main/resources/mappings-$gameVersion.tiny")
-    return tasks.register<JavaExec>("compile${variant.replaceFirstChar(Char::titlecase)}Scripts") {
+    return tasks.register<JavaExec>("compileNamedScripts") {
         group = "build"
-        description = "Compiles this project's scripts for the $variant mapping namespace."
+        description = "Compiles this project's scripts against Mojang names."
         mainClass.set(hollowScriptPrecompiler)
         classpath = hollowScriptCompilerClasspath()
         // The engine resolves its own directory relative to the working directory, and a build has no
@@ -114,7 +109,7 @@ fun Project.registerHollowScriptCompilation(
         inputs.files(scriptFiles).withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.property("namespace", namespace)
         inputs.property("fingerprint", fingerprint)
-        inputs.property("identity", identity)
+        inputs.property("identity", namedScriptIdentity)
         outputs.dir(outputDirectory)
         argumentProviders.add(CommandLineArgumentProvider {
             listOf(
@@ -122,9 +117,9 @@ fun Project.registerHollowScriptCompilation(
                 "--output", outputDirectory.get().asFile.absolutePath,
                 "--namespace", namespace,
                 "--fingerprint", fingerprint,
-                "--identity", identity,
-                "--remap", remap.toString(),
-                "--mappings", if (remap) mappings.absolutePath else "",
+                "--identity", namedScriptIdentity,
+                "--remap", "false",
+                "--mappings", "",
             )
         })
         doFirst {
@@ -133,55 +128,51 @@ fun Project.registerHollowScriptCompilation(
     }
 }
 
-/** Remaps already compiled named script artifacts without starting the Kotlin compiler a second time. */
-fun Project.registerHollowScriptRemapping(
-    variant: String,
-    scriptsDirectory: File,
-    input: TaskProvider<JavaExec>,
-    namespace: String,
-    fingerprint: String,
-    identity: String,
-): TaskProvider<JavaExec> {
-    val inputDirectory = layout.buildDirectory.dir("hollowengine/scripts/named")
-    val outputDirectory = layout.buildDirectory.dir("hollowengine/scripts/$variant")
-    val scriptFiles = fileTree(scriptsDirectory) { include("**/*.kts") }
+/**
+ * Records which Mojang names in [content] have to change on Fabric, and to what. The game applies the
+ * table when it loads the addon there, so one jar serves both loaders.
+ */
+fun Project.registerHollowRemapTable(content: TaskProvider<Jar>): TaskProvider<JavaExec> {
     val gameVersion = rootProject.property("minecraftVersion") as String
+    val relocation = rootProject.property("fabricRelocation") as String
     val mappings = rootProject.file("addons/compiler/src/main/resources/mappings-$gameVersion.tiny")
-    return tasks.register<JavaExec>("compile${variant.replaceFirstChar(Char::titlecase)}Scripts") {
+    val workDirectory = layout.buildDirectory.dir("hollowengine/remap")
+    val table = workDirectory.map { it.file("remap-fabric.tbl.gz") }
+    val ownSources = extensions.getByType<SourceSetContainer>().named("main")
+    val engineClasses = configurations.create("hollowengineEngineClasses") {
+        isCanBeResolved = true
+        isCanBeConsumed = false
+        isTransitive = false
+    }
+    dependencies.add(
+        engineClasses.name,
+        dependencies.project(mapOf("path" to ":runtime", "configuration" to "namedElements")),
+    )
+    return tasks.register<JavaExec>("generateAddonRemapTable") {
         group = "build"
-        description = "Remaps this project's compiled scripts for the $variant mapping namespace."
-        dependsOn(input)
-        mainClass.set(hollowScriptArtifactRemapper)
+        description = "Generates the table that remaps this addon for Fabric when it is loaded."
+        mainClass.set(hollowRemapTableTool)
         classpath = hollowScriptCompilerClasspath()
-        workingDir = layout.buildDirectory.dir("hollowengine/precompiler").get().asFile
-        inputs.files(scriptFiles).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.dir(inputDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.file(mappings).withPathSensitivity(PathSensitivity.RELATIVE)
-        inputs.property("namespace", namespace)
-        inputs.property("fingerprint", fingerprint)
-        inputs.property("identity", identity)
-        outputs.dir(outputDirectory)
+        maxHeapSize = "2g"
+        inputs.file(content.flatMap { it.archiveFile }).withPathSensitivity(PathSensitivity.NONE)
+        inputs.file(mappings).withPathSensitivity(PathSensitivity.NONE)
+        inputs.files(engineClasses).withPathSensitivity(PathSensitivity.NONE)
+        inputs.property("relocation", relocation)
+        outputs.file(table)
         argumentProviders.add(CommandLineArgumentProvider {
             listOf(
-                "--scripts", scriptsDirectory.absolutePath,
-                "--input", inputDirectory.get().asFile.absolutePath,
-                "--output", outputDirectory.get().asFile.absolutePath,
-                "--namespace", namespace,
-                "--fingerprint", fingerprint,
-                "--identity", identity,
+                "--payload", content.get().archiveFile.get().asFile.absolutePath,
                 "--mappings", mappings.absolutePath,
+                "--classpath", ownSources.get().compileClasspath.asPath,
+                "--from", "named",
+                "--to", "intermediary",
+                "--output", table.get().asFile.absolutePath,
+                "--work", workDirectory.get().asFile.resolve("work").absolutePath,
+                "--relocate", relocation,
+                "--keep", engineClasses.asPath,
             )
         })
-        doFirst { workingDir.mkdirs() }
     }
-}
-
-/** Adds a namespace's scripts and their compiled artifacts to a jar. */
-fun Jar.includeHollowScripts(scriptsDirectory: File, compiled: TaskProvider<JavaExec>) {
-    if (project.shipsScriptSources()) {
-        from(scriptsDirectory) { into(hollowScriptsDirectory) }
-    }
-    from(compiled) { into(hollowCompiledScriptsPath) }
 }
 
 fun isHostProvidedAddonLibrary(fileName: String): Boolean = listOf(
@@ -235,63 +226,46 @@ val processAddonResources = tasks.named<ProcessResources>("processResources") {
     }
 }
 val namedClassesJar = tasks.named<Jar>("jar")
-val intermediaryClassesJar = tasks.named<AbstractArchiveTask>("remapJar")
 
 val scriptsDirectory = projectDir.resolve("src/main/resources/$hollowScriptsDirectory")
 val addonNamespace = readHollowAddonId()
 val compileNamedScripts = registerHollowScriptCompilation(
-    variant = "named",
     scriptsDirectory = scriptsDirectory,
     namespace = addonNamespace,
     fingerprint = version.toString(),
-    identity = neoforgeScriptIdentity,
-    remap = false,
-)
-val compileIntermediaryScripts = registerHollowScriptRemapping(
-    variant = "intermediary",
-    scriptsDirectory = scriptsDirectory,
-    input = compileNamedScripts,
-    namespace = addonNamespace,
-    fingerprint = version.toString(),
-    identity = fabricScriptIdentity,
 )
 
-// Scripts and the artifacts compiled from them live inside the variant jar, because compiled script
-// bytecode is remapped for one namespace exactly like the addon's own classes are.
-val namedVariantJar = tasks.register<Jar>("namedVariantJar") {
-    archiveClassifier.set("variant-named")
+// The classes and compiled scripts laid out as the game sees them once it has unpacked the addon,
+// which is what the remap table is recorded from.
+val addonContentJar = tasks.register<Jar>("addonContentJar") {
+    archiveClassifier.set("content-named")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(zipTree(namedClassesJar.flatMap { it.archiveFile }))
-    includeHollowScripts(scriptsDirectory, compileNamedScripts)
+    from(compileNamedScripts) { into(hollowCompiledScriptsPath) }
 }
-val intermediaryVariantJar = tasks.register<Jar>("intermediaryVariantJar") {
-    archiveClassifier.set("variant-intermediary")
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from(zipTree(intermediaryClassesJar.flatMap { it.archiveFile }))
-    includeHollowScripts(scriptsDirectory, compileIntermediaryScripts)
-}
+val generateAddonRemapTable = registerHollowRemapTable(addonContentJar)
 
 val addonJar = tasks.register<Jar>("addonJar") {
-    dependsOn(processAddonResources, namedVariantJar, intermediaryVariantJar, addonModMetadata)
+    dependsOn(processAddonResources, addonModMetadata)
     archiveClassifier.set("")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest.attributes(
-        "HollowEngine-Addon-Format" to "2",
-        "HollowEngine-Variant-Common-Named" to "META-INF/hollowengine/variants/named.jar",
-        "HollowEngine-Variant-Fabric-Intermediary" to "META-INF/hollowengine/variants/intermediary.jar",
-        "HollowEngine-Variant-Neoforge-Official" to "META-INF/hollowengine/variants/named.jar",
-    )
+    includeEmptyDirs = false
+    manifest.attributes("HollowEngine-Addon-Format" to "3")
     from(processAddonResources) {
         exclude("$hollowScriptsDirectory/**")
     }
-    from(addonModMetadata)
-    from(namedVariantJar.flatMap { it.archiveFile }) {
-        into("META-INF/hollowengine/variants")
-        rename { "named.jar" }
+    from(scriptsDirectory) {
+        into(hollowScriptsDirectory)
+        if (!project.shipsScriptSources()) exclude("**/*.kts")
     }
-    from(intermediaryVariantJar.flatMap { it.archiveFile }) {
-        into("META-INF/hollowengine/variants")
-        rename { "intermediary.jar" }
+    from(addonModMetadata)
+    from(namedClassesJar) {
+        into(hollowAddonClassesJar.substringBeforeLast('/'))
+        rename { hollowAddonClassesJar.substringAfterLast('/') }
+    }
+    from(compileNamedScripts) { into(hollowCompiledScriptsPath) }
+    from(generateAddonRemapTable) {
+        into(hollowAddonRemapTablePath.substringBeforeLast('/'))
     }
     from(addonLibraries) {
         into("hollowengine-addon-libs")

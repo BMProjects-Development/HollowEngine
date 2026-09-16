@@ -16,8 +16,5 @@
   "toggle_colliders": "Show the colliders",
   "start_physics": "Drop the rig and see what it does",
   "stop_physics": "Stop the simulation",
-  "kind_item": "Item",
-  "kind_rigid_body": "Rigid body",
-  "kind_joint": "Joint",
-  "generate_ragdoll": "Fill in bodies from the model's geometry"
+  "kind_item": "Item"
 }

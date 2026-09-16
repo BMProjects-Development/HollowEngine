@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.TransformGizmoEditor
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiResourceAccess
@@ -14,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownSlider
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.common.addons.ClientResources
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.network.ReloadServerResourcesPacket
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
@@ -36,8 +36,7 @@ internal fun hollowIdeFileMenuItems(
     val focusedPath = focused?.path
     return listOf(
         UiDropdownItem("hollowengine.gui.ide.file.reload_client_resources".lang, ReloadIcon) {
-            HollowUiResourceAccess.clearCache()
-            Minecraft.getInstance().reloadResourcePacks()
+            ClientResources.reload()
         },
         UiDropdownItem("hollowengine.gui.ide.file.reload_server_resources".lang, ReloadIcon) {
             ReloadServerResourcesPacket().send()
@@ -112,7 +111,14 @@ internal fun hollowIdeWindowMenuItems(model: HollowIdeModel, dock: DockingState)
                 val anchor = model.files.values.firstOrNull { dock.contains(it.id) }?.id
                     ?: ProjectTreeId.takeIf(dock::contains)
                 dock.open(
-                    DockItem(CutsceneTimelineId, "Cutscene Timeline", CutsceneIcon, closable = true, minWidth = 520f, minHeight = 260f),
+                    DockItem(
+                        CutsceneTimelineId,
+                        "Cutscene Timeline",
+                        CutsceneIcon,
+                        closable = true,
+                        minWidth = 520f,
+                        minHeight = 260f
+                    ),
                     DockTarget(anchor, DockPlacement.BOTTOM),
                 )
             }
@@ -127,7 +133,14 @@ internal fun hollowIdeWindowMenuItems(model: HollowIdeModel, dock: DockingState)
                         ?: ProjectTreeId.takeIf(dock::contains)
                 }
                 dock.open(
-                    DockItem(CutscenePropertiesId, "Cutscene Properties", OptionsIcon, closable = true, minWidth = 240f, minHeight = 260f),
+                    DockItem(
+                        CutscenePropertiesId,
+                        "Cutscene Properties",
+                        OptionsIcon,
+                        closable = true,
+                        minWidth = 240f,
+                        minHeight = 260f
+                    ),
                     DockTarget(anchor, DockPlacement.RIGHT),
                 )
             }
@@ -169,7 +182,14 @@ internal fun hollowIdeToolMenuItems(dock: DockingState, profiler: UiProfiler): L
                     ProjectTreeId.takeIf(dock::contains)
                 }
                 dock.open(
-                    DockItem(UiProfilerId, "UI Profiler", OptionsIcon, closable = true, minWidth = 360f, minHeight = 260f),
+                    DockItem(
+                        UiProfilerId,
+                        "UI Profiler",
+                        OptionsIcon,
+                        closable = true,
+                        minWidth = 360f,
+                        minHeight = 260f
+                    ),
                     DockTarget(anchor, DockPlacement.BOTTOM),
                 )
                 dock.focus(UiProfilerId)

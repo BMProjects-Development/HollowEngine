@@ -1,35 +1,22 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
+import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
+import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.toReadablePath
 import java.io.File
 import java.io.IOException
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.LinkOption
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.StandardCopyOption
+import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.Base64
+import java.util.*
 
 private const val AutoSaveDelayMillis = 900L
 
@@ -46,11 +33,11 @@ internal class HollowIdeModel(
     private val pasteMutex = Mutex()
     private val pendingSaves = mutableMapOf<String, Job>()
 
-    fun visibleTreeItems(filter: String): List<UiTreeItem<HollowIdeFileNode>> {
+    fun visibleTreeItems(filter: String, rootLabel: String): List<UiTreeItem<HollowIdeFileNode>> {
         return tree.visible(filter).map { node ->
             UiTreeItem(
                 id = node.path.ifEmpty { "root" }.replace('/', '-'),
-                label = node.name,
+                label = if (node.path.isEmpty()) rootLabel else node.name,
                 depth = node.depth,
                 payload = node,
                 icon = IconHelper.forPath(node.path, node.isDirectory, node.expanded).toString(),
@@ -118,8 +105,7 @@ internal class HollowIdeModel(
             fileTypes.open(path, file::readBytes)?.also { opened ->
                 opened.attachSaveHandler { save(path) }
             }
-        }.getOrNull()
-            ?: return HollowIdeOpenResult.Unsupported
+        }.getOrNull() ?: return HollowIdeOpenResult.Unsupported
         files[path] = opened
         return HollowIdeOpenResult.File(opened, created = true)
     }
@@ -148,8 +134,7 @@ internal class HollowIdeModel(
             return HollowIdeOpenResult.File(opened, created = false)
         }
         val type = fileTypes.find(typeId) ?: return HollowIdeOpenResult.Unsupported
-        val opened = runCatching { type.open(path, bytes) }.getOrNull()
-            ?: return HollowIdeOpenResult.Unsupported
+        val opened = runCatching { type.open(path, bytes) }.getOrNull() ?: return HollowIdeOpenResult.Unsupported
         if (!opened.readOnly) {
             opened.close()
             return HollowIdeOpenResult.Unsupported
@@ -195,7 +180,8 @@ internal class HollowIdeModel(
         val cleanName = name.trim().replace('\\', '/').trim('/')
         if (cleanName.isBlank()) return HollowIdeFileOperationResult.InvalidName
         val parent = targetDirectory(parentPath)
-        val target = parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
+        val target =
+            parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
         Files.createDirectories(target.parent)
         writeIdeFile(target, content.toByteArray(Charsets.UTF_8))
@@ -240,7 +226,8 @@ internal class HollowIdeModel(
         val cleanName = name.trim().replace('\\', '/').trim('/')
         if (cleanName.isBlank()) return HollowIdeFileOperationResult.InvalidName
         val parent = targetDirectory(parentPath)
-        val target = parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
+        val target =
+            parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
         Files.createDirectories(target)
         tree.refresh()
@@ -253,7 +240,8 @@ internal class HollowIdeModel(
         if (cleanName.isBlank() || cleanName.any { it == '/' || it == '\\' }) return HollowIdeFileOperationResult.InvalidName
         val source = path.toPathInsideRoot() ?: return HollowIdeFileOperationResult.NotFound
         if (!Files.exists(source)) return HollowIdeFileOperationResult.NotFound
-        val target = source.parent.resolve(cleanName).normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
+        val target =
+            source.parent.resolve(cleanName).normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
         val opened = files[path]
         if (opened?.dirty == true && !save(path)) return HollowIdeFileOperationResult.NotFound
@@ -276,13 +264,11 @@ internal class HollowIdeModel(
 
     fun delete(paths: List<String>): HollowIdeFileOperationResult {
         val targets = paths.mapNotNull { it.toPathInsideRoot() }.filter { Files.exists(it) }
-            .filterNot { it == DirectoryManager.HOLLOW_ENGINE }
-            .withoutNestedChildren()
+            .filterNot { it == DirectoryManager.HOLLOW_ENGINE }.withoutNestedChildren()
         if (targets.isEmpty()) return HollowIdeFileOperationResult.NotFound
         targets.forEach { path -> path.deleteTree() }
         val removedReadable = targets.map { it.toReadablePathInsideRoot() }
-        files.keys.filter { openPath -> removedReadable.any { openPath == it || openPath.startsWith("$it/") } }
-            .toList()
+        files.keys.filter { openPath -> removedReadable.any { openPath == it || openPath.startsWith("$it/") } }.toList()
             .forEach { path ->
                 files.remove(path)?.close()
                 onFileRemoved?.invoke(path)
@@ -304,7 +290,20 @@ internal class HollowIdeModel(
     fun exportFiles(paths: List<String>): List<File> {
         files.values.filter { file -> file.dirty && paths.any { file.path == it || file.path.startsWith("$it/") } }
             .forEach { save(it.path) }
-        return paths.mapNotNull { it.toPathInsideRoot() }.withoutNestedChildren().map { it.toFile() }.filter { it.exists() }
+        return paths.mapNotNull { it.toPathInsideRoot() }.withoutNestedChildren().map { it.toFile() }
+            .filter { it.exists() }
+    }
+
+    /**
+     * Closes every editor under [directories] without saving, for files about to be replaced from
+     * outside; a pending autosave would otherwise write the old text back afterwards.
+     */
+    fun discardFilesUnder(directories: List<String>) {
+        files.keys.filter { path -> directories.any { path == it || path.startsWith("$it/") } }.forEach { path ->
+            pendingSaves.remove(path)?.cancel()
+            files.remove(path)?.close()
+            onFileRemoved?.invoke(path)
+        }
     }
 
     /** Reconcile once on return from another application, without polling the filesystem per frame. */
@@ -422,10 +421,7 @@ internal sealed interface HollowIdeOpenResult {
 }
 
 internal enum class HollowIdeFileOperationResult {
-    Success,
-    InvalidName,
-    AlreadyExists,
-    NotFound,
+    Success, InvalidName, AlreadyExists, NotFound,
 }
 
 class HollowIdeOpenFile internal constructor(
@@ -554,9 +550,7 @@ internal class HollowIdeFileNode(
         if (!isDirectory) return
         val files = path.fromReadablePath().listFiles().orEmpty()
         children.clear()
-        children += files
-            .sortedWith(compareBy<File> { it.isFile }.thenBy { it.name.lowercase() })
-            .map { file ->
+        children += files.sortedWith(compareBy<File> { it.isFile }.thenBy { it.name.lowercase() }).map { file ->
                 val childPath = if (path.isEmpty()) file.name else "$path/${file.name}"
                 HollowIdeFileNode(file.name, childPath, depth + 1, file.isDirectory).apply {
                     expanded = childPath in expandedPaths
@@ -594,8 +588,7 @@ internal class HollowIdeFileNode(
 
     private fun refreshRecursively() {
         refresh()
-        children.asSequence()
-            .filter(HollowIdeFileNode::isDirectory)
+        children.asSequence().filter(HollowIdeFileNode::isDirectory)
             .filterNot { Files.isSymbolicLink(it.path.fromReadablePath().toPath()) }
             .forEach(HollowIdeFileNode::refreshRecursively)
     }
@@ -626,8 +619,10 @@ private fun targetDirectory(path: String): File {
 /** Whether a file is a copy the engine unpacked out of an addon rather than something authored here. */
 private fun File.isExtractedScript(): Boolean {
     val path = toPath().toAbsolutePath().normalize()
-    return sequenceOf(DirectoryManager.SCRIPT_SOURCE_CACHE, DirectoryManager.SCRIPT_BUNDLE_CACHE)
-        .any { root -> path.startsWith(root.toPath().toAbsolutePath().normalize()) }
+    return sequenceOf(
+        DirectoryManager.SCRIPT_SOURCE_CACHE,
+        DirectoryManager.SCRIPT_BUNDLE_CACHE
+    ).any { root -> path.startsWith(root.toPath().toAbsolutePath().normalize()) }
 }
 
 private fun String.toPathInsideRoot(): Path? {
@@ -653,12 +648,20 @@ internal fun Path.deleteTree() {
     if (!Files.exists(this, LinkOption.NOFOLLOW_LINKS)) return
     Files.walkFileTree(this, object : SimpleFileVisitor<Path>() {
         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-            Files.deleteIfExists(file)
+            try {
+                Files.deleteIfExists(file)
+            } catch (e: Exception) {
+                HollowEngine.LOGGER.info("Error while deleting {}: ", file.toReadablePath(), e)
+            }
             return FileVisitResult.CONTINUE
         }
 
         override fun postVisitDirectory(dir: Path, exception: IOException?): FileVisitResult {
-            Files.deleteIfExists(dir)
+            try {
+                Files.deleteIfExists(dir)
+            } catch (e: Exception) {
+                HollowEngine.LOGGER.info("Error while deleting {}: ", dir.toReadablePath(), e)
+            }
             return FileVisitResult.CONTINUE
         }
     })

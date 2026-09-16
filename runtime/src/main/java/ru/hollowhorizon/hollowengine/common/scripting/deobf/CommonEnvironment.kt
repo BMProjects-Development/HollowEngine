@@ -55,7 +55,7 @@ object CommonEnvironment {
     /**
      * The jar the isolated runtime was actually loaded from.
      */
-    private fun resolveRuntimeJar(): File? {
+    internal fun resolveRuntimeJar(): File? {
         val anchor = HollowEngineRuntimeBootstrap::class.java
         val resource = anchor.classLoader?.getResource(anchor.name.replace('.', '/') + ".class") ?: return null
         if (resource.protocol != "jar") return null

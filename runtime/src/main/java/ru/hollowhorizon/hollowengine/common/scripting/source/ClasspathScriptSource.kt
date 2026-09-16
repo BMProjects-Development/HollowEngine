@@ -1,8 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.addons.HollowAddonMappingNamespace
-import ru.hollowhorizon.hollowengine.common.addons.HollowAddonRuntimeEnvironment
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache
 import java.io.File
@@ -12,14 +10,13 @@ import java.io.File
  * from wherever the bootstrap put it, so the build writes an index of the scripts it packaged and
  * everything is read back through the classloader. Maybe I'll someday extend it for use scripts in any mods.
  *
- * Unlike an addon jar, one engine jar serves every platform, so it carries a compiled artifact per
- * mapping namespace and the right one is picked here.
+ * The artifacts are compiled against Mojang names; on Fabric the bootstrap remaps them together with
+ * the rest of the engine jar, so whatever the classloader finds is already in the right namespace.
  */
 class ClasspathScriptSource(
     override val namespace: String,
     override val classLoader: ClassLoader,
     override val fingerprint: String,
-    private val variant: String = currentVariant(),
 ) : ScriptSource {
     private val paths: List<String> = readIndex()
 
@@ -34,8 +31,8 @@ class ClasspathScriptSource(
     override fun read(id: ScriptId): ScriptArtifacts? {
         if (id.namespace != namespace || id.path !in paths) return null
         val sourceFile = extract("$SOURCE_PREFIX${id.path}", sourceCacheFile(id))
-        val compiledFile = extract("$COMPILED_PREFIX$variant/${id.path}$COMPILED_SUFFIX", bundledCacheFile(id))
-        val sharedFile = extract("$COMPILED_PREFIX$variant/${id.path}$SHARED_SUFFIX", bundledSharedCacheFile(id))
+        val compiledFile = extract("$COMPILED_PREFIX${id.path}$COMPILED_SUFFIX", bundledCacheFile(id))
+        val sharedFile = extract("$COMPILED_PREFIX${id.path}$SHARED_SUFFIX", bundledSharedCacheFile(id))
         if (sourceFile == null && compiledFile == null) return null
         return ScriptArtifacts(id, sourceFile, precompiled = compiledFile, precompiledShared = sharedFile)
     }
@@ -49,16 +46,14 @@ class ClasspathScriptSource(
         DirectoryManager.SCRIPT_SOURCE_CACHE.resolve(namespace).resolve(fingerprint).resolve(id.path)
 
     private fun bundledCacheFile(id: ScriptId): File =
-        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(fingerprint).resolve(variant)
-            .resolve(id.path + COMPILED_SUFFIX)
+        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(fingerprint).resolve(id.path + COMPILED_SUFFIX)
 
     private fun bundledSharedCacheFile(id: ScriptId): File =
-        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(fingerprint).resolve(variant)
-            .resolve(id.path + SHARED_SUFFIX)
+        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(fingerprint).resolve(id.path + SHARED_SUFFIX)
 
     private fun extract(resource: String, target: File): File? {
         val bytes = classLoader.getResourceAsStream(resource)?.use { it.readBytes() } ?: return null
-        if (target.isFile && target.length() == bytes.size.toLong()) return target
+        if (target.isFile && target.readBytes().contentEquals(bytes)) return target
         return runCatching {
             target.parentFile.mkdirs()
             target.writeBytes(bytes)
@@ -73,13 +68,5 @@ class ClasspathScriptSource(
         const val COMPILED_SUFFIX = ScriptCache.ARTIFACT_SUFFIX
         const val SHARED_SUFFIX = ScriptCache.SHARED_ARTIFACT_SUFFIX
         const val SCRIPT_EXTENSION = ".kts"
-
-        /** Bytecode is remapped per namespace, so only one of the packaged variants can be used. */
-        fun currentVariant(): String {
-            val namespace = runCatching { HollowAddonRuntimeEnvironment.mappingNamespace() }.getOrDefault(
-                    HollowAddonMappingNamespace.NAMED
-                )
-            return if (namespace == HollowAddonMappingNamespace.INTERMEDIARY) "intermediary" else "named"
-        }
     }
 }

@@ -18,6 +18,9 @@ private const val DockTabDragDepth = 10f
 typealias DockItemContent = @Composable (DockItem) -> Unit
 typealias DockHeaderContent = @Composable (DockItem) -> Unit
 
+/** What a stack shows at the right end of its tab bar, for the item selected in it. */
+typealias DockTabBarActions = @Composable (DockItem) -> Unit
+
 @Composable
 fun DockSpace(
     state: DockingState,
@@ -25,6 +28,7 @@ fun DockSpace(
     modifier: Modifier = Modifier.size(100.percent, 100.percent),
     tabContent: DockHeaderContent = { item -> DefaultDockTabContent(item) },
     headerContent: DockHeaderContent = { item -> DefaultDockHeaderContent(item) },
+    tabBarActions: DockTabBarActions = {},
     content: DockItemContent,
 ) {
     Box(
@@ -40,14 +44,14 @@ fun DockSpace(
         ) {
             state.root?.let { root ->
                 key(root.id) {
-                    DockNodeView(root, state, tabContent, content)
+                    DockNodeView(root, state, tabContent, tabBarActions, content)
                 }
             }
         }
 
         state.floatingWindows.forEachIndexed { index, window ->
             key(window.id) {
-                FloatingDockWindowView(window, state, index, tabContent, headerContent, content)
+                FloatingDockWindowView(window, state, index, tabContent, headerContent, tabBarActions, content)
             }
         }
 
@@ -62,11 +66,12 @@ private fun DockNodeView(
     node: DockNode,
     state: DockingState,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     content: DockItemContent,
 ) {
     when (node) {
-        is DockNode.Stack -> DockStackView(node, state, tabContent, content)
-        is DockNode.Split -> DockSplitView(node, state, tabContent, content)
+        is DockNode.Stack -> DockStackView(node, state, tabContent, tabBarActions, content)
+        is DockNode.Split -> DockSplitView(node, state, tabContent, tabBarActions, content)
     }
 }
 
@@ -75,17 +80,18 @@ private fun DockSplitView(
     split: DockNode.Split,
     state: DockingState,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     content: DockItemContent,
 ) {
     val horizontal = split.orientation == DockOrientation.HORIZONTAL
     val modifier = Modifier.size(100.percent, 100.percent)
     if (horizontal) {
         Row(id = split.id, tags = listOf(DockTags.Split), modifier = modifier) {
-            SplitContent(split, state, tabContent, content, horizontal)
+            SplitContent(split, state, tabContent, tabBarActions, content, horizontal)
         }
     } else {
         Column(id = split.id, tags = listOf(DockTags.Split), modifier = modifier) {
-            SplitContent(split, state, tabContent, content, horizontal)
+            SplitContent(split, state, tabContent, tabBarActions, content, horizontal)
         }
     }
 }
@@ -95,15 +101,16 @@ private fun SplitContent(
     split: DockNode.Split,
     state: DockingState,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     content: DockItemContent,
     horizontal: Boolean,
 ) {
     Box(modifier = splitPaneModifier(horizontal, split.fraction)) {
-        DockNodeView(split.first, state, tabContent, content)
+        DockNodeView(split.first, state, tabContent, tabBarActions, content)
     }
     Splitter(split, state, horizontal)
     Box(modifier = splitPaneModifier(horizontal, 1f - split.fraction)) {
-        DockNodeView(split.second, state, tabContent, content)
+        DockNodeView(split.second, state, tabContent, tabBarActions, content)
     }
 }
 
@@ -138,6 +145,7 @@ private fun DockStackView(
     stack: DockNode.Stack,
     state: DockingState,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     content: DockItemContent,
 ) {
     Column(
@@ -145,7 +153,7 @@ private fun DockStackView(
         tags = listOf(DockTags.Stack),
         modifier = Modifier.size(100.percent, 100.percent),
     ) {
-        DockTabBar(stack, state, tabContent, allowUndock = true)
+        DockTabBar(stack, state, tabContent, tabBarActions, allowUndock = true)
         val selected = stack.selectedItem ?: return@Column
         Box(
             id = "${stack.id}-content",
@@ -165,6 +173,7 @@ private fun FloatingDockWindowView(
     state: DockingState,
     index: Int,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     headerContent: DockHeaderContent,
     content: DockItemContent,
 ) {
@@ -177,8 +186,8 @@ private fun FloatingDockWindowView(
                 state.focus(selected.id)
             }) {
         Column(modifier = Modifier.size(100.percent, 100.percent)) {
-            FloatingHeader(window, state, headerContent)
-            if (window.stack.items.size > 1) DockTabBar(window.stack, state, tabContent, allowUndock = false)
+            FloatingHeader(window, state, headerContent, if (window.stack.items.size > 1) null else tabBarActions)
+            if (window.stack.items.size > 1) DockTabBar(window.stack, state, tabContent, tabBarActions, allowUndock = false)
             Box(
                 id = "${window.id}-content",
                 tags = listOf(DockTags.Content),
@@ -200,6 +209,7 @@ private fun FloatingHeader(
     window: FloatingDockWindow,
     state: DockingState,
     headerContent: DockHeaderContent,
+    actions: DockTabBarActions?,
 ) {
     val selected = window.stack.selectedItem ?: return
     Row(
@@ -221,6 +231,7 @@ private fun FloatingHeader(
         ) {
             headerContent(selected)
         }
+        actions?.invoke(selected)
         CloseButton(selected, state)
     }
 }
@@ -230,26 +241,37 @@ private fun DockTabBar(
     stack: DockNode.Stack,
     state: DockingState,
     tabContent: DockHeaderContent,
+    tabBarActions: DockTabBarActions,
     allowUndock: Boolean,
 ) {
     val itemIds = stack.items.map { it.id }
     val measurePolicy = remember(stack.id, itemIds) {
         dockTabBarMeasurePolicy(stack.id, itemIds, state)
     }
-    Layout(
-        content = {
-            stack.items.forEachIndexed { index, item ->
-                val selected = stack.selectedItem?.id == item.id
-                key(item.id) {
-                    DockTab(stack.id, index, item, selected, state, tabContent, allowUndock)
+    Row(
+        id = "${stack.id}-tab-row",
+        modifier = Modifier.size(100.percent, 24.px).alignItems(vertical = UiAlign.CENTER),
+    ) {
+        Layout(
+            content = {
+                stack.items.forEachIndexed { index, item ->
+                    val selected = stack.selectedItem?.id == item.id
+                    key(item.id) {
+                        DockTab(stack.id, index, item, selected, state, tabContent, allowUndock)
+                    }
                 }
+            },
+            id = "${stack.id}-tabs",
+            tags = listOf(DockTags.TabBar),
+            modifier = Modifier.size(0.px, 24.px).grow(1f),
+            measurePolicy = measurePolicy,
+        )
+        stack.selectedItem?.let { selected ->
+            key(selected.id) {
+                tabBarActions(selected)
             }
-        },
-        id = "${stack.id}-tabs",
-        tags = listOf(DockTags.TabBar),
-        modifier = Modifier.size(100.percent, 24.px),
-        measurePolicy = measurePolicy,
-    )
+        }
+    }
 }
 
 @Composable

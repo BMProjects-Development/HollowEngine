@@ -16,8 +16,5 @@
   "toggle_colliders": "Показать коллайдеры",
   "start_physics": "Уронить риг и посмотреть, что будет",
   "stop_physics": "Остановить симуляцию",
-  "kind_item": "Предмет",
-  "kind_rigid_body": "Физическое тело",
-  "kind_joint": "Сустав",
-  "generate_ragdoll": "Построить тела по геометрии модели"
+  "kind_item": "Предмет"
 }

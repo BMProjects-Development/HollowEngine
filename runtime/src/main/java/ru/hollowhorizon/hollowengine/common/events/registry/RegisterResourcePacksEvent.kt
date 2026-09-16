@@ -13,4 +13,8 @@ class RegisterResourcePacksEvent(private val resourcePacks: Consumer<Pack>) : Ev
     fun addPack(pack: PackResources) {
         resourcePacks.accept(pack.asPack() ?: error("Resource packs not found!"))
     }
+
+    fun addPack(pack: Pack) {
+        resourcePacks.accept(pack)
+    }
 }

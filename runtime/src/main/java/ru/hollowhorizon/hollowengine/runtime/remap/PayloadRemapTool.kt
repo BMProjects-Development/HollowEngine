@@ -25,6 +25,7 @@ object PayloadRemapTool {
             to = options.to,
             output = recorded,
             relocation = options.relocation,
+            keep = options.keep.flatMapTo(HashSet(), PayloadRemapTableGenerator::classNames),
         )
 
         result.shippedTable.write(options.output)
@@ -85,6 +86,7 @@ object PayloadRemapTool {
         val work: File,
         val reference: File?,
         val relocation: PrefixRelocation,
+        val keep: List<File>,
     ) {
         companion object {
             fun parse(args: Array<String>): Options {
@@ -110,6 +112,10 @@ object PayloadRemapTool {
                     work = require("work"),
                     reference = values["reference"]?.let(::File),
                     relocation = PrefixRelocation.parse(values["relocate"]),
+                    keep = values["keep"].orEmpty()
+                        .split(File.pathSeparatorChar)
+                        .filter(String::isNotBlank)
+                        .map(::File),
                 )
             }
         }
