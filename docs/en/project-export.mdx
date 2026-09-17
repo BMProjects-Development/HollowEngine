@@ -1,0 +1,87 @@
+---
+title: Exporting a Project
+order: 5
+---
+
+<center><h1>Exporting a Project</h1></center>
+
+*Build a HollowEngine project into a distributable JAR, import it back, and prepare it for publishing.*
+
+Starting with HollowEngine 2.3.2, a project can be built into a `.jar` archive that Minecraft loaders recognize as a regular mod. The same exported file works on both **NeoForge** and **Fabric** for Minecraft 1.21.1.
+
+:::warning
+An exported project is still a HollowEngine addon. It will not start unless HollowEngine 2.3.2 or newer is installed.
+:::
+
+## Project toolbar
+
+The **Project** panel provides three actions:
+
+1. **Project Settings** - metadata and dependencies for the future mod. This is also where you configure the dependent mods and add-ons that you can use in your scripts during development.
+2. **Import Project** - restores a previously exported project, provided the source code was included in the archive.
+3. **Export Project** - compiles scripts and builds the finished `.jar` archive. If necessary, you can disable the export of the project’s source code here; however, this will make it impossible to import it back later.
+
+![Settings, import, and export buttons in the Project panel](/hollowengine/pictures/project-export/actions.webp)
+
+## Project settings
+
+Open **Project settings** and fill in the mod metadata.
+
+| Setting | Purpose |
+|---------|---------|
+| **Id** | The project's code name and default namespace. For example, `my_item` in the `dev-project` project receives the identifier `dev-project:my_item`. |
+| **Name** | The display name used in the mod list, item tooltips, and other UI. |
+| **Version** | The current project version. It is also included in the exported filename. |
+| **Runs on** | Where the project may run: client, server, or both sides. |
+| **Description** | A short project description stored in the mod metadata. |
+| **Authors** | The project authors. |
+| **License** | The terms under which the project is distributed. A license is usually required for publishing on CurseForge or Modrinth. |
+| **Icon** | A path to a PNG file inside the project, such as `icon.png`. |
+| **Addon dependencies** | Additional HollowEngine modules required by the project. |
+
+![Project settings window](/hollowengine/pictures/project-export/settings.webp)
+
+Select **Save** after changing the settings.
+
+## Exporting the project
+
+Select **Export project**, then:
+
+1. Check the version of the resulting mod.
+2. Choose whether to include script sources.
+3. Select where to save the JAR.
+4. Select **Export**.
+
+### Exporting with or without sources
+
+When **Include script sources** is enabled, the archive can later be imported back into the editor to continue development.
+
+When it is disabled, the JAR contains compiled scripts only. Importing it back and recovering the exact source project structure will not be available. This is useful for a public build, but it is not a substitute for keeping a backup of the source project.
+
+HollowEngine compiles all scripts during export. If a script cannot be compiled, the build ends with an error. After a successful build, the engine displays the path to the resulting file and offers to reveal it in the file explorer.
+
+![Successful export message](/hollowengine/pictures/project-export/export-success.webp)
+
+The finished archive contains resources, data, loader metadata, and compiled scripts. It is a normal mod JAR, so it can be sent to another player or published on a mod distribution platform.
+For now, cutscenes aren't supported during export because they aren't tied to a specific add-on; you'll likely have to move your cutscenes to a different section later on.
+
+![Contents of an exported JAR](/hollowengine/pictures/project-export/jar-contents.webp)
+
+## Installing and publishing
+
+You can place the finished JAR file in one of the modpack folders:
+
+- `mods` - like a regular mod, it will appear in the mod list;
+- `hollowengine/addons` - as a HollowEngine addon, it won't appear in the mod list, but you can update it almost without restarting the game.
+
+Once HollowEngine 2.3.2 is released, the project can be published on CurseForge or Modrinth. Always declare HollowEngine as a required dependency. If the project is started without the engine, the mod loader stops loading and reports the missing dependency.
+
+![Missing HollowEngine dependency error](/hollowengine/pictures/project-export/missing-dependency.webp)
+
+## Importing a project
+
+To continue working on a previously exported project, select **Import project** and choose its JAR file.
+
+![Selecting a JAR to import](/hollowengine/pictures/project-export/import-dialog.webp)
+
+Import is available only for archives that were exported with script sources included. A project exported without sources cannot be restored this way.
