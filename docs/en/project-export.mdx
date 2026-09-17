@@ -17,9 +17,9 @@ An exported project is still a HollowEngine addon. It will not start unless Holl
 
 The **Project** panel provides three actions:
 
-1. **Project settings** — configure the future mod's metadata and dependencies.
-2. **Import project** — restore a previously exported project when its sources were included.
-3. **Export project** — compile scripts and build the finished JAR.
+1. **Project Settings** - metadata and dependencies for the future mod. This is also where you configure the dependent mods and add-ons that you can use in your scripts during development.
+2. **Import Project** - restores a previously exported project, provided the source code was included in the archive.
+3. **Export Project** - compiles scripts and builds the finished `.jar` archive. If necessary, you can disable the export of the project’s source code here; however, this will make it impossible to import it back later.
 
 ![Settings, import, and export buttons in the Project panel](/hollowengine/pictures/project-export/actions.webp)
 
@@ -63,15 +63,16 @@ HollowEngine compiles all scripts during export. If a script cannot be compiled,
 ![Successful export message](/hollowengine/pictures/project-export/export-success.webp)
 
 The finished archive contains resources, data, loader metadata, and compiled scripts. It is a normal mod JAR, so it can be sent to another player or published on a mod distribution platform.
+For now, cutscenes aren't supported during export because they aren't tied to a specific add-on; you'll likely have to move your cutscenes to a different section later on.
 
 ![Contents of an exported JAR](/hollowengine/pictures/project-export/jar-contents.webp)
 
 ## Installing and publishing
 
-Place the finished JAR in either directory of a game instance:
+You can place the finished JAR file in one of the modpack folders:
 
-- `mods` — install it like a regular mod;
-- `hollowengine/addons` — install it as a HollowEngine addon.
+- `mods` - like a regular mod, it will appear in the mod list;
+- `hollowengine/addons` - as a HollowEngine addon, it won't appear in the mod list, but you can update it almost without restarting the game.
 
 Once HollowEngine 2.3.2 is released, the project can be published on CurseForge or Modrinth. Always declare HollowEngine as a required dependency. If the project is started without the engine, the mod loader stops loading and reports the missing dependency.
 
