@@ -19,6 +19,11 @@ object HollowEngineConfig : Config() {
     @PropertyRange(6.0f, 36.0f)
     var ideEditorFontSize by property(12f)
 
+    @PropertyComment("Font size used by the Hollow IDE console")
+    @PropertyName("ide_console_font_size")
+    @PropertyRange(6.0f, 36.0f)
+    var ideConsoleFontSize by property(10f)
+
     @PropertyComment("Gui Scale used by the Hollow IDE code editor; 0 follows the game, fractions like 1.5 are allowed")
     @PropertyName("ide_gui_scale")
     @PropertyRange(0.0f, 6.0f)

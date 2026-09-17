@@ -48,6 +48,14 @@ internal class HollowAddonRuntime(
     var resourcePackSnapshot: List<HollowAddonResourcePack> = emptyList()
         private set
 
+    /**
+     * Installed addons that are not switched off, loaded or not. Readable from inside an addon's own
+     * `load`, where asking [statuses] would wait for the lock that load is running under.
+     */
+    @Volatile
+    var enabledSnapshot: List<HollowAddonInstallation> = emptyList()
+        private set
+
     @Volatile
     private var started = false
 
@@ -71,6 +79,7 @@ internal class HollowAddonRuntime(
 
         locked {
             candidates.forEach { candidate -> knownCandidates[candidate.sourceFile.canonicalPath] = candidate }
+            refreshEnabledSnapshot()
             candidatesBySource.flatMapIndexed { priority, staged -> staged.map { priority to it } }
                 .groupBy { (_, candidate) -> candidate.descriptor.id }.forEach { (_, found) -> queue(select(found)) }
             drainPending()
@@ -546,6 +555,13 @@ internal class HollowAddonRuntime(
         }
     }
 
+    private fun refreshEnabledSnapshot() {
+        enabledSnapshot = knownCandidates.values
+            .filter { candidate -> candidate.descriptor.id !in disabledAddonIds }
+            .distinctBy { candidate -> candidate.descriptor.id }
+            .map { candidate -> HollowAddonInstallation(candidate.descriptor, candidate.classesFile) }
+    }
+
     private fun refreshSnapshot() {
         loadedSnapshot = loadedAddons.values.map { it.candidate.descriptor }
         val addonsFolder = addonsDirectory.canonicalFile
@@ -571,6 +587,7 @@ internal class HollowAddonRuntime(
         return try {
             block()
         } finally {
+            refreshEnabledSnapshot()
             mutex.unlock()
             if (loadedSnapshot !== loadedBefore) reloadRunningServers()
             if (started && assetsOf(packsBefore) != assetsOf(resourcePackSnapshot)) reloadClientResources()

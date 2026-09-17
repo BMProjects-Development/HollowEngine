@@ -1,12 +1,14 @@
 package ru.hollowhorizon.hollowengine.fabric.internal;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.ModOrigin;
 import ru.hollowhorizon.hollowengine.api.ModList;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.jar.JarFile;
 
 public class FabricModList implements ModList {
@@ -31,6 +33,14 @@ public class FabricModList implements ModList {
         } else {
             throw new IllegalStateException("Unsupported kind: $kind");
         }
+    }
+
+    @Override
+    public List<ModInfo> getMods() {
+        return FabricLoader.getInstance().getAllMods().stream()
+                .map(ModContainer::getMetadata)
+                .map(metadata -> new ModInfo(metadata.getId(), metadata.getName(), metadata.getVersion().getFriendlyString()))
+                .toList();
     }
 
     private File getNestedModFile(ModOrigin origin) throws IOException {

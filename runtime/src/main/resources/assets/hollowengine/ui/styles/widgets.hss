@@ -28,6 +28,12 @@
     border: 1px #647084;
 }
 
+/* Fills the free space of a button wider than its text, so the arrow sits flush against the right edge. */
+.dropdown-button-label {
+    grow: 1;
+    wrap: false;
+}
+
 .dropdown-button-arrow {
     size: 7px 5px;
     shape: path("M 0 0 L 7 0 L 3.5 5 Z", 7 5);

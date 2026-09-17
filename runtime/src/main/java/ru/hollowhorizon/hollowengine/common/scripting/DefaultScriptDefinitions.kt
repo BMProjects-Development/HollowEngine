@@ -16,7 +16,9 @@ const val NODE_SCRIPT_EXTENSION = "node.kts"
 const val UI_SCRIPT_EXTENSION = "ui.kts"
 const val RELOAD_SCRIPT_EXTENSION = "reload.kts"
 const val STARTUP_SCRIPT_EXTENSION = "startup.kts"
+const val CONSOLE_SCRIPT_EXTENSION = "console.kts"
 private const val CLIENT_RELOAD_CONTEXT = "ru.hollowhorizon.hollowengine.client.scripting.ClientReloadContext"
+private const val CONSOLE_SCRIPT = "ru.hollowhorizon.hollowengine.client.scripting.ConsoleScript"
 
 object DefaultScriptDefinitions {
     private val definitions by lazy(::createProviders)
@@ -166,6 +168,24 @@ object DefaultScriptDefinitions {
                 implicitReceivers = listOf(
                     MinecraftServer::class
                 )
+            )
+            this += Provider(
+                extension = CONSOLE_SCRIPT_EXTENSION,
+                baseClass = CONSOLE_SCRIPT,
+                defaultImports = listOf(
+                    Import::class.qualifiedName!!,
+                    ResourceLocation::class.qualifiedName!!,
+                    ItemStack::class.qualifiedName!!,
+                    "net.minecraft.core.BlockPos",
+                    "net.minecraft.world.phys.Vec3",
+                    "net.minecraft.world.entity.Entity",
+                    "net.minecraft.world.entity.LivingEntity",
+                    "kotlinx.coroutines.launch",
+                    "kotlinx.coroutines.delay",
+                    "kotlin.time.Duration.Companion.seconds",
+                    "ru.hollowhorizon.hollowengine.common.utils.rl",
+                    "ru.hollowhorizon.hollowengine.common.utils.literal",
+                ),
             )
         }
     }

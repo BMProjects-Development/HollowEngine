@@ -22,6 +22,7 @@ internal object HollowAddonDescriptorReader {
             version = properties.getProperty("version", "1.0.0").trim(),
             entrypoint = properties.getProperty("entry")?.trim()?.takeIf(String::isNotEmpty),
             dependencies = properties.list("dependsOn"),
+            modDependencies = properties.list("dependsOnMods"),
             name = properties.getProperty("name", id).trim(),
             environment = properties.getProperty("environment", "common")
                 .trim()

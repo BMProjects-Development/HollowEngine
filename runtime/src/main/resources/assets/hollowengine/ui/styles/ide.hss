@@ -111,28 +111,37 @@
     gap: 4px;
 }
 
-.console-toolbar, .console-command-row {
-    width: 100%;
-    height: fit;
-    min-height: 24px;
-    padding: 2px 4px;
+.console-toolbar {
+    size: fit 22px;
+    padding: 0px 3px;
     gap: 5px;
     align-items: start center;
-    background: #31343D;
-    border-radius: 4px;
-}
-
-.console-toolbar-label {
-    height: fit;
-    foreground: #aeb8ca;
-    wrap: false;
 }
 
 .console-level-dropdown {
-    min-width: 72px;
+    min-width: 64px;
+    height: 18px;
+    padding: 0px 6px;
+    background: #24272E;
+    border-radius: 3px;
+}
+
+.console-mode-dropdown {
+    min-width: 84px;
     height: 20px;
     padding: 0px 6px;
     background: #24272E;
+    border-radius: 3px;
+}
+
+.console-command-row {
+    width: 100%;
+    height: fit;
+    min-height: 26px;
+    padding: 2px 4px;
+    gap: 4px;
+    background: #31343D;
+    border-radius: 4px;
 }
 
 .console-filter, .console-command {
@@ -144,72 +153,19 @@
     selection-color: rgba(95, 140, 205, 0.46);
 }
 
-.console-log-list {
+/* The whole log is one read-only field; its colours come from the console's own highlighter. */
+.console-log {
     width: 100%;
+    padding: 2px 6px;
     background: #1E2127;
     border-radius: 4px;
-    font-family: hollowengine:fonts/monocraft;
-    font-size: 10px;
+    foreground: #d7deea;
+    caret-color: #f0f6ff;
+    selection-color: rgba(95, 140, 205, 0.46);
     scrollbar: 6px;
     scrollbar-track: rgba(255, 255, 255, 0.03);
     scrollbar-thumb: rgba(155, 169, 194, 0.42);
     scrollbar-thumb-radius: 3px;
-}
-
-.console-log-row {
-    width: fit;
-    height: fit;
-    min-height: 18px;
-    padding: 2px 6px;
-    gap: 6px;
-    align-items: start start;
-}
-
-.console-log-row:hover {
-    background: rgba(255, 255, 255, 0.035);
-}
-
-.console-log-time, .console-log-logger {
-    height: fit;
-    foreground: #687588;
-    wrap: false;
-}
-
-.console-log-level {
-    height: fit;
-    foreground: #aeb8ca;
-    wrap: false;
-}
-
-.console-log-message {
-    height: fit;
-    foreground: #d7deea;
-    wrap: false;
-}
-
-.console-log-row.level-trace .console-log-level,
-.console-log-row.level-trace .console-log-message {
-    foreground: #7f8a9d;
-}
-
-.console-log-row.level-debug .console-log-level {
-    foreground: #78a8ff;
-}
-
-.console-log-row.level-info .console-log-level {
-    foreground: #82d99b;
-}
-
-.console-log-row.level-warn .console-log-level,
-.console-log-row.level-warn .console-log-message {
-    foreground: #ffc266;
-}
-
-.console-log-row.level-error .console-log-level,
-.console-log-row.level-error .console-log-message,
-.console-log-row.level-fatal .console-log-level,
-.console-log-row.level-fatal .console-log-message {
-    foreground: #ff8787;
 }
 
 .console-empty {
@@ -219,40 +175,28 @@
     foreground: #7f8a9d;
 }
 
-.console-suggestions {
-    width: 100%;
-    max-height: 180px;
-    padding: 3px;
-    gap: 1px;
-    background: #24272E;
-    border: 1px #5F6677;
-    border-radius: 4px;
-}
-
-.console-suggestion {
-    width: 100%;
-    height: fit;
-    padding: 3px 6px;
-    foreground: #cbd3df;
-    border-radius: 3px;
-    wrap: false;
-}
-
-.console-suggestion:hover {
-    background: #414653;
-}
-
 .console-button {
-    height: 22px;
-    padding: 2px 8px;
-    align-items: center center;
-    background: #414653;
-    foreground: #d7deea;
+    size: 22px 22px;
     border-radius: 3px;
+    background: #414653;
+    transition: background 110ms ease-out;
 }
 
 .console-button:hover {
     background: #5f6b80;
+}
+
+.console-button.disabled, .console-button.disabled:hover {
+    background: #2a2d34;
+}
+
+.console-button-icon {
+    size: 13px 13px;
+    tint: #d7deea;
+}
+
+.console-button.disabled .console-button-icon {
+    tint: #687588;
 }
 
 .project-context-menu {
@@ -334,6 +278,14 @@
 
 .project-dialog-field {
     gap: 2px;
+}
+
+.project-dialog-scroll {
+    gap: 7px;
+    padding: 0px 8px 0px 0px;
+    scrollbar: 6px;
+    scrollbar-thumb: rgba(155, 169, 194, 0.42);
+    scrollbar-thumb-radius: 3px;
 }
 
 .project-dialog-label {

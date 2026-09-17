@@ -1,9 +1,15 @@
 {
-  "command_hint": "Enter command...",
+  "command_hint": "Enter a command...",
+  "kotlin_hint": "Kotlin: player, level, server. Ctrl+Enter runs it",
+  "no_world": "No world: switch to Kotlin to run code here",
   "execute": "Execute",
-  "filter": "Filter:",
-  "filter_hint": "Text or Regex",
-  "level": "Level:",
+  "run": "Run (Ctrl+Enter)",
+  "stop": "Stop coroutines launched by snippets",
+  "expand": "Expand to several lines",
+  "collapse": "Collapse to one line",
+  "filter_hint": "Filter: text or regex",
   "auto_scroll": "Auto-scroll",
-  "empty": "No log messages match the current filter"
+  "empty": "No log messages match the current filter",
+  "mode.command": "Command",
+  "mode.kotlin": "Kotlin"
 }

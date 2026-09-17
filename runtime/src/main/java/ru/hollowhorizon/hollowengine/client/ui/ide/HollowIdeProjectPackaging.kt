@@ -10,9 +10,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.api.ModList.ModInfo
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
+import ru.hollowhorizon.hollowengine.common.addons.project.HollowModMetadata
 import ru.hollowhorizon.hollowengine.common.addons.project.HollowProject
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectException
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectExportOptions
@@ -21,8 +23,10 @@ import ru.hollowhorizon.hollowengine.common.addons.project.ProjectImportPlan
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectImporter
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectMessage
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectProperties
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
+import ru.hollowhorizon.hollowengine.common.utils.ModList
 import java.io.File
 
 /**
@@ -57,7 +61,7 @@ internal class HollowIdeProjectPackaging(
     fun openSettings() {
         properties = HollowProject.properties()
         val installed = HollowAddonManager.statuses.map { it.descriptor.id }.distinct().sorted()
-        settings = ProjectSettingsForm(properties, installed)
+        settings = ProjectSettingsForm(properties, installed, ModList.getMods())
     }
 
     fun saveSettings() {
@@ -70,10 +74,14 @@ internal class HollowIdeProjectPackaging(
         form.errors.clear()
         form.errors += problems
         if (problems.isNotEmpty()) return
+        val previous = properties
         runCatching { HollowProject.saveProperties(edited) }.onSuccess {
             properties = edited
             settings = null
             setStatus(PROJECT_SAVED.lang)
+            if (previous.modDependencies != edited.modDependencies || previous.dependsOn != edited.dependsOn) {
+                rebuildScriptingEnvironment()
+            }
         }.onFailure { error ->
             HollowEngine.LOGGER.error("Could not save the project settings", error)
             form.errors += error.message ?: error.javaClass.simpleName
@@ -82,6 +90,20 @@ internal class HollowIdeProjectPackaging(
 
     fun cancelSettings() {
         settings = null
+    }
+
+    private fun rebuildScriptingEnvironment() {
+        val initializer = HollowAddonManager.find<ScriptingEnvironmentInitializer>() ?: return
+        setStatus(MODS_REBUILDING.lang)
+        scope.launch {
+            val result = runCatching { initializer.rebuild() }
+            onMain {
+                result.onSuccess { setStatus(MODS_REBUILT.lang) }.onFailure { error ->
+                    HollowEngine.LOGGER.error("Could not rebuild the scripting environment", error)
+                    setStatus(MODS_REBUILD_FAILED.lang(error.message ?: error.javaClass.simpleName))
+                }
+            }
+        }
     }
 
     fun openExport() {
@@ -166,6 +188,9 @@ internal class HollowIdeProjectPackaging(
         val plan = form.plan ?: return
         if (form.running) return
         form.running = true
+        val projectBefore = HollowProject.properties()
+        val modsBefore = projectBefore.modDependencies
+        val addonsBefore = projectBefore.dependsOn
         model.discardFilesUnder(HollowProject.contentDirectories)
         scope.launch {
             val result = runCatching { ProjectImporter.apply(plan) }
@@ -180,6 +205,9 @@ internal class HollowIdeProjectPackaging(
                         if (backup == null) IMPORT_DONE.lang(plan.properties.displayName)
                         else IMPORT_DONE_BACKUP.lang(plan.properties.displayName, backup.name)
                     )
+                    if (properties.modDependencies != modsBefore || properties.dependsOn != addonsBefore) {
+                        rebuildScriptingEnvironment()
+                    }
                 }.onFailure { error -> form.errors += error.userMessages("Project import failed") }
             }
         }
@@ -204,6 +232,9 @@ internal class HollowIdeProjectPackaging(
         const val LANG = "hollowengine.gui.ide.project"
         const val PROJECT_SAVED = "$LANG.settings.saved"
         const val PROJECT_ID_TAKEN = "$LANG.problem.id_taken"
+        const val MODS_REBUILDING = "$LANG.mods.rebuilding"
+        const val MODS_REBUILT = "$LANG.mods.rebuilt"
+        const val MODS_REBUILD_FAILED = "$LANG.mods.rebuild_failed"
         const val EXPORT_TITLE = "$LANG.export.title"
         const val EXPORT_DEFAULT_ID = "$LANG.export.default_id"
         const val EXPORT_DONE = "$LANG.export.done"
@@ -217,7 +248,11 @@ internal class HollowIdeProjectPackaging(
 private const val EXPORTS_DIRECTORY = "exports"
 
 /** What the settings dialog edits, as text the fields hold until it is saved. */
-internal class ProjectSettingsForm(properties: ProjectProperties, installedAddons: List<String>) {
+internal class ProjectSettingsForm(
+    properties: ProjectProperties,
+    installedAddons: List<String>,
+    installedMods: List<ModInfo>,
+) {
     var id by mutableStateOf(properties.id)
     var name by mutableStateOf(properties.name)
     var version by mutableStateOf(properties.version)
@@ -232,9 +267,39 @@ internal class ProjectSettingsForm(properties: ProjectProperties, installedAddon
         (installedAddons + properties.dependsOn).distinct().filter { it != properties.id }
     val errors = mutableStateListOf<String>()
 
+    val modDependencies = mutableStateListOf<String>().apply { addAll(properties.modDependencies) }
+    var modFilter by mutableStateOf("")
+
+    private val modChoices: List<ModInfo> = run {
+        val addonModIds = installedAddons.mapTo(HashSet(), HollowModMetadata::modId)
+        val installed = installedMods
+            .filter { it.id !in PlatformModIds && it.id !in addonModIds }
+            .distinctBy(ModInfo::id)
+        val missing = properties.modDependencies.filter { id -> installed.none { it.id == id } }
+            .map { id -> ModInfo(id, id, "") }
+        (missing + installed).sortedWith(
+            compareBy<ModInfo> { it.id !in properties.modDependencies }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
+        )
+    }
+    private val installedModIds = installedMods.mapTo(HashSet(), ModInfo::id)
+
+    val visibleModChoices: List<ModInfo>
+        get() {
+            val query = modFilter.trim()
+            if (query.isEmpty()) return modChoices
+            return modChoices.filter { it.id.contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true) }
+        }
+
+    fun isInstalled(mod: ModInfo): Boolean = mod.id in installedModIds
+
     fun toggleDependency(id: String, enabled: Boolean) {
         if (enabled && id !in dependencies) dependencies += id
         if (!enabled) dependencies -= id
+    }
+
+    fun toggleModDependency(id: String, enabled: Boolean) {
+        if (enabled && id !in modDependencies) modDependencies += id
+        if (!enabled) modDependencies -= id
     }
 
     fun toProperties(base: ProjectProperties) = base.copy(
@@ -243,6 +308,7 @@ internal class ProjectSettingsForm(properties: ProjectProperties, installedAddon
         version = version.trim(),
         environment = environment,
         dependsOn = dependencies.toList(),
+        modDependencies = modDependencies.toList(),
         description = description.trim(),
         authors = authors.split(',').map(String::trim).filter(String::isNotEmpty),
         license = license.trim(),
@@ -251,6 +317,9 @@ internal class ProjectSettingsForm(properties: ProjectProperties, installedAddon
 
     companion object {
         val environments = HollowAddonEnvironment.entries
+
+        /** Always on the classpath, so offering them as dependencies would only add noise. */
+        private val PlatformModIds = setOf("minecraft", "java", "fabricloader", "neoforge", "hollowengine")
     }
 }
 

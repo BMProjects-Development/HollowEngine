@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import java.io.File
+import java.io.IOException
+import java.nio.file.InvalidPathException
 
 /**
  * Scripts kept in a plain directory. Used for the sandbox at runtime and for an addon's own
@@ -31,7 +33,13 @@ open class DirectoryScriptSource(
     }
 
     private fun resolve(id: ScriptId): File? {
-        val file = directory.resolve(id.path).canonicalFile
+        val file = try {
+            directory.resolve(id.path).canonicalFile
+        } catch (_: IOException) {
+            return null
+        } catch (_: InvalidPathException) {
+            return null
+        }
         if (!file.isFile) return null
         // A path may not climb out of the directory through `..` segments.
         if (!file.toPath().startsWith(directory.canonicalFile.toPath())) return null

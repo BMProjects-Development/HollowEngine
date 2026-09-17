@@ -62,7 +62,7 @@ class ScriptingAnalyzerImpl(
     private val importDiagnostics = IdentityHashMap<KtFile, List<Diagnostic>>()
 
     private fun getOrCreateFile(name: String, original: String): KtFile {
-        val text = original.replace("\r\n", "\n")
+        val text = original.withUnixLineSeparators()
         val textHash = text.hashCode()
         val textLength = text.length
         val cached = fileCache[name]
@@ -187,7 +187,7 @@ class ScriptingAnalyzerImpl(
                 if (!importedNames.add(importedName)) return@argumentLoop
 
                 val importedText = try {
-                    source.readText()
+                    source.readText().withUnixLineSeparators()
                 } catch (exception: IOException) {
                     diagnostics += importDiagnostic(
                         file,
@@ -310,5 +310,7 @@ private fun removeFromPsiManager(file: KtFile) {
     val fileManager = psiManager.fileManager
     fileManager.setViewProvider(file.virtualFile, null)
 }
+
+private fun String.withUnixLineSeparators(): String = replace("\r\n", "\n").replace('\r', '\n')
 
 val KtAnnotationEntry.typeName: String? get() = (typeReference?.typeElement as? KtUserType)?.referencedName

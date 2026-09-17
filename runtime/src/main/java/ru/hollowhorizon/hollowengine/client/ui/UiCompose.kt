@@ -681,6 +681,12 @@ private fun ContentNode(
 /** Popups render above everything; the OverlayHost carries this layer so all passes prefer it. */
 const val OverlayLayer = Int.MAX_VALUE / 2
 
+/**
+ * Layer of the popup whose content is being composed. A popup opened from inside another one (a dropdown
+ * in a modal dialog) is lifted to at least that layer, so it is never drawn beneath the popup it came from.
+ */
+private val LocalPopupLayer = compositionLocalOf { Int.MIN_VALUE }
+
 /** Handle passed to a [Popup]'s content so it can close itself (`dismiss()`) without external state. */
 interface PopupScope {
     fun dismiss()
@@ -727,6 +733,7 @@ fun Popup(
         }
     }
     val isModal = rememberUpdatedState(modal)
+    val parentLayer = LocalPopupLayer.current
     val entry = remember {
         PopupEntry(Any()).apply {
             this.content = {
@@ -742,12 +749,14 @@ fun Popup(
                     exiting = exiting,
                     animated = this.animated,
                     visible = this.visible,
-                ) { popupContent.value.invoke(scope) }
+                ) {
+                    CompositionLocalProvider(LocalPopupLayer provides this.layer) { popupContent.value.invoke(scope) }
+                }
             }
         }
     }
     SideEffect {
-        entry.layer = layer
+        entry.layer = maxOf(layer, parentLayer)
         entry.dismissOnOutside = dismissOnOutside
         entry.onDismiss = onDismiss
         entry.animated = animated
@@ -797,6 +806,9 @@ private fun PopupNodeEmitter(
         acc.style(ref)
     }.asList()
     val values = PopupValues(anchorBounds, alignment)
+    val styledContent: HollowUiContent = {
+        CompositionLocalProvider(LocalStylesheets provides stylesheets) { content() }
+    }
     ReusableComposeNode<PopupNode, HollowUiApplier>(
         factory = { PopupNode(anchorBounds, alignment, id, tags, modifiers, attributes) },
         update = {
@@ -806,7 +818,7 @@ private fun PopupNodeEmitter(
             }
             updateCommon(modifiers, attributes, tags)
         },
-        content = content,
+        content = styledContent,
     )
 }
 

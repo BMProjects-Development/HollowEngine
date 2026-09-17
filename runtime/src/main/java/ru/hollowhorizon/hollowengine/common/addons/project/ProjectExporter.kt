@@ -94,8 +94,8 @@ object ProjectExporter {
             environment.compiler.compile(
                 sourceFile,
                 ScriptCompilationContext(
-                    extraClasspath = source.classpath,
-                    baseClassLoader = source.classLoader,
+                    extraClasspath = ScriptRegistry.classpath(source.namespace),
+                    baseClassLoader = ScriptRegistry.classLoader(source.namespace),
                     cacheOutput = artifact,
                     cacheFingerprint = fingerprint,
                     sharedCacheOutput = output,

@@ -18,6 +18,10 @@ object ModList : ModList {
         return modList.getFile(modId)
     }
 
+    override fun getMods(): List<ModList.ModInfo> {
+        return modList.mods
+    }
+
     fun getAllFiles(modId: String): List<File> = listOf(getFile(modId))
 }
 

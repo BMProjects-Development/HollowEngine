@@ -68,7 +68,11 @@ internal class KotlinCompiledScriptJar(
         get() = script.metadata(evaluationConfiguration)
             .compilationConfiguration[ScriptCompilationConfiguration.isClientSideScript] == true
 
-    override fun <T> execute(body: ScriptEvaluationConfiguration.Builder.() -> Unit): Result<T> {
+    override fun <T> execute(body: ScriptEvaluationConfiguration.Builder.() -> Unit): Result<T> =
+        @Suppress("UNCHECKED_CAST")
+        evaluate(body).map { result -> result.instance as T }
+
+    override fun evaluate(body: ScriptEvaluationConfiguration.Builder.() -> Unit): Result<ScriptResult> {
         val result = try {
             runBlocking { evaluator(script, evaluationConfiguration.with(body)) }
         } catch (e: LinkageError) {
@@ -80,8 +84,8 @@ internal class KotlinCompiledScriptJar(
         }
         val value = result.value.returnValue
         if (value is ResultValue.Error) return Result.failure(value.error)
-
-        @Suppress("UNCHECKED_CAST") return Result.success(value.scriptInstance as T)
+        return ScriptResult.of(value)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("Script '$name' was not evaluated"))
     }
 }
 

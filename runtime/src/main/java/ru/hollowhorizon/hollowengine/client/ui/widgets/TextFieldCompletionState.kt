@@ -148,7 +148,8 @@ class TextFieldCompletionState(
      * open/pending popup re-queries the contributor at the new caret.
      */
     fun onCharTyped(char: Char) {
-        if (char.isCompletionTrigger() || opened || autoOpenPending) open()
+        val contributorTrigger = contributor?.triggerCharacters?.contains(char) == true
+        if (char.isCompletionTrigger() || contributorTrigger || opened || autoOpenPending) open()
         else lastText = state.text
     }
 

@@ -24,7 +24,7 @@ object ScriptImports {
      */
     fun resolve(owner: ScriptId, reference: String): ScriptId? {
         val normalized = reference.replace('\\', '/').trim().removePrefix("/")
-        if (normalized.isEmpty()) return null
+        if (normalized.isEmpty() || normalized.any(Char::isISOControl)) return null
 
         if (normalized.indexOf(ScriptId.SEPARATOR) >= 0) {
             val id = ScriptId.parse(normalized, owner.namespace)

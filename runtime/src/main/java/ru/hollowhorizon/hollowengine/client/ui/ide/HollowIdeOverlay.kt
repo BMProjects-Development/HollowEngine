@@ -14,7 +14,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeSoundsEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeConsole
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeConsolePanel
+import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeConsoleToolbar
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.HollowIdeUiProfilerPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.ModelEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.VanillaModelEditorPanel
@@ -132,6 +134,7 @@ object HollowIdeOverlay {
         pointerY = { surface.runtime.mouseY },
     )
     private val packaging = HollowIdeProjectPackaging(model) { statusText = it }
+    private val console = HollowIdeConsole()
     private val diagnosticsPanels = mutableStateMapOf<String, Boolean>()
     private val diagnosticsPanelHeights = mutableStateMapOf<String, Float>()
     private var editorAnalysisRevision by mutableStateOf(0)
@@ -498,7 +501,12 @@ object HollowIdeOverlay {
                             id = "ide-dock",
                             modifier = Modifier.size(100.percent, 0.px)
                                 .grow(1f),
-                            tabBarActions = { item -> if (item.id == ProjectTreeId) HollowIdeProjectActions(packaging) },
+                            tabBarActions = { item ->
+                                when (item.id) {
+                                    ProjectTreeId -> HollowIdeProjectActions(packaging)
+                                    ConsoleId -> HollowIdeConsoleToolbar(console)
+                                }
+                            },
                             content = { item -> DockContent(item) },
                         )
                     }
@@ -644,7 +652,7 @@ object HollowIdeOverlay {
                 onRestoreFile = ::restoreAssetFile,
                 onFocusFilter = ::requestSurfaceFocus,
             )
-            ConsoleId -> HollowIdeConsolePanel()
+            ConsoleId -> HollowIdeConsolePanel(console)
             CutsceneTimelineId -> CutsceneTimelineDock(
                 session = CutsceneEditorSessions.default,
                 keyboardActive = dock.focusedItemId == CutsceneTimelineId,

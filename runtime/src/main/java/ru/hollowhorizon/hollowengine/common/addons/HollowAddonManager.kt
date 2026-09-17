@@ -12,6 +12,10 @@ object HollowAddonManager : AutoCloseable {
     val loaded: List<HollowAddonDescriptor>
         get() = runtime?.loadedSnapshot.orEmpty()
 
+    /** Installed addons that are not switched off. Safe to read from inside an addon's `load`. */
+    val enabled: List<HollowAddonInstallation>
+        get() = runtime?.enabledSnapshot.orEmpty()
+
     val restartRequired: List<HollowAddonDescriptor>
         get() = runtime?.restartRequiredSnapshot.orEmpty()
 

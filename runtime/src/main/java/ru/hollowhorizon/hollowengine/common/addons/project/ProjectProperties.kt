@@ -17,6 +17,7 @@ data class ProjectProperties(
     val version: String = DEFAULT_VERSION,
     val environment: HollowAddonEnvironment = HollowAddonEnvironment.COMMON,
     val dependsOn: List<String> = emptyList(),
+    val modDependencies: List<String> = emptyList(),
     val description: String = "",
     val authors: List<String> = emptyList(),
     val license: String = "",
@@ -45,6 +46,7 @@ data class ProjectProperties(
             "version" to version,
             "environment" to environment.name.lowercase(),
             "dependsOn" to dependsOn.joinToString(","),
+            "dependsOnMods" to modDependencies.joinToString(","),
             "description" to description,
             "authors" to authors.joinToString(", "),
             "license" to license,
@@ -71,7 +73,7 @@ data class ProjectProperties(
         const val PROBLEM_ICON = "hollowengine.gui.ide.project.problem.icon"
 
         private val KNOWN_KEYS = setOf(
-            "id", "name", "version", "environment", "dependsOn", "description", "authors", "license", "icon",
+            "id", "name", "version", "environment", "dependsOn", "dependsOnMods", "description", "authors", "license", "icon",
         )
 
         /** The properties in [file], or defaults when there is none. */
@@ -89,6 +91,7 @@ data class ProjectProperties(
                 environment = HollowAddonEnvironment.entries.firstOrNull { it.name.equals(value("environment"), true) }
                     ?: HollowAddonEnvironment.COMMON,
                 dependsOn = list("dependsOn"),
+                modDependencies = list("dependsOnMods"),
                 description = value("description"),
                 authors = list("authors"),
                 license = value("license"),

@@ -7,6 +7,8 @@ import java.io.File
 
 interface ScriptingEnvironmentInitializer {
     fun initialize(javaHome: File, classpath: List<File>, scriptTypes: List<ScriptClassProvider>, mappings: Mappings)
+
+    fun rebuild()
 }
 
 interface ScriptingEnvironment {

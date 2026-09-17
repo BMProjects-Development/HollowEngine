@@ -37,10 +37,9 @@ object ScriptLoader {
 
         val scripting = ScriptingEnvironment.currentOrNull()
         if (scripting != null && artifacts.sourceFile != null) {
-            val source = ScriptRegistry.source(id.namespace)
             val context = ScriptCompilationContext(
-                extraClasspath = source?.classpath.orEmpty(),
-                baseClassLoader = source?.classLoader,
+                extraClasspath = ScriptRegistry.classpath(id.namespace),
+                baseClassLoader = ScriptRegistry.classLoader(id.namespace),
                 cacheOutput = fingerprint?.let { cached },
                 cacheFingerprint = fingerprint,
             )

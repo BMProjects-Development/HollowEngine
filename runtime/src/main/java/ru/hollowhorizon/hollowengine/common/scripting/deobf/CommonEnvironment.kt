@@ -1,11 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.scripting.deobf
 
-import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.MappingsLoader
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import ru.hollowhorizon.hollowengine.runtime.bootstrap.HollowEngineRuntimeBootstrap
 import java.io.File
 import java.net.URI
@@ -33,9 +31,10 @@ object CommonEnvironment {
             }
         }
 
-        if (isProduction) classpath += ModsEnvironment(*HollowEngineConfig.scriptingMods.toTypedArray()).setup(mappings, outputDir)
+        classpath += ModsEnvironment(ScriptingMods.requested()).setup(mappings, outputDir)
+        classpath += ScriptingAddons.classpath()
 
-        return mappings to classpath
+        return mappings to classpath.distinctBy { it.absoluteFile.normalize() }.toMutableList()
     }
 
     private fun setupMappings(compilerJar: File): Mappings {

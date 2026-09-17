@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.HollowEngineBuild
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonClassLoader
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -23,6 +24,9 @@ object ScriptRegistry {
     private val sources = LinkedHashMap<String, ScriptSource>()
     private val listeners = CopyOnWriteArrayList<ScriptSourceListener>()
     private val filesToIds = ConcurrentHashMap<String, ScriptId>()
+
+    /** Delegating loaders built for namespaces that depend on others; dropped when the sources change. */
+    private val dependencyLoaders = HashMap<String, ClassLoader>()
 
     @Volatile
     private var sandboxSource: SandboxScriptSource = SandboxScriptSource()
@@ -115,6 +119,42 @@ object ScriptRegistry {
     fun idOf(file: File): ScriptId? = filesToIds[file.canonicalPath]
 
     /**
+     * Classpath the scripts of [namespace] compile against: its own, plus that of every namespace it
+     * declares in `dependsOn`, so a project can call the classes of the addons it depends on.
+     */
+    fun classpath(namespace: String): List<File> = closure(namespace)
+        .flatMap { source -> source.classpath }
+        .distinctBy { file -> file.absoluteFile.normalize() }
+
+    /**
+     * Classloader the scripts of [namespace] run in: the one of the namespace itself, delegating to the
+     * loaders of the namespaces it depends on.
+     */
+    fun classLoader(namespace: String): ClassLoader? {
+        val source = source(namespace) ?: return null
+        val dependencies = closure(namespace).filter { it !== source }.map(ScriptSource::classLoader).distinct()
+        if (dependencies.isEmpty()) return source.classLoader
+        return synchronized(lock) {
+            dependencyLoaders.getOrPut(namespace) {
+                HollowAddonClassLoader(emptyArray(), source.classLoader, dependencies)
+            }
+        }
+    }
+
+    /** [namespace] and everything it depends on, breadth first and without revisiting a namespace. */
+    private fun closure(namespace: String): List<ScriptSource> {
+        val visited = LinkedHashMap<String, ScriptSource>()
+        fun visit(id: String) {
+            if (id in visited) return
+            val source = source(id) ?: return
+            visited[id] = source
+            source.dependencies.forEach(::visit)
+        }
+        visit(namespace)
+        return visited.values.toList()
+    }
+
+    /**
      * Whether a script of [from] may pull in a script of [to] through `@file:Import`. A namespace can
      * always import from itself; anything else has to be declared as a dependency.
      */
@@ -152,6 +192,7 @@ object ScriptRegistry {
     }
 
     private fun notifyListeners(namespace: String, available: Boolean) {
+        synchronized(lock) { dependencyLoaders.clear() }
         listeners.forEach { listener ->
             runCatching { listener.onScriptSourceChanged(namespace, available) }
                 .onFailure { HollowEngine.LOGGER.error("Script source listener failed for '$namespace'", it) }

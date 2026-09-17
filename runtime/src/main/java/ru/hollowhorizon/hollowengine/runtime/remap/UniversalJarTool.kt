@@ -19,6 +19,7 @@ object UniversalJarTool {
     private const val REMAP_TABLE = "META-INF/hollowengine/runtime/payload-remap-fabric.tbl.gz"
     private const val FABRIC_DESCRIPTOR = "fabric.mod.json"
     private const val NEOFORGE_DESCRIPTOR = "META-INF/neoforge.mods.toml"
+    private const val CONNECTOR_PLACEHOLDER = "connector:placeholder"
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -101,6 +102,13 @@ object UniversalJarTool {
             if (text.contains("\${")) add("$FABRIC_DESCRIPTOR still holds unexpanded template placeholders")
             declaredConfigs(bytes).forEach { config ->
                 if (config !in entries) add("$FABRIC_DESCRIPTOR declares missing mixin config $config")
+            }
+        }
+
+        entries[NEOFORGE_DESCRIPTOR]?.let { bytes ->
+            // Without it Sinytra Connector loads the Fabric half of the jar next to the NeoForge one.
+            if (CONNECTOR_PLACEHOLDER !in String(bytes, Charsets.UTF_8)) {
+                add("$NEOFORGE_DESCRIPTOR does not mark the jar as $CONNECTOR_PLACEHOLDER")
             }
         }
 

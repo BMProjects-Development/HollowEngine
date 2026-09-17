@@ -1,6 +1,11 @@
 modLoader = "javafml"
 loaderVersion = "[4,)"
 license = "${license}"
+
+# The same jar carries the Fabric version; this stops Sinytra Connector from loading it a second time as a Fabric mod.
+[properties]
+"connector:placeholder" = true
+
 [[mods]]
 modId = "${mod_id}"
 version = "${mod_version}"

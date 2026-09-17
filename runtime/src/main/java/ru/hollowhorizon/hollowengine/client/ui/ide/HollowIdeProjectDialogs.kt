@@ -93,38 +93,39 @@ internal fun HollowIdeProjectDialogs(packaging: HollowIdeProjectPackaging) {
 @Composable
 private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSettingsForm) {
     ProjectDialog("project-settings", "$LANG.settings.title".lang, packaging::cancelSettings) {
-        Field("$LANG.field.id".lang, form.id, "project-settings-id", "$LANG.field.id.hint".lang) { form.id = it }
-        Field("$LANG.field.name".lang, form.name, "project-settings-name", form.id) { form.name = it }
-        Field("$LANG.field.version".lang, form.version, "project-settings-version") { form.version = it }
-        EnvironmentField(form)
-        Field("$LANG.field.description".lang, form.description, "project-settings-description") { form.description = it }
-        Field("$LANG.field.authors".lang, form.authors, "project-settings-authors", "$LANG.field.authors.hint".lang) {
-            form.authors = it
-        }
-        Field("$LANG.field.license".lang, form.license, "project-settings-license", "All Rights Reserved") { form.license = it }
-        Field("$LANG.field.icon".lang, form.icon, "project-settings-icon", "$LANG.field.icon.hint".lang) { form.icon = it }
-        if (form.dependencyChoices.isNotEmpty()) {
-            Text("$LANG.field.dependencies".lang, tags = listOf("project-dialog-label"))
-            Column(
-                tags = listOf("project-dialog-dependencies"),
-                modifier = Modifier.size(100.percent, UiLength.Fit)
-                    .maxSize(height = 96.px)
-                    .scrollable(horizontal = false, hasHorizontalScrollbar = false),
-            ) {
-                form.dependencyChoices.forEach { addon ->
-                    Row(
-                        tags = listOf("project-dialog-checkbox-row"),
-                        modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
-                    ) {
-                        Checkbox(
-                            checked = addon in form.dependencies,
-                            onCheckedChange = { form.toggleDependency(addon, it) },
-                            id = "project-dependency-$addon",
-                        )
-                        Text(addon)
+        val viewport = LocalUiViewport.current
+        Column(
+            id = "project-settings-fields",
+            tags = listOf("project-dialog-scroll"),
+            modifier = Modifier.size(100.percent, UiLength.Fit)
+                .maxSize(height = (viewport.height - DialogChromeHeight).coerceAtLeast(MinScrollHeight).px)
+                .scrollable(horizontal = false, hasHorizontalScrollbar = false),
+        ) {
+            Field("$LANG.field.id".lang, form.id, "project-settings-id", "$LANG.field.id.hint".lang) { form.id = it }
+            Field("$LANG.field.name".lang, form.name, "project-settings-name", form.id) { form.name = it }
+            Field("$LANG.field.version".lang, form.version, "project-settings-version") { form.version = it }
+            EnvironmentField(form)
+            Field("$LANG.field.description".lang, form.description, "project-settings-description") {
+                form.description = it
+            }
+            Field("$LANG.field.authors".lang, form.authors, "project-settings-authors", "$LANG.field.authors.hint".lang) {
+                form.authors = it
+            }
+            Field("$LANG.field.license".lang, form.license, "project-settings-license", "All Rights Reserved") {
+                form.license = it
+            }
+            Field("$LANG.field.icon".lang, form.icon, "project-settings-icon", "$LANG.field.icon.hint".lang) { form.icon = it }
+            if (form.dependencyChoices.isNotEmpty()) {
+                Text("$LANG.field.dependencies".lang, tags = listOf("project-dialog-label"))
+                CheckboxList("project-settings-dependencies") {
+                    form.dependencyChoices.forEach { addon ->
+                        CheckboxRow("project-dependency-$addon", addon, addon in form.dependencies) {
+                            form.toggleDependency(addon, it)
+                        }
                     }
                 }
             }
+            ModDependenciesField(form)
         }
         Errors(form.errors)
         Actions {
@@ -155,6 +156,63 @@ private fun EnvironmentField(form: ProjectSettingsForm) {
 }
 
 private fun HollowAddonEnvironment.label(): String = "$LANG.environment.${name.lowercase()}".lang
+
+@Composable
+private fun ModDependenciesField(form: ProjectSettingsForm) {
+    Column(tags = listOf("project-dialog-field"), modifier = Modifier.size(100.percent, UiLength.Fit)) {
+        Text("$LANG.field.mods".lang, tags = listOf("project-dialog-label"))
+        Paragraph("$LANG.field.mods.hint".lang, "project-dialog-hint")
+        TextField(
+            value = form.modFilter,
+            onChange = { form.modFilter = it },
+            placeholder = "$LANG.field.mods.filter".lang,
+            id = "project-settings-mod-filter",
+            tags = listOf("project-dialog-input"),
+            modifier = Modifier.size(100.percent, 22.px),
+        )
+        CheckboxList("project-settings-mods") {
+            val mods = form.visibleModChoices
+            if (mods.isEmpty()) Paragraph("$LANG.field.mods.none".lang, "project-dialog-hint")
+            mods.forEach { mod ->
+                val label = when {
+                    !form.isInstalled(mod) -> "$LANG.field.mods.missing".lang(mod.id)
+                    mod.name == mod.id -> mod.id
+                    else -> "${mod.name} (${mod.id})"
+                }
+                CheckboxRow("project-mod-${mod.id}", label, mod.id in form.modDependencies) {
+                    form.toggleModDependency(mod.id, it)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckboxList(id: String, content: HollowUiContent) {
+    Column(
+        id = id,
+        tags = listOf("project-dialog-dependencies"),
+        modifier = Modifier.size(100.percent, UiLength.Fit)
+            .maxSize(height = CheckboxListHeight.px)
+            .scrollable(horizontal = false, hasHorizontalScrollbar = false),
+        content = content,
+    )
+}
+
+@Composable
+private fun CheckboxRow(id: String, label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        tags = listOf("project-dialog-checkbox-row"),
+        modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange, id = id)
+        Text(label)
+    }
+}
+
+private const val DialogChromeHeight = 140f
+private const val MinScrollHeight = 120f
+private const val CheckboxListHeight = 96f
 
 @Composable
 private fun ExportDialog(packaging: HollowIdeProjectPackaging, form: ProjectExportForm) {

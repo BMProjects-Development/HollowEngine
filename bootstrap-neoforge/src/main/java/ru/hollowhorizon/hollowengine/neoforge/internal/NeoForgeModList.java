@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
+import java.util.List;
 import java.util.Objects;
 
 public class NeoForgeModList implements ModList {
@@ -25,6 +26,13 @@ public class NeoForgeModList implements ModList {
     @Override
     public File getFile(String modId) {
         return getModFile(modId);
+    }
+
+    @Override
+    public List<ModInfo> getMods() {
+        return net.neoforged.fml.ModList.get().getMods().stream()
+                .map(mod -> new ModInfo(mod.getModId(), mod.getDisplayName(), mod.getVersion().toString()))
+                .toList();
     }
 
     private File getModFile(String modId) {

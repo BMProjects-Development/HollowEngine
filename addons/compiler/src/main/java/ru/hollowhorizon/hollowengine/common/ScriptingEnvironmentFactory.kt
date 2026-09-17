@@ -38,22 +38,41 @@ import kotlin.script.experimental.jvm.JvmGetScriptingClass
 import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 
 class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, HollowAddonEntrypoint {
+    @Volatile
+    private var loaded: LoadedAddon? = null
+
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
-        val (mappings, classpath) = CommonEnvironment.setup(context.addonFile)
-        val environment = initialize(
-            javaHome = File(System.getProperty("java.home")),
-            classpath = classpath,
-            hostClasspath = classpath + context.addonFile,
-            scriptTypes = DefaultScriptDefinitions.providers(),
-            mappings = mappings,
-        )
+        loaded = LoadedAddon(context.addonFile, scope)
+        setUp(context.addonFile, scope)
         context.hostServices.publish<ScriptingEnvironmentInitializer>(this)
-        environment.warmUpAnalysis(scope)
     }
 
     override suspend fun unload(context: HollowAddonContext) {
+        loaded = null
         ScriptingEnvironment.clear()
     }
+
+    @Synchronized
+    override fun rebuild() {
+        val addon = loaded ?: return
+        // The old environment keeps the remapped jars open, and setting up writes them again.
+        ScriptingEnvironment.clear()
+        setUp(addon.file, addon.scope)
+    }
+
+    private fun setUp(addonFile: File, scope: CoroutineScope) {
+        val (mappings, classpath) = CommonEnvironment.setup(addonFile)
+        val environment = initialize(
+            javaHome = File(System.getProperty("java.home")),
+            classpath = classpath,
+            hostClasspath = classpath + addonFile,
+            scriptTypes = DefaultScriptDefinitions.providers(),
+            mappings = mappings,
+        )
+        environment.warmUpAnalysis(scope)
+    }
+
+    private class LoadedAddon(val file: File, val scope: CoroutineScope)
 
     override fun initialize(
         javaHome: File,

@@ -16,11 +16,13 @@ def toUpperSnakeCase = { String value ->
             .toUpperCase(Locale.ROOT)
     result.toCharArray()[0].isDigit() ? "NUM_${result}" : result
 }
+def isResourceName = { String name -> name ==~ /[a-z0-9._-]+/ }
+
 def writeAssetNodes
 writeAssetNodes = { File directory, StringBuilder builder, String indent, String namespace, String relativePath ->
     def entries = directory.listFiles() ?: [] as File[]
 
-    entries.findAll { it.isDirectory() }
+    entries.findAll { it.isDirectory() && isResourceName(it.name) }
             .sort { it.name }
             .each { child ->
                 builder.append("${indent}    object ${toPascalCase(child.name)} {\n")
@@ -28,7 +30,7 @@ writeAssetNodes = { File directory, StringBuilder builder, String indent, String
                 builder.append("${indent}    }\n")
             }
 
-    entries.findAll { it.isFile() && !it.name.endsWith(".mcmeta") && !it.name.startsWith(".") }
+    entries.findAll { it.isFile() && isResourceName(it.name) && !it.name.endsWith(".mcmeta") && !it.name.startsWith(".") }
             .groupBy { it.name.substring(0, it.name.lastIndexOf('.')) }
             .toSorted()
             .each { baseName, files ->

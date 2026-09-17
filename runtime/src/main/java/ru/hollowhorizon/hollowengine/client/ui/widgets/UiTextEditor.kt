@@ -93,6 +93,8 @@ data class UiTextCompletion(
 
 fun interface UiCompletionContributor {
     fun complete(context: UiCompletionContext): List<UiTextCompletion>
+
+    val triggerCharacters: String get() = ""
 }
 
 data class UiTextSignature(
