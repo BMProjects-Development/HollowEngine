@@ -1,0 +1,202 @@
+---
+title: Getting Started with HollowEngine
+order: 1
+---
+
+<center><h1>Getting Started with HollowEngine</h1></center>
+
+**Learn how to create your first scripts in HollowEngine.**
+
+## Installation and launch
+
+First, install the mod and its compiler. The latest version is always available on [GitHub](https://github.com/BMProjects-Development/HollowEngine/releases). Download both `.jar` files and place them in your `mods` folder.
+The compiler addon is only required during development. Once you export your project as a standalone mod, it will run without the compiler as long as HollowEngine itself is installed.
+
+After installing the mod and launching the game, look for the gear icon in the upper-left corner of the screen. Click it to open the mod's main panel, which contains several tabs:
+
+- File: Useful actions such as opening the mod folder and reloading client and server resources.
+- Windows: The engine's main tools, including project files, cutscenes, editors, and more.
+- Tools: Additional utilities; currently, this section contains model transformation controls.
+- Help: Useful information such as links to the project community and documentation.
+
+![HollowEngine IDE workspace](/hollowengine/pictures/ide/workspace.webp)
+
+For more information about the editor, see [Working with the IDE](/docs/hollowengine/ide). If you need to add custom resources such as models, textures, or sounds, read the [Assets](/docs/hollowengine/assets) section, which explains project files and how to reference them.
+
+## Checking whether the compiler works
+
+Once you enter a world, you can check whether the compiler is working. Open the Terminal panel and enable Kotlin script mode.
+You can now use code to send a message to yourself in chat:
+
+![First script](/hollowengine/pictures/guide/first-script.webp)
+
+After compilation, your message should appear in the chat:
+
+![First script result](/hollowengine/pictures/guide/first-script-result.webp)
+
+If you encounter a problem, contact us on [Telegram](https://t.me/hollowengine_community) and attach your logs (the `logs/latest.log` file) or a screenshot of the error.
+
+## Creating and configuring your first NPC
+
+The easiest way to create an NPC is to use the **__Developer Tool__**, which you can find on the mod's Creative Mode tab.
+Right-click with the tool to create an NPC. You can then right-click the NPC to edit it. You can also Shift-right-click the air to configure yourself in the same way 👀
+
+![First NPC](/hollowengine/pictures/guide/first-npc.webp)
+
+The editor lets you configure the NPC's name, properties, attributes, model, scripts, and much more.
+
+## Creating a script and attaching it to an NPC
+
+Let's create a simple script that makes an NPC attack a player whenever they get too close.
+
+First, create a [node script](/docs/hollowengine/scripting/node):
+
+![Node script](/hollowengine/pictures/guide/node-script.webp)
+
+By default, a node like this is attached to the server and starts with it after being attached through a command. We need the node to have access to an NPC and be attached to that NPC instead.
+To do this, add an annotation at the beginning of the file:
+
+![NPC node](/hollowengine/pictures/guide/npc-node.webp)
+
+Now write the script itself:
+
+```kotlin
+// Declare that this script is attached to an NPC
+@file:Attach(NpcEntity::class)
+
+// Get a reference to our NPC
+val npc = this@NpcEntity
+
+// Add editor properties and their default values
+val radius by editor.property("Attack radius") { 10 }
+val goBack by editor.property("Return to the starting point?") { true }
+
+// Create a point to return to
+var startPos = Vec3.ZERO
+
+// Store the NPC's current position when the node is attached or the NPC is loaded in a chunk
+onStart {
+    startPos = npc.position()
+}
+
+// Run this action every 20 ticks (1 second)
+onUpdate(every = 20.ticks) {
+    // Get the players in the NPC's current level
+    val player = level().players()
+        // Exclude players who can instantly break and place blocks, which normally means Creative Mode
+        .filter { !it.abilities.instabuild }
+        // Find the closest player, or return from this update if there are no players
+        .minByOrNull { it.distanceTo(npc) } ?: return@onUpdate
+
+    // If the player is within the configured attack radius
+    if (npc.distanceTo(player) < radius) {
+        npc.setTarget(player) // Set the player as the attack target
+    } else {
+        npc.setTarget(null) // Clear the attack target
+
+        // Return to the starting point if the script is configured to do so
+        if (goBack) {
+            // Tell the NPC to move back to the starting point
+            npc.navigation.moveTo(startPos.x, startPos.y, startPos.z, 1.0)
+        } else {
+            // Otherwise, stay at the current position
+            npc.navigation.stop()
+        }
+    }
+}
+```
+
+You can now attach the script to the NPC you created. Open the Scripts section in the NPC editor and find the script there:
+
+![Attaching the script](/hollowengine/pictures/guide/attach-script.webp)
+
+Attaching the script may take 3–5 seconds because it must first be compiled. Once it is attached, you can configure it directly in the editor 🤯
+
+![Attached script](/hollowengine/pictures/guide/attached-script.webp)
+
+:::warning
+If you did this in Survival Mode, the NPC will attack you immediately 🙃
+:::
+
+## Creating a dialogue interaction
+
+Let's look at another example. We will create a second script that lets us attach a dialogue to the NPC.
+
+```kotlin
+// Declare that this script is attached to an NPC
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+// Set the name and description shown in the editor
+editor.name("Dialogue interaction")
+editor.description("Right-click the NPC to start a dialogue.")
+
+// Add a few more editor properties.
+// `assets=["story"]` lets the editor select any `.story` script.
+// `restart=true` restarts the script when this value changes. Without it, this property would update,
+// but the `dialogue` variable below would not.
+val story by editor.property<String>("Story file", assets = ["story"], restart = true) {
+    "scripts/examples/npc_dialogue.story"
+}
+val speaker by editor.property<String>("NPC name in the story", restart = true) { "Guide" }
+val fromTheStart by editor.property<Boolean>("Always start from the beginning?") { true }
+
+val npc = this@NpcEntity
+// This dialogue controller is shared by all players. Use a HashMap if each player needs a separate controller.
+// The path selected in the editor starts with `scripts`, while DialogueController expects a path relative
+// to that folder, so remove the redundant prefix.
+val dialogue = DialogueController(story.removePrefix("scripts/"))
+
+onInteract { event ->
+    // Get the server-side player
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    // Reset the dialogue when it should always start over, for example if the player died during it
+    if (fromTheStart) dialogue.reset()
+    dialogue.start(player) {
+        // Add our NPC as a character. Its default name is Guide.
+        character(speaker, DialogueCharacter.of(npc))
+        // Add a variable that can be used in the story, such as the player's name
+        put("name", player.name.string)
+    }
+}
+
+// Save the current dialogue progress to the NPC's entity data
+onSave { context -> dialogue.save("dialogue", context.tag) }
+onLoad { context -> dialogue.load("dialogue", context.tag) }
+```
+
+Now create the dialogue itself:
+
+```story
+// Example dialogue for scripts/examples/npc_dialogue.node.kts.
+
+# Start
+
+Guide: Hello, {name}! I am an NPC controlled by a script through a dialogue.
+Guide: Would you like to know how I work?
+
+@choice "Yes, tell me"
+    Guide: My script, npc_dialogue.node.kts, listens for <b>onInteract</b> and starts this story.
+    Guide: Everything I say is stored in <wave>npc_dialogue.story</wave>, next to the script itself.
+@choice "Maybe later"
+    Guide: Then get out of here.
+```
+
+Your project should now look something like this:
+
+![Project structure](/hollowengine/pictures/guide/file-structure.webp)
+
+Attach the new script in the same way:
+
+![Attaching the script](/hollowengine/pictures/guide/attach-script-2.webp)
+
+It now has its own editor properties as well:
+
+![Attached script](/hollowengine/pictures/guide/attached-script-2.webp)
+
+Click the folder icon to select the dialogue file:
+
+![Selecting a dialogue](/hollowengine/pictures/guide/story-file-picker.webp)
+
+Congratulations! You now know how to write basic NPC scripts. You can continue exploring the other documentation sections or [suggest](https://t.me/hollowengine_community) a topic for the next tutorial.
