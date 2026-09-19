@@ -1,0 +1,230 @@
+---
+title: Mixin Scripts
+order: 1
+---
+
+<center><h1>Mixin Scripts</h1></center>
+
+*Change Minecraft methods without building a separate mod or restarting after every logic edit.*
+
+A mixin script is a Kotlin file with the `.mixin.kts` suffix. It declares places where HollowEngine inserts code before game classes load, then binds those places to regular Kotlin handlers.
+
+Use a mixin script when an event is not enough: to run code in the middle of a particular method, replace a call, change a returned value, or wrap a whole method. This depends on Minecraft internals and other mods, so prefer regular [events](/docs/hollowengine/scripting/events) whenever they solve the problem.
+
+## Your first mixin
+
+Create a file ending in `.mixin.kts` under `hollowengine/scripts`, for example `jump.mixin.kts`:
+
+```kotlin
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.player.Player
+
+mixin<Player> {
+    method("jumpFromGround") {
+        after {
+            if (!self.level().isClientSide) {
+                self.displayClientMessage(Component.literal("The player jumped"), true)
+            }
+        }
+    }
+}
+```
+
+`mixin<Player>` selects the class, `method("jumpFromGround")` selects a method declared by that class, and `after` runs the body before every exit from the method. Inside the body, `self` has the `Player` type.
+
+Compiling a new or edited mixin script requires an up-to-date Kotlin compiler addon. An exported addon can carry precompiled scripts, so end users do not need the compiler in that case.
+
+:::warning
+A mixin can only target a method declared by the target class itself. If the method is inherited, use the class that actually declares it in `mixin<...>`.
+:::
+
+## Applying changes
+
+A mixin script keeps the injection **declaration** separate from the handler **body**:
+
+| Changed part                                                                    | Applied                                                                                |
+|---------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| target class or method, operation kind, `at`, or `ordinal`                      | after restarting the game                                                              |
+| code inside `before { ... }`, `after { ... }`, `code { ... }`, and other bodies | immediately after running the script again                                             |
+| a new declaration                                                               | after restarting the game                                                              |
+| a removed declaration                                                           | its body is disabled on the next run; the generated injection disappears after restart |
+
+To replace the bodies of mixins already applied, run:
+
+```text
+/hollowengine scripting run scripts/examples/mixins/jump.mixin.kts
+```
+
+The command reports how many bodies were swapped and how many new or changed declarations are waiting for a restart. It runs the whole script again, so values captured by its handlers from the top level are refreshed too.
+
+Declarations are read by the compiler and must consist of constants. For example, this is not valid:
+
+```kotlin
+val targetMethod = "jumpFromGround"
+
+mixin<Player> {
+    method(targetMethod) { // Error: the name must be a string constant
+        after { }
+    }
+}
+```
+
+Handler bodies can contain ordinary dynamic Kotlin code.
+
+## Method operations
+
+Inside `method("name")`, operations are named after what they do:
+
+| Operation                                          | Effect                                                                      |
+|----------------------------------------------------|-----------------------------------------------------------------------------|
+| `before { }`                                       | runs the body at the start of the method                                    |
+| `after { }`                                        | runs before every `return`; a non-void result is available through `result` |
+| `beforeCall<T>("name") { }`                        | runs before the specified call                                              |
+| `afterCall<T>("name") { }`                         | runs after the specified call                                               |
+| `replaceCall<T>("name") { instance, args -> ... }` | replaces a call; `proceed()` makes the original call                        |
+| `modifyCall<T, R>("name") { original -> ... }`     | replaces the value returned by a call                                       |
+| `returns<R> { original -> ... }`                   | replaces the result of the target method                                    |
+| `wrap { ... }`                                     | wraps the whole method; `proceed()` runs the original                       |
+
+The `T` type on a call operation names the owner of the called method, while `R` is the type of the value being changed:
+
+```kotlin
+mixin<Player> {
+    method("jumpFromGround") {
+        replaceCall<Player>("causeFoodExhaustion") { _, _ ->
+            // Do not call proceed(), so jumping consumes no hunger.
+            null
+        }
+    }
+}
+```
+
+When the same call occurs more than once, `ordinal` selects one occurrence starting from zero. Without an `ordinal`, the handler applies to every matching call:
+
+```kotlin
+beforeCall<Player>("awardStat", ordinal = 1) {
+    // Only the second awardStat call.
+}
+```
+
+## Handler context
+
+Handlers receive a context appropriate for the operation:
+
+- `self` is the object on which the target method runs. A static method has no instance.
+- `args[index]` contains target method or wrapped call arguments. In `replaceCall` and `wrap`, assign through `args[index] = value` before `proceed()` to replace one; `inject` handlers can only read them.
+- `cancel()` in `before`, `after`, `beforeCall`, `afterCall`, and `inject` immediately exits a method that returns nothing.
+- `result` in the same handlers sets the method result and exits immediately. Reading it is meaningful at `RETURN` and `TAIL` points.
+- `proceed()` in `replaceCall` and `wrap` runs the original call or method with the current arguments.
+- `proceed(receiver, vararg arguments)` and `proceed(vararg arguments)` run the original with different values.
+
+Value-changing handlers receive the original value as a separate parameter:
+
+```kotlin
+mixin<LivingEntity> {
+    modifyReturnValue<Float>("getJumpPower()F") {
+        code { original ->
+            if (self is Player) original * 1.5f else original
+        }
+    }
+}
+```
+
+## Exact method names
+
+When a class has only one method of a given name, `"jumpFromGround"` is enough. For an overloaded method, add its JVM descriptor:
+
+```kotlin
+method("hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z") {
+    before { }
+}
+
+modifyReturnValue<Float>("getJumpPower()F") {
+    code { original -> original * 1.5f }
+}
+```
+
+The compiler checks that the class and method exist, that a call or field actually occurs in its bytecode, that `ordinal` is in range, and that a changed value has the right type. An ambiguous method name produces an error with suitable descriptors.
+
+## Explicit injection points
+
+For more control, operations corresponding directly to Mixin and MixinExtras are available:
+
+| Declaration                                                              | Purpose                                                 |
+|--------------------------------------------------------------------------|---------------------------------------------------------|
+| `inject(method) { at(...); code { } }`                                   | `@Inject` at the selected point                         |
+| `modifyReturnValue<R>(method) { code { original -> ... } }`              | `@ModifyReturnValue` on the method result               |
+| `modifyExpressionValue<R>(method) { at(...); code { original -> ... } }` | `@ModifyExpressionValue` on a call result or field read |
+| `wrapOperation(method) { at(...); code { instance, args -> ... } }`      | `@WrapOperation` around a call                          |
+| `wrapMethod(method) { code { ... } }`                                    | `@WrapMethod` around the whole method                   |
+
+The simple points are `HEAD`, `RETURN`, and `TAIL`. Use `call` and `field` for calls and field reads:
+
+```kotlin
+inject("jumpFromGround") {
+    at(call<Player>("awardStat", shift = Shift.AFTER))
+    code {
+        // Runs immediately after awardStat.
+    }
+}
+```
+
+`call` and `field` accept `ordinal` as well. Spell a field read as `field<Owner>("name")`. If the called method is overloaded, add its descriptor just as for the target method.
+
+:::advice
+Prefer `method { before/after/... }` for everyday cases: it is shorter and states the intent directly. Explicit operations are useful when you need a particular point or a direct counterpart to a familiar Mixin annotation.
+:::
+
+## Client and server
+
+By default, a mixin script applies in every game installation that contains it: on the physical client and on a dedicated server. Add this at the very top when changing a client-only class:
+
+```kotlin
+@file:ClientSide
+```
+
+Such a script is neither compiled nor applied on a dedicated server. A common mixin script that controls shared gameplay must be installed for both players and the server.
+
+## Imports and shared code
+
+Mixin scripts support the regular [`@file:Import`](/docs/hollowengine/scripting/imports). This is useful for state and functions used by handlers. A complete example lives under `hollowengine/scripts/examples/mixins/`: `jump.mixin.kts` imports the shared `jump_stats.kts` and demonstrates several mechanisms at once.
+
+```kotlin
+@file:Import("jump_stats.kts")
+
+import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.Player
+import ru.hollowhorizon.hollowengine.HollowEngine
+
+mixin<Player> {
+    method("jumpFromGround") {
+        after {
+            if (!self.level().isClientSide) {
+                val count = countJump(self)
+                self.displayClientMessage(Component.literal("Jump #$count"), true)
+            }
+        }
+
+        beforeCall<Player>("awardStat") {
+            if (!self.level().isClientSide) {
+                HollowEngine.LOGGER.info("{} is about to get the jump stat", self.name.string)
+            }
+        }
+
+        replaceCall<Player>("causeFoodExhaustion") { _, _ -> null }
+    }
+}
+
+mixin<LivingEntity> {
+    modifyReturnValue<Float>("getJumpPower()F") {
+        code { original -> if (self is Player) original * jumpBoost else original }
+    }
+}
+```
+
+The neighboring `jump_stats.kts` has `@file:SharedScript` and stores the jump count and `jumpBoost`. Editing `jumpBoost` and running `jump.mixin.kts` again swaps the bodies of already applied mixins without restarting the game.
+
+:::warning
+Mixin scripts are sensitive to Minecraft versions and changes made by other mods. Check diagnostics after an update: a method name, descriptor, or the calls inside it may have changed.
+:::

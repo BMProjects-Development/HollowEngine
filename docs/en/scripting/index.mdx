@@ -17,6 +17,7 @@ All HollowEngine scripts are written in Kotlin in `.kts` files. They must be cre
 - [Simple](/docs/hollowengine/scripting/simple) (`.kts`) - used for one-time execution or for importing your functions, variables, and so on.
 - [Reloadable](/docs/hollowengine/scripting/reload) (`.reload.kts`) - used to handle in-game events. By default it runs on the server and restarts when a world opens and on `/reload`. With the `@file:ClientSide` annotation it runs on the client and restarts on `F3 + T`.
 - [Startup](/docs/hollowengine/scripting/startup) (`.startup.kts`) - runs once while the game starts. This is where items, blocks, creative tabs, and everything else Minecraft only accepts during loading are registered.
+- [Mixin](/docs/hollowengine/scripting/mixins) (`.mixin.kts`) - injects handlers into Minecraft methods. New or changed injection points apply after restarting the game, while the bodies of already applied handlers can be swapped live.
 - [Node](/docs/hollowengine/scripting/node) (`.node.kts`) - registers handlers on a coroutine scope and can be attached to/detached from the server or, with `@file:Attach`, from an entity. It can run actions at specific intervals, store custom data, react to entity events, and switch between configurable states.
 - [UI Scripts](/docs/hollowengine/scripting/ui) (`.ui.kts`) - client-side declarations of Compose-style screens and HUD overlays. They are recompiled on resource reload; server-capable scripts open the declared ids and drive their state through `UiSession`.
 - [Story](/docs/hollowengine/dialogues) (`.story`) - branching dialogue scenarios with their own compact syntax, variables, choices, control flow, and commands for NPCs and screen effects. Kotlin scripts create and start their dialogue sessions.
@@ -29,10 +30,11 @@ The script kinds differ in their base class, available API, execution side, and 
 | `.reload.kts`                         | server                   | when a world opens and on `/reload`                  |
 | `.reload.kts` with `@file:ClientSide` | client                   | at game start, on `F3 + T`, and on resource pack changes |
 | `.startup.kts`                        | client and server        | once, while the game starts                          |
+| `.mixin.kts`                          | client and server        | declarations at startup, bodies with the `run` command |
 | `.node.kts`                           | server                   | by a command or from another script                  |
 | `.ui.kts`                             | client                   | on client resource reload                            |
 
-UI scripts require the Kotlin scripting compiler addon on the client. All scripts except startup ones can be recompiled and updated without rejoining the game or world.
+Compiling new and edited Kotlin scripts requires the Kotlin scripting compiler addon; an exported project can carry precompiled scripts instead. All scripts except startup ones can be recompiled without rejoining the game or world, but new or changed mixin declarations only apply after restarting the game.
 
 :::advice
 The easiest way to create a script of any type is right in the IDE: right-click the `scripts` folder in the project tree → **New Script**. The file starts with a working example. See [Working with the IDE](/docs/hollowengine/ide).
