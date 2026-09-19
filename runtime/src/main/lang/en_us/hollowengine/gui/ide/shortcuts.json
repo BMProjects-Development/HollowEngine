@@ -1,0 +1,22 @@
+{
+  "title": "Keyboard Shortcuts",
+  "group.general": "General",
+  "group.editor": "Code editor",
+  "group.project": "Project panel",
+  "search": "Search across the project",
+  "close_tab": "Close the focused tab",
+  "save": "Save the focused file",
+  "reload_client": "Reload client resources",
+  "find": "Find in the file",
+  "replace": "Find and replace",
+  "next_match": "Next / previous match",
+  "definition": "Go to definition",
+  "format": "Reformat the file",
+  "zoom": "Change the font size",
+  "filter": "Filter files",
+  "clipboard": "Copy, cut, paste",
+  "rename": "Rename",
+  "delete": "Delete",
+  "new_file": "New file",
+  "new_folder": "New folder"
+}

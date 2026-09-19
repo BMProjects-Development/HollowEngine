@@ -2,5 +2,16 @@
   "color_moved": "Color moved; edit it directly",
   "fix.remove_import": "Remove import",
   "fix.remove_unused_imports": "Remove all unused imports (%s)",
-  "read_only": "%s is read-only"
+  "read_only": "%s is read-only",
+  "empty": "Open a file from the Project panel",
+  "status.inserted": "Inserted %s",
+  "status.copied": "Copied %s",
+  "status.no_formatter": "No formatter for %s",
+  "status.already_formatted": "%s is already formatted",
+  "status.changed_while_formatting": "%s changed while formatting",
+  "status.reformatted": "Reformatted %s",
+  "status.definition_not_found": "Definition not found",
+  "status.resource_not_found": "Cannot find '%s'",
+  "status.unsupported_action": "This action is not supported",
+  "status.unsupported_definition": "Cannot open the definition in %s"
 }

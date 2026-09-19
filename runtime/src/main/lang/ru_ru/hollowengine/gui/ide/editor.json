@@ -2,5 +2,16 @@
   "color_moved": "Цвет сместился, отредактируйте его вручную",
   "fix.remove_import": "Удалить импорт",
   "fix.remove_unused_imports": "Удалить все неиспользуемые импорты (%s)",
-  "read_only": "Файл «%s» доступен только для чтения"
+  "read_only": "Файл «%s» доступен только для чтения",
+  "empty": "Откройте файл в панели «Проект»",
+  "status.inserted": "Вставлено: %s",
+  "status.copied": "Скопировано: %s",
+  "status.no_formatter": "Для «%s» нет форматтера",
+  "status.already_formatted": "«%s» уже отформатирован",
+  "status.changed_while_formatting": "«%s» изменился во время форматирования",
+  "status.reformatted": "«%s» отформатирован",
+  "status.definition_not_found": "Определение не найдено",
+  "status.resource_not_found": "Не удалось найти «%s»",
+  "status.unsupported_action": "Это действие не поддерживается",
+  "status.unsupported_definition": "Не удалось открыть определение в %s"
 }

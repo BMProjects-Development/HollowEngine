@@ -1,0 +1,21 @@
+{
+  "title": "World",
+  "loading": "Asking the server…",
+  "error.operator_required": "Changing the world needs operator permissions",
+  "time": "Time",
+  "time.morning": "Morning",
+  "time.noon": "Noon",
+  "time.evening": "Evening",
+  "time.night": "Night",
+  "time.midnight": "Midnight",
+  "daylight_cycle": "Day and night cycle",
+  "weather": "Weather",
+  "weather.clear": "Clear",
+  "weather.rain": "Rain",
+  "weather.thunder": "Thunder",
+  "weather_cycle": "Weather changes",
+  "game_mode": "Game mode",
+  "difficulty": "Difficulty",
+  "difficulty.locked": "locked",
+  "rules": "Game rules"
+}

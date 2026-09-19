@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.asset
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientPacketListener
@@ -32,6 +33,9 @@ internal object AssetManagerLifecycle : ResourceManagerReloadListener {
     var serverRevision by mutableIntStateOf(0)
         private set
 
+    var operator by mutableStateOf(false)
+        private set
+
     override fun onResourceManagerReload(resourceManager: ResourceManager) {
         completedClientReloads.incrementAndGet()
     }
@@ -52,6 +56,7 @@ internal object AssetManagerLifecycle : ResourceManagerReloadListener {
             observedServerManager = serverManager
             observedConnection = connection
             observedOperator = operator
+            this.operator = operator
             serverRevision++
         }
         initialized = true

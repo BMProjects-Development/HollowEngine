@@ -1,0 +1,21 @@
+{
+  "title": "Мир",
+  "loading": "Запрос к серверу…",
+  "error.operator_required": "Для изменения мира нужны права оператора",
+  "time": "Время",
+  "time.morning": "Утро",
+  "time.noon": "Полдень",
+  "time.evening": "Вечер",
+  "time.night": "Ночь",
+  "time.midnight": "Полночь",
+  "daylight_cycle": "Смена дня и ночи",
+  "weather": "Погода",
+  "weather.clear": "Ясно",
+  "weather.rain": "Дождь",
+  "weather.thunder": "Гроза",
+  "weather_cycle": "Смена погоды",
+  "game_mode": "Режим игры",
+  "difficulty": "Сложность",
+  "difficulty.locked": "заблокирована",
+  "rules": "Игровые правила"
+}

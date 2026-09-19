@@ -73,10 +73,12 @@ object TransformGizmoEditor {
     private var contextMenuState by mutableStateOf<ContextMenuState?>(null)
 
     private var enabledValue by mutableStateOf(false)
-    private var modeValue by mutableStateOf(GizmoEditMode.TRANSLATE)
+    private var modesValue by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
 
     val isEnabled: Boolean get() = enabledValue
-    val mode: GizmoEditMode get() = modeValue
+
+    /** The manipulators drawn together; never empty, the last one stays remembered while the gizmo is off. */
+    val modes: Set<GizmoEditMode> get() = modesValue
 
     private val overlay: HollowUiWorldOverlay by lazy {
         HollowUiWorldOverlay(
@@ -92,25 +94,55 @@ object TransformGizmoEditor {
     fun toggleEnabled() = setEnabled(!isEnabled)
 
     fun setEnabled(enabled: Boolean) {
+        ensureInitialized()
         if (enabledValue == enabled) return
         enabledValue = enabled
         HollowEngineConfig.gizmoEnabled = enabled
         if (!enabled) cancelInteraction()
     }
 
-    fun setMode(mode: GizmoEditMode) {
-        if (modeValue == mode) return
-        modeValue = mode
-        HollowEngineConfig.gizmoMode = mode
-        cancelInteraction()
+    fun isModeShown(mode: GizmoEditMode): Boolean = enabledValue && mode in modesValue
+
+    /**
+     * Shows or hides one manipulator. Turning one on also turns the gizmo on; turning off the last
+     * one turns the gizmo off instead of leaving an empty gizmo, and keeps that mode for next time.
+     */
+    fun setModeShown(mode: GizmoEditMode, shown: Boolean) {
+        ensureInitialized()
+        when {
+            shown && !enabledValue -> {
+                setModes(setOf(mode))
+                setEnabled(true)
+            }
+
+            shown -> setModes(modesValue + mode)
+            !enabledValue || mode !in modesValue -> Unit
+            modesValue.size == 1 -> setEnabled(false)
+            else -> setModes(modesValue - mode)
+        }
     }
 
+    fun toggleMode(mode: GizmoEditMode) = setModeShown(mode, !isModeShown(mode))
+
+    private fun setModes(modes: Set<GizmoEditMode>) {
+        if (modes.isEmpty() || modesValue == modes) return
+        modesValue = modes
+        HollowEngineConfig.gizmoModes = GizmoEditMode.entries.filter(modes::contains).joinToString(",") { it.name }
+        currentDrag = null
+        draggingKey = null
+        draggingHandleId = null
+        hoveredHandleId = null
+        labelState = null
+    }
 
     private fun ensureInitialized() {
         if (isInitialized) return
         isInitialized = true
         enabledValue = HollowEngineConfig.gizmoEnabled
-        modeValue = HollowEngineConfig.gizmoMode
+        modesValue = HollowEngineConfig.gizmoModes.split(',')
+            .mapNotNull { name -> GizmoEditMode.entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } }
+            .toSet()
+            .ifEmpty { setOf(GizmoEditMode.TRANSLATE) }
     }
 
     @SubscribeEvent
@@ -299,7 +331,7 @@ object TransformGizmoEditor {
     private fun activeEntryHandleAt(x: Float, y: Float): GizmoHandle? {
         val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return null
         val working = entry.working ?: return null
-        val handles = GizmoGeometry.buildHandles(working.translation, working.rotation, mode)
+        val handles = GizmoGeometry.buildHandles(working.translation, working.rotation, modes)
         return GizmoPicker.pick(handles, x, y)
     }
 
@@ -398,7 +430,7 @@ object TransformGizmoEditor {
         val working = active.working ?: return
 
         val drag = currentDrag
-        if (mode == GizmoEditMode.ROTATE && drag != null && draggingKey == active.entryId) {
+        if (drag != null && drag.handleId.isRotation() && draggingKey == active.entryId) {
             drag.axis?.let { axis ->
                 val perPixel = WorldToScreenProjector.worldPerPixel(drag.origin)
                 GizmoGeometry.buildRotationSector(drag.origin, axis, drag.startAngle, drag.angle, perPixel)
@@ -409,21 +441,37 @@ object TransformGizmoEditor {
             }
         }
 
-        val handles = GizmoGeometry.buildHandles(working.translation, working.rotation, mode, cullRings = false)
+        val handles = GizmoGeometry.buildHandles(working.translation, working.rotation, modes)
             .sortedByDescending { it.depth }
         for (handle in handles) {
             val highlighted =
                 handle.id == draggingHandleId || (draggingHandleId == null && handle.id == hoveredHandleId)
-            val color = if (highlighted) GizmoColors.highlighted(handle.color) else handle.color
+            val base = if (highlighted) GizmoColors.highlighted(handle.color) else handle.color
+            val emphasis = if (highlighted) 1f else handle.emphasis
             handle.fillPolygon?.let { fill ->
-                val alpha = if (handle.id.isSolidHandle()) 0.72f else 0.22f
-                fillPolygon(scope, fill, UiColor(color.red, color.green, color.blue, alpha))
+                val alpha = (if (handle.id.isSolidHandle()) 0.72f else 0.22f) * emphasis
+                fillPolygon(scope, fill, base.withAlpha(alpha))
             }
-            for (stroke in handle.renderLines) strokeLine(scope, stroke.points, color, handle.width, stroke.closed)
+            for (stroke in handle.renderLines) {
+                val strokeEmphasis = if (highlighted) 1f else emphasis * stroke.emphasis
+                strokeLine(
+                    scope,
+                    stroke.points,
+                    base.withAlpha(base.alpha * strokeEmphasis),
+                    handle.width * (0.55f + 0.45f * strokeEmphasis),
+                    stroke.closed,
+                )
+            }
         }
     }
 
+    private fun UiColor.withAlpha(alpha: Float) = UiColor(red, green, blue, alpha)
+
+    private fun GizmoHandleId.isRotation(): Boolean =
+        this == GizmoHandleId.ROTATE_X || this == GizmoHandleId.ROTATE_Y || this == GizmoHandleId.ROTATE_Z
+
     private fun GizmoHandleId.isSolidHandle(): Boolean = when (this) {
+        GizmoHandleId.AXIS_X, GizmoHandleId.AXIS_Y, GizmoHandleId.AXIS_Z,
         GizmoHandleId.SCALE_X, GizmoHandleId.SCALE_Y, GizmoHandleId.SCALE_Z, GizmoHandleId.SCALE_UNIFORM -> true
         else -> false
     }

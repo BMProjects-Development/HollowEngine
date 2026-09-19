@@ -30,7 +30,7 @@ import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.textWrap
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
-private val CenteredOnViewport = UiPopupAlignment(
+internal val CenteredOnViewport = UiPopupAlignment(
     anchorHorizontal = UiAlign.CENTER,
     anchorVertical = UiAlign.CENTER,
     popupHorizontal = UiAlign.CENTER,

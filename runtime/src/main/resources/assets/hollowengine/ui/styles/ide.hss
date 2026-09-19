@@ -26,6 +26,45 @@
     scale: 1.2;
 }
 
+.ide-toolbar-divider {
+    size: 1px 14px;
+    margin: 0px 6px;
+    background: #3a3f4b;
+}
+
+.ide-toolbar-group {
+    padding: 1px;
+    gap: 1px;
+    background: #1E2127;
+    border-radius: 4px;
+}
+
+.ide-toolbar-button {
+    size: 22px 22px;
+    border-radius: 3px;
+    background: #00000000;
+    transition: background 110ms ease-out;
+}
+
+.ide-toolbar-button:hover {
+    background: #414653;
+}
+
+.ide-toolbar-button.active {
+    background: rgba(67, 106, 154, 0.62);
+}
+
+.ide-toolbar-button-icon {
+    size: 13px 13px;
+    tint: #aeb8ca;
+    transition: all 110ms ease-out;
+}
+
+.ide-toolbar-button:hover .ide-toolbar-button-icon,
+.ide-toolbar-button.active .ide-toolbar-button-icon {
+    tint: #ffffff;
+}
+
 .ide-panel, .ide-empty-editor, .ide-editor-shell {
     size: fill fill;
     margin: 2px;
@@ -68,6 +107,63 @@
 
 .ide-status {
     height: 16px;
+    margin-right: 6px;
+    max-width: 360px;
+    wrap: false;
+    text-overflow: dots;
+    font-size: 10px;
+    foreground: #8f9bad;
+}
+
+.ide-empty-editor .ide-status {
+    font-size: 11px;
+}
+
+.ide-shortcuts-dialog {
+    padding: 12px;
+}
+
+.ide-shortcuts-content {
+    gap: 3px;
+    padding: 0px 8px 0px 0px;
+    scrollbar: 6px;
+    scrollbar-thumb: rgba(155, 169, 194, 0.42);
+    scrollbar-thumb-radius: 3px;
+}
+
+.ide-shortcuts-title {
+    margin-bottom: 4px;
+    font-size: 14px;
+    foreground: #F0F3F8;
+}
+
+.ide-shortcuts-group {
+    margin-top: 6px;
+    font-size: 10px;
+    foreground: #8f9bad;
+}
+
+.ide-shortcuts-row {
+    min-height: 20px;
+    padding: 0px 6px;
+    gap: 12px;
+    background: #2A2E36;
+    border-radius: 3px;
+}
+
+.ide-shortcuts-description {
+    width: 0px;
+    foreground: #d7deea;
+}
+
+.ide-shortcuts-keys {
+    wrap: false;
+    padding: 1px 5px;
+    font-size: 10px;
+    foreground: #F0F3F8;
+    background: #3A3F49;
+    border: 1px #4b5362;
+    border-radius: 3px;
 }
 
 .ui-profiler-panel {
@@ -452,7 +548,6 @@
 }
 
 .code-editor {
-    font-size: 12px;
     line-spacing: 2px;
     inlay-hints: true;
 }

@@ -21,9 +21,14 @@ private const val SidebarMaxWidth = 520f
 
 
 private fun editorStylesheet(): CompiledHss {
-    val sheets = listOf(Stylesheet, WidgetStylesheet).map(MinecraftHssResourceLoader::load)
+    val sheets = listOf(WidgetStylesheet, Stylesheet).map(MinecraftHssResourceLoader::load)
+    var offset = 0
     return CompiledHss(
-        rules = sheets.flatMap { it.rules },
+        rules = sheets.flatMap { sheet ->
+            val shifted = sheet.rules.map { it.copy(order = it.order + offset) }
+            offset += (sheet.rules.maxOfOrNull { it.order } ?: -1) + 1
+            shifted
+        },
         keyframes = buildMap { sheets.forEach { putAll(it.keyframes) } },
     )
 }

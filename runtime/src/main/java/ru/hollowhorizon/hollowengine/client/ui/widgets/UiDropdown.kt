@@ -27,6 +27,9 @@ data class UiDropdownItem(
     val mark: UiDropdownMark? = null,
     val slider: UiDropdownSlider? = null,
     val closeOnClick: Boolean = true,
+    val shortcut: String? = null,
+    val separatorBefore: Boolean = false,
+    val children: List<UiDropdownItem>? = null,
     val onClick: () -> Unit = {},
 )
 
@@ -44,6 +47,7 @@ fun UiDropdown(
     Row(
         id = id,
         tags = listOf("dropdown-button") + tags,
+        attributes = mapOf("expanded" to expanded.toString()),
         modifier = Modifier.input(hoverable = true, clickable = true)
             .cursor(UiCursorShape.HAND)
             .alignItems(vertical = UiAlign.CENTER)
@@ -59,41 +63,66 @@ fun UiDropdown(
     }
 
     if (!expanded) return
-    ContextMenu(id, anchorBounds, items, onExpandedChange)
+    ContextMenu(id, anchorBounds, items, onExpandedChange = onExpandedChange)
 }
+
+private val SubmenuAlignment = UiPopupAlignment(
+    anchorHorizontal = UiAlign.END,
+    anchorVertical = UiAlign.START,
+    offsetX = 6f,
+    offsetY = -4f,
+)
 
 @Composable
 fun ContextMenu(
     id: String,
     anchorBounds: UiRect,
     items: List<UiDropdownItem>,
+    alignment: UiPopupAlignment = UiPopupAlignment.BelowStart,
+    layer: Int = 0,
     onExpandedChange: (Boolean) -> Unit = {},
 ) {
     val anyLeading = items.any { it.icon != null || it.mark != null }
+    var openSubmenu by remember { mutableStateOf<Int?>(null) }
+    var anchors by remember { mutableStateOf(emptyMap<Int, UiRect>()) }
     Popup(
         anchorBounds = anchorBounds,
+        alignment = alignment,
+        layer = layer,
         id = "$id-popup",
         tags = listOf("dropdown-popup"),
         onDismiss = { onExpandedChange(false) },
     ) {
         items.forEachIndexed { index, item ->
+            if (item.separatorBefore && index > 0) Box(tags = listOf("dropdown-separator"))
             if (item.slider != null) {
-                DropdownSliderRow("$id-item-$index", item.label, item.slider)
+                DropdownSliderRow("$id-item-$index", item.label, item.slider) { openSubmenu = null }
                 return@forEachIndexed
             }
+            val children = item.children
             val itemAction: (UiEvent) -> Unit = { event ->
                 if (item.enabled) {
-                    if (item.closeOnClick) dismiss()
-                    item.onClick()
+                    if (children != null) {
+                        openSubmenu = if (openSubmenu == index) null else index
+                    } else {
+                        if (item.closeOnClick) dismiss()
+                        item.onClick()
+                    }
                     event.consume()
                 }
             }
             Row(
                 id = "$id-item-$index",
-                tags = if (item.enabled) listOf("dropdown-item") else listOf("dropdown-item", "disabled"),
+                tags = listOfNotNull(
+                    "dropdown-item",
+                    "disabled".takeUnless { item.enabled },
+                    "open".takeIf { children != null && openSubmenu == index },
+                ),
                 modifier = Modifier.input(hoverable = item.enabled, clickable = item.enabled)
                     .cursor(if (item.enabled) UiCursorShape.HAND else UiCursorShape.DEFAULT)
                     .alignItems(vertical = UiAlign.CENTER)
+                    .onEnter { openSubmenu = if (children != null && item.enabled) index else null }
+                    .let { if (children != null) it.onPlaced { rect -> if (anchors[index] != rect) anchors = anchors + (index to rect) } else it }
                     .onClick(itemAction)
             ) {
                 if (item.mark != null) {
@@ -112,18 +141,34 @@ fun ContextMenu(
                     Box(modifier = Modifier.size(16.px, 16.px))
                 }
                 Text(item.label, tags = listOf("dropdown-item-label"))
+                if (item.shortcut != null) Text(item.shortcut, tags = listOf("dropdown-item-shortcut"))
+                if (children != null) Text("›", tags = listOf("dropdown-item-shortcut", "dropdown-item-submenu-arrow"))
             }
         }
+    }
+
+    val open = openSubmenu
+    val children = open?.let { items.getOrNull(it)?.children }
+    val anchor = open?.let(anchors::get)
+    if (children != null && anchor != null) {
+        ContextMenu(
+            id = "$id-sub-$open",
+            anchorBounds = anchor,
+            items = children,
+            onExpandedChange = onExpandedChange,
+            alignment = SubmenuAlignment,
+            layer = layer + 1,
+        )
     }
 }
 
 @Composable
-private fun DropdownSliderRow(id: String, label: String, slider: UiDropdownSlider) {
+private fun DropdownSliderRow(id: String, label: String, slider: UiDropdownSlider, onEnter: () -> Unit) {
     var live by remember(slider.value) { mutableStateOf(slider.value) }
     Row(
         id = id,
         tags = listOf("dropdown-item", "dropdown-slider-item"),
-        modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
+        modifier = Modifier.input(hoverable = true).alignItems(vertical = UiAlign.CENTER).onEnter { onEnter() },
     ) {
         Text(label, tags = listOf("dropdown-item-label"))
         Slider(

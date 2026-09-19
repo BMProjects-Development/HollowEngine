@@ -33,9 +33,9 @@ object HollowEngineConfig : Config() {
     @PropertyName("transform_gizmo_enabled")
     var gizmoEnabled by property(false)
 
-    @PropertyComment("Gizmo editing mode")
-    @PropertyName("transform_gizmo_mode")
-    var gizmoMode by property(GizmoEditMode.TRANSLATE)
+    @PropertyComment("Gizmo editing modes shown together, separated by commas: TRANSLATE, ROTATE, SCALE")
+    @PropertyName("transform_gizmo_modes")
+    var gizmoModes by property(GizmoEditMode.TRANSLATE.name)
 
     @PropertyComment(
         "Characters kept ready before a TrueType font is first drawn. Anything outside this still " +

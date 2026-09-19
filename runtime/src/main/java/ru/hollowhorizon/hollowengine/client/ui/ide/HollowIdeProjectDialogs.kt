@@ -45,13 +45,6 @@ private const val SettingsIcon = "hollowengine:textures/gui/icons/options.svg"
 private const val ImportIcon = "hollowengine:textures/gui/icons/load.svg"
 private const val ExportIcon = "hollowengine:textures/gui/icons/file_zip.svg"
 
-private val CenteredOnViewport = UiPopupAlignment(
-    anchorHorizontal = UiAlign.CENTER,
-    anchorVertical = UiAlign.CENTER,
-    popupHorizontal = UiAlign.CENTER,
-    popupVertical = UiAlign.CENTER,
-)
-
 /** What can be done with the project as a whole, at the right end of the project tree's tab bar. */
 @Composable
 internal fun HollowIdeProjectActions(packaging: HollowIdeProjectPackaging) {

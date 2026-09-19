@@ -192,22 +192,24 @@ class UiModifierResolver(
         profile: UiProfileFrame?,
     ): ResolvedModifiers {
         val baseRuleModifiers = ArrayList<Modifier>()
-        val stateRules = ArrayList<StyleRule>()
-        // One index walk per stylesheet; base/state rules are partitioned from the same matches.
         theme?.let {
-            appendMatchedRules(it, node, StyleOrigin.THEME_DEFAULTS, baseRuleModifiers, stateSink = null, profile)
+            val themeRules = ArrayList<RankedRule>()
+            collectMatchedRules(it, 0, node, StyleOrigin.THEME_DEFAULTS, themeRules, stateSink = null, profile)
+            appendInCascadeOrder(themeRules, baseRuleModifiers)
         }
+        val baseRules = ArrayList<RankedRule>()
+        val stateRules = ArrayList<RankedRule>()
+        var sheetRank = 0
         stylesheet?.let {
-            appendMatchedRules(it, node, StyleOrigin.STYLESHEET, baseRuleModifiers, stateRules, profile)
+            collectMatchedRules(it, sheetRank++, node, StyleOrigin.STYLESHEET, baseRules, stateRules, profile)
         }
         for (scoped in scope.stylesheets) {
-            appendMatchedRules(scoped, node, StyleOrigin.STYLESHEET, baseRuleModifiers, stateRules, profile)
+            collectMatchedRules(scoped, sheetRank++, node, StyleOrigin.STYLESHEET, baseRules, stateRules, profile)
         }
+        appendInCascadeOrder(baseRules, baseRuleModifiers)
 
-        val orderedStateRules = when {
-            stateRules.size > 1 -> stateRules.apply { sortWith(RuleOrderComparator) }
-            else -> stateRules
-        }
+        if (stateRules.size > 1) stateRules.sortWith(RankedRuleComparator)
+        val orderedStateRules = stateRules.map { it.rule }
 
         val attributeModifiers = attributeModifiers(node)
         val baseModifiers =
@@ -232,12 +234,18 @@ class UiModifierResolver(
         )
     }
 
-    private fun appendMatchedRules(
+    private fun appendInCascadeOrder(rules: ArrayList<RankedRule>, sink: MutableList<Modifier>) {
+        if (rules.size > 1) rules.sortWith(RankedRuleComparator)
+        for (ranked in rules) sink += ranked.rule.patch.modifiers()
+    }
+
+    private fun collectMatchedRules(
         hss: CompiledHss,
+        sheetRank: Int,
         node: UiNode,
         baseOrigin: StyleOrigin,
-        baseSink: MutableList<Modifier>,
-        stateSink: MutableList<StyleRule>?,
+        baseSink: MutableList<RankedRule>,
+        stateSink: MutableList<RankedRule>?,
         profile: UiProfileFrame?,
     ) {
         val matched = matchedRulesScratch
@@ -253,18 +261,14 @@ class UiModifierResolver(
             profile.matchedRules += matched.size
         }
         if (matched.isEmpty()) return
-        var baseRules: ArrayList<StyleRule>? = null
         for (rule in matched) {
             when (rule.origin) {
-                baseOrigin -> (baseRules ?: ArrayList<StyleRule>(matched.size).also { baseRules = it }) += rule
-                StyleOrigin.STATE_STYLESHEET -> stateSink?.add(rule)
+                baseOrigin -> baseSink += RankedRule(rule, sheetRank)
+                StyleOrigin.STATE_STYLESHEET -> stateSink?.add(RankedRule(rule, sheetRank))
                 else -> Unit
             }
         }
         matched.clear()
-        val rules = baseRules ?: return
-        if (rules.size > 1) rules.sortWith(RuleOrderComparator)
-        for (rule in rules) baseSink += rule.patch.modifiers()
     }
 
     private fun scopedStyleScope(
@@ -395,10 +399,12 @@ class UiModifierResolver(
             UiTransition("perspective", 200L, TransitionEasing.EASE_OUT),
         )
 
-        private val RuleOrderComparator =
-            compareBy<StyleRule> { it.selector.specificity }.thenBy { it.order }
+        private val RankedRuleComparator =
+            compareBy<RankedRule> { it.rule.selector.specificity }.thenBy { it.sheetRank }.thenBy { it.rule.order }
     }
 }
+
+private class RankedRule(val rule: StyleRule, val sheetRank: Int)
 
 private class NodeResolveState(val owner: UiModifierResolver) {
     var modifierEntry: ModifierCacheEntry? = null

@@ -74,6 +74,7 @@ internal const val AssetManagerIcon = "hollowengine:textures/gui/icons/folder_as
 internal const val ConsoleIcon = "hollowengine:textures/gui/icons/console.svg"
 internal const val SearchIcon = "hollowengine:textures/gui/icons/search.svg"
 internal const val CutsceneIcon = "hollowengine:textures/gui/icons/film.svg"
+internal const val OptionsIcon = "hollowengine:textures/gui/icons/options.svg"
 
 @ClientOnly
 object HollowIdeOverlay {
@@ -113,6 +114,7 @@ object HollowIdeOverlay {
     private var activeButton: Int? = null
     private var collapsed by mutableStateOf(true)
     private var hideToolbarConfirmationVisible by mutableStateOf(false)
+    private var shortcutsVisible by mutableStateOf(false)
     private val projectFilter = UiTreeFilterState(ProjectFilterInputId)
     private var openDropdown by mutableStateOf<String?>(null)
     private var statusText by mutableStateOf("")
@@ -346,7 +348,7 @@ object HollowIdeOverlay {
         initialized = true
         dock.onTabContextMenu = ::openFileContextMenu
         model.onFileRemoved = ::forgetFile
-        dock.open(DockItem(ProjectTreeId, "hollowengine.gui.ide.project_tree".lang, ProjectIcon))
+        dock.open(HollowIdeToolWindows.Project.dockItem())
         surface.setContent { Content() }
     }
     
@@ -369,7 +371,7 @@ object HollowIdeOverlay {
         if (changed) {
             model.updateText(file.path, editor.text)
             dock.updateItem(file.dockItem())
-            statusText = "Inserted $reference"
+            statusText = EditorLang.INSERTED.lang(reference)
         }
         surface.runtime.focus("editor-${file.id}")
         return changed
@@ -403,6 +405,12 @@ object HollowIdeOverlay {
                 FileContextMenuEntry(action, enabled = action.isEnabled(context))
             },
         )
+    }
+
+    private fun closeShortcuts(): Boolean {
+        if (!shortcutsVisible) return false
+        shortcutsVisible = false
+        return true
     }
 
     private fun closeFileContextMenu(): Boolean {
@@ -458,7 +466,7 @@ object HollowIdeOverlay {
 
             override fun copyPath() {
                 Minecraft.getInstance().keyboardHandler.clipboard = target.path
-                statusText = "Copied ${target.path}"
+                statusText = EditorLang.COPIED.lang(target.path)
             }
 
             override fun setStatus(message: String) {
@@ -470,14 +478,15 @@ object HollowIdeOverlay {
     private fun Content() {
         Box(
             id = "ide-root",
-            modifier = Modifier.style("hollowengine:ui/styles/ide.hss")
-                .style("hollowengine:ui/styles/widgets.hss")
+            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss")
+                .style("hollowengine:ui/styles/ide.hss")
                 .size(100.percent, 100.percent)
                 .focusScope()
                 .onKeyInput { input ->
                     val handled = !input.repeat && (
                             input.key == GLFW.GLFW_KEY_ESCAPE && packaging.closeDialogs() ||
                                     input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() ||
+                                    input.key == GLFW.GLFW_KEY_ESCAPE && closeShortcuts() ||
                                     handleHollowIdeSearchKey(search, input.key, input.modifiers, ::openSearchResult) ||
                                     project.handleNameDialogKey(input.key) ||
                                     handleSearchOverlayShortcut(input.key, input.modifiers) ||
@@ -517,6 +526,7 @@ object HollowIdeOverlay {
                     )
                     HollowIdeSearchDialog(search, ::openSearchResult)
                     HollowIdeProjectDialogs(packaging)
+                    HollowIdeShortcutsDialog(shortcutsVisible) { shortcutsVisible = false }
                     EditorColorPickerPopup()
                     UiDragGhost(dragAndDrop)
                 }
@@ -552,25 +562,33 @@ object HollowIdeOverlay {
             Image(LogoIcon, tags = listOf("ide-logo-icon"))
         }
         if (popup) {
+            val editMode = HollowEngineConfig.editMode
             ContextMenu(
                 "ide-editor-menu", anchorBounds, listOf(
-                    UiDropdownItem("Show always") {
+                    UiDropdownItem(
+                        "$MenuLang.show_always".lang,
+                        checked = editMode == EditMode.ENABLED,
+                        mark = UiDropdownMark.RADIO,
+                    ) {
                         HollowEngineConfig.editMode = EditMode.ENABLED
-                        if (collapsed) {
-                            collapsed = false
-                        }
+                        collapsed = false
                     },
-                    UiDropdownItem("Collapse") {
-                        if (!collapsed) {
-                            collapsed = true
-                        }
+                    UiDropdownItem(
+                        "$MenuLang.chat_only".lang,
+                        checked = editMode == EditMode.CHAT_ONLY,
+                        mark = UiDropdownMark.RADIO,
+                    ) {
+                        HollowEngineConfig.editMode = EditMode.CHAT_ONLY
                     },
-                    UiDropdownItem("Hide") {
+                    UiDropdownItem(
+                        if (collapsed) "$MenuLang.expand".lang else "$MenuLang.collapse".lang,
+                        separatorBefore = true,
+                    ) {
+                        collapsed = !collapsed
+                    },
+                    UiDropdownItem("$MenuLang.hide".lang) {
                         requestToolbarHide()
                     },
-                    UiDropdownItem("Show only in chat menu") {
-                        HollowEngineConfig.editMode = EditMode.CHAT_ONLY
-                    }
                 )) { popup = it }
         }
     }
@@ -595,15 +613,30 @@ object HollowIdeOverlay {
             id = "ide-toolbar",
             modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
         ) {
+            val operator = AssetManagerLifecycle.operator
             GearButton()
-            ToolbarMenus()
+            ToolbarMenus(operator)
+            if (operator) {
+                Box(tags = listOf("ide-toolbar-divider"))
+                HollowIdeGizmoSwitcher()
+            }
             Box(modifier = Modifier.size(0.px, 100.percent).grow(1f))
             Text(statusText, tags = listOf("ide-status"))
+            ToolbarIconButton(
+                id = "ide-toolbar-search",
+                icon = SearchIcon,
+                tooltip = "$MenuLang.search".lang + " (Ctrl+N)",
+                onClick = ::openSearch,
+            )
         }
     }
 
+    private fun openSearch() {
+        search.open(focusedEditorFile()?.let { editorStates[it.path]?.selectedText() })
+    }
+
     @Composable
-    private fun ToolbarMenus() {
+    private fun ToolbarMenus(operator: Boolean) {
         UiDropdown(
             id = "ide-file-menu",
             label = "hollowengine.gui.ide.file".lang,
@@ -612,9 +645,12 @@ object HollowIdeOverlay {
             items = hollowIdeFileMenuItems(
                 model = model,
                 dock = dock,
+                packaging = packaging,
                 focusedFile = ::focusedFile,
                 canReformat = { file -> fileActionContext(file).canFormat },
                 onReformat = ::formatFile,
+                onSearch = ::openSearch,
+                operator = operator,
             ),
         )
         UiDropdown(
@@ -629,14 +665,26 @@ object HollowIdeOverlay {
             label = "hollowengine.gui.ide.tools".lang,
             expanded = openDropdown == "tools",
             onExpandedChange = { openDropdown = if (it) "tools" else null },
-            items = hollowIdeToolMenuItems(dock, surface.runtime.profiler),
+            items = hollowIdeToolMenuItems(model, dock, operator),
         )
+        if (operator) {
+            UiDropdown(
+                id = "ide-world-menu",
+                label = WorldLang.TITLE.lang,
+                expanded = openDropdown == "world",
+                onExpandedChange = { expanded ->
+                    if (expanded) WorldControlClient.refresh()
+                    openDropdown = if (expanded) "world" else null
+                },
+                items = hollowIdeWorldMenuItems(),
+            )
+        }
         UiDropdown(
             id = "ide-help-menu",
             label = "hollowengine.gui.ide.help".lang,
             expanded = openDropdown == "help",
             onExpandedChange = { openDropdown = if (it) "help" else null },
-            items = hollowIdeHelpMenuItems(),
+            items = hollowIdeHelpMenuItems(onShowShortcuts = { shortcutsVisible = true }),
         )
     }
 
@@ -845,7 +893,7 @@ object HollowIdeOverlay {
     @Composable
     private fun EmptyEditor() {
         Column(tags = listOf("ide-empty-editor")) {
-            Text("Open a file from Project Tree", tags = listOf("ide-empty-title"))
+            Text(EditorLang.EMPTY.lang, tags = listOf("ide-empty-title"))
             Text(statusText, tags = listOf("ide-status"))
         }
     }
@@ -957,7 +1005,7 @@ object HollowIdeOverlay {
         if (modifiers and GLFW.GLFW_MOD_CONTROL == 0) return false
         if (modifiers and GLFW.GLFW_MOD_SHIFT != 0 || modifiers and GLFW.GLFW_MOD_ALT != 0) return false
         if (key != GLFW.GLFW_KEY_N) return false
-        search.open(focusedEditorFile()?.let { editorStates[it.path]?.selectedText() })
+        openSearch()
         return true
     }
 
@@ -1102,7 +1150,7 @@ object HollowIdeOverlay {
         if (file.readOnly || file.textOrNull == null) return false
         val session = editorSession(file.path)
         if (!session.canFormat) {
-            statusText = "No formatter for ${file.title}"
+            statusText = EditorLang.NO_FORMATTER.lang(file.title)
             return false
         }
         val editor = editorState(file)
@@ -1110,14 +1158,14 @@ object HollowIdeOverlay {
         fileContextMenu = null
         session.format(text) { formatted ->
             when {
-                formatted == null -> statusText = "${file.title} is already formatted"
-                editor.text != text -> statusText = "${file.title} changed while formatting"
+                formatted == null -> statusText = EditorLang.ALREADY_FORMATTED.lang(file.title)
+                editor.text != text -> statusText = EditorLang.CHANGED_WHILE_FORMATTING.lang(file.title)
                 else -> {
                     val caret = mapCaretThroughFormat(text, formatted, editor.caret)
                     editor.applyEdit(formatted, listOf(UiTextCaret(caret)))
                     model.updateText(file.path, formatted)
                     dock.updateItem(file.dockItem())
-                    statusText = "Reformatted ${file.title}"
+                    statusText = EditorLang.REFORMATTED.lang(file.title)
                 }
             }
         }
@@ -1146,7 +1194,7 @@ object HollowIdeOverlay {
         statusText = ""
         session.resolveDefinition(file.text, editor.caret) { definition ->
             if (definition == null) {
-                statusText = "Definition not found"
+                statusText = EditorLang.DEFINITION_NOT_FOUND.lang
                 return@resolveDefinition
             }
             openDefinition(definition)
@@ -1168,7 +1216,7 @@ object HollowIdeOverlay {
             is InlayAction.OpenResource -> {
                 val definition = ResourceLocationTargets.definition(decoded.location)
                 if (definition == null) {
-                    statusText = "Cannot find '${decoded.location}'"
+                    statusText = EditorLang.RESOURCE_NOT_FOUND.lang(decoded.location)
                 } else {
                     openDefinition(definition)
                 }
@@ -1178,7 +1226,7 @@ object HollowIdeOverlay {
                 decoded.copy(start = it.first, end = it.last + 1)
             } ?: decoded)
 
-            null -> statusText = "Unsupported inlay action"
+            null -> statusText = EditorLang.UNSUPPORTED_ACTION.lang
         }
     }
 
@@ -1244,7 +1292,7 @@ object HollowIdeOverlay {
         } else {
             when (val result = model.openFile(definition.path)) {
                 HollowIdeOpenResult.Unsupported -> {
-                    statusText = "Unsupported definition target: ${definition.path}"
+                    statusText = EditorLang.UNSUPPORTED_DEFINITION.lang(definition.path)
                     return
                 }
 
@@ -1324,6 +1372,17 @@ internal object EditorLang {
 
     const val COLOR_MOVED = ROOT + "color_moved"
     const val READ_ONLY = ROOT + "read_only"
+    const val EMPTY = ROOT + "empty"
+    const val INSERTED = ROOT + "status.inserted"
+    const val COPIED = ROOT + "status.copied"
+    const val NO_FORMATTER = ROOT + "status.no_formatter"
+    const val ALREADY_FORMATTED = ROOT + "status.already_formatted"
+    const val CHANGED_WHILE_FORMATTING = ROOT + "status.changed_while_formatting"
+    const val REFORMATTED = ROOT + "status.reformatted"
+    const val DEFINITION_NOT_FOUND = ROOT + "status.definition_not_found"
+    const val RESOURCE_NOT_FOUND = ROOT + "status.resource_not_found"
+    const val UNSUPPORTED_ACTION = ROOT + "status.unsupported_action"
+    const val UNSUPPORTED_DEFINITION = ROOT + "status.unsupported_definition"
 }
 
 private data class EditorColorPicker(
