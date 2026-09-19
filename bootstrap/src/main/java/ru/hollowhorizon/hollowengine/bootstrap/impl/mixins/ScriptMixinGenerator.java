@@ -24,13 +24,13 @@ final class ScriptMixinGenerator {
     private static final String DISPATCH = Type.getInternalName(ScriptMixinDispatch.class);
     private static final String OBJECT = "java/lang/Object";
     private static final Type OBJECT_TYPE = Type.getObjectType(OBJECT);
-    private static final Method INJECT_DISPATCH = new Method("inject", Type.VOID_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, Type.getType(Object[].class), CALLBACK_INFO});
     private static final Method MODIFY_DISPATCH = new Method("modify", OBJECT_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, Type.getType(Object[].class), OBJECT_TYPE});
-    private static final Method WRAP_DISPATCH = new Method("wrap", OBJECT_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, Type.getType(Object[].class), OPERATION});
-    private static final Method WRAP_CALL_DISPATCH = new Method("wrapCall", OBJECT_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, OBJECT_TYPE, Type.BOOLEAN_TYPE, Type.getType(Object[].class), OPERATION});
     private static final Type CALLBACK_INFO = Type.getObjectType("org/spongepowered/asm/mixin/injection/callback/CallbackInfo");
+    private static final Method INJECT_DISPATCH = new Method("inject", Type.VOID_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, Type.getType(Object[].class), CALLBACK_INFO});
     private static final Type CALLBACK_INFO_RETURNABLE = Type.getObjectType("org/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable");
     private static final Type OPERATION = Type.getObjectType("com/llamalad7/mixinextras/injector/wrapoperation/Operation");
+    private static final Method WRAP_DISPATCH = new Method("wrap", OBJECT_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, Type.getType(Object[].class), OPERATION});
+    private static final Method WRAP_CALL_DISPATCH = new Method("wrapCall", OBJECT_TYPE, new Type[]{Type.INT_TYPE, OBJECT_TYPE, OBJECT_TYPE, Type.BOOLEAN_TYPE, Type.getType(Object[].class), OPERATION});
     private static final String MIXIN = "Lorg/spongepowered/asm/mixin/Mixin;";
     private static final String AT = "Lorg/spongepowered/asm/mixin/injection/At;";
     private static final String SHIFT = "Lorg/spongepowered/asm/mixin/injection/At$Shift;";
