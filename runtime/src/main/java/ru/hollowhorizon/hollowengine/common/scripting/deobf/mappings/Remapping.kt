@@ -15,10 +15,12 @@ import org.objectweb.asm.commons.ClassRemapper
 import org.objectweb.asm.commons.MethodRemapper
 import org.objectweb.asm.commons.Remapper
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.metadata.KotlinMetadataRemappingClassVisitor
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
+import kotlin.coroutines.EmptyCoroutineContext
 
 class LambdaAwareRemapper(parent: ClassVisitor, remapper: Remapper) : ClassRemapper(Opcodes.ASM9, parent, remapper) {
     override fun createMethodRemapper(parent: MethodVisitor): MethodRemapper =
@@ -319,9 +321,10 @@ fun remapJars(
     )
 
     val semaphore = Semaphore(8)
+    val context = if (RuntimeFlags.preparingMixins) EmptyCoroutineContext else Dispatchers.IO
 
     inputs.map { file ->
-        async(Dispatchers.IO) {
+        async(context) {
             semaphore.withPermit {
                 val (name, extension) = file.nameWithoutExtension to file.extension
                 remapJar(remapper, file, outputDir, name, postfix, extension)

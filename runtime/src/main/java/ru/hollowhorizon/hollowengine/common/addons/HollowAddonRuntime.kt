@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonVersions
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
+import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinScripts
 import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptSourceLifecycle
@@ -76,6 +77,7 @@ internal class HollowAddonRuntime(
             }
         }
         val candidates = candidatesBySource.flatten()
+        withContext(Dispatchers.IO) { AddonCaches.retainStaged(artifactStore, candidates) }
 
         locked {
             candidates.forEach { candidate -> knownCandidates[candidate.sourceFile.canonicalPath] = candidate }
@@ -85,6 +87,7 @@ internal class HollowAddonRuntime(
             drainPending()
             reportPending()
         }
+        withContext(Dispatchers.IO) { AddonCaches.retainCompiledScripts(candidates) }
         watcherJobs = sources.mapIndexed { index, source ->
             HollowAddonWatcher(source, artifactStore, this, runtimeScope).start(candidatesBySource[index])
         }
@@ -330,12 +333,18 @@ internal class HollowAddonRuntime(
             HollowAddonNotifications.restartRequired(descriptor)
             return false
         }
-        if (candidate.hasStartupScripts && StartupScripts.hasRun) {
+        val lateScripts = when {
+            candidate.hasMixinScripts && MixinScripts.hasRun -> "mixin"
+            candidate.hasStartupScripts && StartupScripts.hasRun -> "startup"
+            else -> null
+        }
+        if (lateScripts != null) {
             restartRequiredAddons[descriptor.id] = descriptor
             restartRequiredSnapshot = restartRequiredAddons.values.toList()
             HollowEngine.LOGGER.warn(
-                "Addon '{}' contains startup scripts and was added or updated after startup; it is disabled for this session.",
+                "Addon '{}' contains {} scripts and was added or updated after startup; it is disabled for this session.",
                 descriptor.id,
+                lateScripts,
             )
             HollowAddonNotifications.restartRequired(descriptor)
             return false

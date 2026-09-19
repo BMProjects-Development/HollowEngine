@@ -34,7 +34,7 @@ object HollowAddonManager : AutoCloseable {
             if (runtime != null) return
             HollowAddonRuntime(
                 sources = sources,
-                cacheDirectory = DirectoryManager.HOLLOW_ENGINE.resolve(".cache").resolve("addons").toFile(),
+                cacheDirectory = cacheDirectory,
             ).also { runtime = it }
         }
         runCatching { runBlocking { created.start() } }
@@ -47,10 +47,14 @@ object HollowAddonManager : AutoCloseable {
             .getOrThrow()
     }
 
-    private fun defaultSources(): List<File> = listOf(
+    /** Where addons are looked for, highest priority first. */
+    internal fun defaultSources(): List<File> = listOf(
         DirectoryManager.HOLLOW_ENGINE.resolve("addons").toFile(),
         File("mods").absoluteFile,
     )
+
+    internal val cacheDirectory: File
+        get() = DirectoryManager.HOLLOW_ENGINE.resolve(".cache").resolve("addons").toFile()
 
     fun isLoaded(id: String): Boolean = loaded.any { it.id == id }
 

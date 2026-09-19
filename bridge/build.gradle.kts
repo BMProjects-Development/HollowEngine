@@ -51,6 +51,7 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
 
     compileOnly("org.spongepowered:mixin:0.8.7")
+    compileOnly("io.github.llamalad7:mixinextras-common:0.4.1")
     compileOnly("org.jetbrains:annotations:24.1.0")
 }
 

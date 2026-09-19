@@ -46,9 +46,11 @@ import ru.hollowhorizon.hollowengine.common.attachments.snapshot.snapshotOf
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.npcs.NpcAnimationRuntime
+import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinScripts
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeRuntime
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.removeNode
+import ru.hollowhorizon.hollowengine.common.scripting.MIXIN_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.RELOAD_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
@@ -295,6 +297,7 @@ private fun CommandExtension.registerScriptingCommands() {
                     source.server.addNode(ScriptRegistry.display(id))
                     return@executes SUCCESS
                 }
+                if (isMixinScriptPath(id.path)) return@executes reloadMixinScript(source, id)
                 runPlainScript(source, id)
             }
         }
@@ -406,15 +409,34 @@ private fun nodeScriptArgument(): RequiredArgumentBuilder<CommandSourceStack, Sc
     }
 
 /**
- * Everything `run` accepts: node scripts, plus plain `.kts` files, which is what one reaches for
- * when trying something out.
+ * Everything `run` accepts: node scripts, plain `.kts` files, which is what one reaches for when trying
+ * something out, and mixin scripts, whose bodies it swaps.
  */
 private fun runnableScriptArgument(): RequiredArgumentBuilder<CommandSourceStack, ScriptId> =
     arg<ScriptId, CommandSourceStack>("path", ScriptPathArgument.scriptPath()).suggests { _, builder ->
         val nodes = DirectoryManager.componentScripts.map(ScriptRegistry::display)
-        val plain = ScriptRegistry.list(".kts").filter { isPlainScriptPath(it.path) }.map(ScriptRegistry::display)
+        val plain = ScriptRegistry.list(".kts").filter { isPlainScriptPath(it.path) || isMixinScriptPath(it.path) }
+            .map(ScriptRegistry::display)
         SharedSuggestionProvider.suggest(nodes + plain, builder)
     }
+
+/** Runs a mixin script again, so the bodies of the mixins applied at launch are the ones in the file now. */
+private fun reloadMixinScript(source: CommandSourceStack, id: ScriptId): Int {
+    val display = ScriptRegistry.display(id)
+    return MixinScripts.reload(id).fold(
+        onSuccess = { binding ->
+            source.sendSuccess({ "Reloaded '$display': ${binding.bound} mixin bodies swapped".literal }, true)
+            if (binding.pending > 0) {
+                source.sendFailure("${binding.pending} declarations changed since the game started; restart to apply them".literal)
+            }
+            1
+        },
+        onFailure = { error ->
+            source.sendFailure("Failed to reload '$display': ${error.message ?: error::class.simpleName}".literal)
+            0
+        },
+    )
+}
 
 /** Runs a plain script once, reporting whatever it threw straight back to the caller. */
 private fun runPlainScript(source: CommandSourceStack, id: ScriptId): Int {
@@ -490,10 +512,12 @@ private fun listEntityNodes(source: CommandSourceStack, entity: net.minecraft.wo
 
 internal fun isNodeScriptPath(path: String): Boolean = path.endsWith(".$NODE_SCRIPT_EXTENSION")
 
+internal fun isMixinScriptPath(path: String): Boolean = path.endsWith(".$MIXIN_SCRIPT_EXTENSION")
+
 /** A `.kts` with no special role not a node, UI, reload or startup script, so running it just runs it. */
 internal fun isPlainScriptPath(path: String): Boolean {
     if (!path.endsWith(".kts")) return false
-    return listOf(NODE_SCRIPT_EXTENSION, UI_SCRIPT_EXTENSION, RELOAD_SCRIPT_EXTENSION, STARTUP_SCRIPT_EXTENSION)
+    return listOf(NODE_SCRIPT_EXTENSION, UI_SCRIPT_EXTENSION, RELOAD_SCRIPT_EXTENSION, STARTUP_SCRIPT_EXTENSION, MIXIN_SCRIPT_EXTENSION)
         .none { path.endsWith(".$it") }
 }
 

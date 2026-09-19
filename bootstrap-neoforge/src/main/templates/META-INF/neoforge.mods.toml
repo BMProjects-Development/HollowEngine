@@ -19,6 +19,8 @@ config = "hollowengine.mixins.json"
 config = "hollowengine-neoforge.mixins.json"
 [[mixins]]
 config = "hollowengine-neoforge.bridge.mixins.json"
+[[mixins]]
+config = "hollowengine-neoforge.scripts.mixins.json"
 
 [[dependencies.${mod_id}]]
 modId = "neoforge"

@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.common.addons
 
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
+import ru.hollowhorizon.hollowengine.common.files.CacheCleanup
+import ru.hollowhorizon.hollowengine.common.scripting.MIXIN_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint
 import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
@@ -29,6 +31,7 @@ internal data class HollowAddonCandidate(
     val descriptor: HollowAddonDescriptor,
     val requiresBootstrapLibraries: Boolean,
     val hasStartupScripts: Boolean,
+    val hasMixinScripts: Boolean,
     val hasAssets: Boolean,
     val hasData: Boolean,
 )
@@ -48,6 +51,16 @@ internal class HollowAddonArtifactStore(
         "log4j-",
         "annotations-",
     ) + AddonBootstrapContract.HOST_NATIVE_LIBRARY_PREFIXES
+
+    /**
+     * Drops everything staged for jars other than those with [fingerprints]. Copies, unpacked classes and
+     * libraries of addon versions that were replaced or removed.
+     */
+    fun retain(fingerprints: Set<String>) {
+        listOf("artifacts", "variants", "libraries").forEach { area ->
+            CacheCleanup.retain(cacheRoot.resolve(area), fingerprints)
+        }
+    }
 
     fun stage(sourceFile: File): HollowAddonCandidate {
         require(sourceFile.isFile && sourceFile.extension.equals("jar", ignoreCase = true)) {
@@ -76,7 +89,8 @@ internal class HollowAddonArtifactStore(
                 requiresBootstrapLibraries = names.any { name ->
                     name.startsWith(AddonBootstrapContract.BOOTSTRAP_LIBRARY_PATH) && name.endsWith(".jar")
                 },
-                hasStartupScripts = names.any(::isStartupScript),
+                hasStartupScripts = names.any { isScript(it, STARTUP_SCRIPT_EXTENSION) },
+                hasMixinScripts = names.any { isScript(it, MIXIN_SCRIPT_EXTENSION) },
                 hasAssets = names.any { it.startsWith(HollowAddonLayout.ASSETS_PREFIX) },
                 hasData = names.any { it.startsWith(HollowAddonLayout.DATA_PREFIX) },
             )
@@ -92,6 +106,7 @@ internal class HollowAddonArtifactStore(
             descriptor = descriptor.copy(mappingNamespace = runtimeNamespace),
             requiresBootstrapLibraries = contents.requiresBootstrapLibraries,
             hasStartupScripts = contents.hasStartupScripts,
+            hasMixinScripts = contents.hasMixinScripts,
             hasAssets = contents.hasAssets,
             hasData = contents.hasData,
         )
@@ -100,6 +115,7 @@ internal class HollowAddonArtifactStore(
     private class Contents(
         val requiresBootstrapLibraries: Boolean,
         val hasStartupScripts: Boolean,
+        val hasMixinScripts: Boolean,
         val hasAssets: Boolean,
         val hasData: Boolean,
     )
@@ -169,8 +185,8 @@ internal class HollowAddonArtifactStore(
         }
     }
 
-    private fun isStartupScript(name: String): Boolean {
-        val source = ".$STARTUP_SCRIPT_EXTENSION"
+    private fun isScript(name: String, extension: String): Boolean {
+        val source = ".$extension"
         val compiled = source + AddonScriptSource.COMPILED_SUFFIX
         return name.startsWith(AddonScriptSource.SOURCE_PREFIX) && name.endsWith(source) || name.startsWith(
             AddonScriptSource.COMPILED_PREFIX

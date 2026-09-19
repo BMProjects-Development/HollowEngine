@@ -18,12 +18,17 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.compiler.createHollowEngineCompilerPluginRegistrars
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
-import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.NeoForgeEnvironmentSetup
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.ClassRemappingSession
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.RemappingClasspath
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinSpecLayout
+import ru.hollowhorizon.hollowengine.common.plugin.mixins.MixinDeclarationCollector
+import ru.hollowhorizon.hollowengine.common.plugin.mixins.MixinError
+import ru.hollowhorizon.hollowengine.common.plugin.mixins.MixinSpecWriter
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.isClientSideScript
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.Serializable
@@ -41,7 +46,9 @@ class ScriptJvmCompilerRemapped(
     definitions: List<ScriptDefinition>,
     hostConfiguration: ScriptingHostConfiguration,
     private val remappingClasspath: Lazy<RemappingClasspath>,
+    private val mappings: () -> Mappings,
     private val remapToRuntime: Boolean = true,
+    private val debugOutput: Boolean = true,
 ) : ScriptCompilerProxy {
     private val delegate = HollowEngineScriptCompiler(definitions, hostConfiguration)
 
@@ -49,23 +56,63 @@ class ScriptJvmCompilerRemapped(
         script: SourceCode,
         scriptCompilationConfiguration: ScriptCompilationConfiguration,
     ): ResultWithDiagnostics<CompiledScript> {
-        return when (val result = delegate.compile(script, scriptCompilationConfiguration)) {
+        val mixins = MixinDeclarationCollector()
+        return when (val result = delegate.compile(script, scriptCompilationConfiguration, mixins)) {
             is ResultWithDiagnostics.Success -> {
-                ResultWithDiagnostics.Success(remapCompiledScript(result.value), result.reports)
+                val spec = when (val written = writeMixinSpec(script, result.value, mixins)) {
+                    is ResultWithDiagnostics.Success -> written.value
+                    is ResultWithDiagnostics.Failure -> return written
+                }
+                ResultWithDiagnostics.Success(remapCompiledScript(result.value, spec), result.reports)
             }
 
             is ResultWithDiagnostics.Failure -> result
         }
     }
 
-    private fun remapCompiledScript(script: CompiledScript): CompiledScript {
+    /**
+     * Mixin spec of the root script, as extra output file, before remapping.
+     */
+    private fun writeMixinSpec(
+        script: SourceCode,
+        compiled: CompiledScript,
+        mixins: MixinDeclarationCollector,
+    ): ResultWithDiagnostics<Map<String, ByteArray>> {
+        val jvmScript = compiled as? KJvmCompiledScript ?: return emptyMap<String, ByteArray>().asSuccess()
+        val errors = mixins.errors.toMutableList()
+        val files = mixins.declarations.mapNotNullTo(HashSet()) { it.location?.file }
+        if (files.size > 1) {
+            errors += MixinError("Mixins can only be declared in the .mixin.kts being compiled, not in scripts it imports", null)
+        }
+        if (errors.isEmpty()) {
+            val clientOnly = jvmScript.compilationConfiguration[ScriptCompilationConfiguration.isClientSideScript] == true
+            val output = MixinSpecWriter { name -> remappingClasspath.value.findClass(name) }
+                .write(jvmScript.scriptClassFQName, clientOnly, mixins.declarations)
+            errors += output.errors
+            val spec = output.spec
+            if (errors.isEmpty()) {
+                val path = jvmScript.scriptClassFQName.replace('.', '/') + MixinSpecLayout.CLASS_SUFFIX + ".class"
+                return (if (spec == null) emptyMap() else mapOf(path to spec)).asSuccess()
+            }
+        }
+        return ResultWithDiagnostics.Failure(errors.map { error -> error.toDiagnostic(script) })
+    }
+
+    private fun MixinError.toDiagnostic(script: SourceCode) = ScriptDiagnostic(
+        ScriptDiagnostic.unspecifiedError,
+        message,
+        ScriptDiagnostic.Severity.ERROR,
+        location?.file ?: script.locationId,
+        location?.let { SourceCode.Location(SourceCode.Position(it.line, it.column), SourceCode.Position(it.endLine, it.endColumn)) },
+    )
+
+    private fun remapCompiledScript(script: CompiledScript, extraFiles: Map<String, ByteArray> = emptyMap()): CompiledScript {
         val jvmScript = script as? KJvmCompiledScript ?: return script
         val module = jvmScript.getCompiledModule() as? KJvmCompiledModuleInMemory ?: return jvmScript
-        val outputFiles = module.compilerOutputFiles
-        val remappingSession = if (remapToRuntime && isProduction && !NeoForgeEnvironmentSetup.isAvailable()) {
-            val environment = ScriptingEnvironment.INSTANCE
+        val outputFiles = module.compilerOutputFiles + extraFiles
+        val remappingSession = if (remapToRuntime && RuntimeFlags.production && !NeoForgeEnvironmentSetup.isAvailable()) {
             ClassRemappingSession(
-                environment.mappings,
+                mappings(),
                 remappingClasspath.value,
                 loader = { name -> outputFiles["$name.class"] },
             )
@@ -84,13 +131,13 @@ class ScriptJvmCompilerRemapped(
             jvmScript.compilationConfiguration,
             jvmScript.scriptClassFQName,
             jvmScript.resultField,
-            jvmScript.otherScripts.map(::remapCompiledScript),
+            jvmScript.otherScripts.map { remapCompiledScript(it) },
             remappedModule,
         )
     }
 
     private fun debugSave(path: String, bytes: ByteArray) {
-        if (HollowEngineConfig.debugMode) {
+        if (debugOutput && HollowEngineConfig.debugMode) {
             val file = DirectoryManager.HOLLOW_ENGINE.resolve(".cache/compiler").resolve(path).toFile()
 
             if (!file.exists()) {
@@ -107,10 +154,17 @@ class HollowEngineScriptCompiler(
     val definitions: List<ScriptDefinition>,
     val hostConfiguration: ScriptingHostConfiguration,
 ) : ScriptCompilerProxy {
-    @OptIn(ExperimentalCompilerApi::class)
     override fun compile(
         script: SourceCode,
         scriptCompilationConfiguration: ScriptCompilationConfiguration,
+    ): ResultWithDiagnostics<CompiledScript> = compile(script, scriptCompilationConfiguration, MixinDeclarationCollector())
+
+    /** Compiles [script], leaving the mixin declarations the compiler plugin read in [mixins]. */
+    @OptIn(ExperimentalCompilerApi::class)
+    fun compile(
+        script: SourceCode,
+        scriptCompilationConfiguration: ScriptCompilationConfiguration,
+        mixins: MixinDeclarationCollector,
     ): ResultWithDiagnostics<CompiledScript> = withMessageCollector { messageCollector ->
         withScriptCompilationCache(script, scriptCompilationConfiguration, messageCollector) {
             withConfiguredK2ScriptCompilerWithLightTree(
@@ -128,6 +182,7 @@ class HollowEngineScriptCompiler(
                         CompilerPluginRegistrar.COMPILER_PLUGIN_REGISTRARS,
                         createHollowEngineCompilerPluginRegistrars(),
                     )
+                    put(MixinDeclarationCollector.KEY, mixins)
                 }
             ) {
                 if (messageCollector.hasErrors()) failure(messageCollector)

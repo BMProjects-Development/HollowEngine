@@ -7,7 +7,7 @@ import net.fabricmc.loader.impl.FabricLoaderImpl
 import net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import ru.hollowhorizon.hollowengine.fabric.findField
 import java.io.File
 import java.nio.file.Path
@@ -21,7 +21,7 @@ object FabricEnvironmentSetup : EnvironmentSetup {
         val logJars: Set<Path> = findField(gameProvider, "logJars")
         val parentClassPath: Collection<Path> = findField(gameProvider, "validParentClassPath")
 
-        if (isProduction) {
+        if (RuntimeFlags.production) {
             val remapped = remapJars(
                 mappings,
                 gameJars.map { it.toFile() },

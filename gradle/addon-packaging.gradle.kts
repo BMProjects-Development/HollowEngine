@@ -77,6 +77,8 @@ fun Project.hollowScriptCompilerClasspath(): FileCollection {
                 "org.apache.logging.log4j:log4j-core:2.23.1",
                 "org.ow2.asm:asm-commons:9.7.1",
             ).forEach { notation -> dependencies.add(created.name, notation) }
+            (dependencies.add(created.name, dependencies.project(mapOf("path" to ":bridge"))) as ModuleDependency)
+                .isTransitive = false
         }
     val ownSources = extensions.getByType<SourceSetContainer>().named("main")
     return files(

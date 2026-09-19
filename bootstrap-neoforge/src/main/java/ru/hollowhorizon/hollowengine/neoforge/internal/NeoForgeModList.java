@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.neoforge.internal;
 
 import cpw.mods.niofs.union.UnionFileSystem;
+import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforgespi.language.IModFileInfo;
 import ru.hollowhorizon.hollowengine.api.ModList;
@@ -12,6 +13,10 @@ import java.nio.file.*;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Reads the mod list FML discovered, which exists before mixins are prepared, unlike the one mods are
+ * constructed from: scripts may have to be compiled before any mod is.
+ */
 public class NeoForgeModList implements ModList {
     private static final Path CACHE_DIR = FMLPaths.GAMEDIR.get()
             .resolve("hollowengine")
@@ -20,7 +25,7 @@ public class NeoForgeModList implements ModList {
 
     @Override
     public boolean isLoaded(String modId) {
-        return net.neoforged.fml.ModList.get().isLoaded(modId);
+        return FMLLoader.getLoadingModList().getModFileById(modId) != null;
     }
 
     @Override
@@ -30,13 +35,13 @@ public class NeoForgeModList implements ModList {
 
     @Override
     public List<ModInfo> getMods() {
-        return net.neoforged.fml.ModList.get().getMods().stream()
+        return FMLLoader.getLoadingModList().getMods().stream()
                 .map(mod -> new ModInfo(mod.getModId(), mod.getDisplayName(), mod.getVersion().toString()))
                 .toList();
     }
 
     private File getModFile(String modId) {
-        IModFileInfo modFileInfo = net.neoforged.fml.ModList.get().getModFileById(modId);
+        IModFileInfo modFileInfo = FMLLoader.getLoadingModList().getModFileById(modId);
         if (modFileInfo == null) {
             throw new IllegalArgumentException("Mod is not loaded or has no mod file: " + modId);
         }

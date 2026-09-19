@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptText
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
 import java.security.MessageDigest
 
@@ -85,7 +85,7 @@ object ScriptFingerprint {
         get() = runtimeIdentity ?: runtimeIdentity(
             platform = runCatching { HollowAddonRuntimeEnvironment.platform.id() }.getOrDefault("unknown"),
             mappingNamespace = runCatching { HollowAddonRuntimeEnvironment.mappingNamespace().id }.getOrDefault("unknown"),
-            production = isProduction,
+            production = RuntimeFlags.production,
         )
 
     private val providers: List<ScriptClassProvider> by lazy {

@@ -176,6 +176,9 @@ internal class JavaClassNameIndex(private val roots: List<VirtualFile>) {
             } finally {
                 Files.deleteIfExists(temporaryFile)
             }
+            Files.newDirectoryStream(cacheFile.parent, "java-classes-*").use { files ->
+                files.filter { it != cacheFile }.forEach { runCatching { Files.deleteIfExists(it) } }
+            }
         }
     }
 

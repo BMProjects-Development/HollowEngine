@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.compiling.ScriptCompilatio
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.ScriptingCompiler
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.RemappingClasspath
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
+import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinSpecLayout
 import ru.hollowhorizon.hollowengine.logW
 import java.io.File
 import java.nio.file.Files
@@ -18,6 +19,7 @@ import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.FileScriptSource
 import kotlin.script.experimental.host.StringScriptSource
 import kotlin.script.experimental.jvm.baseClassLoader
+import kotlin.script.experimental.jvm.impl.KJvmCompiledModuleInMemory
 import kotlin.script.experimental.jvm.impl.KJvmCompiledScript
 import kotlin.script.experimental.jvm.jvm
 import kotlin.script.experimental.jvm.updateClasspath
@@ -72,13 +74,35 @@ class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : Scripti
         }
     }
 
+    /**
+     * Compiles [file] with mixin spec, `null` when it declares no mixins.
+     */
+    fun compileMixinSpec(file: File, extraClasspath: List<File>): Result<ByteArray?> {
+        val definition = environment.scriptDefinitions.getDefinitionFor(file.name)
+        val result = runScriptingBlocking {
+            newCompiler(definition)(
+                FileScriptSource(file),
+                definition.compilationConfiguration.withClasspath(extraClasspath)
+            )
+        }
+        if (result !is ResultWithDiagnostics.Success) {
+            return Result.failure(ScriptCompilationException(file.name, result.reports.map { it.convert() }))
+        }
+        val script = result.value as KJvmCompiledScript
+        val module = script.getCompiledModule() as KJvmCompiledModuleInMemory
+        val path = script.scriptClassFQName.replace('.', '/') + MixinSpecLayout.CLASS_SUFFIX + ".class"
+        return Result.success(module.compilerOutputFiles[path])
+    }
+
     private fun newCompiler(definition: ScriptDefinition, remapToRuntime: Boolean = true) = JvmScriptCompiler(
         definition.hostConfiguration,
         ScriptJvmCompilerRemapped(
             environment.scriptDefinitions,
             definition.hostConfiguration,
             remappingClasspath,
-            remapToRuntime,
+            mappings = { environment.mappings },
+            remapToRuntime = remapToRuntime,
+            debugOutput = environment.debugOutput,
         ),
     )
 
@@ -116,27 +140,24 @@ private fun ScriptEvaluationConfiguration.withBaseClassLoader(
     if (classLoader == null) this else with { ScriptEvaluationConfiguration.jvm.baseClassLoader(classLoader) }
 
 fun List<ScriptDefinition.FromConfigurations>.getDefinitionFor(name: String): ScriptDefinition {
-    return sortedWith(
-        compareByDescending<ScriptDefinition.FromConfigurations> { it.fileExtension.length }
-            .thenByDescending { it.fileExtension }
-    ).first { name.endsWith(it.fileExtension) }
+    return sortedWith(compareByDescending<ScriptDefinition.FromConfigurations> { it.fileExtension.length }.thenByDescending { it.fileExtension }).first {
+        name.endsWith(
+            it.fileExtension
+        )
+    }
 }
 
 fun ScriptDiagnostic.convert(): Diagnostic {
-    return Diagnostic(
-        this.location?.let {
-            Range(
-                Position(it.start.line, it.start.col),
-                Position(it.end?.line ?: it.start.line, it.end?.col ?: it.start.col)
-            )
-        } ?: Range(Position(-1, -1), Position(-1, -1)),
-        when (this.severity) {
-            ScriptDiagnostic.Severity.DEBUG -> Severity.DEBUG
-            ScriptDiagnostic.Severity.INFO -> Severity.INFO
-            ScriptDiagnostic.Severity.WARNING -> Severity.WARNING
-            ScriptDiagnostic.Severity.ERROR -> Severity.ERROR
-            ScriptDiagnostic.Severity.FATAL -> Severity.FATAL
-        },
-        this.message
-    )
+    return Diagnostic(this.location?.let {
+        Range(
+            Position(it.start.line, it.start.col),
+            Position(it.end?.line ?: it.start.line, it.end?.col ?: it.start.col)
+        )
+    } ?: Range(Position(-1, -1), Position(-1, -1)), when (this.severity) {
+        ScriptDiagnostic.Severity.DEBUG -> Severity.DEBUG
+        ScriptDiagnostic.Severity.INFO -> Severity.INFO
+        ScriptDiagnostic.Severity.WARNING -> Severity.WARNING
+        ScriptDiagnostic.Severity.ERROR -> Severity.ERROR
+        ScriptDiagnostic.Severity.FATAL -> Severity.FATAL
+    }, this.message)
 }

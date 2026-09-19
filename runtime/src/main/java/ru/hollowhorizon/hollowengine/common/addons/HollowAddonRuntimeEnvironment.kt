@@ -2,13 +2,13 @@ package ru.hollowhorizon.hollowengine.common.addons
 
 import net.fabricmc.loader.api.FabricLoader
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
-import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 
 internal object HollowAddonRuntimeEnvironment {
     lateinit var platform: RuntimePlatform
 
     val isClient: Boolean
-        get() = isPhysicalClient
+        get() = RuntimeFlags.physicalClient
 
     fun mappingNamespace(): HollowAddonMappingNamespace = when (platform) {
         RuntimePlatform.FABRIC -> resolveMappingNamespace(

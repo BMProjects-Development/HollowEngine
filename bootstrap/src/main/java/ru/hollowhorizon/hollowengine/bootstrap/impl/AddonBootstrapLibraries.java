@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,6 +41,7 @@ final class AddonBootstrapLibraries {
     static Result discover(List<File> directories, File cacheDirectory, Logger logger) throws IOException {
         List<File> sortedAddons = selectAddons(directories, logger);
         if (sortedAddons.isEmpty()) {
+            removeStaleExtractions(cacheDirectory, Set.of(), logger);
             System.clearProperty(AddonBootstrapContract.LOADED_ADDON_FINGERPRINTS_PROPERTY);
             System.clearProperty(AddonBootstrapContract.REJECTED_ADDON_FINGERPRINTS_PROPERTY);
             return new Result(List.of());
@@ -48,9 +50,11 @@ final class AddonBootstrapLibraries {
         Map<String, ExtractedLibrary> librariesByName = new LinkedHashMap<>();
         Set<String> loadedAddonFingerprints = new LinkedHashSet<>();
         Set<String> rejectedAddonFingerprints = new LinkedHashSet<>();
+        Set<String> addonFingerprints = new HashSet<>();
 
         for (File addonFile : sortedAddons) {
             String addonFingerprint = sha256(addonFile.toPath());
+            addonFingerprints.add(addonFingerprint);
             Map<String, ExtractedLibrary> addonLibraries = new LinkedHashMap<>();
             try {
                 boolean containsBootstrapLibraries = inspectAddon(
@@ -71,6 +75,7 @@ final class AddonBootstrapLibraries {
             }
         }
 
+        removeStaleExtractions(cacheDirectory, addonFingerprints, logger);
         System.setProperty(
                 AddonBootstrapContract.LOADED_ADDON_FINGERPRINTS_PROPERTY,
                 String.join(",", loadedAddonFingerprints)
@@ -162,6 +167,24 @@ final class AddonBootstrapLibraries {
     }
 
     private record AddonFile(File file, String id, String version, int priority) {
+    }
+
+    /**
+     * Libraries are extracted per addon jar, so each update of an addon leaves the previous extraction behind.
+     * Nothing is loaded from them yet at this point, so everything but the current addons' goes.
+     */
+    private static void removeStaleExtractions(File cacheDirectory, Set<String> addonFingerprints, Logger logger) {
+        File[] extractions = cacheDirectory.toPath().resolve("addon-bootstrap").toFile().listFiles(File::isDirectory);
+        if (extractions == null) return;
+        for (File extraction : extractions) {
+            if (addonFingerprints.contains(extraction.getName())) continue;
+            try (var files = Files.walk(extraction.toPath())) {
+                files.sorted(Comparator.reverseOrder()).forEach(path -> path.toFile().delete());
+            } catch (IOException exception) {
+                logger.debug("Could not remove stale bootstrap libraries {}", extraction, exception);
+            }
+            if (!extraction.exists()) logger.info("Removed stale bootstrap libraries of a replaced addon: {}", extraction.getName());
+        }
     }
 
     private static boolean inspectAddon(

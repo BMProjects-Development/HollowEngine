@@ -27,7 +27,7 @@ class ScriptSideConfigurator : RefineScriptCompilationConfigurationHandler {
 
         val clientReceivers =
             context.compilationConfiguration[ScriptCompilationConfiguration.clientSideImplicitReceivers]
-                ?: return makeFailureResult("@file:ClientSide and @file:ServerSide only apply to .reload.kts; " + "a .startup.kts runs on both sides and checks isClientSide instead")
+                ?: return makeFailureResult("@file:ClientSide and @file:ServerSide only apply to .reload.kts and .mixin.kts; a .startup.kts runs on both sides and checks isClientSide instead")
         if (clientSide && serverSide) {
             return makeFailureResult("A script runs on one side only: keep either @file:ClientSide or @file:ServerSide")
         }

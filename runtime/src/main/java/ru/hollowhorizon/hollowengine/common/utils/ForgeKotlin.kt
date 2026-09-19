@@ -23,7 +23,11 @@ import ru.hollowhorizon.hollowengine.client.utils.clientRegistryAccess
  *
  * @return `true` if the game is in production mode, otherwise `false`.
  */
-var isProduction: Boolean = false
+var isProduction: Boolean
+    get() = RuntimeFlags.production
+    set(value) {
+        RuntimeFlags.production = value
+    }
 
 /**
  * Checks if the current thread is the logical client thread.
@@ -37,7 +41,11 @@ val isLogicalClient get() = isPhysicalClient && RenderSystem.isOnRenderThread()
  *
  * @return `true` if running on the client side, otherwise `false`.
  */
-var isPhysicalClient = false
+var isPhysicalClient: Boolean
+    get() = RuntimeFlags.physicalClient
+    set(value) {
+        RuntimeFlags.physicalClient = value
+    }
 
 val RANDOM: RandomSource
     get() = RandomSourceHolder.INSTANCE

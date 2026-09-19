@@ -69,6 +69,9 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
 
     api(project(path = runtimeProjectPath, configuration = "namedElements"))
+    compileOnly("org.ow2.asm:asm-tree:9.7.1")
+    testImplementation(project(":bridge")) { isTransitive = false }
+    testImplementation("org.ow2.asm:asm-tree:9.7.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:0.3.4") { isTransitive = false }
 

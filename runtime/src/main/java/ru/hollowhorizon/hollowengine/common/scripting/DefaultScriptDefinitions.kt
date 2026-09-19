@@ -5,6 +5,7 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.world.item.ItemStack
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.scripting.annotations.Import
+import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinScript
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ReloadScript
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadContext
@@ -17,6 +18,7 @@ const val UI_SCRIPT_EXTENSION = "ui.kts"
 const val RELOAD_SCRIPT_EXTENSION = "reload.kts"
 const val STARTUP_SCRIPT_EXTENSION = "startup.kts"
 const val CONSOLE_SCRIPT_EXTENSION = "console.kts"
+const val MIXIN_SCRIPT_EXTENSION = "mixin.kts"
 private const val CLIENT_RELOAD_CONTEXT = "ru.hollowhorizon.hollowengine.client.scripting.ClientReloadContext"
 private const val CONSOLE_SCRIPT = "ru.hollowhorizon.hollowengine.client.scripting.ConsoleScript"
 
@@ -30,13 +32,29 @@ object DefaultScriptDefinitions {
 
     fun providers(): List<Provider> = definitions
 
+    /**
+     * What a script compiled while mixins are prepared may consist of: mixin scripts and the plain scripts
+     * they import. Unlike the rest, building these names no Minecraft class.
+     */
+    fun earlyProviders(): List<Provider> = listOf(plainProvider(), mixinProvider())
+
+    private fun plainProvider(): Provider = Provider("kts", "kotlin.Any", defaultImports = listOf(Import::class.qualifiedName!!))
+
+    private fun mixinProvider(): Provider = Provider(
+        extension = MIXIN_SCRIPT_EXTENSION,
+        baseClass = MixinScript::class.qualifiedName!!,
+        defaultImports = listOf(
+            "ru.hollowhorizon.hollowengine.common.scripting.mixins.*",
+            "ru.hollowhorizon.hollowengine.common.scripting.mixins.Point.*",
+            Import::class.qualifiedName!!,
+        ),
+        // Accepts @file:ClientSide: such a script's mixins are left out on a dedicated server.
+        clientSideReceivers = emptyList(),
+    )
+
     private fun createProviders(): List<Provider> {
         return buildList {
-            this += Provider(
-                "kts", "kotlin.Any", defaultImports = listOf(
-                    Import::class.qualifiedName!!
-                )
-            )
+            this += plainProvider()
             this += Provider(
                 extension = RELOAD_SCRIPT_EXTENSION,
                 baseClass = ReloadScript::class.qualifiedName!!,
@@ -169,6 +187,7 @@ object DefaultScriptDefinitions {
                     MinecraftServer::class
                 )
             )
+            this += mixinProvider()
             this += Provider(
                 extension = CONSOLE_SCRIPT_EXTENSION,
                 baseClass = CONSOLE_SCRIPT,

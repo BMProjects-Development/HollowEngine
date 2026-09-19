@@ -23,6 +23,7 @@ internal enum class ScriptTemplate(
     Startup("Startup Script", ".startup.kts", "ruby", "startup.kts", Icons.FILE_KTS.toString()),
     Node("Node Script", ".node.kts", "node", "node.kts", Icons.FILE_KTS.toString()),
     Ui("UI Script", ".ui.kts", "menu", "ui.kts", Icons.FILE_KTS.toString()),
+    Mixin("Mixin Script", ".mixin.kts", "mixins", "mixin.kts", Icons.FILE_KTS.toString()),
     Dialogue("Dialogue", ".story", "dialogue", "dialogue.story", Icons.DIALOGUE.toString());
 
     val suggestedFileName: String get() = defaultName + extension

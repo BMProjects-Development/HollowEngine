@@ -16,6 +16,8 @@ import ru.hollowhorizon.hollowengine.neoforge.internal.NeoForgeRegistryHolder;
 @Mod("hollowengine")
 public final class HollowCoreNeoForgeBootstrap {
     public HollowCoreNeoForgeBootstrap(IEventBus modBus) {
+        // Normally undone by the first script mixin applied; a launch that applied none still gets it back.
+        NeoForgeScriptMixinPlugin.restore();
         BootstrapRuntimeManager.bridge().setPlatform(RuntimePlatform.NEOFORGE);
         BootstrapRuntimeManager.bridge().setProduction(FMLEnvironment.production);
         BootstrapRuntimeManager.bridge().setClient(FMLEnvironment.dist.isClient());

@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "ru.hollowhorizon.hollowengine.mixin.generated",
+  "plugin": "ru.hollowhorizon.hollowengine.neoforge.NeoForgeScriptMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,5 +1,3 @@
-import java.nio.file.FileSystems
-import java.nio.file.Files
 import java.security.MessageDigest
 
 plugins {
@@ -28,6 +26,15 @@ val runtimePayloadNotice = rootProject.file("bootstrap/runtime-payload/README.MD
 val generatedMetadataDir = layout.buildDirectory.dir("generated/mod-metadata")
 val mergedRuntimeLangDir = rootProject.layout.projectDirectory.dir("build/runtime/generated/lang/")
 val runtimeMappingAttribute = Attribute.of("hollowengine.runtime.mapping", String::class.java)
+
+/**
+ * NeoForge runs on Mojang names in development and in production alike, so its mixin configs have no
+ * reference map. The config templates shared with Fabric name one; the line is dropped here.
+ */
+fun withoutRefmap(line: String): String? = line.takeUnless { it.trimStart().startsWith("\"refmap\"") }
+
+/** Filters are not task inputs; this stands in for [withoutRefmap], so changing both reruns the tasks. */
+val mixinRefmapRule = "without-refmap"
 
 architectury {
     platformSetupLoomIde()
@@ -161,6 +168,7 @@ val generateNeoForgeModMetadata = tasks.register<ProcessResources>("generateNeoF
     )
 
     inputs.properties(properties)
+    inputs.property("mixinRefmap", mixinRefmapRule)
     from(rootProject.file("bootstrap-neoforge/src/main/templates"))
     from(rootProject.file("bridge/src/main/resources/hollowengine.bridge.mixins.json")) {
         rename { "hollowengine-neoforge.bridge.mixins.json" }
@@ -170,7 +178,7 @@ val generateNeoForgeModMetadata = tasks.register<ProcessResources>("generateNeoF
         expand(properties)
     }
     filesMatching("hollowengine-neoforge.bridge.mixins.json") {
-        expand("refmap" to "disabled")
+        filter(::withoutRefmap)
     }
 }
 
@@ -200,7 +208,9 @@ sourceSets.named("main").configure {
 
 tasks.named<ProcessResources>("processResources") {
     dependsOn(embedRuntimeJar, generateNeoForgeModMetadata, ":runtime:mergeLang")
+    inputs.property("mixinRefmap", mixinRefmapRule)
     filesMatching(listOf("*.mixins.json", "pack.mcmeta")) {
+        filter(::withoutRefmap)
         expand(
             mapOf(
                 "mod_id" to modId,
@@ -210,7 +220,6 @@ tasks.named<ProcessResources>("processResources") {
                 "license" to license,
                 "minecraft_version" to minecraftVersion,
                 "neo_version" to neoForgeVersion,
-                "refmap" to "disabled"
             )
         )
     }
@@ -242,17 +251,8 @@ val bootstrapDevJar = tasks.register<Jar>("bootstrapDevJar") {
     from({
         project.configurations.getByName("shadowBundle")
             .map { zipTree(it) }
-    })
-
-    doLast {
-        val jarFile = archiveFile.get().asFile
-        if (jarFile.exists()) {
-            val fs = FileSystems.newFileSystem(jarFile.toPath())
-            fs.use {
-                val refmapPath = it.getPath("/hollowengine.bridge.refmap.json")
-                if (Files.exists(refmapPath)) Files.delete(refmapPath)
-            }
-        }
+    }) {
+        exclude("hollowengine.bridge.mixins.json", "hollowengine.bridge.refmap.json")
     }
 }
 

@@ -7,7 +7,7 @@ import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
 import ru.hollowhorizon.hollowengine.common.utils.ModList
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
 
 /**
@@ -17,7 +17,7 @@ import java.io.File
  */
 object ScriptingMods {
     fun requested(): List<String> = buildList {
-        if (isProduction) addAll(HollowEngineConfig.scriptingMods)
+        if (RuntimeFlags.production) addAll(HollowEngineConfig.scriptingMods)
         addAll(HollowProject.properties().modDependencies)
         HollowAddonManager.enabled.forEach { addon -> addAll(addon.descriptor.modDependencies) }
     }.distinct()
@@ -43,9 +43,13 @@ object ScriptingAddons {
 }
 
 class ModsEnvironment(private val modIds: List<String>) : EnvironmentSetup {
+    var sources: List<File> = emptyList()
+        private set
+
     override fun setup(mappings: Mappings, outputDir: File): List<File> {
         val files = modIds.mapNotNull(::fileOf).distinctBy { it.absoluteFile.normalize() }
-        if (!isProduction || NeoForgeEnvironmentSetup.isAvailable()) return files
+        sources = files
+        if (!RuntimeFlags.production || NeoForgeEnvironmentSetup.isAvailable()) return files
         val (directories, jars) = files.partition(File::isDirectory)
         return directories + remapJars(mappings, jars, outputDir, from = "intermediary", to = "named")
     }

@@ -28,6 +28,7 @@ import ru.hollowhorizon.hollowengine.logW
 import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
+import java.util.jar.JarFile
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.ScriptingHostConfiguration
@@ -90,25 +91,28 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
         scriptTypes: List<ScriptClassProvider>,
         mappings: Mappings,
     ): ScriptingEnvironmentImpl {
-        val kotlinStdlib = classpath.firstOrNull { it.name.startsWith("kotlin-stdlib-jdk8") }
-            ?: classpath.firstOrNull(::containsKotlinStdlib)
-        if (kotlinStdlib != null) {
-            System.setProperty("kotlin.java.stdlib.jar", kotlinStdlib.absolutePath)
-        }
+        useKotlinStdlibFrom(classpath)
         val environment = ScriptingEnvironmentImpl(javaHome, classpath, hostClasspath, scriptTypes, mappings)
         logI("ScriptingEnvironment loaded successfully!")
         ScriptingEnvironment.INSTANCE = environment
         return environment
     }
+}
 
-    private fun containsKotlinStdlib(file: File): Boolean {
-        if (!file.isFile || file.extension != "jar") return false
-        return runCatching {
-            java.util.jar.JarFile(file).use { jar ->
-                jar.getEntry("kotlin/jvm/internal/Intrinsics.class") != null
-            }
-        }.getOrDefault(false)
+/** Points the compiler at the Kotlin stdlib on [classpath], which it otherwise looks for next to itself. */
+internal fun useKotlinStdlibFrom(classpath: List<File>) {
+    val kotlinStdlib = classpath.firstOrNull { it.name.startsWith("kotlin-stdlib-jdk8") }
+        ?: classpath.firstOrNull(::containsKotlinStdlib)
+    if (kotlinStdlib != null) {
+        System.setProperty("kotlin.java.stdlib.jar", kotlinStdlib.absolutePath)
     }
+}
+
+private fun containsKotlinStdlib(file: File): Boolean {
+    if (!file.isFile || file.extension != "jar") return false
+    return runCatching {
+        JarFile(file).use { jar -> jar.getEntry("kotlin/jvm/internal/Intrinsics.class") != null }
+    }.getOrDefault(false)
 }
 
 class ScriptingEnvironmentImpl(
@@ -117,6 +121,8 @@ class ScriptingEnvironmentImpl(
     private val hostClasspath: List<File> = classpath,
     scriptTypes: List<ScriptClassProvider>,
     override val mappings: Mappings,
+    /** Whether compiled classes may be dumped when the config asks for it; see [ScriptingCompilerImpl]. */
+    val debugOutput: Boolean = true,
 ) : ScriptingEnvironment {
     init {
         Logger.setFactory { EmptyLogger }

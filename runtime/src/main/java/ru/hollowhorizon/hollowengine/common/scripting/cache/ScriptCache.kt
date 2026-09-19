@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.scripting.cache
 
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.common.files.CacheCleanup
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache.SHARED_ATTRIBUTE
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache.parseSharedScripts
@@ -158,7 +159,8 @@ object ScriptCache {
      * does not leave its bytecode behind forever.
      *
      * Only namespaces represented in [known] are touched: a disabled addon has no scripts to report and
-     * must not lose the artifacts it will need when it is enabled again.
+     * must not lose the artifacts it will need when it is enabled again. Files a compilation left half
+     * written go too.
      */
     fun prune(known: Collection<ScriptId>) {
         val root = DirectoryManager.SCRIPT_CACHE
@@ -166,18 +168,21 @@ object ScriptCache {
         val expected = known.flatMapTo(HashSet()) {
             listOf(artifact(it).canonicalPath, sharedArtifact(it).canonicalPath)
         }
+        var freed = CacheCleanup.Freed()
         known.mapTo(HashSet(), ScriptId::namespace).forEach { namespace ->
             val namespaceRoot = root.resolve(namespace)
             if (!namespaceRoot.isDirectory) return@forEach
             namespaceRoot.walkBottomUp().forEach { file ->
                 when {
-                    file.isFile && file.extension == "jar" && file.canonicalPath !in expected -> {
-                        if (file.delete()) HollowEngine.LOGGER.debug("Removed stale compiled script '{}'", file)
-                    }
-
+                    file.isFile && file.extension == "tmp" -> freed += CacheCleanup.delete(file)
+                    file.isFile && file.extension == "jar" && file.canonicalPath !in expected -> freed += CacheCleanup.delete(file)
                     file.isDirectory && file != namespaceRoot && file.list()?.isEmpty() == true -> file.delete()
                 }
             }
         }
+        CacheCleanup.report(root, freed)
     }
+
+    /** Removes the compiled scripts of every namespace not in [namespaces]: a renamed project, a deleted addon. */
+    fun retainNamespaces(namespaces: Set<String>) = CacheCleanup.retain(DirectoryManager.SCRIPT_CACHE, namespaces)
 }

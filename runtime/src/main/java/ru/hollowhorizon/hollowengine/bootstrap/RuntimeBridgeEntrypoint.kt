@@ -139,11 +139,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun setProduction(production: Boolean) {
-        isProduction = production
+        RuntimeFlags.production = production
     }
 
     override fun setClient(physicalClient: Boolean) {
-        isPhysicalClient = physicalClient
+        RuntimeFlags.physicalClient = physicalClient
     }
 
     override fun events(): EventBridge = EventBridgeImpl

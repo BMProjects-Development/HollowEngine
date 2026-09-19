@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.common.scripting.deobf
 
-import net.minecraft.SharedConstants
+import ru.hollowhorizon.hollowengine.HollowEngineBuild
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
 import ru.hollowhorizon.hollowengine.common.utils.ModList
-import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
 import java.lang.reflect.Modifier
 import java.nio.file.Path
@@ -14,7 +14,7 @@ object NeoForgeEnvironmentSetup : EnvironmentSetup {
     override fun setup(mappings: Mappings, outputDir: File): List<File> {
         val classpath = runtimeClasspath()
 
-        return if (isProduction && !SharedConstants.getCurrentVersion().id.startsWith("1.21")) {
+        return if (RuntimeFlags.production && !HollowEngineBuild.MINECRAFT_VERSION.startsWith("1.21")) {
             val remapped = remapJars(
                 mappings = mappings,
                 inputs = listOf(ModList.getFile("minecraft")),

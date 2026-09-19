@@ -1,0 +1,16 @@
+// A mixin script. Each mixin { } below becomes a real mixin into a Minecraft class, applied before the
+// game loads its first class, so a new or changed declaration takes effect after a restart. The bodies in
+// { } can be swapped while the game runs: /hollowengine scripting run {{path}}
+//
+// Everything a declaration says is read by the compiler, so its arguments must be constants. A script
+// that changes client-only classes needs @file:ClientSide at the top.
+
+import net.minecraft.world.entity.player.Player
+
+mixin<Player> {
+    method("jumpFromGround") {
+        after {
+            // Runs after every jump. `self` is the player, `args` the arguments of the method.
+        }
+    }
+}

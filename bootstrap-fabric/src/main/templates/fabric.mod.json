@@ -21,7 +21,8 @@
   "mixins": [
     "${mod_id}.mixins.json",
     "${mod_id}.bridge.mixins.json",
-    "${mod_id}-fabric.mixins.json"
+    "${mod_id}-fabric.mixins.json",
+    "${mod_id}-fabric.scripts.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
