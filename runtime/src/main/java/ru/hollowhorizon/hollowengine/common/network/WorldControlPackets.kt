@@ -117,6 +117,7 @@ internal object WorldControl {
     }
 
     /** Moves every level to [timeOfDay] within the current day, so the day counter and moon phase stay. */
+    fun setTimeOfDay(server: MinecraftServer, timeOfDay: Long) {
         val target = timeOfDay.mod(DAY_TICKS)
         val daylight = server.gameRules.getBoolean(GameRules.RULE_DAYLIGHT)
         for (level in server.allLevels) {
