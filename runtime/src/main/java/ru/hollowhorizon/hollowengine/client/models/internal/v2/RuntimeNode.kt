@@ -28,6 +28,7 @@ open class RuntimeNode(
     val definition: NodeDefinition,
     parent: Attachment?,
     private val materialResolver: (Material) -> Material = { it },
+    private val createMeshes: Boolean = true,
 ) : Attachment(parent) {
     val name: String = definition.name ?: parent?.let { "Node_${definition.index}" } ?: "Root"
     var isVisible = true
@@ -52,13 +53,13 @@ open class RuntimeNode(
     val morphWeights: FloatArray = baseMorphWeights.copyOf()
 
     init {
-        definition.mesh?.primitives?.forEach { primitive ->
+        if (createMeshes) definition.mesh?.primitives?.forEach { primitive ->
             attachments += MeshAttachment(primitive, this, materialResolver(primitive.material))
         }
     }
 
     val children = definition.children.map {
-        RuntimeNode(it, this, materialResolver)
+        RuntimeNode(it, this, materialResolver, createMeshes)
     }
 
     val jointGetter by lazy {

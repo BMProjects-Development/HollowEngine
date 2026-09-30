@@ -43,6 +43,8 @@ fun interface RigOverlay {
 object RigOverlays {
     val point = ExtensionPoints.create<RigOverlay>("hollowengine:rig/overlays".rl)
 
+    init { register("hollowengine:rig/hitboxes", HitboxRigOverlay) }
+
     fun register(id: String, overlay: RigOverlay): ExtensionHandle = point.register(id.rl, overlay)
 
     val all: List<RigOverlay> get() = point.extensions

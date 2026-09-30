@@ -50,6 +50,13 @@ extensions.getByType<SourceSetContainer>().named("main") {
     resources.srcDir(hollowAddonResources)
 }
 dependencies.add("compileOnly", files(hollowEngineDevJars.single()))
+// These types appear in the addon API; keep them separate from the thin engine jar.
+dependencies.add("compileOnly", "org.jetbrains.kotlinx:kotlinx-coroutines-core:${
+    providers.gradleProperty("hollowEngineCoroutinesVersion").orElse("1.11.0").get()
+}")
+dependencies.add("compileOnly", "io.insert-koin:koin-core:${
+    providers.gradleProperty("hollowEngineKoinVersion").orElse("4.1.1").get()
+}")
 
 tasks.named<ProcessResources>("processResources") {
     inputs.property("hollowAddonVersion", project.version.toString())

@@ -3,6 +3,9 @@ package ru.hollowhorizon.hollowengine.common.models
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.packs.resources.ResourceManager
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener
+import ru.hollowhorizon.hollowengine.api.ReloadListener
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockModelLoader
 import ru.hollowhorizon.hollowengine.client.models.fbx.FbxModelLoader
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfModelLoader
@@ -13,7 +16,10 @@ import ru.hollowhorizon.hollowengine.client.models.obj.ObjModelLoader
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import java.util.concurrent.ConcurrentHashMap
 
-object ServerModelAnimationMetadata {
+@ReloadListener
+object ServerModelAnimationMetadata : ResourceManagerReloadListener {
+    override fun onResourceManagerReload(resourceManager: ResourceManager) = clearCache()
+
     private val loaders: List<ModelLoader> = listOf(
         GltfModelLoader,
         ObjModelLoader,
@@ -36,6 +42,7 @@ object ServerModelAnimationMetadata {
 
     fun clearCache() {
         modelCache.clear()
+        ServerHitboxAssets.clear()
     }
 
     private fun loadModel(model: String): Result<Model> =

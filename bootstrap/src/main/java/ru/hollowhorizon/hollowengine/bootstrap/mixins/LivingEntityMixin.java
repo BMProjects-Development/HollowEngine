@@ -1,5 +1,8 @@
 package ru.hollowhorizon.hollowengine.bootstrap.mixins;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,6 +14,12 @@ import ru.hollowhorizon.hollowengine.bootstrap.impl.BootstrapRuntimeManager;
 
 @Mixin(LivingEntity.class)
 public class LivingEntityMixin {
+    @WrapMethod(method = "hurt")
+    private boolean hollowengine$hitboxDamage(DamageSource source, float amount, Operation<Boolean> original) {
+        float adjusted = BootstrapRuntimeManager.bridge().modelHitboxDamage((LivingEntity) (Object) this, source, amount);
+        return adjusted >= 0f && original.call(source, adjusted);
+    }
+
     @Inject(method = "tick", at = @At("TAIL"))
     private void hollowengine$tick(CallbackInfo ci) {
         BootstrapRuntimeManager.bridge().onLivingEntityTick((LivingEntity) (Object) this);

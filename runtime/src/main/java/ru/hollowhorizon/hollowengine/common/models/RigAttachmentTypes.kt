@@ -30,6 +30,7 @@ object RigAttachmentTypes {
 
     init {
         point.onChange(TagModuleRevision::invalidate)
+        register(HitboxAttachmentSpec.TYPE)
 
         register(
             RigAttachmentType(

@@ -51,6 +51,8 @@ import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import ru.hollowhorizon.hollowengine.api.ModList;
@@ -63,6 +65,7 @@ import ru.hollowhorizon.hollowengine.api.extensions.ItemStackHelper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -195,6 +198,19 @@ public interface RuntimeBridge extends AutoCloseable {
     void onEntityLoaded(Entity entity, CompoundTag tag);
 
     boolean onEntityHurt(Entity entity, DamageSource damageSource, float amount);
+
+    default boolean hasModelHitboxes(Entity entity) { return false; }
+
+    default EntityHitResult pickModelHitboxes(
+            Level level, @Nullable Entity source, Vec3 start, Vec3 end,
+            Predicate<Entity> predicate, double maxDistanceSquared,
+            @Nullable EntityHitResult vanilla) { return vanilla; }
+
+    default float modelHitboxDamage(Entity entity, DamageSource source, float amount) { return amount; }
+
+    default boolean withModelHitboxAreaDamage(java.util.function.BooleanSupplier damage) { return damage.getAsBoolean(); }
+
+    default AABB modelHitboxBounds(Entity entity) { return entity.getBoundingBox(); }
 
     void onEntityChangedDimension(Entity original, Entity entity, Level fromLevel, Level toLevel);
 

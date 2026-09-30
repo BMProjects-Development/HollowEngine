@@ -254,6 +254,13 @@ object HollowIdeOverlay {
     fun openOrCreate(path: String, initial: () -> ByteArray): Boolean =
         model.createIfMissing(path, initial()) && openPath(path)
 
+    /** Shares an editor document with an embedded view without opening another dock tab. */
+    internal fun relatedFile(path: String, initial: () -> ByteArray): HollowIdeOpenFile? {
+        model.files[path]?.let { return it }
+        if (!model.createIfMissing(path, initial())) return null
+        return (model.openFile(path) as? HollowIdeOpenResult.File)?.file
+    }
+
     /** While Windows owns the gesture the IDE must not act on the input it keeps receiving. */
     private val nativeFileDragActive: Boolean
         get() = WindowsFileDragSource.active || externalFiles.active

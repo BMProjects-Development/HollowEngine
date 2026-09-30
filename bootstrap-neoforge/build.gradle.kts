@@ -97,6 +97,20 @@ repositories {
     flatDir { dirs(rootProject.file("libs")) }
 }
 
+// This distribution is a service wrapper with the actual mod in META-INF/jarjar. Its duplicate
+// root mod descriptor makes NeoForge select the wrapper instead of the nested renderer classes.
+val sodiumDevServiceJar = tasks.register<Jar>("sodiumDevServiceJar") {
+    val sourceJar = rootProject.file("libs/sodium-neoforge-0.8.13+mc1.21.1.jar")
+    archiveFileName.set("sodium-neoforge-0.8.13+mc1.21.1-dev-service.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("development-libraries"))
+    from(zipTree(sourceJar)) {
+        exclude("META-INF/MANIFEST.MF", "META-INF/neoforge.mods.toml")
+    }
+    manifest {
+        from(resources.text.fromArchiveEntry(sourceJar, "META-INF/MANIFEST.MF"))
+    }
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:$minecraftVersion")
     mappings(loom.layered {
@@ -109,8 +123,8 @@ dependencies {
     implementation("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
     runtimeOnly("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
 
-    implementation("lib:sodium-neoforge:0.8.13+mc1.21.1")
-    runtimeOnly("lib:sodium-neoforge:0.8.13+mc1.21.1")
+    compileOnly("lib:sodium-neoforge:0.8.13+mc1.21.1")
+    runtimeOnly(files(sodiumDevServiceJar.flatMap { it.archiveFile }))
 
     implementation("org.anarres:jcpp:1.4.14")
     implementation("io.github.douira:glsl-transformer:3.0.0-pre3")

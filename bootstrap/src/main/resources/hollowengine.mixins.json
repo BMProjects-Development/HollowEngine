@@ -11,6 +11,8 @@
     "BrewingStandMenuMixin",
     "DimensionDataStorageAccessor",
     "LivingEntityMixin",
+    "ModelHitboxPlayerMixin",
+    "ProjectileUtilMixin",
     "MinecraftServerMixin",
     "PackRepositoryMixin",
     "PlayerListMixin",

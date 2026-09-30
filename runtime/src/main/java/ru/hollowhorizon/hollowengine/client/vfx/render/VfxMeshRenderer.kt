@@ -192,7 +192,7 @@ object VfxMeshRenderer {
     private fun drawInstanced(order: List<Batch>, view: VfxView, glow: Boolean) {
         val engine = ModShaders.VFX_MESH ?: return
         val previousVao = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING)
-        val previousBuffer = GL33.glGetInteger(GL33.GL_ELEMENT_ARRAY_BUFFER_BINDING)
+        val previousBuffer = GL33.glGetInteger(GL33.GL_ARRAY_BUFFER_BINDING)
         try {
             GL33.glDepthFunc(GL33.GL_LEQUAL)
             order.forEach { batch ->
@@ -223,7 +223,7 @@ object VfxMeshRenderer {
             VfxMaterialStates.restore()
             GlStateManager._glUseProgram(0)
             RenderSystem.glBindVertexArray(previousVao)
-            RenderSystem.glBindBuffer(GL33.GL_ELEMENT_ARRAY_BUFFER, previousBuffer)
+            RenderSystem.glBindBuffer(GL33.GL_ARRAY_BUFFER, previousBuffer)
         }
     }
 
@@ -254,7 +254,7 @@ object VfxMeshRenderer {
         val indices = VboWrapper.createElementBuffer().apply {
             val data = BufferUtils.createIntBuffer(geometry.indices.size)
             data.put(geometry.indices).flip()
-            uploadData(data)
+            uploadData(data, bindingTarget = GL33.GL_ARRAY_BUFFER)
         }
         GpuMesh(vertices, indices, geometry.indices.size)
     }

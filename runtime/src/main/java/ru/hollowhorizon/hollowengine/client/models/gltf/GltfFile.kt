@@ -12,7 +12,7 @@ import ru.hollowhorizon.hollowengine.common.utils.decodeToString
 import ru.hollowhorizon.hollowengine.common.utils.inflate
 import ru.hollowhorizon.hollowengine.common.utils.json.JsonFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ListOrSingle
-import ru.hollowhorizon.hollowengine.common.utils.rl
+import java.nio.file.Path
 import java.util.*
 
 suspend fun loadGltf(location: ResourceLocation, side: ModelSide = ModelSide.CLIENT): Result<GltfFile> {
@@ -27,7 +27,6 @@ suspend fun loadGltf(location: ResourceLocation, side: ModelSide = ModelSide.CLI
             else -> error("Invalid gltf file type: $type ($filePath)")
         }
 
-        val modelBasePath = if (filePath.contains('/')) filePath.substringBeforeLast('/') else "."
         gltfFile.let { m ->
             coroutineScope {
                 withContext(Dispatchers.IO) {
@@ -47,15 +46,14 @@ suspend fun loadGltf(location: ResourceLocation, side: ModelSide = ModelSide.CLI
                                     else -> throw IllegalStateException("Unknown data format: $uri")
                                 }
                                 return@async
-                            } else {
-                                "${location.namespace}:$modelBasePath/$uri"
-                            }
-                            it.data = Uint8Buffer(bufferUri.rl.readModelBytes(side))
+                            } else resolveGltfResource(location, uri)
+                            it.data = Uint8Buffer(bufferUri.readModelBytes(side))
                         }
                     }.awaitAll()
                     m.images.filter { it.uri != null }.forEach {
-                        if (it.uri?.startsWith("data:") == false) it.uri =
-                            "${location.namespace}:$modelBasePath/${it.uri}"
+                        if (it.uri?.startsWith("data:") == false) {
+                            it.uri = resolveGltfResource(location, it.uri!!).toString()
+                        }
                     }
                     m.updateReferences()
                 }
@@ -65,6 +63,14 @@ suspend fun loadGltf(location: ResourceLocation, side: ModelSide = ModelSide.CLI
     } catch (t: Throwable) {
         Result.failure(t)
     }
+}
+
+/** Рессурсы майнкрафт не могут содержать "." :> */
+private fun resolveGltfResource(model: ResourceLocation, uri: String): ResourceLocation {
+    val parent = Path.of(model.path).parent ?: Path.of("")
+    val path = parent.resolve(uri).normalize()
+    require(!path.isAbsolute && !path.startsWith("..")) { "glTF resource escapes its namespace: $uri" }
+    return ResourceLocation.fromNamespaceAndPath(model.namespace, path.toString().replace('\\', '/').lowercase(Locale.ROOT))
 }
 
 private fun ResourceLocation.readModelBytes(side: ModelSide): ByteArray =

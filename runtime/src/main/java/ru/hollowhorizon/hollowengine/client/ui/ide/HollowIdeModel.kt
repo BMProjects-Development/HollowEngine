@@ -112,6 +112,10 @@ internal class HollowIdeModel(
         val opened = runCatching {
             fileTypes.open(path, file::readBytes)?.also { opened ->
                 opened.attachSaveHandler { save(path) }
+                opened.document.onChange {
+                    opened.markDirty()
+                    scheduleSave(path)
+                }
             }
         }.getOrNull() ?: return HollowIdeOpenResult.Unsupported
         files[path] = opened
@@ -414,16 +418,16 @@ internal class HollowIdeModel(
 
     private fun scheduleSave(path: String) {
         val file = files[path]?.takeIf { it.dirty } ?: return
-        val text = file.textOrNull ?: return
+        val content = file.encode()
         pendingSaves.remove(path)?.cancel()
         pendingSaves[path] = ioScope.launch {
             delay(AutoSaveDelayMillis)
             runCatching {
-                writeIdeFile(path.fromReadablePath().toPath(), text.toByteArray(Charsets.UTF_8))
+                writeIdeFile(path.fromReadablePath().toPath(), content)
             }.onSuccess {
                 Minecraft.getInstance().execute {
                     pendingSaves.remove(path)
-                    files[path]?.markSavedIfText(text)
+                    files[path]?.takeIf { it === file && it.encode().contentEquals(content) }?.markSaved()
                     tree.refresh()
                 }
             }

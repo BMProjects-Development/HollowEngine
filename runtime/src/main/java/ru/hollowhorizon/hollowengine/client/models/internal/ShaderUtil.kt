@@ -10,7 +10,6 @@ import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.renderer.RenderStateShard
 import net.minecraft.client.renderer.RenderType
-import net.minecraft.client.renderer.texture.TextureManager
 import org.lwjgl.opengl.GL13
 import ru.hollowhorizon.hollowengine.bridge.mixins.client.ShaderInstanceAccessor
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
@@ -48,9 +47,9 @@ inline fun drawWithShader(
 
 fun Material.packedLight(worldLight: Int): Int = if (emissive) LightTexture.FULL_BRIGHT else worldLight
 
-fun opaqueShaderState(): RenderType = RenderType.entityCutoutNoCull(TextureManager.INTENTIONAL_MISSING_TEXTURE)
+fun opaqueShaderState(): RenderType = RenderType.entityCutoutNoCull(Material.MISSING_TEXTURE)
 
-fun translucentShaderState(): RenderType = RenderType.entityTranslucent(TextureManager.INTENTIONAL_MISSING_TEXTURE)
+fun translucentShaderState(): RenderType = RenderType.entityTranslucent(Material.MISSING_TEXTURE)
 
 val batchingRenderType: Function<Material, RenderType> = Util.memoize<Material, RenderType> { material: Material ->
     val compositeState = RenderType.CompositeState.builder()

@@ -67,7 +67,7 @@ Use the Gradle wrapper from the repository root:
 - `.\gradlew.bat buildAddons` - build and collect every addon, including the compiler
 - `.\gradlew.bat developmentJar` - build `build/development/HollowEngine-<minecraft>-<version>-dev.jar` for compiling external addons
 
-`build` also produces the development jar, and `buildAndCollect` copies it into `merged/`. It exposes engine classes (including `common.addons` and UI), the bridge, and bundled libraries directly on the compile classpath. Use it as `compileOnly` with Mojang/Parchment mappings and the Kotlin version used by HE. Install the regular universal jar in the game; the development jar is only for compilation.
+`build` also produces the development jar, and `buildAndCollect` copies it into `merged/`. It contains only engine classes (including `common.addons` and UI), the bridge, and the engine's Kotlin package metadata. Kotlin and other third-party libraries are not bundled, so Gradle can resolve their versions in the consuming project. Use the jar as `compileOnly` with Mojang/Parchment mappings and a Kotlin compiler compatible with HE's metadata. Add libraries used by the addon API separately as `compileOnly`: coroutines `1.11.0` and Koin `4.1.1` for the entrypoint/context, and Compose, serialization, or other libraries when your addon uses those APIs. Install the regular universal jar in the game; the development jar is only for compilation.
 
 For an addon tied to a mod, use the [addon template](addons/template/README.md). Its entrypoint is compiled into the mod jar and HE activates it only when that mod is installed. Independent addons continue to use the separate format-3 jar.
 

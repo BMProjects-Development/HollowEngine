@@ -7,5 +7,16 @@
   "nodes": "Узлы",
   "none": "—",
   "polygons": "Полигоны",
-  "shape_keys": "Shape keys"
+  "shape_keys": "Shape keys",
+  "preview": "Модель",
+  "hitboxes": "Хитбоксы",
+  "hitbox.title": "Хитбокс урона",
+  "hitbox.name": "Название",
+  "hitbox.offset": "Смещение",
+  "hitbox.rotation": "Поворот",
+  "hitbox.rotation_hint": "Поворот вокруг локальных осей выбранной модели или кости в градусах.",
+  "hitbox.size": "Размер",
+  "hitbox.size_hint": "Полная ширина, высота и глубина в единицах модели. Каждый размер должен быть положительным.",
+  "hitbox.damage_multiplier": "Множитель урона",
+  "hitbox.open_error": "Не удалось открыть риг модели. Проверьте доступ к папке модели."
 }

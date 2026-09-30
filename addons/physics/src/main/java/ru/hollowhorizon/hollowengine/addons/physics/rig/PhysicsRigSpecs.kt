@@ -8,21 +8,12 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.models.RigVector
 import kotlin.math.abs
 
 private const val LANG = "hollowengine.gui.rig_editor.physics"
 
-@Serializable
-data class RigVector(val x: Float = 0f, val y: Float = 0f, val z: Float = 0f) {
-    fun toVec3f(): Vec3f = Vec3f(x, y, z)
-
-    companion object {
-        val ZERO = RigVector()
-
-        fun of(vector: Vec3f) = RigVector(vector.x, vector.y, vector.z)
-    }
-}
+typealias RigVector = RigVector
 
 /**
  * Shape of a body, in the space of bone it hangs on.

@@ -39,7 +39,7 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
             id = "rig",
             extensions = listOf(".rig"),
             priority = 270,
-            loader = { _, bytes -> HollowIdeRigDocument(bytes) },
+            loader = { path, bytes -> HollowIdeRigDocument(bytes, path.substringAfter("assets/").replaceFirst("/", ":").removeSuffix(".rig")) },
             editor = rigEditor,
         ),
     )

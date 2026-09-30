@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import androidx.compose.runtime.*
-import kotlinx.coroutines.delay
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
@@ -21,9 +20,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeView
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import kotlin.time.Duration.Companion.milliseconds
 
-private const val AutoSaveDelayMillis = 900L
 private const val BoneListWidth = 210f
 private const val MinPanelWidth = 160f
 private const val MaxPanelWidth = 420f
@@ -45,10 +42,6 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
 
     LaunchedEffect(document.revision) {
         viewer.attachment.rig = document.rig
-        file.updateDirty(document.isModified)
-        if (!document.isModified) return@LaunchedEffect
-        delay(AutoSaveDelayMillis.milliseconds)
-        if (document.isModified) file.save()
     }
 
     LaunchedEffect(preview) {
@@ -73,7 +66,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
     val bones = remember(viewer.nodes) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
 
     PublishInspector(source = "rig-${file.path}", key = state.selected to bones) {
-        state.selected?.let { bone -> rigInspectorTarget(document, bone, bones) }
+        rigInspectorTarget(document, state.selected, bones)
     }
 
     Row(
@@ -178,18 +171,29 @@ private fun RigViewport(viewer: ModelViewerState, preview: RigPreview?, onPick: 
 }
 
 @Composable
-private fun BoneList(
+internal fun BoneList(
     viewer: ModelViewerState,
     rig: ModelRig,
     selected: String?,
-    onSelect: (String) -> Unit,
+    onSelect: (String?) -> Unit,
     onToggleVisibility: (RuntimeNode) -> Unit,
     modifier: Modifier,
 ) {
     val expanded = remember(viewer) { mutableStateListOf<String>() }
     val nodes = viewer.nodes
     val items = remember(nodes, expanded.toList(), selected, rig, viewer.nodeVisibilityRevision) {
-        buildList { appendBones(nodes, rig, expanded, selected) }
+        buildList<UiTreeItem<RuntimeNode?>> {
+            val count = rig.attachments.size
+            add(UiTreeItem(
+                id = "model",
+                label = rigText("model_root") + if (count > 0) "  ●$count" else "",
+                depth = 0,
+                payload = null,
+                icon = ColliderIcon,
+                selected = selected == null,
+            ))
+            appendBones(nodes, rig, expanded, selected)
+        }
     }
 
     Column(
@@ -197,23 +201,22 @@ private fun BoneList(
             .gap(6.px),
     ) {
         Text(rigText("bones"), modifier = Modifier.fontSize(11f).foreground(AnimatorColors.Muted))
-        if (items.isEmpty()) {
+        if (nodes.isEmpty()) {
             Text(rigText("no_bones"), modifier = Modifier.fontSize(9f).foreground(AnimatorColors.Muted))
-            return@Column
         }
 
         UiTreeView(
             items = items,
             onToggle = { item -> if (item.id in expanded) expanded.remove(item.id) else expanded.add(item.id) },
-            onSelect = { item, _ -> onSelect(item.payload.name) },
-            onIconClick = { onToggleVisibility(it.payload) },
+            onSelect = { item, _ -> onSelect(item.payload?.name) },
+            onIconClick = { item -> item.payload?.let(onToggleVisibility) ?: onSelect(null) },
             fillRowWidth = true,
             modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(horizontal = false),
         )
     }
 }
 
-private fun MutableList<UiTreeItem<RuntimeNode>>.appendBones(
+private fun MutableList<UiTreeItem<RuntimeNode?>>.appendBones(
     nodes: List<RuntimeNode>,
     rig: ModelRig,
     expanded: List<String>,
@@ -229,17 +232,17 @@ private fun MutableList<UiTreeItem<RuntimeNode>>.appendBones(
 
         add(
             UiTreeItem(
-                id = node.name,
+                id = "bone:${node.name}",
                 label = if (marks.isEmpty()) node.name else "${node.name}  $marks",
                 depth = depth,
                 payload = node,
                 icon = if (node.isVisible) VisibleIcon else InvisibleIcon,
                 hasChildren = node.children.isNotEmpty(),
-                expanded = node.name in expanded,
+                expanded = "bone:${node.name}" in expanded,
                 selected = node.name == selected,
             )
         )
-        if (node.children.isNotEmpty() && node.name in expanded) {
+        if (node.children.isNotEmpty() && "bone:${node.name}" in expanded) {
             appendBones(node.children, rig, expanded, selected, depth + 1)
         }
     }

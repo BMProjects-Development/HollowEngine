@@ -73,9 +73,9 @@ class ListRenderPipeline : RenderPipeline {
     fun renderVAO(context: RenderContext) {
         val activeTexture = GlStateManager._getActiveTexture()
 
-        //Получение текущих VAO и IBO
+        // Binding the saved VAO also restores its element buffer.
         val currentVAO = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING)
-        val currentElementArrayBuffer = GL33.glGetInteger(GL33.GL_ELEMENT_ARRAY_BUFFER_BINDING)
+        val currentArrayBuffer = GL33.glGetInteger(GL33.GL_ARRAY_BUFFER_BINDING)
 
         transformSkinning()
 
@@ -110,7 +110,7 @@ class ListRenderPipeline : RenderPipeline {
         RenderSystem.activeTexture(activeTexture)
 
         RenderSystem.glBindVertexArray(currentVAO)
-        RenderSystem.glBindBuffer(GL33.GL_ELEMENT_ARRAY_BUFFER, currentElementArrayBuffer)
+        RenderSystem.glBindBuffer(GL33.GL_ARRAY_BUFFER, currentArrayBuffer)
 
         GlStateManager._glUseProgram(0)
     }
@@ -118,7 +118,7 @@ class ListRenderPipeline : RenderPipeline {
     fun renderInstanced(context: RenderContext) {
         val activeTexture = GlStateManager._getActiveTexture()
         val currentVAO = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING)
-        val currentElementArrayBuffer = GL33.glGetInteger(GL33.GL_ELEMENT_ARRAY_BUFFER_BINDING)
+        val currentArrayBuffer = GL33.glGetInteger(GL33.GL_ARRAY_BUFFER_BINDING)
 
         GL33.glVertexAttribI2i(3, context.overlay and FFFF, context.overlay shr 16 and FFFF)
         GL33.glVertexAttribI2i(4, context.light and FFFF, context.light shr 16 and FFFF)
@@ -148,7 +148,7 @@ class ListRenderPipeline : RenderPipeline {
         RenderSystem.activeTexture(activeTexture)
 
         RenderSystem.glBindVertexArray(currentVAO)
-        RenderSystem.glBindBuffer(GL33.GL_ELEMENT_ARRAY_BUFFER, currentElementArrayBuffer)
+        RenderSystem.glBindBuffer(GL33.GL_ARRAY_BUFFER, currentArrayBuffer)
 
         GlStateManager._glUseProgram(0)
     }

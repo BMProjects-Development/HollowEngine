@@ -86,7 +86,7 @@ fun groupByMaterial(
 inline fun withInstancingRenderState(body: () -> Unit) {
     val activeTexture = GlStateManager._getActiveTexture()
     val currentVao = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING)
-    val currentElementArrayBuffer = GL33.glGetInteger(GL33.GL_ELEMENT_ARRAY_BUFFER_BINDING)
+    val currentArrayBuffer = GL33.glGetInteger(GL33.GL_ARRAY_BUFFER_BINDING)
     val shaderTexture0 = RenderSystem.getShaderTexture(0)
     val shaderTexture1 = RenderSystem.getShaderTexture(1)
     val shaderTexture2 = RenderSystem.getShaderTexture(2)
@@ -121,7 +121,7 @@ inline fun withInstancingRenderState(body: () -> Unit) {
         RenderSystem.activeTexture(activeTexture)
 
         RenderSystem.glBindVertexArray(currentVao)
-        RenderSystem.glBindBuffer(GL33.GL_ELEMENT_ARRAY_BUFFER, currentElementArrayBuffer)
+        RenderSystem.glBindBuffer(GL33.GL_ARRAY_BUFFER, currentArrayBuffer)
 
         GlStateManager._glUseProgram(0)
     }

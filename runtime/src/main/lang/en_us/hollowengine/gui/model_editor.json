@@ -7,5 +7,16 @@
   "nodes": "Nodes",
   "none": "—",
   "polygons": "Polygons",
-  "shape_keys": "Shape keys"
+  "shape_keys": "Shape keys",
+  "preview": "Model",
+  "hitboxes": "Hitboxes",
+  "hitbox.title": "Damage hitbox",
+  "hitbox.name": "Name",
+  "hitbox.offset": "Offset",
+  "hitbox.rotation": "Rotation",
+  "hitbox.rotation_hint": "Rotation around the selected model or bone's local axes, in degrees.",
+  "hitbox.size": "Size",
+  "hitbox.size_hint": "Full width, height and depth in model units. Each dimension must be positive.",
+  "hitbox.damage_multiplier": "Damage multiplier",
+  "hitbox.open_error": "Could not open the model's rig. Check access to the model folder."
 }

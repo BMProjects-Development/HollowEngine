@@ -17,37 +17,44 @@ import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.models.HitboxAttachmentSpec
 
 
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"
 
 /**
- * What is authored onto the selected bone: its alias, whether it is drawn, and everything hung on it.
+ * What is authored onto the model (null) or selected bone.
  *
  * The bone list the picker offers travels with the target, because the shared inspector composes it
  * somewhere else entirely and knows nothing about this rig.
  */
 internal fun rigInspectorTarget(
     document: HollowIdeRigDocument,
-    bone: String,
+    bone: String?,
     bones: List<String>,
+    attachmentTypes: Set<String>? = null,
 ): InspectorTarget = InspectorTarget(
-    id = "rig-bone-$bone",
-    title = bone,
+    id = "rig-${bone?.let { "bone-$it" } ?: "model"}-$attachmentTypes",
+    title = bone ?: rigText("model_root"),
     icon = BoneIcon,
-    subtitle = rigText("section_bone"),
+    subtitle = rigText(if (bone == null) "section_model" else "section_bone"),
 ) {
     CompositionLocalProvider(LocalEditorBones provides bones) {
-        key(bone) { BoneFields(document, bone) }
+        key(bone) { BoneFields(document, bone, attachmentTypes) }
     }
 }
 
 @Composable
-private fun BoneFields(document: HollowIdeRigDocument, bone: String) {
-    val current = document.rig.bone(bone) ?: RigBone.EMPTY
+internal fun BoneFields(document: HollowIdeRigDocument, bone: String?, attachmentTypes: Set<String>? = null) {
+    val current = document.rig.attachmentTarget(bone)
+    // Other attachment kinds currently require a bone; model-space hitboxes do not.
+    val types = if (bone == null) setOf(HitboxAttachmentSpec.TYPE_ID).let {
+        if (attachmentTypes == null) it else it.intersect(attachmentTypes)
+    } else attachmentTypes
 
     Column(tags = listOf("insp-body")) {
-        Section(rigText("section_bone")) {
+        if (bone == null) Hint(rigText("model_hitboxes_hint"))
+        if (bone != null && attachmentTypes == null) Section(rigText("section_bone")) {
             Readonly(rigText("name"), bone)
             TextRow(rigText("alias"), current.alias.orEmpty()) { value ->
                 document.edit { it.withBone(bone, current.copy(alias = value.trim().ifBlank { null })) }
@@ -57,34 +64,38 @@ private fun BoneFields(document: HollowIdeRigDocument, bone: String) {
             }
         }
 
-        current.attachments.forEach { attachment ->
+        current.attachments.filter { types == null || RigAttachmentTypes.of(it)?.id in types }.forEach { attachment ->
             key(attachment.id) { AttachmentSection(document, bone, current, attachment) }
         }
 
-        AddAttachment(document, bone, current)
+        AddAttachment(document, bone, types)
     }
 }
 
 @Composable
 private fun AttachmentSection(
     document: HollowIdeRigDocument,
-    bone: String,
+    bone: String?,
     current: RigBone,
     attachment: RigAttachmentSpec,
 ) {
     val type = RigAttachmentTypes.of(attachment)
+    var invalid by remember(attachment) { mutableStateOf(false) }
 
-    Section(type.title()) {
+    Section("${type.title()} · ${attachment.id}") {
         if (type == null) {
             Hint(rigText("unknown_attachment"))
         } else {
             AttachmentFields(type, attachment, "/$bone/${attachment.id}") { changed ->
-                document.edit { it.withBone(bone, current.withAttachment(attachment.id, changed)) }
+                invalid = changed.id != attachment.id && current.attachment(changed.id) != null
+                if (invalid) return@AttachmentFields
+                document.edit { rig -> rig.editAttachmentTarget(bone) { it.withAttachment(attachment.id, changed) } }
             }
+            if (invalid) Hint(rigText("duplicate_attachment"))
         }
 
         InspectorButton(rigText("remove_attachment"), tags = listOf("danger")) {
-            document.edit { it.withBone(bone, current.withoutAttachment(attachment.id)) }
+            document.edit { rig -> rig.editAttachmentTarget(bone) { it.withoutAttachment(attachment.id) } }
         }
     }
 }
@@ -100,6 +111,7 @@ private fun AttachmentFields(
     onChange: (RigAttachmentSpec) -> Unit,
 ) {
     @Suppress("UNCHECKED_CAST") val serializer = type.serializer as KSerializer<RigAttachmentSpec>
+    var invalid by remember(attachment) { mutableStateOf(false) }
     val encoded = remember(attachment) {
         runCatching {
             AttachmentJson.encodeToJsonElement(
@@ -115,24 +127,34 @@ private fun AttachmentFields(
         value = encoded,
         path = path,
     ) { updated ->
-        runCatching { AttachmentJson.decodeFromJsonElement(serializer, updated) }.onSuccess(onChange)
-            .onFailure { HollowEngine.LOGGER.warn("Could not apply an edit to '{}': {}", type.id, it.message) }
+        runCatching { AttachmentJson.decodeFromJsonElement(serializer, updated) }.onSuccess {
+            invalid = false
+            onChange(it)
+        }.onFailure { invalid = true }
     }
+    if (invalid) Hint(rigText("invalid_attachment"))
 }
 
 @Composable
-private fun AddAttachment(document: HollowIdeRigDocument, bone: String, current: RigBone) {
+private fun AddAttachment(document: HollowIdeRigDocument, bone: String?, attachmentTypes: Set<String>?) {
     var open by remember(bone) { mutableStateOf(false) }
     var anchor by remember(bone) { mutableStateOf(UiRect.Zero) }
-    val kinds = RigAttachmentTypes.all.filter { it.createDefault != null }
+    val kinds = RigAttachmentTypes.all.filter { it.createDefault != null && (attachmentTypes == null || it.id in attachmentTypes) }
     if (kinds.isEmpty()) return
 
+    fun add(type: RigAttachmentType<*>) {
+        val create = requireNotNull(type.createDefault)
+        document.edit { rig ->
+            rig.editAttachmentTarget(bone) { latest -> latest.withAttachment(create(freeId(latest, type))) }
+        }
+    }
+
     InspectorButton(
-        rigText("add_attachment"),
+        rigText(if (attachmentTypes == setOf(HitboxAttachmentSpec.TYPE_ID)) "add_hitbox" else "add_attachment"),
         icon = "hollowengine:textures/gui/icons/add.svg",
         modifier = Modifier.onPlaced { anchor = it },
         tags = listOf("primary"),
-    ) { open = true }
+    ) { if (kinds.size == 1) add(kinds.single()) else open = true }
 
     if (!open) return
 
@@ -140,10 +162,7 @@ private fun AddAttachment(document: HollowIdeRigDocument, bone: String, current:
         id = "rig-add-attachment",
         anchorBounds = anchor,
         items = kinds.map { type ->
-            val create = requireNotNull(type.createDefault)
-            UiDropdownItem(type.title()) {
-                document.edit { it.withBone(bone, current.withAttachment(create(freeId(current, type)))) }
-            }
+            UiDropdownItem(type.title()) { add(type) }
         },
         onExpandedChange = { if (!it) open = false },
     )

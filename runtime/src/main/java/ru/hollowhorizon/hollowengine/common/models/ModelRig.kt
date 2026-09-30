@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ModelRig(
     val bones: Map<String, RigBone> = emptyMap(),
+    /** Attachments in model space, independent of the imported node hierarchy. */
+    val attachments: List<RigAttachmentSpec> = emptyList(),
 ) {
     val boneByAlias: Map<String, String> by lazy {
         buildMap {
@@ -19,6 +21,15 @@ data class ModelRig(
 
     fun withBone(name: String, bone: RigBone): ModelRig =
         copy(bones = if (bone == RigBone.EMPTY) bones - name else bones + (name to bone))
+
+    /** A null bone selects the model itself. Reuses the same attachment editing operations. */
+    fun attachmentTarget(bone: String?): RigBone =
+        if (bone == null) RigBone(attachments = attachments) else bone(bone) ?: RigBone.EMPTY
+
+    fun editAttachmentTarget(bone: String?, edit: (RigBone) -> RigBone): ModelRig {
+        val updated = edit(attachmentTarget(bone))
+        return if (bone == null) copy(attachments = updated.attachments) else withBone(bone, updated)
+    }
 
     companion object {
         val EMPTY = ModelRig()
@@ -52,7 +63,7 @@ data class RigBone(
 }
 
 /**
- * Something hung on a bone: an item in a hand, a physics body, a collider.
+ * Something attached to a model or bone: a damage hitbox, an item, a physics body, a collider.
  */
 @Serializable
 abstract class RigAttachmentSpec {

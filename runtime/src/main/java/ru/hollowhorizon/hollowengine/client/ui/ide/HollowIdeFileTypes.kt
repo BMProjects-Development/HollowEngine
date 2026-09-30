@@ -20,6 +20,9 @@ interface HollowIdeFileDocument : AutoCloseable {
 
     fun markSaved() = Unit
 
+    /** Lets structured editors participate in the same autosave as text editors. */
+    fun onChange(listener: () -> Unit) = Unit
+
     override fun close() = Unit
 }
 

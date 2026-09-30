@@ -20,6 +20,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimati
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.AnimatorAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.HitboxRigOverlay
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
@@ -178,6 +179,9 @@ object RenderManager {
             )
             if (DebugSkeletonRenderer.isEnabled) {
                 DebugSkeletonRenderer.render(attachment, poseStack, bufferSource)
+                HitboxRigOverlay.draw(
+                    attachment, DebugLines.batch(bufferSource, poseStack), null,
+                )
             }
             poseStack.popPose()
             renderedAny = true

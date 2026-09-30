@@ -4,9 +4,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ServerHitboxAssets
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.loadAsNBT
 import ru.hollowhorizon.hollowengine.common.utils.nbt.save
@@ -16,7 +19,7 @@ import java.io.ByteArrayOutputStream
 /**
  * An open `.rig` file: one [ModelRig] the editor rewrites whole.
  */
-class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
+class HollowIdeRigDocument(bytes: ByteArray, private val modelId: String? = null) : HollowIdeFileDocument {
     override val readOnly: Boolean = false
 
     var rig by mutableStateOf(decode(bytes))
@@ -29,6 +32,9 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
         private set
 
     private var editorState: Any? = null
+    private var changed: (() -> Unit)? = null
+
+    override fun onChange(listener: () -> Unit) { changed = listener }
 
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
@@ -40,6 +46,7 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
         rig = next
         isModified = true
         revision++
+        changed?.invoke()
     }
 
     override fun encode(): ByteArray {
@@ -55,6 +62,10 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
 
     override fun markSaved() {
         isModified = false
+        modelId?.let {
+            ResourceLocation.tryParse(it)?.let { location -> RigAssets.register(location, rig) }
+            ServerHitboxAssets.invalidate(it)
+        }
     }
 
     private companion object {

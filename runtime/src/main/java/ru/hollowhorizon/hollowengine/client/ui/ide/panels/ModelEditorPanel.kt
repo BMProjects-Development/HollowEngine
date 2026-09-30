@@ -2,12 +2,19 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.panels
 
 import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.HitboxRigOverlay
+import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.BoneList
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.BoneFields
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.HitboxAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.save
 import java.io.ByteArrayOutputStream
@@ -44,19 +51,69 @@ internal fun ModelEditorPanel(path: String) {
     var sidebarWidth by remember { mutableStateOf(260f) }
 
     val loaded by viewer.modelFlow.collectAsState()
+    var hitboxes by remember(path) { mutableStateOf(false) }
+    var rigFile by remember(path) { mutableStateOf<HollowIdeOpenFile?>(null) }
+    var selectedBone by remember(path) { mutableStateOf<String?>(null) }
+    var rigError by remember(path) { mutableStateOf(false) }
+    val document = rigFile?.document as? HollowIdeRigDocument
+    LaunchedEffect(document?.revision, document) {
+        document?.let { viewer.attachment.rig = it.rig }
+    }
+    SideEffect {
+        viewer.debugDraw = if (hitboxes) { lines ->
+            if (selectedBone != null) DebugSkeletonRenderer.draw(viewer.attachment, lines, selectedBone)
+            HitboxRigOverlay.draw(viewer.attachment, lines, selectedBone)
+        } else null
+    }
 
-    Row(
-        tags = listOf("model-editor-root"),
-        modifier = Modifier.style("hollowengine:ui/styles/model-editor.hss").size(100.percent, 100.percent),
+    Column(
+        modifier = Modifier.style("hollowengine:ui/styles/model-editor.hss").style(InspectorStylesheet)
+            .size(100.percent, 100.percent).gap(5.px),
     ) {
-        Box(tags = listOf("model-viewer-pane")) {
-            Model(viewer, modifier = Modifier.size(100.percent, 100.percent))
-            Text(viewer.model, tags = listOf("model-title"))
-            ModelToolbar(viewer, path)
-            ModelAnimationBar(viewer, frameTick)
+        Pills(listOf(false, true), hitboxes, { modelText(if (it) "hitboxes" else "preview") }) { next ->
+            if (next) {
+                rigFile = HollowIdeOverlay.relatedFile("$path.rig", ::emptyRig)
+                rigError = rigFile?.document !is HollowIdeRigDocument
+            }
+            hitboxes = next
         }
-        SidebarSplitter(sidebarWidth) { sidebarWidth = it }
-        ModelSidebar(viewer, sidebarWidth, loaded)
+        Row(tags = listOf("model-editor-root"), modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
+            Box(tags = listOf("model-viewer-pane")) {
+                Model(
+                    viewer,
+                    modifier = Modifier.size(100.percent, 100.percent)
+                        .input(clickable = hitboxes).onClick { event ->
+                            if (hitboxes && event.button == 0) {
+                                val candidates = viewer.bonesAt(event.localX, event.localY)
+                                val next = candidates.indexOfFirst { it.name == selectedBone } + 1
+                                selectedBone = candidates.getOrNull(next % candidates.size.coerceAtLeast(1))?.name
+                                event.consume()
+                            }
+                        },
+                )
+                Text(viewer.model, tags = listOf("model-title"))
+                ModelToolbar(viewer, path)
+                ModelAnimationBar(viewer, frameTick)
+            }
+            SidebarSplitter(sidebarWidth) { sidebarWidth = it }
+            if (hitboxes) {
+                Column(tags = listOf("model-sidebar"), modifier = Modifier.size(sidebarWidth.px, 100.percent)) {
+                    when {
+                        rigError -> Hint(modelText("hitbox.open_error"))
+                        document != null -> {
+                            BoneList(
+                                viewer, document.rig, selectedBone, { selectedBone = it }, viewer::toggleNodeVisibility,
+                                Modifier.size(100.percent, 200.px),
+                            )
+                            Column(modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(horizontal = false)) {
+                                val bone = selectedBone
+                                key(bone) { BoneFields(document, bone, setOf(HitboxAttachmentSpec.TYPE_ID)) }
+                            }
+                        }
+                    }
+                }
+            } else ModelSidebar(viewer, sidebarWidth, loaded)
+        }
     }
 }
 

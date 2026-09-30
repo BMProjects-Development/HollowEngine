@@ -56,33 +56,36 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
     }
 
     override fun init() {
-        vao = GL33.glGenVertexArrays()
-        GL33.glBindVertexArray(vao)
-
-        if (isDynamic) {
-            initDynamicBuffers()
-
-            deformer = GpuDeformer(primitive)
-            deformer?.init(
-                dstPos = posBuffer!!.id,
-                dstNor = norBuffer!!.id,
-                dstTan = tanBuffer!!.id
-            )
+        val previousVao = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING)
+        val previousArrayBuffer = GL33.glGetInteger(GL33.GL_ARRAY_BUFFER_BINDING)
+        try {
+            vao = GL33.glGenVertexArrays()
             GL33.glBindVertexArray(vao)
-        } else {
-            initStaticBuffers()
+
+            if (isDynamic) {
+                initDynamicBuffers()
+
+                deformer = GpuDeformer(primitive)
+                deformer?.init(
+                    dstPos = posBuffer!!.id,
+                    dstNor = norBuffer!!.id,
+                    dstTan = tanBuffer!!.id
+                )
+                GL33.glBindVertexArray(vao)
+            } else {
+                initStaticBuffers()
+            }
+
+            initCommonBuffers()
+            if (supportsInstancing) {
+                initInstancingBuffers()
+                initInstancedVao()
+            }
+        } finally {
+            // VAO 0 запрещает операции с буфером(спасибо openGl)
+            GL33.glBindVertexArray(previousVao)
+            GL33.glBindBuffer(GL33.GL_ARRAY_BUFFER, previousArrayBuffer)
         }
-
-        initCommonBuffers()
-        if (supportsInstancing) {
-            initInstancingBuffers()
-            initInstancedVao()
-        }
-
-        GL33.glBindVertexArray(0)
-
-        posBuffer?.unbind()
-        indexBuffer?.unbind()
     }
 
     private fun initStaticBuffers() {

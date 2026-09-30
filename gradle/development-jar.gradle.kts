@@ -4,12 +4,10 @@ import java.util.jar.JarFile
 val modName = property("modName") as String
 val modVersion = property("modVersion") as String
 val minecraftVersion = property("minecraftVersion") as String
-val serializationVersion = property("serializationVersion") as String
-val kotlinVersion = property("kotlinVersion") as String
 
 val developmentJar = tasks.register<Jar>("developmentJar") {
     group = "build"
-    description = "Packages the named engine API and its libraries for compiling external addons."
+    description = "Packages the named engine API without bundled dependencies for compiling external addons."
     archiveBaseName.set("$modName-$minecraftVersion")
     archiveVersion.set(modVersion)
     archiveClassifier.set("dev")
@@ -17,26 +15,21 @@ val developmentJar = tasks.register<Jar>("developmentJar") {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     includeEmptyDirs = false
 
-    val runtimeJar = project(":runtime").tasks.named<Jar>("shadowJar")
+    // Use the thin jar: dependencies must be resolved by the consuming project.
+    val runtimeJar = project(":runtime").tasks.named<Jar>("jar")
     val bridgeJar = project(":bridge").tasks.named<Jar>("jar")
     dependsOn(runtimeJar, bridgeJar)
     from(runtimeJar.flatMap { it.archiveFile }.map { zipTree(it.asFile) })
     from(bridgeJar.flatMap { it.archiveFile }.map { zipTree(it.asFile) })
     from(rootProject.file("LICENSE.MD"))
-    // Kotlin package metadata is needed for top-level functions and type aliases.
-    // Keep dependency notices alongside the classes copied from the runtime.
+    // Keep the engine's Kotlin package metadata for top-level functions and type aliases.
     include(
-        "**/*.class", "META-INF/*.kotlin_module", "**/*.kotlin_builtins",
-        "**/LICENSE*", "**/NOTICE*", "**/license*", "**/notice*",
+        "ru/hollowhorizon/hollowengine/**/*.class", "META-INF/*.kotlin_module", "LICENSE.MD",
     )
-    exclude("module-info.class", "META-INF/versions/**/module-info.class")
 
     manifest.attributes(
         "HollowEngine-Version" to modVersion,
         "HollowEngine-Mappings" to "mojang",
-        // The serialization compiler plugin reads these from the jar containing KSerializer.
-        "Implementation-Version" to serializationVersion,
-        "Require-Kotlin-Version" to kotlinVersion,
     )
 
     doLast {
@@ -47,13 +40,21 @@ val developmentJar = tasks.register<Jar>("developmentJar") {
                 "ru/hollowhorizon/hollowengine/common/addons/HollowAddonApiKt.class",
                 "ru/hollowhorizon/hollowengine/client/ui/screen/HollowComposeUiScreen.class",
                 "ru/hollowhorizon/hollowengine/bootstrap/runtime/RuntimeBridge.class",
-                "kotlinx/coroutines/CoroutineScope.class",
-                "org/koin/core/Koin.class",
             )
             val missing = required.filter { archive.getEntry(it) == null }
             check(missing.isEmpty()) { "Development jar is missing compile-time API classes: $missing" }
             check(archive.entries().asSequence().any { it.name.endsWith(".kotlin_module") }) {
                 "Development jar is missing Kotlin package metadata"
+            }
+            val bundledDependencies = archive.entries().asSequence()
+                .map { it.name }
+                .filter {
+                    it.endsWith(".class") && !it.startsWith("ru/hollowhorizon/hollowengine/") ||
+                        it.endsWith(".kotlin_builtins") || it.endsWith(".jar")
+                }
+                .toList()
+            check(bundledDependencies.isEmpty()) {
+                "Development jar must not bundle dependency classes or jars: $bundledDependencies"
             }
             check(archive.getEntry("fabric.mod.json") == null && archive.getEntry("META-INF/neoforge.mods.toml") == null) {
                 "Development jar must be a compile-only library"

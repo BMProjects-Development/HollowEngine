@@ -12,7 +12,7 @@ import kotlin.math.abs
  * Fills [context] with what an animation expression can read this frame.
  */
 fun fillAnimationVariables(context: AnimatorEvaluationContext, entity: Entity?, partialTick: Float) {
-    val gameTime = Minecraft.getInstance().level?.gameTime?.toFloat() ?: 0f
+    val gameTime = entity?.level()?.gameTime?.toFloat() ?: Minecraft.getInstance().level?.gameTime?.toFloat() ?: 0f
 
     context.temporaries.clear()
     context.entity = entity

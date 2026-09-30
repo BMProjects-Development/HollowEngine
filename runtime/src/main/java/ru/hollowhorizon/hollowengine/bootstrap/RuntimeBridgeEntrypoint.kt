@@ -54,6 +54,10 @@ import net.minecraft.world.level.block.SkullBlock
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.EntityHitResult
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.models.ModelHitboxes
+import java.util.function.Predicate
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.ConsoleAppender
 import ru.hollowhorizon.hollowengine.LOGGER
@@ -222,6 +226,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onLivingEntityTick(entity: LivingEntity) {
         TickEvent.Entity.post(TickEvent.Entity(entity))
+        if (!entity.level().isClientSide) ModelHitboxes.boxes(entity)
     }
 
     override fun onLivingEntityDeath(entity: LivingEntity, damageSource: DamageSource): Boolean {
@@ -609,6 +614,22 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         EntityEvent.Hurt.post(event)
         return event.isCanceled
     }
+
+    override fun hasModelHitboxes(entity: Entity) = ModelHitboxes.hasHitboxes(entity)
+
+    override fun pickModelHitboxes(
+        level: Level, source: Entity?, start: Vec3, end: Vec3,
+        predicate: Predicate<Entity>, maxDistanceSquared: Double, vanilla: EntityHitResult?,
+    ) = ModelHitboxes.pick(level, source, start, end, predicate, maxDistanceSquared, vanilla)
+
+    override fun modelHitboxDamage(entity: Entity, source: DamageSource, amount: Float) =
+        ModelHitboxes.damage(entity, source, amount)
+
+    override fun withModelHitboxAreaDamage(damage: java.util.function.BooleanSupplier) = ModelHitboxes.areaDamage(damage)
+
+    override fun modelHitboxBounds(entity: Entity): AABB =
+        ModelHitboxes.boxes(entity)
+            .map { it.bounds }.reduceOrNull(AABB::minmax) ?: entity.boundingBox
 
     override fun onEntityChangedDimension(entity: Entity, resultEntity: Entity?, fromLevel: Level, toLevel: Level) {
         if (resultEntity != null) {
