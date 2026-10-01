@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.colliders
 
+import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
@@ -83,19 +84,13 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
      * shortest, pointing away from the collider; null when they do not overlap.
      */
     fun penetration(box: AABB): Vec3? {
-        val half = Vec3(box.xsize / 2.0, box.ysize / 2.0, box.zsize / 2.0)
         val between = box.center.subtract(center)
         var best: Vec3? = null
         var bestOverlap = Double.MAX_VALUE
 
-        for (candidate in separatingAxes()) {
-            val length = candidate.length()
-            if (length < EPSILON) continue
-            val axis = candidate.scale(1.0 / length)
-            val reach = axes.sumOf { abs(it.dot(axis)) } +
-                half.x * abs(axis.x) + half.y * abs(axis.y) + half.z * abs(axis.z)
+        for (axis in separatingAxes) {
             val distance = between.dot(axis)
-            val overlap = reach - abs(distance)
+            val overlap = reach(axis, box) - abs(distance)
             if (overlap <= 0.0) return null
             if (overlap < bestOverlap) {
                 bestOverlap = overlap
@@ -105,17 +100,62 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return best
     }
 
+    /**
+     * How far of [distance] [box] can move along [axis] before it touches this collider. A box that already
+     * overlaps it is let go: it has to be able to walk out.
+     */
+    fun sweep(box: AABB, axis: Direction.Axis, distance: Double): Double {
+        if (distance == 0.0) return 0.0
+        val between = box.center.subtract(center)
+        var enter = Double.NEGATIVE_INFINITY
+        var exit = Double.POSITIVE_INFINITY
+
+        for (normal in separatingAxes) {
+            val reach = reach(normal, box)
+            val start = between.dot(normal)
+            val speed = distance * normal.get(axis)
+            if (abs(speed) < EPSILON) {
+                if (abs(start) >= reach) return distance
+                continue
+            }
+            val first = (-reach - start) / speed
+            val second = (reach - start) / speed
+            enter = max(enter, min(first, second))
+            exit = min(exit, max(first, second))
+            if (enter >= exit) return distance
+        }
+        if (enter < 0.0 || enter >= 1.0) return distance
+        val allowed = distance * enter - Math.copySign(CONTACT_GAP, distance)
+        return if (allowed * distance <= 0.0) 0.0 else allowed
+    }
+
+    /** Where [point], carried by this box, is once the box has become [next]: how a moving collider moves what it holds. */
+    fun carry(point: Vec3, next: ColliderBox): Vec3? {
+        val local = toLocal(point) ?: return null
+        return next.center.add(next.axisX.scale(local.x)).add(next.axisY.scale(local.y)).add(next.axisZ.scale(local.z))
+    }
+
+    /** Half the length of the shadows of this collider and of [box] on [normal], put together. */
+    private fun reach(normal: Vec3, box: AABB): Double =
+        abs(axisX.dot(normal)) + abs(axisY.dot(normal)) + abs(axisZ.dot(normal)) +
+            box.xsize / 2.0 * abs(normal.x) + box.ysize / 2.0 * abs(normal.y) + box.zsize / 2.0 * abs(normal.z)
+
     /** The face normals of both boxes and the crossings of their edges: if any of them separates, both do not overlap. */
-    private fun separatingAxes(): List<Vec3> = buildList {
-        add(axisY.cross(axisZ))
-        add(axisZ.cross(axisX))
-        add(axisX.cross(axisY))
-        addAll(WORLD_AXES)
-        axes.forEach { edge -> WORLD_AXES.forEach { add(edge.cross(it)) } }
+    private val separatingAxes: List<Vec3> by lazy {
+        buildList {
+            add(axisY.cross(axisZ))
+            add(axisZ.cross(axisX))
+            add(axisX.cross(axisY))
+            addAll(WORLD_AXES)
+            axes.forEach { edge -> WORLD_AXES.forEach { add(edge.cross(it)) } }
+        }.mapNotNull { candidate -> candidate.length().takeIf { it >= EPSILON }?.let { candidate.scale(1.0 / it) } }
     }
 
     companion object {
         private const val EPSILON = 1.0e-9
+
+        /** The gap a stopped box is left at, the same vanilla leaves against blocks. */
+        private const val CONTACT_GAP = 1.0e-7
         private val SIGNS = doubleArrayOf(-1.0, 1.0)
         private val WORLD_AXES = listOf(Vec3(1.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0), Vec3(0.0, 0.0, 1.0))
 

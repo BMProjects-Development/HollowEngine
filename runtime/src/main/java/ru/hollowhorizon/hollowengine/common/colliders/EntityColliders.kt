@@ -6,6 +6,7 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
+import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderTickPoses
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import java.util.function.Predicate
 
@@ -22,6 +23,17 @@ object EntityColliders {
 
     fun of(entity: Entity): List<EntityCollider> =
         if (entity.level().isClientSide) ClientColliderPoses.of(entity) else ServerColliderPoses.current(entity)
+
+    /**
+     * The colliders of [entity] that act on bodies, over the last ticks, newest first: posed tick by tick
+     * on either side, so a client bumps into what the server moves mobs by.
+     */
+    fun physical(entity: Entity): List<List<EntityCollider>> =
+        if (entity.level().isClientSide) ClientColliderTickPoses.recent(entity) else ServerColliderPoses.recent(entity)
+
+    /** The entities in [level] whose colliders act on bodies. */
+    fun physicalHosts(level: Level): List<Entity> =
+        if (level.isClientSide) ClientColliderTickPoses.physical else ServerColliderPoses.physicalIn(level)
 
     fun rig(entity: Entity): ModelRig? =
         if (entity.level().isClientSide) ClientColliderPoses.rig(entity) else ServerColliderPoses.rig(entity)

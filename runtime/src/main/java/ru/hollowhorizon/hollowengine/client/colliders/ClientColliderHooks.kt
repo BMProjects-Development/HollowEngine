@@ -6,14 +6,13 @@ import net.minecraft.world.phys.HitResult
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaimPacket
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderHit
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderHitResult
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderPush
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 
 /**
  * What the client does about colliders: tells the server which one the player aimed at before the
- * vanilla attack or interaction goes out, and lets pushing colliders shove the player.
+ * vanilla attack or interaction goes out, and poses the colliders that act on bodies every tick.
  */
 object ClientColliderHooks {
     /** The clickable collider of [target] under the crosshair. */
@@ -32,7 +31,6 @@ object ClientColliderHooks {
     @SubscribeEvent
     @ClientOnly
     fun onClientTick(event: TickEvent.Client) {
-        val player = event.minecraft.player ?: return
-        if (!player.isSpectator) ColliderPush.pushPlayer(player)
+        ClientColliderTickPoses.tick(event.minecraft.level)
     }
 }

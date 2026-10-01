@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
@@ -19,9 +20,11 @@ private const val LANG = "hollowengine.gui.rig_editor.collider"
 @Serializable
 enum class ColliderAlignment {
     /** Turns with its bone and with the entity: an oriented box. */
+    @EditorName("$LANG.alignment.oriented")
     ORIENTED,
 
     /** Stays square to the world, only its center follows the bone: an axis-aligned box. */
+    @EditorName("$LANG.alignment.world")
     WORLD,
 }
 
@@ -34,12 +37,38 @@ data class ColliderModes(
     @EditorName("$LANG.modes.interact")
     @EditorDescription("$LANG.modes.interact.hint")
     val interact: Boolean = false,
-    @EditorName("$LANG.modes.push")
-    @EditorDescription("$LANG.modes.push.hint")
-    val push: Boolean = false,
+    @EditorName("$LANG.modes.contact")
+    @EditorDescription("$LANG.modes.contact.hint")
+    val contact: ColliderContact = ColliderContact.NONE,
+    @EditorName("$LANG.modes.force")
+    @EditorDescription("$LANG.modes.force.hint")
+    @EditorRange(min = 0.0)
+    val force: Float = 1f,
 ) {
     /** Whether the crosshair stops at this collider. */
     val isTarget: Boolean get() = hit || interact
+
+    val pushes: Boolean get() = contact == ColliderContact.PUSH
+    val solid: Boolean get() = contact == ColliderContact.SOLID
+
+    /** Whether it acts on bodies at all, which is what makes the entity's pose run every tick on a client too. */
+    val isPhysical: Boolean get() = contact != ColliderContact.NONE
+}
+
+/** What a collider does to an entity that walks into it. */
+@Serializable
+enum class ColliderContact {
+    /** Nothing: it is walked through. */
+    @EditorName("$LANG.contact.none")
+    NONE,
+
+    /** Shoves it aside, the way mobs shove each other. */
+    @EditorName("$LANG.contact.push")
+    PUSH,
+
+    /** Stops it, and can be stood on; moving, it carries what stands on it. */
+    @EditorName("$LANG.contact.solid")
+    SOLID,
 }
 
 /**

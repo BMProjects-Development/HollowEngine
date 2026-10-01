@@ -1,3 +1,4 @@
+import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Test
@@ -11,6 +12,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -81,6 +83,51 @@ class ColliderBoxTest {
 
         assertNull(flat.clip(Vec3(0.0, -1.0, 0.0), Vec3(0.0, 1.0, 0.0)))
         assertFalse(flat.contains(Vec3.ZERO))
+    }
+
+    /** The box stops where its face meets the corner of the turned box, not where their bounds meet. */
+    @Test
+    fun `moving box stops against the corner of a turned box`() {
+        val box = AABB(-2.1, -0.1, -0.1, -1.9, 0.1, 0.1)
+
+        assertEquals(1.9 - sqrt(0.5), diamond.sweep(box, Direction.Axis.X, 3.0), 1.0e-5)
+    }
+
+    /** Off to the side the corner is out of reach, and the box meets the slanted face further on. */
+    @Test
+    fun `moving box stops against the slanted face of a turned box`() {
+        val box = AABB(-2.1, -0.1, 0.3, -1.9, 0.1, 0.5)
+
+        // Its corner nearest the diamond is at z = 0.3, where the slanted face is at x = -(√0.5 - 0.3).
+        assertEquals(1.9 - (sqrt(0.5) - 0.3), diamond.sweep(box, Direction.Axis.X, 3.0), 1.0e-5)
+    }
+
+    @Test
+    fun `box that already overlaps a collider is let out`() {
+        val inside = AABB(-0.1, -0.1, -0.1, 0.1, 0.1, 0.1)
+
+        assertEquals(-3.0, diamond.sweep(inside, Direction.Axis.X, -3.0))
+    }
+
+    @Test
+    fun `box moving past or away from a collider keeps its whole move`() {
+        val beside = AABB(-2.1, 2.0, -0.1, -1.9, 2.2, 0.1)
+        val behind = AABB(-2.1, -0.1, -0.1, -1.9, 0.1, 0.1)
+
+        assertEquals(3.0, diamond.sweep(beside, Direction.Axis.X, 3.0))
+        assertEquals(-3.0, diamond.sweep(behind, Direction.Axis.X, -3.0))
+    }
+
+    /** What stands on a collider turns with it: a quarter turn takes a point on its X side to its Z side. */
+    @Test
+    fun `turning collider carries a point with it`() {
+        val before = ColliderBox.aligned(Vec3.ZERO, Vec3(0.5, 0.5, 0.5))
+        val after = ColliderBox.of(MutableMat4f().rotate(90f.deg, Vec3f.Y_AXIS), Vec3.ZERO)
+
+        val carried = assertNotNull(before.carry(Vec3(1.0, 0.0, 0.0), after))
+
+        assertEquals(0.0, carried.x, 1.0e-5)
+        assertEquals(1.0, abs(carried.z), 1.0e-5)
     }
 
     /** The width reaches the farthest corner from the vertical axis, so turning the entity never pokes out of it. */

@@ -58,14 +58,18 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
+import net.minecraft.world.phys.shapes.VoxelShape
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
 import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaims
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderCombat
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderContacts
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
+import ru.hollowhorizon.hollowengine.common.colliders.SolidColliders
 import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
 import java.util.function.Predicate
+import java.util.function.Supplier
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.ConsoleAppender
 import ru.hollowhorizon.hollowengine.LOGGER
@@ -646,6 +650,22 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun bodyDimensions(entity: Entity, vanilla: EntityDimensions): EntityDimensions =
         EntityBodies.dimensions(entity, vanilla)
+
+    override fun collideWithColliders(entity: Entity, movement: Vec3, move: Supplier<Vec3>): Vec3 {
+        val moved = SolidColliders.during(entity, movement, move)
+        if (ColliderContacts.isSimulatedHere(entity)) EntityBodies.afterMove(entity, movement, moved)
+        return moved
+    }
+
+    override fun collideShapesWithColliders(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 =
+        SolidColliders.collide(movement, box, shapes, vanilla)
+
+    override fun stepHeightsWithColliders(box: AABB, limit: Float, vanilla: FloatArray): FloatArray =
+        SolidColliders.stepHeights(box, limit, vanilla)
+
+    override fun onLivingEntityTickStart(entity: LivingEntity) = ColliderContacts.resolve(entity)
+
+    override fun isSupportedByColliders(entity: Entity): Boolean = SolidColliders.supports(entity)
 
     override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
         ColliderCombat.resolve(entity, damageSource)

@@ -21,7 +21,13 @@ import java.io.InputStream
  */
 @ReloadListener
 object ServerColliderAssets : ResourceManagerReloadListener {
-    class Assets(val rig: ModelRig, val animator: Animator?)
+    class Assets(private val model: String, val rig: ModelRig, val animator: Animator?) {
+        /** What the entity's colliders are posed from; loads the model, so only when the rig has colliders. */
+        val pose: ColliderPoseAssets? by lazy {
+            if (!rig.hasColliders()) null
+            else ServerModelAnimationMetadata.model(model)?.let { ColliderPoseAssets(rig, animator, it) }
+        }
+    }
 
     private val cache = HashMap<String, Assets>()
 
@@ -38,11 +44,11 @@ object ServerColliderAssets : ResourceManagerReloadListener {
     }
 
     private fun load(model: String): Assets {
-        val location = ResourceLocation.tryParse(model) ?: return Assets(ModelRig.EMPTY, null)
+        val location = ResourceLocation.tryParse(model) ?: return Assets(model, ModelRig.EMPTY, null)
         val rig = read(location.withSuffix(RIG_SUFFIX)) {
             NBTFormat.deserialize(ModelRig.serializer(), it.loadAsNBT())
         } ?: ModelRig.EMPTY
-        if (!rig.hasColliders()) return Assets(rig, null)
+        if (!rig.hasColliders()) return Assets(model, rig, null)
 
         val controller = read(location.withSuffix(METADATA_SUFFIX)) {
             ModelMetadata.parse(it.readBytes().decodeToString(), model)
@@ -52,7 +58,7 @@ object ServerColliderAssets : ResourceManagerReloadListener {
             StandardPlayerAnimatorPreset.ID -> StandardPlayerAnimatorPreset.create()
             else -> read(controller) { NBTFormat.deserialize(Animator.serializer(), it.loadAsNBT()) }
         }
-        return Assets(rig, animator)
+        return Assets(model, rig, animator)
     }
 
     private fun <T> read(location: ResourceLocation, decode: (InputStream) -> T): T? {

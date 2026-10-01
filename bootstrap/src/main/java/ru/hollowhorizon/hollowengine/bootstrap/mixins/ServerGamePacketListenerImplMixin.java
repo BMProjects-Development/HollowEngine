@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.bootstrap.mixins;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.network.chat.Component;
@@ -24,6 +25,11 @@ public abstract class ServerGamePacketListenerImplMixin {
     @WrapOperation(method = "handleInteract", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"))
     private AABB hollowengine$interactReach(Entity target, Operation<AABB> original) {
         return BootstrapRuntimeManager.bridge().colliderReachBounds(player, target, original.call(target));
+    }
+
+    @WrapMethod(method = "noBlocksAround")
+    private boolean hollowengine$noBlocksAround(Entity entity, Operation<Boolean> original) {
+        return original.call(entity) && !BootstrapRuntimeManager.bridge().isSupportedByColliders(entity);
     }
 
     @Inject(method = "broadcastChatMessage", at = @At("HEAD"), cancellable = true)

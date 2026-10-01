@@ -9,7 +9,7 @@ import kotlinx.serialization.SerialInfo
  * What the component editor knows about a component beyond its serial form.
  */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class EditorName(val name: String)
 
 /** The line under a field, or under a component's header. */

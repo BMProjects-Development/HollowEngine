@@ -14,6 +14,11 @@ import ru.hollowhorizon.hollowengine.bootstrap.impl.BootstrapRuntimeManager;
 
 @Mixin(LivingEntity.class)
 public class LivingEntityMixin {
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void hollowengine$tickStart(CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onLivingEntityTickStart((LivingEntity) (Object) this);
+    }
+
     @Inject(method = "tick", at = @At("TAIL"))
     private void hollowengine$tick(CallbackInfo ci) {
         BootstrapRuntimeManager.bridge().onLivingEntityTick((LivingEntity) (Object) this);

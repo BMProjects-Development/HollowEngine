@@ -32,10 +32,11 @@ object ColliderDebugRenderer {
         return EntityColliders.hasTargets(entity)
     }
 
-    /** Clickable colliders draw blue, hit-taking ones green, ones that only push gray. */
+    /** Clickable colliders draw blue, hit-taking ones green, solid ones orange, ones that only push gray. */
     fun colorOf(modes: ColliderModes): Int = when {
         modes.interact -> INTERACT_COLOR
         modes.hit -> HIT_COLOR
+        modes.solid -> SOLID_COLOR
         else -> PUSH_COLOR
     }
 
@@ -44,4 +45,5 @@ object ColliderDebugRenderer {
     private val HIT_COLOR = 0xCC4DFF99.toInt()
     private val INTERACT_COLOR = 0xCC59B8FF.toInt()
     private val PUSH_COLOR = 0xCCE0E0E0.toInt()
+    private val SOLID_COLOR = 0xCCFFB347.toInt()
 }

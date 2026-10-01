@@ -330,8 +330,8 @@ private fun EnumField(
     Column(tags = listOf("insp-field")) {
         FieldLabel(label, description)
         PillFlow {
-            descriptor.elementNames.forEach { name ->
-                Pill(ComponentLabels.prettify(name), name == current) { onChange(JsonPrimitive(name)) }
+            descriptor.elementNames.forEachIndexed { index, name ->
+                Pill(ComponentLabels.enumValueName(descriptor, index), name == current) { onChange(JsonPrimitive(name)) }
             }
         }
     }

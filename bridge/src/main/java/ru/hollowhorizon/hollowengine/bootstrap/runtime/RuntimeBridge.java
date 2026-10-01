@@ -55,6 +55,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import ru.hollowhorizon.hollowengine.api.ModList;
@@ -213,6 +214,16 @@ public interface RuntimeBridge extends AutoCloseable {
     boolean bodySolid(Entity entity, boolean vanilla);
 
     EntityDimensions bodyDimensions(Entity entity, EntityDimensions vanilla);
+
+    Vec3 collideWithColliders(Entity entity, Vec3 movement, Supplier<Vec3> move);
+
+    Vec3 collideShapesWithColliders(Vec3 movement, AABB box, List<VoxelShape> shapes, Supplier<Vec3> vanilla);
+
+    float[] stepHeightsWithColliders(AABB box, float limit, float[] vanilla);
+
+    void onLivingEntityTickStart(LivingEntity entity);
+
+    boolean isSupportedByColliders(Entity entity);
 
     DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
 

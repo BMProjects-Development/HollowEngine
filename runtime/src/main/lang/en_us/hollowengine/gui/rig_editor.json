@@ -27,7 +27,7 @@
   "collider.name": "Name",
   "collider.name.hint": "What scripts and events call this collider. Unique within the rig.",
   "collider.alignment": "Alignment",
-  "collider.alignment.hint": "Oriented turns with the bone and the entity. World stays square to the world and only follows where the bone is: cheaper, and the shape a solid collider will need.",
+  "collider.alignment.hint": "Oriented turns with the bone and the entity. World-aligned stays square to the world and only follows where the bone is: cheaper, and the shape a solid collider will need.",
   "collider.offset": "Offset",
   "collider.rotation": "Rotation",
   "collider.rotation.hint": "Degrees, applied X, then Y, then Z. A world-aligned collider ignores it.",
@@ -37,6 +37,13 @@
   "collider.modes.hit.hint": "Melee attacks and projectiles land here instead of on the entity's box. The damage source tells which collider was hit.",
   "collider.modes.interact": "Clickable",
   "collider.modes.interact.hint": "A right click on it reaches scripts with the collider's name, like a button on a panel.",
-  "collider.modes.push": "Pushes",
-  "collider.modes.push.hint": "Shoves whatever stands in it aside, the way mobs shove each other."
+  "collider.alignment.oriented": "Oriented",
+  "collider.alignment.world": "World-aligned",
+  "collider.contact.none": "None",
+  "collider.contact.push": "Push",
+  "collider.contact.solid": "Solid",
+  "collider.modes.contact": "Contact",
+  "collider.modes.contact.hint": "What it does to a body that walks into it. Push shoves it aside the way mobs shove each other, Solid stops it and can be stood on, and carries what stands on it as it moves. Moving with an animation, both pass their speed on.",
+  "collider.modes.force": "Force",
+  "collider.modes.force.hint": "How much of its own speed a moving collider passes on to what it runs into. 1 sends it off as fast as the collider moves; 0 only pushes it out."
 }
