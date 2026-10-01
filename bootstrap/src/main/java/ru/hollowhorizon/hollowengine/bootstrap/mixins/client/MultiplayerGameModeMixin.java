@@ -7,6 +7,8 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,6 +22,17 @@ public class MultiplayerGameModeMixin {
         if (BootstrapRuntimeManager.bridge().onClientUseItemOn(player, hand, result)) {
             cir.setReturnValue(InteractionResult.FAIL);
         }
+    }
+
+    @Inject(method = "attack", at = @At("HEAD"))
+    private void hollowengine$claimAttack(Player player, Entity target, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onClientTargetEntity(target, null);
+    }
+
+    @Inject(method = "interactAt", at = @At("HEAD"))
+    private void hollowengine$claimInteraction(Player player, Entity target, EntityHitResult result, InteractionHand hand,
+                                               CallbackInfoReturnable<InteractionResult> cir) {
+        BootstrapRuntimeManager.bridge().onClientTargetEntity(target, result);
     }
 
     @Inject(method = "interact", at = @At("HEAD"), cancellable = true)

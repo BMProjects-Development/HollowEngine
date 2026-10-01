@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
@@ -69,7 +68,6 @@ fun npc(
         yBodyRot = rotation.x
 
         set(Model(model))
-        set(HitboxComponent(HitboxMode.PULLING))
         set(TransformComponent(transform))
 
         if (attributes.isNotEmpty()) {

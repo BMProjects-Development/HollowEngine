@@ -197,6 +197,11 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
     var transformDrag: VfxTransformDrag? = null
     var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
 
+    /** A transform from the keyboard under way, and where the pointer last was: where the next one starts. */
+    var keyboard by mutableStateOf<VfxKeyboardTransform?>(null)
+    var pointerX = 0f
+    var pointerY = 0f
+
     /** What dragged handle is set to right now, drawn beside it. */
     var readout by mutableStateOf<VfxGizmoReadout?>(null)
 
@@ -207,6 +212,10 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
     }
 
     fun select(id: String?) {
+        if (keyboard != null) {
+            keyboard = null
+            endGesture()
+        }
         selected = id
         id?.let(session::touch)
         session.timeline.clearSelection()
@@ -248,7 +257,15 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
             preview.viewportWidth = rect.width
             preview.viewportHeight = rect.height
         }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus()
-            .onKeyInput { input -> if (handleHistoryKeys(document, input)) input.consume() }.onPress { event ->
+            .onKeyInput { input ->
+                if (handleTransformKeys(document, state, driven, input) || handleHistoryKeys(document, input)) input.consume()
+            }.onPress { event ->
+                state.pointerX = event.localX
+                state.pointerY = event.localY
+                if (clickDuringKeyboardTransform(document, state, event.button)) {
+                    event.consume()
+                    return@onPress
+                }
                 val left = event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
                 val handle = if (left) gizmo.handleAt(event.localX, event.localY) else null
                 val moving = if (left && handle == null && node != null && runtime != null) {
@@ -290,6 +307,12 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
                 state.transformDrag = null
                 state.readout = null
             }.onHover { event ->
+                state.pointerX = event.localX
+                state.pointerY = event.localY
+                if (state.keyboard != null) {
+                    moveKeyboardTransform(document, state, event.modifiers)
+                    return@onHover
+                }
                 val over = transform.pick(handles, event.localX, event.localY)?.id
                 if (over != state.hoveredHandle) state.hoveredHandle = over
             }.onScroll { event ->
@@ -301,11 +324,20 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     ) {
         Box(
             modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
-                .drawBehind(key = listOf(gizmo, handles, state.drag?.id, state.hoveredHandle)) {
+                .drawBehind(key = listOf(gizmo, handles, state.drag?.id, state.hoveredHandle, state.keyboard)) {
                     drawGizmo(gizmo, state.drag?.id)
-                    transform.draw(this, handles, state.hoveredHandle, state.transformDrag)
+                    val keyboard = state.keyboard
+                    if (keyboard != null) keyboard.keyboard.draw(this)
+                    else transform.draw(this, handles, state.hoveredHandle, state.transformDrag)
                 },
         )
+        state.keyboard?.let { keyboard ->
+            Text(
+                keyboard.keyboard.hint,
+                tags = listOf("vfx-gizmo-readout"),
+                modifier = Modifier.position(8.px, 32.px).inputTransparent(),
+            )
+        }
         state.readout?.let { readout ->
             Text(
                 formatNumber(readout.value),

@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.mojang.blaze3d.audio.SoundBuffer;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -51,6 +52,9 @@ import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import ru.hollowhorizon.hollowengine.api.ModList;
@@ -65,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public interface RuntimeBridge extends AutoCloseable {
@@ -198,6 +203,35 @@ public interface RuntimeBridge extends AutoCloseable {
     void onEntityLoaded(Entity entity, CompoundTag tag);
 
     boolean onEntityHurt(Entity entity, DamageSource damageSource, float amount);
+
+    float onLivingEntityHurt(LivingEntity entity, DamageSource damageSource, float amount);
+
+    boolean bodyPushable(Entity entity, boolean vanilla);
+
+    boolean bodyPushesOthers(Entity entity);
+
+    boolean bodySolid(Entity entity, boolean vanilla);
+
+    EntityDimensions bodyDimensions(Entity entity, EntityDimensions vanilla);
+
+    DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
+
+    boolean hasColliderTargets(Entity entity, boolean projectile);
+
+    @Nullable
+    EntityHitResult pickColliders(
+            Level level, @Nullable Entity source, Vec3 start, Vec3 end, AABB search,
+            Predicate<Entity> predicate, double maxDistanceSquared, @Nullable EntityHitResult vanilla, boolean projectile);
+
+    void onPlayerAttack(Player player, Entity target, Runnable attack);
+
+    void onProjectileHit(Entity projectile, HitResult result, Runnable hit);
+
+    AABB colliderReachBounds(Player player, Entity target, AABB vanilla);
+
+    boolean renderColliderHitbox(Entity entity, float partialTick, PoseStack poseStack, VertexConsumer lines);
+
+    void onClientTargetEntity(Entity target, @Nullable HitResult result);
 
     void onEntityChangedDimension(Entity original, Entity entity, Level fromLevel, Level toLevel);
 

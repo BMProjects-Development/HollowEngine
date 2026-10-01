@@ -38,19 +38,11 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
-    /** Effects to go back to, newest last; the timeline part is not in them, it has its own history. */
-    private val undoStack = ArrayDeque<VfxEffect>()
-    private val redoStack = ArrayDeque<VfxEffect>()
+    /** Effects to go back to; the timeline part of them is not restored, it has its own history. */
+    private val history = DocumentHistory<VfxEffect>()
 
-    /** The effect as it was when a gesture started; the whole gesture becomes one step back. */
-    private var gestureStart: VfxEffect? = null
-    private var lastMergeKey: String? = null
-    private var lastEditNanos = 0L
-
-    var canUndo by mutableStateOf(false)
-        private set
-    var canRedo by mutableStateOf(false)
-        private set
+    val canUndo: Boolean get() = history.canUndo
+    val canRedo: Boolean get() = history.canRedo
 
     /**
      * Told about every edit the author makes, once it is in; edits made without [edit]'s history, such
@@ -68,71 +60,31 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
         val next = change(previous)
         if (next == previous) return
 
-        if (history && gestureStart == null) {
-            val now = System.nanoTime()
-            val merges = mergeKey != null && mergeKey == lastMergeKey && now - lastEditNanos < MERGE_WINDOW_NANOS
-            if (!merges) remember(previous)
-            lastMergeKey = mergeKey
-            lastEditNanos = now
-        }
+        if (history) this.history.beforeEdit(previous, mergeKey)
         apply(next)
         if (history) onEdit?.invoke(previous, next)
     }
 
     /** Starts a gesture, such as dragging a handle, that should go back in one step. */
-    fun beginGesture() {
-        if (gestureStart == null) gestureStart = effect
-    }
+    fun beginGesture() = history.beginGesture(effect)
 
-    fun endGesture() {
-        val start = gestureStart ?: return
-        gestureStart = null
-        lastMergeKey = null
-        if (start != effect) remember(start)
-    }
+    fun endGesture() = history.endGesture(effect)
 
-    fun undo(): Boolean {
-        val previous = undoStack.removeLastOrNull() ?: return false
-        redoStack.addLast(effect)
-        lastMergeKey = null
-        apply(previous.copy(timeline = effect.timeline))
-        return true
-    }
+    fun undo(): Boolean = history.undo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
 
-    fun redo(): Boolean {
-        val next = redoStack.removeLastOrNull() ?: return false
-        undoStack.addLast(effect)
-        lastMergeKey = null
-        apply(next.copy(timeline = effect.timeline))
-        return true
-    }
-
-    private fun remember(state: VfxEffect) {
-        undoStack.addLast(state)
-        while (undoStack.size > HISTORY_LIMIT) undoStack.removeFirst()
-        redoStack.clear()
-        refreshHistoryState()
-    }
+    fun redo(): Boolean = history.redo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
 
     private fun apply(next: VfxEffect) {
         effect = next
         isModified = true
         revision++
-        refreshHistoryState()
-    }
-
-    private fun refreshHistoryState() {
-        canUndo = undoStack.isNotEmpty()
-        canRedo = redoStack.isNotEmpty()
     }
 
     override fun encode(): ByteArray = if (readOnly) original.toByteArray() else VfxFormat.write(effect).toByteArray()
 
     override fun reload(bytes: ByteArray) {
         if (!readOnly && bytes.toString(Charsets.UTF_8) == VfxFormat.write(effect)) return
-        undoStack.clear()
-        redoStack.clear()
-        refreshHistoryState()
+        history.clear()
         load(bytes)
         isModified = false
         revision++
@@ -152,10 +104,5 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
             error = e.message ?: e::class.simpleName
             HollowEngine.LOGGER.warn("Could not read effect: {}", error)
         }
-    }
-
-    private companion object {
-        const val HISTORY_LIMIT = 100
-        const val MERGE_WINDOW_NANOS = 700_000_000L
     }
 }

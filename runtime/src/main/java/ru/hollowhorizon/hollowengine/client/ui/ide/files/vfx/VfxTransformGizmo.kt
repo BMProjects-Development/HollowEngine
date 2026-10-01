@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoGeometry
 import ru.hollowhorizon.hollowengine.client.editor.GizmoHandle
 import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.editor.GizmoKeyboardTransform
 import ru.hollowhorizon.hollowengine.client.editor.GizmoManipulator
 import ru.hollowhorizon.hollowengine.client.editor.GizmoRenderer
 import ru.hollowhorizon.hollowengine.client.editor.GizmoPicker
@@ -69,14 +70,31 @@ internal class VfxTransformGizmo {
     /** The placement [drag] has come to with the pointer at ([x], [y]), or null while nothing moved. */
     fun drag(drag: VfxTransformDrag, x: Float, y: Float, modifiers: Int): VfxTransform? {
         val values = manipulator.update(drag.gizmo, x, y, modifiers) ?: return null
-        val start = drag.start
-        val parent = drag.parent
-        return when (drag.gizmo.handleId.mode) {
+        return place(drag.gizmo.handleId.mode, values, drag.start, drag.parent)
+    }
+
+    /** A transform from the keyboard on the node at [frame], starting where the pointer is. */
+    fun keyboard(
+        nodeId: String, mode: GizmoEditMode, frame: VfxFrame, parent: VfxFrame?, start: VfxTransform, x: Float, y: Float,
+    ): VfxKeyboardTransform {
+        val values = GizmoTransformValues(frame.position.copy(), frame.rotation.copy(), start.scale)
+        val keyboard = GizmoKeyboardTransform(mode, values, x, y, projector, geometry, manipulator)
+        return VfxKeyboardTransform(nodeId, start, parent?.let { VfxFrame().set(it) } ?: VfxFrame(), keyboard)
+    }
+
+    /** The placement [transform] has come to with the pointer at ([x], [y]), or null while it cannot tell. */
+    fun update(transform: VfxKeyboardTransform, x: Float, y: Float, modifiers: Int): VfxTransform? {
+        val values = transform.keyboard.update(x, y, modifiers) ?: return null
+        return place(transform.keyboard.mode, values, transform.start, transform.parent)
+    }
+
+    /** What [values] make of the node's placement in [parent]'s space: only the part [mode] moves. */
+    private fun place(mode: GizmoEditMode, values: GizmoTransformValues, start: VfxTransform, parent: VfxFrame): VfxTransform =
+        when (mode) {
             GizmoEditMode.TRANSLATE -> start.copy(position = parent.toLocalPoint(values.translation))
             GizmoEditMode.ROTATE -> start.copy(rotation = eulerDegrees(parent.rotation.conjugate() * values.rotation))
             GizmoEditMode.SCALE -> start.copy(scale = values.scale)
         }
-    }
 
     fun draw(scope: UiCanvasDrawScope, handles: List<GizmoHandle>, hovered: GizmoHandleId?, drag: VfxTransformDrag?) {
         drag?.gizmo?.let { GizmoRenderer.drawRotationSector(scope, geometry, projector, it) }
@@ -109,18 +127,19 @@ internal class VfxTransformGizmo {
     private fun QuatF.copy(): QuatF = QuatF(x, y, z, w)
 }
 
+/** A transform from the keyboard on a node, with its placement and parent when it began. */
+internal class VfxKeyboardTransform(
+    val nodeId: String,
+    val start: VfxTransform,
+    val parent: VfxFrame,
+    val keyboard: GizmoKeyboardTransform,
+)
+
 /** A gizmo drag on a node: the drag of the gizmo, and the node's placement and parent when it began. */
 internal class VfxTransformDrag(val gizmo: GizmoDrag, val start: VfxTransform, val parent: VfxFrame) {
     /** What the value label shows: a distance, an angle in degrees or a scale factor. */
     val label: Float get() = gizmo.labelValue.toFloat()
 }
-
-private val GizmoEditMode.property: VfxProperty
-    get() = when (this) {
-        GizmoEditMode.TRANSLATE -> VfxProperty.POSITION
-        GizmoEditMode.ROTATE -> VfxProperty.ROTATION
-        GizmoEditMode.SCALE -> VfxProperty.SCALE
-    }
 
 private val GizmoHandleId.mode: GizmoEditMode
     get() = when (this) {

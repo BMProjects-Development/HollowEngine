@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.bootstrap.mixins;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -36,6 +38,11 @@ public abstract class PlayerMixin extends LivingEntity implements PlayerExtensio
         }
     }
 
+
+    @WrapMethod(method = "attack")
+    private void hollowengine$attack(Entity target, Operation<Void> original) {
+        BootstrapRuntimeManager.bridge().onPlayerAttack((Player) (Object) this, target, () -> original.call(target));
+    }
 
     @Override
     public void hollowcore$closeContainer() {

@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.util.Mth
+import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.HollowEngine
@@ -186,9 +187,22 @@ class ModelViewerState(model: String) {
         return hypot(head.x + dx * along - x, head.y + dy * along - y)
     }
 
+    /** The size of the panel the preview was last drawn into. */
+    val panelWidth: Float get() = lastRect.width
+    val panelHeight: Float get() = lastRect.height
+
+    /** How many panel pixels one unit of the model spans; the preview has no perspective. */
+    val pixelsPerUnit: Float get() = min(lastRect.width, lastRect.height) * zoom
+
+    /** Model space to panel pixels, y down, z toward the viewer: [project] as a matrix. */
+    fun panelMatrix(): Matrix4f = Matrix4f()
+        .translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
+        .scale(pixelsPerUnit, -pixelsPerUnit, pixelsPerUnit)
+        .rotateX(pitch * Mth.DEG_TO_RAD)
+        .rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD)
+
     private fun viewMatrix(): Mat4f {
-        val baseSize = min(lastRect.width, lastRect.height)
-        val scale = baseSize * zoom
+        val scale = pixelsPerUnit
         return MutableMat4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
             .scale(Vec3f(scale, -scale, scale)).rotate(pitch.deg, Vec3f.X_AXIS)
             .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS)
@@ -216,7 +230,9 @@ class ModelViewerState(model: String) {
 
         configurePreviewAnimator(animations)
 
-        fillAnimationVariables(animationContext, null, TickHandler.partialTick)
+        fillAnimationVariables(
+            animationContext, null, TickHandler.partialTick, Minecraft.getInstance().level?.gameTime ?: 0L,
+        )
         animationContext.time = TickHandler.gameTime
         animations.indices.forEach { index ->
             animationContext.variables[animationWeightVariables[index]] = animationWeights[animations[index].name] ?: 0f

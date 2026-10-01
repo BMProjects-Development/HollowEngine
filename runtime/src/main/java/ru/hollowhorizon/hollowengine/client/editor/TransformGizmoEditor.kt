@@ -66,6 +66,10 @@ object TransformGizmoEditor {
     private var lastPhysY = 0f
 
     private var labelState by mutableStateOf<OverlayLabelState?>(null)
+
+    /** A transform from the keyboard under way, and where its hint is shown. */
+    private var keyboard: GizmoKeyboardTransform? = null
+    private var keyboardHint by mutableStateOf<KeyboardHintState?>(null)
     private var contextMenuState by mutableStateOf<ContextMenuState?>(null)
 
     private var modesValue by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
@@ -214,6 +218,9 @@ object TransformGizmoEditor {
         if (!crosshairMode() && pointerOverIde() && action == GLFW.GLFW_PRESS) return false
         if (!crosshairMode() && overlay.handleMouseButton(physX, physY, button, action)) return true
         val (x, y) = pointerLogical(physX, physY)
+        keyboard?.let { transform ->
+            return action != GLFW.GLFW_PRESS || finishKeyboardTransform(transform.click(button))
+        }
         return when (action) {
             GLFW.GLFW_PRESS -> onPress(x, y, button)
             GLFW.GLFW_RELEASE -> onRelease(button)
@@ -238,6 +245,10 @@ object TransformGizmoEditor {
         if (!isEditorAvailable() || crosshairMode()) return false
         overlay.handleMouseMove(physX, physY)
         val (x, y) = pointerLogical(physX, physY)
+        keyboard?.let { transform ->
+            moveKeyboardTransform(transform, hollowIdeModifierMask())
+            return true
+        }
         val drag = currentDrag
         if (drag == null && pointerOverIde()) {
             hoveredHandleId = null
@@ -265,7 +276,61 @@ object TransformGizmoEditor {
 
     fun handleKey(key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
         if (!isEditorAvailable() || crosshairMode()) return false
+        if (action == GLFW.GLFW_PRESS && handleTransformKey(key, modifiers)) return true
         return overlay.handleKey(key, scanCode, action, modifiers)
+    }
+
+    /** T, R and S on the selected node, and the keys of a transform under way. */
+    private fun handleTransformKey(key: Int, modifiers: Int): Boolean {
+        val transform = keyboard
+        if (transform != null) {
+            val result = transform.key(key)
+            if (result == GizmoKeyResult.CHANGED) {
+                draggingKey?.let(entries::get)?.let { applyFromGizmo(it, transform.start) }
+                keyboardHint = keyboardHint?.copy(text = transform.hint)
+                moveKeyboardTransform(transform, modifiers)
+            }
+            return finishKeyboardTransform(result) || result == GizmoKeyResult.CHANGED
+        }
+        if (modifiers != 0 || pointerOverIde()) return false
+
+        val mode = GizmoKeyboardTransform.modeFor(key) ?: return false
+        val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return false
+        val working = entry.working ?: return false
+        val (x, y) = pointerLogical(lastPhysX, lastPhysY)
+        keyboard = GizmoKeyboardTransform(mode, working, x, y, WorldToScreenProjector, GizmoGeometry.World, GizmoManipulator.World)
+        keyboardHint = KeyboardHintState(x, y, keyboard?.hint.orEmpty())
+        draggingKey = entry.entryId
+        contextMenuState = null
+        return true
+    }
+
+    private fun moveKeyboardTransform(transform: GizmoKeyboardTransform, modifiers: Int) {
+        val entry = draggingKey?.let(entries::get) ?: return
+        val (x, y) = pointerLogical(lastPhysX, lastPhysY)
+        val values = transform.update(x, y, modifiers) ?: return
+        entry.working = values
+        applyFromGizmo(entry, values)
+    }
+
+    /** Ends the transform from the keyboard when [result] says so; true when it did. */
+    private fun finishKeyboardTransform(result: GizmoKeyResult): Boolean {
+        val transform = keyboard ?: return false
+        val entry = draggingKey?.let(entries::get)
+        when (result) {
+            GizmoKeyResult.CONFIRMED -> Unit
+            GizmoKeyResult.CANCELLED -> entry?.let {
+                it.working = transform.start
+                applyFromGizmo(it, transform.start)
+            }
+
+            else -> return false
+        }
+        keyboard = null
+        keyboardHint = null
+        draggingKey = null
+        entry?.let(::refreshFromRuntime)
+        return true
     }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean {
@@ -365,6 +430,8 @@ object TransformGizmoEditor {
     }
 
     private fun cancelInteraction() {
+        keyboard = null
+        keyboardHint = null
         currentDrag = null
         draggingKey = null
         draggingHandleId = null
@@ -398,6 +465,16 @@ object TransformGizmoEditor {
                                 color = UiColor(0f, 0f, 0f, 0.55f)
                             )
                         )
+                        .foreground(UiColor(0.94f, 0.96f, 1f)),
+                )
+            }
+
+            keyboardHint?.let { hint ->
+                Text(
+                    hint.text,
+                    modifier = Modifier.position((hint.x + 16f).px, (hint.y + 16f).px)
+                        .padding(6.px, 3.px)
+                        .background(UiColor(0.08f, 0.10f, 0.14f, 0.9f))
                         .foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
@@ -446,6 +523,11 @@ object TransformGizmoEditor {
 
         val active = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return
         val working = active.working ?: return
+
+        keyboard?.let { transform ->
+            transform.draw(scope)
+            return
+        }
 
         val drag = currentDrag
         if (drag != null && draggingKey == active.entryId) {
@@ -726,6 +808,7 @@ object TransformGizmoEditor {
     private data class GizmoEntryId(val snapshotId: UUID, val nodeId: UUID)
     private data class ContextMenuState(val entryId: GizmoEntryId, val anchor: UiRect)
     private data class OverlayLabelState(val x: Float, val y: Float, val value: Double)
+    private data class KeyboardHintState(val x: Float, val y: Float, val text: String)
 }
 
 enum class GizmoEditMode {

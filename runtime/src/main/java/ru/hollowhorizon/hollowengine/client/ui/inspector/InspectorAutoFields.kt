@@ -77,7 +77,7 @@ internal fun FieldHelp(description: String?) {
     )
 }
 
-private const val HelpIcon = "hollowengine:textures/gui/icons/docs.svg"
+private const val HelpIcon = "hollowengine:textures/gui/icons/info.svg"
 
 internal data class FieldRange(val min: Double, val max: Double, val slider: Boolean)
 

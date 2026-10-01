@@ -26,7 +26,7 @@ internal object InspectorIcons {
     const val ADD = "hollowengine:textures/gui/icons/add.svg"
     const val REMOVE = "hollowengine:textures/gui/icons/remove.svg"
     const val FOLDER = "hollowengine:textures/gui/icons/folder.svg"
-    const val HELP = "hollowengine:textures/gui/icons/docs.svg"
+    const val HELP = "hollowengine:textures/gui/icons/info.svg"
     const val SEARCH = "hollowengine:textures/gui/icons/search.svg"
     const val CLOSE = "hollowengine:textures/gui/icons/cross.svg"
 }

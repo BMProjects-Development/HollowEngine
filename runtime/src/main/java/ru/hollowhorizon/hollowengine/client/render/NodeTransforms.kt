@@ -4,15 +4,14 @@ import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
+import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import java.util.*
@@ -63,16 +62,8 @@ fun resolveNodeWorldTransform(
     transform: TransformComponent,
     partialTick: Float,
 ): TrsTransformF {
-    val hostYaw = when (host) {
-        is LivingEntity -> Mth.rotLerp(partialTick, host.yBodyRotO, host.yBodyRot)
-        else -> Mth.rotLerp(partialTick, host.yRotO, host.yRot)
-    }
-    val hostPosition = Vec3f(
-        Mth.lerp(partialTick.toDouble(), host.xOld, host.x).toFloat(),
-        Mth.lerp(partialTick.toDouble(), host.yOld, host.y).toFloat(),
-        Mth.lerp(partialTick.toDouble(), host.zOld, host.z).toFloat(),
-    )
-    val hostRotation = hostEntityRotation(hostYaw)
+    val hostPosition = hostPosition(host, partialTick).let { Vec3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
+    val hostRotation = hostRotation(host, partialTick)
     val local = transform.transform
     val worldTranslation = Vec3f(local.translation).rotateBy(hostRotation) + hostPosition
     val worldRotation = MutableQuatF(hostRotation).mul(local.rotation).norm()
@@ -160,16 +151,8 @@ fun worldTransformToComponent(
         )
     } else {
         val host = findNodeHostEntity(level, hostEntityUuid) ?: return null
-        val hostYaw = when (host) {
-            is LivingEntity -> Mth.rotLerp(partialTick, host.yBodyRotO, host.yBodyRot)
-            else -> Mth.rotLerp(partialTick, host.yRotO, host.yRot)
-        }
-        val hostPosition = Vec3f(
-            Mth.lerp(partialTick.toDouble(), host.xOld, host.x).toFloat(),
-            Mth.lerp(partialTick.toDouble(), host.yOld, host.y).toFloat(),
-            Mth.lerp(partialTick.toDouble(), host.zOld, host.z).toFloat(),
-        )
-        val hostRotation = hostEntityRotation(hostYaw)
+        val hostPosition = hostPosition(host, partialTick)
+        val hostRotation = hostRotation(host, partialTick)
         val inverseHostRotation = MutableQuatF(hostRotation).invert().norm()
         val localTranslation = Vec3f(
             (worldPosition.x - hostPosition.x).toFloat(),
@@ -213,4 +196,3 @@ private fun sanitizeScaleComponent(value: Float): Float {
     return if (normalized == -0.0f) 0.01f else normalized
 }
 
-private fun hostEntityRotation(yaw: Float): QuatF = QuatF(hostYawDegrees(yaw).deg, Vec3f.Y_AXIS)

@@ -19,6 +19,10 @@ object RigGenerators {
 
     class Entry(val id: String, val titleKey: String, val generator: RigGenerator)
 
+    init {
+        register(ColliderRigGenerator.ID, "hollowengine.gui.rig_editor.generate_colliders", ColliderRigGenerator)
+    }
+
     fun register(id: String, titleKey: String, generator: RigGenerator): ExtensionHandle =
         point.register(id.rl, Entry(id, titleKey, generator))
 

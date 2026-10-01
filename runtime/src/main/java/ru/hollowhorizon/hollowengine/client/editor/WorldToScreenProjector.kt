@@ -110,7 +110,7 @@ open class GizmoProjector {
         )
     }
 
-    fun worldPerPixel(world: Vec3): Float {
+    open fun worldPerPixel(world: Vec3): Float {
         if (logicalHeight <= 0f) return 0.05f
         val distance = world.distanceTo(cameraPosition).toFloat()
         val worldHeightAtDepth = 2f * tan(fovYRadians * 0.5f) * distance

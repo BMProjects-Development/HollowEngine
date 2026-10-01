@@ -1,5 +1,7 @@
 {
   "translate": "Move",
   "rotate": "Rotate",
-  "scale": "Scale"
+  "scale": "Scale",
+  "local": "local",
+  "keys": "X/Y/Z axis · Ctrl snap, Ctrl+Shift fine, Alt coarse · click or Enter applies · right click or Esc cancels"
 }

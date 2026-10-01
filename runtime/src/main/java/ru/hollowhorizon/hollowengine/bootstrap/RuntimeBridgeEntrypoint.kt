@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap
 import com.mojang.blaze3d.audio.SoundBuffer
 import com.mojang.blaze3d.platform.Window
 import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.datafixers.util.Either
 import net.minecraft.Util
 import net.minecraft.client.Camera
@@ -54,6 +55,17 @@ import net.minecraft.world.level.block.SkullBlock
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.EntityHitResult
+import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
+import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaims
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderCombat
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
+import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
+import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
+import java.util.function.Predicate
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.ConsoleAppender
 import ru.hollowhorizon.hollowengine.LOGGER
@@ -165,7 +177,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onPlayerInteractEntity(player: Player, hand: InteractionHand, target: Entity): Boolean {
-        val event = PlayerInteractEvent.EntityInteract(player, hand, target)
+        val collider = ColliderClaims.peek(player, target)?.takeIf { it.spec.modes.interact }?.hit
+        val event = PlayerInteractEvent.EntityInteract(player, hand, target, collider)
         PlayerInteractEvent.EntityInteract.post(event)
         return event.isCanceled
     }
@@ -391,7 +404,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientInteractEntity(player: Player, hand: InteractionHand, target: Entity): Boolean {
-        val event = PlayerInteractEvent.EntityInteract(player, hand, target)
+        val collider = ClientColliderHooks.interacted(target)
+        val event = PlayerInteractEvent.EntityInteract(player, hand, target, collider)
         PlayerInteractEvent.EntityInteract.post(event)
         return event.isCanceled
     }
@@ -617,6 +631,51 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         EntityEvent.Hurt.post(event)
         return event.isCanceled
     }
+
+    override fun onLivingEntityHurt(entity: LivingEntity, damageSource: DamageSource, amount: Float): Float {
+        val event = EntityEvent.Hurt(entity, damageSource, amount)
+        EntityEvent.Hurt.post(event)
+        return if (event.isCanceled) Float.NaN else event.amount
+    }
+
+    override fun bodyPushable(entity: Entity, vanilla: Boolean): Boolean = EntityBodies.isPushable(entity, vanilla)
+
+    override fun bodyPushesOthers(entity: Entity): Boolean = EntityBodies.pushesOthers(entity)
+
+    override fun bodySolid(entity: Entity, vanilla: Boolean): Boolean = EntityBodies.isSolid(entity, vanilla)
+
+    override fun bodyDimensions(entity: Entity, vanilla: EntityDimensions): EntityDimensions =
+        EntityBodies.dimensions(entity, vanilla)
+
+    override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
+        ColliderCombat.resolve(entity, damageSource)
+
+    override fun hasColliderTargets(entity: Entity, projectile: Boolean): Boolean =
+        EntityColliders.hasTargets(entity, colliderModes(projectile))
+
+    override fun pickColliders(
+        level: Level, source: Entity?, start: Vec3, end: Vec3, search: AABB,
+        predicate: Predicate<Entity>, maxDistanceSquared: Double, vanilla: EntityHitResult?, projectile: Boolean,
+    ): EntityHitResult? =
+        EntityColliders.pick(level, source, start, end, search, predicate, maxDistanceSquared, vanilla, colliderModes(projectile))
+
+    override fun onPlayerAttack(player: Player, target: Entity, attack: Runnable) =
+        ColliderCombat.attack(player, target, attack)
+
+    override fun onProjectileHit(projectile: Entity, result: HitResult, hit: Runnable) =
+        ColliderCombat.projectileHit(projectile, result, hit)
+
+    override fun colliderReachBounds(player: Player, target: Entity, vanilla: AABB): AABB =
+        ColliderClaims.reachBounds(player, target, vanilla)
+
+    override fun onClientTargetEntity(target: Entity, result: HitResult?) = ClientColliderHooks.claim(result, target)
+
+    override fun renderColliderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean =
+        ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
+
+    /** Projectiles land only on colliders that take hits; the crosshair also stops at the clickable ones. */
+    private fun colliderModes(projectile: Boolean): (ColliderModes) -> Boolean =
+        if (projectile) ColliderModes::hit else ColliderModes::isTarget
 
     override fun onEntityChangedDimension(entity: Entity, resultEntity: Entity?, fromLevel: Level, toLevel: Level) {
         if (resultEntity != null) {

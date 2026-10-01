@@ -31,16 +31,10 @@ class HollowIdeShaderGraphDocument(bytes: ByteArray) : HollowIdeFileDocument {
     var revision by mutableStateOf(0)
         private set
 
-    private val undoStack = ArrayDeque<ShaderGraph>()
-    private val redoStack = ArrayDeque<ShaderGraph>()
+    private val history = DocumentHistory<ShaderGraph>()
 
-    /** The graph as it was when a gesture started; the whole gesture becomes one step back. */
-    private var gestureStart: ShaderGraph? = null
-
-    var canUndo by mutableStateOf(false)
-        private set
-    var canRedo by mutableStateOf(false)
-        private set
+    val canUndo: Boolean get() = history.canUndo
+    val canRedo: Boolean get() = history.canRedo
 
     /** What the editor keeps while the file stays open, such as where the view was, across tab switches. */
     private var editorState: Any? = null
@@ -56,61 +50,30 @@ class HollowIdeShaderGraphDocument(bytes: ByteArray) : HollowIdeFileDocument {
         if (readOnly) return
         val next = change(graph)
         if (next == graph) return
-        if (gestureStart == null) remember(graph)
+        history.beforeEdit(graph)
         apply(next)
     }
 
     /** Starts a gesture, such as dragging a node, that should go back in one step. */
-    fun beginGesture() {
-        if (gestureStart == null) gestureStart = graph
-    }
+    fun beginGesture() = history.beginGesture(graph)
 
-    fun endGesture() {
-        val start = gestureStart ?: return
-        gestureStart = null
-        if (start != graph) remember(start)
-    }
+    fun endGesture() = history.endGesture(graph)
 
-    fun undo(): Boolean {
-        val previous = undoStack.removeLastOrNull() ?: return false
-        redoStack.addLast(graph)
-        apply(previous)
-        return true
-    }
+    fun undo(): Boolean = history.undo(graph)?.also(::apply) != null
 
-    fun redo(): Boolean {
-        val next = redoStack.removeLastOrNull() ?: return false
-        undoStack.addLast(graph)
-        apply(next)
-        return true
-    }
-
-    private fun remember(state: ShaderGraph) {
-        undoStack.addLast(state)
-        while (undoStack.size > HISTORY_LIMIT) undoStack.removeFirst()
-        redoStack.clear()
-        refreshHistoryState()
-    }
+    fun redo(): Boolean = history.redo(graph)?.also(::apply) != null
 
     private fun apply(next: ShaderGraph) {
         graph = next
         isModified = true
         revision++
-        refreshHistoryState()
-    }
-
-    private fun refreshHistoryState() {
-        canUndo = undoStack.isNotEmpty()
-        canRedo = redoStack.isNotEmpty()
     }
 
     override fun encode(): ByteArray = if (readOnly) original.toByteArray() else ShaderGraphFormat.write(graph).toByteArray()
 
     override fun reload(bytes: ByteArray) {
         if (!readOnly && bytes.toString(Charsets.UTF_8) == ShaderGraphFormat.write(graph)) return
-        undoStack.clear()
-        redoStack.clear()
-        refreshHistoryState()
+        history.clear()
         load(bytes)
         isModified = false
         revision++
@@ -130,9 +93,5 @@ class HollowIdeShaderGraphDocument(bytes: ByteArray) : HollowIdeFileDocument {
             error = e.message ?: e::class.simpleName
             HollowEngine.LOGGER.warn("Could not read shader graph: {}", error)
         }
-    }
-
-    private companion object {
-        const val HISTORY_LIMIT = 100
     }
 }

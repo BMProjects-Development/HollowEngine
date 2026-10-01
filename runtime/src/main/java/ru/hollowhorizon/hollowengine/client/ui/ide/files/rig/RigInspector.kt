@@ -13,6 +13,8 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
@@ -20,45 +22,55 @@ import ru.hollowhorizon.hollowengine.common.models.RigBone
 
 
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"
+private const val ModelIcon = "hollowengine:textures/gui/icons/files/rig.svg"
 
 /**
- * What is authored onto the selected bone: its alias, whether it is drawn, and everything hung on it.
+ * What is authored onto the selected bone, or onto the model itself when no bone is selected: the bone's
+ * alias and whether it is drawn, and everything hung on it.
  *
  * The bone list the picker offers travels with the target, because the shared inspector composes it
  * somewhere else entirely and knows nothing about this rig.
  */
 internal fun rigInspectorTarget(
     document: HollowIdeRigDocument,
-    bone: String,
+    state: RigEditorState,
     bones: List<String>,
-): InspectorTarget = InspectorTarget(
-    id = "rig-bone-$bone",
-    title = bone,
-    icon = BoneIcon,
-    subtitle = rigText("section_bone"),
-) {
-    CompositionLocalProvider(LocalEditorBones provides bones) {
-        key(bone) { BoneFields(document, bone) }
+): InspectorTarget {
+    val bone = state.selected
+    val collider = state.selectedCollider
+    return InspectorTarget(
+        id = "rig-bone-${bone ?: ""}",
+        title = bone ?: rigText("model"),
+        icon = if (bone == null) ModelIcon else BoneIcon,
+        subtitle = rigText(if (bone == null) "section_model" else "section_bone"),
+    ) {
+        CompositionLocalProvider(LocalEditorBones provides bones) {
+            key(bone) { HolderFields(document, bone, collider) }
+        }
     }
 }
 
 @Composable
-private fun BoneFields(document: HollowIdeRigDocument, bone: String) {
-    val current = document.rig.bone(bone) ?: RigBone.EMPTY
+private fun HolderFields(document: HollowIdeRigDocument, bone: String?, selectedCollider: String?) {
+    val current = document.rig.holder(bone)
 
     Column(tags = listOf("insp-body")) {
-        Section(rigText("section_bone")) {
-            Readonly(rigText("name"), bone)
-            TextRow(rigText("alias"), current.alias.orEmpty()) { value ->
-                document.edit { it.withBone(bone, current.copy(alias = value.trim().ifBlank { null })) }
+        if (bone != null) {
+            Section(rigText("section_bone")) {
+                Readonly(rigText("name"), bone)
+                TextRow(rigText("alias"), current.alias.orEmpty()) { value ->
+                    document.edit { it.withBone(bone, current.copy(alias = value.trim().ifBlank { null })) }
+                }
+                Pills(listOf(false, true), current.hidden, { rigText(if (it) "hidden" else "visible") }) { hidden ->
+                    document.edit { it.withBone(bone, current.copy(hidden = hidden)) }
+                }
             }
-            Pills(listOf(false, true), current.hidden, { rigText(if (it) "hidden" else "visible") }) { hidden ->
-                document.edit { it.withBone(bone, current.copy(hidden = hidden)) }
-            }
+        } else if (current.attachments.isEmpty()) {
+            Hint(rigText("model_hint"))
         }
 
         current.attachments.forEach { attachment ->
-            key(attachment.id) { AttachmentSection(document, bone, current, attachment) }
+            key(attachment.id) { AttachmentSection(document, bone, current, attachment, attachment.id == selectedCollider) }
         }
 
         AddAttachment(document, bone, current)
@@ -68,23 +80,25 @@ private fun BoneFields(document: HollowIdeRigDocument, bone: String) {
 @Composable
 private fun AttachmentSection(
     document: HollowIdeRigDocument,
-    bone: String,
+    bone: String?,
     current: RigBone,
     attachment: RigAttachmentSpec,
+    selected: Boolean,
 ) {
     val type = RigAttachmentTypes.of(attachment)
+    val title = if (attachment is ColliderAttachmentSpec) "${type.title()} · ${attachment.id}" else type.title()
 
-    Section(type.title()) {
+    Section(if (selected) "◆ $title" else title) {
         if (type == null) {
             Hint(rigText("unknown_attachment"))
         } else {
-            AttachmentFields(type, attachment, "/$bone/${attachment.id}") { changed ->
-                document.edit { it.withBone(bone, current.withAttachment(attachment.id, changed)) }
+            AttachmentFields(type, attachment, "/${bone ?: ""}/${attachment.id}") { changed ->
+                document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}") { it.withHolder(bone, current.withAttachment(attachment.id, changed)) }
             }
         }
 
         InspectorButton(rigText("remove_attachment"), tags = listOf("danger")) {
-            document.edit { it.withBone(bone, current.withoutAttachment(attachment.id)) }
+            document.edit { it.withHolder(bone, current.withoutAttachment(attachment.id)) }
         }
     }
 }
@@ -121,10 +135,10 @@ private fun AttachmentFields(
 }
 
 @Composable
-private fun AddAttachment(document: HollowIdeRigDocument, bone: String, current: RigBone) {
+private fun AddAttachment(document: HollowIdeRigDocument, bone: String?, current: RigBone) {
     var open by remember(bone) { mutableStateOf(false) }
     var anchor by remember(bone) { mutableStateOf(UiRect.Zero) }
-    val kinds = RigAttachmentTypes.all.filter { it.createDefault != null }
+    val kinds = attachableKinds(bone)
     if (kinds.isEmpty()) return
 
     InspectorButton(
@@ -142,19 +156,32 @@ private fun AddAttachment(document: HollowIdeRigDocument, bone: String, current:
         items = kinds.map { type ->
             val create = requireNotNull(type.createDefault)
             UiDropdownItem(type.title()) {
-                document.edit { it.withBone(bone, current.withAttachment(create(freeAttachmentId(current, type)))) }
+                document.edit { it.withHolder(bone, current.withAttachment(create(freeAttachmentId(it, bone, type)))) }
             }
         },
         onExpandedChange = { if (!it) open = false },
     )
 }
 
-internal fun freeAttachmentId(bone: RigBone, type: RigAttachmentType<*>): String {
+/** What can be hung on [bone]; on the model itself, only what works in model space. */
+internal fun attachableKinds(bone: String?): List<RigAttachmentType<*>> =
+    RigAttachmentTypes.all.filter { it.createDefault != null && (bone != null || it.allowedOnModel) }
+
+/**
+ * A name for a new attachment of [type] on [bone]. Colliders are named across the whole rig, since that
+ * name is how scripts and events tell them apart.
+ */
+internal fun freeAttachmentId(rig: ModelRig, bone: String?, type: RigAttachmentType<*>): String {
+    val taken = if (type.specClass == ColliderAttachmentSpec::class) {
+        rig.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
+    } else {
+        rig.holder(bone).attachments.mapTo(HashSet()) { it.id }
+    }
     val base = type.id.substringAfterLast('/')
-    if (bone.attachment(base) == null) return base
+    if (base !in taken) return base
 
     var index = 2
-    while (bone.attachment("$base$index") != null) index++
+    while ("$base$index" in taken) index++
     return "$base$index"
 }
 
@@ -168,4 +195,3 @@ private val AttachmentJson = Json {
     encodeDefaults = true
     ignoreUnknownKeys = true
 }
-

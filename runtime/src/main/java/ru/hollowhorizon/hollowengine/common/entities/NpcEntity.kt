@@ -5,7 +5,6 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.PathfinderMob
@@ -18,10 +17,7 @@ import net.minecraft.world.level.GameType
 import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.components.HitboxComponent
-import ru.hollowhorizon.hollowengine.common.attachments.components.hitboxComponent
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.snapshotOf
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionController
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcMoveControl
@@ -80,18 +76,6 @@ class NpcEntity : PathfinderMob {
     override fun wantsToPickUp(pStack: ItemStack) = false
 
 
-    override fun doPush(pEntity: Entity) {
-        if (hitboxMode != HitboxMode.EMPTY) super.doPush(pEntity)
-    }
-
-    override fun isPushable(): Boolean {
-        return super.isPushable() && hitboxMode == HitboxMode.PULLING
-    }
-
-    override fun canBeCollidedWith(): Boolean {
-        return hitboxMode == HitboxMode.BLOCKING && isAlive
-    }
-
     override fun aiStep() {
         updateSwingTime()
         super.aiStep()
@@ -125,13 +109,6 @@ class NpcEntity : PathfinderMob {
     }
 
     val pickupDistance get() = pickupReach
-
-    var hitboxMode: HitboxMode
-        get() = hitboxComponent?.mode ?: HitboxMode.PULLING
-        set(value) {
-            set(HitboxComponent(value))
-        }
-
 
     fun seat() {
         SeatEntity.seat(this)

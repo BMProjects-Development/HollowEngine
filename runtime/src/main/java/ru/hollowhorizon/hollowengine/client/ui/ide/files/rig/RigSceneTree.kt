@@ -7,8 +7,8 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
-import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 
 /** The id of the row that stands for the model itself, above its bones. */
 private const val RigRootId = "rig-root"
@@ -30,7 +30,7 @@ internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorStat
             add(
                 UiTreeItem(
                     id = RigRootId,
-                    label = title,
+                    label = document.rig.attachments.size.takeIf { it > 0 }?.let { "$title  ●$it" } ?: title,
                     depth = 0,
                     payload = null,
                     icon = RigIcon,
@@ -41,7 +41,7 @@ internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorStat
             )
             if (state.rootExpanded) appendBones(nodes, document.rig, state.expanded, state.selected, depth = 1)
         },
-        onSelect = { id -> state.selected = id.takeUnless { it == RigRootId } },
+        onSelect = { id -> state.select(id.takeUnless { it == RigRootId }) },
         onToggle = { id ->
             when (id) {
                 RigRootId -> state.rootExpanded = !state.rootExpanded
@@ -50,7 +50,7 @@ internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorStat
             }
         },
         hint = rigText("no_bones").takeIf { nodes.isEmpty() },
-        menu = { id -> id?.takeUnless { it == RigRootId }?.let { boneMenu(document, state, it) }.orEmpty() },
+        menu = { id -> if (id == null) emptyList() else boneMenu(document, state, id.takeUnless { it == RigRootId }) },
         onIconClick = { id -> nodes.findBone(id)?.let(state.viewer::toggleNodeVisibility) },
     )
 }
@@ -87,10 +87,13 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
     }
 }
 
-/** What a right click on a bone offers: hanging something on it, and hiding it in the preview. */
-private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone: String): List<UiDropdownItem> {
-    val node = state.viewer.nodes.findBone(bone)
-    val kinds = RigAttachmentTypes.all.filter { it.createDefault != null }
+/**
+ * What a right click on a bone offers: hanging something on it, and hiding it in the preview. On the
+ * model itself, null [bone], only what can hang on the whole model.
+ */
+private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone: String?): List<UiDropdownItem> {
+    val node = bone?.let { state.viewer.nodes.findBone(it) }
+    val kinds = attachableKinds(bone)
     return listOfNotNull(
         UiDropdownItem(
             rigText("attach"),
@@ -98,11 +101,12 @@ private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone
             children = kinds.map { type ->
                 val create = requireNotNull(type.createDefault)
                 UiDropdownItem(type.title()) {
+                    var added: RigAttachmentSpec? = null
                     document.edit { rig ->
-                        val current = rig.bone(bone) ?: RigBone.EMPTY
-                        rig.withBone(bone, current.withAttachment(create(freeAttachmentId(current, type))))
+                        val spec = create(freeAttachmentId(rig, bone, type)).also { added = it }
+                        rig.withHolder(bone, rig.holder(bone).withAttachment(spec))
                     }
-                    state.selected = bone
+                    state.select(bone, added?.takeIf { it is ColliderAttachmentSpec }?.id)
                 }
             },
         ).takeIf { kinds.isNotEmpty() },

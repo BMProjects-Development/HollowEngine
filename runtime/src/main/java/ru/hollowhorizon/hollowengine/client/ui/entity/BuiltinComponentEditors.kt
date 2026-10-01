@@ -10,16 +10,20 @@ import kotlinx.serialization.json.jsonObject
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
+import ru.hollowhorizon.hollowengine.common.colliders.fitEntityBox
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.PlayerSkinPart
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import java.util.Locale
 
 /**
  * The extras the engine's own components bring to the editor.
@@ -36,6 +40,7 @@ internal object BuiltinComponentEditors {
         ComponentEditors.register("hollowengine:model".rl) { scope -> ModelExtras(scope) }
         ComponentEditors.register("hollowengine:materials".rl) { scope -> MaterialsExtras(scope) }
         ComponentEditors.register("hollowengine:animations".rl) { scope -> AnimationsExtras(scope) }
+        ComponentEditors.register("hollowengine:entity/body".rl) { scope -> BodyExtras(scope) }
     }
 
     private fun modelPaths(): List<String> = HollowModelManager.allModels.map { it.toString() }
@@ -64,6 +69,27 @@ private fun ModelExtras(scope: ComponentEditorScope) {
         HollowIdeOverlay.openPath(path)
     }
 }
+
+/** Sizes the body around the colliders of the entity's model, standing at rest; nothing without colliders. */
+@Composable
+private fun BodyExtras(scope: ComponentEditorScope) {
+    val session = LocalEntityEditorSession.current ?: return
+    val body = scope.component as? BodyComponent ?: return
+    val modelPath = session.entries.firstNotNullOfOrNull { (it.value as? Model)?.model } ?: return
+    val location = remember(modelPath) { ResourceLocation.tryParse(modelPath) } ?: return
+    val model by remember(location) { HollowModelManager.getOrCreate(location) }.collectAsState()
+    val transform = session.entries.firstNotNullOfOrNull { it.value as? TransformComponent } ?: TransformComponent()
+    val fit = remember(model, transform) { fitEntityBox(model, RigAssets.of(location), transform.transform.matrixF) } ?: return
+
+    InspectorButton(
+        label = "${EntityEditorComponentLang.fitBody}  ${formatSize(fit.first)} × ${formatSize(fit.second)}",
+        modifier = Modifier.size(100.percent, 24.px).tooltipOnHover(EntityEditorComponentLang.fitBodyHint),
+    ) {
+        ComponentJson.encode(body.copy(width = fit.first, height = fit.second))?.let(scope::replace)
+    }
+}
+
+private fun formatSize(value: Float): String = "%.2f".format(Locale.ROOT, value)
 
 @Composable
 private fun MaterialsExtras(scope: ComponentEditorScope) {
@@ -139,4 +165,6 @@ internal object EntityEditorComponentLang {
     val noAnimator: String get() = ComponentLabels.translate(ROOT + "no_animator")
     val quickMaterials: String get() = ComponentLabels.translate(ROOT + "quick_materials")
     val playAnimation: String get() = ComponentLabels.translate(ROOT + "play_animation")
+    val fitBody: String get() = ComponentLabels.translate("hollowengine.component.hollowengine.entity.body.fit")
+    val fitBodyHint: String get() = ComponentLabels.translate("hollowengine.component.hollowengine.entity.body.fit.hint")
 }

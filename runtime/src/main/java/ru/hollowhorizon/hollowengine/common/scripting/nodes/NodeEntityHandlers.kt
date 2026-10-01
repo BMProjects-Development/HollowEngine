@@ -3,6 +3,8 @@ package ru.hollowhorizon.hollowengine.common.scripting.nodes
 import kotlinx.coroutines.launch
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderHit
+import ru.hollowhorizon.hollowengine.common.colliders.colliderHit
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractEvent
@@ -25,6 +27,36 @@ context(entity: LivingEntity, script: NodeScript)
 fun onHurt(block: suspend (EntityEvent.Hurt) -> Unit) {
     EntityEvent.Hurt.subscribe(script) { event ->
         if (event.entity === entity) script.launch { block(event) }
+    }
+}
+
+/**
+ * Fires when the bound entity takes damage on one of [colliders], or on any of its colliders when none
+ * is named. Damage that did not land on a collider, like a fall or an explosion, does not fire it.
+ */
+context(entity: LivingEntity, script: NodeScript)
+fun onColliderHit(vararg colliders: String, block: suspend (EntityEvent.Hurt, ColliderHit) -> Unit) {
+    EntityEvent.Hurt.subscribe(script) { event ->
+        val hit = event.source.colliderHit ?: return@subscribe
+        if (event.entity === entity && (colliders.isEmpty() || hit.collider in colliders)) {
+            script.launch { block(event, hit) }
+        }
+    }
+}
+
+/**
+ * Fires when a player clicks one of [colliders] of the bound entity, or any of its clickable colliders
+ * when none is named. Filtered like [onInteract].
+ */
+context(entity: LivingEntity, script: NodeScript)
+fun onColliderInteract(vararg colliders: String, block: suspend (PlayerInteractEvent.EntityInteract, ColliderHit) -> Unit) {
+    PlayerInteractEvent.EntityInteract.subscribe(script) { event ->
+        val hit = event.collider ?: return@subscribe
+        if (event.target === entity && event.hand == InteractionHand.MAIN_HAND && !event.player.level().isClientSide &&
+            (colliders.isEmpty() || hit.collider in colliders)
+        ) {
+            script.launch { block(event, hit) }
+        }
     }
 }
 

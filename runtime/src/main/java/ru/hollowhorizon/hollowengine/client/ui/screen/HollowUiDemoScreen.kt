@@ -39,9 +39,9 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
             Row(id = "tabs", tags = listOf("tabs"), modifier = Modifier.scrollable()) {
                 tab("overview", "Главная", "hollowengine:textures/gui/npc_menu/talk.png")
                 tab("widgets", "Виджеты", "hollowengine:textures/gui/npc_menu/quests.png")
-                tab("text", "Text", "hollowengine:textures/gui/icons/docs.svg")
-                tab("textlab", "TextLab", "hollowengine:textures/gui/icons/docs.svg")
-                tab("inlineflow", "Flow", "hollowengine:textures/gui/icons/docs.svg")
+                tab("text", "Text", "hollowengine:textures/gui/icons/info.svg")
+                tab("textlab", "TextLab", "hollowengine:textures/gui/icons/info.svg")
+                tab("inlineflow", "Flow", "hollowengine:textures/gui/icons/info.svg")
                 tab("editor", "Editor", "hollowengine:textures/gui/icons/code_editor.svg")
                 tab("layout", "Разметка", "hollowengine:textures/gui/npc_menu/trade.png")
                 tab("docking", "Docking", "hollowengine:textures/gui/icons/code_editor.svg")

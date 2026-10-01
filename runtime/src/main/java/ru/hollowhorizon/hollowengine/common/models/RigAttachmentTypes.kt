@@ -7,6 +7,7 @@ import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
@@ -21,6 +22,7 @@ class RigAttachmentType<S : RigAttachmentSpec>(
     val serializer: KSerializer<S>,
     val titleKey: String,
     val createDefault: ((id: String) -> S)? = null,
+    val allowedOnModel: Boolean = false,
 ) {
     val key: ResourceLocation = id.rl
 }
@@ -49,6 +51,7 @@ object RigAttachmentTypes {
                 createDefault = { id -> VfxBoneAttachmentSpec(id = id) },
             )
         )
+        register(ColliderAttachmentSpec.TYPE)
     }
 
     fun register(type: RigAttachmentType<*>): ExtensionHandle = point.register(type.key, type)

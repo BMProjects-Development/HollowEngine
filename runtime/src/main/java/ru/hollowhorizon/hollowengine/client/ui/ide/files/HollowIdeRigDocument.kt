@@ -30,13 +30,33 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
 
     private var editorState: Any? = null
 
+    private val history = DocumentHistory<ModelRig>()
+
+    val canUndo: Boolean get() = history.canUndo
+    val canRedo: Boolean get() = history.canRedo
+
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
-    fun edit(change: (ModelRig) -> ModelRig) {
+    /** Replaces the rig with what [change] makes of it; edits sharing [mergeKey] in quick succession undo together. */
+    fun edit(mergeKey: String? = null, change: (ModelRig) -> ModelRig) {
         val next = change(rig)
         if (next == rig) return
 
+        history.beforeEdit(rig, mergeKey)
+        apply(next)
+    }
+
+    /** Starts a gesture, such as dragging a handle, that should go back in one step. */
+    fun beginGesture() = history.beginGesture(rig)
+
+    fun endGesture() = history.endGesture(rig)
+
+    fun undo(): Boolean = history.undo(rig)?.also(::apply) != null
+
+    fun redo(): Boolean = history.redo(rig)?.also(::apply) != null
+
+    private fun apply(next: ModelRig) {
         rig = next
         isModified = true
         revision++
@@ -48,6 +68,9 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
     }
 
     override fun reload(bytes: ByteArray) {
+        // Our own save coming back is no change, and must not cost the history.
+        if (decode(bytes) == rig) return
+        history.clear()
         rig = decode(bytes)
         isModified = false
         revision++
