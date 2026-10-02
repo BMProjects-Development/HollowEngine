@@ -5,9 +5,9 @@ import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import java.util.WeakHashMap
 
 /**
  * Where the colliders of every entity are on the server, tick by tick.
@@ -22,8 +22,8 @@ object ServerColliderPoses {
     private val tracks = ColliderPoseTracks(HISTORY_TICKS) { model -> ServerColliderAssets.of(model).pose }
 
     /** The entities of each level with colliders, and those whose colliders act on bodies, as of the last tick. */
-    private val hosts = WeakHashMap<Level, List<ColliderHost>>()
-    private val physical = WeakHashMap<Level, List<PosedHost>>()
+    private val hosts = HashMap<Level, List<ColliderHost>>()
+    private val physical = HashMap<Level, List<PosedHost>>()
 
     /** The colliders of [entity] as of the last tick, placed now if it has none yet. */
     fun current(entity: Entity): List<EntityCollider> = recent(entity).firstOrNull().orEmpty()
@@ -41,6 +41,13 @@ object ServerColliderPoses {
 
     internal fun physicalIn(level: Level): List<PosedHost> = physical[level].orEmpty()
 
+    /** Lets go of [level], which is closing: what is kept here holds its entities, and they hold it. */
+    internal fun forget(level: Level) {
+        hosts.remove(level)
+        physical.remove(level)
+        ColliderTouches.forget(level)
+    }
+
     internal fun tick(level: Level, entities: List<Entity>) {
         val posed = entities.mapNotNull { entity -> tracks.track(entity, advance = true)?.let { entity to it } }
         hosts[level] = posed.mapNotNull { (entity, track) -> track.bounds?.let { ColliderHost(entity, it) } }
@@ -54,4 +61,9 @@ fun onColliderServerTick(event: TickEvent.Server) {
     event.server.allLevels.forEach { level ->
         ServerColliderPoses.tick(level, AttachmentRegistry.entitySnapshots(level).map { it.first })
     }
+}
+
+@SubscribeEvent
+fun onColliderLevelUnload(event: LevelEvent.Unload) {
+    if (!event.level.isClientSide) ServerColliderPoses.forget(event.level)
 }

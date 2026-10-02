@@ -149,14 +149,17 @@ internal object SolidColliders {
 
         var offset = Vec3.ZERO
         repeat(WALL_PASSES) {
-            val step = entered.flatMap { (box, walls) ->
-                val moved = box.move(offset.x, 0.0, offset.z)
-                walls.mapNotNull { exitFrom(moved, it) }
-            }.maxByOrNull { it.lengthSqr() } ?: return offset.takeIf { it.lengthSqr() >= MIN_MOVE * MIN_MOVE }
+            val step = deepestExit(entered, offset) ?: return offset.takeIf { it.lengthSqr() >= MIN_MOVE * MIN_MOVE }
             offset = offset.add(step)
         }
-        return null
+        return offset.takeIf { deepestExit(entered, offset) == null }
     }
+
+    /** The longest of the ways out of the walls the colliders are still in, moved by [offset]; null when they are in none. */
+    private fun deepestExit(entered: List<Pair<ColliderBox, List<AABB>>>, offset: Vec3): Vec3? = entered.flatMap { (box, walls) ->
+        val moved = box.move(offset.x, 0.0, offset.z)
+        walls.mapNotNull { exitFrom(moved, it) }
+    }.maxByOrNull { it.lengthSqr() }
 
     /** The shortest way sideways out of [wall] for the entity [box] belongs to; the wall would go the other way. */
     private fun exitFrom(box: ColliderBox, wall: AABB): Vec3? = SIDEWAYS.mapNotNull { direction ->

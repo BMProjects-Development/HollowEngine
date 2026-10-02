@@ -7,7 +7,6 @@ import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.common.events.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
-import java.util.WeakHashMap
 
 /** Where a touch between a collider and an entity is at. */
 enum class ColliderTouchPhase {
@@ -52,7 +51,11 @@ internal object ColliderTouches {
     private data class Touch(val host: Entity, val other: Entity, val collider: String, val bone: String?)
 
     /** What touched on the last tick of each level, and whether it stood. */
-    private val last = WeakHashMap<Level, Map<Touch, Boolean>>()
+    private val last = HashMap<Level, Map<Touch, Boolean>>()
+
+    fun forget(level: Level) {
+        last.remove(level)
+    }
 
     /** [hosts] of [level] with their colliders over the last ticks, newest first, as the server posed them. */
     fun post(level: Level, hosts: List<Pair<Entity, List<List<EntityCollider>>>>) {

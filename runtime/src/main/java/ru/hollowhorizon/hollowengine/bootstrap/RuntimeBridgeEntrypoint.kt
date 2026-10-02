@@ -620,6 +620,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onLevelClosed(level: Level) {
+        LevelEvent.Unload.post(LevelEvent.Unload(level))
         AttachmentRegistry.close(level)
     }
 
