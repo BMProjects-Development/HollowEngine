@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -130,20 +131,64 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
     }
 
     /** How far up [box] has to move to stop overlapping this collider; null when they do not overlap. */
-    fun lift(box: AABB): Double? {
+    fun lift(box: AABB): Double? = escape(box, UP)
+
+    /**
+     * How far [box] has to move along the unit [direction] to stop overlapping this collider; null when they
+     * do not overlap.
+     */
+    fun escape(box: AABB, direction: Vec3): Double? {
         val between = box.center.subtract(center)
-        var lowest = Double.POSITIVE_INFINITY
+        var shortest = Double.POSITIVE_INFINITY
 
         for (normal in separatingAxes) {
             val reach = reach(normal, box)
             val start = between.dot(normal)
             if (abs(start) >= reach) return null
-            if (abs(normal.y) < EPSILON) continue
-            val needed = if (normal.y > 0.0) (reach - start) / normal.y else (-reach - start) / normal.y
-            lowest = min(lowest, needed)
+            val speed = normal.dot(direction)
+            if (abs(speed) < EPSILON) continue
+            val needed = if (speed > 0.0) (reach - start) / speed else (-reach - start) / speed
+            shortest = min(shortest, needed)
         }
-        return lowest
+        return shortest
     }
+
+    /**
+     * Where this collider first touched [box] on its way here from [previous], over the last tick: a fast
+     * collider, a swung sword, can cross a whole entity in one tick and be past it by the end of it. Null
+     * when it never touched it.
+     */
+    fun firstTouch(previous: ColliderBox?, box: AABB): ColliderTouch? {
+        if (previous == null) return penetration(box)?.let { ColliderTouch(this, it) }
+        val steps = steps(previous, box)
+        for (step in 1..steps) {
+            val pose = if (step == steps) this else previous.lerp(this, step.toDouble() / steps)
+            pose.penetration(box)?.let { return ColliderTouch(pose, it) }
+        }
+        return null
+    }
+
+    /** How many poses between [previous] and this one are tried, so that none skips over [box] or over itself. */
+    private fun steps(previous: ColliderBox, box: AABB): Int {
+        val travel = previous.corners().zip(corners()).maxOf { (from, to) -> from.distanceTo(to) }
+        val thinnest = minOf(box.xsize, box.ysize, box.zsize, axes.minOf { it.length() } * 2.0).coerceAtLeast(MIN_STEP)
+        return ceil(travel / (thinnest / 2.0)).toInt().coerceIn(1, MAX_STEPS)
+    }
+
+    /**
+     * The pose [t] of the way from this one to [next]. Axes are blended and kept at their blended length,
+     * which for the turn a bone makes in one tick is close enough to the turn itself.
+     */
+    fun lerp(next: ColliderBox, t: Double): ColliderBox = ColliderBox(
+        center.lerp(next.center, t),
+        blend(axisX, next.axisX, t),
+        blend(axisY, next.axisY, t),
+        blend(axisZ, next.axisZ, t),
+    )
+
+    /** Whether this is the very pose [other] is: a collider that has not moved. */
+    fun sameAs(other: ColliderBox): Boolean =
+        center == other.center && axisX == other.axisX && axisY == other.axisY && axisZ == other.axisZ
 
     fun move(x: Double, y: Double, z: Double): ColliderBox = ColliderBox(center.add(x, y, z), axisX, axisY, axisZ)
 
@@ -176,6 +221,20 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         private const val CONTACT_GAP = 1.0e-7
         private val SIGNS = doubleArrayOf(-1.0, 1.0)
         private val WORLD_AXES = listOf(Vec3(1.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0), Vec3(0.0, 0.0, 1.0))
+        private val UP = Vec3(0.0, 1.0, 0.0)
+
+        /** The most poses tried along one tick of a collider's motion. */
+        private const val MAX_STEPS = 16
+
+        /** The thinnest anything is taken to be when working out how many poses to try. */
+        private const val MIN_STEP = 0.05
+
+        private fun blend(from: Vec3, to: Vec3, t: Double): Vec3 {
+            val blended = from.lerp(to, t)
+            val length = blended.length()
+            if (length < EPSILON) return blended
+            return blended.scale((from.length() + (to.length() - from.length()) * t) / length)
+        }
 
         /**
          * The unit cube around the origin carried by [matrix], which places it relative to [origin].
@@ -216,3 +275,6 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         }
     }
 }
+
+/** A collider overlapping a box: the [pose] it overlapped it in, and the [overlap] that pushes the box out of it. */
+class ColliderTouch(val pose: ColliderBox, val overlap: Vec3)

@@ -18,8 +18,8 @@ val Entity.colliders: List<EntityCollider> get() = EntityColliders.of(this)
  * takes them from the pose it last drew.
  */
 object EntityColliders {
-    /** How far a collider may reach out of its entity's box and still be found by a search around the box. */
-    private const val SEARCH_MARGIN = 4.0
+    /** How far a collider may move between the tick that placed it and a frame or a projectile looking for it. */
+    private const val TICK_MOTION = 1.0
 
     fun of(entity: Entity): List<EntityCollider> =
         if (entity.level().isClientSide) ClientColliderPoses.of(entity) else ServerColliderPoses.current(entity)
@@ -32,8 +32,12 @@ object EntityColliders {
         if (entity.level().isClientSide) ClientColliderTickPoses.recent(entity) else ServerColliderPoses.recent(entity)
 
     /** The entities in [level] whose colliders act on bodies. */
-    fun physicalHosts(level: Level): List<Entity> =
+    fun physicalHosts(level: Level): List<PosedHost> =
         if (level.isClientSide) ClientColliderTickPoses.physical else ServerColliderPoses.physicalIn(level)
+
+    /** The entities in [level] with colliders, found by where the colliders are rather than by their boxes. */
+    fun hosts(level: Level): List<ColliderHost> =
+        if (level.isClientSide) ClientColliderTickPoses.hosts else ServerColliderPoses.hostsIn(level)
 
     fun rig(entity: Entity): ModelRig? =
         if (entity.level().isClientSide) ClientColliderPoses.rig(entity) else ServerColliderPoses.rig(entity)
@@ -61,7 +65,7 @@ object EntityColliders {
         var nearest = vanilla
         var nearestDistance = vanilla?.let { start.distanceToSqr(surfaceOf(it, start, end)) } ?: maxDistanceSquared
 
-        level.getEntities(source, search.inflate(SEARCH_MARGIN)) { predicate.test(it) && hasTargets(it, modes) }
+        candidates(level, source, search) { predicate.test(it) && hasTargets(it, modes) }
             .forEach { entity ->
                 if (source != null && entity.rootVehicle === source.rootVehicle) return@forEach
                 of(entity).forEach { collider ->
@@ -75,6 +79,15 @@ object EntityColliders {
                 }
             }
         return nearest
+    }
+
+    /**
+     * The entities whose colliders may be in [search]: those whose colliders were around it on the last tick,
+     * however big they are, and those whose boxes are in it, which covers an entity posed for the first time.
+     */
+    private fun candidates(level: Level, source: Entity?, search: AABB, predicate: (Entity) -> Boolean): Set<Entity> {
+        val near = hosts(level).filter { it.entity !== source && it.bounds.inflate(TICK_MOTION).intersects(search) }.map { it.entity }
+        return (near + level.getEntities(source, search)).filterTo(LinkedHashSet()) { !it.isRemoved && predicate(it) }
     }
 
     /** Where the segment meets the entity's box; some vanilla searches report the entity's position instead. */

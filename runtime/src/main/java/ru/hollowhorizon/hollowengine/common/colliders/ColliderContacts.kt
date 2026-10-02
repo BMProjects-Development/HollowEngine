@@ -26,96 +26,103 @@ internal object ColliderContacts {
     private const val NEAR = 0.25
     private const val EPSILON = 1.0e-4
 
-    private val displacing = ThreadLocal.withInitial { false }
+    private val displacedBy = ThreadLocal<Entity?>()
 
     /** Whether the move being made now is a collider moving an entity rather than the entity moving itself. */
-    val isDisplacing: Boolean get() = displacing.get()
+    val isDisplacing: Boolean get() = displacedBy.get() != null
+
+    /** The entity whose colliders are moving another one right now: they let it through on its way out of them. */
+    val displacer: Entity? get() = displacedBy.get()
 
     fun isSimulatedHere(entity: Entity): Boolean =
         if (entity.level().isClientSide) entity.isControlledByLocalInstance && entity is Player else entity !is Player
 
     fun resolve(entity: Entity) {
         if (entity.noPhysics || entity.isSpectator || !isSimulatedHere(entity)) return
-        leaveWalls(entity)
-        if (EntityBodies.isMovedByOthers(entity)) pushBack(entity)
-        val near = entity.boundingBox.inflate(NEAR)
-        EntityColliders.physicalHosts(entity.level()).forEach { host ->
-            if (host === entity || host.rootVehicle === entity.rootVehicle) return@forEach
-            val ticks = EntityColliders.physical(host)
-            val now = ticks.firstOrNull() ?: return@forEach
-            val before = ticks.getOrNull(1).orEmpty()
-            now.forEach { collider ->
-                if (!collider.spec.modes.isPhysical || !collider.box.bounds.intersects(near)) return@forEach
-                val previous = previousOf(collider, before)
+        val hosts = EntityColliders.physicalHosts(entity.level())
+        hosts.firstOrNull { it.entity === entity }?.let { own ->
+            leaveWalls(own)
+            if (EntityBodies.isMovedByOthers(entity)) pushBack(own)
+        }
 
-                if (collider.spec.modes.solid) touchSolid(entity, collider, previous)
+        val near = entity.boundingBox.inflate(NEAR)
+        hosts.forEach { host ->
+            if (host.entity === entity || host.entity.rootVehicle === entity.rootVehicle || !host.bounds.intersects(near)) {
+                return@forEach
+            }
+            host.now.forEach { collider ->
+                val previous = host.previousOf(collider)
+                val swept = previous?.bounds?.minmax(collider.box.bounds) ?: collider.box.bounds
+                if (!swept.intersects(near)) return@forEach
+
+                if (collider.spec.modes.solid) touchSolid(entity, host.entity, collider, previous)
                 else touchPushing(entity, collider, previous)
             }
         }
     }
 
-    /** Moves [host] out of the walls its own solid colliders turned or swung into over the last tick. */
-    private fun leaveWalls(host: Entity) {
-        if (!EntityColliders.hasTargets(host, ColliderModes::solid)) return
-        val ticks = EntityColliders.physical(host)
-        val before = ticks.getOrNull(1).orEmpty()
-        val solid = ticks.firstOrNull().orEmpty().filter { it.spec.modes.solid }.map { it.box to previousOf(it, before) }
-        SolidColliders.outOfWalls(host, solid)?.let { displace(host, it) }
+    /** Moves [own]'s entity out of the walls its solid colliders turned or swung into over the last tick. */
+    private fun leaveWalls(own: PosedHost) {
+        val solid = own.now.filter { it.spec.modes.solid }
+        val moved = solid.any { collider -> own.previousOf(collider)?.sameAs(collider.box) == false }
+        if (!moved) return
+        val out = SolidColliders.outOfWalls(own.entity, solid.map { it.box to own.previousOf(it) }) ?: return
+        displace(own.entity, own.entity, out)
     }
 
-    private fun previousOf(collider: EntityCollider, before: List<EntityCollider>): ColliderBox? =
-        before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.box
-
-    private fun touchSolid(entity: Entity, collider: EntityCollider, previous: ColliderBox?) {
+    private fun touchSolid(entity: Entity, host: Entity, collider: EntityCollider, previous: ColliderBox?) {
         val box = collider.box
         val support = previous ?: box
         if (entity.onGround() && support.penetration(entity.boundingBox.move(0.0, -SUPPORT_DEPTH, 0.0)) != null) {
-            ride(entity, box, previous)
+            ride(entity, host, box, previous)
             return
         }
-        val overlap = box.penetration(entity.boundingBox) ?: return
-        displace(entity, overlap)
-        passOn(entity, overlap, motionAt(entity.boundingBox.center, previous, box), collider.spec.modes.force)
+        val touch = box.firstTouch(previous, entity.boundingBox) ?: return
+        val center = entity.boundingBox.center
+
+        val out = center.add(touch.overlap)
+        val target = if (touch.pose === box) out else touch.pose.carry(out, box) ?: out
+        displace(entity, host, target.subtract(center))
+        box.penetration(entity.boundingBox)?.let { displace(entity, host, it) }
+        passOn(entity, touch.overlap, motionAt(center, previous, box), collider.spec.modes.force)
     }
 
     /**
      * Carries [entity], which stands on the collider, along with it and lifts it out where the collider rose
      * into it. What rides a collider takes none of its speed: it stops when the collider stops.
      */
-    private fun ride(entity: Entity, box: ColliderBox, previous: ColliderBox?) {
+    private fun ride(entity: Entity, host: Entity, box: ColliderBox, previous: ColliderBox?) {
         val feet = Vec3(entity.x, entity.boundingBox.minY, entity.z)
-        motionAt(feet, previous, box)?.takeIf { it.lengthSqr() >= EPSILON * EPSILON }?.let { displace(entity, it) }
+        motionAt(feet, previous, box)?.takeIf { it.lengthSqr() >= EPSILON * EPSILON }?.let { displace(entity, host, it) }
 
         val lift = box.lift(entity.boundingBox) ?: return
-        if (lift <= entity.maxUpStep()) displace(entity, Vec3(0.0, lift, 0.0))
-        else box.penetration(entity.boundingBox)?.let { displace(entity, it) }
+        if (lift <= entity.maxUpStep()) displace(entity, host, Vec3(0.0, lift, 0.0))
+        else box.penetration(entity.boundingBox)?.let { displace(entity, host, it) }
     }
 
     private fun touchPushing(entity: Entity, collider: EntityCollider, previous: ColliderBox?) {
         if (!EntityBodies.isMovedByOthers(entity)) return
         val box = collider.box
-        val overlap = box.penetration(entity.boundingBox) ?: return
         val motion = motionAt(entity.boundingBox.center, previous, box)
         if (motion == null || motion.lengthSqr() < EPSILON * EPSILON) {
+            val overlap = box.penetration(entity.boundingBox) ?: return
             stillPush(box, entity, overlap)?.let { entity.push(it.x, 0.0, it.z) }
             return
         }
-        passOn(entity, overlap, motion, collider.spec.modes.force)
+        val touch = box.firstTouch(previous, entity.boundingBox) ?: return
+        passOn(entity, touch.overlap, motion, collider.spec.modes.force)
     }
 
     /**
-     * Pushes [host] back from what stands in its still pushing colliders, the way mobs push each other both
-     * ways. A collider swung by an animation does not push its own entity back.
+     * Pushes [own]'s entity back from what stands in its still pushing colliders, the way mobs push each
+     * other both ways. A collider swung by an animation does not push its own entity back.
      */
-    private fun pushBack(host: Entity) {
-        val ticks = EntityColliders.physical(host)
-        val now = ticks.firstOrNull() ?: return
-        val before = ticks.getOrNull(1).orEmpty()
-        now.forEach { collider ->
+    private fun pushBack(own: PosedHost) {
+        val host = own.entity
+        own.now.forEach { collider ->
             if (!collider.spec.modes.pushes) return@forEach
             val box = collider.box
-            val previous = previousOf(collider, before)
-            val motion = motionAt(box.center, previous, box)
+            val motion = motionAt(box.center, own.previousOf(collider), box)
             if (motion != null && motion.lengthSqr() >= EPSILON * EPSILON) return@forEach
 
             host.level().getEntities(host, box.bounds) { other ->
@@ -135,17 +142,19 @@ internal object ColliderContacts {
     }
 
     /**
-     * Moves [entity] by [motion] through vanilla's collision. Vanilla's move decides whether the entity is
-     * on the ground from that move alone, and a collider's nudge is no fall: the entity keeps the ground it
-     * had, or it could not jump and would glide as on ice for the rest of the tick.
+     * Moves [entity] by [motion] through vanilla's collision, except with the colliders of [by], which are
+     * what it is being moved out of. Vanilla's move decides whether the entity is on the ground from that
+     * move alone, and a collider's nudge is no fall: the entity keeps the ground it had, or it could not
+     * jump and would glide as on ice for the rest of the tick.
      */
-    private fun displace(entity: Entity, motion: Vec3) {
+    private fun displace(entity: Entity, by: Entity, motion: Vec3) {
         val grounded = entity.onGround()
-        displacing.set(true)
+        val outer = displacedBy.get()
+        displacedBy.set(by)
         try {
             entity.move(MoverType.SHULKER_BOX, motion)
         } finally {
-            displacing.set(false)
+            displacedBy.set(outer)
         }
         entity.setOnGround(grounded)
     }

@@ -63,8 +63,11 @@ internal class ColliderPoseTracks(
     private val historyTicks: Int,
     private val assetsOf: (model: String) -> ColliderPoseAssets?,
 ) {
-    /** The track of [entity], posed for this tick, or null when its model gives it nothing to pose. */
-    fun track(entity: Entity): ColliderPoseTrack? {
+    /**
+     * The track of [entity], or null when its model gives it nothing to pose. Only the tick poses it again,
+     * with [advance]: whatever asks during a tick sees the poses the last one ended with.
+     */
+    fun track(entity: Entity, advance: Boolean = false): ColliderPoseTrack? {
         val runtime = AttachmentRegistry.attachmentsOrNull(entity)?.runtime ?: return null
         val node = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull()
         val assets = node?.let { assetsOf(it.model.model) }
@@ -78,7 +81,7 @@ internal class ColliderPoseTracks(
             runtime.remove(this)
             track = runtime.getOrPut(this) { ColliderPoseTrack(assets, historyTicks) }
         }
-        track.advance(entity, node)
+        if (advance || track.history.isEmpty()) track.advance(entity, node)
         return track
     }
 }

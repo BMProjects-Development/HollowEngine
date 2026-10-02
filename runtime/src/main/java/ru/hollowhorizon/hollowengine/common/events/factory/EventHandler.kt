@@ -27,6 +27,9 @@ open class EventHandler<T : Event> {
         (javaClass.genericSuperclass as? ParameterizedType)?.actualTypeArguments?.firstOrNull() as? Class<*>
     }
 
+    /** Whether anything listens, for events that are costly to work out before they can be posted. */
+    val hasListeners: Boolean get() = subscriptions.isNotEmpty()
+
     fun register(priority: Int = 0, listener: (T) -> Unit): (T) -> Unit {
         add(Subscription(eventListenerOf(priority, listener), side = null, job = null))
         return listener

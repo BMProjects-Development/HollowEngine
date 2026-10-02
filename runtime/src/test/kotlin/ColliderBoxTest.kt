@@ -136,6 +136,35 @@ class ColliderBoxTest {
     }
 
     @Test
+    fun `fast collider that crossed a box within the tick touched it`() {
+        val before = ColliderBox.aligned(Vec3(-3.0, 0.0, 0.0), Vec3(0.25, 0.25, 0.25))
+        val now = ColliderBox.aligned(Vec3(3.0, 0.0, 0.0), Vec3(0.25, 0.25, 0.25))
+        val box = AABB(-0.3, -0.9, -0.3, 0.3, 0.9, 0.3)
+
+        assertNull(before.penetration(box))
+        assertNull(now.penetration(box))
+        val touch = assertNotNull(now.firstTouch(before, box))
+        assertTrue(touch.pose.center.x < 0.0, "the first touch is on the side the collider came from")
+    }
+
+    @Test
+    fun `fast collider that went past a box does not touch it`() {
+        val before = ColliderBox.aligned(Vec3(-3.0, 0.0, 2.0), Vec3(0.25, 0.25, 0.25))
+        val now = ColliderBox.aligned(Vec3(3.0, 0.0, 2.0), Vec3(0.25, 0.25, 0.25))
+
+        assertNull(now.firstTouch(before, AABB(-0.3, -0.9, -0.3, 0.3, 0.9, 0.3)))
+    }
+
+    @Test
+    fun `box sunk in shallowly from below still has a way out sideways`() {
+        val slab = ColliderBox.aligned(Vec3(0.0, 1.0, 0.0), Vec3(1.0, 0.5, 1.0))
+        val wall = AABB(0.8, 0.0, -0.5, 2.0, 0.6, 0.5)
+
+        assertEquals(0.0, assertNotNull(slab.penetration(wall)).x, 1.0e-9)
+        assertEquals(0.2, assertNotNull(slab.escape(wall, Vec3(1.0, 0.0, 0.0))), 1.0e-9)
+    }
+
+    @Test
     fun `turning collider carries a point with it`() {
         val before = ColliderBox.aligned(Vec3.ZERO, Vec3(0.5, 0.5, 0.5))
         val after = ColliderBox.of(MutableMat4f().rotate(90f.deg, Vec3f.Y_AXIS), Vec3.ZERO)

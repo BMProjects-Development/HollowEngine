@@ -4,7 +4,9 @@ import kotlinx.serialization.Serializable
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
@@ -42,21 +44,58 @@ internal object ColliderClaims {
     /** How much farther than its reach a player may aim, the same leeway vanilla gives. */
     private const val REACH_BUFFER = 1.0
 
+    /** How far, as a cosine, the claimed point may be from where the player looks: 60 degrees. */
+    private const val MIN_VIEW_COSINE = 0.5
+
     internal fun receive(player: ServerPlayer, packet: ColliderClaimPacket) {
         val runtime = AttachmentRegistry.attachments(player).runtime
         runtime.remove(ClaimKey)
 
         val target = player.serverLevel().getEntity(packet.entityId)?.takeUnless { it.isRemoved } ?: return
         val point = Vec3(packet.x, packet.y, packet.z)
+        val eye = player.eyePosition
         val reach = player.entityInteractionRange() + REACH_BUFFER
-        if (player.eyePosition.distanceToSqr(point) > reach * reach) return
+        if (eye.distanceToSqr(point) > reach * reach || !isInView(player, eye, point) || isWalledOff(player, eye, point)) return
 
         val collider = ServerColliderPoses.recent(target).firstNotNullOfOrNull { tick ->
             tick.firstOrNull { it.name == packet.collider && it.bone == packet.bone && it.box.distanceTo(point) <= TOLERANCE }
+                ?.takeIf { claimed -> isFirstOnTheWay(tick, claimed, eye, point) }
         } ?: return
 
         val hit = ColliderHit(target, collider.name, collider.bone, point)
         runtime.getOrPut(ClaimKey) { ColliderClaim(hit, collider.spec, player.level().gameTime) }
+    }
+
+    /**
+     * Whether [point] is roughly where [player] looks. The server hears of a turn a tick after the client
+     * made it, and a fast flick of the mouse moves the view a long way in a tick, so this only rules out
+     * points to the side of or behind the player.
+     */
+    private fun isInView(player: ServerPlayer, eye: Vec3, point: Vec3): Boolean {
+        val toPoint = point.subtract(eye)
+        if (toPoint.lengthSqr() < TOLERANCE * TOLERANCE) return true
+        return player.getViewVector(1f).dot(toPoint.normalize()) >= MIN_VIEW_COSINE
+    }
+
+    /** Whether a block stands between [eye] and [point], short of where the point is anyway. */
+    private fun isWalledOff(player: ServerPlayer, eye: Vec3, point: Vec3): Boolean {
+        val hit = player.level().clip(ClipContext(eye, point, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player))
+        if (hit.type != HitResult.Type.BLOCK) return false
+        val open = eye.distanceTo(point) - TOLERANCE
+        return open > 0.0 && eye.distanceToSqr(hit.location) < open * open
+    }
+
+    /**
+     * Whether [claimed] is the first of the colliders of its entity in [tick] that the line from [eye] to
+     * [point] meets, so a player cannot claim a part of an entity hidden behind another part of it.
+     */
+    private fun isFirstOnTheWay(tick: List<EntityCollider>, claimed: EntityCollider, eye: Vec3, point: Vec3): Boolean {
+        val open = eye.distanceTo(point) - TOLERANCE
+        if (open <= 0.0) return true
+        return tick.none { other ->
+            other !== claimed && other.spec.modes.isTarget &&
+                other.box.clip(eye, point)?.let { eye.distanceToSqr(it) < open * open } == true
+        }
     }
 
     /** The claim [player] holds on [target] this tick. */

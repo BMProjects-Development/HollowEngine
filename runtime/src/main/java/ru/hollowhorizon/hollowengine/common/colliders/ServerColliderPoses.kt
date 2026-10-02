@@ -21,8 +21,9 @@ object ServerColliderPoses {
 
     private val tracks = ColliderPoseTracks(HISTORY_TICKS) { model -> ServerColliderAssets.of(model).pose }
 
-    /** The entities of each level whose colliders act on bodies, as of the last tick. Server thread only. */
-    private val physical = WeakHashMap<Level, List<Entity>>()
+    /** The entities of each level with colliders, and those whose colliders act on bodies, as of the last tick. */
+    private val hosts = WeakHashMap<Level, List<ColliderHost>>()
+    private val physical = WeakHashMap<Level, List<PosedHost>>()
 
     /** The colliders of [entity] as of the last tick, placed now if it has none yet. */
     fun current(entity: Entity): List<EntityCollider> = recent(entity).firstOrNull().orEmpty()
@@ -36,12 +37,15 @@ object ServerColliderPoses {
         return ServerColliderAssets.of(node.model.model).rig
     }
 
-    internal fun physicalIn(level: Level): List<Entity> = physical[level].orEmpty()
+    internal fun hostsIn(level: Level): List<ColliderHost> = hosts[level].orEmpty()
+
+    internal fun physicalIn(level: Level): List<PosedHost> = physical[level].orEmpty()
 
     internal fun tick(level: Level, entities: List<Entity>) {
-        physical[level] = entities.filter { entity ->
-            tracks.track(entity)?.assets?.rig?.hasColliders(ColliderModes::isPhysical) == true
-        }
+        val posed = entities.mapNotNull { entity -> tracks.track(entity, advance = true)?.let { entity to it } }
+        hosts[level] = posed.mapNotNull { (entity, track) -> track.bounds?.let { ColliderHost(entity, it) } }
+        physical[level] = posed.mapNotNull { (entity, track) -> PosedHost.of(entity, track.history) }
+        ColliderTouches.post(posed.map { (entity, track) -> entity to track.history })
     }
 }
 

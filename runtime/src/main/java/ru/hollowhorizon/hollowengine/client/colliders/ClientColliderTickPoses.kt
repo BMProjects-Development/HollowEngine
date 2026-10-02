@@ -3,14 +3,17 @@ package ru.hollowhorizon.hollowengine.client.colliders
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderHost
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseAssets
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseTracks
 import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
+import ru.hollowhorizon.hollowengine.common.colliders.PosedHost
 import ru.hollowhorizon.hollowengine.common.colliders.hasColliders
 
 /**
@@ -26,14 +29,22 @@ object ClientColliderTickPoses {
     private val tracks = ColliderPoseTracks(HISTORY_TICKS, ::assetsOf)
 
     /** The entities whose colliders act on bodies, as of the last tick. */
-    var physical: List<Entity> = emptyList()
+    var physical: List<PosedHost> = emptyList()
+        private set
+
+    /** The entities with colliders, around where the last tick drew them. */
+    var hosts: List<ColliderHost> = emptyList()
         private set
 
     fun recent(entity: Entity): List<List<EntityCollider>> = tracks.track(entity)?.history.orEmpty()
 
     fun tick(level: ClientLevel?) {
-        physical = level?.let { AttachmentRegistry.entitySnapshots(it).map { entry -> entry.first }.filter { tracks.track(it) != null } }
-            .orEmpty()
+        val entities = level?.let { AttachmentRegistry.entitySnapshots(it).map { entry -> entry.first } }.orEmpty()
+        physical = entities.mapNotNull { entity -> tracks.track(entity, advance = true)?.let { PosedHost.of(entity, it.history) } }
+        hosts = entities.mapNotNull { entity ->
+            val drawn = ClientColliderPoses.of(entity)
+            if (drawn.isEmpty()) null else ColliderHost(entity, drawn.map { it.box.bounds }.reduce(AABB::minmax))
+        }
     }
 
     /** Made again whenever the rig, the model or its animator are replaced, as after a reload or a save. */

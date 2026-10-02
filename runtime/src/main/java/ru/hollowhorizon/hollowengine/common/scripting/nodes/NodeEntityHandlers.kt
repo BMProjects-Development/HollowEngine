@@ -4,6 +4,7 @@ import kotlinx.coroutines.launch
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderHit
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderTouchEvent
 import ru.hollowhorizon.hollowengine.common.colliders.colliderHit
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
@@ -56,6 +57,20 @@ fun onColliderInteract(vararg colliders: String, block: suspend (PlayerInteractE
             (colliders.isEmpty() || hit.collider in colliders)
         ) {
             script.launch { block(event, hit) }
+        }
+    }
+}
+
+/**
+ * Fires every tick one of [colliders] of the bound entity touches a living entity, or any of its colliders
+ * when none is named. A fast collider that went through the entity during the tick counts too, so a swung
+ * sword finds what it swept. Whatever the colliders' modes, the touch does nothing by itself.
+ */
+context(entity: LivingEntity, script: NodeScript)
+fun onCollideTick(vararg colliders: String, block: suspend (ColliderTouchEvent) -> Unit) {
+    ColliderTouchEvent.subscribe(script) { event ->
+        if (event.entity === entity && (colliders.isEmpty() || event.collider in colliders)) {
+            script.launch { block(event) }
         }
     }
 }

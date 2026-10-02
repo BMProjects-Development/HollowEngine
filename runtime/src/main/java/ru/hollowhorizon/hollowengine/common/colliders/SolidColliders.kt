@@ -9,7 +9,6 @@ import net.minecraft.world.phys.shapes.Shapes
 import net.minecraft.world.phys.shapes.VoxelShape
 import java.util.function.Supplier
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -28,6 +27,14 @@ internal object SolidColliders {
 
     /** How far above its feet a block still counts as the floor under an entity in the air. */
     private const val FLOOR_TOLERANCE = 1.0e-3
+
+    /** How many walls a collider is taken out of one after another before the entity is left where it is. */
+    private const val WALL_PASSES = 4
+
+    /** How far from a wall a collider taken out of it is left. */
+    private const val WALL_GAP = 1.0e-4
+
+    private val SIDEWAYS = listOf(Vec3(1.0, 0.0, 0.0), Vec3(-1.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0), Vec3(0.0, 0.0, -1.0))
 
     private class Move(val boxes: List<ColliderBox>, val movement: Vec3)
 
@@ -138,31 +145,30 @@ internal object SolidColliders {
         val floor = floorOf(host, 0.0)
         val walls = host.level().getBlockCollisions(host, reach).flatMap { it.toAabbs() }.filter { it.maxY > floor }
         if (walls.isEmpty()) return null
+        val entered = colliders.map { (box, previous) -> box to walls.filter { previous?.penetration(it) == null } }
 
-        var minX = 0.0
-        var maxX = 0.0
-        var minZ = 0.0
-        var maxZ = 0.0
-        for ((box, previous) in colliders) for (wall in walls) {
-            val overlap = box.penetration(wall) ?: continue
-            if (previous?.penetration(wall) != null) continue
-            minX = min(minX, -overlap.x)
-            maxX = max(maxX, -overlap.x)
-            minZ = min(minZ, -overlap.z)
-            maxZ = max(maxZ, -overlap.z)
+        var offset = Vec3.ZERO
+        repeat(WALL_PASSES) {
+            val step = entered.flatMap { (box, walls) ->
+                val moved = box.move(offset.x, 0.0, offset.z)
+                walls.mapNotNull { exitFrom(moved, it) }
+            }.maxByOrNull { it.lengthSqr() } ?: return offset.takeIf { it.lengthSqr() >= MIN_MOVE * MIN_MOVE }
+            offset = offset.add(step)
         }
-        val out = Vec3(minX + maxX, 0.0, minZ + maxZ)
-        return out.takeIf { it.lengthSqr() >= MIN_MOVE * MIN_MOVE }
+        return null
     }
+
+    /** The shortest way sideways out of [wall] for the entity [box] belongs to; the wall would go the other way. */
+    private fun exitFrom(box: ColliderBox, wall: AABB): Vec3? = SIDEWAYS.mapNotNull { direction ->
+        box.escape(wall, direction)?.let { direction.scale(-(it + WALL_GAP)) }
+    }.minByOrNull { it.lengthSqr() }
 
     /**
      * Whether a solid collider of an entity other than [entity] reaches into [box]: vanilla asks this of
      * blocks to keep a sneaking player from walking off an edge.
      */
-    fun overlaps(entity: Entity, box: AABB): Boolean = EntityColliders.physicalHosts(entity.level()).any { host ->
-        host !== entity && host.rootVehicle !== entity.rootVehicle &&
-            solidBoxes(host).any { it.bounds.intersects(box) && it.penetration(box) != null }
-    }
+    fun overlaps(entity: Entity, box: AABB): Boolean = solidIn(entity.level(), box) { it.isOtherThan(entity) }
+        .any { it.penetration(box) != null }
 
     /**
      * The height below which blocks are the floor under [entity], lowered by [drop], not walls its own
@@ -192,13 +198,7 @@ internal object SolidColliders {
     fun obstructs(level: Level, shape: VoxelShape): Boolean {
         if (shape.isEmpty) return false
         val parts = shape.toAabbs()
-        val bounds = shape.bounds()
-        return EntityColliders.physicalHosts(level).any { host ->
-            if (host.isRemoved) return@any false
-            solidBoxes(host).any { collider ->
-                collider.bounds.intersects(bounds) && parts.any { collider.penetration(it) != null }
-            }
-        }
+        return solidIn(level, shape.bounds()) { true }.any { collider -> parts.any { collider.penetration(it) != null } }
     }
 
     /**
@@ -219,13 +219,24 @@ internal object SolidColliders {
         return allowed
     }
 
+    /**
+     * The solid colliders around [entity] moving by [movement]. Those of an entity moving it out of them,
+     * see [ColliderContacts.displacer], let it through.
+     */
     private fun around(entity: Entity, movement: Vec3): List<ColliderBox> {
         val reach = entity.boundingBox.expandTowards(movement).inflate(entity.maxUpStep().toDouble() + 0.5)
-        return EntityColliders.physicalHosts(entity.level()).flatMap { host ->
-            if (host === entity || host.rootVehicle === entity.rootVehicle) return@flatMap emptyList()
-            solidBoxes(host).filter { it.bounds.intersects(reach) }
-        }
+        val displacer = ColliderContacts.displacer
+        return solidIn(entity.level(), reach) { it.isOtherThan(entity) && it !== displacer }
     }
+
+    /** The solid colliders now in [area], of the entities [hosts] lets in. */
+    private fun solidIn(level: Level, area: AABB, hosts: (Entity) -> Boolean): List<ColliderBox> =
+        EntityColliders.physicalHosts(level).flatMap { host ->
+            if (!host.bounds.intersects(area) || host.entity.isRemoved || !hosts(host.entity)) return@flatMap emptyList()
+            host.now.filter { it.spec.modes.solid && it.box.bounds.intersects(area) }.map { it.box }
+        }
+
+    private fun Entity.isOtherThan(entity: Entity): Boolean = this !== entity && rootVehicle !== entity.rootVehicle
 
     /** Where the solid colliders of [host] are now, as this side sees them. */
     fun solidBoxes(host: Entity): List<ColliderBox> =
