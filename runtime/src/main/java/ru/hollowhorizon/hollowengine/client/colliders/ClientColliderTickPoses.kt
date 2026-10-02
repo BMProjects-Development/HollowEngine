@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseAssets
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseTracks
 import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
+import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.PosedHost
 import ru.hollowhorizon.hollowengine.common.colliders.hasColliders
 
@@ -36,22 +37,30 @@ object ClientColliderTickPoses {
     var hosts: List<ColliderHost> = emptyList()
         private set
 
-    fun recent(entity: Entity): List<List<EntityCollider>> = tracks.track(entity)?.history.orEmpty()
+    fun recent(entity: Entity): List<List<EntityCollider>> =
+        if (isPhysical(entity)) tracks.track(entity)?.history.orEmpty() else emptyList()
 
     fun tick(level: ClientLevel?) {
         val entities = level?.let { AttachmentRegistry.entitySnapshots(it).map { entry -> entry.first } }.orEmpty()
-        physical = entities.mapNotNull { entity -> tracks.track(entity, advance = true)?.let { PosedHost.of(entity, it.history) } }
+        physical = entities.filter(::isPhysical)
+            .mapNotNull { entity -> tracks.track(entity, advance = true)?.let { PosedHost.of(entity, it.history) } }
         hosts = entities.mapNotNull { entity ->
             val drawn = ClientColliderPoses.of(entity)
             if (drawn.isEmpty()) null else ColliderHost(entity, drawn.map { it.box.bounds }.reduce(AABB::minmax))
         }
     }
 
+    /**
+     * Whether [entity] has colliders that act on bodies, what scripts changed counted: only those are
+     * posed every tick here, since that runs the animator once more for each of them.
+     */
+    private fun isPhysical(entity: Entity): Boolean = EntityColliders.hasTargets(entity, ColliderModes::isPhysical)
+
     /** Made again whenever the rig, the model or its animator are replaced, as after a reload or a save. */
     private fun assetsOf(model: String): ColliderPoseAssets? {
         val location = ResourceLocation.tryParse(model) ?: return null
         val rig = RigAssets.of(location)
-        if (!rig.hasColliders(ColliderModes::isPhysical)) {
+        if (!rig.hasColliders()) {
             assets.remove(model)
             return null
         }

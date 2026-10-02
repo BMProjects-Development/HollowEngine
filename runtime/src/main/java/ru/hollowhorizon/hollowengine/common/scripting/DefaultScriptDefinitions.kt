@@ -135,6 +135,8 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.ui.net.*",
                     "ru.hollowhorizon.hollowengine.client.ui.script.observe",
                     "ru.hollowhorizon.hollowengine.client.ui.script.LocalReplacedScreen",
+                    "ru.hollowhorizon.hollowengine.common.colliders.collider",
+                    "ru.hollowhorizon.hollowengine.common.colliders.colliders",
                     "ru.hollowhorizon.hollowengine.common.scripting.annotations.*",
                     "net.minecraft.nbt.CompoundTag",
                     ResourceLocation::class.qualifiedName!!,

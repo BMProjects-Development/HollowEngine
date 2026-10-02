@@ -45,7 +45,7 @@ object ServerColliderPoses {
         val posed = entities.mapNotNull { entity -> tracks.track(entity, advance = true)?.let { entity to it } }
         hosts[level] = posed.mapNotNull { (entity, track) -> track.bounds?.let { ColliderHost(entity, it) } }
         physical[level] = posed.mapNotNull { (entity, track) -> PosedHost.of(entity, track.history) }
-        ColliderTouches.post(posed.map { (entity, track) -> entity to track.history })
+        ColliderTouches.post(level, posed.map { (entity, track) -> entity to track.history })
     }
 }
 

@@ -43,8 +43,11 @@ object EntityColliders {
         if (entity.level().isClientSide) ClientColliderPoses.rig(entity) else ServerColliderPoses.rig(entity)
 
     /** Whether [entity] has colliders of the [modes] that stand in for its box. */
-    fun hasTargets(entity: Entity, modes: (ColliderModes) -> Boolean = ColliderModes::isTarget): Boolean =
-        rig(entity)?.hasColliders(modes) == true
+    fun hasTargets(entity: Entity, modes: (ColliderModes) -> Boolean = ColliderModes::isTarget): Boolean {
+        val rig = rig(entity) ?: return false
+        if (entity.collidersComponent == null) return rig.hasColliders(modes)
+        return effectiveSpecs(entity, rig).any { modes(it.modes) }
+    }
 
     /**
      * The nearest of [vanilla] and the colliders of the entities around [search] along the segment from

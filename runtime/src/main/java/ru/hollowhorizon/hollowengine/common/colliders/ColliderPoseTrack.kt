@@ -48,7 +48,7 @@ internal class ColliderPoseTrack(val assets: ColliderPoseAssets, private val his
         animator.applyTo(target, context)
         roots.forEach(RuntimeNode::updateHierarchyMatrices)
 
-        val placed = assets.rig.placeColliders(roots, entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f))
+        val placed = applyOverrides(entity, assets.rig.placeColliders(roots, entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))
         bounds = placed.map { it.box.bounds }.reduceOrNull(AABB::minmax)
         history.addFirst(placed)
         while (history.size > historyTicks) history.removeLast()

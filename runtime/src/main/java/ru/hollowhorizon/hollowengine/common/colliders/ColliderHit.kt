@@ -5,7 +5,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 
-/** A collider of [entity] that was struck or clicked, and where. */
+/** A collider of [entity] that was struck, clicked or aimed at, and where. */
 data class ColliderHit(
     val entity: Entity,
     val collider: String,

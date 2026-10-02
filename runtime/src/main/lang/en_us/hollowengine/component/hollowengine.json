@@ -79,5 +79,10 @@
   "player_arms": "Arm shape",
   "player_arms.arms": "Shape",
   "transform": "Transform",
-  "transform.transform": "Matrix"
+  "transform.transform": "Matrix",
+  "entity.colliders": "Colliders",
+  "entity.colliders.overrides": "Changes",
+  "entity.colliders.overrides.hint": "Changes made to the colliders of the model on this entity alone, by collider name. What is left unset stays as the rig has it. Scripts write these through entity.collider(name).",
+  "entity.colliders.enabled": "Enabled",
+  "entity.colliders.enabled.hint": "A disabled collider is not there at all: it is not hit, clicked or bumped into."
 }

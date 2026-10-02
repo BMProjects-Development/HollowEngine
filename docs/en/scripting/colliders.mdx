@@ -108,7 +108,7 @@ npc.set(BodyComponent(width = 2f, height = 1.5f))
 
 ### In a node script
 
-A [node script](/docs/hollowengine/scripting/node) attached to an entity has three handlers for its colliders. Each takes the names of the colliders to listen to; with none, it hears all of them.
+A [node script](/docs/hollowengine/scripting/node) attached to an entity has these handlers for its colliders. Each takes the names of the colliders to listen to; with none, it hears all of them.
 
 ```kotlin
 @file:Attach(net.minecraft.world.entity.LivingEntity::class)
@@ -121,16 +121,76 @@ onColliderInteract("button_red", "button_green") { event, hit ->
     event.player.send("Pressed ${hit.collider}")
 }
 
-onCollideTick("sword") { event ->
+onColliderEnter("sword") { event ->
     event.other.hurt(event.other.damageSources().generic(), 4f)
+}
+
+onCollideTick("altar") { event ->
+    if (event.isStanding) println("${event.other.name.string} stands on the altar")
 }
 ```
 
-- `onColliderHit` runs when the entity takes damage on one of the colliders. Damage that did not land on a collider, a fall or an explosion, does not fire it.
-- `onColliderInteract` runs when a player right-clicks one of the clickable colliders.
-- `onCollideTick` runs every tick one of the colliders touches a living entity, whatever its modes. The touch does nothing by itself: the script decides. It fires every tick the two touch, and vanilla's grace period after damage keeps a sword resting on a player from hitting them twenty times a second. A swing that should hit only once has to remember who it already hit.
+| Handler | Runs |
+|---------|------|
+| `onColliderHit` | when the entity takes damage on one of the colliders. Damage that did not land on a collider, a fall or an explosion, does not fire it |
+| `onColliderInteract` | when a player right-clicks one of the clickable colliders |
+| `onColliderEnter` | once, when one of the colliders starts touching a living entity |
+| `onCollideTick` | every tick one of the colliders touches a living entity, the first one included |
+| `onColliderExit` | once, on the tick after a touch ended |
 
-`hit` is a `ColliderHit`: `entity`, `collider`, `bone` and `location`, the point that was hit. The `onCollideTick` event has `entity`, `other`, `collider` and `bone`.
+A touch is counted whatever the collider's modes and does nothing by itself: the script decides. A fast collider that went through an entity within a tick has touched it, so a swung sword meets what it swept. An entity standing on a collider, or leaning on one, touches it too, and `event.isStanding` tells the one standing on top from one inside or beside it.
+
+`onColliderEnter` is the one for a strike that should land once per contact. `onCollideTick` fires every tick the two touch; vanilla's grace period after damage keeps a sword resting on a player from hitting them twenty times a second, but nothing more.
+
+`hit` is a `ColliderHit`: `entity`, `collider`, `bone`, `location`, the point that was hit. A touch event has `entity`, `other`, `collider`, `bone`, `phase` and `isStanding`.
+
+### Changing colliders
+
+`entity.collider(name)` is one collider of one entity. Changing it changes that entity alone: the rig and every other entity with the model stay as they are.
+
+```kotlin
+val door = npc.collider("door")
+door.enabled = false                    // not there at all: not hit, clicked or bumped into
+door.contact = ColliderContact.NONE     // walked through, still hit and clicked
+door.hit = false
+door.interact = true
+door.force = 2f
+door.reset()                            // back to what the rig says
+```
+
+Changes are made on the server, which saves them with the entity and sends them to the clients: a door opened by a script is open for every player, after a restart too. They show up in the entity's components as **Colliders**, where they can be edited by hand or cleared.
+
+Reading works on either side: `enabled`, `hit`, `interact`, `contact` and `force` are what the collider does now, `spec` is what the rig has, and `placed` is where it is right now, or null while it is turned off.
+
+### Dealing damage to a collider
+
+`entity.hurtCollider(name, source, amount)` deals damage as a hit on that collider: `onColliderHit` and `colliderHit` see it like any other hit there. For a scripted attack that should find a weak spot:
+
+```kotlin
+boss.hurtCollider("core", boss.damageSources().magic(), 10f)
+```
+
+### Where they are
+
+`entity.colliders` lists the colliders of an entity where they are now, with what scripts changed applied: `name`, `bone`, `spec` and `box`. On the server that is the pose of the last tick; on a client, the pose the model was last drawn in.
+
+```kotlin
+val head = npc.colliders.firstOrNull { it.name == "head" }
+val top = head?.box?.bounds?.maxY
+```
+
+### On the client
+
+The crosshair aims at colliders, and `hitResult.collider` tells which one it is on, so an interface can name what the player looks at:
+
+```kotlin
+import net.minecraft.client.Minecraft
+
+val collider = observe { Minecraft.getInstance().hitResult.collider }
+if (collider != null) Text("Touch ${collider.collider}")
+```
+
+`collider` and `colliders` are imported in `.ui.kts` by default. `entity.collider(name)` reads on a client too, so an interface can tell an open door from a closed one.
 
 ### Events
 
@@ -140,7 +200,7 @@ The same information reaches any script through events:
 |-------|-----------------------|
 | `EntityEvent.Hurt` | `event.source.colliderHit`, null when the damage did not land on a collider |
 | `PlayerInteractEvent.EntityInteract` | `event.collider`, null when the click was not on a clickable collider |
-| `ColliderTouchEvent` | posted on the server every tick a collider touches a living entity |
+| `ColliderTouchEvent` | posted on the server for every touch, every tick, with its `phase`: `START`, `STAY` or `END` |
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.colliders.colliderHit
@@ -174,5 +234,6 @@ Projectiles hit only colliders that **take hits**. Mob attacks and explosions ar
 - Colliders act on living entities. Items, arrows and boats pass through solid colliders.
 - Mobs do not know about colliders when finding a path: they walk into a solid one and go around it.
 - A player riding a turning collider moves with it, but their view does not turn.
+- Colliders follow the animations the server knows of: the clips played and the controller. What a client lays over them on its own, a ragdoll or a cutscene pose, moves the model but not its colliders.
 - A player is moved by their own client, so the server does not stop players at solid colliders. Standing on one over a drop is not counted as flying.
 - Saving the rig in the editor applies it in the world at once, in single player and on the server the game itself runs. A dedicated server picks it up on its next resource reload.

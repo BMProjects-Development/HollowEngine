@@ -79,5 +79,10 @@
   "player_arms": "Форма рук",
   "player_arms.arms": "Форма",
   "transform": "Трансформация",
-  "transform.transform": "Матрица"
+  "transform.transform": "Матрица",
+  "entity.colliders": "Коллайдеры",
+  "entity.colliders.overrides": "Изменения",
+  "entity.colliders.overrides.hint": "Изменения коллайдеров модели только у этой сущности, по имени коллайдера. Что не задано, остаётся как в риге. Скрипты пишут их через entity.collider(имя).",
+  "entity.colliders.enabled": "Включён",
+  "entity.colliders.enabled.hint": "Выключенного коллайдера нет вовсе: по нему не попасть, его не кликнуть и в него не упереться."
 }

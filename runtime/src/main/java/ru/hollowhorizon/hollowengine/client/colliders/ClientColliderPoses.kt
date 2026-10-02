@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
+import ru.hollowhorizon.hollowengine.common.colliders.applyOverrides
 import ru.hollowhorizon.hollowengine.common.colliders.entityModelMatrix
 import ru.hollowhorizon.hollowengine.common.colliders.hasColliders
 import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
@@ -28,11 +29,12 @@ object ClientColliderPoses {
 
         val instance = entity.modelInstanceOrNull(node.nodeId, node.model.model) ?: return emptyList()
         val partialTick = Minecraft.getInstance().timer.getGameTimeDeltaPartialTick(false)
-        return rig.placeColliders(
+        val placed = rig.placeColliders(
             instance.attachment.nodes,
             entityModelMatrix(entity, node.transform, partialTick),
             hostPosition(entity, partialTick),
         )
+        return applyOverrides(entity, placed)
     }
 
     /**

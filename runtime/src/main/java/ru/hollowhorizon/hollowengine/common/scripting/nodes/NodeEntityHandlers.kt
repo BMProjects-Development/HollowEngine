@@ -5,6 +5,7 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderHit
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderTouchEvent
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderTouchPhase
 import ru.hollowhorizon.hollowengine.common.colliders.colliderHit
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
@@ -64,12 +65,31 @@ fun onColliderInteract(vararg colliders: String, block: suspend (PlayerInteractE
 /**
  * Fires every tick one of [colliders] of the bound entity touches a living entity, or any of its colliders
  * when none is named. A fast collider that went through the entity during the tick counts too, so a swung
- * sword finds what it swept. Whatever the colliders' modes, the touch does nothing by itself.
+ * sword finds what it swept, and so does an entity standing on a collider. Whatever the colliders' modes,
+ * the touch does nothing by itself.
  */
 context(entity: LivingEntity, script: NodeScript)
-fun onCollideTick(vararg colliders: String, block: suspend (ColliderTouchEvent) -> Unit) {
+fun onCollideTick(vararg colliders: String, block: suspend (ColliderTouchEvent) -> Unit) =
+    onColliderTouch(colliders, ColliderTouchPhase.START, ColliderTouchPhase.STAY, block = block)
+
+/** Fires once when one of [colliders] of the bound entity starts touching a living entity; see [onCollideTick]. */
+context(entity: LivingEntity, script: NodeScript)
+fun onColliderEnter(vararg colliders: String, block: suspend (ColliderTouchEvent) -> Unit) =
+    onColliderTouch(colliders, ColliderTouchPhase.START, block = block)
+
+/** Fires once when one of [colliders] of the bound entity stops touching a living entity; see [onCollideTick]. */
+context(entity: LivingEntity, script: NodeScript)
+fun onColliderExit(vararg colliders: String, block: suspend (ColliderTouchEvent) -> Unit) =
+    onColliderTouch(colliders, ColliderTouchPhase.END, block = block)
+
+context(entity: LivingEntity, script: NodeScript)
+private fun onColliderTouch(
+    colliders: Array<out String>,
+    vararg phases: ColliderTouchPhase,
+    block: suspend (ColliderTouchEvent) -> Unit,
+) {
     ColliderTouchEvent.subscribe(script) { event ->
-        if (event.entity === entity && (colliders.isEmpty() || event.collider in colliders)) {
+        if (event.entity === entity && event.phase in phases && (colliders.isEmpty() || event.collider in colliders)) {
             script.launch { block(event) }
         }
     }
