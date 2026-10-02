@@ -60,6 +60,7 @@ import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.VoxelShape
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
+import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
 import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaims
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderCombat
@@ -671,6 +672,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
 
+    override fun overlapsSolidColliders(entity: Entity, box: AABB): Boolean = SolidColliders.overlaps(entity, box)
+
     override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
         ColliderCombat.resolve(entity, damageSource)
 
@@ -771,6 +774,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         RenderEntityNameplateEvent.post(event)
         return event.isVisible
     }
+
+    override fun entityNameplateAttachment(entity: Entity, vanilla: Vec3?): Vec3? =
+        vanilla?.let { ClientColliderPoses.nameplateAttachment(entity, it) }
 
     override fun onCameraSetup(
         gameRenderer: GameRenderer,

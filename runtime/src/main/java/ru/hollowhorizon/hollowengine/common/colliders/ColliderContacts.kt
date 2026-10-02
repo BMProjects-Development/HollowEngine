@@ -36,6 +36,7 @@ internal object ColliderContacts {
 
     fun resolve(entity: Entity) {
         if (entity.noPhysics || entity.isSpectator || !isSimulatedHere(entity)) return
+        leaveWalls(entity)
         if (EntityBodies.isMovedByOthers(entity)) pushBack(entity)
         val near = entity.boundingBox.inflate(NEAR)
         EntityColliders.physicalHosts(entity.level()).forEach { host ->
@@ -45,13 +46,25 @@ internal object ColliderContacts {
             val before = ticks.getOrNull(1).orEmpty()
             now.forEach { collider ->
                 if (!collider.spec.modes.isPhysical || !collider.box.bounds.intersects(near)) return@forEach
-                val previous = before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.box
+                val previous = previousOf(collider, before)
 
                 if (collider.spec.modes.solid) touchSolid(entity, collider, previous)
                 else touchPushing(entity, collider, previous)
             }
         }
     }
+
+    /** Moves [host] out of the walls its own solid colliders turned or swung into over the last tick. */
+    private fun leaveWalls(host: Entity) {
+        if (!EntityColliders.hasTargets(host, ColliderModes::solid)) return
+        val ticks = EntityColliders.physical(host)
+        val before = ticks.getOrNull(1).orEmpty()
+        val solid = ticks.firstOrNull().orEmpty().filter { it.spec.modes.solid }.map { it.box to previousOf(it, before) }
+        SolidColliders.outOfWalls(host, solid)?.let { displace(host, it) }
+    }
+
+    private fun previousOf(collider: EntityCollider, before: List<EntityCollider>): ColliderBox? =
+        before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.box
 
     private fun touchSolid(entity: Entity, collider: EntityCollider, previous: ColliderBox?) {
         val box = collider.box
@@ -101,7 +114,7 @@ internal object ColliderContacts {
         now.forEach { collider ->
             if (!collider.spec.modes.pushes) return@forEach
             val box = collider.box
-            val previous = before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.box
+            val previous = previousOf(collider, before)
             val motion = motionAt(box.center, previous, box)
             if (motion != null && motion.lengthSqr() >= EPSILON * EPSILON) return@forEach
 

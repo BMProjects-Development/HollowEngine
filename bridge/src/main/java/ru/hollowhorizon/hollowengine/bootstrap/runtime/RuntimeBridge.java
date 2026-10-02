@@ -227,6 +227,8 @@ public interface RuntimeBridge extends AutoCloseable {
 
     boolean isObstructedByColliders(Level level, VoxelShape shape);
 
+    boolean overlapsSolidColliders(Entity entity, AABB box);
+
     DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
 
     boolean hasColliderTargets(Entity entity, boolean projectile);
@@ -266,6 +268,8 @@ public interface RuntimeBridge extends AutoCloseable {
     boolean isEntityFrustumCullingDisabled(Entity entity);
 
     boolean onRenderEntityNameplate(Entity entity, boolean vanillaVisible);
+
+    @Nullable Vec3 entityNameplateAttachment(Entity entity, @Nullable Vec3 vanilla);
 
     CameraSetup onCameraSetup(GameRenderer gameRenderer, Camera camera, float yaw, float pitch, float roll, float partialTick);
 

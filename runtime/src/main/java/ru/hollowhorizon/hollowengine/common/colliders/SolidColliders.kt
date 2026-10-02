@@ -9,6 +9,8 @@ import net.minecraft.world.phys.shapes.Shapes
 import net.minecraft.world.phys.shapes.VoxelShape
 import java.util.function.Supplier
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Solid colliders in vanilla's movement: a moving entity stops at them the way it stops at blocks and
@@ -23,6 +25,9 @@ internal object SolidColliders {
     private const val FLOATING_DEPTH = 0.55
 
     private const val MIN_MOVE = 1.0e-7
+
+    /** How far above its feet a block still counts as the floor under an entity in the air. */
+    private const val FLOOR_TOLERANCE = 1.0e-3
 
     private class Move(val boxes: List<ColliderBox>, val movement: Vec3)
 
@@ -108,7 +113,7 @@ internal object SolidColliders {
         dy = clampOwn(own, blocks, Direction.Axis.Y, dy)
         own = own.map { it.move(0.0, dy, 0.0) }
 
-        val floor = entity.boundingBox.minY + dy + entity.maxUpStep()
+        val floor = floorOf(entity, min(dy, 0.0))
         val walls = blocks.filter { it.maxY > floor }
         if (abs(dx) < abs(dz)) {
             dz = clampOwn(own, walls, Direction.Axis.Z, dz)
@@ -120,6 +125,53 @@ internal object SolidColliders {
             dz = clampOwn(own, walls, Direction.Axis.Z, dz)
         }
         return Vec3(dx, dy, dz)
+    }
+
+    /**
+     * How far [host] has to move sideways for its own solid colliders to leave the walls they went into over
+     * the last tick, as when it turned or an animation swung them; null when they went into none. A wall a
+     * collider was in already is left alone: one put there on purpose keeps the entity where it was put.
+     */
+    fun outOfWalls(host: Entity, colliders: List<Pair<ColliderBox, ColliderBox?>>): Vec3? {
+        if (colliders.isEmpty()) return null
+        val reach = colliders.map { it.first.bounds }.reduce(AABB::minmax)
+        val floor = floorOf(host, 0.0)
+        val walls = host.level().getBlockCollisions(host, reach).flatMap { it.toAabbs() }.filter { it.maxY > floor }
+        if (walls.isEmpty()) return null
+
+        var minX = 0.0
+        var maxX = 0.0
+        var minZ = 0.0
+        var maxZ = 0.0
+        for ((box, previous) in colliders) for (wall in walls) {
+            val overlap = box.penetration(wall) ?: continue
+            if (previous?.penetration(wall) != null) continue
+            minX = min(minX, -overlap.x)
+            maxX = max(maxX, -overlap.x)
+            minZ = min(minZ, -overlap.z)
+            maxZ = max(maxZ, -overlap.z)
+        }
+        val out = Vec3(minX + maxX, 0.0, minZ + maxZ)
+        return out.takeIf { it.lengthSqr() >= MIN_MOVE * MIN_MOVE }
+    }
+
+    /**
+     * Whether a solid collider of an entity other than [entity] reaches into [box]: vanilla asks this of
+     * blocks to keep a sneaking player from walking off an edge.
+     */
+    fun overlaps(entity: Entity, box: AABB): Boolean = EntityColliders.physicalHosts(entity.level()).any { host ->
+        host !== entity && host.rootVehicle !== entity.rootVehicle &&
+            solidBoxes(host).any { it.bounds.intersects(box) && it.penetration(box) != null }
+    }
+
+    /**
+     * The height below which blocks are the floor under [entity], lowered by [drop], not walls its own
+     * colliders meet: on the ground, what its box steps onto; in the air, only what is under its feet, so an
+     * entity knocked up still meets the walls it flies into.
+     */
+    private fun floorOf(entity: Entity, drop: Double): Double {
+        val step = if (entity.onGround()) entity.maxUpStep().toDouble() else FLOOR_TOLERANCE
+        return entity.boundingBox.minY + drop + step
     }
 
     /** How far of [distance] the colliders can move along [axis] before one of them runs into one of [blocks]. */

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.colliders
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
@@ -32,6 +33,18 @@ object ClientColliderPoses {
             entityModelMatrix(entity, node.transform, partialTick),
             hostPosition(entity, partialTick),
         )
+    }
+
+    /**
+     * Where the name over [entity] hangs relative to its feet: above the top of its colliders as drawn, where
+     * vanilla puts it above the top of its box, so it follows the model as it stands, crouches or lies.
+     */
+    fun nameplateAttachment(entity: Entity, vanilla: Vec3): Vec3 {
+        val colliders = of(entity)
+        if (colliders.isEmpty()) return vanilla
+        val partialTick = Minecraft.getInstance().timer.getGameTimeDeltaPartialTick(false)
+        val top = colliders.maxOf { it.box.bounds.maxY } - hostPosition(entity, partialTick).y - 0.2
+        return Vec3(vanilla.x, top, vanilla.z)
     }
 
     fun rig(entity: Entity): ModelRig? = modelNode(entity)?.let(::rigOf)
