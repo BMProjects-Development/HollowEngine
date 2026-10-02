@@ -39,20 +39,18 @@ npc.despawn()
 
 Because `NpcEntity` inherits from Minecraft entities, standard methods such as `remove(...)`, `discard()`, `teleportTo(...)`, `setItemInHand(...)`, and other Minecraft API methods are also available.
 
-## Hitbox
+## Body
 
-NPCs have a convenient `hitboxMode` property:
-
-```kotlin
-npc.hitboxMode = HitboxMode.PULLING   // normal collision and pushing
-npc.hitboxMode = HitboxMode.EMPTY     // passable entity
-npc.hitboxMode = HitboxMode.BLOCKING  // can be walked on top of, like a block
-```
-
-Import the enum:
+Whether an NPC pushes, blocks or lets others pass through is set by the [Body](/docs/hollowengine/scripting/colliders#the-body-of-an-entity) component. Without one, an NPC pushes and is pushed the way mobs are.
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+
+npc.set(BodyComponent(mode = BodyMode.PUSHING))   // shoves and is shoved, like a mob
+npc.set(BodyComponent(mode = BodyMode.EMPTY))     // others pass through it
+npc.set(BodyComponent(mode = BodyMode.BLOCKING))  // stops others and can be stood on
 ```
 
 ## Seating and standing up

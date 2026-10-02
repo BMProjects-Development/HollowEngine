@@ -27,7 +27,7 @@
   "collider.name": "Name",
   "collider.name.hint": "What scripts and events call this collider. Unique within the rig.",
   "collider.alignment": "Alignment",
-  "collider.alignment.hint": "Oriented turns with the bone and the entity. World-aligned stays square to the world and only follows where the bone is: cheaper, and the shape a solid collider will need.",
+  "collider.alignment.hint": "Oriented turns with the bone and the entity. World-aligned stays square to the world and only follows where the bone is: cheaper, and it ignores the rotation.",
   "collider.offset": "Offset",
   "collider.rotation": "Rotation",
   "collider.rotation.hint": "Degrees, applied X, then Y, then Z. A world-aligned collider ignores it.",

@@ -1,0 +1,178 @@
+---
+title: Colliders and Bodies
+order: 11
+---
+
+<center><h1>Colliders and Bodies</h1></center>
+
+*Boxes on a model's bones that take hits, work as buttons, push and block, and the body component that decides what an entity's own box does.*
+
+---
+
+## What a collider is
+
+A vanilla entity is a single box. A collider is a box hung on a bone of the model, or on the model as a whole, in its [rig](/docs/hollowengine/scripting/rig-editor). It moves with the animation: a raised arm takes a hit where the arm is, and a boss's tail can be stood on while it lies on the ground.
+
+Colliders live in the `.rig` file next to the model, so every entity wearing that model has them. The server poses them itself with the same animator the clients draw with, so a hit is checked against where the bone really was rather than where a client says it was.
+
+Press **F3+B** to see them in the world: green ones take hits, blue ones are clickable, orange ones are solid, gray ones only push. An entity with colliders that take hits or are clickable no longer shows its vanilla box there, since that box no longer takes hits.
+
+---
+
+## Adding colliders
+
+Open the model's `.rig` in the [rig editor](/docs/hollowengine/scripting/rig-editor), select a bone and press **+ Attach → Collider**. To hang one on the model as a whole, say a body box for a statue or a button on a control panel, select **The whole model** at the top of the bone list instead.
+
+**Fit a collider around every bone that holds geometry** on the toolbar gives each such bone a collider sized to it. Treat it as a draft: delete what is decoration (eyes, a second skin layer) and merge what should be one box.
+
+**Show the colliders** on the toolbar draws them over the preview.
+
+## Parameters
+
+| Parameter | Meaning |
+|-----------|---------|
+| Name | what scripts and events call the collider; unique within the rig |
+| Alignment | **Oriented** turns with the bone and the entity. **World-aligned** stays square to the world and only follows where the bone is, which is cheaper and ignores Rotation |
+| Offset, Rotation, Size | in blocks and degrees, in the space of the bone. Rotation is applied X, then Y, then Z |
+| Takes hits | melee attacks and projectiles land on this collider instead of on the entity's box |
+| Clickable | a right click on it reaches scripts with the collider's name, like a button |
+| Contact | what it does to a body that walks into it: **None**, **Push** or **Solid**, see below |
+| Force | how much of its own speed a moving collider passes on to what it runs into |
+
+A collider can take hits and be clickable at once. A click on a collider that is clickable but does not take hits is not an attack: hitting a button presses it and does no damage.
+
+### Contact
+
+**None** - entities walk through it. This is the default: most colliders are only there to be hit.
+
+**Push** - it shoves entities out of itself the way mobs shove each other, and is shoved back by them.
+
+**Solid** - it stops entities like a block does:
+
+- it can be walked into, stood on and stepped onto, a tilted one included, as high as vanilla steps onto blocks;
+- whatever stands on it rides along as the animation moves it, and stops when it stops;
+- a sneaking player stops at its edge the way they stop at the edge of a block;
+- a block cannot be placed where a solid collider is.
+
+### Force
+
+A collider moved by an animation hands its speed to what it runs into, along the direction it pushes that out. With **Force** 1 a swung club sends a player off as fast as the club was moving, and the player keeps flying once the club stops, slowed down the vanilla way. With 0 the collider only pushes things out of itself. Above 1 it throws harder than it moves.
+
+What stands on a solid collider takes none of its speed: it rides it and nothing more.
+
+A fast collider is followed along its whole motion over a tick, so a sword swung through an entity within a single tick still meets it.
+
+---
+
+## The body of an entity
+
+Colliders are about the model. What the entity's own box does is set by the **Body** component. Open it on any entity with the **Developer Tool**: a right click on the entity brings up its components.
+
+| Parameter | Meaning |
+|-----------|---------|
+| Mode | **Empty**: entities pass through each other. **Pushing**: they shove each other apart, the way mobs do. **Blocking**: it stops them and can be stood on, like a boat |
+| Moved by others | players and mobs can move it: a pushing body is shoved aside, a blocking one is pushed along by walking into it, like a crate |
+| Width, Height | the size of the box, in blocks; zero for both keeps the size of the entity type |
+| Fit to colliders | sets the width and height around the colliders of the model at rest. The width holds however the entity turns |
+
+An entity without the component behaves as vanilla made it.
+
+### Colliders replace the box
+
+Once the model has colliders that push or are solid, the box takes no part in pushing and blocking at all: it would push and be pushed where nothing of the model is. The colliders are the entity's shape:
+
+- walking into a solid collider pushes the entity along, in any mode but **Empty**, as long as it is **Moved by others**;
+- standing in a pushing collider shoves the entity back a little;
+- standing on the entity never moves it, so a player on top of a cart cannot push the cart from inside it;
+- the entity's own solid colliders stop at blocks as it moves, is knocked back or turns, so a long model does not end up halfway in a wall.
+
+With colliders like that, **Pushing** and **Blocking** behave alike. Only **Empty** still matters: nobody moves the entity.
+
+The box still sets how the entity itself walks and how mobs find their way around it. Its nameplate hangs above the colliders, wherever the animation has them.
+
+### From a script
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+
+npc.set(BodyComponent(mode = BodyMode.BLOCKING, pushable = false))
+npc.set(BodyComponent(mode = BodyMode.EMPTY))
+npc.set(BodyComponent(width = 2f, height = 1.5f))
+```
+
+---
+
+## Scripts
+
+### In a node script
+
+A [node script](/docs/hollowengine/scripting/node) attached to an entity has three handlers for its colliders. Each takes the names of the colliders to listen to; with none, it hears all of them.
+
+```kotlin
+@file:Attach(net.minecraft.world.entity.LivingEntity::class)
+
+onColliderHit("head") { event, hit ->
+    event.amount *= 2f
+}
+
+onColliderInteract("button_red", "button_green") { event, hit ->
+    event.player.send("Pressed ${hit.collider}")
+}
+
+onCollideTick("sword") { event ->
+    event.other.hurt(event.other.damageSources().generic(), 4f)
+}
+```
+
+- `onColliderHit` runs when the entity takes damage on one of the colliders. Damage that did not land on a collider, a fall or an explosion, does not fire it.
+- `onColliderInteract` runs when a player right-clicks one of the clickable colliders.
+- `onCollideTick` runs every tick one of the colliders touches a living entity, whatever its modes. The touch does nothing by itself: the script decides. It fires every tick the two touch, and vanilla's grace period after damage keeps a sword resting on a player from hitting them twenty times a second. A swing that should hit only once has to remember who it already hit.
+
+`hit` is a `ColliderHit`: `entity`, `collider`, `bone` and `location`, the point that was hit. The `onCollideTick` event has `entity`, `other`, `collider` and `bone`.
+
+### Events
+
+The same information reaches any script through events:
+
+| Event | Where the collider is |
+|-------|-----------------------|
+| `EntityEvent.Hurt` | `event.source.colliderHit`, null when the damage did not land on a collider |
+| `PlayerInteractEvent.EntityInteract` | `event.collider`, null when the click was not on a clickable collider |
+| `ColliderTouchEvent` | posted on the server every tick a collider touches a living entity |
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.colliders.colliderHit
+
+@SubscribeEvent
+fun onHurt(event: EntityEvent.Hurt) {
+    val hit = event.source.colliderHit ?: return
+    println("${event.entity.name.string} took a hit on ${hit.collider}")
+}
+```
+
+---
+
+## How hits are checked
+
+The client aims at colliders as it draws them and tells the server which one it hit, just before the vanilla attack or click. The server then checks that:
+
+- the collider was near that point on one of the last ten ticks, which covers a ping up to half a second;
+- the point is within the player's reach and roughly where the player is looking;
+- no block stands between the player's eyes and the point;
+- no other collider of the same entity is in the way, so a hit cannot be claimed on a head behind a shield.
+
+A claim that fails is dropped. An attack that comes without a claim, as when another mod makes the player attack, lands the vanilla way, on no collider.
+
+Projectiles hit only colliders that **take hits**. Mob attacks and explosions are not aimed and land the vanilla way.
+
+---
+
+## Notes
+
+- Colliders act on living entities. Items, arrows and boats pass through solid colliders.
+- Mobs do not know about colliders when finding a path: they walk into a solid one and go around it.
+- A player riding a turning collider moves with it, but their view does not turn.
+- A player is moved by their own client, so the server does not stop players at solid colliders. Standing on one over a drop is not counted as flying.
+- Saving the rig in the editor applies it in the world at once, in single player and on the server the game itself runs. A dedicated server picks it up on its next resource reload.

@@ -11,7 +11,7 @@ order: 2
 
 ## `npc()`
 
-Функция `npc()` создаёт `NpcEntity`, добавляет его в мир и сразу назначает базовые компоненты модели, хитбокса и анимаций.
+Функция `npc()` создаёт `NpcEntity`, добавляет его в мир и сразу назначает базовые компоненты модели и анимаций.
 
 ```kotlin
 val guide = npc(
@@ -29,10 +29,8 @@ fun npc(
     model: String = "hollowengine:models/entity/player_model.gltf",
     rotation: Vec2 = rotation(0, 0),
     world: String = "minecraft:overworld",
-    size: Pair<Float, Float> = 0.6f to 1.8f,
     attributes: Map<String, Float> = emptyMap(),
-    textures: Map<String, String> = emptyMap(),
-    transform: Transform = Transform(),
+    transform: TrsTransformF = TrsTransformF(),
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
@@ -46,16 +44,14 @@ fun npc(
 | `model` | `String` | `"hollowengine:models/entity/player_model.gltf"` | Resource location `.gltf` модели. |
 | `rotation` | `Vec2` | `rotation(0, 0)` | Начальный yaw/pitch. |
 | `world` | `String` | `"minecraft:overworld"` | ID измерения, куда будет добавлен NPC. |
-| `size` | `Pair<Float, Float>` | `0.6f to 1.8f` | Ширина/высота хитбокса. В v2.3 параметр есть в сигнатуре, но для точной настройки лучше использовать компоненты. |
 | `attributes` | `Map<String, Float>` | `emptyMap()` | Базовые значения атрибутов через registry id. |
-| `textures` | `Map<String, String>` | `emptyMap()` | Карта текстур по слоям/материалам. В v2.3 низкоуровневая настройка текстур всё ещё лучше делается через компоненты/модель. |
-| `transform` | `Transform` | `Transform()` | Локальная трансформация модели. В v2.3 не стоит полагаться на него как на стабильный публичный способ настройки. |
+| `transform` | `TrsTransformF` | `TrsTransformF()` | Локальная трансформация модели. В v2.3 не стоит полагаться на него как на стабильный публичный способ настройки. |
 | `nameplateMode` | `NameplateMode` | `NameplateMode.SHOW` | Начальный режим отображения неймплейта. |
 | `inverseHeadRotation` | `Boolean` | `false` | Зарезервировано для особенностей поворота головы/модели. |
 | `inventorySize` | `Int` | `36` | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
 
 :::caution
-Часть параметров уже присутствует в сигнатуре, но ещё не является полноценным стабильным пользовательским API. В v2.3 надёжно применяются позиция, поворот, мир, модель, имя, `nameplateMode`, атрибуты, базовый хитбокс и стандартный аниматор. Для тонкой настройки модели, текстур, анимаций и хитбокса лучше явно назначать компоненты.
+Часть параметров уже присутствует в сигнатуре, но ещё не является полноценным стабильным пользовательским API. В v2.3 надёжно применяются позиция, поворот, мир, модель, имя, `nameplateMode`, атрибуты и стандартный аниматор. Для тонкой настройки модели, текстур и анимаций лучше явно назначать компоненты; как NPC толкается и не пускает других, задаёт компонент [Тело](/docs/hollowengine/scripting/colliders#the-body-of-an-entity).
 :::
 
 ---
@@ -124,7 +120,6 @@ val guard = npc(
 После создания NPC получает:
 
 - `Model(model)` — компонент модели;
-- `HitboxComponent(HitboxMode.PULLING)` — стандартное поведение хитбокса;
 - `StandardPlayerAnimatorPreset.create()` — стандартную player-like locomotion анимацию;
 - `TransformComponent(...)` — базовую трансформацию модели;
 - `customName` и `isCustomNameVisible`;

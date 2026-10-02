@@ -37,7 +37,6 @@ val alive = npc.isAlive
 
 | Property | Type | Read | Write |
 |----------|------|------|-------|
-| `npc.hitboxMode` | `HitboxMode` | Current hitbox mode. | Assigns `HitboxComponent` and synchronizes the snapshot. |
 | `npc.pickupDistance` | depends on `pickupReach` | Item pickup radius. | Read-only. |
 | `npc.fakePlayer` | `ServerPlayer` | Fake player used for actions such as breaking blocks. | Read-only. |
 | `npc.goals` | `GoalSelector` | NPC goal selector. | Modify through the goal selector API. |
@@ -48,10 +47,8 @@ val alive = npc.isAlive
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 
 npc.setNameplate("Merchant", NameplateMode.SHOW)
-npc.hitboxMode = HitboxMode.EMPTY
 ```
 
 ---
@@ -98,10 +95,9 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 
 npc.set(Model("my_mod:models/entity/guide.gltf"))
-npc.set(HitboxComponent(HitboxMode.BLOCKING))
+npc.set(BodyComponent(mode = BodyMode.BLOCKING))
 npc.set(StandardPlayerAnimatorPreset.create())
 ```
 

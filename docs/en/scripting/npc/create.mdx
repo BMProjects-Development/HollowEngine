@@ -11,7 +11,7 @@ order: 2
 
 ## `npc()`
 
-The `npc()` function creates an `NpcEntity`, adds it to the world, and assigns the base model, hitbox, and animation components.
+The `npc()` function creates an `NpcEntity`, adds it to the world, and assigns the base model and animation components.
 
 ```kotlin
 val guide = npc(
@@ -29,10 +29,8 @@ fun npc(
     model: String = "hollowengine:models/entity/player_model.gltf",
     rotation: Vec2 = rotation(0, 0),
     world: String = "minecraft:overworld",
-    size: Pair<Float, Float> = 0.6f to 1.8f,
     attributes: Map<String, Float> = emptyMap(),
-    textures: Map<String, String> = emptyMap(),
-    transform: Transform = Transform(),
+    transform: TrsTransformF = TrsTransformF(),
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
@@ -46,16 +44,14 @@ fun npc(
 | `model` | `String` | `"hollowengine:models/entity/player_model.gltf"` | Resource location of the `.gltf` model. |
 | `rotation` | `Vec2` | `rotation(0, 0)` | Initial yaw/pitch. |
 | `world` | `String` | `"minecraft:overworld"` | Dimension id where the NPC is added. |
-| `size` | `Pair<Float, Float>` | `0.6f to 1.8f` | Hitbox width/height. The parameter exists in v2.3, but explicit components are safer for precise setup. |
 | `attributes` | `Map<String, Float>` | `emptyMap()` | Base attribute values by registry id. |
-| `textures` | `Map<String, String>` | `emptyMap()` | Texture map by layer/material. In v2.3, low-level texture customization is still better handled through components/model setup. |
-| `transform` | `Transform` | `Transform()` | Local model transform. Do not rely on it as a stable public customization path yet. |
+| `transform` | `TrsTransformF` | `TrsTransformF()` | Local model transform. Do not rely on it as a stable public customization path yet. |
 | `nameplateMode` | `NameplateMode` | `NameplateMode.SHOW` | Initial nameplate visibility mode. |
 | `inverseHeadRotation` | `Boolean` | `false` | Reserved for model/head-rotation specifics. |
 | `inventorySize` | `Int` | `36` | Number of slots in [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Can also be changed later with `npc.inventory.resize(...)`. |
 
 :::caution
-Some parameters are already present in the signature but are not yet a fully stable user-facing API. In v2.3, position, rotation, world, model, name, `nameplateMode`, attributes, the base hitbox, and the standard animator are applied reliably. For fine-grained model, texture, animation, and hitbox setup, assign components explicitly.
+Some parameters are already present in the signature but are not yet a fully stable user-facing API. In v2.3, position, rotation, world, model, name, `nameplateMode`, attributes, and the standard animator are applied reliably. For fine-grained model, texture, and animation setup, assign components explicitly; how the NPC pushes and blocks is set by the [Body](/docs/hollowengine/scripting/colliders#the-body-of-an-entity) component.
 :::
 
 ---
@@ -124,7 +120,6 @@ Attribute names must match the attribute registry ids in the current Minecraft/N
 After creation, the NPC receives:
 
 - `Model(model)` - the model component;
-- `HitboxComponent(HitboxMode.PULLING)` - default hitbox behavior;
 - `StandardPlayerAnimatorPreset.create()` - standard player-like locomotion animation;
 - `TransformComponent(...)` - base model transform;
 - a nameplate initialized from `name` and `nameplateMode`;
