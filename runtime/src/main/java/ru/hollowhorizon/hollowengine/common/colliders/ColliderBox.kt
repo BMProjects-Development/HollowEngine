@@ -129,6 +129,24 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return if (allowed * distance <= 0.0) 0.0 else allowed
     }
 
+    /** How far up [box] has to move to stop overlapping this collider; null when they do not overlap. */
+    fun lift(box: AABB): Double? {
+        val between = box.center.subtract(center)
+        var lowest = Double.POSITIVE_INFINITY
+
+        for (normal in separatingAxes) {
+            val reach = reach(normal, box)
+            val start = between.dot(normal)
+            if (abs(start) >= reach) return null
+            if (abs(normal.y) < EPSILON) continue
+            val needed = if (normal.y > 0.0) (reach - start) / normal.y else (-reach - start) / normal.y
+            lowest = min(lowest, needed)
+        }
+        return lowest
+    }
+
+    fun move(x: Double, y: Double, z: Double): ColliderBox = ColliderBox(center.add(x, y, z), axisX, axisY, axisZ)
+
     /** Where [point], carried by this box, is once the box has become [next]: how a moving collider moves what it holds. */
     fun carry(point: Vec3, next: ColliderBox): Vec3? {
         val local = toLocal(point) ?: return null

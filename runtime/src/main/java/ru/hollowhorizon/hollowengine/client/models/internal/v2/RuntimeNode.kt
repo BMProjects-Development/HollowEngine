@@ -29,7 +29,8 @@ open class RuntimeNode(
     parent: Attachment?,
     private val materialResolver: (Material) -> Material = { it },
 ) : Attachment(parent) {
-    val name: String = definition.name ?: parent?.let { "Node_${definition.index}" } ?: "Root"
+    /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
+    val name: String = definition.name ?: "Node_${definition.index}"
     var isVisible = true
         set(value) {
             field = value

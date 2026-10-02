@@ -5,7 +5,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.listSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
@@ -251,7 +250,7 @@ open class Vec4f(open val x: Float, open val y: Float, open val z: Float, open v
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4f> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Float>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Float>("hollowengine.Vec4f")
 
         override fun serialize(encoder: Encoder, value: Vec4f) {
             encoder.encodeCollection(descriptor, 4) {
@@ -609,7 +608,7 @@ open class Vec4d(open val x: Double, open val y: Double, open val z: Double, ope
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4d> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Double>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Double>("hollowengine.Vec4d")
 
         override fun serialize(encoder: Encoder, value: Vec4d) {
             encoder.encodeCollection(descriptor, 4) {
@@ -904,7 +903,7 @@ open class Vec4i(open val x: Int, open val y: Int, open val z: Int, open val w: 
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4i> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Int>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Int>("hollowengine.Vec4i")
 
         override fun serialize(encoder: Encoder, value: Vec4i) {
             encoder.encodeCollection(descriptor, 4) {

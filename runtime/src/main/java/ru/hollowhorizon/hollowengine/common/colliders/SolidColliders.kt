@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.colliders
 
 import net.minecraft.core.Direction
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.Shapes
@@ -10,18 +11,22 @@ import java.util.function.Supplier
 import kotlin.math.abs
 
 /**
- * Solid colliders in vanilla's movement: a moving entity stops at them the way it stops at blocks, steps
- * up onto low ones and walks up tilted ones a step at a time.
+ * Solid colliders in vanilla's movement: a moving entity stops at them the way it stops at blocks and
+ * steps up onto them, tilted ones included, as high as it steps up onto blocks.
  */
 internal object SolidColliders {
-    /** Steps tried on top of vanilla's when walking up a tilted collider, as fine as a model's pixel. */
-    private const val SLOPE_STEP = 1f / 16f
+    /** How far above a collider a step leaves the entity, so the step itself does not end in a touch. */
+    private const val STEP_CLEARANCE = 1.0e-5
 
     /** The box around a player vanilla's floating check looks for blocks in. */
     private const val FLOATING_MARGIN = 0.0625
     private const val FLOATING_DEPTH = 0.55
 
-    private val active = ThreadLocal<List<ColliderBox>?>()
+    private const val MIN_MOVE = 1.0e-7
+
+    private class Move(val boxes: List<ColliderBox>, val movement: Vec3)
+
+    private val active = ThreadLocal<Move?>()
 
     /** Runs [move], the move of [entity] by [movement], with the solid colliders around it in effect. */
     fun during(entity: Entity, movement: Vec3, move: Supplier<Vec3>): Vec3 {
@@ -30,7 +35,7 @@ internal object SolidColliders {
         if (boxes.isEmpty()) return move.get()
 
         val previous = active.get()
-        active.set(boxes)
+        active.set(Move(boxes, movement))
         try {
             return move.get()
         } finally {
@@ -40,7 +45,7 @@ internal object SolidColliders {
 
     /** Vanilla's collision of [box] moving by [movement] with [shapes], with the colliders in effect as well. */
     fun collide(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 {
-        val boxes = active.get() ?: return vanilla.get()
+        val boxes = active.get()?.boxes ?: return vanilla.get()
         var moved = box
         var dx = movement.x
         var dy = movement.y
@@ -64,27 +69,84 @@ internal object SolidColliders {
     }
 
     /**
-     * The heights vanilla tries to step up by, and more where solid colliders are: the top of each, and
-     * fine steps, since the lowest step that gets the entity further is the one taken and a tilted
-     * collider has no single top.
+     * The heights vanilla tries to step up by, and the ones that clear the solid colliders in the way of
+     * the step: vanilla takes the lowest that gets the entity further, and a tilted collider has no top of
+     * its own, only the height that clears it where the entity is going.
      */
     fun stepHeights(box: AABB, limit: Float, vanilla: FloatArray): FloatArray {
-        val boxes = active.get() ?: return vanilla
-        val reach = box.inflate(1.0, 0.0, 1.0).expandTowards(0.0, limit.toDouble(), 0.0)
-        val near = boxes.filter { it.bounds.intersects(reach) }
-        if (near.isEmpty()) return vanilla
+        val move = active.get() ?: return vanilla
+        val target = box.move(move.movement.x, 0.0, move.movement.z)
+        val path = box.expandTowards(move.movement.x, 0.0, move.movement.z)
 
         val heights = vanilla.toMutableSet()
-        near.forEach { collider ->
-            val top = (collider.bounds.maxY - box.minY).toFloat()
-            if (top > 0f && top <= limit) heights += top
+        move.boxes.forEach { collider ->
+            for (candidate in arrayOf(target, path)) {
+                val height = (collider.lift(candidate) ?: continue) + STEP_CLEARANCE
+                if (height <= limit) heights += height.toFloat()
+            }
         }
-        var step = SLOPE_STEP
-        while (step < limit) {
-            heights += step
-            step += SLOPE_STEP
+        return if (heights.size == vanilla.size) vanilla else heights.sorted().toFloatArray()
+    }
+
+    /**
+     * [moved], what vanilla let [entity] move by with its box, cut short where its own solid colliders would
+     * go into blocks: the entity is as big as they are. They meet walls but not the floor the box walks on,
+     * so a collider that reaches down to the feet does not drag along the ground.
+     */
+    fun keepOutOfBlocks(entity: Entity, moved: Vec3): Vec3 {
+        if (moved.lengthSqr() < MIN_MOVE * MIN_MOVE || !EntityColliders.hasTargets(entity, ColliderModes::solid)) return moved
+        var own = solidBoxes(entity)
+        if (own.isEmpty()) return moved
+
+        val reach = own.map { it.bounds.expandTowards(moved) }.reduce(AABB::minmax)
+        val blocks = entity.level().getBlockCollisions(entity, reach).flatMap { it.toAabbs() }
+        if (blocks.isEmpty()) return moved
+
+        var dx = moved.x
+        var dy = moved.y
+        var dz = moved.z
+        dy = clampOwn(own, blocks, Direction.Axis.Y, dy)
+        own = own.map { it.move(0.0, dy, 0.0) }
+
+        val floor = entity.boundingBox.minY + dy + entity.maxUpStep()
+        val walls = blocks.filter { it.maxY > floor }
+        if (abs(dx) < abs(dz)) {
+            dz = clampOwn(own, walls, Direction.Axis.Z, dz)
+            own = own.map { it.move(0.0, 0.0, dz) }
+            dx = clampOwn(own, walls, Direction.Axis.X, dx)
+        } else {
+            dx = clampOwn(own, walls, Direction.Axis.X, dx)
+            own = own.map { it.move(dx, 0.0, 0.0) }
+            dz = clampOwn(own, walls, Direction.Axis.Z, dz)
         }
-        return heights.sorted().toFloatArray()
+        return Vec3(dx, dy, dz)
+    }
+
+    /** How far of [distance] the colliders can move along [axis] before one of them runs into one of [blocks]. */
+    private fun clampOwn(own: List<ColliderBox>, blocks: List<AABB>, axis: Direction.Axis, distance: Double): Double {
+        var allowed = distance
+        for (collider in own) for (block in blocks) {
+            if (allowed == 0.0) return 0.0
+            // The collider moving into the block is the block moving the other way into the collider.
+            allowed = -collider.sweep(block, axis, -allowed)
+        }
+        return allowed
+    }
+
+    /**
+     * Whether the solid colliders of the entities around [shape] reach into it: a block cannot be placed into
+     * them, the same as into an entity's box.
+     */
+    fun obstructs(level: Level, shape: VoxelShape): Boolean {
+        if (shape.isEmpty) return false
+        val parts = shape.toAabbs()
+        val bounds = shape.bounds()
+        return EntityColliders.physicalHosts(level).any { host ->
+            if (host.isRemoved) return@any false
+            solidBoxes(host).any { collider ->
+                collider.bounds.intersects(bounds) && parts.any { collider.penetration(it) != null }
+            }
+        }
     }
 
     /**
@@ -109,9 +171,11 @@ internal object SolidColliders {
         val reach = entity.boundingBox.expandTowards(movement).inflate(entity.maxUpStep().toDouble() + 0.5)
         return EntityColliders.physicalHosts(entity.level()).flatMap { host ->
             if (host === entity || host.rootVehicle === entity.rootVehicle) return@flatMap emptyList()
-            EntityColliders.physical(host).firstOrNull().orEmpty()
-                .filter { it.spec.modes.solid && it.box.bounds.intersects(reach) }
-                .map { it.box }
+            solidBoxes(host).filter { it.bounds.intersects(reach) }
         }
     }
+
+    /** Where the solid colliders of [host] are now, as this side sees them. */
+    fun solidBoxes(host: Entity): List<ColliderBox> =
+        EntityColliders.physical(host).firstOrNull().orEmpty().filter { it.spec.modes.solid }.map { it.box }
 }

@@ -382,13 +382,19 @@
 .insp-vector-cell {
     grow: 1;
     size: 0px fit;
-    gap: 2px;
+    gap: 4px;
+    align-items: start center;
 }
 
 .insp-vector-label {
     size: fit fit;
     foreground: $text-faint;
     font-size: $font-size-small;
+}
+
+.insp-vector-cell .insp-input {
+    size: 0px fit;
+    grow: 1;
 }
 
 .insp-nested {

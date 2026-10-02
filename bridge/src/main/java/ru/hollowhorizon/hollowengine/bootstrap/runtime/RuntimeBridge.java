@@ -225,6 +225,8 @@ public interface RuntimeBridge extends AutoCloseable {
 
     boolean isSupportedByColliders(Entity entity);
 
+    boolean isObstructedByColliders(Level level, VoxelShape shape);
+
     DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
 
     boolean hasColliderTargets(Entity entity, boolean projectile);

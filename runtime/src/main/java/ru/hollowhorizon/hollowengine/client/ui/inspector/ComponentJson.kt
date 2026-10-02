@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
+import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import kotlin.reflect.KClass
 
 /**
@@ -68,7 +69,7 @@ internal object ComponentJson {
             PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> JsonPrimitive(0)
             PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> JsonPrimitive(0.0)
             SerialKind.ENUM -> JsonPrimitive(descriptor.elementNames.firstOrNull().orEmpty())
-            StructureKind.LIST -> JsonArray(emptyList())
+            StructureKind.LIST -> JsonArray(List(VectorDescriptors.components(descriptor) ?: 0) { defaultJson(descriptor.getElementDescriptor(0)) })
             StructureKind.MAP -> JsonObject(emptyMap())
             StructureKind.CLASS, StructureKind.OBJECT -> JsonObject(
                 (0 until descriptor.elementsCount).associate { index ->

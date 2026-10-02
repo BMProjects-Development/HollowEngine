@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
+import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -120,7 +121,11 @@ internal fun ValueEditor(
 
         SerialKind.ENUM -> EnumField(label, description, descriptor, value, onChange)
 
-        StructureKind.LIST -> ListField(label, owner, descriptor, hints, value, path, onChange)
+        StructureKind.LIST -> {
+            val size = VectorDescriptors.components(descriptor)
+            if (size != null) ListVectorField(label, description, descriptor, size, value, path, onChange)
+            else ListField(label, owner, descriptor, hints, value, path, onChange)
+        }
 
         StructureKind.MAP -> MapField(label, owner, descriptor, value, path, onChange)
 
@@ -347,19 +352,52 @@ private fun VectorField(
     onChange: (JsonElement) -> Unit,
 ) {
     val body = value as? JsonObject ?: JsonObject(emptyMap())
+    val components = (0 until descriptor.elementsCount).mapNotNull { index ->
+        val name = descriptor.getElementName(index)
+        val kind = descriptor.getElementDescriptor(index).kind as? PrimitiveKind ?: return@mapNotNull null
+        VectorComponent(name, kind, (body[name] as? JsonPrimitive)?.doubleOrNull ?: 0.0) { next ->
+            onChange(body.withField(name, numberJson(kind, next)))
+        }
+    }
+    VectorRow(label, description, path, components)
+}
+
+/** A vector written as a list of numbers, such as `Vec3f`: its components side by side, never added or removed. */
+@Composable
+private fun ListVectorField(
+    label: String?,
+    description: String?,
+    descriptor: SerialDescriptor,
+    size: Int,
+    value: JsonElement,
+    path: String,
+    onChange: (JsonElement) -> Unit,
+) {
+    val kind = descriptor.getElementDescriptor(0).kind as? PrimitiveKind ?: return UnsupportedField(label, descriptor)
+    val items = value as? JsonArray ?: JsonArray(emptyList())
+    val numbers = List(size) { index -> (items.getOrNull(index) as? JsonPrimitive)?.doubleOrNull ?: 0.0 }
+    val components = numbers.mapIndexed { index, number ->
+        VectorComponent(VectorAxes[index], kind, number) { next ->
+            onChange(JsonArray(numbers.mapIndexed { other, old -> numberJson(kind, if (other == index) next else old) }))
+        }
+    }
+    VectorRow(label, description, path, components)
+}
+
+private class VectorComponent(val name: String, val kind: PrimitiveKind, val value: Double, val onChange: (Double) -> Unit)
+
+private val VectorAxes = listOf("x", "y", "z", "w")
+
+@Composable
+private fun VectorRow(label: String?, description: String?, path: String, components: List<VectorComponent>) {
     Column(tags = listOf("insp-field")) {
         FieldLabel(label, description)
         Row(tags = listOf("insp-vector")) {
-            for (index in 0 until descriptor.elementsCount) {
-                val name = descriptor.getElementName(index)
-                val kind = descriptor.getElementDescriptor(index).kind as? PrimitiveKind ?: continue
-                val whole = kind == PrimitiveKind.INT || kind == PrimitiveKind.LONG
-                val number = (body[name] as? JsonPrimitive)?.doubleOrNull ?: 0.0
-                Column(tags = listOf("insp-vector-cell")) {
-                    Text(name, tags = listOf("insp-vector-label"))
-                    NumberInput("$path/$name", number, whole) { next ->
-                        onChange(body.withField(name, numberJson(kind, next)))
-                    }
+            components.forEach { component ->
+                val whole = component.kind == PrimitiveKind.INT || component.kind == PrimitiveKind.LONG
+                Row(tags = listOf("insp-vector-cell")) {
+                    Text(component.name, tags = listOf("insp-vector-label"))
+                    NumberInput("$path/${component.name}", component.value, whole, onChange = component.onChange)
                 }
             }
         }

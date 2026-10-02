@@ -22,7 +22,7 @@ object AnimationLoader {
         val animData = animationModel.channels
             .map { channel ->
                 val node = nodes[channel.node]
-                    ?: throw AnimationException("Node with index ${channel.node} not found!")
+                    ?: throw IllegalStateException("Node with index ${channel.node} not found!")
 
                 val timeKeys = channel.times.toFloatArray()
                 val target = AnimationTarget.valueOf(channel.path.uppercase())

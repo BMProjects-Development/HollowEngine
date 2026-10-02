@@ -120,6 +120,22 @@ class ColliderBoxTest {
 
     /** What stands on a collider turns with it: a quarter turn takes a point on its X side to its Z side. */
     @Test
+    fun `box sunk into a flat collider is lifted to its top`() {
+        val floor = ColliderBox.aligned(Vec3.ZERO, Vec3(1.0, 0.5, 1.0))
+
+        assertEquals(0.2, assertNotNull(floor.lift(AABB(-0.3, 0.3, -0.3, 0.3, 2.1, 0.3))), 1.0e-9)
+        assertNull(floor.lift(AABB(-0.3, 0.6, -0.3, 0.3, 2.4, 0.3)))
+    }
+
+    @Test
+    fun `box sunk into a slope is lifted to the slope where its edge is highest`() {
+        val ridge = ColliderBox.of(MutableMat4f().rotate(45f.deg, Vec3f.Z_AXIS), Vec3.ZERO)
+        val box = AABB(0.2, 0.3, -0.1, 0.4, 2.1, 0.1)
+
+        assertEquals(sqrt(0.5) - 0.2 - 0.3, assertNotNull(ridge.lift(box)), 1.0e-5)
+    }
+
+    @Test
     fun `turning collider carries a point with it`() {
         val before = ColliderBox.aligned(Vec3.ZERO, Vec3(0.5, 0.5, 0.5))
         val after = ColliderBox.of(MutableMat4f().rotate(90f.deg, Vec3f.Y_AXIS), Vec3.ZERO)

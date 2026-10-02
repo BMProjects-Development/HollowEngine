@@ -653,8 +653,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun collideWithColliders(entity: Entity, movement: Vec3, move: Supplier<Vec3>): Vec3 {
         val moved = SolidColliders.during(entity, movement, move)
-        if (ColliderContacts.isSimulatedHere(entity)) EntityBodies.afterMove(entity, movement, moved)
-        return moved
+        if (entity.noPhysics || !ColliderContacts.isSimulatedHere(entity)) return moved
+        val kept = SolidColliders.keepOutOfBlocks(entity, moved)
+        EntityBodies.afterMove(entity, movement, kept)
+        return kept
     }
 
     override fun collideShapesWithColliders(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 =
@@ -666,6 +668,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onLivingEntityTickStart(entity: LivingEntity) = ColliderContacts.resolve(entity)
 
     override fun isSupportedByColliders(entity: Entity): Boolean = SolidColliders.supports(entity)
+
+    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
 
     override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
         ColliderCombat.resolve(entity, damageSource)
