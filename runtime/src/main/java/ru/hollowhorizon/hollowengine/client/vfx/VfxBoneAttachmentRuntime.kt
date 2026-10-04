@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
 import net.minecraft.client.Minecraft
-import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
@@ -17,38 +16,28 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
 
 /**
- * An effect attached to bone.
+ * One effect placed by whatever carries it, with the matrix captured while the carrier was drawn, and
+ * advanced on game time.
  */
-class VfxBoneAttachment(
-    private val spec: VfxBoneAttachmentSpec,
-    private val node: RuntimeNode,
-) : Attachment(node) {
+class VfxBoundEffect(val asset: String) {
     private var instance: VfxInstance? = null
     private var lastGameTime = Float.NaN
     private var lastFrame = Long.MIN_VALUE
 
-    /** Bone space to camera-relative space, captured while the model was drawn. */
-    private val placement = Matrix4f()
+    /** The effect's space to camera-relative space, as of the last time the carrier was drawn. */
+    val placement = Matrix4f()
 
-    override fun collectCommands(pipeline: RenderPipeline) {
-        if (!spec.autoPlay || spec.effect.isBlank()) return
-
-        pipeline.addBatchedRenderable {
-            if (!node.isVisible) return@addBatchedRenderable
-
-            val frame = TickHandler.renderFrame
-            if (frame == lastFrame) return@addBatchedRenderable
-            lastFrame = frame
-
-            placement.set(stack.last().pose()).mul(globalMatrix.asMatrix4f())
-            VfxBoneBindings.submit(this@VfxBoneAttachment)
-        }
+    /** True on the first call of a frame: a carrier is drawn by several passes, the effect only once. */
+    fun claimFrame(): Boolean {
+        val frame = TickHandler.renderFrame
+        if (frame == lastFrame) return false
+        lastFrame = frame
+        return true
     }
 
-    /** Advances the effect and says where it is; called once a frame by the world renderer. */
-    fun update(cameraPosition: Vec3): VfxBoneBinding? {
-        val level = Minecraft.getInstance().level ?: return null
-        val playing = instance ?: create(level) ?: return null
+    /** Advances the effect and places it at [local], camera-relative; null while its file is missing. */
+    fun advance(cameraPosition: Vec3, local: Matrix4f): VfxBoneBinding? {
+        val playing = instance ?: create() ?: return null
 
         val now = TickHandler.gameTime
         val dt = when {
@@ -56,9 +45,6 @@ class VfxBoneAttachment(
             else -> ((now - lastGameTime) / TICKS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
         }
         lastGameTime = now
-
-        val local = Matrix4f(placement)
-        applyOffset(local)
 
         val translation = local.getTranslation(Vector3f())
         playing.moveTo(
@@ -78,16 +64,10 @@ class VfxBoneAttachment(
         return VfxBoneBinding(playing, local)
     }
 
-    /** The offset the author gave the attachment, on top of the bone. */
-    private fun applyOffset(matrix: Matrix4f) {
-        val transform = VfxTransform(spec.offset, spec.rotation, Vec3f(spec.scale, spec.scale, spec.scale))
-        val frame = VfxFrame().setCombined(VfxFrame().setIdentity(), transform)
-        matrix.mul(frame.toMatrix(MutableMat4f()).asMatrix4f())
-    }
-
-    private fun create(level: Level): VfxInstance? {
-        val effect = VfxAssets[spec.effect] ?: return null
-        return VfxInstance(effect, spec.effect, VfxWorldEnvironment(level)).also { instance = it }
+    private fun create(): VfxInstance? {
+        val level = Minecraft.getInstance().level ?: return null
+        val effect = VfxAssets[asset] ?: return null
+        return VfxInstance(effect, asset, VfxWorldEnvironment(level)).also { instance = it }
     }
 
     private companion object {
@@ -96,23 +76,64 @@ class VfxBoneAttachment(
     }
 }
 
-/** One bone effect, already advanced, with the matrix that places it in front of the camera. */
+/** Something that hands the world renderer one placed effect a frame. */
+fun interface VfxBindingSource {
+    /** Advances the effect and says where it is; called once a frame by the world renderer. */
+    fun update(cameraPosition: Vec3): VfxBoneBinding?
+}
+
+/**
+ * An effect attached to bone.
+ */
+class VfxBoneAttachment(
+    private val spec: VfxBoneAttachmentSpec,
+    private val node: RuntimeNode,
+) : Attachment(node), VfxBindingSource {
+    private val effect = VfxBoundEffect(spec.effect)
+
+    override fun collectCommands(pipeline: RenderPipeline) {
+        if (!spec.autoPlay || spec.effect.isBlank()) return
+
+        pipeline.addBatchedRenderable {
+            if (!node.isVisible) return@addBatchedRenderable
+            if (!effect.claimFrame()) return@addBatchedRenderable
+
+            effect.placement.set(stack.last().pose()).mul(globalMatrix.asMatrix4f())
+            VfxBoneBindings.submit(this@VfxBoneAttachment)
+        }
+    }
+
+    override fun update(cameraPosition: Vec3): VfxBoneBinding? {
+        val local = Matrix4f(effect.placement)
+        applyOffset(local)
+        return effect.advance(cameraPosition, local)
+    }
+
+    /** The offset the author gave the attachment, on top of the bone. */
+    private fun applyOffset(matrix: Matrix4f) {
+        val transform = VfxTransform(spec.offset, spec.rotation, Vec3f(spec.scale, spec.scale, spec.scale))
+        val frame = VfxFrame().setCombined(VfxFrame().setIdentity(), transform)
+        matrix.mul(frame.toMatrix(MutableMat4f()).asMatrix4f())
+    }
+}
+
+/** One placed effect, already advanced, with the matrix that places it in front of the camera. */
 class VfxBoneBinding(val instance: VfxInstance, val placement: Matrix4f)
 
 /**
- * The bone effects drawn this frame.
+ * The effects carried by bones and entities, drawn this frame.
  */
 object VfxBoneBindings {
-    private val submitted = ArrayList<VfxBoneAttachment>()
+    private val submitted = ArrayList<VfxBindingSource>()
     private val bindings = ArrayList<VfxBoneBinding>()
 
-    fun submit(attachment: VfxBoneAttachment) {
-        submitted += attachment
+    fun submit(source: VfxBindingSource) {
+        submitted += source
     }
 
     fun drain(cameraPosition: Vec3): List<VfxBoneBinding> {
         bindings.clear()
-        submitted.forEach { attachment -> attachment.update(cameraPosition)?.let(bindings::add) }
+        submitted.forEach { source -> source.update(cameraPosition)?.let(bindings::add) }
         submitted.clear()
         return bindings
     }

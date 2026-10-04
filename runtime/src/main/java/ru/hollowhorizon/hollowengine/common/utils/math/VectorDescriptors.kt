@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.utils.math
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.listSerialDescriptor
+import kotlinx.serialization.encoding.CompositeDecoder
 
 /**
  * Vectors are written as plain lists of numbers, under a name of their own, so an editor can tell a
@@ -21,4 +22,22 @@ object VectorDescriptors {
 
     /** How many components the vector [descriptor] describes has, or null when it is no vector. */
     fun components(descriptor: SerialDescriptor): Int? = components[descriptor.serialName]
+}
+
+/**
+ * Reads the components of a vector written as a collection. A sequential format, like the packet buffer,
+ * writes the size first and gives no element indices; the others name each element as it comes.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal class VectorReader(private val decoder: CompositeDecoder, private val descriptor: SerialDescriptor) {
+    private val sequential = decoder.decodeSequentially()
+
+    init {
+        if (sequential) decoder.decodeCollectionSize(descriptor)
+    }
+
+    /** Moves to the component at [index], which must be the next one. */
+    fun expect(index: Int) {
+        if (!sequential) require(decoder.decodeElementIndex(descriptor) == index)
+    }
 }

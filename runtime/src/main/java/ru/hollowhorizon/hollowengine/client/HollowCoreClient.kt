@@ -55,6 +55,7 @@ object HollowCoreClient {
     fun onRegisterRenderers(event: RegisterEntityRenderersEvent) {
         event.registerEntity(ModEntities.NPC_ENTITY, ::EmptyEntityRenderer)
         event.registerEntity(ModEntities.SEAT, ::EmptyEntityRenderer)
+        event.registerEntity(ModEntities.OBJECT, ::EmptyEntityRenderer)
     }
 
     val KEY_V = KeyMapping("key.v", GLFW.GLFW_KEY_V, "key.v1")

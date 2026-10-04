@@ -272,11 +272,12 @@ open class Vec3f(open val x: Float, open val y: Float, open val z: Float) {
 
         override fun deserialize(decoder: Decoder): Vec3f {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeFloatElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeFloatElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeFloatElement(descriptor, 2)
             dec.endStructure(descriptor)
             return Vec3f(x, y, z)
@@ -645,11 +646,12 @@ open class Vec3d(open val x: Double, open val y: Double, open val z: Double) {
 
         override fun deserialize(decoder: Decoder): Vec3d {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeDoubleElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeDoubleElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeDoubleElement(descriptor, 2)
             dec.endStructure(descriptor)
             return Vec3d(x, y, z)
@@ -925,11 +927,12 @@ open class Vec3i(open val x: Int, open val y: Int, open val z: Int) {
 
         override fun deserialize(decoder: Decoder): Vec3i {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeIntElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeIntElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeIntElement(descriptor, 2)
             dec.endStructure(descriptor)
             return Vec3i(x, y, z)

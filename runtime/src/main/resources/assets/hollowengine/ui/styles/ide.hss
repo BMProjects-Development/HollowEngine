@@ -490,14 +490,14 @@
     gap: 3px;
 }
 
-.project-actions {
+.panel-actions {
     size: fit 100%;
     padding: 0px 2px;
     gap: 1px;
     align-items: center center;
 }
 
-.project-action {
+.panel-action {
     size: fit fit;
     margin: 2px 0px;
     padding: 3px;
@@ -506,17 +506,26 @@
     transition: background 110ms ease-out;
 }
 
-.project-action:hover {
+.panel-action:hover {
     background: $bg-hover;
 }
 
-.project-action-icon {
+.panel-action-icon {
     size: 13px 13px;
     tint: $text-soft;
 }
 
-.project-action:hover .project-action-icon {
+.panel-action:hover .panel-action-icon,
+.panel-action.active .panel-action-icon {
     tint: $white;
+}
+
+/* A choice kept in a tool window's header, like the part of the level the scene lists. */
+.dropdown-button.panel-dropdown {
+    height: 20px;
+    padding: 0px 6px;
+    gap: 4px;
+    font-size: $font-size-small;
 }
 
 .project-dialog-content {
@@ -1121,6 +1130,7 @@
     wrap: false;
     foreground: $text-strong;
 }
+
 
 .scene-hint {
     size: 100% fit;

@@ -4,11 +4,7 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeView
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /**
@@ -30,6 +26,10 @@ class SceneTarget(
     val onMove: ((dragged: String, target: String) -> Boolean)? = null,
     val canMove: (dragged: String, target: String) -> Boolean = { _, _ -> true },
     val onIconClick: ((String) -> Unit)? = null,
+    /** The rows matching a search, ancestors included; null when the hierarchy cannot be searched. */
+    val search: ((String) -> List<UiTreeItem<Any?>>)? = null,
+    /** Controls over the tree, like what part of the hierarchy it shows. */
+    val toolbar: (@Composable () -> Unit)? = null,
 )
 
 /**
@@ -69,6 +69,52 @@ fun PublishScene(source: String, key: Any?, target: () -> SceneTarget?) {
     DisposableEffect(source) { onDispose { IdeScenes.release(source) } }
 }
 
+/** The search of each hierarchy, shared by the window's header, which opens it, and its tree, which shows it. */
+private object SceneFilters {
+    private val filters = HashMap<String, UiTreeFilterState>()
+
+    fun of(sceneId: String): UiTreeFilterState =
+        filters.getOrPut(sceneId) { UiTreeFilterState("scene-filter-$sceneId") }
+}
+
+/** What the scene window keeps in its header for the hierarchy it shows: that hierarchy's controls and the search. */
+@Composable
+internal fun SceneHeaderActions() {
+    val published = IdeScenes.current
+    val sceneId: String
+    val toolbar: (@Composable () -> Unit)?
+    val searchable: Boolean
+    when {
+        published != null -> {
+            sceneId = published.id
+            toolbar = published.toolbar
+            searchable = published.search != null
+        }
+
+        WorldObjectScene.isAvailable() -> {
+            sceneId = WorldObjectScene.SCENE_ID
+            toolbar = WorldObjectScene.toolbar
+            searchable = true
+        }
+
+        else -> return
+    }
+    PanelActions {
+        toolbar?.invoke()
+        if (searchable) {
+            val filter = SceneFilters.of(sceneId)
+            PanelActionButton(
+                id = "scene-search-button",
+                icon = SceneSearchIcon,
+                tooltip = "hollowengine.gui.ide.windows.scene_search".lang,
+                active = filter.expanded,
+            ) {
+                if (filter.expanded) filter.close() else filter.open()
+            }
+        }
+    }
+}
+
 /** An item of a scene tree being dragged: which hierarchy it came from, so another cannot take it. */
 private data class SceneDrag(val scene: String, val item: String)
 
@@ -78,8 +124,8 @@ private data class SceneDrag(val scene: String, val item: String)
  * the selection answers the usual keys.
  */
 @Composable
-internal fun SceneDock() {
-    val target = IdeScenes.current
+internal fun SceneDock(onFilterOpened: (String) -> Unit) {
+    val target = IdeScenes.current ?: WorldObjectScene.target()
     var menu by remember { mutableStateOf<SceneMenu?>(null) }
 
     Column(tags = listOf("ide-panel", "scene-panel"), modifier = Modifier.size(100.percent, 100.percent)) {
@@ -93,11 +139,18 @@ internal fun SceneDock() {
             menu = if (items.isEmpty()) null else SceneMenu(event.x, event.y, items)
         }
         val move = target.onMove
+        val search = target.search
+        val filter = SceneFilters.of(target.id)
+        val query = filter.query.trim()
+        val items = if (search != null && query.isNotEmpty()) search(query) else target.items
         val empty = target.items.isEmpty()
 
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
             UiTreeView(
-                items = target.items,
+                items = items,
+                filterState = filter.takeIf { search != null },
+                filterPlaceholder = "hollowengine.message.filter".lang,
+                onFilterOpened = onFilterOpened,
                 onToggle = { item -> target.onToggle(item.id) },
                 onSelect = { item, event ->
                     if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
@@ -124,7 +177,9 @@ internal fun SceneDock() {
                 },
                 canDrop = { item, dragged ->
                     val drag = dragged.payload as? SceneDrag
-                    drag != null && drag.scene == target.id && drag.item != item.id && target.canMove(drag.item, item.id)
+                    drag != null && drag.scene == target.id && drag.item != item.id && target.canMove(
+                        drag.item, item.id
+                    )
                 },
                 modifier = Modifier.size(100.percent, 100.percent).onKeyInput { input ->
                     if (input.key == GLFW.GLFW_KEY_ESCAPE && target.items.any { it.selected }) {
@@ -167,3 +222,4 @@ private fun SceneEmptyState(message: String, addHint: Boolean) {
 }
 
 private const val SceneEmptyIcon = "hollowengine:textures/gui/icons/layers.svg"
+private const val SceneSearchIcon = "hollowengine:textures/gui/icons/search.svg"

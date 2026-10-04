@@ -2,7 +2,9 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.asset
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDrag
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
@@ -85,15 +87,30 @@ private fun AssetTile(
     onClick: () -> Unit,
     onContext: (Float, Float) -> Unit,
 ) {
+    val dragged = remember { booleanArrayOf(false) }
     InlineWidget(
         id = "asset-tile-${entry.entryKey}",
-        modifier = Modifier.size(TileWidth.px, TileHeight.px).cursor(UiCursorShape.HAND).onClick { event ->
-            when {
-                event.isLeftClick() -> onClick()
-                event.isRightClick() -> onContext(event.x, event.y)
+        modifier = Modifier.size(TileWidth.px, TileHeight.px).cursor(UiCursorShape.HAND)
+            .onPress { event ->
+                dragged[0] = false
+                if (event.isRightClick()) {
+                    onContext(event.x, event.y)
+                    event.consume()
+                }
             }
-            event.consume()
-        },
+            .dragSource(LocalDragAndDrop.current) {
+                val file = (entry as? AssetGridEntry.File)?.file ?: return@dragSource null
+                dragged[0] = true
+                UiDragItem(
+                    payload = HollowIdeFileDrag(file.projectPath(scope)),
+                    icon = IconHelper.forPath(file.location.path).toString(),
+                    label = file.name,
+                )
+            }
+            .onRelease { event ->
+                if (!dragged[0] && event.isLeftClick()) onClick()
+                event.consume()
+            },
     ) {
         Column(tags = if (selected) listOf("asset-tile", "selected") else listOf("asset-tile")) {
             Box(tags = listOf("asset-preview")) {

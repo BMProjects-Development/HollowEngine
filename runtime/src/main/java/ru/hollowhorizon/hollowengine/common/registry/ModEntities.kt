@@ -6,6 +6,7 @@ import net.minecraft.world.entity.MobCategory
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.SeatEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterEntityAttributesEvent
 
@@ -16,6 +17,11 @@ object ModEntities : HollowRegistry(HollowEngine.MODID) {
 
     val SEAT: EntityType<SeatEntity> by register("seat") {
         EntityType.Builder.of(::SeatEntity, MobCategory.CREATURE).sized(0.0f, 0.0f).build("seat")
+    }
+
+    val OBJECT: EntityType<WorldObjectEntity> by register("object") {
+        EntityType.Builder.of(::WorldObjectEntity, MobCategory.MISC).sized(0.5f, 0.5f)
+            .fireImmune().clientTrackingRange(10).build("object")
     }
 }
 

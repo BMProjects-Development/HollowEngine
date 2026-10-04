@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.panels
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -30,6 +31,16 @@ fun GameViewportDock(active: Boolean = false, attached: Boolean = true) {
         if (!attached) HollowIdeGameViewport.release(placement)
         onDispose { HollowIdeGameViewport.release(placement) }
     }
+    val dragAndDrop = LocalDragAndDrop.current
+    val dropping = dragAndDrop?.hoveredTargetId == GameViewportDrop.TARGET_ID && dragAndDrop.canDrop
+    val marker = GameViewportDrop.preview.takeIf { dropping }
+    val drop = if (!attached) Modifier else Modifier.dropTarget(
+        id = GameViewportDrop.TARGET_ID,
+        accepts = GameViewportDrop::accepts,
+        onDragOver = { _, x, y -> GameViewportDrop.hover(placement.imageBounds(), x, y) },
+        onDrop = { item, x, y -> GameViewportDrop.drop(item, placement.imageBounds(), x, y) },
+    )
+    LaunchedEffect(dropping) { if (!dropping) GameViewportDrop.clear() }
     Box(
         id = GameViewportNodeId,
         tags = listOfNotNull("game-viewport", "active".takeIf { active && attached }),
@@ -38,7 +49,8 @@ fun GameViewportDock(active: Boolean = false, attached: Boolean = true) {
                 placement.bounds = it
                 if (attached) HollowIdeGameViewport.report(placement, it)
             }
-            .drawBehind(key = "game-viewport-$attached") {
+            .then(drop)
+            .drawBehind(key = "game-viewport-$attached-$marker") {
                 if (!attached) return@drawBehind
                 val rect = HollowIdeGameViewport.imageRect(UiRect(0f, 0f, size.width, size.height)) ?: return@drawBehind
                 drawTexture(
@@ -47,6 +59,7 @@ fun GameViewportDock(active: Boolean = false, attached: Boolean = true) {
                     flipY = true,
                     opaque = true,
                 )
+                marker?.let { GameViewportDrop.drawMarker(this, rect, it) }
             },
     ) {
         if (!attached) {
@@ -61,4 +74,7 @@ fun GameViewportDock(active: Boolean = false, attached: Boolean = true) {
 
 private class PanelPlacement {
     var bounds: UiRect? = null
+
+    /** Where the game image sits on the IDE surface. */
+    fun imageBounds(): UiRect? = bounds?.let { HollowIdeGameViewport.imageRect(it) }
 }

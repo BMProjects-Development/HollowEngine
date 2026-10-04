@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.vfx.VfxAssets
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.colliders.fitEntityBox
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
@@ -23,6 +24,7 @@ import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.PlayerSkinPart
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
 import java.util.Locale
 
 /**
@@ -36,6 +38,7 @@ internal object BuiltinComponentEditors {
         registered = true
 
         EditorAssetSources.register(*HollowModelManager.allSupportedFormats.toTypedArray()) { modelPaths() }
+        EditorAssetSources.register(VfxFormat.EXTENSION) { VfxAssets.ids.map { it.toString() } }
 
         ComponentEditors.register("hollowengine:model".rl) { scope -> ModelExtras(scope) }
         ComponentEditors.register("hollowengine:materials".rl) { scope -> MaterialsExtras(scope) }

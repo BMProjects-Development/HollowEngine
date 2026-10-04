@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -98,9 +99,12 @@ fun fitEntityBox(colliders: List<EntityCollider>): Pair<Float, Float>? {
  * The entity's position is left out; colliders add it in double precision.
  */
 internal fun entityModelMatrix(host: Entity, transform: TransformComponent, partialTick: Float): Mat4f =
-    MutableMat4f().rotate(hostRotation(host, partialTick)).mul(transform.transform.matrixF)
+    MutableMat4f().rotate(hostRotation(host, partialTick)).scale(hostScale(host, partialTick))
+        .mul(transform.transform.matrixF)
 
+/** How the host turns what it carries: a world object turns freely, any other entity with its body's yaw. */
 internal fun hostRotation(host: Entity, partialTick: Float): QuatF {
+    if (host is WorldObjectEntity) return host.pose(partialTick).rotation.let { QuatF(it.x, it.y, it.z, it.w) }
     val yaw = when (host) {
         is LivingEntity -> Mth.rotLerp(partialTick, host.yBodyRotO, host.yBodyRot)
         else -> Mth.rotLerp(partialTick, host.yRotO, host.yRot)
@@ -108,11 +112,21 @@ internal fun hostRotation(host: Entity, partialTick: Float): QuatF {
     return QuatF(hostYawDegrees(yaw).deg, Vec3f.Y_AXIS)
 }
 
-internal fun hostPosition(host: Entity, partialTick: Float): Vec3 = Vec3(
-    Mth.lerp(partialTick.toDouble(), host.xOld, host.x),
-    Mth.lerp(partialTick.toDouble(), host.yOld, host.y),
-    Mth.lerp(partialTick.toDouble(), host.zOld, host.z),
-)
+/** How the host scales what it carries; only world objects have a scale of their own. */
+internal fun hostScale(host: Entity, partialTick: Float): Vec3f {
+    if (host !is WorldObjectEntity) return Vec3f.ONES
+    return host.pose(partialTick).scale.let { Vec3f(it.x, it.y, it.z) }
+}
+
+/** Where the host carries things from. A child world object is placed by its parent, not by its own last two ticks. */
+internal fun hostPosition(host: Entity, partialTick: Float): Vec3 {
+    if (host is WorldObjectEntity) return host.pose(partialTick).position.let { Vec3(it.x, it.y, it.z) }
+    return Vec3(
+        Mth.lerp(partialTick.toDouble(), host.xOld, host.x),
+        Mth.lerp(partialTick.toDouble(), host.yOld, host.y),
+        Mth.lerp(partialTick.toDouble(), host.zOld, host.z),
+    )
+}
 
 private fun Mat4f.uniformScale(): Float {
     val x = transform(Vec3f.X_AXIS, 0f, MutableVec3f()).length()

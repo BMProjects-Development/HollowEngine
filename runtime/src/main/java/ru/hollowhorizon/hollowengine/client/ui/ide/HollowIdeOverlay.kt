@@ -748,8 +748,11 @@ object HollowIdeOverlay {
                             id = "ide-dock",
                             modifier = Modifier.size(100.percent, 0.px).grow(1f),
                             tabBarActions = { item ->
-                                if (item.id == ProjectTreeId) HollowIdeProjectActions(packaging)
-                                else fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
+                                when (item.id) {
+                                    SceneId -> SceneHeaderActions()
+                                    ProjectTreeId -> HollowIdeProjectActions(packaging)
+                                    else -> fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
+                                }
                             },
                             content = { item -> DockContent(item) },
                         )
@@ -1012,7 +1015,7 @@ object HollowIdeOverlay {
             ConsoleId -> HollowIdeConsolePanel(console, currentProblems())
             TimelineId -> TimelineDock(keyboardActive = dock.focusedItemId == TimelineId)
 
-            SceneId -> SceneDock()
+            SceneId -> SceneDock(onFilterOpened = ::requestSurfaceFocus)
 
             InspectorId -> IdeInspectorDock()
 

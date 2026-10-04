@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.render
 
 import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.math.Axis
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.client.renderer.MultiBufferSource
@@ -9,7 +8,6 @@ import net.minecraft.client.renderer.RenderType
 import net.minecraft.client.renderer.entity.LivingEntityRenderer
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.core.BlockPos
-import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.Level
@@ -17,7 +15,6 @@ import net.minecraft.world.phys.AABB
 import org.joml.Quaternionf
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
-import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.AnimatorAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
@@ -25,6 +22,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderCont
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
+import ru.hollowhorizon.hollowengine.common.attachments.components.vfxComponent
+import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
+import ru.hollowhorizon.hollowengine.common.colliders.hostScale
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderEntityEvent
@@ -47,7 +47,9 @@ object RenderManager {
         AnimatorAssets.register(StandardPlayerAnimatorPreset.ID.rl, StandardPlayerAnimatorPreset.create())
     }
 
-    private var isWorldPass = false
+    /** Whether entities are being drawn into the level now, rather than into an interface. */
+    var isWorldPass = false
+        private set
 
     @SubscribeEvent
     fun onTrackWorldPass(event: RenderLevelStageEvent) {
@@ -111,7 +113,8 @@ object RenderManager {
     fun extendCullingBounds(entity: Entity, vanillaBounds: AABB): AABB =
         modelCullingBounds[entity]?.let(vanillaBounds::minmax) ?: vanillaBounds
 
-    fun isFrustumCullingDisabled(entity: Entity): Boolean = entity in frustumCullingDisabledHosts
+    /** Effects spread past any box, so an entity that carries one is never culled by its box. */
+    fun isFrustumCullingDisabled(entity: Entity): Boolean = entity in frustumCullingDisabledHosts || entity.vfxComponent != null
 
     @SubscribeEvent
     fun onRenderEntityNodes(event: RenderEntityEvent.Pre) {
@@ -151,13 +154,16 @@ object RenderManager {
             val light =
                 if (isWorldPass) lightAt(level, entity, attachment, worldTransform, packedLight) else packedLight
 
-            val hostYaw = when (entity) {
-                is LivingEntity -> Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)
-                else -> Mth.rotLerp(partialTick, entity.yRotO, entity.yRot)
-            }
+            val hostRotation = hostRotation(entity, partialTick)
+            val hostScale = hostScale(entity, partialTick)
             val local = node.transform.transform
             poseStack.pushPose()
-            poseStack.mulPose(Axis.YP.rotationDegrees(hostYawDegrees(hostYaw)))
+            if (isWorldPass) {
+                val shift = hostRenderShift(entity, partialTick)
+                poseStack.translate(shift.x, shift.y, shift.z)
+            }
+            poseStack.mulPose(Quaternionf(hostRotation.x, hostRotation.y, hostRotation.z, hostRotation.w))
+            poseStack.scale(hostScale.x, hostScale.y, hostScale.z)
             poseStack.translate(
                 local.translation.x.toDouble(),
                 local.translation.y.toDouble(),

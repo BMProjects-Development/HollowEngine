@@ -1,0 +1,21 @@
+{
+  "world": "World",
+  "favorites": "Favorites",
+  "not_loaded": "%s (not loaded)",
+  "empty": "Drag a model or an effect from the project onto the game view to place it.",
+  "scope.nearby": "Nearby",
+  "scope.in_view": "In view",
+  "scope.loaded": "All loaded",
+  "create_empty": "Create empty object",
+  "create_child": "Create empty child",
+  "unparent": "Move out to the world",
+  "duplicate": "Duplicate",
+  "reset_transform": "Reset rotation and scale",
+  "drop_to_ground": "Drop to the ground",
+  "go_to": "Go to object",
+  "favorite_add": "Add to favorites",
+  "favorite_remove": "Remove from favorites",
+  "copy_id": "Copy UUID",
+  "id_copied": "UUID copied",
+  "delete": "Delete"
+}

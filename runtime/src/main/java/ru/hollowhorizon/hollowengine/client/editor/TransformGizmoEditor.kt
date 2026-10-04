@@ -38,6 +38,8 @@ import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.attachments.binding.*
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import java.util.*
 import kotlin.math.*
@@ -329,7 +331,7 @@ object TransformGizmoEditor {
         keyboard = null
         keyboardHint = null
         draggingKey = null
-        entry?.let(::refreshFromRuntime)
+        entry?.let(::finishEdit)
         return true
     }
 
@@ -402,8 +404,21 @@ object TransformGizmoEditor {
         draggingHandleId = null
         currentDrag = null
         labelState = null
-        entry?.let { refreshFromRuntime(it) }
+        entry?.let(::finishEdit)
         return true
+    }
+
+    /** A drag or a keyboard transform of [entry] is over: what shows it reads it again. */
+    private fun finishEdit(entry: GizmoEntry) {
+        refreshFromRuntime(entry)
+        entry.worldObject?.let(WorldObjectEditing::finishGizmo)
+    }
+
+    /** Puts the gizmo on the entity with [entityId], when it is boxed; the scene window selects through this. */
+    fun select(entityId: Int) {
+        val entryId = entries.entries.firstOrNull { it.value.entityId == entityId }?.key ?: return
+        activeKey = entryId
+        contextMenuState = null
     }
 
     private fun updateHover(x: Float, y: Float) {
@@ -418,7 +433,15 @@ object TransformGizmoEditor {
         return GizmoPicker.pick(handles, x, y)
     }
 
+    /** A world object gets the menu it has everywhere; any other node, the gizmo's own. */
     private fun openContextMenu(entryId: GizmoEntryId, x: Float, y: Float) {
+        val target = entries[entryId]?.worldObject
+        if (target != null) {
+            contextMenuState = null
+            WorldInspector.select(target.id)
+            WorldObjectContextMenu.open(target, x, y)
+            return
+        }
         contextMenuState = ContextMenuState(entryId, UiRect(x, y, 0f, 0f))
     }
 
@@ -631,6 +654,7 @@ object TransformGizmoEditor {
         val partialTick = TickHandler.partialTick
 
         service.records.forEach { record ->
+            if (record.hostEntity is WorldObjectEntity) return@forEach
             val snapshot = service.snapshot(record.snapshotId) ?: return@forEach
             val hostEntityUuid = snapshot.hostEntityUuidOrNull() ?: record.hostEntityUuid
             val claimedNodes = hashSetOf<UUID>()
@@ -657,6 +681,24 @@ object TransformGizmoEditor {
 
         }
 
+        val camera = WorldToScreenProjector.cameraPosition
+        val reach = WorldObjectEditing.GIZMO_REACH * WorldObjectEditing.GIZMO_REACH
+        WorldObjects.all(level).forEach { target ->
+            if (target.distanceToSqr(camera) > reach) return@forEach
+            val entryId = GizmoEntryId(target.uuid, ROOT_COMPONENT_ID)
+            val entry = entries.getOrPut(entryId) { GizmoEntry(entryId) }
+            entry.hostEntityUuid = target.uuid
+            entry.entityId = target.id
+            entry.worldObject = target
+            entry.target = TransformGizmoTarget(TransformGizmoTargetType.TRANSFORM, "Object", TRANSFORM_ICON)
+            entry.visible = true
+            val dragging = draggingKey == entryId
+            val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, partialTick), 0)
+            val display = displayResolved(entry, resolved, dragging)
+            entry.updateFromResolved(display, WorldObjectEditing.bounds(target, partialTick), dragging)
+            seen += entryId
+        }
+
         val iterator = entries.entries.iterator()
         while (iterator.hasNext()) {
             val (entryId, _) = iterator.next()
@@ -672,6 +714,11 @@ object TransformGizmoEditor {
     }
 
     private fun refreshFromRuntime(entry: GizmoEntry) {
+        entry.worldObject?.let { target ->
+            val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, TickHandler.partialTick), 0)
+            entry.updateFromResolved(resolved, WorldObjectEditing.bounds(target, TickHandler.partialTick), dragging = false)
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
         val nodeSnapshot = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
@@ -734,6 +781,12 @@ object TransformGizmoEditor {
     }
 
     private fun applyFromGizmo(entry: GizmoEntry, values: GizmoTransformValues) {
+        entry.worldObject?.let { target ->
+            if (values == entry.lastAppliedValues) return
+            entry.lastAppliedValues = values
+            WorldObjectEditing.applyGizmo(target, values)
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val worldPosition =
             Vec3(values.translation.x.toDouble(), values.translation.y.toDouble(), values.translation.z.toDouble())
@@ -763,6 +816,12 @@ object TransformGizmoEditor {
 
     private fun resetTransform(entryId: GizmoEntryId) {
         val entry = entries[entryId] ?: return
+        entry.worldObject?.let { target ->
+            WorldObjectEditing.resetRotationAndScale(target)
+            refreshFromRuntime(entry)
+            contextMenuState = null
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
         val node = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
@@ -783,6 +842,10 @@ object TransformGizmoEditor {
 
         var hostEntityUuid: UUID? = null
         var entityId: Int? = null
+
+        /** Set when the entry is a world object itself, which the gizmo moves whole. */
+        var worldObject: WorldObjectEntity? = null
+        var lastAppliedValues: GizmoTransformValues? = null
         var snapshot: Snapshot? = null
         var target: TransformGizmoTarget? = null
         var modelComponent: Model? = null

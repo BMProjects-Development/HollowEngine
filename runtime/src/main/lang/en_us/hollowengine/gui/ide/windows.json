@@ -5,5 +5,6 @@
   "inspector": "Inspector",
   "game_viewport": "Game View",
   "game_viewport.detached": "The game is only shown while this panel is docked",
-  "scene_add_hint": "Right-click to add one."
+  "scene_add_hint": "Right-click to add one.",
+  "scene_search": "Search (Ctrl+F)"
 }

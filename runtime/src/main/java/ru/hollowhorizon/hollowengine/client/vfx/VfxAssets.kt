@@ -34,6 +34,7 @@ object VfxAssets : ResourceManagerReloadListener {
                 }
             }
         VfxScenes.onAssetsReloaded()
+        EntityVfx.onAssetsReloaded()
         VfxShaders.clear()
         VfxModelSurfaces.clear()
     }

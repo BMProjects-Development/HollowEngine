@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.client.ui.Box
 import ru.hollowhorizon.hollowengine.client.ui.Checkbox
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
 import ru.hollowhorizon.hollowengine.client.ui.LocalUiViewport
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.Popup
@@ -35,7 +34,6 @@ import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.textWrap
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
@@ -48,31 +46,10 @@ private const val ExportIcon = "hollowengine:textures/gui/icons/export.svg"
 /** What can be done with the project as a whole, at the right end of the project tree's tab bar. */
 @Composable
 internal fun HollowIdeProjectActions(packaging: HollowIdeProjectPackaging) {
-    Row(
-        tags = listOf("project-actions"),
-        modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
-    ) {
-        ToolbarButton("project-settings-button", SettingsIcon, "$LANG.settings".lang, packaging::openSettings)
-        ToolbarButton("project-import-button", ImportIcon, "$LANG.import".lang, packaging::startImport)
-        ToolbarButton("project-export-button", ExportIcon, "$LANG.export".lang, packaging::openExport)
-    }
-}
-
-@Composable
-private fun ToolbarButton(id: String, icon: String, tooltip: String, onClick: () -> Unit) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOf("project-action"),
-        modifier = Modifier.input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND)
-            .tooltipOnHover(tooltip)
-            .onClick { event ->
-                onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("project-action-icon"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
+    PanelActions {
+        PanelActionButton("project-settings-button", SettingsIcon, "$LANG.settings".lang, onClick = packaging::openSettings)
+        PanelActionButton("project-import-button", ImportIcon, "$LANG.import".lang, onClick = packaging::startImport)
+        PanelActionButton("project-export-button", ExportIcon, "$LANG.export".lang, onClick = packaging::openExport)
     }
 }
 

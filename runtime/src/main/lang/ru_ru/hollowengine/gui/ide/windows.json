@@ -5,5 +5,6 @@
   "inspector": "Инспектор",
   "game_viewport": "Окно игры",
   "game_viewport.detached": "Игра отображается только в прикреплённом режиме",
-  "scene_add_hint": "Нажмите ПКМ, чтобы добавить."
+  "scene_add_hint": "Нажмите ПКМ, чтобы добавить.",
+  "scene_search": "Поиск (Ctrl+F)"
 }

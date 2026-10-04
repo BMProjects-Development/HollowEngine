@@ -97,6 +97,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCam
 import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost
 import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
 import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
+import ru.hollowhorizon.hollowengine.client.editor.WorldObjectContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationOverlay
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxWorldRenderer
 import ru.hollowhorizon.hollowengine.common.ui.hud.HudLayerRegistry
@@ -949,6 +950,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onKeyboardKey(windowPointer: Long, key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
         ClientKeyWaitManager.handleKey(key, action)
         if (HollowIdeOverlay.handleKey(key, scanCode, action, modifiers)) return true
+        if (WorldObjectContextMenu.handleKey(key, scanCode, action, modifiers)) return true
         if (TransformGizmoEditor.handleKey(key, scanCode, action, modifiers)) return true
         if (UiScriptHudHost.handleKey(key, scanCode, action, modifiers)) return true
         return false
@@ -980,7 +982,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         var isGizmoBlocking = false
         if (world != null) {
             WorldInspector.handleMouseMove(world.x, world.y)
-            isGizmoInputCaptured = TransformGizmoEditor.handleMouseMove(world.x, world.y)
+            isGizmoInputCaptured = WorldObjectContextMenu.handleMouseMove(world.x, world.y)
+            isGizmoInputCaptured = isGizmoInputCaptured || TransformGizmoEditor.handleMouseMove(world.x, world.y)
             val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
             isScriptOverlayCaptured = UiScriptHudHost.handleMouseMove(guiX, guiY)
             isGizmoBlocking = TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
@@ -1024,7 +1027,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseButton(x, y, button, action)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
+        return WorldObjectContextMenu.handleMouseButton(world.x, world.y, button, action) ||
+                TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
                 WorldInspector.pickAt(world.x, world.y, button, action) ||
                 UiScriptHudHost.handleMouseButton(guiX, guiY, button, action) ||
                 TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)

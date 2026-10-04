@@ -228,9 +228,10 @@ open class Vec2f(open val x: Float, open val y: Float) {
 
         override fun deserialize(decoder: Decoder): Vec2f {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeFloatElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeFloatElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2f(x, y)
@@ -548,9 +549,10 @@ open class Vec2d(open val x: Double, open val y: Double) {
 
         override fun deserialize(decoder: Decoder): Vec2d {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeDoubleElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeDoubleElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2d(x, y)
@@ -803,9 +805,10 @@ open class Vec2i(open val x: Int, open val y: Int) {
 
         override fun deserialize(decoder: Decoder): Vec2i {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeIntElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeIntElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2i(x, y)

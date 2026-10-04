@@ -202,31 +202,51 @@ private fun <T> UiTreeRow(
         onSelect(item, event)
         event.consume()
     }
+    val width = if (fillRowWidth) 100.percent else UiLength.Auto
+    Box(mode = UiBoxMode.STACK, id = "$id-stack", modifier = Modifier.size(width, TreeRowHeight.px)) {
+        Row(id = "$id-guides", modifier = Modifier.size(UiLength.Auto, TreeRowHeight.px).inputTransparent()) {
+            repeat(item.depth) { level ->
+                val parentLevel = level == item.depth - 1
+                val opensSubtree = item.hasChildren && item.expanded
+                val guide = when {
+                    parentLevel && opensSubtree -> if (continues[level]) "branch" else "last"
+                    parentLevel -> if (continues[level]) "line" else "end"
+                    continues[level] -> "line"
+                    else -> null
+                }
+                Box(tags = listOfNotNull("tree-indent", guide))
+            }
+        }
+        UiTreeRowContent(item, id, width, onToggle, onIconClick, dragAndDrop, Modifier
+            .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
+            .dragSource(dragSource, drag)
+            .then(dropModifier))
+    }
+}
+
+@Composable
+private fun <T> UiTreeRowContent(
+    item: UiTreeItem<T>,
+    id: String,
+    width: UiLength,
+    onToggle: (UiTreeItem<T>) -> Unit,
+    onIconClick: ((UiTreeItem<T>) -> Unit)?,
+    dragAndDrop: UiDragAndDropState?,
+    interaction: Modifier,
+) {
     Row(
         id = id,
         tags = listOfNotNull("tree-item", "selected".takeIf { item.selected },
             if (dragAndDrop?.hoveredTargetId == id) {
                 if (dragAndDrop.canDrop) "drop-target" else "drop-rejected"
             } else null),
-        modifier = Modifier.size(if (fillRowWidth) 100.percent else UiLength.Auto, TreeRowHeight.px)
+        modifier = Modifier.size(width, TreeRowHeight.px)
             .alignItems(vertical = UiAlign.CENTER)
             .input(hoverable = true, clickable = true)
             .cursor(UiCursorShape.HAND)
-            .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
-            .dragSource(dragSource, drag)
-            .then(dropModifier)
+            .then(interaction)
     ) {
-        repeat(item.depth) { level ->
-            val parentLevel = level == item.depth - 1
-            val opensSubtree = item.hasChildren && item.expanded
-            val guide = when {
-                parentLevel && opensSubtree -> if (continues[level]) "branch" else "last"
-                parentLevel -> if (continues[level]) "line" else "end"
-                continues[level] -> "line"
-                else -> null
-            }
-            Box(tags = listOfNotNull("tree-indent", guide))
-        }
+        repeat(item.depth) { Box(tags = listOf("tree-indent-space")) }
         Box(
             tags = if (!item.hasChildren) listOf("tree-expander-empty") else listOf("tree-expander"),
             attributes = mapOf(

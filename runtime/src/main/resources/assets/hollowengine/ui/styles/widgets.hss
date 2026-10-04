@@ -186,6 +186,10 @@
     background: alpha($danger, 0.35);
 }
 
+.tree-indent-space {
+    size: 16px 100%;
+}
+
 .tree-indent {
     size: 16px 100%;
     fill: none;
