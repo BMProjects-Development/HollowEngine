@@ -9,9 +9,11 @@ import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
+import net.minecraft.world.entity.MoverType
 import net.minecraft.world.level.Explosion
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.entity.EntityInLevelCallback
+import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
@@ -150,9 +152,30 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     override fun tick() {
         shownBefore = shown
         if (level().isClientSide) ease()
+        drift()
         followParent()
         if (parent != null) updateWorldCache()
         firstTick = false
+    }
+
+    /**
+     * What is left of a push: a root object whose body lets others move it slides along the ground with the
+     * world in the way, and slows to a stop. The server moves it; both sides let the speed die out, so the
+     * animator, which reads it, stops walking when the object does.
+     */
+    private fun drift() {
+        val motion = deltaMovement
+        if (motion == Vec3.ZERO) return
+        if (motion.horizontalDistanceSqr() < MIN_DRIFT * MIN_DRIFT || parentId != null) {
+            deltaMovement = Vec3.ZERO
+            return
+        }
+        if (!level().isClientSide) {
+            noPhysics = false
+            move(MoverType.SELF, Vec3(motion.x, 0.0, motion.z))
+            noPhysics = true
+        }
+        deltaMovement = Vec3(motion.x * DRIFT_FRICTION, 0.0, motion.z * DRIFT_FRICTION)
     }
 
     /** Moves the drawn pose a step toward the one the server sent, the way living entities ease. */
@@ -325,5 +348,11 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         private const val RENDER_DISTANCE = 160.0
 
         private const val MOVE_EPSILON = 1.0e-8
+
+        /** Share of a push kept from one tick to the next, about what ground friction leaves a walking mob. */
+        private const val DRIFT_FRICTION = 0.6
+
+        /** Blocks per tick below which a sliding object counts as stopped. */
+        private const val MIN_DRIFT = 0.003
     }
 }

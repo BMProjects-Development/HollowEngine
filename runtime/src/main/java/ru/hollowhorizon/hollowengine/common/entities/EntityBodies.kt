@@ -17,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.colliders.ColliderContacts
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.SolidColliders
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import kotlin.math.abs
@@ -47,14 +48,15 @@ object EntityBodies {
     /** A blocking body stops others with its box, unless it has colliders that act on bodies: then they are its shape. */
     fun isSolid(entity: Entity, vanilla: Boolean): Boolean =
         vanilla || entity.bodyComponent?.mode == BodyMode.BLOCKING && entity.isAlive && !hasPhysicalColliders(entity)
-
+    
     /**
-     * Whether others may move [entity], by walking into it or by their colliders: its body says, and without
-     * one an entity with colliders that act on bodies can be moved and any other as far as vanilla pushes it.
+     * Whether pushes move [entity]. Without a body, mobs are moved like vanilla ones and anything with
+     * colliders that act on bodies too; a world object stays where it was placed.
      */
     fun isMovedByOthers(entity: Entity): Boolean {
         if (!entity.isAlive || entity.isSpectator) return false
-        val body = entity.bodyComponent ?: return hasPhysicalColliders(entity) || entity.isPushable
+        val body = entity.bodyComponent
+            ?: return entity !is WorldObjectEntity && (hasPhysicalColliders(entity) || entity.isPushable)
         return body.isMovedByOthers
     }
 
