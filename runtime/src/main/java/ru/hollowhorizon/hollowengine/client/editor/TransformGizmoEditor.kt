@@ -24,6 +24,7 @@ import ru.hollowhorizon.hollowengine.client.render.worldTransformToComponent
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeModifierMask
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeWorldPoint
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiShadow
@@ -60,6 +61,9 @@ object TransformGizmoEditor {
     private var hoveredKey: GizmoEntryId? = null
     private var draggingKey: GizmoEntryId? = null
     private var activeKey: GizmoEntryId? = null
+
+    /** The entry of the part the scene window last selected, which the gizmo takes up on its own. */
+    private var selectedPartKey: GizmoEntryId? = null
     private var hoveredHandleId: GizmoHandleId? = null
     private var draggingHandleId: GizmoHandleId? = null
     private var currentDrag: GizmoDrag? = null
@@ -301,6 +305,7 @@ object TransformGizmoEditor {
         val working = entry.working ?: return false
         val (x, y) = pointerLogical(lastPhysX, lastPhysY)
         keyboard = GizmoKeyboardTransform(mode, working, x, y, WorldToScreenProjector, GizmoGeometry.World, GizmoManipulator.World)
+        beginEdit(entry)
         keyboardHint = KeyboardHintState(x, y, keyboard?.hint.orEmpty())
         draggingKey = entry.entryId
         contextMenuState = null
@@ -359,6 +364,7 @@ object TransformGizmoEditor {
             when (button) {
                 GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
                     currentDrag = GizmoManipulator.World.begin(handle, entry.working ?: return false, x, y)
+                    beginEdit(entry)
                     draggingKey = entry.entryId
                     draggingHandleId = handle.id
                     contextMenuState = null
@@ -408,8 +414,15 @@ object TransformGizmoEditor {
         return true
     }
 
+    /** A drag or a keyboard transform of [entry] starts: whatever it ends up doing goes back in one step. */
+    private fun beginEdit(entry: GizmoEntry) {
+        entry.part?.editing?.beginGesture()
+        entry.worldObject?.let(WorldObjectHistory::beginGizmo)
+    }
+
     /** A drag or a keyboard transform of [entry] is over: what shows it reads it again. */
     private fun finishEdit(entry: GizmoEntry) {
+        entry.part?.editing?.endGesture()
         refreshFromRuntime(entry)
         entry.worldObject?.let(WorldObjectEditing::finishGizmo)
     }
@@ -699,6 +712,24 @@ object TransformGizmoEditor {
             seen += entryId
         }
 
+        WorldObjectParts.selectedPart()?.let { part ->
+            val entryId = GizmoEntryId(part.entity.uuid, UUID.nameUUIDFromBytes(part.key.encodeToByteArray()))
+            val entry = entries.getOrPut(entryId) { GizmoEntry(entryId) }
+            entry.hostEntityUuid = part.entity.uuid
+            entry.entityId = null
+            entry.part = part
+            entry.target = TransformGizmoTarget(TransformGizmoTargetType.TRANSFORM, part.label, TRANSFORM_ICON)
+            entry.visible = true
+            val dragging = draggingKey == entryId
+            val display = displayResolved(entry, ResolvedNodeTransform(part.worldTransform(partialTick), 0), dragging)
+            entry.updateFromResolved(display, buildGenericBounds(display.transform), dragging)
+            if (selectedPartKey != entryId) {
+                selectedPartKey = entryId
+                activeKey = entryId
+            }
+            seen += entryId
+        } ?: run { selectedPartKey = null }
+
         val iterator = entries.entries.iterator()
         while (iterator.hasNext()) {
             val (entryId, _) = iterator.next()
@@ -714,6 +745,11 @@ object TransformGizmoEditor {
     }
 
     private fun refreshFromRuntime(entry: GizmoEntry) {
+        entry.part?.let { part ->
+            val resolved = ResolvedNodeTransform(part.worldTransform(TickHandler.partialTick), 0)
+            entry.updateFromResolved(resolved, buildGenericBounds(resolved.transform), dragging = false)
+            return
+        }
         entry.worldObject?.let { target ->
             val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, TickHandler.partialTick), 0)
             entry.updateFromResolved(resolved, WorldObjectEditing.bounds(target, TickHandler.partialTick), dragging = false)
@@ -781,6 +817,12 @@ object TransformGizmoEditor {
     }
 
     private fun applyFromGizmo(entry: GizmoEntry, values: GizmoTransformValues) {
+        entry.part?.let { part ->
+            if (values == entry.lastAppliedValues) return
+            entry.lastAppliedValues = values
+            part.apply(values, TickHandler.partialTick)
+            return
+        }
         entry.worldObject?.let { target ->
             if (values == entry.lastAppliedValues) return
             entry.lastAppliedValues = values
@@ -845,6 +887,9 @@ object TransformGizmoEditor {
 
         /** Set when the entry is a world object itself, which the gizmo moves whole. */
         var worldObject: WorldObjectEntity? = null
+
+        /** Set when the entry is a part of a model selected in the scene window: a bone, or something placed on one. */
+        var part: PartGizmo? = null
         var lastAppliedValues: GizmoTransformValues? = null
         var snapshot: Snapshot? = null
         var target: TransformGizmoTarget? = null

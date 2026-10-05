@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import androidx.compose.runtime.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -19,6 +18,9 @@ import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.models.RigPose
+import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
+import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 
 
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"
@@ -32,7 +34,7 @@ private const val ModelIcon = "hollowengine:textures/gui/icons/files/rig.svg"
  * somewhere else entirely and knows nothing about this rig.
  */
 internal fun rigInspectorTarget(
-    document: HollowIdeRigDocument,
+    document: RigEditing,
     state: RigEditorState,
     bones: List<String>,
 ): InspectorTarget {
@@ -51,7 +53,12 @@ internal fun rigInspectorTarget(
 }
 
 @Composable
-private fun HolderFields(document: HollowIdeRigDocument, bone: String?, selectedCollider: String?) {
+internal fun HolderFields(
+    document: RigEditing,
+    bone: String?,
+    selectedCollider: String?,
+    kinds: List<RigAttachmentType<*>> = attachableKinds(bone),
+) {
     val current = document.rig.holder(bone)
 
     Column(tags = listOf("insp-body")) {
@@ -65,6 +72,9 @@ private fun HolderFields(document: HollowIdeRigDocument, bone: String?, selected
                     document.edit { it.withBone(bone, current.copy(hidden = hidden)) }
                 }
             }
+            PoseFields(document, bone, current)
+            val model = LocalRigModelInfo.current
+            if (bone in model.meshBones) MeshMaterialFields(document, bone, current, model.materials)
         } else if (current.attachments.isEmpty()) {
             Hint(rigText("model_hint"))
         }
@@ -73,13 +83,30 @@ private fun HolderFields(document: HollowIdeRigDocument, bone: String?, selected
             key(attachment.id) { AttachmentSection(document, bone, current, attachment, attachment.id == selectedCollider) }
         }
 
-        AddAttachment(document, bone, current)
+        AddAttachment(document, bone, current, kinds)
+    }
+}
+
+/** Where the bone is moved over its animation; rotation is shown in degrees. */
+@Composable
+private fun PoseFields(document: RigEditing, bone: String, current: RigBone) {
+    val pose = current.pose ?: RigPose.IDENTITY
+    val path = "/$bone/pose"
+    fun write(next: RigPose) = document.edit(mergeKey = path) { it.withBone(bone, current.copy(pose = next.takeUnless(RigPose::isIdentity))) }
+
+    Section(rigText("section_pose")) {
+        Vec3Row(rigText("pose_position"), pose.position, "$path/position") { write(pose.copy(position = it)) }
+        Vec3Row(rigText("pose_rotation"), pose.rotation.eulerDegreesXyz(), "$path/rotation") { degrees ->
+            write(pose.copy(rotation = eulerRotationXyz(degrees)))
+        }
+        Vec3Row(rigText("pose_scale"), pose.scale, "$path/scale") { write(pose.copy(scale = it)) }
+        if (!pose.isIdentity) InspectorButton(rigText("pose_reset")) { write(RigPose.IDENTITY) }
     }
 }
 
 @Composable
 private fun AttachmentSection(
-    document: HollowIdeRigDocument,
+    document: RigEditing,
     bone: String?,
     current: RigBone,
     attachment: RigAttachmentSpec,
@@ -116,7 +143,7 @@ private fun AttachmentFields(
     @Suppress("UNCHECKED_CAST") val serializer = type.serializer as KSerializer<RigAttachmentSpec>
     val encoded = remember(attachment) {
         runCatching {
-            AttachmentJson.encodeToJsonElement(
+            ComponentJson.format.encodeToJsonElement(
                 serializer,
                 attachment
             ) as JsonObject
@@ -129,16 +156,15 @@ private fun AttachmentFields(
         value = encoded,
         path = path,
     ) { updated ->
-        runCatching { AttachmentJson.decodeFromJsonElement(serializer, updated) }.onSuccess(onChange)
+        runCatching { ComponentJson.format.decodeFromJsonElement(serializer, updated) }.onSuccess(onChange)
             .onFailure { HollowEngine.LOGGER.warn("Could not apply an edit to '{}': {}", type.id, it.message) }
     }
 }
 
 @Composable
-private fun AddAttachment(document: HollowIdeRigDocument, bone: String?, current: RigBone) {
+private fun AddAttachment(document: RigEditing, bone: String?, current: RigBone, kinds: List<RigAttachmentType<*>>) {
     var open by remember(bone) { mutableStateOf(false) }
     var anchor by remember(bone) { mutableStateOf(UiRect.Zero) }
-    val kinds = attachableKinds(bone)
     if (kinds.isEmpty()) return
 
     InspectorButton(
@@ -156,7 +182,7 @@ private fun AddAttachment(document: HollowIdeRigDocument, bone: String?, current
         items = kinds.map { type ->
             val create = requireNotNull(type.createDefault)
             UiDropdownItem(type.title()) {
-                document.edit { it.withHolder(bone, current.withAttachment(create(freeAttachmentId(it, bone, type)))) }
+                document.edit { it.withHolder(bone, current.withAttachment(create(freeAttachmentId(document.occupied, bone, type)))) }
             }
         },
         onExpandedChange = { if (!it) open = false },
@@ -191,7 +217,3 @@ internal fun RigAttachmentType<*>?.title(): String {
     return if (translated == titleKey) id.substringAfterLast('/') else translated
 }
 
-private val AttachmentJson = Json {
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-}

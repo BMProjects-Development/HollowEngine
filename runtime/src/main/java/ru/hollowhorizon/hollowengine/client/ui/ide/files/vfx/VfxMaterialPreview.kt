@@ -22,7 +22,7 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
  * The material being edited on its own, turning slowly in an empty view.
  */
 @Composable
-internal fun VfxMaterialPreview(state: VfxEditorState, surface: VfxSurfaceSpec) {
+internal fun VfxMaterialPreview(state: VfxInspectorState, surface: VfxSurfaceSpec) {
     val preview = state.materialPreview
     val effect = remember(surface) { VfxEffect(nodes = listOf(previewNode(surface))) }
     val current by rememberUpdatedState(effect)

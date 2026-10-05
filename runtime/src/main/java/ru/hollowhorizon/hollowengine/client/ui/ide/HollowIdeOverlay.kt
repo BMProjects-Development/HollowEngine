@@ -7,6 +7,8 @@ import net.minecraft.client.gui.screens.ChatScreen
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
+import ru.hollowhorizon.hollowengine.client.editor.EditorMode
+import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
@@ -457,9 +459,18 @@ object HollowIdeOverlay {
         }
         if (action == GLFW.GLFW_PRESS || action == GLFW.GLFW_REPEAT) {
             pipeline.await()
-            surface.runtime.keyPressed(key, scanCode, modifiers, repeat = action == GLFW.GLFW_REPEAT)
+            val taken = surface.runtime.keyPressed(key, scanCode, modifiers, repeat = action == GLFW.GLFW_REPEAT)
+            if (!taken && action == GLFW.GLFW_PRESS) worldKey(key, modifiers)
         }
         return true
+    }
+
+    /**
+     * A key nothing in the editor took. While the scene window shows the world, undo and redo go to the world's
+     * history, wherever the focus was left: on the inspector, a toolbar, or nowhere.
+     */
+    private fun worldKey(key: Int, modifiers: Int) {
+        if (IdeScenes.current == null && EditorMode.isAvailable()) WorldHistory.handleKey(key, modifiers)
     }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean {

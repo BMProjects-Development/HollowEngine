@@ -15,7 +15,7 @@ import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseTracks
 import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.PosedHost
-import ru.hollowhorizon.hollowengine.common.colliders.hasColliders
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
 /**
  * The colliders that act on bodies, posed tick by tick on this client the way the server poses them.
@@ -58,16 +58,16 @@ object ClientColliderTickPoses {
 
     /** Made again whenever the rig, the model or its animator are replaced, as after a reload or a save. */
     private fun assetsOf(model: String): ColliderPoseAssets? {
+        if (model.isBlank()) return EmptyModel
         val location = ResourceLocation.tryParse(model) ?: return null
         val rig = RigAssets.of(location)
-        if (!rig.hasColliders()) {
-            assets.remove(model)
-            return null
-        }
         val loaded = HollowModelManager.getOrCreate(location).value.takeIf { it !== Model.EMPTY } ?: return null
         val animator = HollowModelManager.animatorOf(location)
         val cached = assets[model]
         if (cached != null && cached.rig === rig && cached.model === loaded && cached.animator === animator) return cached
         return ColliderPoseAssets(rig, animator, loaded).also { assets[model] = it }
     }
+
+    /** A blank model has no skeleton: only what hangs on the model itself has a place. */
+    private val EmptyModel = ColliderPoseAssets(ModelRig.EMPTY, null, Model.EMPTY)
 }

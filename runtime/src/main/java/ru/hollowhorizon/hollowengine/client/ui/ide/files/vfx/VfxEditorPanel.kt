@@ -158,7 +158,7 @@ private fun Toolbar(state: VfxEditorState) {
 }
 
 /** What editor is looking at, as opposed to what it is editing. */
-internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
+internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxInspectorState(), VfxNodeSelection {
     val preview = VfxPreviewState()
     val session = VfxTimelineSession(document, preview).also { it.timeline.isPlaying = true }
 
@@ -177,16 +177,10 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
         session.timeline.commitHistoryTransaction()
     }
 
-    var selected by mutableStateOf<String?>(null)
+    override var selected by mutableStateOf<String?>(null)
         private set
     val expanded = mutableStateListOf<String>()
     var rootExpanded by mutableStateOf(true)
-
-    /** Which inspector sections are open, kept here so they survive switching between nodes. */
-    private val sections = mutableStateMapOf<String, Boolean>()
-
-    /** The material of the selected surface on its own, in the material section of the inspector. */
-    val materialPreview = materialPreviewState()
 
     /** The shape handle being dragged, with node as it was when drag started. */
     var drag: VfxGizmoHandle? = null
@@ -205,13 +199,7 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
     /** What dragged handle is set to right now, drawn beside it. */
     var readout by mutableStateOf<VfxGizmoReadout?>(null)
 
-    fun isSectionOpen(key: String): Boolean = sections[key] ?: false
-
-    fun toggleSection(key: String) {
-        sections[key] = !isSectionOpen(key)
-    }
-
-    fun select(id: String?) {
+    override fun select(id: String?) {
         if (keyboard != null) {
             keyboard = null
             endGesture()
@@ -219,6 +207,10 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
         selected = id
         id?.let(session::touch)
         session.timeline.clearSelection()
+    }
+
+    override fun reveal(parent: String?) {
+        if (parent == null) rootExpanded = true else if (parent !in expanded) expanded.add(parent)
     }
 
     fun focusProperty(nodeId: String, property: VfxProperty) = session.focus(nodeId, property)

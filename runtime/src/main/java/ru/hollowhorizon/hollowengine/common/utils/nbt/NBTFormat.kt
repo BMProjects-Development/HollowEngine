@@ -23,6 +23,8 @@ import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize
+import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
+import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -46,6 +48,8 @@ internal val TagModule
         AnimatorLayerTypes.registerInto(this)
         AnimatorStateTypes.registerInto(this)
         RigAttachmentTypes.registerInto(this)
+        VfxNodeTypes.registerInto(this)
+        VfxModuleTypes.registerInto(this)
 
         polymorphic(Tag::class) {
             subclass(ByteTag::class, ForByteNBT)

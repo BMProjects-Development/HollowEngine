@@ -4,10 +4,12 @@ import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.ModelAnimator
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import java.util.UUID
 
 /**
@@ -17,6 +19,8 @@ class ModelInstance(val attachment: ModelAttachment) {
     val animator = ModelAnimator()
     private var posedFrame = Long.MIN_VALUE
     private var materials: MaterialsComponent? = null
+    private var instanceRig: ModelRig? = null
+    private var assetRig: ModelRig? = null
 
     init {
         // A reloaded model may bring new materials
@@ -24,15 +28,26 @@ class ModelInstance(val attachment: ModelAttachment) {
     }
 
     /**
-     * Sets what this instance plays and what it wears.
+     * Sets what this instance plays, what it wears and what this entity hangs on it over the model's own rig.
      */
-    fun configure(animations: AnimationsComponent?, materials: MaterialsComponent?) {
+    fun configure(animations: AnimationsComponent?, materials: MaterialsComponent?, rig: ModelRig = ModelRig.EMPTY) {
         animator.configure(HollowModelManager.animatorOf(attachment.location), animations)
+        rig(rig)
         if (this.materials == materials) return
 
         this.materials = materials
         dress()
     }
+
+    /** Lays [instance] over the model's rig, again only when either of them changed. */
+    private fun rig(instance: ModelRig) {
+        val asset = RigAssets.of(attachment.location)
+        if (instance === instanceRig && asset === assetRig) return
+        instanceRig = instance
+        assetRig = asset
+        attachment.rig = asset.overlay(instance)
+    }
+
 
     /**
      * Advances the animation and leaves the nodes ready to draw, once per frame.
@@ -43,6 +58,7 @@ class ModelInstance(val attachment: ModelAttachment) {
 
         attachment.beginPose()
         animator.applyTo(attachment, context)
+        applyRigPose(attachment.nodes, attachment.rig)
         attachment.endPose()
     }
 

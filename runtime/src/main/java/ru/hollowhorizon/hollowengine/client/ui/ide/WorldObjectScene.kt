@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.Level
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
 import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
 import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.client.editor.WorldToScreenProjector
@@ -14,7 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelOrNull
-import ru.hollowhorizon.hollowengine.common.attachments.components.vfxComponent
+import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectFavorite
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
@@ -31,6 +32,7 @@ private data class WorldObjectRow(
     val parent: UUID?,
     val label: String,
     val icon: String,
+    val parts: ObjectParts?,
     /** Whether the object itself falls within the chosen [WorldSceneScope]. */
     val inScope: Boolean,
 )
@@ -65,7 +67,9 @@ internal object WorldObjectScene {
 
     /** Rebuilt on the game thread after a change, read by the scene window's composition. */
     private var rows by mutableStateOf<List<WorldObjectRow>>(emptyList())
+    /** The world and favorites rows start open and are closed by hand; every other row starts closed. */
     private val collapsed = mutableStateListOf<String>()
+    private val expanded = mutableStateListOf<String>()
     private var dirty = true
     private var ticksToScope = 0
 
@@ -96,16 +100,20 @@ internal object WorldObjectScene {
         val updated = level?.let(WorldObjects::all).orEmpty().map(::rowOf)
             .sortedWith(compareBy({ it.label.lowercase() }, { it.entityId }))
         if (updated != rows) rows = updated
+
     }
 
     private fun rowOf(entity: WorldObjectEntity): WorldObjectRow {
         val model = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelOrNull()
         val icon = when {
-            model != null -> MODEL_ICON
-            entity.vfxComponent != null -> EFFECT_ICON
+            model == null -> WorldObjectEditing.EMPTY_ICON
+            !model.isEmpty -> MODEL_ICON
+            model.rig.allAttachments().any { it.second is VfxBoneAttachmentSpec } -> EFFECT_ICON
             else -> WorldObjectEditing.EMPTY_ICON
         }
-        return WorldObjectRow(entity.id, entity.uuid, entity.parentId, entity.name.string, icon, inScope(entity))
+        val parts = if (entity.uuid.toString() in expanded) WorldObjectParts.of(entity) else null
+        if (parts?.loading == true) dirty = true
+        return WorldObjectRow(entity.id, entity.uuid, entity.parentId, entity.name.string, icon, parts, inScope(entity))
     }
 
     private fun inScope(entity: WorldObjectEntity): Boolean {
@@ -141,7 +149,7 @@ internal object WorldObjectScene {
             id = SCENE_ID,
             items = tree(withAncestors(all.filter { it.inScope }, byId), favorites, byId, selected, expandAll = false),
             onSelect = ::select,
-            onToggle = { id -> if (!collapsed.remove(id)) collapsed += id },
+            onToggle = ::toggle,
             hint = "$LANG.empty".lang.takeIf { all.isEmpty() },
             menu = { id -> menu(id, byId) },
             onKey = ::handleKey,
@@ -177,7 +185,7 @@ internal object WorldObjectScene {
         expandAll: Boolean,
     ): List<UiTreeItem<Any?>> {
         val items = ArrayList<UiTreeItem<Any?>>()
-        fun open(id: String) = expandAll || id !in collapsed
+        fun open(id: String) = expandAll || if (id == ROOT || id == FAVORITES) id !in collapsed else id in expanded
 
         if (favorites.isNotEmpty()) {
             items += UiTreeItem(
@@ -224,11 +232,13 @@ internal object WorldObjectScene {
                     depth = depth,
                     payload = row.entityId,
                     icon = row.icon,
-                    hasChildren = !children[row.uuid].isNullOrEmpty(),
+                    hasChildren = true,
                     expanded = open(id),
-                    selected = row.entityId == selected,
+                    selected = row.entityId == selected && WorldObjectParts.selected == null,
                 )
-                if (open(id)) addChildren(row.uuid, depth + 1)
+                if (!open(id)) return@forEach
+                row.parts?.let { parts -> WorldObjectParts.appendRows(items, row.uuid, row.entityId, parts, depth + 1, ::open) }
+                addChildren(row.uuid, depth + 1)
             }
         }
         if (open(ROOT)) addChildren(null, 1)
@@ -254,12 +264,47 @@ internal object WorldObjectScene {
         )
     }
 
+    /** Opens or closes [id]; an object's parts are read only while it is open, so opening one looks them up. */
+    private fun toggle(id: String) {
+        val list = if (id == ROOT || id == FAVORITES) collapsed else expanded
+        if (!list.remove(id)) list += id
+        dirty = true
+    }
+
     private fun select(id: String?) {
+        partOf(id)?.let { (ref, parts) ->
+            WorldObjectParts.select(ref, parts)
+            return
+        }
+        WorldObjectParts.clear()
         val target = id?.let(::objectOf)
-        if (target != null) WorldObjectEditing.select(target.id) else WorldInspector.close()
+        if (target == null) {
+            WorldInspector.close()
+            return
+        }
+        if (WorldInspector.holds(target.id)) WorldInspector.reveal()
+        WorldObjectEditing.select(target.id)
+    }
+
+    /** The parts of the object with [uuid], as last read; null while its row is closed. */
+    fun partsOf(uuid: UUID): ObjectParts? = rows.firstOrNull { it.uuid == uuid }?.parts
+
+    /** Opens the row [id], so what was just put under it shows. */
+    fun expand(id: String) {
+        if (id in expanded) return
+        expanded += id
+        dirty = true
+    }
+
+    /** The part a row stands for, with the parts of its object as last read. */
+    private fun partOf(id: String?): Pair<PartRef, ObjectParts>? {
+        val (uuid, path) = id?.let(WorldObjectParts::parse) ?: return null
+        val row = rows.firstOrNull { it.uuid == uuid } ?: return null
+        return PartRef(row.entityId, uuid, path) to (row.parts ?: return null)
     }
 
     private fun menu(id: String?, byId: Map<UUID, WorldObjectRow>): List<UiDropdownItem> {
+        partOf(id)?.let { (ref, parts) -> return WorldObjectParts.menu(ref, parts) }
         if (id == null || id == ROOT) {
             return listOf(
                 UiDropdownItem(
@@ -284,6 +329,8 @@ internal object WorldObjectScene {
 
     private fun handleKey(input: UiKeyInput): Boolean {
         if (input.repeat) return false
+        if (WorldHistory.handleKey(input.key, input.modifiers)) return true
+        if (WorldObjectParts.handleKey(input.key, input.modifiers) { uuid -> rows.firstOrNull { it.uuid == uuid }?.parts }) return true
         if (input.key == GLFW.GLFW_KEY_DELETE || input.key == GLFW.GLFW_KEY_D && input.command) {
             return WorldObjectEditing.handleShortcut(input.key, input.modifiers)
         }

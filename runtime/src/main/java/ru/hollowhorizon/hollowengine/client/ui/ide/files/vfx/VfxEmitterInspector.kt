@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
 import ru.hollowhorizon.hollowengine.common.vfx.VfxDirectionMode
@@ -23,8 +22,8 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxSubEmission
  */
 @Composable
 internal fun EmitterFields(
-    document: HollowIdeVfxDocument,
-    state: VfxEditorState,
+    document: VfxEditing,
+    state: VfxInspectorState,
     emitter: VfxEmitterSpec,
     underEmitter: Boolean,
 ) {
@@ -116,7 +115,7 @@ internal fun EmitterFields(
 
 /** Whether and when the emitter spawns from the particles of the emitter it sits under. */
 @Composable
-private fun SubEmissionFields(document: HollowIdeVfxDocument, state: VfxEditorState, emitter: VfxEmitterSpec) {
+private fun SubEmissionFields(document: VfxEditing, state: VfxInspectorState, emitter: VfxEmitterSpec) {
     val sub = emitter.subEmission
     fun update(next: VfxSubEmission) = document.replace(emitter.copy(subEmission = next))
 
@@ -139,7 +138,7 @@ private fun SubEmissionFields(document: HollowIdeVfxDocument, state: VfxEditorSt
 
 /** The shape shows only what chosen kind reads. */
 @Composable
-private fun ShapeFields(document: HollowIdeVfxDocument, state: VfxEditorState, emitter: VfxEmitterSpec) {
+private fun ShapeFields(document: VfxEditing, state: VfxInspectorState, emitter: VfxEmitterSpec) {
     val shape = emitter.shape
     fun update(next: VfxShape) = document.replace(emitter.copy(shape = next))
 

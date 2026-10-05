@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.client.ui.Box
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
@@ -39,7 +38,7 @@ import kotlin.reflect.KClass
  * The modules of an emitter, one folding section each, and a menu of what can still be added.
  */
 @Composable
-internal fun VfxModuleSections(document: HollowIdeVfxDocument, state: VfxEditorState, emitter: VfxEmitterSpec) {
+internal fun VfxModuleSections(document: VfxEditing, state: VfxInspectorState, emitter: VfxEmitterSpec) {
     emitter.modules.forEachIndexed { index, module ->
         val type = VfxModuleTypes.of(module)
         val name = type?.titleKey?.lang ?: module.id
@@ -71,7 +70,7 @@ internal fun VfxModuleSections(document: HollowIdeVfxDocument, state: VfxEditorS
 }
 
 @Composable
-private fun AddModuleButton(document: HollowIdeVfxDocument, emitter: VfxEmitterSpec) {
+private fun AddModuleButton(document: VfxEditing, emitter: VfxEmitterSpec) {
     val addable = VfxModuleTypes.forEmitter(emitter)
         .filter { it.createDefault != null }
         .filter { type -> type.repeatable || emitter.modules.none { type.specClass.isInstance(it) } }
@@ -110,7 +109,7 @@ private fun moduleIcon(kind: KClass<out VfxModuleSpec>): String = when (kind) {
 
 @Composable
 private fun ModuleFields(
-    document: HollowIdeVfxDocument,
+    document: VfxEditing,
     emitter: VfxEmitterSpec,
     index: Int,
     module: VfxModuleSpec,
@@ -207,18 +206,18 @@ private fun ModuleFields(
     }
 }
 
-private fun HollowIdeVfxDocument.replaceModule(emitter: VfxEmitterSpec, index: Int, module: VfxModuleSpec) {
+private fun VfxEditing.replaceModule(emitter: VfxEmitterSpec, index: Int, module: VfxModuleSpec) {
     val modules = emitter.modules.toMutableList()
     if (index !in modules.indices) return
     modules[index] = module
     edit(mergeKey = "node:${emitter.id}") { it.withNode(emitter.copy(modules = modules)) }
 }
 
-private fun HollowIdeVfxDocument.removeModule(emitter: VfxEmitterSpec, index: Int) {
+private fun VfxEditing.removeModule(emitter: VfxEmitterSpec, index: Int) {
     val modules = emitter.modules.filterIndexed { at, _ -> at != index }
     edit(mergeKey = "node:${emitter.id}") { it.withNode(emitter.copy(modules = modules)) }
 }
 
-private fun HollowIdeVfxDocument.addModule(emitter: VfxEmitterSpec, module: VfxModuleSpec) {
+private fun VfxEditing.addModule(emitter: VfxEmitterSpec, module: VfxModuleSpec) {
     edit { it.withNode(emitter.copy(modules = emitter.modules + module)) }
 }

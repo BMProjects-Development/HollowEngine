@@ -88,9 +88,16 @@ object WorldObjectEditing {
         RemoveWorldObjectsPacket(objects.map { it.id }).send()
     }
 
-    fun setParent(target: WorldObjectEntity, parent: WorldObjectEntity?) {
-        if (parent != null && (parent === target || parent.isDescendantOf(target))) return
+    fun setParent(target: WorldObjectEntity, parent: WorldObjectEntity?) = WorldObjectHistory.reparent(target, parent)
+
+    /** Asks the server to put the object [entityId] under [parentId]; false when either is gone or it would make a loop. */
+    internal fun sendParent(entityId: Int, parentId: Int?): Boolean {
+        val level = Minecraft.getInstance().level ?: return false
+        val target = level.getEntity(entityId) as? WorldObjectEntity ?: return false
+        val parent = parentId?.let { level.getEntity(it) as? WorldObjectEntity ?: return false }
+        if (parent != null && (parent === target || parent.isDescendantOf(target))) return false
         WorldObjectParentPacket(target.id, parent?.id).send()
+        return true
     }
 
     /** Puts the object into the inspector and under the gizmo. */
@@ -223,16 +230,23 @@ object WorldObjectEditing {
 
     /** Clears the object's own rotation and scale, keeping where it stands under its parent. */
     internal fun resetRotationAndScale(target: WorldObjectEntity) {
+        val before = WorldObjectHistory.capture(target)
         val local = ObjectPose(target.localPose.position, Quaternionf(), Vector3f(1f))
         place(target, target.parent?.pose(1f)?.compose(local) ?: local)
+        WorldObjectHistory.recordPose(target, before)
     }
 
-    /** The gizmo let go of the object: the inspector, if it shows it, is out of date now. */
+    /** The gizmo let go of the object: one step back in the history, and the inspector, if it shows it, is out of date now. */
     internal fun finishGizmo(target: WorldObjectEntity) {
+        WorldObjectHistory.finishGizmo(target)
+        refreshInspector(target)
+    }
+
+    internal fun refreshInspector(target: WorldObjectEntity) {
         if (WorldInspector.holds(target.id)) EntityEditorClient.request(target, EntityEditorClient.Destination.INSPECTOR)
     }
 
-    private fun place(target: WorldObjectEntity, world: ObjectPose) {
+    internal fun place(target: WorldObjectEntity, world: ObjectPose) {
         target.setWorldPose(world, snap = true)
         WorldObjectPosePacket(target.id, world).send()
     }

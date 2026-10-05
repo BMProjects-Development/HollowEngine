@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeRuntime
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
@@ -9,7 +8,7 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
  * What the timeline holds for the properties of [nodeId], as the preview plays it.
  */
 internal fun vfxDrivenLookup(
-    document: HollowIdeVfxDocument,
+    document: VfxEditing,
     state: VfxEditorState,
     nodeId: String,
 ): (VfxProperty) -> VfxDrivenValue? = lookup@{ property ->

@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.common.utils.rl
 class RigAttachmentContext(
     val node: RuntimeNode,
     val entity: () -> LivingEntity?,
+    val owner: ModelAttachment? = null,
 )
 
 /**
@@ -22,6 +23,16 @@ class RigAttachmentContext(
  */
 fun interface RigAttachmentFactory {
     fun create(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment?
+}
+
+/**
+ * An attachment that takes a changed spec while it keeps running, as long as [RigAttachmentSpec.structure]
+ * stays the same; the model it hangs on is then not built again.
+ */
+interface RespecAttachment {
+    val spec: RigAttachmentSpec
+
+    fun respec(spec: RigAttachmentSpec)
 }
 
 object RigAttachmentFactories {

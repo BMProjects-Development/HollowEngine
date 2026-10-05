@@ -21,25 +21,32 @@ class DocumentHistory<T : Any>(private val limit: Int = DEFAULT_LIMIT) {
     var canRedo by mutableStateOf(false)
         private set
 
-    /** Called with the document as it is, right before an edit replaces it. */
-    fun beforeEdit(current: T, mergeKey: String? = null) {
-        if (gestureStart != null) return
+    /**
+     * Called with the document as it is, right before an edit replaces it. True when the edit starts a step of
+     * its own, rather than joining the gesture under way or the edit before it.
+     */
+    fun beforeEdit(current: T, mergeKey: String? = null): Boolean {
+        if (gestureStart != null) return false
         val now = System.nanoTime()
         val merges = mergeKey != null && mergeKey == lastMergeKey && now - lastEditNanos < MERGE_WINDOW_NANOS
         if (!merges) remember(current)
         lastMergeKey = mergeKey
         lastEditNanos = now
+        return !merges
     }
 
     fun beginGesture(current: T) {
         if (gestureStart == null) gestureStart = current
     }
 
-    fun endGesture(current: T) {
-        val start = gestureStart ?: return
+    /** True when the gesture changed the document, and so became a step. */
+    fun endGesture(current: T): Boolean {
+        val start = gestureStart ?: return false
         gestureStart = null
         lastMergeKey = null
-        if (start != current) remember(start)
+        if (start == current) return false
+        remember(start)
+        return true
     }
 
     /** What to go back to from [current], or null when there is nothing. */

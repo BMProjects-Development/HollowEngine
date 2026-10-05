@@ -8,6 +8,9 @@ import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiWorldOverlay
 import ru.hollowhorizon.hollowengine.client.ui.UiPopupAlignment
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectScene
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.MinecraftHssResourceLoader
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
@@ -74,7 +77,10 @@ object WorldObjectContextMenu {
         return true
     }
 
-    /** Escape closes the menu; with it closed, Delete and Ctrl+D act on the selected object. */
+    /**
+     * Escape closes the menu. With it closed, undo and redo go to the world's history, and Delete and Ctrl+D act
+     * on the selected part or object - in the world with the chat open, and in the game panel of the editor.
+     */
     fun handleKey(key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
         if (opened != null) {
             if (key == GLFW.GLFW_KEY_ESCAPE && action == GLFW.GLFW_PRESS) {
@@ -83,8 +89,10 @@ object WorldObjectContextMenu {
             }
             return overlay.handleKey(key, scanCode, action, modifiers)
         }
-        if (action != GLFW.GLFW_PRESS || Minecraft.getInstance().screen == null) return false
-        if (!EditorMode.isAvailable()) return false
+        if (action != GLFW.GLFW_PRESS || !EditorMode.isAvailable()) return false
+        if (Minecraft.getInstance().screen == null && !HollowIdeOverlay.isGameViewportActive) return false
+        if (WorldHistory.handleKey(key, modifiers)) return true
+        if (WorldObjectParts.handleKey(key, modifiers, WorldObjectScene::partsOf)) return true
         return WorldObjectEditing.handleShortcut(key, modifiers)
     }
 

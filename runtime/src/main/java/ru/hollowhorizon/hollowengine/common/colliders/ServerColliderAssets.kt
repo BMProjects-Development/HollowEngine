@@ -5,6 +5,7 @@ import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ReloadListener
+import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.ModelMetadata
 import ru.hollowhorizon.hollowengine.common.models.ModelResourceIO
@@ -21,11 +22,14 @@ import java.io.InputStream
  */
 @ReloadListener
 object ServerColliderAssets : ResourceManagerReloadListener {
-    class Assets(private val model: String, val rig: ModelRig, val animator: Animator?) {
-        /** What the entity's colliders are posed from; loads the model, so only when the rig has colliders. */
+    class Assets(private val model: String, val rig: ModelRig, private val readAnimator: () -> Animator?) {
+        /**
+         * What colliders on this model are posed from. It loads the model, so it is only asked for once some
+         * entity has colliders on it; a blank model has no skeleton and poses only what hangs on it itself.
+         */
         val pose: ColliderPoseAssets? by lazy {
-            if (!rig.hasColliders()) null
-            else ServerModelAnimationMetadata.model(model)?.let { ColliderPoseAssets(rig, animator, it) }
+            if (model.isBlank()) ColliderPoseAssets(rig, null, Model.EMPTY)
+            else ServerModelAnimationMetadata.model(model)?.let { ColliderPoseAssets(rig, readAnimator(), it) }
         }
     }
 
@@ -44,21 +48,22 @@ object ServerColliderAssets : ResourceManagerReloadListener {
     }
 
     private fun load(model: String): Assets {
-        val location = ResourceLocation.tryParse(model) ?: return Assets(model, ModelRig.EMPTY, null)
+        val location = ResourceLocation.tryParse(model)?.takeIf { model.isNotBlank() } ?: return Assets(model, ModelRig.EMPTY) { null }
         val rig = read(location.withSuffix(RIG_SUFFIX)) {
             NBTFormat.deserialize(ModelRig.serializer(), it.loadAsNBT())
         } ?: ModelRig.EMPTY
-        if (!rig.hasColliders()) return Assets(model, rig, null)
+        return Assets(model, rig) { animatorOf(location, model) }
+    }
 
+    private fun animatorOf(location: ResourceLocation, model: String): Animator? {
         val controller = read(location.withSuffix(METADATA_SUFFIX)) {
             ModelMetadata.parse(it.readBytes().decodeToString(), model)
         }?.animationController
-        val animator = when (controller?.toString()) {
+        return when (controller?.toString()) {
             null -> null
             StandardPlayerAnimatorPreset.ID -> StandardPlayerAnimatorPreset.create()
             else -> read(controller) { NBTFormat.deserialize(Animator.serializer(), it.loadAsNBT()) }
         }
-        return Assets(model, rig, animator)
     }
 
     private fun <T> read(location: ResourceLocation, decode: (InputStream) -> T): T? {

@@ -38,13 +38,19 @@ fun ModelRig.hasColliders(modes: (ColliderModes) -> Boolean = { true }): Boolean
  * Places every collider of the rig on the current pose of [roots]. [toEntity] carries model space to the
  * world around [origin], the entity's position, which is added last to stay precise far from spawn.
  */
-internal fun ModelRig.placeColliders(roots: List<RuntimeNode>, toEntity: Mat4f, origin: Vec3): List<EntityCollider> {
+internal fun ModelRig.placeColliders(
+    roots: List<RuntimeNode>,
+    toEntity: Mat4f,
+    origin: Vec3,
+    modelMatrix: Mat4f? = null,
+): List<EntityCollider> {
     val placed = colliders
     if (placed.isEmpty()) return emptyList()
 
     val nodes = roots.flatMap { it.walk() }.associateBy { it.name }
+    val onModel = modelMatrix?.let { toEntity.mul(it, MutableMat4f()) } ?: toEntity
     return placed.mapNotNull { (bone, spec) ->
-        val holder = if (bone == null) toEntity else {
+        val holder = if (bone == null) onModel else {
             val node = nodes[bone] ?: return@mapNotNull null
             toEntity.mul(node.globalMatrix, MutableMat4f())
         }

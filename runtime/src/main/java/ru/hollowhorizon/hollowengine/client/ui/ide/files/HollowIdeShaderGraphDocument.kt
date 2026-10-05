@@ -57,7 +57,9 @@ class HollowIdeShaderGraphDocument(bytes: ByteArray) : HollowIdeFileDocument {
     /** Starts a gesture, such as dragging a node, that should go back in one step. */
     fun beginGesture() = history.beginGesture(graph)
 
-    fun endGesture() = history.endGesture(graph)
+    fun endGesture() {
+        history.endGesture(graph)
+    }
 
     fun undo(): Boolean = history.undo(graph)?.also(::apply) != null
 

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.KeyMapping
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.NestedModelAttachment
 import ru.hollowhorizon.hollowengine.client.particles.BedrockParticles
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.vfx.VfxAssets
@@ -33,6 +34,7 @@ object HollowCoreClient {
     init {
         RenderSystem.recordRenderCall(RenderManager::onInitialize)
         VfxBoneBindings.register()
+        NestedModelAttachment.register()
     }
 
     @SubscribeEvent

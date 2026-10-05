@@ -19,7 +19,8 @@ import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.attachments.components.VfxComponent
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
@@ -54,10 +55,10 @@ class SpawnWorldObjectPacket(
 
         val created = WorldObjectEntity(level)
         created.moveTo(x, y, z, 0f, 0f)
-        when (kind) {
-            WorldObjectKind.MODEL -> created set Model(asset)
-            WorldObjectKind.VFX -> created set VfxComponent(effect = asset)
-            WorldObjectKind.EMPTY -> Unit
+        created set when (kind) {
+            WorldObjectKind.MODEL -> Model(asset)
+            WorldObjectKind.VFX -> Model("", ModelRig(attachments = listOf(VfxBoneAttachmentSpec(id = "effect", effect = asset))))
+            WorldObjectKind.EMPTY -> Model("")
         }
         if (kind != WorldObjectKind.EMPTY) created.customName = asset.substringAfterLast('/').substringBefore('.').literal
         if (!level.addFreshEntity(created)) return
@@ -122,12 +123,9 @@ class WorldObjectParentPacket(val entityId: Int, val parentId: Int? = null) : Ho
 class RemoveWorldObjectsPacket(val entityIds: List<Int>) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return
-        entityIds.forEach { id -> player.level().worldObject(id)?.let(::removeTree) }
-    }
-
-    private fun removeTree(target: WorldObjectEntity) {
-        target.children().forEach(::removeTree)
-        target.remove(Entity.RemovalReason.DISCARDED)
+        entityIds.forEach { id ->
+            player.level().worldObject(id)?.subtree()?.asReversed()?.forEach { it.remove(Entity.RemovalReason.DISCARDED) }
+        }
     }
 }
 
@@ -140,20 +138,23 @@ class DuplicateWorldObjectPacket(val entityId: Int) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return
         val source = player.level().worldObject(entityId) ?: return
-        val copy = duplicate(source, parent = null) ?: return
+        val copies = HashMap<WorldObjectEntity, WorldObjectEntity>()
+        source.subtree().forEach { node ->
+            val parent = if (node === source) null else node.parent?.let(copies::get) ?: return@forEach
+            duplicate(node, parent)?.let { copies[node] = it }
+        }
+        val copy = copies[source] ?: return
         WorldObjectSpawnedPacket(copy.id).send(player as? ServerPlayer ?: return)
     }
 
-    /** A copy of [source] with its components and scripts; a copied child goes under the copy of its parent. */
+    /** A copy of [source] with its components and scripts, put under [parent], the copy of its own parent. */
     private fun duplicate(source: WorldObjectEntity, parent: WorldObjectEntity?): WorldObjectEntity? {
         val tag = CompoundTag()
         if (!source.save(tag)) return null
         tag.remove("UUID")
         val copy = EntityType.create(tag, source.level()).orElse(null) as? WorldObjectEntity ?: return null
         parent?.let(copy::attachKeepingLocalPose)
-        if (!source.level().addFreshEntity(copy)) return null
-        source.children().forEach { child -> duplicate(child, copy) }
-        return copy
+        return copy.takeIf { source.level().addFreshEntity(it) }
     }
 }
 

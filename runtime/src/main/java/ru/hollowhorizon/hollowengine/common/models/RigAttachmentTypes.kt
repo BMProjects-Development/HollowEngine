@@ -49,6 +49,17 @@ object RigAttachmentTypes {
                 serializer = VfxBoneAttachmentSpec.serializer(),
                 titleKey = "hollowengine.gui.rig_editor.kind_vfx",
                 createDefault = { id -> VfxBoneAttachmentSpec(id = id) },
+                allowedOnModel = true,
+            )
+        )
+        register(
+            RigAttachmentType(
+                id = "hollowengine:rig/model",
+                specClass = ModelAttachmentSpec::class,
+                serializer = ModelAttachmentSpec.serializer(),
+                titleKey = "hollowengine.gui.rig_editor.kind_model",
+                createDefault = { id -> ModelAttachmentSpec(id = id) },
+                allowedOnModel = true,
             )
         )
         register(ColliderAttachmentSpec.TYPE)

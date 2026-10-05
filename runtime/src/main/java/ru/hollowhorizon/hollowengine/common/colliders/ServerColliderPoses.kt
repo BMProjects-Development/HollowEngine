@@ -32,9 +32,12 @@ object ServerColliderPoses {
     fun recent(entity: Entity): List<List<EntityCollider>> =
         if (entity.level().isClientSide) emptyList() else tracks.track(entity)?.history.orEmpty()
 
+    private val rigs = EntityRigs { model -> ServerColliderAssets.of(model).rig }
+
+    /** The rig of [entity]'s model with what it hangs on it, the colliders of nested models gathered in. */
     fun rig(entity: Entity): ModelRig? {
         val node = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull() ?: return null
-        return ServerColliderAssets.of(node.model.model).rig
+        return rigs.of(entity, node.model)
     }
 
     internal fun hostsIn(level: Level): List<ColliderHost> = hosts[level].orEmpty()

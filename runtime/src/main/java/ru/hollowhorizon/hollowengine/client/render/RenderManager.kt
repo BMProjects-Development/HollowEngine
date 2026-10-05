@@ -22,7 +22,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderCont
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
-import ru.hollowhorizon.hollowengine.common.attachments.components.vfxComponent
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
 import ru.hollowhorizon.hollowengine.common.colliders.hostScale
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -90,7 +89,7 @@ object RenderManager {
             val instance = host.modelInstance(node.nodeId, node.model.model)
 
             instance.attachment.entity = host as? LivingEntity
-            instance.configure(node.animations, node.materials)
+            instance.configure(node.animations, node.materials, node.model.rig)
             val worldTransform = resolveNodeWorldTransform(host, node.transform, partialTick)
             instance.update(
                 AnimatorEvaluationContext().also {
@@ -99,7 +98,7 @@ object RenderManager {
                 }
             )
 
-            if (!instance.attachment.isFrustumCullingEnabled) {
+            if (!instance.attachment.isFrustumCullingEnabled || instance.attachment.carriesEffects) {
                 frustumCullingDisabledHosts.add(host)
                 return@forEachModelNodeRecord
             }
@@ -113,8 +112,7 @@ object RenderManager {
     fun extendCullingBounds(entity: Entity, vanillaBounds: AABB): AABB =
         modelCullingBounds[entity]?.let(vanillaBounds::minmax) ?: vanillaBounds
 
-    /** Effects spread past any box, so an entity that carries one is never culled by its box. */
-    fun isFrustumCullingDisabled(entity: Entity): Boolean = entity in frustumCullingDisabledHosts || entity.vfxComponent != null
+    fun isFrustumCullingDisabled(entity: Entity): Boolean = entity in frustumCullingDisabledHosts
 
     @SubscribeEvent
     fun onRenderEntityNodes(event: RenderEntityEvent.Pre) {
@@ -143,7 +141,7 @@ object RenderManager {
             val instance = entity.modelInstance(node.nodeId, node.model.model)
             val attachment = instance.attachment
             attachment.entity = entity as? LivingEntity
-            instance.configure(node.animations, node.materials)
+            instance.configure(node.animations, node.materials, node.model.rig)
             val worldTransform = resolveNodeWorldTransform(entity, node.transform, partialTick)
             instance.update(
                 AnimatorEvaluationContext().also {

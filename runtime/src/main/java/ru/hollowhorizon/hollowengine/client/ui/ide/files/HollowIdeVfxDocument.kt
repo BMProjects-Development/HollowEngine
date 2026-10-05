@@ -5,14 +5,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditing
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
 
 /**
  * An open `.vfx` file: one [VfxEffect] the editor rewrites whole.
  */
-class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
-    var effect by mutableStateOf(VfxEffect.EMPTY)
+class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument, VfxEditing {
+    override var effect by mutableStateOf(VfxEffect.EMPTY)
         private set
 
     /** What went wrong reading the file, or null when it read fine. */
@@ -50,10 +51,7 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
      */
     var onEdit: ((before: VfxEffect, after: VfxEffect) -> Unit)? = null
 
-    /**
-     * Replaces the effect with what [change] makes of it.
-     */
-    fun edit(mergeKey: String? = null, history: Boolean = true, change: (VfxEffect) -> VfxEffect) {
+    override fun edit(mergeKey: String?, history: Boolean, change: (VfxEffect) -> VfxEffect) {
         if (readOnly) return
 
         val previous = effect
@@ -65,14 +63,15 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument {
         if (history) onEdit?.invoke(previous, next)
     }
 
-    /** Starts a gesture, such as dragging a handle, that should go back in one step. */
-    fun beginGesture() = history.beginGesture(effect)
+    override fun beginGesture() = history.beginGesture(effect)
 
-    fun endGesture() = history.endGesture(effect)
+    override fun endGesture() {
+        history.endGesture(effect)
+    }
 
-    fun undo(): Boolean = history.undo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
+    override fun undo(): Boolean = history.undo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
 
-    fun redo(): Boolean = history.redo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
+    override fun redo(): Boolean = history.redo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
 
     private fun apply(next: VfxEffect) {
         effect = next

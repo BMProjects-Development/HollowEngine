@@ -12,11 +12,16 @@ import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.elementDescriptors
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
+import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
+import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
 import kotlin.reflect.KClass
 
 /**
@@ -26,11 +31,31 @@ import kotlin.reflect.KClass
  * tree, and a changed tree is decoded back into a component.
  */
 internal object ComponentJson {
-    val format = Json {
-        encodeDefaults = true
-        ignoreUnknownKeys = true
-        explicitNulls = true
-    }
+    @Volatile
+    private var cached: Json? = null
+
+    @Volatile
+    private var cachedRevision = -1
+
+    val format: Json
+        get() {
+            val revision = TagModuleRevision.current
+            cached?.takeIf { cachedRevision == revision }?.let { return it }
+            return Json {
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+                explicitNulls = true
+                allowSpecialFloatingPointValues = true
+                serializersModule = SerializersModule {
+                    RigAttachmentTypes.registerInto(this)
+                    VfxNodeTypes.registerInto(this)
+                    VfxModuleTypes.registerInto(this)
+                }
+            }.also {
+                cached = it
+                cachedRevision = revision
+            }
+        }
 
     @Suppress("UNCHECKED_CAST")
     fun serializerOf(type: KClass<*>): KSerializer<Component>? =

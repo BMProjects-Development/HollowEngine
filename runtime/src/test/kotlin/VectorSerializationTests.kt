@@ -4,12 +4,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import net.minecraft.network.FriendlyByteBuf
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.attachments.components.VfxComponent
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ObjectPlacement
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3d
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import kotlin.test.assertEquals
 
 /**
@@ -22,8 +22,8 @@ class VectorSerializationTests {
         val placement = ObjectPlacement(Vec3d(1.5, -64.0, 1.0e6), Vec3f(10f, 20f, 30f), Vec3f(0.5f, 2f, 1f))
         assertEquals(placement, throughBuffer(ObjectPlacement.serializer(), placement))
 
-        val effect = VfxComponent("hollowengine:vfx/fire.vfx", Vec3f(0f, 1.25f, -0.5f))
-        assertEquals(effect, throughBuffer(VfxComponent.serializer(), effect))
+        val effect = VfxBoneAttachmentSpec("fire", "hollowengine:vfx/fire.vfx", Vec3f(0f, 1.25f, -0.5f), Vec3f(90f, 0f, 0f), scale = 2f)
+        assertEquals(effect, throughBuffer(VfxBoneAttachmentSpec.serializer(), effect))
     }
 
     @Test

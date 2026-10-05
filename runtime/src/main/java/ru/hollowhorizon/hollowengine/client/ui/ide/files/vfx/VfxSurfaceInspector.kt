@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderTarget
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPathField
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorHost
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Pill
@@ -62,7 +61,7 @@ internal fun VfxAssetRow(
 }
 
 @Composable
-internal fun PlaneFields(document: HollowIdeVfxDocument, state: VfxEditorState, plane: VfxPlaneSpec) {
+internal fun PlaneFields(document: VfxEditing, state: VfxInspectorState, plane: VfxPlaneSpec) {
     Folding(state, "facing", vfxText("section_facing"), VfxIcons.FACING) {
         Pills(VfxFacing.entries, plane.facing, { vfxText("facing_${it.name.lowercase()}") }) {
             document.replace(plane.copy(facing = it))
@@ -77,7 +76,7 @@ internal fun PlaneFields(document: HollowIdeVfxDocument, state: VfxEditorState, 
 }
 
 @Composable
-internal fun MeshFields(document: HollowIdeVfxDocument, state: VfxEditorState, mesh: VfxMeshSpec) {
+internal fun MeshFields(document: VfxEditing, state: VfxInspectorState, mesh: VfxMeshSpec) {
     Folding(state, "mesh", vfxText("section_mesh"), VfxIcons.MESH) {
         ToggleRow(vfxText("align_to_velocity"), mesh.alignToVelocity) {
             document.replace(
@@ -108,7 +107,7 @@ internal fun MeshFields(document: HollowIdeVfxDocument, state: VfxEditorState, m
 }
 
 @Composable
-internal fun ModelFields(document: HollowIdeVfxDocument, state: VfxEditorState, model: VfxModelSpec) {
+internal fun ModelFields(document: VfxEditing, state: VfxInspectorState, model: VfxModelSpec) {
     Folding(state, "model", vfxText("section_model"), VfxIcons.MODEL) {
         VfxAssetRow(vfxText("model"), model.model, VfxModelExtensions, id = "vfx-model-path") {
             document.replace(model.copy(model = it))
@@ -121,7 +120,7 @@ internal fun ModelFields(document: HollowIdeVfxDocument, state: VfxEditorState, 
 }
 
 @Composable
-internal fun TrailFields(document: HollowIdeVfxDocument, state: VfxEditorState, trail: VfxTrailSpec) {
+internal fun TrailFields(document: VfxEditing, state: VfxInspectorState, trail: VfxTrailSpec) {
     Folding(state, "trail", vfxText("section_trail"), VfxIcons.TRAIL) {
         VfxValueRow(vfxText("width"), trail.width, VfxProperty.WIDTH, vfxText("ribbon_width_hint")) {
             document.replace(trail.copy(width = it))
@@ -143,7 +142,7 @@ internal fun TrailFields(document: HollowIdeVfxDocument, state: VfxEditorState, 
 }
 
 @Composable
-internal fun BeamFields(document: HollowIdeVfxDocument, state: VfxEditorState, beam: VfxBeamSpec) {
+internal fun BeamFields(document: VfxEditing, state: VfxInspectorState, beam: VfxBeamSpec) {
     Folding(state, "beam", vfxText("section_beam"), VfxIcons.BEAM) {
         val nodes = document.effect.walk().map { it.id }.filter { it != beam.id }
         VfxAssetRow(
@@ -192,7 +191,7 @@ private fun RibbonUvRows(mode: VfxRibbonUv, tileLength: Float, onMode: (VfxRibbo
  * buffer, then the shader of the author's with what that shader declares.
  */
 @Composable
-private fun MaterialFields(document: HollowIdeVfxDocument, state: VfxEditorState, surface: VfxSurfaceSpec) {
+private fun MaterialFields(document: VfxEditing, state: VfxInspectorState, surface: VfxSurfaceSpec) {
     val material = surface.material
     fun update(next: VfxMaterialSpec) = document.replace(surface.withSurface(material = next))
 

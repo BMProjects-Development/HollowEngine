@@ -7,19 +7,24 @@ import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
+import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 
 /**
  * One effect placed by whatever carries it, with the matrix captured while the carrier was drawn, and
  * advanced on game time.
  */
-class VfxBoundEffect(val asset: String) {
+class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
+    private var asset: String = asset
+
+    /** What plays instead of the file, when the carrier has its own copy of the effect. */
+    private var own: VfxEffect? = own
+
     private var instance: VfxInstance? = null
     private var lastGameTime = Float.NaN
     private var lastFrame = Long.MIN_VALUE
@@ -64,9 +69,23 @@ class VfxBoundEffect(val asset: String) {
         return VfxBoneBinding(playing, local)
     }
 
+    /**
+     * Plays [asset], or [own] in its place, from now on. A change that only moves or switches nodes keeps the
+     * running effect; any other starts it over.
+     */
+    fun use(asset: String, own: VfxEffect?) {
+        if (asset == this.asset && own == this.own) return
+        val playing = instance
+        val next = own ?: VfxAssets[asset]
+        val keeps = asset == this.asset && playing != null && next != null && playing.adoptPlacement(next)
+        this.asset = asset
+        this.own = own
+        if (!keeps) instance = null
+    }
+
     private fun create(): VfxInstance? {
         val level = Minecraft.getInstance().level ?: return null
-        val effect = VfxAssets[asset] ?: return null
+        val effect = own ?: VfxAssets[asset] ?: return null
         return VfxInstance(effect, asset, VfxWorldEnvironment(level)).also { instance = it }
     }
 
@@ -86,13 +105,22 @@ fun interface VfxBindingSource {
  * An effect attached to bone.
  */
 class VfxBoneAttachment(
-    private val spec: VfxBoneAttachmentSpec,
+    spec: VfxBoneAttachmentSpec,
     private val node: RuntimeNode,
-) : Attachment(node), VfxBindingSource {
-    private val effect = VfxBoundEffect(spec.effect)
+) : Attachment(node), VfxBindingSource, RespecAttachment {
+    override var spec: VfxBoneAttachmentSpec = spec
+        private set
+
+    private val effect = VfxBoundEffect(spec.effect, spec.ownEffect)
+
+    override fun respec(spec: RigAttachmentSpec) {
+        if (spec !is VfxBoneAttachmentSpec) return
+        this.spec = spec
+        effect.use(spec.effect, spec.ownEffect)
+    }
 
     override fun collectCommands(pipeline: RenderPipeline) {
-        if (!spec.autoPlay || spec.effect.isBlank()) return
+        if (!spec.autoPlay || spec.effect.isBlank() && spec.ownEffect == null) return
 
         pipeline.addBatchedRenderable {
             if (!node.isVisible) return@addBatchedRenderable
@@ -111,9 +139,7 @@ class VfxBoneAttachment(
 
     /** The offset the author gave the attachment, on top of the bone. */
     private fun applyOffset(matrix: Matrix4f) {
-        val transform = VfxTransform(spec.offset, spec.rotation, Vec3f(spec.scale, spec.scale, spec.scale))
-        val frame = VfxFrame().setCombined(VfxFrame().setIdentity(), transform)
-        matrix.mul(frame.toMatrix(MutableMat4f()).asMatrix4f())
+        matrix.mul(spec.localTransform().matrixF.asMatrix4f())
     }
 }
 
@@ -144,3 +170,6 @@ object VfxBoneBindings {
         }
     }
 }
+
+/** What the attachment plays: its own copy of the effect, or the file; null while the file is missing. */
+fun VfxBoneAttachmentSpec.played(): VfxEffect? = ownEffect ?: VfxAssets[effect]

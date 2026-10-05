@@ -7,6 +7,7 @@ import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionSpec
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
@@ -189,5 +190,6 @@ object VfxModuleRevision {
     @Synchronized
     fun invalidate() {
         current++
+        TagModuleRevision.invalidate()
     }
 }

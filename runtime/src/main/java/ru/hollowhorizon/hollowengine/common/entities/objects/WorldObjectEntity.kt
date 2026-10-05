@@ -42,6 +42,12 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     /** Set while a change must show at once rather than ease in, like one the editor predicts. */
     private var snapping = false
 
+    /**
+     * Until this tick the client shows the pose its own editor set and lets the server's answers to it go by:
+     * they are older than what is shown, and easing toward them would pull the object back mid-drag.
+     */
+    private var predictedUntil = -1
+
     /** The tick the parent last changed in: the new local pose that comes with it shows at once, not eased from the old one. */
     private var parentChangedTick = -1
 
@@ -111,6 +117,7 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         if (snap) {
             shownBefore = shown
             setOldPosAndRot()
+            if (level().isClientSide) predictedUntil = tickCount + PREDICTION_TICKS
         }
         updateWorldCache()
     }
@@ -148,6 +155,20 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
 
     /** The loaded objects directly under this one. */
     fun children(): List<WorldObjectEntity> = WorldObjects.all(level()).filter { it.parentId == uuid }
+
+    /**
+     * This object and every loaded one under it, parents before children. Parents are checked for loops only
+     * among loaded objects, so one may still close through an object that was not loaded; it is listed once.
+     */
+    fun subtree(): List<WorldObjectEntity> {
+        val seen = LinkedHashSet<WorldObjectEntity>()
+        val queue = ArrayDeque(listOf(this))
+        while (queue.isNotEmpty()) {
+            val next = queue.removeFirst()
+            if (seen.add(next)) queue.addAll(next.children())
+        }
+        return seen.toList()
+    }
 
     override fun tick() {
         shownBefore = shown
@@ -216,7 +237,7 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     )
 
     override fun lerpTo(x: Double, y: Double, z: Double, yRot: Float, xRot: Float, steps: Int) {
-        if (parentId != null) return
+        if (parentId != null || tickCount < predictedUntil) return
         positionTarget = Vector3d(x, y, z)
         positionSteps = steps
     }
@@ -224,13 +245,14 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     override fun onSyncedDataUpdated(accessor: EntityDataAccessor<*>) {
         super.onSyncedDataUpdated(accessor)
         when (accessor) {
-            OFFSET, ROTATION, SCALE -> {
-                if (level().isClientSide && !snapping && !firstTick && tickCount != parentChangedTick) {
-                    shownSteps = LERP_STEPS
-                } else {
+            OFFSET, ROTATION, SCALE -> when {
+                !level().isClientSide || snapping || firstTick || tickCount == parentChangedTick -> {
                     shown = localData()
                     shownBefore = shown
                 }
+
+                tickCount < predictedUntil -> Unit
+                else -> shownSteps = LERP_STEPS
             }
 
             PARENT -> {
@@ -343,6 +365,9 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
 
         /** Ticks a change from the server takes to ease in on the client. */
         private const val LERP_STEPS = 3
+
+        /** How long the client trusts its own editor over the server: a second covers the answer even on a slow connection. */
+        private const val PREDICTION_TICKS = 20
 
         /** In blocks; far enough for a decoration to stay in view across its tracking range. */
         private const val RENDER_DISTANCE = 160.0

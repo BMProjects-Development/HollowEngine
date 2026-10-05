@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.entity.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeWorldPoint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
@@ -120,6 +121,7 @@ object WorldInspector {
             current.accept(state)
             current
         } else {
+            WorldObjectParts.clear()
             EntityEditorSession(state).also { session = it }
         }
         InspectorSelection.publish(Source, entityInspectorTarget(shown))
@@ -132,6 +134,11 @@ object WorldInspector {
     }
 
     fun holds(entityId: Int): Boolean = session?.entityId == entityId
+
+    /** Puts the entity being edited back into the inspector, which something else took over meanwhile. */
+    fun reveal() {
+        session?.let { InspectorSelection.publish(Source, entityInspectorTarget(it)) }
+    }
 
     /** The entity in the inspector; a snapshot read, so composition that shows it follows the selection. */
     val selectedEntityId: Int? get() = session?.entityId

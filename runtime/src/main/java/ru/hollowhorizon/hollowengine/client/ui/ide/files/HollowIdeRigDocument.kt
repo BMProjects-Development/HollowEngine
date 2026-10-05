@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.loadAsNBT
@@ -16,10 +17,10 @@ import java.io.ByteArrayOutputStream
 /**
  * An open `.rig` file: one [ModelRig] the editor rewrites whole.
  */
-class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
+class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument, RigEditing {
     override val readOnly: Boolean = false
 
-    var rig by mutableStateOf(decode(bytes))
+    override var rig by mutableStateOf(decode(bytes))
         private set
 
     var isModified by mutableStateOf(false)
@@ -39,7 +40,7 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
     /** Replaces the rig with what [change] makes of it; edits sharing [mergeKey] in quick succession undo together. */
-    fun edit(mergeKey: String? = null, change: (ModelRig) -> ModelRig) {
+    override fun edit(mergeKey: String?, change: (ModelRig) -> ModelRig) {
         val next = change(rig)
         if (next == rig) return
 
@@ -48,13 +49,15 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument {
     }
 
     /** Starts a gesture, such as dragging a handle, that should go back in one step. */
-    fun beginGesture() = history.beginGesture(rig)
+    override fun beginGesture() = history.beginGesture(rig)
 
-    fun endGesture() = history.endGesture(rig)
+    override fun endGesture() {
+        history.endGesture(rig)
+    }
 
-    fun undo(): Boolean = history.undo(rig)?.also(::apply) != null
+    override fun undo(): Boolean = history.undo(rig)?.also(::apply) != null
 
-    fun redo(): Boolean = history.redo(rig)?.also(::apply) != null
+    override fun redo(): Boolean = history.redo(rig)?.also(::apply) != null
 
     private fun apply(next: ModelRig) {
         rig = next

@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -20,15 +21,21 @@ data class VfxBoneAttachmentSpec(
     @EditorAsset(".vfx")
     val effect: String = "",
     @EditorName("hollowengine.gui.vfx.spawn_offset")
-    val offset: Vec3f = Vec3f.ZERO,
-    /** Euler angles in degrees, on top of the bone rotation. */
+    override val offset: Vec3f = Vec3f.ZERO,
     @EditorName("hollowengine.gui.vfx.rotation")
-    val rotation: Vec3f = Vec3f.ZERO,
+    override val rotation: Vec3f = Vec3f.ZERO,
     @EditorName("hollowengine.gui.vfx.scale")
-    val scale: Float = 1f,
+    override val scale: Float = 1f,
     /** Whether it starts as soon as the model is drawn; otherwise a script starts it. */
     @EditorName("hollowengine.gui.vfx.auto_play")
     val autoPlay: Boolean = true,
-) : RigAttachmentSpec() {
+    @EditorHidden
+    val ownEffect: VfxEffect? = null,
+) : RigAttachmentSpec(), PlacedAttachmentSpec {
     override fun withId(id: String) = copy(id = id)
+
+    override fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float) = copy(offset = offset, rotation = rotation, scale = scale)
+
+    /** The running effect takes every change in place. */
+    override fun structure() = VfxBoneAttachmentSpec(id)
 }

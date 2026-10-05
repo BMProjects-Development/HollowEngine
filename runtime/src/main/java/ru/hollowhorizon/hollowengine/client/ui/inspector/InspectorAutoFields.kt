@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -382,6 +383,18 @@ private fun ListVectorField(
         }
     }
     VectorRow(label, description, path, components)
+}
+
+/** Three numbers on one row, the way a vector field of a component is shown. */
+@Composable
+internal fun Vec3Row(label: String, value: Vec3f, path: String, description: String? = null, onChange: (Vec3f) -> Unit) {
+    val numbers = floatArrayOf(value.x, value.y, value.z)
+    VectorRow(label, description, path, numbers.indices.map { index ->
+        VectorComponent(VectorAxes[index], PrimitiveKind.FLOAT, numbers[index].toDouble()) { next ->
+            val changed = numbers.copyOf().also { it[index] = next.toFloat() }
+            onChange(Vec3f(changed[0], changed[1], changed[2]))
+        }
+    })
 }
 
 private class VectorComponent(val name: String, val kind: PrimitiveKind, val value: Double, val onChange: (Double) -> Unit)

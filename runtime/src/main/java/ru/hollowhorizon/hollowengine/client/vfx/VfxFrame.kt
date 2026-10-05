@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.deg
+import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
 
 /**
@@ -84,10 +84,6 @@ class VfxFrame {
 
     companion object {
         /** Euler degrees as a quaternion, applied X then Y then Z. */
-        fun eulerOf(euler: Vec3f): QuatF = MutableQuatF()
-            .setIdentity()
-            .rotate(euler.x.deg, Vec3f.X_AXIS)
-            .rotate(euler.y.deg, Vec3f.Y_AXIS)
-            .rotate(euler.z.deg, Vec3f.Z_AXIS)
+        fun eulerOf(euler: Vec3f): QuatF = eulerRotationXyz(euler)
     }
 }

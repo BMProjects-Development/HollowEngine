@@ -44,15 +44,16 @@ internal fun vfxNodeInspector(
             LocalVfxFieldFocus provides { property -> state.focusProperty(nodeId, property) },
             LocalVfxDriven provides vfxDrivenLookup(document, state, nodeId),
         ) {
-            NodeFields(document, state, live)
+            VfxNodeFields(document, state, live)
         }
     }
 }
 
-internal fun HollowIdeVfxDocument.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}") { it.withNode(node) }
+internal fun VfxEditing.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}") { it.withNode(node) }
 
+/** Everything the inspector shows for [node], wherever the effect it belongs to lives. */
 @Composable
-private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, node: VfxNodeSpec) {
+internal fun VfxNodeFields(document: VfxEditing, state: VfxInspectorState, node: VfxNodeSpec) {
     NodeHead(document, node)
 
     Folding(state, "transform", vfxText("section_transform"), VfxIcons.TRANSFORM) {
@@ -91,7 +92,7 @@ private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, no
  * whether it draws on particles or once, which depends on where it sits in the tree.
  */
 @Composable
-private fun NodeHead(document: HollowIdeVfxDocument, node: VfxNodeSpec) {
+private fun NodeHead(document: VfxEditing, node: VfxNodeSpec) {
     var draft by remember(node.id, node.name) { mutableStateOf(node.name) }
     Row(tags = listOf("vfx-node-head")) {
         Checkbox(
@@ -130,7 +131,7 @@ private fun NodeHead(document: HollowIdeVfxDocument, node: VfxNodeSpec) {
  * turn, so it only offers the color.
  */
 @Composable
-private fun ParticleFields(document: HollowIdeVfxDocument, state: VfxEditorState, node: VfxParticleRendererSpec) {
+private fun ParticleFields(document: VfxEditing, state: VfxInspectorState, node: VfxParticleRendererSpec) {
     val look = node.particle
     fun update(next: VfxAppearance) = document.replace(node.withParticle(next))
 
@@ -156,7 +157,7 @@ private fun ParticleFields(document: HollowIdeVfxDocument, state: VfxEditorState
  */
 @Composable
 internal fun Folding(
-    state: VfxEditorState,
+    state: VfxInspectorState,
     key: String,
     title: String,
     icon: String,

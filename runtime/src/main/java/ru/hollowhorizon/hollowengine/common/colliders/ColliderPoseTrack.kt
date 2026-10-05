@@ -8,25 +8,28 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.ModelAnimat
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
-/** What a side poses an entity's colliders from: the rig, the animator the model wears, and the model. */
+/** What a side poses a model's colliders from: the model's rig file, the animator it wears, and the model. */
 class ColliderPoseAssets(val rig: ModelRig, val animator: Animator?, val model: Model)
 
 /**
- * The skeleton of one entity's model, posed once a tick by the animator the client draws with, and
- * where its colliders were over the last ticks, newest first.
+ * The skeleton of one entity's model and of the models hung on it, posed once a tick by the animator the
+ * client draws with, and where its colliders were over the last ticks, newest first.
  */
-internal class ColliderPoseTrack(val assets: ColliderPoseAssets, private val historyTicks: Int) {
-    private val roots = restPose(assets.model)
-    private val nodes = roots.flatMap { it.walk() }
-    private val target = PoseTarget(roots.byIndex(), assets.model.animationsByName, assets.rig.boneByAlias)
+internal class ColliderPoseTrack(
+    val assets: ColliderPoseAssets,
+    /** What the entity hangs on its model, over the rig file; a track is made again when it changes. */
+    val own: ModelRig,
+    private val historyTicks: Int,
+    assetsOf: (String) -> ColliderPoseAssets?,
+) {
+    private val posed = PosedModel(assets.model, assets.rig.overlay(own), null, assetsOf)
+    private val target = PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias)
     private val animator = ModelAnimator()
     private val context = AnimatorEvaluationContext()
     private var posedAt = Long.MIN_VALUE
@@ -42,13 +45,14 @@ internal class ColliderPoseTrack(val assets: ColliderPoseAssets, private val his
         if (posedAt == now) return
         posedAt = now
 
-        nodes.forEach(RuntimeNode::resetPose)
+        posed.resetPose()
         animator.configure(assets.animator, node.animations)
         fillAnimationVariables(context, entity, 1f)
         animator.applyTo(target, context)
-        roots.forEach(RuntimeNode::updateHierarchyMatrices)
+        posed.applyRigPoses()
+        posed.updateMatrices()
 
-        val placed = applyOverrides(entity, assets.rig.placeColliders(roots, entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))
+        val placed = applyOverrides(entity, posed.placeColliders(entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))
         bounds = placed.map { it.box.bounds }.reduceOrNull(AABB::minmax)
         history.addFirst(placed)
         while (history.size > historyTicks) history.removeLast()
@@ -57,29 +61,30 @@ internal class ColliderPoseTrack(val assets: ColliderPoseAssets, private val his
 
 /**
  * A track per entity, kept in its runtime attachments: made from what [assetsOf] finds for the entity's
- * model, and made again when that changes, as after a reload.
+ * model and what the entity hangs on it, and made again when either changes, as after a reload or an edit.
  */
 internal class ColliderPoseTracks(
     private val historyTicks: Int,
     private val assetsOf: (model: String) -> ColliderPoseAssets?,
 ) {
     /**
-     * The track of [entity], or null when its model gives it nothing to pose. Only the tick poses it again,
+     * The track of [entity], or null when nothing on its model has colliders. Only the tick poses it again,
      * with [advance]: whatever asks during a tick sees the poses the last one ended with.
      */
     fun track(entity: Entity, advance: Boolean = false): ColliderPoseTrack? {
         val runtime = AttachmentRegistry.attachmentsOrNull(entity)?.runtime ?: return null
         val node = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull()
-        val assets = node?.let { assetsOf(it.model.model) }
+        val assets = node?.takeIf { EntityColliders.rig(entity)?.hasColliders() == true }?.let { assetsOf(it.model.model) }
         if (node == null || assets == null) {
             runtime.remove(this)
             return null
         }
 
+        val own = node.model.rig
         var track = runtime.getOrNull<ColliderPoseTrack>(this)
-        if (track == null || track.assets !== assets) {
+        if (track == null || track.assets !== assets || track.own != own) {
             runtime.remove(this)
-            track = runtime.getOrPut(this) { ColliderPoseTrack(assets, historyTicks) }
+            track = runtime.getOrPut(this) { ColliderPoseTrack(assets, own, historyTicks, assetsOf) }
         }
         if (advance || track.history.isEmpty()) track.advance(entity, node)
         return track

@@ -1,8 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import net.minecraft.world.phys.Vec3
-import org.joml.Quaternionf
-import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.editor.GizmoDrag
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoGeometry
@@ -21,6 +19,7 @@ import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.client.vfx.VfxFrame
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
 
@@ -92,7 +91,7 @@ internal class VfxTransformGizmo {
     private fun place(mode: GizmoEditMode, values: GizmoTransformValues, start: VfxTransform, parent: VfxFrame): VfxTransform =
         when (mode) {
             GizmoEditMode.TRANSLATE -> start.copy(position = parent.toLocalPoint(values.translation))
-            GizmoEditMode.ROTATE -> start.copy(rotation = eulerDegrees(parent.rotation.conjugate() * values.rotation))
+            GizmoEditMode.ROTATE -> start.copy(rotation = (parent.rotation.conjugate() * values.rotation).eulerDegreesXyz())
             GizmoEditMode.SCALE -> start.copy(scale = values.scale)
         }
 
@@ -114,13 +113,6 @@ internal class VfxTransformGizmo {
     }
 
     private fun safe(value: Float): Float = if (value in -1.0e-6f..1.0e-6f) 1f else value
-
-    /** Euler degrees in the order [VfxFrame.eulerOf] applies them: X, then Y, then Z. */
-    private fun eulerDegrees(rotation: QuatF): Vec3f {
-        val angles = Quaternionf(rotation.x, rotation.y, rotation.z, rotation.w).getEulerAnglesXYZ(Vector3f())
-        return Vec3f(Math.toDegrees(angles.x.toDouble()).toFloat(), Math.toDegrees(angles.y.toDouble()).toFloat(),
-            Math.toDegrees(angles.z.toDouble()).toFloat())
-    }
 
     private fun Vec3f.copy(): Vec3f = Vec3f(x, y, z)
 
