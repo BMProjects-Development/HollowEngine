@@ -6,8 +6,9 @@ import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.DocumentHistory
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
@@ -32,36 +33,30 @@ internal class EntityRigEditing(val entityId: Int, initial: Model) : RigEditing 
     private var unsent = false
     private var sentAtNanos = 0L
 
-    private val history = DocumentHistory<ModelRig>(WorldHistory.LIMIT)
-
-    private val step = object : WorldHistory.Step {
-        override val entityId: Int get() = this@EntityRigEditing.entityId
-
-        override fun undo(): Boolean = history.undo(rig)?.also(::apply) != null
-
-        override fun redo(): Boolean = history.redo(rig)?.also(::apply) != null
-    }
+    override val history get() = WorldHistory.history
 
     override val occupied: ModelRig
         get() = RigAssets.of(ResourceLocation.tryParse(model.model)).overlay(rig)
 
-    override fun edit(mergeKey: String?, change: (ModelRig) -> ModelRig) {
+    override fun edit(mergeKey: String?, label: UndoLabel?, change: (ModelRig) -> ModelRig) {
         val next = change(rig)
         if (next == rig) return
-        if (history.beforeEdit(rig, mergeKey)) WorldHistory.record(step)
+        WorldHistory.record(entityId, SnapshotStep(this, label ?: UndoLabel.EDIT, rig, { rig }, ::restore), mergeKey)
         apply(next)
     }
 
-    override fun beginGesture() = history.beginGesture(rig)
+    override fun beginGesture() = history.begin()
 
     override fun endGesture() {
-        if (history.endGesture(rig)) WorldHistory.record(step)
+        history.commit()
         flush()
     }
 
-    override fun undo(): Boolean = WorldHistory.undo()
-
-    override fun redo(): Boolean = WorldHistory.redo()
+    /** Puts back a rig from the history; it goes to the server at once, as no gesture ends after it. */
+    private fun restore(previous: ModelRig) {
+        apply(previous)
+        flush()
+    }
 
     /** Shows [next] at once; the server hears of it with the next [flush]. */
     private fun apply(next: ModelRig) {
@@ -109,7 +104,6 @@ internal class EntityRigEditing(val entityId: Int, initial: Model) : RigEditing 
     fun forget() {
         unsent = false
         sent.clear()
-        history.clear()
         WorldHistory.forget(entityId)
     }
 

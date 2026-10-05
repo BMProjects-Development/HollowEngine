@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
@@ -30,6 +31,8 @@ class SceneTarget(
     val search: ((String) -> List<UiTreeItem<Any?>>)? = null,
     /** Controls over the tree, like what part of the hierarchy it shows. */
     val toolbar: (@Composable () -> Unit)? = null,
+    /** Where edits made through this hierarchy go back, for keys and history window. */
+    val history: UndoHistory? = null,
 )
 
 /**

@@ -5,6 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
@@ -16,7 +20,7 @@ import java.io.ByteArrayOutputStream
 /**
  * An open `.animator` file: one [Animator] the editor rewrites whole.
  */
-class HollowIdeAnimatorDocument(bytes: ByteArray) : HollowIdeFileDocument {
+class HollowIdeAnimatorDocument(bytes: ByteArray) : HollowIdeFileDocument, UndoOwner {
     override val readOnly: Boolean = false
 
     var animator by mutableStateOf(decode(bytes))
@@ -35,10 +39,21 @@ class HollowIdeAnimatorDocument(bytes: ByteArray) : HollowIdeFileDocument {
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
-    fun edit(change: (Animator) -> Animator) {
+    override val history = UndoHistory()
+
+    /**
+     * Replaces the animator with what [change] makes of it, as a step called [label] in the history; edits
+     * sharing [mergeKey] in quick succession, such as the frames of a drag, undo together.
+     */
+    fun edit(mergeKey: String? = null, label: UndoLabel? = null, change: (Animator) -> Animator) {
         val next = change(animator)
         if (next == animator) return
 
+        history.record(SnapshotStep(this, label ?: UndoLabel.EDIT, animator, { animator }, ::apply), mergeKey)
+        apply(next)
+    }
+
+    private fun apply(next: Animator) {
         animator = next
         isModified = true
         revision++
@@ -50,6 +65,8 @@ class HollowIdeAnimatorDocument(bytes: ByteArray) : HollowIdeFileDocument {
     }
 
     override fun reload(bytes: ByteArray) {
+        if (decode(bytes) == animator) return
+        history.clear()
         animator = decode(bytes)
         isModified = false
         revision++

@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoStep
 import ru.hollowhorizon.hollowengine.common.entities.objects.ObjectPose
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -11,6 +13,9 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 /** The steps world objects themselves leave in [WorldHistory]: where one was put, and what it was put under. */
 @ClientOnly
 internal object WorldObjectHistory {
+    private val MOVE = UndoLabel("${UndoLabel.LANG}.world.move")
+    private val PARENT = UndoLabel("${UndoLabel.LANG}.world.parent")
+
     /** The object the gizmo holds and where it was when the drag began, so letting go makes one step of it. */
     private var gizmoStart: Pair<Int, ObjectPose>? = null
 
@@ -28,17 +33,19 @@ internal object WorldObjectHistory {
     fun recordPose(target: WorldObjectEntity, before: ObjectPose) {
         val after = capture(target)
         if (same(before, after)) return
-        WorldHistory.record(PoseStep(target.id, before, after))
+        WorldHistory.record(target.id, PoseStep(target.id, before, after))
     }
 
     /** Puts [target] under [parent], as a step that can be taken back. */
     fun reparent(target: WorldObjectEntity, parent: WorldObjectEntity?) {
         val before = target.parent?.id
         if (before == parent?.id || !WorldObjectEditing.sendParent(target.id, parent?.id)) return
-        WorldHistory.record(ParentStep(target.id, before, parent?.id))
+        WorldHistory.record(target.id, ParentStep(target.id, before, parent?.id))
     }
 
-    private class PoseStep(override val entityId: Int, val before: ObjectPose, val after: ObjectPose) : WorldHistory.Step {
+    private class PoseStep(val entityId: Int, val before: ObjectPose, val after: ObjectPose) : UndoStep {
+        override val label get() = MOVE
+
         override fun undo(): Boolean = place(before)
 
         override fun redo(): Boolean = place(after)
@@ -51,7 +58,9 @@ internal object WorldObjectHistory {
         }
     }
 
-    private class ParentStep(override val entityId: Int, val before: Int?, val after: Int?) : WorldHistory.Step {
+    private class ParentStep(val entityId: Int, val before: Int?, val after: Int?) : UndoStep {
+        override val label get() = PARENT
+
         override fun undo(): Boolean = WorldObjectEditing.sendParent(entityId, before)
 
         override fun redo(): Boolean = WorldObjectEditing.sendParent(entityId, after)

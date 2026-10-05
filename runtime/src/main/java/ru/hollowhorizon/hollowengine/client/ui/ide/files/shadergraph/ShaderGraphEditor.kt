@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxGraphMaterials
 import kotlin.math.hypot
 import kotlin.time.Duration.Companion.milliseconds
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 internal const val ShaderGraphStylesheet = "hollowengine:ui/styles/shader-graph.hss"
 private const val AutoSaveDelayMillis = 900L
@@ -266,8 +267,7 @@ internal fun ShaderGraphEditor(file: HollowIdeOpenFile) {
                 if (input.shift) document.ungroup(selection) else document.groupNodes(selection.nodes)
             )
 
-            input.control && input.key == GLFW.GLFW_KEY_Z && !input.shift -> document.undo()
-            input.control && (input.key == GLFW.GLFW_KEY_Y || input.shift && input.key == GLFW.GLFW_KEY_Z) -> document.redo()
+            UndoKeys.handle(document.history, input.key, input.modifiers) -> Unit
             input.key == GLFW.GLFW_KEY_ESCAPE -> if (link != null) {
                 link = null
                 document.endGesture()

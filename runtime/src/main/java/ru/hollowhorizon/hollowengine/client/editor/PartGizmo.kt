@@ -17,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import kotlin.math.abs
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 /**
  * A part of an entity's model under the gizmo: a bone, or something placed on one.
@@ -89,7 +90,7 @@ internal class BoneGizmo(
             rotation = MutableQuatF(animatedRotation.inverted()).mul(relative.rotation).norm(),
             scale = Vec3f(relative.scale) / animatedScale,
         )
-        editing.edit(mergeKey = "pose:$bone") { rig -> rig.withBone(bone, rig.holder(bone).copy(pose = pose.takeUnless(RigPose::isIdentity))) }
+        editing.edit(mergeKey = "pose:$bone", label = UndoLabel("${UndoLabel.LANG}.rig.pose", bone)) { rig -> rig.withBone(bone, rig.holder(bone).copy(pose = pose.takeUnless(RigPose::isIdentity))) }
     }
 }
 
@@ -123,7 +124,7 @@ internal class AttachmentGizmo(
         val scale = Vec3f(relative.scale)
         val uniform = listOf(scale.x, scale.y, scale.z).maxBy { abs(it - current.scale) }
         val placed = current.placedAt(Vec3f(relative.translation), QuatF(relative.rotation).eulerDegreesXyz(), uniform)
-        editing.edit(mergeKey = "place:${bone.orEmpty()}/$attachmentId") { rig ->
+        editing.edit(mergeKey = "place:${bone.orEmpty()}/$attachmentId", label = UndoLabel("${UndoLabel.LANG}.rig.place", attachmentId)) { rig ->
             rig.withHolder(bone, rig.holder(bone).withAttachment(placed))
         }
     }

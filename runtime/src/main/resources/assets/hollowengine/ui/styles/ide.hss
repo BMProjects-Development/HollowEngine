@@ -1082,6 +1082,62 @@
     tint: $text-strong;
 }
 
+.ide-panel.history-panel {
+    padding: 0px;
+    gap: 0px;
+}
+
+.history-context-dropdown {
+    min-width: 96px;
+    height: 18px;
+    padding: 0px 6px;
+}
+
+.history-list {
+    padding: 2px 4px 4px 4px;
+    gap: 1px;
+    background: $bg-field;
+    @apply $thin-scroll;
+}
+
+.history-empty {
+    padding: 8px;
+    align-items: center center;
+    background: $bg-field;
+    foreground: $text-faint;
+}
+
+.history-row {
+    size: 100% 20px;
+    padding: 0px 8px;
+    align-items: start center;
+    border-radius: $radius-small;
+    background: transparent;
+    transition: background 100ms ease-out;
+}
+
+.history-row:hover {
+    background: $bg-hover;
+}
+
+.history-row.current {
+    background: $row-selected;
+}
+
+.history-label {
+    width: 0px;
+    grow: 1;
+    foreground: $text;
+}
+
+.history-row.current .history-label {
+    foreground: $text-strong;
+}
+
+.history-row.undone .history-label {
+    foreground: $text-faint;
+}
+
 .file-context-menu {
     padding: 4px;
     gap: 1px;

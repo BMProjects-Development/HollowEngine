@@ -58,8 +58,11 @@ internal fun HollowIdeImageEditor(
 
     fun applyHistory(redo: Boolean) {
         finishStroke()
-        val changed = if (redo) document.redo() else document.undo()
-        if (!changed) return
+        if (redo) document.history.redo() else document.history.undo()
+    }
+
+    val historyPosition = document.history.position
+    LaunchedEffect(document, historyPosition) {
         file.updateDirty(document.isModified)
         uploadRevision++
     }
@@ -163,21 +166,7 @@ internal fun HollowIdeImageEditor(
         tags = listOf("image-editor-root"),
         modifier = Modifier.style(InspectorStylesheet).style("hollowengine:ui/styles/image-editor.hss")
             .size(100.percent, 100.percent)
-            .focusScope()
-            .onKeyInput { input ->
-                if (!input.command || input.repeat) return@onKeyInput
-                when (input.key) {
-                    GLFW.GLFW_KEY_Z -> {
-                        applyHistory(redo = input.shift)
-                        input.consume()
-                    }
-
-                    GLFW.GLFW_KEY_Y -> {
-                        applyHistory(redo = true)
-                        input.consume()
-                    }
-                }
-            },
+            .focusScope(),
     ) {
         Box(
             tags = listOf("image-editor-canvas-scroll"),
@@ -268,7 +257,7 @@ internal fun HollowIdeImageEditor(
                 ToolButton(
                     "hollowengine.gui.image_editor.undo".lang,
                     selected = false,
-                    enabled = document.canUndo,
+                    enabled = document.history.canUndo,
                     modifier = HistoryButtonModifier,
                 ) {
                     applyHistory(redo = false)
@@ -276,7 +265,7 @@ internal fun HollowIdeImageEditor(
                 ToolButton(
                     "hollowengine.gui.image_editor.redo".lang,
                     selected = false,
-                    enabled = document.canRedo,
+                    enabled = document.history.canRedo,
                     modifier = HistoryButtonModifier,
                 ) {
                     applyHistory(redo = true)

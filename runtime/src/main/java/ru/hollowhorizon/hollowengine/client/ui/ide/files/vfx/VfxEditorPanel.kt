@@ -25,6 +25,8 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.time.Duration.Companion.milliseconds
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 private const val AutoSaveDelayMillis = 900L
 
@@ -166,15 +168,16 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
         document.onEdit = session::recordEdit
     }
 
-    /** A drag in the viewport: one step back in the file, and one in the timeline for the keys it records. */
+    /** A drag in the viewport: one step back in the file, the keys it records included. */
     fun beginGesture() {
         document.beginGesture()
-        session.timeline.beginHistoryTransaction("Record keys")
+        session.timeline.beginHistoryTransaction(TimelineEdits.RECORD_KEYS)
     }
 
+    /** The timeline's keys go in while the file's step is still open, so both go back together. */
     fun endGesture() {
-        document.endGesture()
         session.timeline.commitHistoryTransaction()
+        document.endGesture()
     }
 
     override var selected by mutableStateOf<String?>(null)
@@ -340,15 +343,8 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     }
 }
 
-private fun handleHistoryKeys(document: HollowIdeVfxDocument, input: UiKeyInput): Boolean {
-    if (input.repeat || !input.control) return false
-    return when (input.key) {
-        GLFW.GLFW_KEY_Z if input.shift -> document.redo()
-        GLFW.GLFW_KEY_Z -> document.undo()
-        GLFW.GLFW_KEY_Y -> document.redo()
-        else -> false
-    }
-}
+private fun handleHistoryKeys(document: HollowIdeVfxDocument, input: UiKeyInput): Boolean =
+    !input.repeat && UndoKeys.handle(document.history, input.key, input.modifiers)
 
 /** The number beside the handle being dragged. */
 internal class VfxGizmoReadout(val x: Float, val y: Float, val value: Float)

@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.Level
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
 import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
 import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.client.editor.WorldToScreenProjector
@@ -329,7 +328,6 @@ internal object WorldObjectScene {
 
     private fun handleKey(input: UiKeyInput): Boolean {
         if (input.repeat) return false
-        if (WorldHistory.handleKey(input.key, input.modifiers)) return true
         if (WorldObjectParts.handleKey(input.key, input.modifiers) { uuid -> rows.firstOrNull { it.uuid == uuid }?.parts }) return true
         if (input.key == GLFW.GLFW_KEY_DELETE || input.key == GLFW.GLFW_KEY_D && input.command) {
             return WorldObjectEditing.handleShortcut(input.key, input.modifiers)

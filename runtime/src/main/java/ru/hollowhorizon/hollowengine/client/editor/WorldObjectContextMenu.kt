@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiWorldOverlay
 import ru.hollowhorizon.hollowengine.client.ui.UiPopupAlignment
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
@@ -91,7 +92,7 @@ object WorldObjectContextMenu {
         }
         if (action != GLFW.GLFW_PRESS || !EditorMode.isAvailable()) return false
         if (Minecraft.getInstance().screen == null && !HollowIdeOverlay.isGameViewportActive) return false
-        if (WorldHistory.handleKey(key, modifiers)) return true
+        if (UndoKeys.handle(WorldHistory.history, key, modifiers)) return true
         if (WorldObjectParts.handleKey(key, modifiers, WorldObjectScene::partsOf)) return true
         return WorldObjectEditing.handleShortcut(key, modifiers)
     }

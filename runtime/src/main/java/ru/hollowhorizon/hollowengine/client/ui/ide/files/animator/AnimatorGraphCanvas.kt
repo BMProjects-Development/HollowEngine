@@ -204,7 +204,7 @@ internal fun AnimatorGraphCanvas(
                     if (link != null) {
                         link = link?.copy(canvasX = gesture.canvasX, canvasY = gesture.canvasY)
                     } else {
-                        document.edit {
+                        document.edit(mergeKey = "move:$layerId/$stateId") {
                             it.withNodeAt(
                                 layerId,
                                 stateId,

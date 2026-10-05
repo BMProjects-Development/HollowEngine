@@ -24,6 +24,7 @@ import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.*
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 /** What the shared inspector shows for the selected node of an effect. */
 internal fun vfxNodeInspector(
@@ -49,7 +50,7 @@ internal fun vfxNodeInspector(
     }
 }
 
-internal fun VfxEditing.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}") { it.withNode(node) }
+internal fun VfxEditing.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}", label = UndoLabel("${UndoLabel.LANG}.vfx.node", node.id)) { it.withNode(node) }
 
 /** Everything the inspector shows for [node], wherever the effect it belongs to lives. */
 @Composable

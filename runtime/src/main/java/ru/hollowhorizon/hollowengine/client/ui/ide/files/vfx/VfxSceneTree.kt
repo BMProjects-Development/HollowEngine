@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 /** The id of the row that stands for the effect itself, above its nodes. */
 internal const val VfxRootId = "vfx-root"
@@ -19,6 +20,7 @@ internal const val VfxRootId = "vfx-root"
  */
 internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorState, title: String) = SceneTarget(
     id = "vfx-nodes",
+    history = document.history,
     items = buildList {
         val nodes = document.effect.nodes
         add(
@@ -123,13 +125,7 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
 internal fun handleVfxNodeKey(document: VfxEditing, state: VfxNodeSelection, key: Int, modifiers: Int, repeat: Boolean): Boolean {
     val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
     val alt = modifiers and GLFW.GLFW_MOD_ALT != 0
-    if (control && !repeat) {
-        when (key) {
-            GLFW.GLFW_KEY_Z if modifiers and GLFW.GLFW_MOD_SHIFT != 0 -> return document.redo()
-            GLFW.GLFW_KEY_Z -> return document.undo()
-            GLFW.GLFW_KEY_Y -> return document.redo()
-        }
-    }
+    if (!repeat && UndoKeys.handle(document.history, key, modifiers)) return true
     val id = state.selected ?: return false
     return when {
         key == GLFW.GLFW_KEY_DELETE -> remove(document, state, id).let { true }

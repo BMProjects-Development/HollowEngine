@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline
 
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 /**
  * The keyboard of the timeline window, whatever it is showing.
@@ -13,15 +14,7 @@ object TimelineKeys {
         val ctrl = modifiers and GLFW.GLFW_MOD_CONTROL != 0
         val shift = modifiers and GLFW.GLFW_MOD_SHIFT != 0
         return when {
-            ctrl && key == GLFW.GLFW_KEY_Z -> {
-                if (shift) timeline.redo() else timeline.undo()
-                true
-            }
-
-            ctrl && key == GLFW.GLFW_KEY_Y -> {
-                timeline.redo()
-                true
-            }
+            UndoKeys.handle(timeline.history, key, modifiers) -> true
 
             ctrl && key == GLFW.GLFW_KEY_TAB -> {
                 if (timeline.viewMode == TimelineViewMode.CURVES) timeline.viewMode = TimelineViewMode.DOPE_SHEET

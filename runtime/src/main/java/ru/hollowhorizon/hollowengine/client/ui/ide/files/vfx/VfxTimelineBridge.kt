@@ -15,7 +15,8 @@ class VfxTimelineSession(
     private val document: HollowIdeVfxDocument,
     private val preview: VfxPreviewState,
 ) {
-    val timeline = TimelineController()
+    /** Records into the file's history, so Ctrl+Z walks back through effect and tracks in the order they were edited. */
+    val timeline = TimelineController(document.history)
 
     /** Properties the author asked for, as `node|property`. */
     private val pinned = LinkedHashSet<String>()
@@ -185,7 +186,7 @@ class VfxTimelineSession(
         if (spec == document.effect.timeline) return
 
         suppressCommit = true
-        document.edit(history = false) { it.copy(timeline = spec) }
+        document.edit(recorded = false) { it.copy(timeline = spec) }
         builtFor = document.revision
         suppressCommit = false
     }

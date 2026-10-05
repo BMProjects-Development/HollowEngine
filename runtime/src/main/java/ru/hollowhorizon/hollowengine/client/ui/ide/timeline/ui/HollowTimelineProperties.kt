@@ -20,6 +20,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSession
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 /** The cutscene's own fields, composed inside whichever panel the shared inspector is drawn in. */
 @Composable
@@ -287,7 +288,7 @@ private fun applyTangent(
     side: TangentSide,
     tangent: KeyTangent,
 ) {
-    controller.edit("Edit keyframe handle") {
+    controller.edit(TimelineEdits.EDIT_HANDLES) {
         controller.setTangent(keyframe, side, tangent, keyframe.handleMode, timeScale = 1f, valueScale = 1f)
     }
 }

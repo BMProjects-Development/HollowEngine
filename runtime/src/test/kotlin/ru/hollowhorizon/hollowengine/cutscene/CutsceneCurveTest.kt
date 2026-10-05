@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TangentSide
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineCurve
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -198,10 +199,10 @@ class CutsceneCurveTest {
         val curve = curveOf(Keyframe(0f, 0f), Keyframe(1f, 5f), controller = controller)
         val key = curve.keyframes[1]
 
-        controller.beginHistoryTransaction("Edit handle")
+        controller.beginHistoryTransaction(TimelineEdits.EDIT_HANDLES)
         controller.setTangent(key, TangentSide.INCOMING, KeyTangent(-0.25f, -3f), HandleMode.MIRRORED, 1f, 1f)
         controller.commitHistoryTransaction()
-        controller.undo()
+        controller.history.undo()
 
         assertEquals(HandleMode.AUTO, curve.keyframes[1].handleMode)
     }

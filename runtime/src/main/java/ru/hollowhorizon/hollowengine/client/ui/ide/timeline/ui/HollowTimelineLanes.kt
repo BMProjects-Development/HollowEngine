@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 private const val TimelineKeyframeSize = 10f
 private const val LaneContentId = "timeline-lane-content"
@@ -389,7 +390,7 @@ internal fun TimelineContextMenu(
             val curve = state.curve
             if (curve != null && !state.locked) {
                 add(UiDropdownItem(CutsceneLang.ADD_KEYFRAME.lang, icon = PulseIcon) {
-                    controller.edit("Add keyframe") {
+                    controller.edit(TimelineEdits.ADD_KEY) {
                         controller.setKey(curve, state.time, curve.valueAt(state.time, 0f))
                     }
                     refresh()

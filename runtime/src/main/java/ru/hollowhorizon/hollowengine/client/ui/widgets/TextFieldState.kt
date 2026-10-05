@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.*
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
@@ -30,9 +31,9 @@ class TextFieldState(
     caretColor: UiColor = DefaultTextFieldCaretColor,
     selectionColor: UiColor = DefaultTextFieldSelectionColor,
     textShadow: Shadow? = Shadow(offsetX = 1f, offsetY = 1f),
-    private val historyMergeWindowNanos: Long = TextFieldStateHistoryMergeWindowNanos,
-    private val nanoTime: () -> Long = System::nanoTime,
-) {
+    historyMergeWindowNanos: Long = TextFieldStateHistoryMergeWindowNanos,
+    nanoTime: () -> Long = System::nanoTime,
+) : UndoOwner {
     val scroll: UiScrollHandle = UiScrollHandle()
 
     var fontSize: Float by mutableStateOf(fontSize)
@@ -65,9 +66,8 @@ class TextFieldState(
     val selectionAnchor: Int? get() = primaryCaret.selectionAnchor
     val hasSelection: Boolean get() = caretRanges.any { it.hasSelection }
 
-    private val undoStack = ArrayDeque<TextFieldHistoryEntry>()
-    private val redoStack = ArrayDeque<TextFieldHistoryEntry>()
-    private var lastHistoryEditNanos = Long.MIN_VALUE
+    /** The text and carets before each burst of typing; a pause or a caret move starts the next one. */
+    override val history = UndoHistory(TextFieldStateHistoryLimit, mergeWindowNanos = historyMergeWindowNanos, nanoTime = nanoTime)
     private var restoringHistory = false
 
     fun insert(insertion: String): Boolean {
@@ -240,11 +240,7 @@ class TextFieldState(
         if (!filter.accepts(normalized)) return
         val changed = normalized != text
         text = normalized
-        if (changed) {
-            undoStack.clear()
-            redoStack.clear()
-            breakHistoryGroup()
-        }
+        if (changed) history.clear()
         if (moveCaretToEnd) setCarets(listOf(UiTextCaret(text.length)))
         else setCarets(caretRanges.map { it.coerceIn(text.length) })
     }
@@ -360,23 +356,9 @@ class TextFieldState(
         if (caretRanges != previous) caretVisibilityRevision++
     }
 
-    fun undo(): Boolean {
-        if (readOnly) return false
-        val entry = undoStack.removeLastOrNull() ?: return false
-        redoStack.addLast(historyEntry())
-        restoreHistory(entry)
-        breakHistoryGroup()
-        return true
-    }
+    fun undo(): Boolean = !readOnly && history.undo()
 
-    fun redo(): Boolean {
-        if (readOnly) return false
-        val entry = redoStack.removeLastOrNull() ?: return false
-        undoStack.addLast(historyEntry())
-        restoreHistory(entry)
-        breakHistoryGroup()
-        return true
-    }
+    fun redo(): Boolean = !readOnly && history.redo()
 
     private fun replaceSelectedRanges(replacement: String): Boolean {
         val ranges = activeCaretRanges().map { TextEditRange(it.selectionStart, it.selectionEnd) }
@@ -539,20 +521,10 @@ class TextFieldState(
 
     private fun recordHistorySnapshot() {
         if (restoringHistory) return
-        val now = nanoTime()
-        val entry = historyEntry()
-        val startsNewGroup = lastHistoryEditNanos == Long.MIN_VALUE || now - lastHistoryEditNanos > historyMergeWindowNanos
-        if (startsNewGroup && undoStack.lastOrNull() != entry) {
-            undoStack.addLast(entry)
-            while (undoStack.size > TextFieldStateHistoryLimit) undoStack.removeFirst()
-        }
-        lastHistoryEditNanos = now
-        redoStack.clear()
+        history.record(SnapshotStep(this, TypingLabel, historyEntry(), ::historyEntry, ::restoreHistory), TypingMergeKey)
     }
 
-    private fun breakHistoryGroup() {
-        lastHistoryEditNanos = Long.MIN_VALUE
-    }
+    private fun breakHistoryGroup() = history.breakMerge()
 
     private fun historyEntry(): TextFieldHistoryEntry = TextFieldHistoryEntry(text, caretRanges.toList())
 
@@ -578,6 +550,8 @@ private val DefaultTextFieldSelectionColor = UiColor(0.28f, 0.54f, 0.95f, 0.35f)
 
 private const val TextFieldStateHistoryLimit = 128
 private const val TextFieldStateHistoryMergeWindowNanos = 600_000_000L
+private const val TypingMergeKey = "typing"
+private val TypingLabel = UndoLabel("${UndoLabel.LANG}.typing")
 private val AutoPairClosings = mapOf(
     '(' to ')',
     '[' to ']',

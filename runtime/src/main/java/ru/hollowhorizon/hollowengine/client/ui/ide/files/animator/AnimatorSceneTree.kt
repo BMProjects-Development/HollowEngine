@@ -44,6 +44,7 @@ internal fun animatorSceneTarget(
     onSelect: (AnimatorSelection) -> Unit,
 ) = SceneTarget(
     id = "animator-layers",
+    history = document.history,
     items = buildList {
         document.animator.layers.forEach { layer ->
             val controller = document.animator.controller(layer.id)

@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline
 
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+
 internal data class KeyframeState(
     val time: Float,
     val value: Float,
@@ -57,56 +59,25 @@ internal data class TimelineSnapshot(
     val extra: Any? = null,
 )
 
-class TimelineHistory(private val controller: TimelineController) {
-    private val undoStack = ArrayDeque<TimelineSnapshot>()
-    private val redoStack = ArrayDeque<TimelineSnapshot>()
-    private var transactionStart: TimelineSnapshot? = null
 
-    fun begin(label: String) {
-        if (transactionStart == null) {
-            transactionStart = controller.createSnapshot()
-        }
-    }
+/** What timeline's steps are called in the history window. */
+object TimelineEdits {
+    private fun label(name: String) = UndoLabel("${UndoLabel.LANG}.timeline.$name")
 
-    fun commit() {
-        val before = transactionStart ?: return
-        transactionStart = null
-        val after = controller.createSnapshot()
-        if (before != after) {
-            undoStack += before
-            redoStack.clear()
-        }
-    }
-
-    fun <T> record(label: String, block: () -> T): T {
-        if (transactionStart != null) {
-            return block()
-        }
-        val before = controller.createSnapshot()
-        val result = block()
-        val after = controller.createSnapshot()
-        if (before != after) {
-            undoStack += before
-            redoStack.clear()
-        }
-        return result
-    }
-
-    fun undo() {
-        val snapshot = undoStack.removeLastOrNull() ?: return
-        redoStack += controller.createSnapshot()
-        controller.restoreSnapshot(snapshot)
-    }
-
-    fun redo() {
-        val snapshot = redoStack.removeLastOrNull() ?: return
-        undoStack += controller.createSnapshot()
-        controller.restoreSnapshot(snapshot)
-    }
-
-    fun clear() {
-        undoStack.clear()
-        redoStack.clear()
-        transactionStart = null
-    }
+    val ADD_KEY = label("add_key")
+    val DELETE_KEYS = label("delete_keys")
+    val MOVE_KEYS = label("move_keys")
+    val CLONE_KEYS = label("clone_keys")
+    val DUPLICATE_KEYS = label("duplicate_keys")
+    val PASTE_KEYS = label("paste_keys")
+    val NUDGE_KEYS = label("nudge_keys")
+    val SMOOTH_KEYS = label("smooth_keys")
+    val EDIT_VALUE = label("edit_value")
+    val EDIT_HANDLES = label("edit_handles")
+    val CURVE_PRESET = label("curve_preset")
+    val ROTATION_BASIS = label("rotation_basis")
+    val RECORD_KEYS = label("record_keys")
+    val CAPTURE_KEY = label("capture_key")
+    val MOVE_CUTSCENE = label("move_cutscene")
+    val REANCHOR_CUTSCENE = label("reanchor_cutscene")
 }

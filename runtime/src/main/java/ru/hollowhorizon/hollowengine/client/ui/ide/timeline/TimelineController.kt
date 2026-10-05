@@ -6,6 +6,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -23,7 +27,7 @@ enum class TimelineViewMode {
     CURVES,
 }
 
-class TimelineController {
+class TimelineController(override val history: UndoHistory = UndoHistory()) : UndoOwner {
     companion object {
         const val KEYFRAME_TIME_EPSILON = ChannelCurve.KEY_TIME_EPSILON
         private const val DEFAULT_CURVE_SPAN = 20f
@@ -57,7 +61,9 @@ class TimelineController {
      */
     var isRecording by mutableStateOf(false)
 
-    val history = TimelineHistory(this)
+    /** The tracks as they were when the transaction under way began. */
+    private var transactionStart: TimelineSnapshot? = null
+    private var transactionLabel = UndoLabel.EDIT
 
     var onChanged: (() -> Unit)? = null
     var onTimeChanged: (() -> Unit)? = null
@@ -248,15 +254,16 @@ class TimelineController {
         isWorkAreaSelected = false
     }
 
-    fun edit(label: String, block: () -> Unit) {
-        history.record(label) {
-            block()
-            onChanged?.invoke()
-        }
+    /** Changes the tracks with [block], as one step called [label]; inside a transaction it joins that one. */
+    fun edit(label: UndoLabel, block: () -> Unit) {
+        val before = createSnapshot().takeIf { transactionStart == null }
+        block()
+        onChanged?.invoke()
+        if (before != null) recordSince(before, label)
     }
 
     fun deleteSelectedKeyframes() {
-        edit("Delete keyframes") {
+        edit(TimelineEdits.DELETE_KEYS) {
             val doomed = selectedKeyframes.toList()
             allProperties().forEach { property ->
                 if (isLocked(property)) return@forEach
@@ -295,7 +302,7 @@ class TimelineController {
     fun setSelectedKeyframeValue(reference: Keyframe, value: Float) {
         val referenceCurve = curveOf(reference) ?: return
         val delta = value - reference.value
-        edit("Edit keyframe value") {
+        edit(TimelineEdits.EDIT_VALUE) {
             selectedKeyframes.forEach { key ->
                 val property = propertyOf(key) ?: return@forEach
                 if (isLocked(property)) return@forEach
@@ -313,7 +320,7 @@ class TimelineController {
 
     fun addKeyframes(property: AnimProperty<*>, time: Float): List<Keyframe> {
         if (isLocked(property)) return emptyList()
-        return edited("Add keyframe") {
+        return edited(TimelineEdits.ADD_KEY) {
             property.curves.mapIndexed { channel, curve ->
                 setKey(curve, time, curve.valueAt(time, defaultChannel(property, channel)), selectKey = false)
             }.also { select(it, additive = false) }
@@ -328,7 +335,7 @@ class TimelineController {
     fun recordKeys(property: AnimProperty<*>, values: Map<Int, Float>, previous: FloatArray? = null) {
         if (values.isEmpty() || isLocked(property)) return
         val time = currentTime
-        edit("Record keys") {
+        edit(TimelineEdits.RECORD_KEYS) {
             values.forEach { (channel, value) ->
                 val curve = property.curves.getOrNull(channel) ?: return@forEach
                 val before = previous?.getOrNull(channel) ?: curve.valueAt(time, defaultChannel(property, channel))
@@ -370,7 +377,7 @@ class TimelineController {
     fun pasteKeyframes(time: Float = currentTime) {
         if (clipboard.isEmpty()) return
         val live = allCurves()
-        edit("Paste keyframes") {
+        edit(TimelineEdits.PASTE_KEYS) {
             val created = mutableListOf<Keyframe>()
             clipboard.forEach { clip ->
                 if (live.none { it === clip.curve }) return@forEach
@@ -402,7 +409,7 @@ class TimelineController {
 
         val originals = selectedKeyframes.toList()
         if (originals.isEmpty()) return
-        edit("Duplicate keyframes") {
+        edit(TimelineEdits.DUPLICATE_KEYS) {
             val created = mutableListOf<Keyframe>()
             originals.forEach { original ->
                 val curve = curveOf(original) ?: return@forEach
@@ -432,7 +439,7 @@ class TimelineController {
     fun isDragDriver(keyframe: Keyframe): Boolean = dragDriver === keyframe
 
     fun beginKeyframeDrag(focus: Keyframe) {
-        beginHistoryTransaction("Move keyframes")
+        beginHistoryTransaction(TimelineEdits.MOVE_KEYS)
         dragStartTimes = selectedKeyframes.associateWith { it.time }
         dragFocusKeyframe = focus
         dragDriver = focus
@@ -440,7 +447,7 @@ class TimelineController {
 
     fun beginCloneDrag(driver: Keyframe, withValues: Boolean): Boolean {
         val originals = selectedKeyframes.toList().ifEmpty { listOf(driver) }
-        beginHistoryTransaction("Clone keyframes")
+        beginHistoryTransaction(TimelineEdits.CLONE_KEYS)
         val clones = LinkedHashMap<Keyframe, Keyframe>()
         originals.forEach { original ->
             val curve = curveOf(original) ?: return@forEach
@@ -499,7 +506,7 @@ class TimelineController {
 
     fun nudgeSelectedKeyframes(deltaSeconds: Float) {
         if (selectedKeyframes.isEmpty()) return
-        edit("Nudge keyframes") {
+        edit(TimelineEdits.NUDGE_KEYS) {
             val starts = selectedKeyframes.associateWith { it.time }
             moveKeyframesFromStarts(starts, deltaSeconds)
         }
@@ -533,7 +540,7 @@ class TimelineController {
 
     fun applyPreset(preset: CurvePreset) {
         if (!canEditSelectedCurves) return
-        edit("Apply curve preset") {
+        edit(TimelineEdits.CURVE_PRESET) {
             selectedKeyframes.toList().forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -544,7 +551,7 @@ class TimelineController {
     }
 
     fun setSelectedHandleMode(mode: HandleMode) {
-        edit("Edit keyframe handles") {
+        edit(TimelineEdits.EDIT_HANDLES) {
             selectedKeyframes.forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -595,7 +602,7 @@ class TimelineController {
 
     fun smoothSelectedKeyframes() {
         if (!canEditSelectedCurves) return
-        edit("Smooth keyframes") {
+        edit(TimelineEdits.SMOOTH_KEYS) {
             selectedKeyframes.forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -647,23 +654,33 @@ class TimelineController {
     val canEditSelectedCurves: Boolean
         get() = selectedKeyframes.any { key -> curveOf(key)?.spec?.supportsCurveEditor == true }
 
-    fun beginHistoryTransaction(label: String) = history.begin(label)
+    /** Starts a drag or a recording whose changes go back as one step called [label]. */
+    fun beginHistoryTransaction(label: UndoLabel) {
+        if (transactionStart != null) return
+        transactionStart = createSnapshot()
+        transactionLabel = label
+    }
 
-    fun commitHistoryTransaction() = history.commit()
+    fun commitHistoryTransaction() {
+        val before = transactionStart ?: return
+        transactionStart = null
+        recordSince(before, transactionLabel)
+    }
 
-    fun undo() {
-        history.undo()
+    fun clearHistory() {
+        transactionStart = null
+        history.clear()
+    }
+
+    private fun recordSince(before: TimelineSnapshot, label: UndoLabel) {
+        if (createSnapshot() != before) history.record(SnapshotStep(this, label, before, ::createSnapshot, ::restoreFromHistory))
+    }
+
+    private fun restoreFromHistory(snapshot: TimelineSnapshot) {
+        restoreSnapshot(snapshot)
         onChanged?.invoke()
         onTimeChanged?.invoke()
     }
-
-    fun redo() {
-        history.redo()
-        onChanged?.invoke()
-        onTimeChanged?.invoke()
-    }
-
-    fun clearHistory() = history.clear()
 
     internal fun createSnapshot(): TimelineSnapshot = TimelineSnapshot(
         properties = allProperties().map { property ->
@@ -698,7 +715,7 @@ class TimelineController {
         restoreExtraState?.invoke(snapshot.extra)
     }
 
-    private fun <T> edited(label: String, block: () -> T): T {
+    private fun <T> edited(label: UndoLabel, block: () -> T): T {
         var result: T? = null
         edit(label) { result = block() }
         return result as T

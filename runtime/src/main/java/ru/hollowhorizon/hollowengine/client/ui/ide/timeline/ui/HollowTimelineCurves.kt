@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import kotlin.math.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 private const val CurveSampleStep = 3f
 private const val CurvePointSize = 9f
@@ -265,7 +266,7 @@ private fun CurveHandle(
             .cursor(UiCursorShape.MOVE).onPress { event ->
                 if (!event.isLeftClick()) return@onPress
                 grabbed = lane.curve.effectiveTangents(keyframe).tangent(side)
-                controller.beginHistoryTransaction("Edit handle")
+                controller.beginHistoryTransaction(TimelineEdits.EDIT_HANDLES)
                 event.consume()
             }.onDrag { event ->
                 val next = KeyTangent(

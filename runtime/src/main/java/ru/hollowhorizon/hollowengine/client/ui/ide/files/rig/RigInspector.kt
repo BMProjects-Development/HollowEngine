@@ -21,6 +21,7 @@ import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"
@@ -120,7 +121,7 @@ private fun AttachmentSection(
             Hint(rigText("unknown_attachment"))
         } else {
             AttachmentFields(type, attachment, "/${bone ?: ""}/${attachment.id}") { changed ->
-                document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}") { it.withHolder(bone, current.withAttachment(attachment.id, changed)) }
+                document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}", label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) { it.withHolder(bone, current.withAttachment(attachment.id, changed)) }
             }
         }
 

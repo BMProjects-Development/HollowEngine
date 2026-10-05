@@ -52,6 +52,7 @@ internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorStat
         hint = rigText("no_bones").takeIf { nodes.isEmpty() },
         menu = { id -> if (id == null) emptyList() else boneMenu(document, state, id.takeUnless { it == RigRootId }) },
         onIconClick = { id -> nodes.findBone(id)?.let(state.viewer::toggleNodeVisibility) },
+        history = document.history,
     )
 }
 

@@ -1,29 +1,26 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import androidx.compose.runtime.mutableStateMapOf
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 
 /**
  * An effect being edited, wherever it lives: a `.vfx` file, or the copy of it one entity plays. The inspector
  * and the node tree edit both the same way.
  */
-interface VfxEditing {
+interface VfxEditing : UndoOwner {
     val effect: VfxEffect
 
     /**
-     * Replaces the effect with what [change] makes of it; edits sharing [mergeKey] in quick succession undo
-     * together, and one made without [history] is not undone at all.
+     * Replaces the effect with what [change] makes of it, as a step called [label] in the history.
      */
-    fun edit(mergeKey: String? = null, history: Boolean = true, change: (VfxEffect) -> VfxEffect)
+    fun edit(mergeKey: String? = null, recorded: Boolean = true, label: UndoLabel? = null, change: (VfxEffect) -> VfxEffect)
 
     /** Starts a gesture, such as dragging a handle, that should go back in one step. */
     fun beginGesture()
 
     fun endGesture()
-
-    fun undo(): Boolean
-
-    fun redo(): Boolean
 }
 
 /** What the inspector of an effect keeps from one node to the next: which sections are open, and the material it previews. */

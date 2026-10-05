@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 /**
  * The preview of the rig, and how the pointer and the keyboard edit it.
@@ -123,12 +124,7 @@ private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, inp
         return finishTransform(document, state, result) || result == GizmoKeyResult.CHANGED
     }
 
-    if (input.command) return when (input.key) {
-        GLFW.GLFW_KEY_Z if input.shift -> document.redo()
-        GLFW.GLFW_KEY_Z -> document.undo()
-        GLFW.GLFW_KEY_Y -> document.redo()
-        else -> false
-    }
+    if (input.command) return UndoKeys.handle(document.history, input.key, input.modifiers)
     if (input.alt) return false
 
     val mode = GizmoKeyboardTransform.modeFor(input.key) ?: return false

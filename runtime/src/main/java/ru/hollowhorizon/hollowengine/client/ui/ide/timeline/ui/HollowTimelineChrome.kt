@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 /** The stylesheet of the timeline window's chrome; lanes and keys are drawn from [TimelineColors]. */
 internal const val TimelineStylesheet = "hollowengine:ui/styles/timeline.hss"
@@ -553,7 +554,7 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
                     separatorBefore = true,
                     children = RotationMode.entries.map { mode ->
                         UiDropdownItem(rotationModeLabel(mode), checked = type.mode == mode) {
-                            controller.edit("Change rotation basis") { property.setRotationMode(mode) }
+                            controller.edit(TimelineEdits.ROTATION_BASIS) { property.setRotationMode(mode) }
                             refresh()
                         }
                     },

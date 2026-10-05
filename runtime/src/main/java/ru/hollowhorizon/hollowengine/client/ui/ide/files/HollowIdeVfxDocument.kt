@@ -4,6 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditing
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
@@ -39,11 +42,11 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument, VfxEditing
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
-    /** Effects to go back to; the timeline part of them is not restored, it has its own history. */
-    private val history = DocumentHistory<VfxEffect>()
-
-    val canUndo: Boolean get() = history.canUndo
-    val canRedo: Boolean get() = history.canRedo
+    /**
+     * Edits of the effect and of its timeline, in the order they were made. Restoring an effect keeps the
+     * timeline as it is: the timeline's own steps put it back.
+     */
+    override val history = UndoHistory()
 
     /**
      * Told about every edit the author makes, once it is in; edits made without [edit]'s history, such
@@ -51,27 +54,23 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument, VfxEditing
      */
     var onEdit: ((before: VfxEffect, after: VfxEffect) -> Unit)? = null
 
-    override fun edit(mergeKey: String?, history: Boolean, change: (VfxEffect) -> VfxEffect) {
+    override fun edit(mergeKey: String?, recorded: Boolean, label: UndoLabel?, change: (VfxEffect) -> VfxEffect) {
         if (readOnly) return
 
         val previous = effect
         val next = change(previous)
         if (next == previous) return
 
-        if (history) this.history.beforeEdit(previous, mergeKey)
+        if (recorded) history.record(SnapshotStep(this, label ?: UndoLabel.EDIT, previous, { effect }, ::restore), mergeKey)
         apply(next)
-        if (history) onEdit?.invoke(previous, next)
+        if (recorded) onEdit?.invoke(previous, next)
     }
 
-    override fun beginGesture() = history.beginGesture(effect)
+    override fun beginGesture() = history.begin()
 
-    override fun endGesture() {
-        history.endGesture(effect)
-    }
+    override fun endGesture() = history.commit()
 
-    override fun undo(): Boolean = history.undo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
-
-    override fun redo(): Boolean = history.redo(effect)?.also { apply(it.copy(timeline = effect.timeline)) } != null
+    private fun restore(snapshot: VfxEffect) = apply(snapshot.copy(timeline = effect.timeline))
 
     private fun apply(next: VfxEffect) {
         effect = next

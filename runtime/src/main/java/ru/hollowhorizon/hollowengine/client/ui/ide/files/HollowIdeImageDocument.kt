@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
 import java.awt.image.BufferedImage
@@ -17,11 +18,11 @@ internal class HollowIdeImageDocument(
     path: String,
     bytes: ByteArray,
     override val readOnly: Boolean = false,
-) : HollowIdeFileDocument {
+) : HollowIdeFileDocument, UndoOwner {
     private val format = ImageFileFormat.fromPath(path)
     private var image = NativeImage.read(bytes)
     private val texture = DynamicTexture(image)
-    private val history = HollowIdeImageHistory()
+    override val history = HollowIdePixelChange.history()
     private var textureDirty = false
     private var closed = false
 
@@ -31,9 +32,7 @@ internal class HollowIdeImageDocument(
         "hollowide-image-${NextTextureId.incrementAndGet()}",
         texture,
     )
-    val canUndo: Boolean get() = history.canUndo
-    val canRedo: Boolean get() = history.canRedo
-    val isModified: Boolean get() = history.isModified
+    val isModified: Boolean get() = !history.isAtSaved
     fun beginEdit() = HollowIdeImageEdit()
 
     fun colorAt(x: Int, y: Int): UiColor? {
@@ -80,16 +79,8 @@ internal class HollowIdeImageDocument(
 
     fun commit(edit: HollowIdeImageEdit): Boolean {
         if (edit.isEmpty) return false
-        history.push(edit.build(::readPixel))
+        history.record(edit.build(::readPixel, ::restorePixel))
         return true
-    }
-
-    fun undo(): Boolean = history.undo(::writePixel).also { changed ->
-        if (changed) textureDirty = true
-    }
-
-    fun redo(): Boolean = history.redo(::writePixel).also { changed ->
-        if (changed) textureDirty = true
     }
 
     fun uploadIfDirty() {
@@ -151,8 +142,10 @@ internal class HollowIdeImageDocument(
 
     private fun readPixel(index: Int): Int = image.getPixelRGBA(index % width, index / width)
 
-    private fun writePixel(index: Int, color: Int) {
+    /** Puts a pixel back from the history; the texture catches up on the next [uploadIfDirty]. */
+    private fun restorePixel(index: Int, color: Int) {
         image.setPixelRGBA(index % width, index / width, color)
+        textureDirty = true
     }
 
     private fun encodeJpeg(): ByteArray {

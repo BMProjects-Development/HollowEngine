@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -31,33 +34,22 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument, RigEditing
 
     private var editorState: Any? = null
 
-    private val history = DocumentHistory<ModelRig>()
-
-    val canUndo: Boolean get() = history.canUndo
-    val canRedo: Boolean get() = history.canRedo
+    override val history = UndoHistory()
 
     @Suppress("UNCHECKED_CAST")
     fun <T : Any> editorState(create: () -> T): T = (editorState as? T) ?: create().also { editorState = it }
 
-    /** Replaces the rig with what [change] makes of it; edits sharing [mergeKey] in quick succession undo together. */
-    override fun edit(mergeKey: String?, change: (ModelRig) -> ModelRig) {
+    override fun edit(mergeKey: String?, label: UndoLabel?, change: (ModelRig) -> ModelRig) {
         val next = change(rig)
         if (next == rig) return
 
-        history.beforeEdit(rig, mergeKey)
+        history.record(SnapshotStep(this, label ?: UndoLabel.EDIT, rig, { rig }, ::apply), mergeKey)
         apply(next)
     }
 
-    /** Starts a gesture, such as dragging a handle, that should go back in one step. */
-    override fun beginGesture() = history.beginGesture(rig)
+    override fun beginGesture() = history.begin()
 
-    override fun endGesture() {
-        history.endGesture(rig)
-    }
-
-    override fun undo(): Boolean = history.undo(rig)?.also(::apply) != null
-
-    override fun redo(): Boolean = history.redo(rig)?.also(::apply) != null
+    override fun endGesture() = history.commit()
 
     private fun apply(next: ModelRig) {
         rig = next
