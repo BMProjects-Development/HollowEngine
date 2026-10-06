@@ -66,7 +66,7 @@ internal fun applyOverrides(entity: Entity, placed: List<EntityCollider>): List<
     return placed.mapNotNull { collider ->
         val override = overrides[collider.name] ?: return@mapNotNull collider
         if (override.enabled == false) return@mapNotNull null
-        EntityCollider(collider.name, collider.bone, collider.spec.copy(modes = override.applyTo(collider.spec.modes)), collider.box)
+        EntityCollider(collider.name, collider.bone, collider.spec.copy(modes = override.applyTo(collider.spec.modes)), collider.volume)
     }
 }
 
@@ -147,7 +147,7 @@ class ColliderHandle internal constructor(val entity: Entity, val name: String) 
 fun Entity.hurtCollider(name: String, source: DamageSource, amount: Float): Boolean {
     val (bone, _) = EntityColliders.rig(this)?.colliders?.firstOrNull { it.second.id == name }
         ?: throw IllegalArgumentException("${this.name.string} has no collider named \"$name\"")
-    val location = colliders.firstOrNull { it.name == name }?.box?.center ?: boundingBox.center
+    val location = colliders.firstOrNull { it.name == name }?.volume?.center ?: boundingBox.center
     return hurt(ColliderDamageSource(source, ColliderHit(this, name, bone, location)), amount)
 }
 

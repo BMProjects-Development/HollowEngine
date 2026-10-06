@@ -49,6 +49,7 @@ internal fun AutoFields(
                     multiline = ComponentLabels.isMultiline(descriptor, index),
                     asset = ComponentLabels.asset(descriptor, index),
                     bone = ComponentLabels.isBone(descriptor, index),
+                    widget = ComponentLabels.widget(descriptor, index),
                 ),
                 value = current,
                 path = "$path/$name",
@@ -88,6 +89,8 @@ internal data class FieldHints(
     val multiline: Boolean = false,
     val asset: List<String> = emptyList(),
     val bone: Boolean = false,
+    /** The registered editor the field asks for; see [InspectorWidgets]. */
+    val widget: String? = null,
 )
 
 private fun matchesQuery(query: String, vararg candidates: String): Boolean {
@@ -108,6 +111,10 @@ internal fun ValueEditor(
 ) {
     if (descriptor.isNullable) {
         NullableEditor(label, description, owner, descriptor, hints, value, path, onChange)
+        return
+    }
+    hints.widget?.let(InspectorWidgets::find)?.let { widget ->
+        widget.Content(InspectorWidgetField(label, description, descriptor, value, path, onChange))
         return
     }
 

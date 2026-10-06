@@ -14,7 +14,7 @@ import org.joml.Vector3f
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
-import ru.hollowhorizon.hollowengine.client.render.resolveNodeWorldTransform
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.client.ui.entity.EntityEditorClient
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem

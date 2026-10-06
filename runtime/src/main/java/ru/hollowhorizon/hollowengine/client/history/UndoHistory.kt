@@ -112,8 +112,8 @@ class UndoHistory(
 
     /** Undoes or redoes until [target] steps are done, as a click in the history window asks. */
     fun moveTo(target: Int) {
-        while (state.position > target && undo()) Unit
-        while (state.position < target && redo()) Unit
+        while (state.position > target) if (!undo()) break
+        while (state.position < target) if (!redo()) break
     }
 
     /** Keeps the next edit from folding into the last one, as when the caret moves between two words. */

@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.ModelMetadata
 import ru.hollowhorizon.hollowengine.common.models.ModelResourceIO
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.runsOnServer
 import ru.hollowhorizon.hollowengine.common.models.ServerModelAnimationMetadata
 import ru.hollowhorizon.hollowengine.common.models.StandardPlayerAnimatorPreset
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
@@ -22,14 +23,19 @@ import java.io.InputStream
  */
 @ReloadListener
 object ServerColliderAssets : ResourceManagerReloadListener {
-    class Assets(private val model: String, val rig: ModelRig, private val readAnimator: () -> Animator?) {
+    class Assets(private val model: String, val rig: ModelRig, readAnimator: () -> Animator?) {
+        val animator: Animator? by lazy(readAnimator)
+
+        /** Whether the animator has states the server runs, so the model is posed here with or without colliders. */
+        val runsOnServer: Boolean by lazy { animator?.runsOnServer() == true }
+
         /**
          * What colliders on this model are posed from. It loads the model, so it is only asked for once some
-         * entity has colliders on it; a blank model has no skeleton and poses only what hangs on it itself.
+         * entity needs posing; a blank model has no skeleton and poses only what hangs on it itself.
          */
         val pose: ColliderPoseAssets? by lazy {
             if (model.isBlank()) ColliderPoseAssets(rig, null, Model.EMPTY)
-            else ServerModelAnimationMetadata.model(model)?.let { ColliderPoseAssets(rig, readAnimator(), it) }
+            else ServerModelAnimationMetadata.model(model)?.let { ColliderPoseAssets(rig, animator, it) }
         }
     }
 

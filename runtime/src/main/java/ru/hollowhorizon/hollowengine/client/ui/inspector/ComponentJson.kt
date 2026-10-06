@@ -13,10 +13,12 @@ import kotlinx.serialization.descriptors.elementDescriptors
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.descriptors.getPolymorphicDescriptors
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -48,6 +50,7 @@ internal object ComponentJson {
                 allowSpecialFloatingPointValues = true
                 serializersModule = SerializersModule {
                     RigAttachmentTypes.registerInto(this)
+                    ColliderShapeTypes.registerInto(this)
                     VfxNodeTypes.registerInto(this)
                     VfxModuleTypes.registerInto(this)
                 }
@@ -114,7 +117,9 @@ internal object ComponentJson {
         return JsonObject(body + (format.configuration.classDiscriminator to JsonPrimitive(descriptor.serialName)))
     }
 
+    /** The kinds a polymorphic field can hold: those of a sealed class, or those registered for an open one. */
     fun subclassDescriptors(descriptor: SerialDescriptor): List<SerialDescriptor> {
+        if (descriptor.kind == PolymorphicKind.OPEN) return format.serializersModule.getPolymorphicDescriptors(descriptor)
         if (descriptor.elementsCount < 2) return emptyList()
         return descriptor.getElementDescriptor(1).elementDescriptors.toList()
     }

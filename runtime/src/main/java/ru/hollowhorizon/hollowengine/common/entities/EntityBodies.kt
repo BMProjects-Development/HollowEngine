@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
 import ru.hollowhorizon.hollowengine.common.attachments.components.bodyComponent
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderBox
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderVolume
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderContacts
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
@@ -21,6 +22,7 @@ import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import kotlin.math.abs
+import kotlin.math.withSign
 
 /**
  * What [BodyComponent] changes about vanilla: each call takes what vanilla would answer and returns what
@@ -102,7 +104,7 @@ object EntityBodies {
     }
 
     /** What a body stops others with: its solid colliders, or its box when it is blocking and has no colliders that act on bodies. */
-    private fun shapesOf(body: Entity): List<ColliderBox> {
+    private fun shapesOf(body: Entity): List<ColliderVolume> {
         if (hasPhysicalColliders(body)) return SolidColliders.solidBoxes(body)
         if (body.bodyComponent?.mode != BodyMode.BLOCKING) return emptyList()
         val box = body.boundingBox
@@ -112,19 +114,19 @@ object EntityBodies {
     private fun hasPhysicalColliders(entity: Entity): Boolean = EntityColliders.hasTargets(entity, ColliderModes::isPhysical)
 
     /** Whether [shape] is what stopped [box] from going on by [blocked]. */
-    private fun blocks(shape: ColliderBox, box: AABB, blocked: Vec3): Boolean {
+    private fun blocks(shape: ColliderVolume, box: AABB, blocked: Vec3): Boolean {
         val inner = box.deflate(CONTACT)
         return stops(shape, inner, Direction.Axis.X, blocked.x) || stops(shape, inner, Direction.Axis.Z, blocked.z)
     }
 
-    private fun stops(shape: ColliderBox, box: AABB, axis: Direction.Axis, distance: Double): Boolean {
+    private fun stops(shape: ColliderVolume, box: AABB, axis: Direction.Axis, distance: Double): Boolean {
         if (abs(distance) < MIN_SHOVE) return false
-        val reach = distance + Math.copySign(CONTACT * 2.0, distance)
+        val reach = distance + (CONTACT * 2.0).withSign(distance)
         return abs(shape.sweep(box, axis, reach)) < abs(reach) - CONTACT
     }
 
     /** Whether [box] stands on [shape]. */
-    private fun holdsUp(shape: ColliderBox, box: AABB): Boolean =
+    private fun holdsUp(shape: ColliderVolume, box: AABB): Boolean =
         shape.penetration(box.deflate(CONTACT, 0.0, CONTACT).move(0.0, -SUPPORT_DEPTH, 0.0)) != null
 
     /** Resizes [entity] when its components now give it another size than the one it was given last. */

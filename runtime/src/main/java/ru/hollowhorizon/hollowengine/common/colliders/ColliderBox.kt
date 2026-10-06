@@ -7,22 +7,27 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.withSign
 
 /**
  * A box in the world: a center and three half-axes, the vectors from the center to the middle of three
  * of its faces. An oriented box has them turned with its bone; a world-aligned one has them along X, Y
  * and Z. A bone that is scaled unevenly can skew them, so nothing here assumes they are perpendicular.
  */
-class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ: Vec3) {
+class ColliderBox(override val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ: Vec3) : ColliderVolume {
     private val axes = arrayOf(axisX, axisY, axisZ)
 
     /** Rows of the inverse of the axes matrix, or null for a box flattened to nothing. */
     private val inverse: Array<Vec3>? = invert(axisX, axisY, axisZ)
 
-    val bounds: AABB = run {
+    override val frame: ColliderBox get() = this
+
+    /** Half the box's thinnest side. */
+    val thinnest: Double get() = axes.minOf { it.length() }
+
+    override val bounds: AABB = run {
         val rx = abs(axisX.x) + abs(axisY.x) + abs(axisZ.x)
         val ry = abs(axisX.y) + abs(axisY.y) + abs(axisZ.y)
         val rz = abs(axisX.z) + abs(axisY.z) + abs(axisZ.z)
@@ -48,8 +53,7 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return abs(local.x) <= 1.0 && abs(local.y) <= 1.0 && abs(local.z) <= 1.0
     }
 
-    /** How far [point] is from the box; zero inside it. */
-    fun distanceTo(point: Vec3): Double {
+    override fun distanceTo(point: Vec3): Double {
         val local = toLocal(point) ?: return point.distanceTo(center)
         val nearest = center
             .add(axisX.scale(local.x.coerceIn(-1.0, 1.0)))
@@ -58,8 +62,7 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return nearest.distanceTo(point)
     }
 
-    /** Where the segment from [start] to [end] first touches the box; [start] itself when it begins inside. */
-    fun clip(start: Vec3, end: Vec3): Vec3? {
+    override fun clip(start: Vec3, end: Vec3): Vec3? {
         val from = toLocal(start) ?: return null
         val to = toLocal(end) ?: return null
         var enter = 0.0
@@ -80,11 +83,7 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return start.add(end.subtract(start).scale(enter))
     }
 
-    /**
-     * How far [box] has to move to stop overlapping this collider, along the axis where that is
-     * shortest, pointing away from the collider; null when they do not overlap.
-     */
-    fun penetration(box: AABB): Vec3? {
+    override fun penetration(box: AABB): Vec3? {
         val between = box.center.subtract(center)
         var best: Vec3? = null
         var bestOverlap = Double.MAX_VALUE
@@ -101,11 +100,7 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         return best
     }
 
-    /**
-     * How far of [distance] [box] can move along [axis] before it touches this collider. A box that already
-     * overlaps it is let go: it has to be able to walk out.
-     */
-    fun sweep(box: AABB, axis: Direction.Axis, distance: Double): Double {
+    override fun sweep(box: AABB, axis: Direction.Axis, distance: Double): Double {
         if (distance == 0.0) return 0.0
         val between = box.center.subtract(center)
         var enter = Double.NEGATIVE_INFINITY
@@ -125,19 +120,12 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
             exit = min(exit, max(first, second))
             if (enter >= exit) return distance
         }
-        if (enter < 0.0 || enter >= 1.0) return distance
-        val allowed = distance * enter - Math.copySign(CONTACT_GAP, distance)
+        if (enter !in 0.0..<1.0) return distance
+        val allowed = distance * enter - CONTACT_GAP.withSign(distance)
         return if (allowed * distance <= 0.0) 0.0 else allowed
     }
 
-    /** How far up [box] has to move to stop overlapping this collider; null when they do not overlap. */
-    fun lift(box: AABB): Double? = escape(box, UP)
-
-    /**
-     * How far [box] has to move along the unit [direction] to stop overlapping this collider; null when they
-     * do not overlap.
-     */
-    fun escape(box: AABB, direction: Vec3): Double? {
+    override fun escape(box: AABB, direction: Vec3): Double? {
         val between = box.center.subtract(center)
         var shortest = Double.POSITIVE_INFINITY
 
@@ -154,48 +142,30 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
     }
 
     /**
-     * Where this collider first touched [box] on its way here from [previous], over the last tick: a fast
-     * collider, a swung sword, can cross a whole entity in one tick and be past it by the end of it. Null
-     * when it never touched it.
-     */
-    fun firstTouch(previous: ColliderBox?, box: AABB): ColliderTouch? {
-        if (previous == null) return penetration(box)?.let { ColliderTouch(this, it) }
-        val steps = steps(previous, box)
-        for (step in 1..steps) {
-            val pose = if (step == steps) this else previous.lerp(this, step.toDouble() / steps)
-            pose.penetration(box)?.let { return ColliderTouch(pose, it) }
-        }
-        return null
-    }
-
-    /** How many poses between [previous] and this one are tried, so that none skips over [box] or over itself. */
-    private fun steps(previous: ColliderBox, box: AABB): Int {
-        val travel = previous.corners().zip(corners()).maxOf { (from, to) -> from.distanceTo(to) }
-        val thinnest = minOf(box.xsize, box.ysize, box.zsize, axes.minOf { it.length() } * 2.0).coerceAtLeast(MIN_STEP)
-        return ceil(travel / (thinnest / 2.0)).toInt().coerceIn(1, MAX_STEPS)
-    }
-
-    /**
-     * The pose [t] of the way from this one to [next]. Axes are blended and kept at their blended length,
+     * The pose [t] of the way from this one to [next]'s box. Axes are blended and kept at their blended length,
      * which for the turn a bone makes in one tick is close enough to the turn itself.
      */
-    fun lerp(next: ColliderBox, t: Double): ColliderBox = ColliderBox(
-        center.lerp(next.center, t),
-        blend(axisX, next.axisX, t),
-        blend(axisY, next.axisY, t),
-        blend(axisZ, next.axisZ, t),
-    )
+    override fun lerp(next: ColliderVolume, t: Double): ColliderBox {
+        val to = next.frame
+        return ColliderBox(center.lerp(to.center, t), blend(axisX, to.axisX, t), blend(axisY, to.axisY, t), blend(axisZ, to.axisZ, t))
+    }
 
-    /** Whether this is the very pose [other] is: a collider that has not moved. */
-    fun sameAs(other: ColliderBox): Boolean =
-        center == other.center && axisX == other.axisX && axisY == other.axisY && axisZ == other.axisZ
+    override fun sameAs(other: ColliderVolume): Boolean {
+        val box = other.frame
+        return center == box.center && axisX == box.axisX && axisY == box.axisY && axisZ == box.axisZ
+    }
 
-    fun move(x: Double, y: Double, z: Double): ColliderBox = ColliderBox(center.add(x, y, z), axisX, axisY, axisZ)
+    override fun move(x: Double, y: Double, z: Double): ColliderBox = ColliderBox(center.add(x, y, z), axisX, axisY, axisZ)
 
-    /** Where [point], carried by this box, is once the box has become [next]: how a moving collider moves what it holds. */
-    fun carry(point: Vec3, next: ColliderBox): Vec3? {
+    override fun carry(point: Vec3, next: ColliderVolume): Vec3? {
         val local = toLocal(point) ?: return null
-        return next.center.add(next.axisX.scale(local.x)).add(next.axisY.scale(local.y)).add(next.axisZ.scale(local.z))
+        val to = next.frame
+        return to.center.add(to.axisX.scale(local.x)).add(to.axisY.scale(local.y)).add(to.axisZ.scale(local.z))
+    }
+
+    override fun outline(lines: ColliderLines) {
+        val corners = corners()
+        EDGES.forEach { (from, to) -> lines.line(corners[from], corners[to]) }
     }
 
     /** Half the length of the shadows of this collider and of [box] on [normal], put together. */
@@ -221,13 +191,11 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
         private const val CONTACT_GAP = 1.0e-7
         private val SIGNS = doubleArrayOf(-1.0, 1.0)
         private val WORLD_AXES = listOf(Vec3(1.0, 0.0, 0.0), Vec3(0.0, 1.0, 0.0), Vec3(0.0, 0.0, 1.0))
-        private val UP = Vec3(0.0, 1.0, 0.0)
 
-        /** The most poses tried along one tick of a collider's motion. */
-        private const val MAX_STEPS = 16
-
-        /** The thinnest anything is taken to be when working out how many poses to try. */
-        private const val MIN_STEP = 0.05
+        /** Pairs of [corners] joined by an edge: they differ in exactly one axis. */
+        private val EDGES = (0 until 8).flatMap { from ->
+            listOf(1, 2, 4).mapNotNull { bit -> (from or bit).takeIf { from and bit == 0 }?.let { from to it } }
+        }
 
         private fun blend(from: Vec3, to: Vec3, t: Double): Vec3 {
             val blended = from.lerp(to, t)
@@ -276,5 +244,3 @@ class ColliderBox(val center: Vec3, val axisX: Vec3, val axisY: Vec3, val axisZ:
     }
 }
 
-/** A collider overlapping a box: the [pose] it overlapped it in, and the [overlap] that pushes the box out of it. */
-class ColliderTouch(val pose: ColliderBox, val overlap: Vec3)

@@ -19,7 +19,11 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
 object ServerColliderPoses {
     const val HISTORY_TICKS = 10
 
-    private val tracks = ColliderPoseTracks(HISTORY_TICKS) { model -> ServerColliderAssets.of(model).pose }
+    private val tracks = ColliderPoseTracks(
+        HISTORY_TICKS,
+        assetsOf = { model -> ServerColliderAssets.of(model).pose },
+        posedAnyway = { model -> ServerColliderAssets.of(model).runsOnServer },
+    )
 
     /** The entities of each level with colliders, and those whose colliders act on bodies, as of the last tick. */
     private val hosts = HashMap<Level, List<ColliderHost>>()

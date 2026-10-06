@@ -87,14 +87,14 @@ internal object ColliderTouches {
             near.forEach { other ->
                 val box = other.boundingBox
                 val around = box.inflate(TOUCH_MARGIN).expandTowards(0.0, -STAND_DEPTH, 0.0)
-                if (collider.box.firstTouch(previous, around) == null) return@forEach
-                into[Touch(entity, other, collider.name, collider.bone)] = isStanding(collider.box, box)
+                if (collider.volume.firstTouch(previous, around) == null) return@forEach
+                into[Touch(entity, other, collider.name, collider.bone)] = isStanding(collider.volume, box)
             }
         }
     }
 
     /** Whether [box] rests on top of [collider]: it reaches under the feet and nowhere above them. */
-    private fun isStanding(collider: ColliderBox, box: AABB): Boolean {
+    private fun isStanding(collider: ColliderVolume, box: AABB): Boolean {
         val feet = AABB(box.minX, box.minY - STAND_DEPTH, box.minZ, box.maxX, box.minY + FEET, box.maxZ)
         val body = AABB(box.minX, box.minY + FEET, box.minZ, box.maxX, box.maxY, box.maxZ)
         return collider.penetration(feet) != null && collider.penetration(body) == null

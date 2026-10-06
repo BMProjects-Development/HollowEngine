@@ -40,6 +40,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
 import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.hssColorLiteralText
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import java.io.File
@@ -577,6 +578,20 @@ object HollowIdeOverlay {
         contributions.start()
         restoreLayout()
         surface.setContent { Content() }
+        TagModuleRevision.observe(::rereadFilesSoon)
+    }
+
+    @Volatile
+    private var rereadPending = false
+
+    /** Reads the open files again once the kinds they are stored as have changed. */
+    private fun rereadFilesSoon() {
+        if (rereadPending) return
+        rereadPending = true
+        Minecraft.getInstance().execute {
+            rereadPending = false
+            model.rereadUnchangedFiles()
+        }
     }
 
     private fun restoreLayout() {

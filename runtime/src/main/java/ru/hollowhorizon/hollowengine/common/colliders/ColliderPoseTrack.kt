@@ -29,7 +29,7 @@ internal class ColliderPoseTrack(
     assetsOf: (String) -> ColliderPoseAssets?,
 ) {
     private val posed = PosedModel(assets.model, assets.rig.overlay(own), null, assetsOf)
-    private val target = PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias)
+    private val target = PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig)
     private val animator = ModelAnimator()
     private val context = AnimatorEvaluationContext()
     private var posedAt = Long.MIN_VALUE
@@ -48,12 +48,13 @@ internal class ColliderPoseTrack(
         posed.resetPose()
         animator.configure(assets.animator, node.animations)
         fillAnimationVariables(context, entity, 1f)
+        context.modelToWorld = resolveNodeWorldTransform(entity, node.transform, 1f)
         animator.applyTo(target, context)
         posed.applyRigPoses()
         posed.updateMatrices()
 
         val placed = applyOverrides(entity, posed.placeColliders(entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))
-        bounds = placed.map { it.box.bounds }.reduceOrNull(AABB::minmax)
+        bounds = placed.map { it.volume.bounds }.reduceOrNull(AABB::minmax)
         history.addFirst(placed)
         while (history.size > historyTicks) history.removeLast()
     }
@@ -66,15 +67,17 @@ internal class ColliderPoseTrack(
 internal class ColliderPoseTracks(
     private val historyTicks: Int,
     private val assetsOf: (model: String) -> ColliderPoseAssets?,
+    private val posedAnyway: (model: String) -> Boolean = { false },
 ) {
     /**
-     * The track of [entity], or null when nothing on its model has colliders. Only the tick poses it again,
+     * The track of [entity], or null when nothing on its model needs posing. Only the tick poses it again,
      * with [advance]: whatever asks during a tick sees the poses the last one ended with.
      */
     fun track(entity: Entity, advance: Boolean = false): ColliderPoseTrack? {
         val runtime = AttachmentRegistry.attachmentsOrNull(entity)?.runtime ?: return null
         val node = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull()
-        val assets = node?.takeIf { EntityColliders.rig(entity)?.hasColliders() == true }?.let { assetsOf(it.model.model) }
+        val needed = node != null && (EntityColliders.rig(entity)?.hasColliders() == true || posedAnyway(node.model.model))
+        val assets = node?.takeIf { needed }?.let { assetsOf(it.model.model) }
         if (node == null || assets == null) {
             runtime.remove(this)
             return null

@@ -73,7 +73,7 @@ object EntityColliders {
                 if (source != null && entity.rootVehicle === source.rootVehicle) return@forEach
                 of(entity).forEach { collider ->
                     if (!modes(collider.spec.modes)) return@forEach
-                    val location = collider.box.clip(start, end) ?: return@forEach
+                    val location = collider.volume.clip(start, end) ?: return@forEach
                     val distance = start.distanceToSqr(location)
                     if (distance < nearestDistance) {
                         nearest = ColliderHitResult(entity, location, collider)

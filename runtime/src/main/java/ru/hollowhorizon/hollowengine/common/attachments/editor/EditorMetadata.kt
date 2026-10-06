@@ -48,6 +48,17 @@ annotation class EditorRange(
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorBone
 
+/** Edits the field with the editor registered under [id] instead of the one its type would get. */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorWidget(val id: String)
+
+/** The field editors the engine registers, by the id [EditorWidget] names them with. */
+object EditorWidgets {
+    /** A list of names of the colliders on the same bone as the attachment, ticked off among those there are. */
+    const val COLLIDERS = "hollowengine:colliders"
+}
+
 /** A string field that deserves more than one line. */
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)

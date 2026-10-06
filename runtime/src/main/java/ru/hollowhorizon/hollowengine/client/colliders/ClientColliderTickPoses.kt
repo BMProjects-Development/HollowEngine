@@ -46,7 +46,7 @@ object ClientColliderTickPoses {
             .mapNotNull { entity -> tracks.track(entity, advance = true)?.let { PosedHost.of(entity, it.history) } }
         hosts = entities.mapNotNull { entity ->
             val drawn = ClientColliderPoses.of(entity)
-            if (drawn.isEmpty()) null else ColliderHost(entity, drawn.map { it.box.bounds }.reduce(AABB::minmax))
+            if (drawn.isEmpty()) null else ColliderHost(entity, drawn.map { it.volume.bounds }.reduce(AABB::minmax))
         }
     }
 

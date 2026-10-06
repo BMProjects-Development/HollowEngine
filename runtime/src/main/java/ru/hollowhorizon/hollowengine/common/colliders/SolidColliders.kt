@@ -36,7 +36,7 @@ internal object SolidColliders {
 
     private val SIDEWAYS = listOf(Vec3(1.0, 0.0, 0.0), Vec3(-1.0, 0.0, 0.0), Vec3(0.0, 0.0, 1.0), Vec3(0.0, 0.0, -1.0))
 
-    private class Move(val boxes: List<ColliderBox>, val movement: Vec3)
+    private class Move(val boxes: List<ColliderVolume>, val movement: Vec3)
 
     private val active = ThreadLocal<Move?>()
 
@@ -139,7 +139,7 @@ internal object SolidColliders {
      * the last tick, as when it turned or an animation swung them; null when they went into none. A wall a
      * collider was in already is left alone: one put there on purpose keeps the entity where it was put.
      */
-    fun outOfWalls(host: Entity, colliders: List<Pair<ColliderBox, ColliderBox?>>): Vec3? {
+    fun outOfWalls(host: Entity, colliders: List<Pair<ColliderVolume, ColliderVolume?>>): Vec3? {
         if (colliders.isEmpty()) return null
         val reach = colliders.map { it.first.bounds }.reduce(AABB::minmax)
         val floor = floorOf(host, 0.0)
@@ -156,13 +156,13 @@ internal object SolidColliders {
     }
 
     /** The longest of the ways out of the walls the colliders are still in, moved by [offset]; null when they are in none. */
-    private fun deepestExit(entered: List<Pair<ColliderBox, List<AABB>>>, offset: Vec3): Vec3? = entered.flatMap { (box, walls) ->
+    private fun deepestExit(entered: List<Pair<ColliderVolume, List<AABB>>>, offset: Vec3): Vec3? = entered.flatMap { (box, walls) ->
         val moved = box.move(offset.x, 0.0, offset.z)
         walls.mapNotNull { exitFrom(moved, it) }
     }.maxByOrNull { it.lengthSqr() }
 
     /** The shortest way sideways out of [wall] for the entity [box] belongs to; the wall would go the other way. */
-    private fun exitFrom(box: ColliderBox, wall: AABB): Vec3? = SIDEWAYS.mapNotNull { direction ->
+    private fun exitFrom(box: ColliderVolume, wall: AABB): Vec3? = SIDEWAYS.mapNotNull { direction ->
         box.escape(wall, direction)?.let { direction.scale(-(it + WALL_GAP)) }
     }.minByOrNull { it.lengthSqr() }
 
@@ -184,7 +184,7 @@ internal object SolidColliders {
     }
 
     /** How far of [distance] the colliders can move along [axis] before one of them runs into one of [blocks]. */
-    private fun clampOwn(own: List<ColliderBox>, blocks: List<AABB>, axis: Direction.Axis, distance: Double): Double {
+    private fun clampOwn(own: List<ColliderVolume>, blocks: List<AABB>, axis: Direction.Axis, distance: Double): Double {
         var allowed = distance
         for (collider in own) for (block in blocks) {
             if (allowed == 0.0) return 0.0
@@ -213,7 +213,7 @@ internal object SolidColliders {
         return around(entity, Vec3.ZERO).any { it.penetration(feet) != null }
     }
 
-    private fun clamp(axis: Direction.Axis, box: AABB, shapes: List<VoxelShape>, boxes: List<ColliderBox>, distance: Double): Double {
+    private fun clamp(axis: Direction.Axis, box: AABB, shapes: List<VoxelShape>, boxes: List<ColliderVolume>, distance: Double): Double {
         var allowed = if (shapes.isEmpty()) distance else Shapes.collide(axis, box, shapes, distance)
         for (collider in boxes) {
             if (allowed == 0.0) break
@@ -226,22 +226,22 @@ internal object SolidColliders {
      * The solid colliders around [entity] moving by [movement]. Those of an entity moving it out of them,
      * see [ColliderContacts.displacer], let it through.
      */
-    private fun around(entity: Entity, movement: Vec3): List<ColliderBox> {
+    private fun around(entity: Entity, movement: Vec3): List<ColliderVolume> {
         val reach = entity.boundingBox.expandTowards(movement).inflate(entity.maxUpStep().toDouble() + 0.5)
         val displacer = ColliderContacts.displacer
         return solidIn(entity.level(), reach) { it.isOtherThan(entity) && it !== displacer }
     }
 
     /** The solid colliders now in [area], of the entities [hosts] lets in. */
-    private fun solidIn(level: Level, area: AABB, hosts: (Entity) -> Boolean): List<ColliderBox> =
+    private fun solidIn(level: Level, area: AABB, hosts: (Entity) -> Boolean): List<ColliderVolume> =
         EntityColliders.physicalHosts(level).flatMap { host ->
             if (!host.bounds.intersects(area) || host.entity.isRemoved || !hosts(host.entity)) return@flatMap emptyList()
-            host.now.filter { it.spec.modes.solid && it.box.bounds.intersects(area) }.map { it.box }
+            host.now.filter { it.spec.modes.solid && it.volume.bounds.intersects(area) }.map { it.volume }
         }
 
     private fun Entity.isOtherThan(entity: Entity): Boolean = this !== entity && rootVehicle !== entity.rootVehicle
 
     /** Where the solid colliders of [host] are now, as this side sees them. */
-    fun solidBoxes(host: Entity): List<ColliderBox> =
-        EntityColliders.physical(host).firstOrNull().orEmpty().filter { it.spec.modes.solid }.map { it.box }
+    fun solidBoxes(host: Entity): List<ColliderVolume> =
+        EntityColliders.physical(host).firstOrNull().orEmpty().filter { it.spec.modes.solid }.map { it.volume }
 }

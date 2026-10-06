@@ -20,8 +20,8 @@ class PosedHost private constructor(
     val bounds: AABB,
 ) {
     /** Where [collider] was the tick before, or null when it was not there yet. */
-    fun previousOf(collider: EntityCollider): ColliderBox? =
-        before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.box
+    fun previousOf(collider: EntityCollider): ColliderVolume? =
+        before.firstOrNull { it.name == collider.name && it.bone == collider.bone }?.volume
 
     companion object {
         /**
@@ -36,7 +36,7 @@ class PosedHost private constructor(
             val now = history.firstOrNull()?.filter { modes(it.spec.modes) }.orEmpty()
             if (now.isEmpty()) return null
             val before = history.getOrNull(1).orEmpty().filter { modes(it.spec.modes) }
-            val bounds = (now + before).map { it.box.bounds }.reduce(AABB::minmax)
+            val bounds = (now + before).map { it.volume.bounds }.reduce(AABB::minmax)
             return PosedHost(entity, now, before, bounds)
         }
     }

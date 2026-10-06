@@ -5,6 +5,7 @@ import kotlinx.coroutines.delay
 import ru.hollowhorizon.hollowengine.client.editor.GizmoDrag
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
@@ -16,7 +17,10 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import kotlin.time.Duration.Companion.milliseconds
@@ -27,7 +31,6 @@ private const val PhysicsIcon = "hollowengine:textures/gui/icons/timeline/play.s
 private const val StopIcon = "hollowengine:textures/gui/icons/timeline/pause.svg"
 private const val SkeletonIcon = "hollowengine:textures/gui/icons/rig/skeleton.svg"
 private const val ColliderIcon = "hollowengine:textures/gui/icons/rig/colliders.svg"
-private const val GenerateIcon = "hollowengine:textures/gui/icons/reload.svg"
 
 /** The modes of the collider gizmo, with the icons and names the IDE toolbar gives them for the world. */
 private val GizmoModes = listOf(
@@ -51,7 +54,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
     var preview by remember(document) { mutableStateOf<RigPreview?>(null) }
 
     LaunchedEffect(document.revision) {
-        viewer.attachment.rig = document.rig.withoutColliders()
+        viewer.attachment.rig = document.rig
         file.updateDirty(document.isModified)
         if (!document.isModified) return@LaunchedEffect
         delay(AutoSaveDelayMillis.milliseconds)
@@ -129,13 +132,36 @@ private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, previ
                 onClick = onPhysics,
             )
         }
-        RigGenerators.all.forEach { entry ->
-            AnimatorIconButton(GenerateIcon, entry.titleKey.lang, size = 12f) {
-                viewer.attachment.ensureReady()
-                document.edit { entry.generator.generate(viewer.attachment, it) }
-            }
-        }
+        GenerateButton(document, viewer)
     }
+}
+
+/** One button for every way to fill in the rig, each named with its own icon in the menu it opens. */
+@Composable
+private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerState) {
+    val generators = RigGenerators.all
+    if (generators.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    var anchor by remember { mutableStateOf(UiRect.Zero) }
+    AnimatorIconButton(
+        RigGenerators.DEFAULT_ICON,
+        rigText("generate"),
+        size = 12f,
+        active = open,
+        modifier = Modifier.onPlaced { anchor = it },
+    ) { open = !open }
+    if (!open) return
+    ContextMenu(
+        id = "rig-generate-menu",
+        anchorBounds = anchor,
+        items = generators.map { entry ->
+            UiDropdownItem(entry.titleKey.lang, entry.icon) {
+                viewer.attachment.ensureReady()
+                document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(viewer.attachment, it) }
+            }
+        },
+        onExpandedChange = { if (!it) open = false },
+    )
 }
 
 /**

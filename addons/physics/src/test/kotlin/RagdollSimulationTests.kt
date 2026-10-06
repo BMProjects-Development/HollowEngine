@@ -165,4 +165,28 @@ class RagdollSimulationTests {
 
     private fun distanceBetween(first: Vec3f, second: Vec3f): Float =
         MutableVec3f(first).subtract(second).length()
+
+    @Test
+    fun `a shove every tick carries the ragdoll at its pace instead of speeding it up`() {
+        assertTrue(JoltNatives.ensureLoaded().isSuccess, "Jolt did not load")
+        val plan = spinePlan()
+        val system = PhysicsWorld.createSystem()
+        val instance = requireNotNull(RagdollInstance.create(system, RagdollTemplate.build(plan, spec), spec))
+        val placement = ModelPlacement(Vec3f(0f, 70f, 0f), QuatF.IDENTITY)
+        instance.start(placement, plan.bones.associate { it.nodeIndex to matrixOf(QuatF.IDENTITY, it.bindPosition) as Mat4f }, Vec3f.ZERO)
+
+        val allocator = TempAllocatorImpl(8 * 1024 * 1024)
+        val jobs = JobSystemThreadPool(Jolt.cMaxPhysicsJobs, Jolt.cMaxPhysicsBarriers, 1)
+        repeat(20) {
+            instance.nudge(Vec3f(3f, 0f, 0f))
+            system.update(1f / 20f, 3, allocator, jobs)
+        }
+
+        val bodies = system.bodyInterface
+        instance.bodyIds.forEach { id ->
+            val speed = bodies.getLinearVelocity(id).x
+            assertTrue(speed in 0f..3.5f, "A body moves at $speed blocks a second along the shove, which is 3")
+        }
+        instance.close()
+    }
 }

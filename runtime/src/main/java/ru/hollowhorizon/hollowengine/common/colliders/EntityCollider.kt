@@ -8,15 +8,11 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.deg
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.sqrt
 
 /** One collider of an entity, where it is in the world for one tick or one frame. */
@@ -24,15 +20,18 @@ class EntityCollider(
     val name: String,
     val bone: String?,
     val spec: ColliderAttachmentSpec,
-    val box: ColliderBox,
+    val volume: ColliderVolume,
 )
 
 internal val ModelRig.colliders: List<Pair<String?, ColliderAttachmentSpec>>
     get() = allAttachments().mapNotNull { (bone, spec) -> (spec as? ColliderAttachmentSpec)?.let { bone to it } }
 
 fun ModelRig.hasColliders(modes: (ColliderModes) -> Boolean = { true }): Boolean =
-    attachments.any { it is ColliderAttachmentSpec && modes(it.modes) } ||
-        bones.values.any { bone -> bone.attachments.any { it is ColliderAttachmentSpec && modes(it.modes) } }
+    attachments.any { it is ColliderAttachmentSpec && modes(it.modes) } || bones.values.any { bone ->
+        bone.attachments.any {
+            it is ColliderAttachmentSpec && modes(it.modes)
+        }
+    }
 
 /**
  * Places every collider of the rig on the current pose of [roots]. [toEntity] carries model space to the
@@ -58,9 +57,15 @@ internal fun ModelRig.placeColliders(
     }
 }
 
-/** The box [holder] carries this collider to; a world-aligned one keeps only where its center goes. */
-internal fun ColliderAttachmentSpec.place(holder: Mat4f, toEntity: Mat4f, origin: Vec3): ColliderBox {
-    if (alignment == ColliderAlignment.ORIENTED) return ColliderBox.of(holder.mul(localMatrix(), MutableMat4f()), origin)
+/** Where [holder] carries this collider to: its shape inside its box, which keeps only where its center goes when world-aligned. */
+internal fun ColliderAttachmentSpec.place(holder: Mat4f, toEntity: Mat4f, origin: Vec3): ColliderVolume =
+    ColliderShapeFactories.place(shape, frame(holder, toEntity, origin))
+
+private fun ColliderAttachmentSpec.frame(holder: Mat4f, toEntity: Mat4f, origin: Vec3): ColliderBox {
+    if (alignment == ColliderAlignment.ORIENTED) return ColliderBox.of(
+        holder.mul(localMatrix(), MutableMat4f()),
+        origin
+    )
 
     val center = holder.transform(offset, 1f, MutableVec3f())
     val scale = toEntity.uniformScale()
@@ -72,8 +77,7 @@ internal fun ColliderAttachmentSpec.place(holder: Mat4f, toEntity: Mat4f, origin
 
 /** The skeleton of [model] standing in its rest pose, with its matrices worked out. */
 internal fun restPose(model: Model): List<RuntimeNode> =
-    model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, null) }
-        .onEach { root ->
+    model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, null) }.onEach { root ->
             root.walk().forEach(RuntimeNode::resetPose)
             root.updateHierarchyMatrices()
         }
@@ -91,7 +95,7 @@ fun fitEntityBox(colliders: List<EntityCollider>): Pair<Float, Float>? {
     var radius = 0.0
     var top = 0.0
     colliders.forEach { collider ->
-        collider.box.corners().forEach { corner ->
+        collider.volume.frame.corners().forEach { corner ->
             radius = maxOf(radius, sqrt(corner.x * corner.x + corner.z * corner.z))
             top = maxOf(top, corner.y)
         }
@@ -107,6 +111,17 @@ fun fitEntityBox(colliders: List<EntityCollider>): Pair<Float, Float>? {
 internal fun entityModelMatrix(host: Entity, transform: TransformComponent, partialTick: Float): Mat4f =
     MutableMat4f().rotate(hostRotation(host, partialTick)).scale(hostScale(host, partialTick))
         .mul(transform.transform.matrixF)
+
+/** Where a model node carried by [host] stands in the world: its own transform, then the host's. */
+fun resolveNodeWorldTransform(host: Entity, transform: TransformComponent, partialTick: Float): TrsTransformF {
+    val hostPosition = hostPosition(host, partialTick).let { Vec3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
+    val hostRotation = hostRotation(host, partialTick)
+    val hostScale = hostScale(host, partialTick)
+    val local = transform.transform
+    val worldTranslation = (Vec3f(local.translation) * hostScale).rotateBy(hostRotation) + hostPosition
+    val worldRotation = MutableQuatF(hostRotation).mul(local.rotation).norm()
+    return TrsTransformF().setCompositionOf(worldTranslation, worldRotation, Vec3f(local.scale) * hostScale)
+}
 
 /** How the host turns what it carries: a world object turns freely, any other entity with its body's yaw. */
 internal fun hostRotation(host: Entity, partialTick: Float): QuatF {

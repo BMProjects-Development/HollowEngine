@@ -58,7 +58,7 @@ internal object ColliderClaims {
         if (eye.distanceToSqr(point) > reach * reach || !isInView(player, eye, point) || isWalledOff(player, eye, point)) return
 
         val collider = ServerColliderPoses.recent(target).firstNotNullOfOrNull { tick ->
-            tick.firstOrNull { it.name == packet.collider && it.bone == packet.bone && it.box.distanceTo(point) <= TOLERANCE }
+            tick.firstOrNull { it.name == packet.collider && it.bone == packet.bone && it.volume.distanceTo(point) <= TOLERANCE }
                 ?.takeIf { claimed -> isFirstOnTheWay(tick, claimed, eye, point) }
         } ?: return
 
@@ -94,7 +94,7 @@ internal object ColliderClaims {
         if (open <= 0.0) return true
         return tick.none { other ->
             other !== claimed && other.spec.modes.isTarget &&
-                other.box.clip(eye, point)?.let { eye.distanceToSqr(it) < open * open } == true
+                other.volume.clip(eye, point)?.let { eye.distanceToSqr(it) < open * open } == true
         }
     }
 

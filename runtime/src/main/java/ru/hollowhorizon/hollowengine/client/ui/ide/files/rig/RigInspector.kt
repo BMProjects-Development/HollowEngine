@@ -120,8 +120,13 @@ private fun AttachmentSection(
         if (type == null) {
             Hint(rigText("unknown_attachment"))
         } else {
-            AttachmentFields(type, attachment, "/${bone ?: ""}/${attachment.id}") { changed ->
-                document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}", label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) { it.withHolder(bone, current.withAttachment(attachment.id, changed)) }
+            val colliders = document.occupied.holder(bone).attachments.filterIsInstance<ColliderAttachmentSpec>().map { it.id }
+            CompositionLocalProvider(LocalEditorColliders provides colliders) {
+                AttachmentFields(type, attachment, "/${bone ?: ""}/${attachment.id}") { changed ->
+                    document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}", label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) {
+                        it.withHolder(bone, current.withAttachment(attachment.id, changed))
+                    }
+                }
             }
         }
 

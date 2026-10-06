@@ -322,6 +322,16 @@ internal class HollowIdeModel(
         }
     }
 
+    /** Reads every open file without unsaved edits again from disk. */
+    fun rereadUnchangedFiles() {
+        files.values.toList().filter { !it.dirty && !it.readOnly && !it.virtual && it.type.requiresContent }.forEach { file ->
+            val source = file.path.fromReadablePath()
+            if (!source.isFile) return@forEach
+            runCatching { file.refresh(source.readBytes()) }
+                .onFailure { HollowEngine.LOGGER.warn("Could not read '{}' again: {}", file.path, it.message) }
+        }
+    }
+
     /** Reconcile once on return from another application, without polling the filesystem per frame. */
     fun refreshExternalFiles() {
         tree.refresh()

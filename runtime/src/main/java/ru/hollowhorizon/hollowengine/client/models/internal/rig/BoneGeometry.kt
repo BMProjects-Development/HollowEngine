@@ -10,9 +10,18 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /** A box around the geometry a bone holds, in that bone's own space. */
 class BoneBounds(val min: Vec3f, val max: Vec3f) {
+    val thinnestSide: Float get() = minOf(max.x - min.x, max.y - min.y, max.z - min.z)
     val center: Vec3f get() = Vec3f((min.x + max.x) / 2f, (min.y + max.y) / 2f, (min.z + max.z) / 2f)
     val size: Vec3f get() = Vec3f(max.x - min.x, max.y - min.y, max.z - min.z)
     val largestSide: Float get() = maxOf(max.x - min.x, max.y - min.y, max.z - min.z)
+
+    companion object {
+        /** The box around [points]. */
+        fun around(points: List<Vec3f>) = BoneBounds(
+            Vec3f(points.minOf { it.x }, points.minOf { it.y }, points.minOf { it.z }),
+            Vec3f(points.maxOf { it.x }, points.maxOf { it.y }, points.maxOf { it.z }),
+        )
+    }
 }
 
 /**
@@ -20,7 +29,7 @@ class BoneBounds(val min: Vec3f, val max: Vec3f) {
  * when they fit a box or a body to a bone.
  */
 object BoneGeometry {
-    /** Every bone that holds geometry, with the box around it, in skeleton order. */
+    /** Every bone that holds geometry, with the surrounding box, in skeleton order. */
     fun boundsPerBone(model: ModelAttachment): Map<RuntimeNode, BoneBounds> =
         boundsPerBone(model.nodes.flatMap { it.walk() }, model.model.boneBounds)
 
@@ -28,20 +37,28 @@ object BoneGeometry {
      * [geometry] is the local box of each node's mesh by node index. A mesh on a node that is no bone
      * counts towards the nearest bone above it.
      */
-    fun boundsPerBone(nodes: List<RuntimeNode>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<RuntimeNode, BoneBounds> {
+    fun boundsPerBone(nodes: List<RuntimeNode>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<RuntimeNode, BoneBounds> =
+        cornersPerBone(nodes, geometry).mapValues { (_, corners) ->
+            BoneBounds.around(corners)
+        }
+
+    /** The corners of every piece of geometry each bone holds, in the bone's own space: what a hull is fitted around. */
+    fun cornersPerBone(model: ModelAttachment): Map<RuntimeNode, List<Vec3f>> =
+        cornersPerBone(model.nodes.flatMap { it.walk() }, model.model.boneBounds)
+
+    fun cornersPerBone(nodes: List<RuntimeNode>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<RuntimeNode, List<Vec3f>> {
         if (nodes.isEmpty() || geometry.isEmpty()) return emptyMap()
 
         val bindGlobals = bindGlobalsOf(nodes)
         val bones = boneNodes(nodes)
-        val boxes = LinkedHashMap<RuntimeNode, Accumulator>()
+        val corners = LinkedHashMap<RuntimeNode, MutableList<Vec3f>>()
         val corner = MutableVec3f()
-        val inBone = MutableVec3f()
 
         nodes.forEach { node ->
             val (min, max) = geometry[node.definition.index] ?: return@forEach
             val bone = if (node in bones) node else node.boneAncestor(bones) ?: return@forEach
             val toBone = intoBoneSpace(node, bone, bindGlobals) ?: return@forEach
-            val box = boxes.getOrPut(bone) { Accumulator() }
+            val ofBone = corners.getOrPut(bone) { ArrayList() }
 
             repeat(CORNERS) { index ->
                 corner.set(
@@ -49,11 +66,10 @@ object BoneGeometry {
                     if (index and 2 == 0) min.y else max.y,
                     if (index and 4 == 0) min.z else max.z,
                 )
-                toBone.transform(corner, 1f, inBone)
-                box.add(inBone)
+                ofBone += Vec3f(toBone.transform(corner, 1f, MutableVec3f()))
             }
         }
-        return boxes.mapValues { (_, box) -> box.bounds() }
+        return corners
     }
 
     /** The nodes that are bones: the joints of a skin, or for a model without one, every node that only groups others. */
@@ -74,7 +90,8 @@ object BoneGeometry {
         return inverse.mul(nodeGlobal, MutableMat4f())
     }
 
-    private fun bindGlobalsOf(nodes: List<RuntimeNode>): Map<Int, Mat4f> {
+    /** Where every node stands in model space in the bind pose, by node index. */
+    fun bindGlobalsOf(nodes: List<RuntimeNode>): Map<Int, Mat4f> {
         val globals = HashMap<Int, Mat4f>(nodes.size)
         nodes.forEach { node ->
             val local = node.definition.baseTransform.matrixF
@@ -82,22 +99,6 @@ object BoneGeometry {
             globals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: local
         }
         return globals
-    }
-
-    private class Accumulator {
-        private val min = MutableVec3f(Float.POSITIVE_INFINITY)
-        private val max = MutableVec3f(Float.NEGATIVE_INFINITY)
-
-        fun add(point: Vec3f) {
-            min.x = minOf(min.x, point.x)
-            min.y = minOf(min.y, point.y)
-            min.z = minOf(min.z, point.z)
-            max.x = maxOf(max.x, point.x)
-            max.y = maxOf(max.y, point.y)
-            max.z = maxOf(max.z, point.z)
-        }
-
-        fun bounds() = BoneBounds(Vec3f(min.x, min.y, min.z), Vec3f(max.x, max.y, max.z))
     }
 
     private val IDENTITY: Mat4f = MutableMat4f().setIdentity()

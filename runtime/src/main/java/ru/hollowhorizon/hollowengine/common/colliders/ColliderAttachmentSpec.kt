@@ -91,10 +91,16 @@ data class ColliderAttachmentSpec(
     val rotation: Vec3f = Vec3f.ZERO,
     @EditorName("$LANG.size")
     val size: Vec3f = Vec3f(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE),
+    @EditorName("$LANG.shape")
+    @EditorDescription("$LANG.shape.hint")
+    val shape: ColliderShapeSpec = BoxShapeSpec,
     @EditorName("$LANG.modes")
     val modes: ColliderModes = ColliderModes(),
 ) : RigAttachmentSpec() {
     override fun withId(id: String) = copy(id = id)
+
+    /** A collider builds nothing on the drawn model, so moving or resizing one never rebuilds it. */
+    override fun structure() = ColliderAttachmentSpec(id = id)
 
     val orientation: QuatF get() = eulerRotation(rotation)
 

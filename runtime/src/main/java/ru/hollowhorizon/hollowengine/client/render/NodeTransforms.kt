@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
 import ru.hollowhorizon.hollowengine.common.colliders.hostScale
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import java.util.*
@@ -56,24 +57,6 @@ fun resolveNodeTransform(
                 worldTransform.translation.z.toDouble()
             )
         ),
-    )
-}
-
-fun resolveNodeWorldTransform(
-    host: Entity,
-    transform: TransformComponent,
-    partialTick: Float,
-): TrsTransformF {
-    val hostPosition = hostPosition(host, partialTick).let { Vec3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
-    val hostRotation = hostRotation(host, partialTick)
-    val hostScale = hostScale(host, partialTick)
-    val local = transform.transform
-    val worldTranslation = (Vec3f(local.translation) * hostScale).rotateBy(hostRotation) + hostPosition
-    val worldRotation = MutableQuatF(hostRotation).mul(local.rotation).norm()
-    return TrsTransformF().setCompositionOf(
-        worldTranslation,
-        worldRotation,
-        Vec3f(local.scale) * hostScale,
     )
 }
 

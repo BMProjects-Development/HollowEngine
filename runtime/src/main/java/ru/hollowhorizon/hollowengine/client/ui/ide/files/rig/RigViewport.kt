@@ -171,7 +171,7 @@ private fun pick(document: HollowIdeRigDocument, state: RigEditorState, x: Float
     if (!state.showColliders || !state.gizmo.capture(viewer)) return
     val (start, end) = state.gizmo.ray(x, y) ?: return
     val hits = previewColliders(document.rig, viewer.nodes)
-        .mapNotNull { collider -> collider.box.clip(start, end)?.let { collider to it.distanceToSqr(start) } }
+        .mapNotNull { collider -> collider.volume.clip(start, end)?.let { collider to it.distanceToSqr(start) } }
         .sortedBy { it.second }
         .map { it.first }
     if (hits.isEmpty()) return

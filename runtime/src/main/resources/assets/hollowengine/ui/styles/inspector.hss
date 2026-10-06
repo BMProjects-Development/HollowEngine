@@ -192,6 +192,10 @@
     font-size: $font-size-small;
 }
 
+.insp-hint.warning {
+    foreground: $warning;
+}
+
 .insp-readonly {
     size: 100% fit;
     min-height: 15px;

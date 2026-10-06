@@ -38,12 +38,6 @@ internal fun publishRig(modelId: String, rig: ModelRig) {
     Minecraft.getInstance().singleplayerServer?.execute { ServerColliderAssets.invalidate(modelId) }
 }
 
-/** The rig with its colliders taken off; nothing the preview builds for its bones depends on them. */
-internal fun ModelRig.withoutColliders(): ModelRig = copy(
-    attachments = attachments.filterNot { it is ColliderAttachmentSpec },
-    bones = bones.mapValues { (_, bone) -> bone.copy(attachments = bone.attachments.filterNot { it is ColliderAttachmentSpec }) },
-)
-
 /** The colliders of [rig] on the preview's current pose, in model space. */
 internal fun previewColliders(rig: ModelRig, roots: List<RuntimeNode>): List<EntityCollider> =
     rig.placeColliders(roots, IDENTITY, Vec3.ZERO)
@@ -56,10 +50,13 @@ internal fun holderMatrix(roots: List<RuntimeNode>, bone: String?): Mat4f? {
 
 internal fun DebugLines.Batch.colliders(colliders: List<EntityCollider>, selected: ColliderSelection?) {
     colliders.forEach { collider ->
-        val box = collider.box
         val isSelected = selected != null && selected.bone == collider.bone && selected.id == collider.name
         val color = if (isSelected) SELECTED_COLOR else ColliderDebugRenderer.colorOf(collider.spec.modes)
-        box(box.center.toVec3f(), box.axisX.toVec3f(), box.axisY.toVec3f(), box.axisZ.toVec3f(), color)
+        collider.volume.outline { start, end -> line(start.toVec3f(), end.toVec3f(), color) }
+        // The box the gizmo sizes, around a selected shape that does not fill it.
+        if (isSelected && collider.volume !== collider.volume.frame) {
+            collider.volume.frame.outline { start, end -> line(start.toVec3f(), end.toVec3f(), FRAME_COLOR) }
+        }
     }
 }
 
@@ -107,3 +104,4 @@ private val IDENTITY: Mat4f = MutableMat4f().setIdentity()
 private const val MIN_SIZE = 0.01f
 
 private val SELECTED_COLOR = 0xFFFFA333.toInt()
+private val FRAME_COLOR = 0x66FFA333

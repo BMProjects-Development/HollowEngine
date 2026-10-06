@@ -52,7 +52,7 @@ internal object ColliderContacts {
             }
             host.now.forEach { collider ->
                 val previous = host.previousOf(collider)
-                val swept = previous?.bounds?.minmax(collider.box.bounds) ?: collider.box.bounds
+                val swept = previous?.bounds?.minmax(collider.volume.bounds) ?: collider.volume.bounds
                 if (!swept.intersects(near)) return@forEach
 
                 if (collider.spec.modes.solid) touchSolid(entity, host.entity, collider, previous)
@@ -64,14 +64,14 @@ internal object ColliderContacts {
     /** Moves [own]'s entity out of the walls its solid colliders turned or swung into over the last tick. */
     private fun leaveWalls(own: PosedHost) {
         val solid = own.now.filter { it.spec.modes.solid }
-        val moved = solid.any { collider -> own.previousOf(collider)?.sameAs(collider.box) == false }
+        val moved = solid.any { collider -> own.previousOf(collider)?.sameAs(collider.volume) == false }
         if (!moved) return
-        val out = SolidColliders.outOfWalls(own.entity, solid.map { it.box to own.previousOf(it) }) ?: return
+        val out = SolidColliders.outOfWalls(own.entity, solid.map { it.volume to own.previousOf(it) }) ?: return
         displace(own.entity, own.entity, out)
     }
 
-    private fun touchSolid(entity: Entity, host: Entity, collider: EntityCollider, previous: ColliderBox?) {
-        val box = collider.box
+    private fun touchSolid(entity: Entity, host: Entity, collider: EntityCollider, previous: ColliderVolume?) {
+        val box = collider.volume
         val support = previous ?: box
         if (entity.onGround() && support.penetration(entity.boundingBox.move(0.0, -SUPPORT_DEPTH, 0.0)) != null) {
             ride(entity, host, box, previous)
@@ -91,7 +91,7 @@ internal object ColliderContacts {
      * Carries [entity], which stands on the collider, along with it and lifts it out where the collider rose
      * into it. What rides a collider takes none of its speed: it stops when the collider stops.
      */
-    private fun ride(entity: Entity, host: Entity, box: ColliderBox, previous: ColliderBox?) {
+    private fun ride(entity: Entity, host: Entity, box: ColliderVolume, previous: ColliderVolume?) {
         val feet = Vec3(entity.x, entity.boundingBox.minY, entity.z)
         motionAt(feet, previous, box)?.takeIf { it.lengthSqr() >= EPSILON * EPSILON }?.let { displace(entity, host, it) }
 
@@ -100,9 +100,9 @@ internal object ColliderContacts {
         else box.penetration(entity.boundingBox)?.let { displace(entity, host, it) }
     }
 
-    private fun touchPushing(entity: Entity, collider: EntityCollider, previous: ColliderBox?) {
+    private fun touchPushing(entity: Entity, collider: EntityCollider, previous: ColliderVolume?) {
         if (!EntityBodies.isMovedByOthers(entity)) return
-        val box = collider.box
+        val box = collider.volume
         val motion = motionAt(entity.boundingBox.center, previous, box)
         if (motion == null || motion.lengthSqr() < EPSILON * EPSILON) {
             val overlap = box.penetration(entity.boundingBox) ?: return
@@ -121,7 +121,7 @@ internal object ColliderContacts {
         val host = own.entity
         own.now.forEach { collider ->
             if (!collider.spec.modes.pushes) return@forEach
-            val box = collider.box
+            val box = collider.volume
             val motion = motionAt(box.center, own.previousOf(collider), box)
             if (motion != null && motion.lengthSqr() >= EPSILON * EPSILON) return@forEach
 
@@ -135,7 +135,7 @@ internal object ColliderContacts {
     }
 
     /** The push a still collider gives [entity], which overlaps it by [overlap]: away from it, the deeper the stronger. */
-    private fun stillPush(box: ColliderBox, entity: Entity, overlap: Vec3): Vec3? {
+    private fun stillPush(box: ColliderVolume, entity: Entity, overlap: Vec3): Vec3? {
         val direction = horizontal(overlap) ?: horizontal(entity.position().subtract(box.center)) ?: return null
         val speed = (horizontalLength(overlap) * PUSH_STRENGTH).coerceAtMost(MAX_PUSH)
         return direction.scale(speed)
@@ -179,7 +179,7 @@ internal object ColliderContacts {
     }
 
     /** How far the collider moved the point [point] of itself over the last tick, or null when it has no last tick. */
-    private fun motionAt(point: Vec3, previous: ColliderBox?, box: ColliderBox): Vec3? =
+    private fun motionAt(point: Vec3, previous: ColliderVolume?, box: ColliderVolume): Vec3? =
         previous?.carry(point, box)?.subtract(point)
 
     private fun horizontal(vector: Vec3): Vec3? {

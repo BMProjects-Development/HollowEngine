@@ -94,6 +94,7 @@ class ModelAttachment(
             if (sameStructure) {
                 respecAttachments()
                 dress()
+                target = null
             } else {
                 builtFor?.let(::rebuild)
             }
@@ -172,6 +173,7 @@ class ModelAttachment(
         nodesByIndex = nodesByIndex,
         animations = model.animationsByName,
         aliases = rig.boneByAlias,
+        rig = rig,
     ).also { target = it }
 
     /**

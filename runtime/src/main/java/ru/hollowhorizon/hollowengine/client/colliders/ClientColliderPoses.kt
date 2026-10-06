@@ -53,7 +53,7 @@ object ClientColliderPoses {
         val colliders = of(entity)
         if (colliders.isEmpty()) return vanilla
         val partialTick = Minecraft.getInstance().timer.getGameTimeDeltaPartialTick(false)
-        val top = colliders.maxOf { it.box.bounds.maxY } - hostPosition(entity, partialTick).y - 0.2
+        val top = colliders.maxOf { it.volume.bounds.maxY } - hostPosition(entity, partialTick).y - 0.2
         return Vec3(vanilla.x, top, vanilla.z)
     }
 

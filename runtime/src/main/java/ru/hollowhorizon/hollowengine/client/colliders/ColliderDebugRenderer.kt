@@ -22,11 +22,10 @@ object ColliderDebugRenderer {
             val origin = hostPosition(entity, partialTick)
             val batch = DebugLines.Batch(lines, poseStack.last())
             colliders.forEach { collider ->
-                val box = collider.box
-                batch.box(
-                    box.center.subtract(origin).toVec3f(), box.axisX.toVec3f(), box.axisY.toVec3f(), box.axisZ.toVec3f(),
-                    colorOf(collider.spec.modes),
-                )
+                val color = colorOf(collider.spec.modes)
+                collider.volume.outline { start, end ->
+                    batch.line(start.subtract(origin).toVec3f(), end.subtract(origin).toVec3f(), color)
+                }
             }
         }
         return EntityColliders.hasTargets(entity)

@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
@@ -29,6 +30,8 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 
 val NBT_TAGS = HashMap<KClass<*>, MutableList<KClass<*>>>()
@@ -48,6 +51,7 @@ internal val TagModule
         AnimatorLayerTypes.registerInto(this)
         AnimatorStateTypes.registerInto(this)
         RigAttachmentTypes.registerInto(this)
+        ColliderShapeTypes.registerInto(this)
         VfxNodeTypes.registerInto(this)
         VfxModuleTypes.registerInto(this)
 
@@ -97,13 +101,26 @@ internal val TagModule
  * Says when [TagModule] has to be built again.
  */
 object TagModuleRevision {
-    @Volatile
-    var current: Int = 0
-        private set
 
-    @Synchronized
+    private val _current = AtomicInteger(0)
+    val current: Int get() = _current.get()
+
+    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+
     fun invalidate() {
-        current++
+        _current.incrementAndGet()
+        listeners.forEach { it() }
+    }
+
+    /**
+     * Calls [listener] whenever the kinds things are stored as change, as when an addon loads, unloads or reloads.
+     * It is called on whatever thread changed them.
+     */
+    fun observe(listener: () -> Unit): AutoCloseable {
+        listeners.add(listener)
+        return AutoCloseable {
+            listeners.remove(listener)
+        }
     }
 }
 
