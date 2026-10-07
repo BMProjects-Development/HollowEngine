@@ -232,7 +232,7 @@ Projectiles hit only colliders that **take hits**. Mob attacks and explosions ar
 ## Notes
 
 - Colliders act on living entities. Items, arrows and boats pass through solid colliders.
-- Mobs do not know about colliders when finding a path: they walk into a solid one and go around it.
+- Mobs plan their paths around solid colliders and blocking bodies, the way they plan around blocks, and plan again when one moves into or out of their way; see [Navigation](/docs/hollowengine/scripting/npc/navigation#colliders-and-blocking-bodies). The top of a collider is not yet ground a path goes over.
 - A player riding a turning collider moves with it, but their view does not turn.
 - Colliders follow the animations the server knows of: the clips played and the controller. What a client lays over them on its own, a ragdoll or a cutscene pose, moves the model but not its colliders.
 - A player is moved by their own client, so the server does not stop players at solid colliders. Standing on one over a drop is not counted as flying.

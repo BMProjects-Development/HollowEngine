@@ -39,7 +39,7 @@ order: 4
 
 | Команда | Аргументы | Поведение |
 | --- | --- | --- |
-| `@walk-to` | `who position-or-character [speed=...] [distance=...] [timeout=15s]` | Перемещает NPC и ждёт прибытия. `timeout=0` отключает ограничение. |
+| `@walk-to` | `who position-or-character [speed=...] [distance=...] [timeout=15s] [facing=...]` | Перемещает NPC и ждёт прибытия. `timeout=0` отключает ограничение. Список позиций `[[x, y, z], [x, y, z]]` NPC проходит по очереди и останавливается только в последней. `facing=` — персонаж или позиция, на которые NPC смотрит по пути; идёт он тогда боком или задом. |
 | `@stop-walking` | `who` | Останавливает навигацию NPC. |
 | `@look-at` | `who position [time=1500ms]` или `who character` | Смотрит на позицию или следит за персонажем. |
 | `@stop-looking` | `who` | Сбрасывает цель взгляда. |
@@ -51,6 +51,8 @@ order: 4
 
 ```story
 @walk-to Стражник [100, 64, 120] speed=1.2 distance=2 timeout=10s
+@walk-to Стражник [[100, 64, 120], [110, 64, 120], [110, 64, 135]]
+@walk-to Стражник [96, 64, 120] facing=player
 @look-at Стражник player
 @play-once Стражник hello fade=250ms
 ```
