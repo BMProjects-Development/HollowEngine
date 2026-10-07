@@ -17,6 +17,7 @@ import net.minecraft.world.level.pathfinder.PathType as BlockPathTypes
 class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, level) {
     private val openedDoors = mutableMapOf<BlockPos, Boolean>()
     private val locomotion = NpcLocomotion(mob)
+    internal val passing = PassingSteer(mob)
     internal val facing = WalkFacing(mob)
     private var steeringTarget: Vec3? = null
     private var lookTarget: Vec3? = null
@@ -117,9 +118,13 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     private fun walk(currentPath: Path, moveControl: NpcMoveControl?) {
         val ahead = ahead(currentPath)
         val movement = settings.movement
-        val share = locomotion.share(ahead, movement, speedModifier)
         val held = facing.held()
-        moveToward(steer(currentPath, ahead, locomotion.headingDistance(speedModifier)))
+        val heading = steer(currentPath, ahead, locomotion.headingDistance(speedModifier))
+        val makesWay = settings.avoid.entities
+        moveToward(if (makesWay) passing.around(heading, ahead, ::canHeadFor) else heading)
+        val waits = makesWay && passing.waits
+        if (waits) locomotion.pause()
+        val share = if (waits) 0.0 else locomotion.share(ahead, movement, speedModifier)
         moveControl?.stride = Stride(
             share,
             held?.yaw,
@@ -187,7 +192,9 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         if (!canCutCorner(currentPath.nextNode.type) || abs(next.y - start.y) > mob.maxUpStep()) return next
         return NpcNavigationGeometry.findWalkableWaypoint(level, mob, start, next)
             ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, next)
-            ?: next
+            ?: next.also {
+                recomputePath()
+            }
     }
 
     /** Whether the NPC can walk from [start] to [point] in a line without cutting across what it avoids. */

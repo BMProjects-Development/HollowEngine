@@ -40,6 +40,8 @@ data class AvoidSettings(
     @EditorDescription("$LANG.waterCost.hint")
     @EditorRange(min = 0.0)
     val waterCost: Float = 8f,
+    @EditorDescription("$LANG.entities.hint")
+    val entities: Boolean = true,
     @EditorDescription("$LANG.blocks.hint")
     val blocks: List<BlockCost> = emptyList(),
 )

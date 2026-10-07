@@ -66,6 +66,12 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
             operation = if (gapJumps.tick(jump)) Operation.JUMPING else Operation.WAIT
             return
         }
+        val stride = stride
+        if (operation == Operation.JUMPING && (jump != null || stride != null)) {
+            if (jump != null) gapJumps.tick(jump) else if (stride != null) walk(stride)
+            if (mob.onGround()) operation = Operation.WAIT
+            return
+        }
         when (this.operation) {
             Operation.STRAFE -> {
                 val speed = (this.speedModifier * mob.getAttributeValue(Attributes.MOVEMENT_SPEED)).toFloat()
@@ -97,7 +103,6 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
 
             Operation.MOVE_TO -> {
                 this.operation = Operation.WAIT
-                val stride = stride
                 if (stride != null) walk(stride) else moveToWanted()
             }
 

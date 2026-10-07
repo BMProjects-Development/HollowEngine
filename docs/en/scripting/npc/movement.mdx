@@ -35,6 +35,7 @@ Movement functions return a `MoveResult`, so you can tell what actually happened
 | `MoveResult.Arrived` | The NPC reached the target distance. |
 | `MoveResult.Unreachable` | No path could be found for a while (see `unreachable` below). |
 | `MoveResult.TargetUnavailable` | The target entity disappeared, changed dimension, or its reference went stale (see `unavailableTarget` below). |
+| `MoveResult.Closest(reason, distance)` | The NPC stopped as close to the point as it got, `distance` blocks from it. `reason` says why (see [Getting as close as it can](#getting-as-close-as-it-can)). |
 
 ```kotlin
 val result = npc.move(player)
@@ -77,7 +78,7 @@ npc.move(
 | `unreachable` | `WAIT_AND_RETRY` | What to do when no path can be found (see below). |
 | `unavailableTarget` | `WAIT_AND_RETRY` | What to do when the target entity is gone or invalid (see below). |
 
-Both policies work the same way: `WAIT_AND_RETRY` keeps trying forever (useful for "just get there eventually" scripted scenes), while `FAIL` gives up and returns `MoveResult.Unreachable` / `MoveResult.TargetUnavailable` so your script can decide what to do next.
+Both policies work the same way: `WAIT_AND_RETRY` keeps trying forever (useful for "just get there eventually" scripted scenes), while `FAIL` gives up and returns `MoveResult.Unreachable` / `MoveResult.TargetUnavailable`, or `MoveResult.Closest` with `NO_PATH` or `BLOCKED`, so your script can decide what to do next.
 
 ```kotlin
 enum class UnreachablePolicy { WAIT_AND_RETRY, FAIL }
@@ -85,6 +86,30 @@ enum class UnavailableTargetPolicy { WAIT_AND_RETRY, FAIL }
 ```
 
 How the NPC finds its way and walks it, its jumps, its speed on straights and in turns, the blocks it walks around, is set up per NPC by its [Navigation component](/docs/hollowengine/scripting/npc/navigation).
+
+### Getting as close as it can
+
+A point the NPC's body cannot stand at, such as one inside a wall, in the air or too close to a fence for its width, is not waited at forever: the NPC walks to the nearest spot within two blocks of it where it can stand, and the move ends there with `MoveResult.Closest`. `reason` is one of:
+
+| `Shortfall` | Means | When |
+|-------------|-------|------|
+| `NO_ROOM` | The point has no room for the NPC; it stands on the nearest spot that has. | Always, whatever `unreachable` says. |
+| `NO_PATH` | No way leads to the point; the NPC went as far as a way does. | With `unreachable = FAIL`; with `WAIT_AND_RETRY` it waits there and keeps trying. |
+| `BLOCKED` | Something it can neither pass nor push aside stood in its way: walking got it nowhere twice in a row for `stuckTimeoutTicks`. | With `unreachable = FAIL`; with `WAIT_AND_RETRY` it keeps trying. |
+
+```kotlin
+when (val result = npc.move(pos(10, 64, 10), MoveOptions(arrivalDistance = 0.0, unreachable = UnreachablePolicy.FAIL))) {
+    MoveResult.Arrived -> npc.say("Here I am.")
+    is MoveResult.Closest -> when (result.reason) {
+        Shortfall.NO_ROOM -> npc.say("This is as close as I fit.")
+        Shortfall.NO_PATH -> npc.say("I can't find a way there.")
+        Shortfall.BLOCKED -> npc.say("Someone is in my way.")
+    }
+    else -> {}
+}
+```
+
+A point on the way, in [a walk through several points](#walking-through-several-points), that has no room counts as passed at the spot nearest it.
 
 ### Walking through several points
 

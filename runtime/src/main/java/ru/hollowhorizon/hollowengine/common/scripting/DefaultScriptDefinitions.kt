@@ -184,6 +184,7 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.npcs.actions.*",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveResult",
+                    "ru.hollowhorizon.hollowengine.common.npcs.navigation.Shortfall",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.UnavailableTargetPolicy",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.UnreachablePolicy",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.Facing",

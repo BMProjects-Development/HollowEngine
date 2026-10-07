@@ -85,6 +85,8 @@
   "entity.navigation.swim.hint": "Swims through deep water. Without it, water deeper than a block is a wall to the NPC; one that stands in it already gets out to the nearest shore.",
   "entity.navigation.waterCost": "Water cost",
   "entity.navigation.waterCost.hint": "How many blocks of walking a block of water is worth, so a swimming NPC still takes a bridge.",
+  "entity.navigation.entities": "Make way",
+  "entity.navigation.entities.hint": "Steps out of the way of those standing on its path, coming toward it or crossing it: NPCs, players and mobs, all but those with an empty body. Meeting one head on, it keeps right, so two such NPCs pass each other; where there is no room to, one gives way and waits. It does not walk around whoever stands at the end of its path.",
   "entity.navigation.blocks": "Blocks",
   "entity.navigation.blocks.hint": "Blocks the NPC walks around: both the floor it stands on and the blocks its body is in count, such as farmland, a carpet or crops. For a block that matches several entries, the highest cost counts.",
   "entity.navigation.block": "Block",

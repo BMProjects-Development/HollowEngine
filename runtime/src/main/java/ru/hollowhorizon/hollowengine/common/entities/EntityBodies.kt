@@ -47,6 +47,10 @@ object EntityBodies {
         return entity.bodyComponent?.let { it.mode == BodyMode.PUSHING } ?: true
     }
 
+    /** Whether others run into [entity] at all: into its colliders that act on bodies, or into its box unless its body is empty. */
+    fun isTangible(entity: Entity): Boolean =
+        hasPhysicalColliders(entity) || entity.bodyComponent?.mode != BodyMode.EMPTY
+
     /** A blocking body stops others with its box, unless it has colliders that act on bodies: then they are its shape. */
     fun isSolid(entity: Entity, vanilla: Boolean): Boolean =
         vanilla || entity.bodyComponent?.mode == BodyMode.BLOCKING && entity.isAlive && !hasPhysicalColliders(entity)

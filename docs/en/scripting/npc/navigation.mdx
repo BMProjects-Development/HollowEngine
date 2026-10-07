@@ -52,6 +52,7 @@ Open the NPC's components with the NPC wand and add **Navigation** (`hollowengin
 |-------|---------|---------|
 | Swim | on | Swims through deep water. Without it, water deeper than a block is a wall to the NPC; one that stands in it already gets out to the nearest shore. |
 | Water cost | `8` | How many blocks of walking a block of water is worth, so a swimming NPC still takes a bridge. |
+| Make way | on | Steps out of the way of others in its path; see [Meeting others](#meeting-others). |
 | Blocks | empty | Blocks the NPC walks around, each with a cost. |
 
 An entry of **Blocks** is a block id such as `minecraft:farmland`, or a block tag such as `#minecraft:flowers`, and a cost: how many blocks of walking stepping onto or into such a block is worth. A negative cost means never. Both the floor the NPC stands on and the blocks its body is in count, so farmland, carpets and crops all work; a block that matches several entries costs the most of them.
@@ -72,6 +73,16 @@ npc.move(
 ```
 
 Zones to keep out of are set from scripts as well, for one move or for good: see [Keeping out of zones](/docs/hollowengine/scripting/npc/movement#keeping-out-of-zones).
+
+---
+
+## Meeting others
+
+With **Make way** on, an NPC walking its path keeps out of the way of NPCs, players and mobs, all but those with an empty body: those standing in its path, coming toward it or crossing it. It works out where it will pass closest to each of them, and if that is too close, steps aside on the side the other is not, keeping right when they meet head on. Two NPCs walking into each other both step aside to their right and pass each other. The path stays as it was: once the other is past, the NPC walks back onto it. It does not step around whoever stands where its path ends, as the player it walks up to.
+
+Where a wall or a ledge leaves no room to pass, as in a gap between two pillars, one of the two gives way: the NPC that still has room steps aside where it is and waits until the other is by, while the one already in the narrow part goes on. Two that both have room settle it between themselves, and a player or a mob, which never gives way, is waited for. The NPC waits five seconds at most and then goes on. In a corridor one block wide, where neither has room, NPCs still push past each other.
+
+Unlike [colliders](#colliders-and-blocking-bodies), these bodies take no part in the path search: they move, and a path planned around where they stood would be wrong a tick later.
 
 ---
 
