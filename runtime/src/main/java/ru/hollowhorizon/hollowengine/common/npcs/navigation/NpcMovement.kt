@@ -1,13 +1,13 @@
 package ru.hollowhorizon.hollowengine.common.npcs.navigation
 
 import kotlinx.coroutines.delay
+import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.pathfinder.Path
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
-import kotlin.math.max
-import kotlin.math.sqrt
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class UnreachablePolicy {
@@ -30,6 +30,7 @@ data class MoveOptions(
     val unreachable: UnreachablePolicy = UnreachablePolicy.WAIT_AND_RETRY,
     val unavailableTarget: UnavailableTargetPolicy = UnavailableTargetPolicy.WAIT_AND_RETRY,
     val navigation: (NavigationComponent.() -> NavigationComponent)? = null,
+    val facing: Facing = Facing.Path,
 ) {
     init {
         require(speed > 0.0) { "Movement speed must be greater than zero" }
@@ -48,7 +49,8 @@ sealed interface MoveResult {
 }
 
 internal suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: MoveOptions): MoveResult {
-    val arrivalDistanceSq = options.arrivalDistance * options.arrivalDistance
+    val arrivalDistance = maxOf(options.arrivalDistance, MIN_ARRIVAL_DISTANCE)
+    val arrivalDistanceSq = arrivalDistance * arrivalDistance
     val targetMoveThresholdSq = options.targetMoveThreshold * options.targetMoveThreshold
     var lastPathTarget: Vec3? = null
     var lastProgressPosition = position()
@@ -59,10 +61,16 @@ internal suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: Move
     var reachingPath: Path? = null
 
     npcNavigation.settingsOverride = options.navigation?.let { tune -> (navigationComponent ?: NavigationComponent()).tune() }
+    npcNavigation.stopDistance = options.arrivalDistance
+    npcNavigation.facing.setMove(options.facing)
     try {
         while (true) {
             val currentTarget = target() ?: return MoveResult.TargetUnavailable
-            if (distanceToSqr(currentTarget) <= arrivalDistanceSq) return MoveResult.Arrived
+            npcNavigation.exactTarget = currentTarget
+            if (distanceToSqr(currentTarget) <= arrivalDistanceSq) {
+                finishFacing(options.facing)
+                return MoveResult.Arrived
+            }
 
             val progressed = position().distanceToSqr(lastProgressPosition) >= MIN_PROGRESS_DISTANCE_SQ
             if (progressed) {
@@ -93,11 +101,6 @@ internal suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: Move
                 }
             }
 
-            val remainingDistance = sqrt(distanceToSqr(currentTarget))
-            val slowdownDistance = max(options.arrivalDistance + 0.5, MIN_SLOWDOWN_DISTANCE)
-            val speedScale = (remainingDistance / slowdownDistance).coerceIn(MIN_SPEED_SCALE, 1.0)
-            navigation.setSpeedModifier(options.speed * speedScale)
-
             if (pathCreationFailed && navigation.isDone) {
                 ticksWithoutPath++
                 if (options.unreachable == UnreachablePolicy.FAIL &&
@@ -113,7 +116,36 @@ internal suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: Move
     } finally {
         navigation.stop()
         npcNavigation.settingsOverride = null
+        npcNavigation.stopDistance = 0.0
+        npcNavigation.exactTarget = null
+        npcNavigation.facing.setMove(Facing.Path)
     }
+}
+
+/**
+ * Turns the NPC, stopped, the rest of the way to what its move faced: a jump turns it to the landing, and the
+ * last steps may end before it has turned back.
+ */
+private suspend fun NpcEntity.finishFacing(facing: Facing) {
+    if (facing == Facing.Path) return
+    navigation.stop()
+    repeat(MAX_FINISH_TURN_TICKS) {
+        val faced = when (facing) {
+            is Facing.Toward -> facing.target()?.let { faceTowards(it) } ?: true
+            is Facing.Yaw -> turnBodyTo(facing.yaw)
+            Facing.Path -> true
+        }
+        if (faced) return
+        delay(TICK_DURATION)
+    }
+}
+
+private fun NpcEntity.turnBodyTo(yaw: Float): Boolean {
+    val body = Mth.approachDegrees(yRot, yaw, FINISH_TURN)
+    yRot = body
+    yBodyRot = body
+    yHeadRot = body
+    return abs(Mth.wrapDegrees(yaw - body)) <= 1f
 }
 
 internal suspend fun NpcEntity.moveToEntity(target: Ref<out Entity>, options: MoveOptions): MoveResult {
@@ -143,6 +175,11 @@ internal suspend fun NpcEntity.moveToEntity(target: Ref<out Entity>, options: Mo
 }
 
 private val TICK_DURATION = 50.milliseconds
+
+/** How close, in blocks, the NPC has to come to a point when asked to come all the way. */
+private const val MIN_ARRIVAL_DISTANCE = 0.2
+
+/** The most ticks the NPC turns at the end of a move to face what it faced on the way, and how fast, in degrees a tick. */
+private const val MAX_FINISH_TURN_TICKS = 20
+private const val FINISH_TURN = 18f
 private const val MIN_PROGRESS_DISTANCE_SQ = 0.0025
-private const val MIN_SLOWDOWN_DISTANCE = 2.0
-private const val MIN_SPEED_SCALE = 0.35

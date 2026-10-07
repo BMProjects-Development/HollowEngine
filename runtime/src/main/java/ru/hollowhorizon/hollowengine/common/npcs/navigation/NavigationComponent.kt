@@ -28,6 +28,40 @@ private const val LANG = "hollowengine.component.hollowengine.entity.navigation"
 data class NavigationComponent(
     val path: PathSettings = PathSettings(),
     val jumps: JumpSettings = JumpSettings(),
+    val movement: MovementSettings = MovementSettings(),
+)
+
+/** How the NPC walks its path: how it speeds up and slows down, and which way it may walk. */
+@Serializable
+data class MovementSettings(
+    /** Seconds from standing to full speed. */
+    @EditorDescription("$LANG.acceleration.hint")
+    @EditorRange(0.0, 3.0)
+    val acceleration: Float = 0.3f,
+    /** Seconds from full speed to a stop, at the end of the path and before sharp turns. */
+    @EditorDescription("$LANG.deceleration.hint")
+    @EditorRange(0.0, 3.0)
+    val deceleration: Float = 0.5f,
+    /** How much faster it walks on a long straight stretch; 1 never speeds up. */
+    @EditorDescription("$LANG.straightBoost.hint")
+    @EditorRange(1.0, 2.0)
+    val straightBoost: Float = 1.1f,
+    /** How long, in blocks, a straight stretch ahead has to be for it to speed up. */
+    @EditorDescription("$LANG.straightLength.hint")
+    @EditorRange(min = 1.0)
+    val straightLength: Float = 8f,
+    /** The longest walk, in blocks, it takes backward to a point behind it rather than turning round; zero always turns. */
+    @EditorDescription("$LANG.backstep.hint")
+    @EditorRange(min = 0.0)
+    val backstep: Float = 2f,
+    /** Its speed walking backward, as a share of walking forward. */
+    @EditorDescription("$LANG.backwardSpeed.hint")
+    @EditorRange(0.1, 1.0, slider = true)
+    val backwardSpeed: Float = 0.6f,
+    /** Its speed walking sideways, as a share of walking forward. */
+    @EditorDescription("$LANG.sidewaysSpeed.hint")
+    @EditorRange(0.1, 1.0, slider = true)
+    val sidewaysSpeed: Float = 0.8f,
 )
 
 @Serializable

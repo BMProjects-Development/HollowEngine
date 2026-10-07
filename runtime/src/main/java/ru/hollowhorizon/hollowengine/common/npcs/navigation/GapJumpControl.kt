@@ -33,6 +33,7 @@ internal class GapJumpControl(private val mob: NpcEntity) {
     /** Moves the NPC along [jump] for this tick; true when it took off. */
     fun tick(jump: GapJump): Boolean {
         val walk = mob.getAttributeValue(Attributes.MOVEMENT_SPEED)
+        mob.xxa = 0f
         when {
             !mob.onGround() -> {
                 face(jump.landing, MAX_TURN)
@@ -110,16 +111,30 @@ internal class GapJumpControl(private val mob: NpcEntity) {
         val distance = Mth.length(dx, dz)
         val motion = mob.deltaMovement
         val speed = motion.horizontalDistance()
+        val held = mob.npcNavigation.facing.held()
+        if (held != null) turnBody(held.yaw, held.turnSpeed) else if (distance >= SETTLE_REACH) face(target, MAX_SETTLE_TURN)
         if (distance < SETTLE_REACH) {
             mob.speed = 0f
+            mob.xxa = 0f
             if (speed < JumpSimulation.REST_SPEED * 2.0) arrived()
             return
         }
-        face(target, MAX_SETTLE_TURN)
         val closing = (motion.x * dx + motion.z * dz) / distance
         val slide =
             JumpSimulation.slideDistance(speed, NpcNavigationGeometry.frictionUnder(mob.level(), mob.position()))
-        mob.speed = if (closing > 0.0 && slide >= distance) 0f else (walk * SETTLE_SPEED_FACTOR).toFloat()
+        val input = if (closing > 0.0 && slide >= distance) 0f else (walk * SETTLE_SPEED_FACTOR).toFloat()
+        mob.speed = input
+        val yaw = mob.yRot * Mth.DEG_TO_RAD
+        val towardX = (dx / distance).toFloat()
+        val towardZ = (dz / distance).toFloat()
+        mob.zza = input * (-towardX * Mth.sin(yaw) + towardZ * Mth.cos(yaw))
+        mob.xxa = input * (towardX * Mth.cos(yaw) + towardZ * Mth.sin(yaw))
+    }
+
+    private fun turnBody(yaw: Float, maxTurn: Float) {
+        val body = Mth.approachDegrees(mob.yBodyRot, yaw, maxTurn)
+        mob.yRot = body
+        mob.setYBodyRot(body)
     }
 
     /** Whether the NPC keeps ground under its feet this tick if it stops pushing on now. */

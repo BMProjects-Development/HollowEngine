@@ -8,6 +8,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -18,6 +19,9 @@ fun LivingEntity.faceTowards(
     maxAngularSpeed: Float = 360f,
     updateIntervalMs: Long = 50L,
 ): Boolean {
+    if (this is NpcEntity && npcNavigation.isInProgress) {
+        return npcNavigation.faceWhileWalking(target, maxAngularSpeed * (updateIntervalMs / 1000f))
+    }
     val currentPos = position()
     val eyePos = Vec3(currentPos.x, currentPos.y + eyeHeight, currentPos.z)
     val dx = target.x - eyePos.x

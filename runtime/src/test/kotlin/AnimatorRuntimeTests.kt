@@ -258,8 +258,8 @@ class AnimatorRuntimeTests {
 
         assertTrue(evaluator.boolean(runTransition.condition, context))
         assertFalse(evaluator.boolean(idleTransition.condition, context))
-        assertEquals(-0.6f, evaluator.float(walkState.speed, context), 0.0001f)
-        assertEquals(-0.6f, evaluator.float(runState.speed, context), 0.0001f)
+        assertEquals(-1.2f / 1.43f, evaluator.float(walkState.speed, context), 0.0001f)
+        assertEquals(-1.2f / 3.19f, evaluator.float(runState.speed, context), 0.0001f)
         assertEquals(6.5f, evaluator.vector(headTransform.rotation!!, context).x, 0.0001f)
         assertEquals(-18.6f, evaluator.vector(headTransform.rotation, context).y, 0.0001f)
         assertEquals(0f, evaluator.vector(leftEyeTransform.translation!!, context).x, 0.0001f)

@@ -12,15 +12,27 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntity
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import kotlin.math.abs
-import kotlin.math.min
 import net.minecraft.world.level.pathfinder.PathType as BlockPathTypes
 
 class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, level) {
     private val openedDoors = mutableMapOf<BlockPos, Boolean>()
+    private val locomotion = NpcLocomotion(mob)
+    internal val facing = WalkFacing(mob)
     private var steeringTarget: Vec3? = null
+    private var lookTarget: Vec3? = null
+
+    /** The last point the path turned the head to. */
+    private var pathLook: Vec3? = null
+    private var backstepPath: Path? = null
 
     /** The settings of the move under way, taking the place of the NPC's own for as long as it lasts. */
     var settingsOverride: NavigationComponent? = null
+
+    /** How far short of the end of its path the NPC means to stop; it brakes to stop there. */
+    var stopDistance = 0.0
+
+    /** The point the move under way is for, which the path ends at rather than at the middle of its block. */
+    var exactTarget: Vec3? = null
 
     /** What the NPC's path search and its steps go by now. */
     val settings: NavigationComponent
@@ -34,29 +46,135 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
 
     override fun tick() {
         steeringTarget = null
+        lookTarget = null
         super.tick()
         closePassedDoors()
         val currentPath = path?.takeUnless(Path::isDone)
+        if (currentPath !== backstepPath) updateBackstep(currentPath)
         val jump = currentPath?.let(::gapJumpOf)
-        (mob.moveControl as? NpcMoveControl)?.gapJump = jump
-        if (currentPath == null) return
-        val node = currentPath.nextNode
-
-        if (node.type == BlockPathTypes.WALKABLE_DOOR) {
-            val state = level.getBlockState(node.asBlockPos())
-            if (DoorBlock.isWoodenDoor(state)) {
-                val door = state.block as DoorBlock
-                door.setOpen(mob, level, state, node.asBlockPos(), true)
-                openedDoors.putIfAbsent(node.asBlockPos(), false)
-            }
+        val moveControl = mob.moveControl as? NpcMoveControl
+        moveControl?.gapJump = jump
+        moveControl?.stride = null
+        if (currentPath == null) {
+            locomotion.pause()
+            return
         }
+        openDoorAhead(currentPath)
 
-        if (jump != null) moveToward(jump.landing) else updateSteering(currentPath)
-        if (steeringTarget == null) {
-            val nodePosition = currentPath.getNextEntityPos(mob)
-            steeringTarget = Vec3(nodePosition.x, getGroundY(nodePosition), nodePosition.z)
+        if (jump != null) {
+            locomotion.pause()
+            moveToward(jump.landing)
+        } else {
+            walk(currentPath, moveControl)
         }
         sendDebugPath(currentPath)
+    }
+
+    /**
+     * Faces [target] while the NPC walks, turning by at most [turnSpeed] degrees a tick, for as long as it is
+     * asked every tick; whether the body faces it now.
+     */
+    internal fun faceWhileWalking(target: Vec3, turnSpeed: Float): Boolean {
+        facing.look(target, turnSpeed)
+        val yaw = (Mth.atan2(target.z - mob.z, target.x - mob.x) * Mth.RAD_TO_DEG - 90.0).toFloat()
+        return abs(Mth.wrapDegrees(yaw - mob.yRot)) <= 1f
+    }
+
+    private fun walk(currentPath: Path, moveControl: NpcMoveControl?) {
+        val ahead = ahead(currentPath)
+        val movement = settings.movement
+        val share = locomotion.share(ahead, movement, speedModifier)
+        val held = facing.held()
+        moveToward(steer(currentPath, ahead, locomotion.headingDistance(speedModifier)))
+        moveControl?.stride = Stride(
+            share,
+            held?.yaw,
+            held?.turnSpeed ?: 0f,
+            movement.sidewaysSpeed.toDouble(),
+            movement.backwardSpeed.toDouble(),
+        )
+        val look = held?.look ?: ahead.pointAt(locomotion.lookDistance(speedModifier)).add(0.0, mob.eyeHeight * LOOK_HEIGHT, 0.0)
+        lookAt(look)
+    }
+
+    /**
+     * Turns the head to [look], unless something else, such as an attack goal, aimed it this tick: the path is
+     * only where the head goes when nothing else wants it.
+     */
+    private fun lookAt(look: Vec3) {
+        val control = mob.lookControl
+        val ours = pathLook
+        val taken = control.isLookingAtTarget &&
+                (ours == null || control.wantedX != ours.x || control.wantedY != ours.y || control.wantedZ != ours.z)
+        if (taken) return
+        control.setLookAt(look.x, look.y, look.z, HEAD_TURN, HEAD_PITCH)
+        pathLook = look
+        lookTarget = look
+    }
+
+    private fun ahead(currentPath: Path): PathAhead {
+        val npcPath = currentPath as? NpcPath
+        val points = arrayListOf(mob.position())
+        var length = 0.0
+        for (index in currentPath.nextNodeIndex until currentPath.nodeCount) {
+            val node = groundPosAtNode(currentPath, index)
+            val point = if (index == currentPath.nodeCount - 1) exactEnd(node) ?: node else node
+            length += Mth.length(point.x - points.last().x, point.z - points.last().z)
+            points += point
+            val last = index == currentPath.nodeCount - 1
+            if (last) return PathAhead(points, stopShort = stopDistance)
+            if (npcPath?.isJumpTo(index + 1) == true) return PathAhead(points, stopShort = 0.0)
+            if (length > PLANNING_REACH || !canCutCorner(currentPath.getNode(index).type)) break
+        }
+        return PathAhead(points, stopShort = null)
+    }
+
+    /**
+     * Where the NPC heads this tick: the point [distance] along the path ahead when it can walk there in a line,
+     * else the farthest node before it that it can, else a way around the corner to the next node.
+     */
+    private fun steer(currentPath: Path, ahead: PathAhead, distance: Double): Vec3 {
+        val next = ahead.points[1]
+        if (!mob.onGround()) return next
+        val start = mob.position()
+        val heading = ahead.pointAt(distance)
+        if (NpcNavigationGeometry.canWalkDirectly(level, mob, start, heading)) return heading
+        for (index in ahead.nodeBefore(distance) downTo 1) {
+            val node = ahead.points[index]
+            if (NpcNavigationGeometry.canWalkDirectly(level, mob, start, node)) return node
+        }
+        if (!canCutCorner(currentPath.nextNode.type) || abs(next.y - start.y) > mob.maxUpStep()) return next
+        return NpcNavigationGeometry.findWalkableWaypoint(level, mob, start, next)
+            ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, next)
+            ?: next
+    }
+
+    /**
+     * A short walk to a point behind the NPC, when its move faces the path, is taken backward: it keeps facing
+     * the way it did. The walk is judged anew for every new path, so a backstep goes on through replanning.
+     */
+    private fun updateBackstep(currentPath: Path?) {
+        backstepPath = currentPath
+        val reach = settings.movement.backstep
+        if (currentPath == null || reach <= 0f || !facing.facesPath) {
+            facing.backstep = null
+            return
+        }
+        val ahead = ahead(currentPath)
+        val end = ahead.points.last()
+        val forward = mob.yRot * Mth.DEG_TO_RAD
+        val toEndX = end.x - mob.x
+        val toEndZ = end.z - mob.z
+        val distance = Mth.length(toEndX, toEndZ)
+        val behind = distance > MIN_BACKSTEP &&
+                (-Mth.sin(forward) * toEndX + Mth.cos(forward) * toEndZ) / distance < BACKSTEP_COS
+        val reachesEnd = ahead.points.size == currentPath.nodeCount - currentPath.nextNodeIndex + 1
+        val flat = ahead.points.all { abs(it.y - mob.y) <= mob.maxUpStep() }
+        facing.backstep = if (reachesEnd && flat && ahead.length <= reach && (behind || facing.isBackstepping)) {
+            facing.backstep ?: mob.yRot
+        } else {
+            null
+        }
     }
 
     /**
@@ -71,13 +189,40 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         val index = currentPath?.nextNodeIndex ?: return super.followThePath()
         val takesOff = currentPath.isJumpTo(index + 1)
         val landed = currentPath.isJumpTo(index)
-        if (!takesOff && !landed) return super.followThePath()
+        if (!takesOff && !landed) {
+            val end = if (index == currentPath.nodeCount - 1) exactEnd(groundPosAtNode(currentPath, index)) else null
+            val passed = if (end != null) {
+                Mth.length(end.x - mob.x, end.z - mob.z) <= maxOf(stopDistance, EXACT_REACH)
+            } else {
+                passes(currentPath, index)
+            }
+            if (passed) currentPath.advance()
+            doStuckDetection(tempMobPos)
+            return
+        }
 
         val node = currentPath.getNextEntityPos(mob)
         val reached = abs(mob.x - node.x) < TAKEOFF_REACH && abs(mob.z - node.z) < TAKEOFF_REACH && abs(mob.y - node.y) < 1.0
         val settled = !landed || mob.onGround() && (isAtRest() || !takesOff && carriesOnToward(currentPath, index + 1))
         if (reached && settled) currentPath.advance()
         doStuckDetection(tempMobPos)
+    }
+
+    private fun exactEnd(lastNode: Vec3): Vec3? {
+        val target = exactTarget ?: return null
+        if (abs(target.x - lastNode.x) > EXACT_SPAN || abs(target.z - lastNode.z) > EXACT_SPAN) return null
+        if (abs(target.y - lastNode.y) > 1.0) return null
+        return Vec3(target.x, lastNode.y, target.z)
+    }
+
+    private fun passes(currentPath: Path, index: Int): Boolean {
+        maxDistanceToWaypoint = if (mob.bbWidth > 0.75f) mob.bbWidth / 2.0f else 0.75f - mob.bbWidth / 2.0f
+        val node = currentPath.getNodePos(index)
+        val reach = maxDistanceToWaypoint.toDouble()
+        if (abs(mob.x - (node.x + 0.5)) < reach && abs(mob.z - (node.z + 0.5)) < reach && abs(mob.y - node.y) < 1.0) return true
+        if (index + 1 >= currentPath.nodeCount || !canCutCorner(currentPath.getNode(index).type)) return false
+        if (!mob.position().closerThan(Vec3.atBottomCenterOf(node), CUT_REACH)) return false
+        return canMoveDirectly(tempMobPos, currentPath.getEntityPosAtNode(mob, index + 1))
     }
 
     private fun isAtRest(): Boolean = mob.deltaMovement.horizontalDistance() < SETTLED_SPEED
@@ -114,35 +259,19 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         return NpcNavigationGeometry.canWalkDirectly(level, mob, groundedFrom, groundedTo)
     }
 
-    private fun updateSteering(currentPath: Path) {
-        if (!mob.onGround()) return
-
-        val start = Vec3(mob.x, mob.y, mob.z)
-        val firstIndex = currentPath.nextNodeIndex
-        val lastIndex = min(firstIndex + MAX_LOOKAHEAD_NODES, currentPath.nodeCount - 1)
-        for (index in lastIndex downTo firstIndex + 1) {
-            if (!canSteerPast(currentPath, firstIndex, index)) continue
-
-            val nodePosition = currentPath.getEntityPosAtNode(mob, index)
-            val target = Vec3(nodePosition.x, getGroundY(nodePosition), nodePosition.z)
-            if (!NpcNavigationGeometry.canWalkDirectly(level, mob, start, target)) continue
-
-            moveToward(target)
-            return
-        }
-
-        if (!canCutCorner(currentPath.nextNode.type)) return
-        val nodePosition = currentPath.getNextEntityPos(mob)
-        val target = Vec3(nodePosition.x, getGroundY(nodePosition), nodePosition.z)
-        val waypoint = NpcNavigationGeometry.findWalkableWaypoint(level, mob, start, target)
-            ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, target)
-            ?: return
-        moveToward(waypoint)
-    }
-
     private fun moveToward(target: Vec3) {
         steeringTarget = target
         mob.moveControl.setWantedPosition(target.x, target.y, target.z, speedModifier)
+    }
+
+    private fun openDoorAhead(currentPath: Path) {
+        val node = currentPath.nextNode
+        if (node.type != BlockPathTypes.WALKABLE_DOOR) return
+        val state = level.getBlockState(node.asBlockPos())
+        if (!DoorBlock.isWoodenDoor(state)) return
+        val door = state.block as DoorBlock
+        door.setOpen(mob, level, state, node.asBlockPos(), true)
+        openedDoors.putIfAbsent(node.asBlockPos(), false)
     }
 
     private fun sendDebugPath(currentPath: Path) {
@@ -162,17 +291,9 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
             target.z,
             currentPath.canReach(),
             NpcPathDebugPoint(steeringTarget.x, steeringTarget.y, steeringTarget.z),
+            lookTarget?.let { NpcPathDebugPoint(it.x, it.y, it.z) },
+            locomotion.share.toFloat(),
         ).sendTrackingEntity(mob)
-    }
-
-    /** Whether the NPC may steer straight from node [fromIndex] toward node [toIndex]: no door, hazard or jump between. */
-    private fun canSteerPast(currentPath: Path, fromIndex: Int, toIndex: Int): Boolean {
-        val npcPath = currentPath as? NpcPath
-        for (index in fromIndex..toIndex) {
-            if (!canCutCorner(currentPath.getNode(index).type)) return false
-            if (index > fromIndex && npcPath?.isJumpTo(index) == true) return false
-        }
-        return true
     }
 
     private fun closePassedDoors() {
@@ -197,12 +318,32 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
 
     companion object {
         private val DEFAULT_SETTINGS = NavigationComponent()
-        private const val MAX_LOOKAHEAD_NODES = 4
         private const val DEBUG_SYNC_INTERVAL = 10
         private const val DOOR_NEAR_DISTANCE_SQ = 2.25
 
+        /** How far along the path, in blocks, the pace is planned. */
+        private const val PLANNING_REACH = 16.0
+
+        /** How high on the NPC, as a share of its eye height, the point it looks at along its path lies. */
+        private const val LOOK_HEIGHT = 0.85
+        private const val HEAD_TURN = 10f
+        private const val HEAD_PITCH = 20f
+
+        /** A point behind the NPC by more than this, as the cosine of the angle off its facing, is walked to backward. */
+        private const val BACKSTEP_COS = -0.5
+        private const val MIN_BACKSTEP = 0.3
+
         /** How close to the middle of the node before a jump the NPC gets before it starts its run-up. */
         private const val TAKEOFF_REACH = 0.3
+
+        /** How near a node, in blocks, the NPC may cut it short, as vanilla allows. */
+        private const val CUT_REACH = 2.0
+
+        /** How close to the point it walks to the NPC has to come to be there. */
+        private const val EXACT_REACH = 0.1
+
+        /** How far from the middle of the last node's block, each way, a point still counts as in it. */
+        private const val EXACT_SPAN = 0.75
 
         /** Blocks per tick below which an NPC that jumped onto a node has stopped on it. */
         private const val SETTLED_SPEED = 0.02

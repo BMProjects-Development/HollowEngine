@@ -133,17 +133,18 @@ internal object JumpSimulation {
         dirX: Double,
         dirZ: Double,
         landing: Vec3,
+        sprinting: Boolean = true,
     ): JumpDecision {
         val acceleration = groundAcceleration(body.speed, body.friction)
         val vx = motionX + dirX * acceleration
         val vz = motionZ + dirZ * acceleration
-        val now = takeOff(space, body, position, vx, vz, dirX, dirZ, landing)
+        val now = takeOff(space, body, position, vx, vz, dirX, dirZ, landing, sprinting)
 
         val ahead = position.add(vx, 0.0, vz)
         val canWait = hasSupport(space, body.halfWidth, ahead.x, ahead.y, ahead.z)
         val drag = groundDrag(body.friction)
         val later = if (canWait) {
-            takeOff(space, body, ahead, vx * drag + dirX * acceleration, vz * drag + dirZ * acceleration, dirX, dirZ, landing)
+            takeOff(space, body, ahead, vx * drag + dirX * acceleration, vz * drag + dirZ * acceleration, dirX, dirZ, landing, sprinting)
         } else {
             null
         }
@@ -176,8 +177,10 @@ internal object JumpSimulation {
         dirX: Double,
         dirZ: Double,
         landing: Vec3,
+        sprinting: Boolean = true,
     ): JumpOutcome {
-        val air = Body(position.x, position.y, position.z, vx + dirX * SPRINT_JUMP_BOOST, body.jumpPower, vz + dirZ * SPRINT_JUMP_BOOST)
+        val boost = if (sprinting) SPRINT_JUMP_BOOST else 0.0
+        val air = Body(position.x, position.y, position.z, vx + dirX * boost, body.jumpPower, vz + dirZ * boost)
         val acceleration = body.speed * INPUT_SCALE * AIR_ACCELERATION
         var drag = groundDrag(body.friction)
         var apex = position.y

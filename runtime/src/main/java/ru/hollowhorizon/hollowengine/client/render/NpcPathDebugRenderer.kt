@@ -43,7 +43,7 @@ object NpcPathDebugRenderer {
             nextNodeIndex = packet.nextNodeIndex.coerceIn(0, nodes.lastIndex)
         }
         val jumps = packet.nodes.indices.filter { packet.nodes[it].jump }
-        paths[packet.entityId] = DebugPath(path, jumps, packet.steeringTarget, Util.getMillis())
+        paths[packet.entityId] = DebugPath(path, jumps, packet.steeringTarget, packet.lookTarget, packet.speedShare, Util.getMillis())
     }
 
     @SubscribeEvent
@@ -68,25 +68,36 @@ object NpcPathDebugRenderer {
                 camera.y,
                 camera.z,
             )
-            renderSteeringTarget(event, bufferSource, debugPath.steeringTarget)
+            renderMarker(event, bufferSource, debugPath.steeringTarget, MARKER_SIZE, 0.0f, 1.0f, 1.0f)
+            debugPath.lookTarget?.let { renderMarker(event, bufferSource, it, LOOK_MARKER_SIZE, 1.0f, 0.2f, 1.0f) }
+            val heading = debugPath.steeringTarget
+            DebugRenderer.renderFloatingText(
+                event.poseStack, bufferSource, "x%.2f".format(debugPath.speedShare),
+                heading.x, heading.y + MARKER_HEIGHT + SHARE_TEXT_LIFT, heading.z, SHARE_TEXT_COLOR,
+            )
             renderJumps(event, bufferSource, debugPath)
         }
         bufferSource.endBatch()
     }
 
-    private fun renderSteeringTarget(
+    /** A post at [target]: cyan where the NPC heads, magenta where it looks. */
+    private fun renderMarker(
         event: RenderLevelStageEvent,
         bufferSource: MultiBufferSource,
         target: NpcPathDebugPoint,
+        size: Double,
+        red: Float,
+        green: Float,
+        blue: Float,
     ) {
         val camera = event.camera.position
         val bounds = AABB.ofSize(
             Vec3(target.x, target.y + MARKER_HEIGHT * 0.5, target.z),
-            MARKER_SIZE,
+            size,
             MARKER_HEIGHT,
-            MARKER_SIZE,
+            size,
         ).move(-camera.x, -camera.y, -camera.z)
-        DebugRenderer.renderFilledBox(event.poseStack, bufferSource, bounds, 0.0f, 1.0f, 1.0f, 0.8f)
+        DebugRenderer.renderFilledBox(event.poseStack, bufferSource, bounds, red, green, blue, 0.8f)
     }
 
     private fun renderJumps(event: RenderLevelStageEvent, bufferSource: MultiBufferSource, debugPath: DebugPath) {
@@ -119,6 +130,8 @@ object NpcPathDebugRenderer {
         val path: Path,
         val jumps: List<Int>,
         val steeringTarget: NpcPathDebugPoint,
+        val lookTarget: NpcPathDebugPoint?,
+        val speedShare: Float,
         val updatedAt: Long,
     )
 
@@ -126,6 +139,9 @@ object NpcPathDebugRenderer {
     private const val NODE_RADIUS = 0.3f
     private const val MARKER_SIZE = 0.2
     private const val MARKER_HEIGHT = 0.7
+    private const val LOOK_MARKER_SIZE = 0.1
+    private const val SHARE_TEXT_LIFT = 0.3
+    private const val SHARE_TEXT_COLOR = 0xFFFFFF
     private const val ARC_SEGMENTS = 12
     private const val ARC_HEIGHT = 1.25f
     private const val JUMP_COLOR = 0xFFFFAA00.toInt()

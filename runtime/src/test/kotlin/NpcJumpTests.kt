@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpOutcome
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpSimulation
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpSpace
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.PathStraightening
+import kotlin.math.sqrt
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -122,6 +123,71 @@ class NpcJumpTests {
         error("never decided")
     }
 
+    /** Ground at y = 63 and, from x = 2 on, a block higher. */
+    private val step = Blocks(
+        (-6..8).flatMap { x -> (-2..2).flatMap { z -> listOfNotNull(Triple(x, 63, z), Triple(x, 64, z).takeIf { x >= 2 }) } },
+    )
+
+    @Test
+    fun `walking backward it times its jump up a block to get over the edge`() {
+        // Backward it walks at 60% of its speed, which vanilla gets from the square root of the input.
+        val body = body(NPC_SPEED * sqrt(0.6))
+        val landing = Vec3(2.5, 65.0, 0.5)
+        // From up against the block, as vanilla jumps, it gets no more than a toe onto the top.
+        val againstIt = JumpSimulation.takeOff(step, body, Vec3(1.69, 64.0, 0.5), 0.0, 0.0, 1.0, 0.0, landing, sprinting = false)
+        assertTrue(againstIt !is JumpOutcome.Landed, "from against the block got $againstIt")
+
+        val acceleration = JumpSimulation.groundAcceleration(body.speed, body.friction)
+        val drag = JumpSimulation.groundDrag(body.friction)
+        var x = 0.5
+        var vx = 0.0
+        repeat(60) {
+            val position = Vec3(x, 64.0, 0.5)
+            when (JumpSimulation.decide(step, body, position, vx, 0.0, 1.0, 0.0, landing, sprinting = false)) {
+                JumpDecision.TAKE_OFF -> {
+                    val outcome = JumpSimulation.takeOff(step, body, position, vx + acceleration, 0.0, 1.0, 0.0, landing, sprinting = false)
+                    assertTrue(outcome is JumpOutcome.Landed, "took off at $x and got $outcome")
+                    return
+                }
+                JumpDecision.RUN -> {
+                    vx += acceleration
+                    x += vx
+                    vx *= drag
+                }
+                JumpDecision.BRAKE -> error("braked at $x moving $vx")
+            }
+        }
+        error("never jumped")
+    }
+
+    @Test
+    fun `a step back from the block is room enough to climb it with margin`() {
+        // Climbing pushes at full speed whichever way it faces; it backs off until its side is this far from the block.
+        val body = body(NPC_SPEED)
+        val landing = Vec3(2.5, 65.0, 0.5)
+        val acceleration = JumpSimulation.groundAcceleration(body.speed, body.friction)
+        val drag = JumpSimulation.groundDrag(body.friction)
+        var x = 2.0 - body.halfWidth - STEP_BACK
+        var vx = 0.0
+        repeat(60) {
+            val position = Vec3(x, 64.0, 0.5)
+            when (JumpSimulation.decide(step, body, position, vx, 0.0, 1.0, 0.0, landing, sprinting = false)) {
+                JumpDecision.TAKE_OFF -> {
+                    val outcome = JumpSimulation.takeOff(step, body, position, vx + acceleration, 0.0, 1.0, 0.0, landing, sprinting = false)
+                    assertTrue(outcome is JumpOutcome.Landed, "took off at $x and got $outcome")
+                    return
+                }
+                JumpDecision.RUN -> {
+                    vx += acceleration
+                    x += vx
+                    vx *= drag
+                }
+                JumpDecision.BRAKE -> error("braked at $x moving $vx")
+            }
+        }
+        error("never jumped")
+    }
+
     @Test
     fun `from rest in the middle the run-up lands on the pillar`() {
         val outcome = runUp(pillar, body(NPC_SPEED * 1.5), 0.5, 0.0, onPillar)
@@ -162,5 +228,8 @@ class NpcJumpTests {
     private companion object {
         /** The movement speed of an engine NPC. */
         const val NPC_SPEED = 0.23
+
+        /** How far from the block, past its half width, the NPC backs off to climb it; kept in step with NpcMoveControl. */
+        const val STEP_BACK = 0.6
     }
 }

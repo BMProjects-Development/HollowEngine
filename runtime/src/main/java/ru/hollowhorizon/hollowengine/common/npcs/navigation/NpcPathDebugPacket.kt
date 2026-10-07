@@ -34,6 +34,8 @@ data class NpcPathDebugPacket(
     val targetZ: Int,
     val reached: Boolean,
     val steeringTarget: NpcPathDebugPoint,
+    val lookTarget: NpcPathDebugPoint? = null,
+    val speedShare: Float = 1f,
 ) : HollowPacket {
     override fun handle(player: Player) {
         NpcPathDebugRenderer.update(this)
