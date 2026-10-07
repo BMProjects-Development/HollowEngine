@@ -11,11 +11,17 @@ import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator
 import net.minecraft.world.phys.Vec3
 
-class NpcNodeEvaluator(private val settingsOf: () -> NavigationComponent) : WalkNodeEvaluator() {
+class NpcNodeEvaluator(
+    private val settingsOf: () -> NavigationComponent,
+    private val zonesOf: () -> List<Zone>,
+) : WalkNodeEvaluator() {
     private val cardinalNeighbors = arrayOfNulls<Node>(Direction.Plane.HORIZONTAL.count())
     private val diagonalNeighbors = arrayOfNulls<Node>(Direction.Plane.HORIZONTAL.count())
     private var settings = NavigationComponent()
     private var landingRises = IntArray(0)
+    /** The avoid rules of the last search, kept after it for straightening the path it found. */
+    internal var avoid: AvoidRules? = null
+        private set
 
     init {
         setCanFloat(true)
@@ -24,9 +30,20 @@ class NpcNodeEvaluator(private val settingsOf: () -> NavigationComponent) : Walk
     }
 
     override fun prepare(level: PathNavigationRegion, mob: Mob) {
-        super.prepare(level, mob)
         settings = settingsOf()
+        setCanFloat(settings.avoid.swim)
+        mob.setPathfindingMalus(PathType.WATER, settings.avoid.waterCost)
+        super.prepare(level, mob)
         landingRises = landingRisesOf(settings.jumps)
+        avoid = AvoidRules(level, settings.avoid, zonesOf(), entityHeight, mob.blockPosition(), mob.isInWater)
+    }
+
+    /** A cell the NPC may not enter by its avoid rules is blocked, whatever is in it. */
+    override fun getCachedPathType(x: Int, y: Int, z: Int): PathType {
+        val type = super.getCachedPathType(x, y, z)
+        if (type == PathType.BLOCKED) return type
+        val cost = avoid?.cost(x, y, z) ?: return type
+        return if (cost == AvoidRules.FORBIDDEN) PathType.BLOCKED else type
     }
 
     override fun getNeighbors(outputArray: Array<Node>, node: Node): Int {
@@ -248,7 +265,10 @@ class NpcNodeEvaluator(private val settingsOf: () -> NavigationComponent) : Walk
     }
 
     /** What the step from [from] to [to] costs on top of its length: a jump is worth [JumpSettings.jumpCost] blocks of walking. */
-    internal fun additionalTravelCost(from: Node, to: Node): Float {
+    internal fun additionalTravelCost(from: Node, to: Node): Float =
+        stepCost(from, to) + (avoid?.cost(to.x, to.y, to.z)?.coerceAtLeast(0f) ?: 0f)
+
+    private fun stepCost(from: Node, to: Node): Float {
         if (isGapJump(from, to)) return settings.jumps.jumpCost
 
         val fromFloor = getFloorLevel(BlockPos(from.x, from.y, from.z))

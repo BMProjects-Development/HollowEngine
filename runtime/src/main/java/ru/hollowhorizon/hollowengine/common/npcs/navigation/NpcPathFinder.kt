@@ -21,7 +21,7 @@ class NpcPathFinder(
         searchDepthMultiplier: Float,
     ): Path? {
         val path = super.findPath(region, mob, targetPositions, maxRange, accuracy, searchDepthMultiplier) ?: return null
-        return NpcPath.of(path, region, mob, settingsOf().path.straighten)
+        return NpcPath.of(path, region, mob, settingsOf().path.straighten, evaluator.avoid)
     }
 
     override fun distance(first: Node, second: Node): Float {

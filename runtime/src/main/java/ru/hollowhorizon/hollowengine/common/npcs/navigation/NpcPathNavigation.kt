@@ -28,18 +28,52 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     /** The settings of the move under way, taking the place of the NPC's own for as long as it lasts. */
     var settingsOverride: NavigationComponent? = null
 
-    /** How far short of the end of its path the NPC means to stop; it brakes to stop there. */
-    var stopDistance = 0.0
+    private var aimedTarget: Vec3? = null
+    private var aimedVia: List<Vec3> = emptyList()
+    private var aimedStop = 0.0
+    private var aimedAt = Long.MIN_VALUE
 
     /** The point the move under way is for, which the path ends at rather than at the middle of its block. */
-    var exactTarget: Vec3? = null
+    val exactTarget: Vec3? get() = aimedTarget.takeIf { isAimFresh() }
+
+    /**
+     * The points the move goes on through after [exactTarget], when it passes several: the pace is planned along
+     * them, so the NPC rounds the point it is walking to and keeps going instead of stopping there.
+     */
+    val via: List<Vec3> get() = if (isAimFresh()) aimedVia else emptyList()
+
+    /** How far short of the end of its path the NPC means to stop; it brakes to stop there. */
+    val stopDistance: Double get() = if (isAimFresh()) aimedStop else 0.0
+
+    /**
+     * Says what the move under way is for: [target], then [via], stopping [stop] short of the last. Whatever drives
+     * the NPC, a scripted move or a patrol, says it every tick; a path nobody aims any more, such as a goal's, ends
+     * at its last node again.
+     */
+    fun aim(target: Vec3?, via: List<Vec3> = emptyList(), stop: Double = 0.0) {
+        aimedTarget = target
+        aimedVia = via
+        aimedStop = stop
+        aimedAt = level.gameTime
+    }
+
+    private fun isAimFresh(): Boolean = level.gameTime - aimedAt <= AIM_TICKS
+
+    /** Zones the NPC keeps out of on every way it walks, until a script lets it in again. */
+    val avoidedZones = mutableListOf<Zone>()
+
+    /** Zones the move under way keeps it out of. */
+    var moveZones: List<Zone> = emptyList()
+
+    /** The avoid rules on the live world, for what the NPC heads for between the nodes of its path. */
+    private var liveAvoid: AvoidRules? = null
 
     /** What the NPC's path search and its steps go by now. */
     val settings: NavigationComponent
         get() = settingsOverride ?: mob.navigationComponent ?: DEFAULT_SETTINGS
 
     override fun createPathFinder(maxVisitedNodes: Int): PathFinder {
-        val evaluator = NpcNodeEvaluator { settings }
+        val evaluator = NpcNodeEvaluator({ settings }, ::zones)
         nodeEvaluator = evaluator
         return NpcPathFinder(evaluator, maxVisitedNodes) { settings }
     }
@@ -50,7 +84,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         super.tick()
         closePassedDoors()
         val currentPath = path?.takeUnless(Path::isDone)
-        if (currentPath !== backstepPath) updateBackstep(currentPath)
+        if (currentPath !== backstepPath) onPathChanged(currentPath)
         val jump = currentPath?.let(::gapJumpOf)
         val moveControl = mob.moveControl as? NpcMoveControl
         moveControl?.gapJump = jump
@@ -122,7 +156,14 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
             length += Mth.length(point.x - points.last().x, point.z - points.last().z)
             points += point
             val last = index == currentPath.nodeCount - 1
-            if (last) return PathAhead(points, stopShort = stopDistance)
+            if (last) {
+                for (point in via) {
+                    length += Mth.length(point.x - points.last().x, point.z - points.last().z)
+                    points += point
+                    if (length > PLANNING_REACH) return PathAhead(points, stopShort = null)
+                }
+                return PathAhead(points, stopShort = stopDistance)
+            }
             if (npcPath?.isJumpTo(index + 1) == true) return PathAhead(points, stopShort = 0.0)
             if (length > PLANNING_REACH || !canCutCorner(currentPath.getNode(index).type)) break
         }
@@ -138,15 +179,28 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         if (!mob.onGround()) return next
         val start = mob.position()
         val heading = ahead.pointAt(distance)
-        if (NpcNavigationGeometry.canWalkDirectly(level, mob, start, heading)) return heading
+        if (canHeadFor(start, heading)) return heading
         for (index in ahead.nodeBefore(distance) downTo 1) {
             val node = ahead.points[index]
-            if (NpcNavigationGeometry.canWalkDirectly(level, mob, start, node)) return node
+            if (canHeadFor(start, node)) return node
         }
         if (!canCutCorner(currentPath.nextNode.type) || abs(next.y - start.y) > mob.maxUpStep()) return next
         return NpcNavigationGeometry.findWalkableWaypoint(level, mob, start, next)
             ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, next)
             ?: next
+    }
+
+    /** Whether the NPC can walk from [start] to [point] in a line without cutting across what it avoids. */
+    private fun canHeadFor(start: Vec3, point: Vec3): Boolean =
+        NpcNavigationGeometry.canWalkDirectly(level, mob, start, point) && liveAvoid?.crosses(start, point) != true
+
+    private fun zones(): List<Zone> = if (moveZones.isEmpty()) avoidedZones.toList() else avoidedZones + moveZones
+
+    private fun onPathChanged(currentPath: Path?) {
+        updateBackstep(currentPath)
+        liveAvoid = currentPath?.let {
+            AvoidRules(level, settings.avoid, zones(), Mth.ceil(mob.bbHeight), mob.blockPosition(), mob.isInWater)
+        }
     }
 
     /**
@@ -335,6 +389,9 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
 
         /** How close to the middle of the node before a jump the NPC gets before it starts its run-up. */
         private const val TAKEOFF_REACH = 0.3
+
+        /** How many ticks what a move aims at holds without being said again. */
+        private const val AIM_TICKS = 1L
 
         /** How near a node, in blocks, the NPC may cut it short, as vanilla allows. */
         private const val CUT_REACH = 2.0

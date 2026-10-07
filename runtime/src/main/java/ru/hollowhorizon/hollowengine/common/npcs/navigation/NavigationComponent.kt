@@ -29,6 +29,31 @@ data class NavigationComponent(
     val path: PathSettings = PathSettings(),
     val jumps: JumpSettings = JumpSettings(),
     val movement: MovementSettings = MovementSettings(),
+    val avoid: AvoidSettings = AvoidSettings(),
+)
+
+/** What the NPC keeps off on its way: water, and blocks it walks around or never steps on. */
+@Serializable
+data class AvoidSettings(
+    @EditorDescription("$LANG.swim.hint")
+    val swim: Boolean = true,
+    @EditorDescription("$LANG.waterCost.hint")
+    @EditorRange(min = 0.0)
+    val waterCost: Float = 8f,
+    @EditorDescription("$LANG.blocks.hint")
+    val blocks: List<BlockCost> = emptyList(),
+)
+
+/**
+ * A block, or a block tag written `#namespace:path`, and what stepping onto or into one costs, in blocks of
+ * walking; a negative cost is never.
+ */
+@Serializable
+data class BlockCost(
+    @EditorDescription("$LANG.block.hint")
+    val block: String = "",
+    @EditorDescription("$LANG.cost.hint")
+    val cost: Float = 8f,
 )
 
 /** How the NPC walks its path: how it speeds up and slows down, and which way it may walk. */

@@ -25,8 +25,11 @@ class NpcPath private constructor(
     }
 
     companion object {
-        /** [path] as found by the search, its nodes pulled straight in [level] when [straighten] is on. */
-        fun of(path: Path, level: CollisionGetter, mob: Mob, straighten: Boolean): NpcPath {
+        /**
+         * [path] as found by the search, its nodes pulled straight in [level] when [straighten] is on. A straight
+         * line never cuts across what [avoid] makes the NPC go around.
+         */
+        internal fun of(path: Path, level: CollisionGetter, mob: Mob, straighten: Boolean, avoid: AvoidRules?): NpcPath {
             val nodes = List(path.nodeCount, path::getNode)
             val jumps = BooleanArray(nodes.size) { it > 0 && isGapJump(nodes[it - 1], nodes[it]) }
             val kept = if (straighten) {
@@ -34,7 +37,7 @@ class NpcPath private constructor(
                     nodes,
                     jumps,
                     canSkip = { it.type in SKIPPABLE },
-                    canWalk = { from, to -> canWalkStraight(level, mob, from, to) },
+                    canWalk = { from, to -> canWalkStraight(level, mob, from, to, avoid) },
                 )
             } else {
                 nodes.indices.toList()
@@ -47,7 +50,7 @@ class NpcPath private constructor(
             )
         }
 
-        private fun canWalkStraight(level: CollisionGetter, mob: Mob, from: Node, to: Node): Boolean {
+        private fun canWalkStraight(level: CollisionGetter, mob: Mob, from: Node, to: Node, avoid: AvoidRules?): Boolean {
             val start = NpcNavigationGeometry.nodeCenter(
                 mob,
                 from.x,
@@ -61,7 +64,7 @@ class NpcPath private constructor(
                 to.z
             )
             if (start.distanceToSqr(end) > MAX_STRAIGHT * MAX_STRAIGHT) return false
-            return NpcNavigationGeometry.canWalkDirectly(level, mob, start, end)
+            return NpcNavigationGeometry.canWalkDirectly(level, mob, start, end) && avoid?.crosses(start, end) != true
         }
 
         /** The ground a straight line may cross without the NPC having to stop on it, as doors and hazards make it. */

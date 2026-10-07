@@ -87,9 +87,40 @@ fun NpcEntity.startMove(pos: Vec3, options: MoveOptions = MoveOptions()): NpcAct
  */
 suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = position)
 
+/**
+ * Moves the NPC through [points] in turn without stopping at any but the last: each one before it counts as
+ * passed within [MoveOptions.passDistance], and [MoveOptions.arrivalDistance] is for the last.
+ */
+suspend fun NpcEntity.move(points: List<Vec3>, options: MoveOptions = MoveOptions()): MoveResult =
+    startMove(points, options).await()
+
+fun NpcEntity.startMove(points: List<Vec3>, options: MoveOptions = MoveOptions()): NpcAction<MoveResult> {
+    require(points.isNotEmpty()) { "A move needs at least one point" }
+    return actions.start(NpcActionKeys.MOVEMENT) { moveThrough(points.map { point -> { point } }, options) }
+}
+
 fun NpcEntity.stopMoving() {
     actions.cancel(NpcActionKeys.MOVEMENT)
     navigation.stop()
+}
+
+/**
+ * Keeps the NPC out of [zone] on every way it walks, its moves and its goals alike, until [stopAvoiding]. It is
+ * not saved with the NPC: a script that needs it after a reload adds it again.
+ */
+fun NpcEntity.avoid(zone: Zone) {
+    npcNavigation.avoidedZones += zone
+    navigation.recomputePath()
+}
+
+fun NpcEntity.stopAvoiding(zone: Zone) {
+    if (npcNavigation.avoidedZones.remove(zone)) navigation.recomputePath()
+}
+
+fun NpcEntity.stopAvoidingAll() {
+    if (npcNavigation.avoidedZones.isEmpty()) return
+    npcNavigation.avoidedZones.clear()
+    navigation.recomputePath()
 }
 
 /**
