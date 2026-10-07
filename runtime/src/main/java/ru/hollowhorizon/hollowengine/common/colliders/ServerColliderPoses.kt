@@ -53,6 +53,7 @@ object ServerColliderPoses {
         hosts.remove(level)
         physical.remove(level)
         ColliderTouches.forget(level)
+        ColliderPathObstacles.forget(level)
     }
 
     internal fun tick(level: Level, entities: List<Entity>) {
@@ -66,7 +67,9 @@ object ServerColliderPoses {
 @SubscribeEvent
 fun onColliderServerTick(event: TickEvent.Server) {
     event.server.allLevels.forEach { level ->
-        ServerColliderPoses.tick(level, AttachmentRegistry.entitySnapshots(level).map { it.first })
+        val entities = AttachmentRegistry.entitySnapshots(level).map { it.first }
+        ServerColliderPoses.tick(level, entities)
+        ColliderPathObstacles.update(level, entities)
     }
 }
 

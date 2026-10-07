@@ -229,6 +229,9 @@ public interface RuntimeBridge extends AutoCloseable {
 
     boolean overlapsSolidColliders(Entity entity, AABB box);
 
+    @Nullable
+    PathObstacles pathObstacles(Mob mob);
+
     DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
 
     boolean hasColliderTargets(Entity entity, boolean projectile);

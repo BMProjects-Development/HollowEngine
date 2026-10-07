@@ -104,9 +104,9 @@ object EntityBodies {
     }
 
     /** What a body stops others with: its solid colliders, or its box when it is blocking and has no colliders that act on bodies. */
-    private fun shapesOf(body: Entity): List<ColliderVolume> {
+    internal fun shapesOf(body: Entity): List<ColliderVolume> {
         if (hasPhysicalColliders(body)) return SolidColliders.solidBoxes(body)
-        if (body.bodyComponent?.mode != BodyMode.BLOCKING) return emptyList()
+        if (body.bodyComponent?.mode != BodyMode.BLOCKING || !body.isAlive) return emptyList()
         val box = body.boundingBox
         return listOf(ColliderBox.aligned(box.center, Vec3(box.xsize / 2.0, box.ysize / 2.0, box.zsize / 2.0)))
     }

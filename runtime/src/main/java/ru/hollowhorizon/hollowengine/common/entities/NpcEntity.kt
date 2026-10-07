@@ -22,6 +22,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionController
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcMoveControl
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathNavigation
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.maxDrop
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.utils.FakePlayer
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -64,6 +65,11 @@ class NpcEntity : PathfinderMob {
 
 
     override fun createNavigation(pLevel: Level) = NpcPathNavigation(pLevel, this)
+
+    val npcNavigation: NpcPathNavigation get() = navigation as NpcPathNavigation
+
+    /** How far it steps off a ledge, by its navigation settings rather than by its health as mobs do. */
+    override fun getMaxFallDistance(): Int = npcNavigation.settings.path.maxDrop(this)
 
     override fun registerGoals() {
         goalSelector.addGoal(1, FloatGoal(this))

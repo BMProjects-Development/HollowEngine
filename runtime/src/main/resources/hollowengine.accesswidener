@@ -73,3 +73,5 @@ accessible field net/minecraft/world/entity/LivingEntity jumping Z
 accessible field net/minecraft/world/entity/LivingEntity noJumpDelay I
 accessible field net/minecraft/server/level/ServerChunkCache chunkMap Lnet/minecraft/server/level/ChunkMap;
 accessible method net/minecraft/server/level/ChunkMap getChunks ()Ljava/lang/Iterable;
+
+accessible field net/minecraft/server/level/ServerLevel navigatingMobs Ljava/util/Set;

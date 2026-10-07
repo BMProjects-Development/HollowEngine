@@ -6,7 +6,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.ai.control.MoveControl
 import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.level.pathfinder.PathfindingContext
-
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import kotlin.math.abs
 import kotlin.math.max
@@ -23,7 +22,18 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
         private const val DIAGONAL_JUMP_DISTANCE_SQ = 2.25
     }
 
+    /** The jump over a gap the step the NPC is on makes; the navigation sets it every tick. */
+    var gapJump: GapJump? = null
+
+    private val gapJumps = GapJumpControl(mob)
+
     override fun tick() {
+        val jump = gapJump
+        gapJumps.beginTick(jump, operation == Operation.JUMPING)
+        if (jump != null && operation == Operation.MOVE_TO) {
+            operation = if (gapJumps.tick(jump)) Operation.JUMPING else Operation.WAIT
+            return
+        }
         when (this.operation) {
             Operation.STRAFE -> {
                 val speed = (this.speedModifier * mob.getAttributeValue(Attributes.MOVEMENT_SPEED)).toFloat()
@@ -67,6 +77,7 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
                 }
 
                 var yawDelta = 0f
+                var headingFactor = 1f
                 if (horizontalDistSq >= MIN_DISTANCE_FOR_TURN_SQ) {
                     val targetYaw = (Mth.atan2(dz, dx) * (180 / Math.PI) - 90.0).toFloat()
                     yawDelta = Mth.wrapDegrees(targetYaw - mob.yBodyRot)
@@ -76,8 +87,9 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
                         mob.setYBodyRot(bodyYaw)
                         mob.yHeadRot = rotlerp(mob.yHeadRot, bodyYaw, MAX_HEAD_TURN)
                     }
+                    headingFactor = max(0f, Mth.cos(Mth.wrapDegrees(targetYaw - mob.yRot) * Mth.DEG_TO_RAD))
                 }
-                mob.speed = (this.speedModifier * mob.getAttributeValue(Attributes.MOVEMENT_SPEED)).toFloat()
+                mob.speed = (this.speedModifier * mob.getAttributeValue(Attributes.MOVEMENT_SPEED)).toFloat() * headingFactor
 
                 val diagonalApproach = abs(dx) > mob.bbWidth * 0.5 && abs(dz) > mob.bbWidth * 0.5
                 val jumpDistanceSq = if (diagonalApproach) {

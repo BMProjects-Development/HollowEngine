@@ -66,6 +66,7 @@ import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaims
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderCombat
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderContacts
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderPathObstacles
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.SolidColliders
 import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
@@ -79,6 +80,7 @@ import ru.hollowhorizon.hollowengine.api.ModList
 import ru.hollowhorizon.hollowengine.api.extensions.FakePlayerFactory
 import ru.hollowhorizon.hollowengine.api.extensions.ItemStackHelper
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.EventBridge
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.PathObstacles
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimeBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.client.audio.streams.ExtendedSoundConverter
@@ -675,6 +677,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
 
     override fun overlapsSolidColliders(entity: Entity, box: AABB): Boolean = SolidColliders.overlaps(entity, box)
+
+    override fun pathObstacles(mob: Mob): PathObstacles? = ColliderPathObstacles.of(mob)
 
     override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
         ColliderCombat.resolve(entity, damageSource)

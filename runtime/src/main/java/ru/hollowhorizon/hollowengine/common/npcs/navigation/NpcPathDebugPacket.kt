@@ -13,6 +13,7 @@ data class NpcPathDebugNode(
     val z: Int,
     val type: String,
     val costMalus: Float,
+    val jump: Boolean = false,
 )
 
 @Serializable

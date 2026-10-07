@@ -3,9 +3,12 @@ package ru.hollowhorizon.hollowengine.common.npcs.navigation
 import net.minecraft.core.BlockPos
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Mob
+import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.level.BlockGetter
 import net.minecraft.world.level.CollisionGetter
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderPathObstacles
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -23,6 +26,9 @@ internal object NpcNavigationGeometry {
     private const val MAX_JUMP_DISTANCE = 1.75
     private const val MAX_SAFE_DROP = 1.25
     private const val JUMP_CLEARANCE = 0.05
+
+    /** How far under the feet the block that sets the ground friction is looked for, as vanilla does. */
+    private const val GROUND_PROBE = 0.5000001
 
     fun canWalkDirectly(
         level: CollisionGetter,
@@ -127,7 +133,7 @@ internal object NpcNavigationGeometry {
 
         val elevatedY = to.y + JUMP_CLEARANCE
         val ascent = bodyBox(mob, from).expandTowards(0.0, elevatedY - from.y, 0.0)
-        if (!level.noCollision(mob, ascent)) return false
+        if (!isFree(level, mob, ascent)) return false
 
         val elevatedFrom = Vec3(from.x, elevatedY, from.z)
         val elevatedTo = Vec3(to.x, elevatedY, to.z)
@@ -151,7 +157,7 @@ internal object NpcNavigationGeometry {
         val ledgeTarget = Vec3(to.x, from.y, to.z)
         if (!hasBodyClearance(level, mob, from, ledgeTarget)) return false
         val descent = bodyBox(mob, to).expandTowards(0.0, drop, 0.0)
-        return level.noCollision(mob, descent) && hasSupport(level, mob, to)
+        return isFree(level, mob, descent) && hasSupport(level, mob, to)
     }
 
     fun hasStepableSurface(
@@ -183,7 +189,7 @@ internal object NpcNavigationGeometry {
         for (sample in 1..sampleCount) {
             val progress = sample.toDouble() / sampleCount
             val position = from.lerp(to, progress)
-            if (!level.noCollision(mob, bodyBox(mob, position))) return false
+            if (!isFree(level, mob, bodyBox(mob, position))) return false
             if (!hasSupport(level, mob, position)) return false
         }
         return true
@@ -195,7 +201,7 @@ internal object NpcNavigationGeometry {
         val sampleCount = max(1, ceil(distance / sampleDistance).toInt())
         for (sample in 0..sampleCount) {
             val position = from.lerp(to, sample.toDouble() / sampleCount)
-            if (!level.noCollision(mob, bodyBox(mob, position))) return false
+            if (!isFree(level, mob, bodyBox(mob, position))) return false
         }
         return true
     }
@@ -226,6 +232,27 @@ internal object NpcNavigationGeometry {
         )
         return !level.noCollision(mob, support)
     }
+
+    /** Whether [box] meets neither blocks nor the colliders and blocking bodies of other entities. */
+    fun isFree(level: CollisionGetter, mob: Mob, box: AABB): Boolean =
+        level.noCollision(mob, box) && !ColliderPathObstacles.overlaps(mob, box)
+
+    /** What a jump of [mob] is simulated in: the blocks of [level] and the obstacles around them. */
+    fun jumpSpace(level: CollisionGetter, mob: Mob): JumpSpace = JumpSpace { box -> !isFree(level, mob, box) }
+
+    /** [mob] running at [speed], vanilla's speed of it, on ground of [friction]. */
+    fun jumpBody(mob: Mob, speed: Double, friction: Double) = JumpBody(
+        halfWidth = mob.bbWidth * 0.5,
+        height = mob.bbHeight.toDouble(),
+        speed = speed,
+        jumpPower = mob.getAttributeValue(Attributes.JUMP_STRENGTH) + mob.jumpBoostPower,
+        gravity = mob.gravity,
+        friction = friction,
+    )
+
+    /** The friction of the ground under a body standing at [position]. */
+    fun frictionUnder(level: BlockGetter, position: Vec3): Double =
+        level.getBlockState(BlockPos.containing(position.x, position.y - GROUND_PROBE, position.z)).block.friction.toDouble()
 
     fun nodeCenter(mob: Mob, x: Int, floorY: Double, z: Int): Vec3 {
         val horizontalOffset = Mth.floor(mob.bbWidth + 1.0f) / 2.0
