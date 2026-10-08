@@ -57,6 +57,12 @@ annotation class EditorWidget(val id: String)
 object EditorWidgets {
     /** A list of names of the colliders on the same bone as the attachment, ticked off among those there are. */
     const val COLLIDERS = "hollowengine:colliders"
+
+    /** The name of one IK target of the rig, picked among those there are. */
+    const val RIG_TARGETS = "hollowengine:rig_targets"
+
+    /** An expression of the animator's language, with its completion and highlighting. */
+    const val ANIMATION_EXPRESSION = "hollowengine:animation_expression"
 }
 
 /** A string field that deserves more than one line. */

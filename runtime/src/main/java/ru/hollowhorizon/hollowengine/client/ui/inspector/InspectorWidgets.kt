@@ -3,6 +3,11 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 import androidx.compose.runtime.Composable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
+import ru.hollowhorizon.hollowengine.client.ui.Column
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.ExpressionField
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
@@ -34,6 +39,21 @@ object InspectorWidgets {
             @Composable
             override fun Content(field: InspectorWidgetField) =
                 CollidersField(field.label, field.description, field.value, field.onChange)
+        })
+        register(EditorWidgets.RIG_TARGETS, object : InspectorWidget {
+            @Composable
+            override fun Content(field: InspectorWidgetField) =
+                RigTargetField(field.label, field.description, field.value.jsonPrimitive.content) { field.onChange(JsonPrimitive(it)) }
+        })
+        register(EditorWidgets.ANIMATION_EXPRESSION, object : InspectorWidget {
+            @Composable
+            override fun Content(field: InspectorWidgetField) {
+                val source = (field.value as? JsonObject)?.get("source")?.jsonPrimitive?.content.orEmpty()
+                Column(tags = listOf("insp-field")) {
+                    FieldLabel(field.label, field.description)
+                    ExpressionField("", source, id = "insp-expression${field.path}") { field.onChange(JsonObject(mapOf("source" to JsonPrimitive(it)))) }
+                }
+            }
         })
     }
 

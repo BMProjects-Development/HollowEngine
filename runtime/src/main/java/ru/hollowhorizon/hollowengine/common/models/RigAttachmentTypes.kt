@@ -23,6 +23,7 @@ class RigAttachmentType<S : RigAttachmentSpec>(
     val titleKey: String,
     val createDefault: ((id: String) -> S)? = null,
     val allowedOnModel: Boolean = false,
+    val namedAcrossRig: Boolean = false,
 ) {
     val key: ResourceLocation = id.rl
 }
@@ -63,6 +64,8 @@ object RigAttachmentTypes {
             )
         )
         register(ColliderAttachmentSpec.TYPE)
+        register(IkTargetSpec.TYPE)
+        register(IkChainSpec.TYPE)
     }
 
     fun register(type: RigAttachmentType<*>): ExtensionHandle = point.register(type.key, type)

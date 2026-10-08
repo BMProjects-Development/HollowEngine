@@ -5,6 +5,8 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
@@ -104,6 +106,12 @@ internal class PosedModel(
         applyRigPose(roots, rig)
         nested.forEach(PosedModel::applyRigPoses)
     }
+
+    /**
+     * Bends the IK chains of this model. Nested models stand still in their rest pose, so only the outermost
+     * one, which the animator moves, has anything to bend.
+     */
+    fun applyRigConstraints(context: AnimatorEvaluationContext) = applyRigConstraints(roots, rig, context)
 
     /** Turns the posed nodes into matrices, the nested models' with them. */
     fun updateMatrices() {

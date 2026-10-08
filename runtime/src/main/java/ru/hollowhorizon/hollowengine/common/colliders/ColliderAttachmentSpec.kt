@@ -118,6 +118,7 @@ data class ColliderAttachmentSpec(
             titleKey = "hollowengine.gui.rig_editor.kind_collider",
             createDefault = { id -> ColliderAttachmentSpec(id = id) },
             allowedOnModel = true,
+            namedAcrossRig = true,
         )
     }
 }

@@ -32,9 +32,10 @@ internal fun AnimatorIconButton(
  * Field that holding an animation expression.
  */
 @Composable
-internal fun ExpressionField(label: String, value: String, onChange: (String) -> Unit) = TextRow(
+internal fun ExpressionField(label: String, value: String, id: String? = null, onChange: (String) -> Unit) = TextRow(
     label = label,
     value = value,
+    id = id,
     completions = AnimationExpressionEditing.completions,
     highlighter = AnimationExpressionEditing.highlighter,
     diagnostics = AnimationExpressionEditing.diagnostics(value),

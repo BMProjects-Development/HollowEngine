@@ -51,6 +51,7 @@ internal class ColliderPoseTrack(
         context.modelToWorld = resolveNodeWorldTransform(entity, node.transform, 1f)
         animator.applyTo(target, context)
         posed.applyRigPoses()
+        posed.applyRigConstraints(context)
         posed.updateMatrices()
 
         val placed = applyOverrides(entity, posed.placeColliders(entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))

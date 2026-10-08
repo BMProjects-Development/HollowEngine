@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 
 /** The id of the row that stands for the model itself, above its bones. */
@@ -107,7 +106,7 @@ private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone
                         val spec = create(freeAttachmentId(rig, bone, type)).also { added = it }
                         rig.withHolder(bone, rig.holder(bone).withAttachment(spec))
                     }
-                    state.select(bone, added?.takeIf { it is ColliderAttachmentSpec }?.id)
+                    state.select(bone, added?.takeIf(::hasGizmo)?.id)
                 }
             },
         ).takeIf { kinds.isNotEmpty() },

@@ -25,8 +25,8 @@ import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
 
-/** Which collider is selected: the bone it hangs on, null for the model itself, and its name. */
-internal data class ColliderSelection(val bone: String?, val id: String)
+/** Which part is selected: the bone it hangs on, null for the model itself, and its id. */
+internal data class RigPartSelection(val bone: String?, val id: String)
 
 /**
  * Puts a saved rig to use in the world right away: on this client, and on the server running in this
@@ -48,7 +48,7 @@ internal fun holderMatrix(roots: List<RuntimeNode>, bone: String?): Mat4f? {
     return roots.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } }?.globalMatrix
 }
 
-internal fun DebugLines.Batch.colliders(colliders: List<EntityCollider>, selected: ColliderSelection?) {
+internal fun DebugLines.Batch.colliders(colliders: List<EntityCollider>, selected: RigPartSelection?) {
     colliders.forEach { collider ->
         val isSelected = selected != null && selected.bone == collider.bone && selected.id == collider.name
         val color = if (isSelected) SELECTED_COLOR else ColliderDebugRenderer.colorOf(collider.spec.modes)
@@ -64,19 +64,19 @@ internal fun DebugLines.Batch.colliders(colliders: List<EntityCollider>, selecte
  * A collider as the gizmo sees it: its center and turn in model space, and its size along its own axes.
  * [with] goes back to the fields of the collider, in the space of what it hangs on.
  */
-internal class ColliderFrame(val spec: ColliderAttachmentSpec, holder: Mat4f) {
+internal class ColliderFrame(override val spec: ColliderAttachmentSpec, holder: Mat4f) : RigGizmoFrame {
     private val holder = MutableMat4f(holder)
     private val holderRotation: QuatF = holder.getRotation(MutableQuatF()).norm()
 
-    val isWorldAligned: Boolean get() = spec.alignment == ColliderAlignment.WORLD
+    override val isWorldAligned: Boolean get() = spec.alignment == ColliderAlignment.WORLD
 
-    val values: GizmoTransformValues = GizmoTransformValues(
+    override val values: GizmoTransformValues = GizmoTransformValues(
         translation = holder.transform(spec.offset, 1f, MutableVec3f()),
         rotation = if (isWorldAligned) QuatF.IDENTITY else holderRotation * spec.orientation,
         scale = spec.size,
     )
 
-    fun with(values: GizmoTransformValues): ColliderAttachmentSpec {
+    override fun with(values: GizmoTransformValues): ColliderAttachmentSpec {
         val inverse = MutableMat4f(holder)
         if (!inverse.invert()) return spec
         val local = holderRotation.inverted() * values.rotation

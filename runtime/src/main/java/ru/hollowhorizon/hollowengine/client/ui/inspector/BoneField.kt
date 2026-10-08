@@ -7,9 +7,30 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 
 val LocalEditorBones = staticCompositionLocalOf { emptyList<String>() }
 
+/** The IK targets of the rig being edited, by name, for the fields that pick one. */
+val LocalEditorRigTargets = staticCompositionLocalOf { emptyList<String>() }
+
 @Composable
-internal fun BoneField(label: String?, description: String?, value: String, onChange: (String) -> Unit) {
-    val bones = LocalEditorBones.current
+internal fun BoneField(label: String?, description: String?, value: String, onChange: (String) -> Unit) =
+    NamePickerField(label, description, value, LocalEditorBones.current, "bone", onChange)
+
+@Composable
+internal fun RigTargetField(label: String?, description: String?, value: String, onChange: (String) -> Unit) =
+    NamePickerField(label, description, value, LocalEditorRigTargets.current, "target", onChange)
+
+/**
+ * Picks one of [names] in a searchable popup, or none. [kind] names the lang keys of its texts,
+ * `hollowengine.gui.inspector.<kind>.*`.
+ */
+@Composable
+private fun NamePickerField(
+    label: String?,
+    description: String?,
+    value: String,
+    names: List<String>,
+    kind: String,
+    onChange: (String) -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     var anchor by remember { mutableStateOf(UiRect.Zero) }
 
@@ -28,7 +49,7 @@ internal fun BoneField(label: String?, description: String?, value: String, onCh
                 },
         ) {
             Text(
-                value.ifBlank { boneText("none") },
+                value.ifBlank { pickerText(kind, "none") },
                 tags = listOf("insp-bone-label"),
                 modifier = Modifier.grow(1f),
             )
@@ -36,23 +57,24 @@ internal fun BoneField(label: String?, description: String?, value: String, onCh
         }
     }
 
-    if (open) BonePopup(anchor, bones, value, onDismiss = { open = false }) { picked ->
+    if (open) NamePopup(anchor, names, value, kind, onDismiss = { open = false }) { picked ->
         open = false
         onChange(picked)
     }
 }
 
 @Composable
-private fun BonePopup(
+private fun NamePopup(
     anchor: UiRect,
-    bones: List<String>,
+    names: List<String>,
     selected: String,
+    kind: String,
     onDismiss: () -> Unit,
     onPick: (String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val matches = remember(bones, query) {
-        if (query.isBlank()) bones else bones.filter { it.contains(query, ignoreCase = true) }
+    val matches = remember(names, query) {
+        if (query.isBlank()) names else names.filter { it.contains(query, ignoreCase = true) }
     }
 
     Popup(
@@ -64,7 +86,7 @@ private fun BonePopup(
         TextField(
             value = query,
             id = "insp-bone-search",
-            placeholder = boneText("search"),
+            placeholder = pickerText(kind, "search"),
             fontSize = 9f,
             onChange = { query = it },
             tags = listOf("insp-input"),
@@ -75,17 +97,17 @@ private fun BonePopup(
             tags = listOf("insp-bone-list"),
             modifier = Modifier.scrollable(horizontal = false),
         ) {
-            if (selected.isNotBlank()) BoneRow(boneText("clear"), selected = false) { onPick("") }
-            matches.forEach { bone ->
-                key(bone) { BoneRow(bone, selected = bone == selected) { onPick(bone) } }
+            if (selected.isNotBlank()) PickerRow(pickerText(kind, "clear"), selected = false) { onPick("") }
+            matches.forEach { name ->
+                key(name) { PickerRow(name, selected = name == selected) { onPick(name) } }
             }
-            if (matches.isEmpty()) Text(boneText("no_matches"), tags = listOf("insp-hint"))
+            if (matches.isEmpty()) Text(pickerText(kind, "no_matches"), tags = listOf("insp-hint"))
         }
     }
 }
 
 @Composable
-private fun BoneRow(label: String, selected: Boolean, onPick: () -> Unit) {
+private fun PickerRow(label: String, selected: Boolean, onPick: () -> Unit) {
     Row(
         tags = if (selected) listOf("dropdown-item", "selected") else listOf("dropdown-item"),
         modifier = Modifier.input(hoverable = true, clickable = true)
@@ -100,4 +122,4 @@ private fun BoneRow(label: String, selected: Boolean, onPick: () -> Unit) {
     }
 }
 
-private fun boneText(name: String): String = "hollowengine.gui.inspector.bone.$name".lang
+private fun pickerText(kind: String, name: String): String = "hollowengine.gui.inspector.$kind.$name".lang

@@ -59,6 +59,7 @@ class ModelInstance(val attachment: ModelAttachment) {
         attachment.beginPose()
         animator.applyTo(attachment, context)
         applyRigPose(attachment.nodes, attachment.rig)
+        applyRigConstraints(attachment.nodes, attachment.rig, context)
         attachment.endPose()
     }
 

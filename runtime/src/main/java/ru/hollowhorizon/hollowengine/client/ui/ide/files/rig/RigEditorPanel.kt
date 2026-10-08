@@ -22,7 +22,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val AutoSaveDelayMillis = 900L
@@ -61,8 +60,8 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         if (document.isModified && file.save()) publishRig(state.viewer.model, document.rig)
     }
 
-    LaunchedEffect(preview, state.colliderSelection) {
-        while (preview != null || state.colliderSelection != null) withFrameNanos { state.frame++ }
+    LaunchedEffect(preview, state.partSelection) {
+        while (preview != null || state.partSelection != null) withFrameNanos { state.frame++ }
     }
 
     DisposableEffect(document) {
@@ -73,9 +72,12 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
     }
 
     viewer.debugDraw = { lines ->
-        if (state.showSkeleton) DebugSkeletonRenderer.draw(viewer.attachment, lines, state.selected)
+        if (state.showSkeleton) {
+            DebugSkeletonRenderer.draw(viewer.attachment, lines, state.selected)
+            lines.ikOverlay(document.rig, viewer.nodes, state.partSelection)
+        }
         if (state.showColliders) {
-            lines.colliders(previewColliders(document.rig, viewer.nodes), state.colliderSelection)
+            lines.colliders(previewColliders(document.rig, viewer.nodes), state.partSelection)
             RigOverlays.all.forEach { it.draw(viewer.attachment, lines, state.selected) }
             preview?.draw(lines)
         }
@@ -83,7 +85,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
 
     val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
 
-    PublishInspector(source = "rig-${file.path}", key = Triple(state.selected, state.selectedCollider, bones)) {
+    PublishInspector(source = "rig-${file.path}", key = Triple(state.selected, state.selectedPart, bones)) {
         rigInspectorTarget(document, state, bones)
     }
 
@@ -118,7 +120,7 @@ private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, previ
         AnimatorIconButton(ColliderIcon, rigText("toggle_colliders"), size = 12f, active = state.showColliders) {
             state.showColliders = !state.showColliders
         }
-        if (state.colliderSelection != null) {
+        if (state.partSelection != null) {
             GizmoModes.forEach { (mode, icon, tooltip) ->
                 AnimatorIconButton(icon, tooltip.lang, size = 12f, active = state.gizmoMode == mode) { state.gizmoMode = mode }
             }
@@ -174,8 +176,8 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     var selected by mutableStateOf<String?>(null)
         private set
 
-    /** The selected collider on [selected], if any. */
-    var selectedCollider by mutableStateOf<String?>(null)
+    /** The selected part on [selected], if any: a collider, a target or anything else the gizmo moves. */
+    var selectedPart by mutableStateOf<String?>(null)
         private set
 
     var showSkeleton by mutableStateOf(true)
@@ -185,10 +187,10 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     val expanded = mutableStateListOf<String>()
     var rootExpanded by mutableStateOf(true)
 
-    val gizmo = RigColliderGizmo()
+    val gizmo = RigPartGizmo()
     var gizmoMode by mutableStateOf(GizmoEditMode.TRANSLATE)
     var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
-    var transform by mutableStateOf<ColliderTransform?>(null)
+    var transform by mutableStateOf<RigPartTransform?>(null)
     internal var handleDrag: RigHandleDrag? = null
 
     /** Ticks every frame while something in the preview moves on its own, to redraw the gizmo over it. */
@@ -203,15 +205,15 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     /** Set by a press the gizmo took, so the click that follows does not change the selection. */
     internal var swallowClick = false
 
-    val colliderSelection: ColliderSelection? get() = selectedCollider?.let { ColliderSelection(selected, it) }
+    val partSelection: RigPartSelection? get() = selectedPart?.let { RigPartSelection(selected, it) }
 
-    /** Selects [bone] and [collider] on it; a transform or a drag under way stays where it got to. */
-    fun select(bone: String?, collider: String? = null) {
+    /** Selects [bone] and [part] on it; a transform or a drag under way stays where it got to. */
+    fun select(bone: String?, part: String? = null) {
         if (transform != null || handleDrag != null) document.endGesture()
         transform = null
         handleDrag = null
         selected = bone
-        selectedCollider = collider
+        selectedPart = part
     }
 
     fun pointer(x: Float, y: Float) {
@@ -223,17 +225,17 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
         handleDrag = null
     }
 
-    /** The selected collider where it is now in the preview, or null when none is selected or it is gone. */
-    fun selectedFrame(): ColliderFrame? {
-        val selection = colliderSelection ?: return null
-        val spec = document.rig.holder(selection.bone).attachment(selection.id) as? ColliderAttachmentSpec ?: return null
+    /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
+    fun selectedFrame(): RigGizmoFrame? {
+        val selection = partSelection ?: return null
+        val spec = document.rig.holder(selection.bone).attachment(selection.id) ?: return null
         val holder = holderMatrix(viewer.nodes, selection.bone) ?: return null
-        return ColliderFrame(spec, holder)
+        return gizmoFrame(spec, holder)
     }
 }
 
-/** A drag on a gizmo handle: the collider it moves, where it was when the drag began, and the drag. */
-internal class RigHandleDrag(val selection: ColliderSelection, val frame: ColliderFrame, val drag: GizmoDrag)
+/** A drag on a gizmo handle: the part it moves, where it was when the drag began, and the drag. */
+internal class RigHandleDrag(val selection: RigPartSelection, val frame: RigGizmoFrame, val drag: GizmoDrag)
 
 private fun RigPreview?.toggled(viewer: ModelViewerState): RigPreview? {
     if (this != null) {

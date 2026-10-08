@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
@@ -40,7 +41,7 @@ internal fun rigInspectorTarget(
     bones: List<String>,
 ): InspectorTarget {
     val bone = state.selected
-    val collider = state.selectedCollider
+    val collider = state.selectedPart
     return InspectorTarget(
         id = "rig-bone-${bone ?: ""}",
         title = bone ?: rigText("model"),
@@ -57,7 +58,7 @@ internal fun rigInspectorTarget(
 internal fun HolderFields(
     document: RigEditing,
     bone: String?,
-    selectedCollider: String?,
+    selectedPart: String?,
     kinds: List<RigAttachmentType<*>> = attachableKinds(bone),
 ) {
     val current = document.rig.holder(bone)
@@ -80,8 +81,11 @@ internal fun HolderFields(
             Hint(rigText("model_hint"))
         }
 
-        current.attachments.forEach { attachment ->
-            key(attachment.id) { AttachmentSection(document, bone, current, attachment, attachment.id == selectedCollider) }
+        val targets = document.occupied.allAttachments().mapNotNull { (_, spec) -> (spec as? IkTargetSpec)?.id }
+        CompositionLocalProvider(LocalEditorRigTargets provides targets) {
+            current.attachments.forEach { attachment ->
+                key(attachment.id) { AttachmentSection(document, bone, current, attachment, attachment.id == selectedPart) }
+            }
         }
 
         AddAttachment(document, bone, current, kinds)
@@ -200,12 +204,12 @@ internal fun attachableKinds(bone: String?): List<RigAttachmentType<*>> =
     RigAttachmentTypes.all.filter { it.createDefault != null && (bone != null || it.allowedOnModel) }
 
 /**
- * A name for a new attachment of [type] on [bone]. Colliders are named across the whole rig, since that
- * name is how scripts and events tell them apart.
+ * A name for a new attachment of [type] on [bone]. Kinds others refer to by name, as scripts do colliders
+ * and IK chains do targets, are named across the whole rig.
  */
 internal fun freeAttachmentId(rig: ModelRig, bone: String?, type: RigAttachmentType<*>): String {
-    val taken = if (type.specClass == ColliderAttachmentSpec::class) {
-        rig.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
+    val taken = if (type.namedAcrossRig) {
+        rig.allAttachments().filter { type.specClass.isInstance(it.second) }.mapTo(HashSet()) { it.second.id }
     } else {
         rig.holder(bone).attachments.mapTo(HashSet()) { it.id }
     }
