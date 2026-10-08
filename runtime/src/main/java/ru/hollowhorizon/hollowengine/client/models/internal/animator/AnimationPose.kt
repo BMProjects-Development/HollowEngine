@@ -72,6 +72,53 @@ class AnimationPose {
 
             return result
         }
+
+        /**
+         * [poses] averaged by [weights], which need not sum to one. As in [mix], a pose that leaves a bone
+         * alone counts as holding it at rest.
+         */
+        fun blend(poses: List<AnimationPose>, weights: List<Float>): AnimationPose {
+            if (poses.size == 1) return poses[0]
+            val result = AnimationPose()
+            val total = weights.sum()
+            if (total <= 0f) return result
+
+            val nodes = LinkedHashSet<Int>()
+            poses.forEach { pose -> pose.entries.forEach { nodes += it.key } }
+            nodes.forEach { node ->
+                val bones = poses.map { it[node] }
+                val blended = result.bone(node)
+
+                if (bones.any { it?.translation != null }) {
+                    val sum = MutableVec3f()
+                    bones.forEachIndexed { i, bone -> sum += (bone?.translation ?: Vec3f.ZERO) * (weights[i] / total) }
+                    blended.translation = sum
+                }
+                if (bones.any { it?.rotation != null }) {
+                    val sum = MutableQuatF(0f, 0f, 0f, 0f)
+                    bones.forEachIndexed { i, bone ->
+                        val rotation = bone?.rotation ?: QuatF.IDENTITY
+                        val weight = weights[i] / total
+                        sum += rotation * if (sum.dot(rotation) < 0f) -weight else weight
+                    }
+                    blended.rotation = sum.norm()
+                }
+                if (bones.any { it?.scale != null }) {
+                    val sum = MutableVec3f()
+                    bones.forEachIndexed { i, bone -> sum += (bone?.scale ?: Vec3f.ONES) * (weights[i] / total) }
+                    blended.scale = sum
+                }
+                if (bones.any { it?.weights != null }) {
+                    val size = bones.maxOf { it?.weights?.size ?: 0 }
+                    blended.weights = FloatArray(size) { index ->
+                        bones.indices.sumOf { i ->
+                            ((bones[i]?.weights?.getOrNull(index) ?: 0f) * weights[i] / total).toDouble()
+                        }.toFloat()
+                    }
+                }
+            }
+            return result
+        }
     }
 }
 

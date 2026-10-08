@@ -144,12 +144,16 @@ private fun StateSection(
                 }
             }
 
+            is BlendStateSpec -> BlendStateFields(document, layerId, state)
+
             // A state this build has no editor for: an addon's own kind, or one whose addon is missing.
             is UnknownAnimatorStateSpec -> Hint(animatorText("unknown_state"))
 
             else -> Hint(animatorText("no_state_editor"))
         }
     }
+
+    if (state is BlendStateSpec) BlendMotionsSection(document, layerId, state)
 
     val links = controller.transitions.withIndex()
         .filter { (_, transition) -> transition.from == state.id || transition.to == state.id }
@@ -210,7 +214,7 @@ private fun TransitionSection(
 }
 
 @Composable
-private fun PlayModeRow(current: AnimationPlayMode, onChange: (AnimationPlayMode) -> Unit) {
+internal fun PlayModeRow(current: AnimationPlayMode, onChange: (AnimationPlayMode) -> Unit) {
     Label(animatorText("play_mode"))
     Pills(AnimationPlayMode.entries, current, { it.name.lowercase() }, onChange)
 }

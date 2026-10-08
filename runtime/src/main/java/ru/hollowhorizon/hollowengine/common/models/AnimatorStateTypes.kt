@@ -42,6 +42,15 @@ object AnimatorStateTypes {
                 createDefault = { id -> ClipStateSpec(id = id, animation = id) },
             )
         )
+        register(
+            AnimatorStateType(
+                id = "hollowengine:animator/state/blend",
+                specClass = BlendStateSpec::class,
+                serializer = BlendStateSpec.serializer(),
+                titleKey = "hollowengine.gui.animator_editor.state_kind_blend",
+                createDefault = { id -> BlendStateSpec(id = id, x = AnimationExpression("horizontal_speed")) },
+            )
+        )
     }
 
     fun register(type: AnimatorStateType<*>): ExtensionHandle = point.register(type.key, type)

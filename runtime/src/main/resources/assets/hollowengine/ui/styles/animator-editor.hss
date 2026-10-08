@@ -136,3 +136,130 @@
     font-size: $font-size;
     foreground: $text-muted;
 }
+
+/* The diagram of a blend state in the inspector: clips are round, the checked point is a square crosshair. */
+.animator-blend-point {
+    background: $text-faint;
+    border: 1px alpha($white, 0.35);
+    border-radius: 5px;
+    transition: background 110ms ease-out, border-color 110ms ease-out;
+}
+
+.animator-blend-point:hover {
+    background: $text-strong;
+    border-color: $white;
+}
+
+.animator-blend-point.active {
+    background: $success;
+}
+
+.animator-blend-halo {
+    background: alpha($success, 0.18);
+    border-radius: 20px;
+}
+
+.animator-blend-label {
+    font-size: 7px;
+    foreground: $text-muted;
+    text-wrap: false;
+}
+
+.animator-blend-label.active {
+    foreground: $text-strong;
+}
+
+.animator-blend-probe {
+    border: 1px $accent;
+    border-radius: 1px;
+}
+
+.animator-blend-tick {
+    font-size: 7px;
+    foreground: $text-faint;
+    text-wrap: false;
+}
+
+.animator-blend-tick.center {
+    text-align: center;
+}
+
+.animator-blend-tick.right {
+    text-align: right;
+}
+
+.animator-blend-readout {
+    gap: 5px;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.animator-blend-readout-mark {
+    size: 7px 7px;
+    border: 1px $accent;
+    border-radius: 1px;
+}
+
+.animator-blend-readout-title {
+    font-size: 8px;
+    foreground: $text-soft;
+}
+
+.animator-blend-readout-value {
+    font-size: 8px;
+    foreground: $accent;
+    text-wrap: false;
+}
+
+.animator-blend-label.leftward {
+    text-align: right;
+}
+
+.animator-blend-label-position {
+    foreground: $text-faint;
+}
+
+/* The range of the diagram: fields under the ends of a line, or a table under a plane. */
+.animator-blend-line-range {
+    padding: 0 0 4px 0;
+}
+
+.animator-blend-plane-range {
+    gap: 3px;
+    padding: 2px 0 6px 0;
+}
+
+.animator-blend-range-row {
+    gap: 5px;
+    align-items: center;
+}
+
+.animator-blend-range-axis {
+    size: 10px fit;
+    font-size: 8px;
+    foreground: $text-soft;
+}
+
+.animator-blend-range-word {
+    font-size: 8px;
+    foreground: $text-muted;
+    text-wrap: false;
+}
+
+/* A clip's folding section: where it stands and its weight sit in the heading. */
+.animator-blend-heading-position {
+    font-size: 8px;
+    foreground: $text-faint;
+    text-wrap: false;
+}
+
+.animator-blend-weight {
+    text-align: right;
+    font-size: 8px;
+    foreground: $text-soft;
+    text-wrap: false;
+}
+
+.animator-blend-coordinates {
+    gap: 6px;
+}

@@ -49,9 +49,11 @@
     text-overflow: dots;
 }
 
+/* The scrollbar lies over the panel, so the fields keep clear of it on the right. */
 .insp-body {
     size: 100% fit;
     gap: 3px;
+    padding: 0 8px 0 0;
 }
 
 .insp-empty-state {

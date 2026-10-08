@@ -43,6 +43,7 @@ import ru.hollowhorizon.hollowengine.common.models.AnimationControllerTransition
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
+import ru.hollowhorizon.hollowengine.common.models.BlendStateSpec
 import ru.hollowhorizon.hollowengine.common.models.ClipStateSpec
 import ru.hollowhorizon.hollowengine.common.models.GraphPoint
 import ru.hollowhorizon.hollowengine.common.models.nodeAt
@@ -225,7 +226,11 @@ internal fun AnimatorGraphCanvas(
                 StateNodeContent(
                     stateId = stateId,
                     subtitle = state.subtitle(),
-                    playMode = (state as? ClipStateSpec)?.playMode,
+                    playMode = when (state) {
+                        is ClipStateSpec -> state.playMode
+                        is BlendStateSpec -> state.playMode
+                        else -> null
+                    },
                     isEntry = controller.entryState == stateId,
                 )
             }
@@ -419,6 +424,7 @@ private fun AnimationControllerLayerSpec.state(stateId: String): AnimationContro
 private fun AnimationControllerStateSpec?.subtitle(): String? = when (this) {
     null -> null
     is ClipStateSpec -> animation
+    is BlendStateSpec -> motions.joinToString(" · ") { it.animation }.ifEmpty { kindName() }
     else -> kindName()
 }
 
