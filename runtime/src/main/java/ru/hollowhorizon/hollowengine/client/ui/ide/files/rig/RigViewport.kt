@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
@@ -109,7 +108,7 @@ private fun beginHandleDrag(document: HollowIdeRigDocument, state: RigEditorStat
 
 private fun dragHandle(document: HollowIdeRigDocument, state: RigEditorState, x: Float, y: Float, modifiers: Int) {
     val drag = state.handleDrag ?: return
-    state.gizmo.drag(drag.drag, drag.frame, x, y, modifiers)?.let { document.placePart(drag.selection, it) }
+    state.gizmo.drag(drag.drag, x, y, modifiers)?.let { values -> document.edit { drag.frame.placed(it, values) } }
 }
 
 private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, input: UiKeyInput): Boolean {
@@ -118,7 +117,7 @@ private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, inp
     if (transform != null) {
         val result = transform.keyboard.key(input.key)
         if (result == GizmoKeyResult.CHANGED) {
-            document.placePart(transform.selection, transform.frame.spec)
+            document.edit { transform.frame.restored(it) }
             moveTransform(document, state, input.modifiers)
         }
         return finishTransform(document, state, result) || result == GizmoKeyResult.CHANGED
@@ -144,7 +143,7 @@ private fun finishTransform(document: HollowIdeRigDocument, state: RigEditorStat
     val transform = state.transform ?: return false
     when (result) {
         GizmoKeyResult.CONFIRMED -> Unit
-        GizmoKeyResult.CANCELLED -> document.placePart(transform.selection, transform.frame.spec)
+        GizmoKeyResult.CANCELLED -> document.edit { transform.frame.restored(it) }
         else -> return false
     }
     state.transform = null
@@ -155,7 +154,7 @@ private fun finishTransform(document: HollowIdeRigDocument, state: RigEditorStat
 private fun moveTransform(document: HollowIdeRigDocument, state: RigEditorState, modifiers: Int) {
     val transform = state.transform ?: return
     transform.keyboard.update(state.pointerX, state.pointerY, modifiers)
-        ?.let { document.placePart(transform.selection, transform.frame.with(it)) }
+        ?.let { values -> document.edit { transform.frame.placed(it, values) } }
 }
 
 /** An IK target under the pointer wins, then a bone; a collider is picked only where there is neither. */
@@ -186,11 +185,6 @@ private fun pick(document: HollowIdeRigDocument, state: RigEditorState, x: Float
     val index = hits.indexOfFirst { it.bone == state.selected && it.name == state.selectedPart }
     val next = hits[(index + 1) % hits.size]
     state.select(next.bone, next.name)
-}
-
-/** Writes [spec] over the part [selection] names, wherever it hangs. */
-internal fun HollowIdeRigDocument.placePart(selection: RigPartSelection, spec: RigAttachmentSpec) = edit { rig ->
-    rig.withHolder(selection.bone, rig.holder(selection.bone).withAttachment(selection.id, spec))
 }
 
 private const val PUSH_STRENGTH = 0.05f

@@ -2,6 +2,7 @@ import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.addRigBones
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelRotation
@@ -12,6 +13,10 @@ import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
+import ru.hollowhorizon.hollowengine.common.models.withAddedBone
+import ru.hollowhorizon.hollowengine.common.models.withAddedBoneRenamed
+import ru.hollowhorizon.hollowengine.common.models.withoutAddedBone
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -86,6 +91,38 @@ class IkTests {
 
         assertClose(goal, nodes.getValue("foot").modelMatrix().getTranslation(), tolerance = 1e-3f)
         assertEquals(1f, abs(footTurn.dot(nodes.getValue("foot").modelRotation())), 1e-4f)
+    }
+
+    @Test
+    fun `bones the rig adds are built under their parents, and a chain can end on one`() {
+        val leg = RuntimeNode(definition(0, "leg", Vec3f.ZERO), parent = null)
+        val rig = ModelRig(
+            bones = mapOf(
+                "foot" to RigBone(origin = RigBoneOrigin("leg", offset = Vec3f(0f, -1f, 0f))),
+                "toe" to RigBone(
+                    origin = RigBoneOrigin("foot", offset = Vec3f(0f, -0.5f, 0f)),
+                    attachments = listOf(IkChainSpec(id = "reach", bones = 2, target = "spot")),
+                ),
+                "orphan" to RigBone(origin = RigBoneOrigin("missing")),
+            ),
+            attachments = listOf(IkTargetSpec(id = "spot", offset = Vec3f(0.5f, -0.5f, 0f))),
+        )
+
+        val roots = addRigBones(listOf(leg), rig, holder = null)
+        val names = roots.flatMap { it.walk() }.map { it.name }
+        assertEquals(listOf("leg", "foot", "toe"), names)
+
+        applyRigConstraints(roots, rig, AnimatorEvaluationContext())
+        val toe = roots.flatMap { it.walk() }.single { it.name == "toe" }
+        assertClose(Vec3f(0.5f, -0.5f, 0f), toe.modelMatrix().getTranslation(), tolerance = 1e-2f)
+    }
+
+    @Test
+    fun `removing or renaming an added bone carries the bones added under it along`() {
+        val rig = ModelRig().withAddedBone("foot", "leg").withAddedBone("toe", "foot")
+
+        assertEquals("heel", rig.withAddedBoneRenamed("foot", "heel").bones.getValue("toe").origin?.parent)
+        assertTrue(rig.withoutAddedBone("foot").bones.isEmpty())
     }
 
     private fun definition(index: Int, name: String, translation: Vec3f, vararg children: NodeDefinition) = NodeDefinition(

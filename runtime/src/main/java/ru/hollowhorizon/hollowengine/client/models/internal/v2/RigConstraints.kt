@@ -48,6 +48,12 @@ fun RuntimeNode.modelRotation(): QuatF {
     return above.modelRotation() * transform.rotation
 }
 
+/** [this] node's matrix in the space of its model in the rest pose, before anything animates it. */
+fun RuntimeNode.restModelMatrix(): Mat4f {
+    val above = parent as? RuntimeNode ?: return definition.baseTransform.matrixF
+    return above.restModelMatrix().mul(definition.baseTransform.matrixF, MutableMat4f())
+}
+
 /** The bones a chain hung on [end] bends, from its root down to [end] itself. */
 fun IkChainSpec.links(end: RuntimeNode): List<RuntimeNode> {
     val links = mutableListOf(end)
@@ -69,7 +75,7 @@ private fun solveChain(
     nodes: Map<String, RuntimeNode>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
-    ground: IkGround?,
+    ground: IkGround,
 ) {
     val links = chain.links(end)
     if (links.size < 2) return
@@ -83,9 +89,11 @@ private fun solveChain(
     val joints = links.map { it.modelMatrix().getTranslation() }
     val target = rig.ikTargetMatrix(chain.target, nodes::get)
     var goal: Vec3f = target?.getTranslation() ?: joints.last()
-    if (chain.ground && ground != null) {
+    if (chain.ground) {
         val reach = joints.zipWithNext { a, b -> a.distance(b) }.sum()
-        goal = ground.under(goal, reach) ?: return
+        val floor = ground.heightUnder(goal, reach) ?: return
+        val rest = links.last().restModelMatrix().getTranslation().y
+        goal = Vec3f(goal.x, floor + maxOf(goal.y, rest), goal.z)
     }
 
     val pole = rig.ikTargetMatrix(chain.pole, nodes::get)?.getTranslation()
@@ -167,37 +175,47 @@ private fun stretchGeometry(links: List<RuntimeNode>, factor: Float) {
 }
 
 /**
- * The ground under a model in the world, for chains that put their goal on it. A model with no entity, as
- * in an editor's preview, has none, and its chains reach for the goal as it is.
+ * The ground chains put their goal on, as a height in model space, which is taken to stand upright: the world
+ * under an entity, or a floor at the model's origin for a model with no world around it, as in an editor's
+ * preview.
  */
-private class IkGround(private val entity: Entity, toWorld: TrsTransformF, partialTick: Float) {
-    private val feet: Vec3 = entity.getPosition(partialTick)
-    private val rotation: QuatF = MutableQuatF(toWorld.rotation)
-    private val scale: Vec3f = Vec3f(toWorld.scale)
+private sealed interface IkGround {
+    /** How high the ground under [goal] is in model space; null where there is none within [reach] of the feet. */
+    fun heightUnder(goal: Vec3f, reach: Float): Float?
 
-    private val shift: Vec3f = Vec3f(toWorld.translation) - Vec3f(feet.x.toFloat(), feet.y.toFloat(), feet.z.toFloat())
+    object Floor : IkGround {
+        override fun heightUnder(goal: Vec3f, reach: Float): Float = 0f
+    }
 
-    fun under(goal: Vec3f, reach: Float): Vec3f? {
-        val offset = shift + IkSolver.rotate(goal * scale, rotation)
-        val span = (reach * scale.y).coerceAtLeast(MIN_REACH).toDouble()
-        val x = feet.x + offset.x
-        val z = feet.z + offset.z
-        val from = Vec3(x, feet.y + span, z)
-        val to = Vec3(x, feet.y - span, z)
-        val hit = entity.level().clip(ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity))
-        if (hit.type == HitResult.Type.MISS) return null
+    class World(private val entity: Entity, toWorld: TrsTransformF, partialTick: Float) : IkGround {
+        private val feet: Vec3 = entity.getPosition(partialTick)
+        private val rotation: QuatF = MutableQuatF(toWorld.rotation)
+        private val scale: Vec3f = Vec3f(toWorld.scale)
 
-        val rise = (hit.location.y - feet.y).toFloat()
-        return goal + IkSolver.rotate(Vec3f(0f, rise, 0f), rotation.inverted()) / scale
+        private val shift: Vec3f = Vec3f(toWorld.translation) - Vec3f(feet.x.toFloat(), feet.y.toFloat(), feet.z.toFloat())
+
+        override fun heightUnder(goal: Vec3f, reach: Float): Float? {
+            val offset = shift + IkSolver.rotate(goal * scale, rotation)
+            val span = (reach * scale.y).coerceAtLeast(MIN_REACH).toDouble()
+            val x = feet.x + offset.x
+            val z = feet.z + offset.z
+            val hit = entity.level().clip(
+                ClipContext(Vec3(x, feet.y + span, z), Vec3(x, feet.y - span, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity)
+            )
+            if (hit.type == HitResult.Type.MISS) return null
+            return ((hit.location.y - feet.y).toFloat() - shift.y) / scale.y
+        }
+
+        private companion object {
+            const val MIN_REACH = 0.5f
+        }
     }
 
     companion object {
-        private const val MIN_REACH = 0.5f
-
-        fun of(context: AnimatorEvaluationContext): IkGround? {
-            val entity = context.entity ?: return null
-            val toWorld = context.modelToWorld ?: return null
-            return IkGround(entity, toWorld, context.partialTick)
+        fun of(context: AnimatorEvaluationContext): IkGround {
+            val entity = context.entity ?: return Floor
+            val toWorld = context.modelToWorld ?: return Floor
+            return World(entity, toWorld, context.partialTick)
         }
     }
 }

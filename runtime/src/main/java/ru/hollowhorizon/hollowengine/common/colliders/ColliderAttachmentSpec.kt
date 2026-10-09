@@ -119,6 +119,7 @@ data class ColliderAttachmentSpec(
             createDefault = { id -> ColliderAttachmentSpec(id = id) },
             allowedOnModel = true,
             namedAcrossRig = true,
+            editorColor = 0xE05A5A,
         )
     }
 }

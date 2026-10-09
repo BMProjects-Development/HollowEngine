@@ -58,8 +58,19 @@ open class RuntimeNode(
         }
     }
 
-    val children = definition.children.map {
+    private val ownChildren: MutableList<RuntimeNode> = definition.children.mapTo(ArrayList()) {
         RuntimeNode(it, this, materialResolver)
+    }
+
+    val children: List<RuntimeNode> get() = ownChildren
+
+    /**
+     * Builds a node under this one that the model itself does not have, as a bone a rig adds. The model's own
+     * definitions are shared by every instance and stay as they are.
+     */
+    fun adopt(definition: NodeDefinition): RuntimeNode {
+        definition.parent = this.definition
+        return RuntimeNode(definition, this, materialResolver).also(ownChildren::add)
     }
 
     val jointGetter by lazy {

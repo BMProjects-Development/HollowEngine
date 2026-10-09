@@ -14,6 +14,10 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
+import ru.hollowhorizon.hollowengine.common.models.withIkTargetRenamed
+import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
+import ru.hollowhorizon.hollowengine.common.models.withAddedBoneRenamed
+import ru.hollowhorizon.hollowengine.common.models.withoutAddedBone
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
@@ -49,7 +53,7 @@ internal fun rigInspectorTarget(
         subtitle = rigText(if (bone == null) "section_model" else "section_bone"),
     ) {
         CompositionLocalProvider(LocalEditorBones provides bones) {
-            key(bone) { HolderFields(document, bone, collider) }
+            key(bone) { HolderFields(document, bone, collider, onSelectBone = state::select) }
         }
     }
 }
@@ -60,6 +64,7 @@ internal fun HolderFields(
     bone: String?,
     selectedPart: String?,
     kinds: List<RigAttachmentType<*>> = attachableKinds(bone),
+    onSelectBone: (String?) -> Unit = {},
 ) {
     val current = document.rig.holder(bone)
 
@@ -74,7 +79,8 @@ internal fun HolderFields(
                     document.edit { it.withBone(bone, current.copy(hidden = hidden)) }
                 }
             }
-            PoseFields(document, bone, current)
+            val origin = current.origin
+            if (origin != null) AddedBoneFields(document, bone, origin, onSelectBone) else PoseFields(document, bone, current)
             val model = LocalRigModelInfo.current
             if (bone in model.meshBones) MeshMaterialFields(document, bone, current, model.materials)
         } else if (current.attachments.isEmpty()) {
@@ -83,12 +89,45 @@ internal fun HolderFields(
 
         val targets = document.occupied.allAttachments().mapNotNull { (_, spec) -> (spec as? IkTargetSpec)?.id }
         CompositionLocalProvider(LocalEditorRigTargets provides targets) {
-            current.attachments.forEach { attachment ->
-                key(attachment.id) { AttachmentSection(document, bone, current, attachment, attachment.id == selectedPart) }
+            current.attachments.forEachIndexed { index, attachment ->
+                key(index) { AttachmentSection(document, bone, current, index, attachment, attachment.id == selectedPart) }
             }
         }
 
         AddAttachment(document, bone, current, kinds)
+    }
+}
+
+/**
+ * A bone the rig adds: its name, what it hangs on, and where. A new name is applied by its button, since the
+ * name is what the bone is selected and kept by, and renaming it letter by letter would lose the field.
+ */
+@Composable
+private fun AddedBoneFields(document: RigEditing, bone: String, origin: RigBoneOrigin, onSelectBone: (String?) -> Unit) {
+    var draft by remember(bone) { mutableStateOf(bone) }
+    val path = "/$bone/origin"
+    fun write(next: RigBoneOrigin) = document.edit(mergeKey = path) { it.withBone(bone, it.holder(bone).copy(origin = next)) }
+
+    Section(rigText("section_added_bone")) {
+        TextRow(rigText("name"), draft, id = "$path/name") { draft = it.trim() }
+        if (draft != bone) {
+            val taken = draft.isBlank() || draft in LocalEditorBones.current || draft in document.occupied.bones
+            if (taken) {
+                Hint(rigText("bone_name_taken"))
+            } else {
+                InspectorButton(rigText("rename_bone"), tags = listOf("primary")) {
+                    document.edit { it.withAddedBoneRenamed(bone, draft) }
+                    onSelectBone(draft)
+                }
+            }
+        }
+        Readonly(rigText("bone_parent"), origin.parent ?: rigText("model"))
+        Vec3Row(rigText("pose_position"), origin.offset, "$path/offset") { write(origin.copy(offset = it)) }
+        Vec3Row(rigText("pose_rotation"), origin.rotation, "$path/rotation") { write(origin.copy(rotation = it)) }
+        InspectorButton(rigText("remove_bone"), tags = listOf("danger")) {
+            document.edit { it.withoutAddedBone(bone) }
+            onSelectBone(origin.parent)
+        }
     }
 }
 
@@ -114,11 +153,13 @@ private fun AttachmentSection(
     document: RigEditing,
     bone: String?,
     current: RigBone,
+    index: Int,
     attachment: RigAttachmentSpec,
     selected: Boolean,
 ) {
     val type = RigAttachmentTypes.of(attachment)
-    val title = if (attachment is ColliderAttachmentSpec) "${type.title()} · ${attachment.id}" else type.title()
+    val title = if (type?.namedAcrossRig == true) "${type.title()} · ${attachment.id}" else type.title()
+    val path = "/${bone ?: ""}/#$index"
 
     Section(if (selected) "◆ $title" else title) {
         if (type == null) {
@@ -126,9 +167,11 @@ private fun AttachmentSection(
         } else {
             val colliders = document.occupied.holder(bone).attachments.filterIsInstance<ColliderAttachmentSpec>().map { it.id }
             CompositionLocalProvider(LocalEditorColliders provides colliders) {
-                AttachmentFields(type, attachment, "/${bone ?: ""}/${attachment.id}") { changed ->
-                    document.edit(mergeKey = "/${bone ?: ""}/${attachment.id}", label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) {
-                        it.withHolder(bone, current.withAttachment(attachment.id, changed))
+                AttachmentFields(type, attachment, path) { changed ->
+                    document.edit(mergeKey = path, label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) { rig ->
+                        val placed = rig.withHolder(bone, rig.holder(bone).withAttachment(attachment.id, changed))
+                        if (attachment is IkTargetSpec && changed.id != attachment.id) placed.withIkTargetRenamed(attachment.id, changed.id)
+                        else placed
                     }
                 }
             }

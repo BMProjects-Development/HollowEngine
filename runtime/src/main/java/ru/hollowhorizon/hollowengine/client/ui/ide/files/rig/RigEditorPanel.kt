@@ -71,9 +71,15 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         }
     }
 
+    viewer.debugFill = { shapes ->
+        if (state.showSkeleton) {
+            val colors = boneColors(document.rig, viewer.nodes)
+            DebugSkeletonRenderer.fill(viewer.attachment, shapes, state.selected, colors::get)
+        }
+    }
+    viewer.debugBackdrop = { lines -> lines.floor() }
     viewer.debugDraw = { lines ->
         if (state.showSkeleton) {
-            DebugSkeletonRenderer.draw(viewer.attachment, lines, state.selected)
             lines.ikOverlay(document.rig, viewer.nodes, state.partSelection)
         }
         if (state.showColliders) {
@@ -170,7 +176,8 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
  * What the editor is looking at, as opposed to what it is editing.
  */
 internal class RigEditorState(private val document: HollowIdeRigDocument, modelId: String) {
-    val viewer = ModelViewerState(modelId)
+    // The floor drawn in the preview is the reference, so the flat grid behind the model goes.
+    val viewer = ModelViewerState(modelId).apply { showGrid = false }
 
     /** The selected bone, or null for the model itself. */
     var selected by mutableStateOf<String?>(null)
@@ -213,7 +220,11 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
         transform = null
         handleDrag = null
         selected = bone
-        selectedPart = part
+        selectedPart = part ?: when {
+            bone == null -> null
+            document.rig.bone(bone)?.origin != null -> BONE_ORIGIN_PART
+            else -> BONE_POSE_PART
+        }
     }
 
     fun pointer(x: Float, y: Float) {
@@ -228,9 +239,19 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
     fun selectedFrame(): RigGizmoFrame? {
         val selection = partSelection ?: return null
+        if (selection.id == BONE_POSE_PART) {
+            val bone = selection.bone ?: return null
+            val node = viewer.nodes.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } } ?: return null
+            return BonePoseFrame(bone, node, document.rig.bone(bone)?.pose)
+        }
+        if (selection.id == BONE_ORIGIN_PART) {
+            val bone = selection.bone ?: return null
+            val origin = document.rig.bone(bone)?.origin ?: return null
+            return BoneOriginFrame(bone, origin, holderMatrix(viewer.nodes, origin.parent) ?: return null)
+        }
         val spec = document.rig.holder(selection.bone).attachment(selection.id) ?: return null
         val holder = holderMatrix(viewer.nodes, selection.bone) ?: return null
-        return gizmoFrame(spec, holder)
+        return gizmoFrame(selection, spec, holder)
     }
 }
 

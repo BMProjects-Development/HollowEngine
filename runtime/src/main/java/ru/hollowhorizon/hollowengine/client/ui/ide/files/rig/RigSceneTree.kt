@@ -8,6 +8,8 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.freeBoneName
+import ru.hollowhorizon.hollowengine.common.models.withAddedBone
 
 /** The id of the row that stands for the model itself, above its bones. */
 private const val RigRootId = "rig-root"
@@ -67,6 +69,7 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
         val marks = listOfNotNull(
             bone?.attachments?.size?.takeIf { it > 0 }?.let { "●$it" },
             bone?.alias?.takeIf { it.isNotBlank() }?.let { "→$it" },
+            "+".takeIf { bone?.origin != null },
         ).joinToString(" ")
 
         add(
@@ -88,13 +91,20 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
 }
 
 /**
- * What a right click on a bone offers: hanging something on it, and hiding it in the preview. On the
- * model itself, null [bone], only what can hang on the whole model.
+ * What a right click on a bone offers: adding a bone under it, hanging something on it, and hiding it in the
+ * preview. On the model itself, null [bone], a new bone and only what can hang on the whole model.
  */
 private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone: String?): List<UiDropdownItem> {
     val node = bone?.let { state.viewer.nodes.findBone(it) }
     val kinds = attachableKinds(bone)
     return listOfNotNull(
+        UiDropdownItem(rigText("add_bone"), icon = AddIcon) {
+            val existing = state.viewer.nodes.flatMap { it.walk() }.map(RuntimeNode::name)
+            var added: String? = null
+            document.edit { rig -> rig.freeBoneName(existing).let { name -> added = name; rig.withAddedBone(name, bone) } }
+            if (bone != null && bone !in state.expanded) state.expanded += bone
+            added?.let(state::select)
+        },
         UiDropdownItem(
             rigText("attach"),
             icon = AddIcon,

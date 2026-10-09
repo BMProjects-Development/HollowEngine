@@ -19,6 +19,16 @@ data class UiKeyInput(
 
     val consumed: Boolean get() = event.consumed
 
+    /**
+     * Whether the key types a character: a letter, digit, sign or space, or one on the keypad, with neither
+     * Ctrl nor Alt held, which turn it into a shortcut.
+     */
+    fun typesCharacter(): Boolean {
+        if (command || alt) return false
+        return key in GLFW.GLFW_KEY_SPACE..GLFW.GLFW_KEY_WORLD_2 ||
+            key in GLFW.GLFW_KEY_KP_0..GLFW.GLFW_KEY_KP_EQUAL && key != GLFW.GLFW_KEY_KP_ENTER
+    }
+
     /** Stops this key event from reaching lower-priority handlers on the same node. */
     fun consume() {
         event.consume()

@@ -76,6 +76,11 @@ class ModelViewerState(model: String) {
     var nodeVisibilityRevision by mutableStateOf(0)
         private set
 
+    /** Lines drawn among the model rather than over it, which it hides where it is in front: a floor. */
+    var debugBackdrop: ((DebugLines.Batch) -> Unit)? = null
+
+    /** Solid shapes drawn over the model, under [debugDraw]'s lines. */
+    var debugFill: ((DebugShapes.Batch) -> Unit)? = null
     var debugDraw: ((DebugLines.Batch) -> Unit)? = null
     private var lastRect = UiRect.Zero
 
@@ -280,6 +285,14 @@ class ModelViewerState(model: String) {
             OpenGLUtils.renderBoundingBox(stack, minCorner, maxCorner, Color.WHITE.withAlpha(0.75f))
         }
 
+        debugBackdrop?.let { draw ->
+            draw(DebugLines.batch(bufferSource, stack, DebugLines.PANEL_DEPTH))
+            bufferSource.endBatch(DebugLines.PANEL_DEPTH)
+        }
+        debugFill?.let { fill ->
+            fill(DebugShapes.batch(bufferSource, stack))
+            bufferSource.endBatch(DebugShapes.PANEL)
+        }
         debugDraw?.let { draw ->
             draw(DebugLines.batch(bufferSource, stack, DebugLines.PANEL))
             bufferSource.endBatch(DebugLines.PANEL)

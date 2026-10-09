@@ -60,7 +60,13 @@ data class ModelRig(
      * take in place, here and in the models nested in it. Two rigs with the same structure show the same nodes.
      */
     fun structure(): ModelRig = ModelRig(
-        bones.mapValues { (_, bone) -> bone.copy(pose = null, attachments = bone.attachments.map(RigAttachmentSpec::structure)) },
+        bones.mapValues { (_, bone) ->
+            bone.copy(
+                pose = null,
+                origin = bone.origin?.let { RigBoneOrigin(parent = it.parent) },
+                attachments = bone.attachments.map(RigAttachmentSpec::structure),
+            )
+        },
         attachments.map(RigAttachmentSpec::structure),
     )
 
@@ -101,6 +107,7 @@ data class RigBone(
     val attachments: List<RigAttachmentSpec> = emptyList(),
     val material: String? = null,
     val pose: RigPose? = null,
+    val origin: RigBoneOrigin? = null,
 ) {
     fun attachment(id: String): RigAttachmentSpec? = attachments.firstOrNull { it.id == id }
 
@@ -123,6 +130,7 @@ data class RigBone(
         attachments = attachments.overlay(instance.attachments),
         material = instance.material ?: material,
         pose = instance.pose ?: pose,
+        origin = instance.origin ?: origin,
     )
 
     companion object {

@@ -584,7 +584,7 @@ fun EditableTextField(
             .onKeyInput(TextFieldDefaultKeyPriority) { input ->
                 val handled = handleEditableFieldQuickFixKey(state, input, quickFix, diagnostics) ||
                         handleEditableFieldKey(state, input, layout, completion, codeInsight)
-                if (handled) input.consume()
+                if (handled || !state.readOnly && input.typesCharacter()) input.consume()
             }.onPress { event ->
                 state.focus()
                 val hit = clickHit(event, layout, gutterWidth)

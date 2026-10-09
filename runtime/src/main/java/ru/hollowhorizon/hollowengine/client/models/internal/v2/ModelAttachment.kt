@@ -20,6 +20,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRender
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -93,12 +94,25 @@ class ModelAttachment(
             currentRig = value
             if (sameStructure) {
                 respecAttachments()
+                placeAddedBones()
                 dress()
                 target = null
             } else {
                 builtFor?.let(::rebuild)
             }
         }
+
+    /**
+     * Moves the bones the rig adds to where it now puts them. Their place is their own rest pose, so it is set
+     * there and the next pose starts from it, without building the model again.
+     */
+    private fun placeAddedBones() {
+        val added = currentRig.addedBones
+        if (added.isEmpty()) return
+        runtimeNodes.forEach { root ->
+            root.walk().forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
+        }
+    }
 
     /** Hands the running attachments their specs again, after a change that left the rig's structure as it was. */
     private fun respecAttachments() {
@@ -187,9 +201,11 @@ class ModelAttachment(
         builtFor = model
         currentRig = authoredRig ?: RigAssets.of(location)
         runtimeMaterials = ModelInstanceMaterials(model)
-        runtimeNodes = model.scenes.getOrNull(model.scene)?.nodes?.map {
-            RuntimeNode(it, this, runtimeMaterials::resolve)
-        } ?: emptyList()
+        runtimeNodes = addRigBones(
+            model.scenes.getOrNull(model.scene)?.nodes?.map { RuntimeNode(it, this, runtimeMaterials::resolve) } ?: emptyList(),
+            currentRig,
+            this,
+        )
         nodesByIndex = runtimeNodes.byIndex()
         nodesByIndex.values.forEach(::customizeNode)
         modelRoot = RuntimeNode(NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF()), this).also { root ->

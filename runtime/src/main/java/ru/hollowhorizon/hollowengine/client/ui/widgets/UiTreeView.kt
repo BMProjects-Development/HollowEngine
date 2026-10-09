@@ -105,9 +105,10 @@ fun <T> UiTreeView(
                 onClose = filterState::close,
             )
         }
+        var treeWidth by remember { mutableStateOf(0f) }
         Column(
             tags = listOf("tree-view-scroll"),
-            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState).then(
+            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState).onPlaced { treeWidth = it.width }.then(
                 if (onBackgroundClick == null && onBackgroundContextMenu == null) Modifier else Modifier.input(clickable = true).onClick { event ->
                     if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && onBackgroundContextMenu != null) {
                         onBackgroundContextMenu(event)
@@ -121,7 +122,7 @@ fun <T> UiTreeView(
             items.forEachIndexed { index, item ->
                 key(item.id) {
                     UiTreeRow(
-                        item, continuations[index], onToggle, onSelect, onIconClick, fillRowWidth, onDrop, canDrop,
+                        item, continuations[index], onToggle, onSelect, onIconClick, fillRowWidth, treeWidth, onDrop, canDrop,
                         draggable = dragItem != null,
                     ) {
                         dragItem?.invoke(item)
@@ -185,6 +186,7 @@ private fun <T> UiTreeRow(
     onSelect: (UiTreeItem<T>, UiEvent) -> Unit,
     onIconClick: ((UiTreeItem<T>) -> Unit)?,
     fillRowWidth: Boolean,
+    minWidth: Float,
     onDrop: ((UiTreeItem<T>, UiDragItem) -> Boolean)?,
     canDrop: (UiTreeItem<T>, UiDragItem) -> Boolean,
     draggable: Boolean,
@@ -203,7 +205,8 @@ private fun <T> UiTreeRow(
         event.consume()
     }
     val width = if (fillRowWidth) 100.percent else UiLength.Auto
-    Box(mode = UiBoxMode.STACK, id = "$id-stack", modifier = Modifier.size(width, TreeRowHeight.px)) {
+    val minimum = if (fillRowWidth) Modifier else Modifier.minSize(minWidth.px)
+    Box(mode = UiBoxMode.STACK, id = "$id-stack", modifier = Modifier.size(width, TreeRowHeight.px).then(minimum)) {
         Row(id = "$id-guides", modifier = Modifier.size(UiLength.Auto, TreeRowHeight.px).inputTransparent()) {
             repeat(item.depth) { level ->
                 val parentLevel = level == item.depth - 1
@@ -217,7 +220,7 @@ private fun <T> UiTreeRow(
                 Box(tags = listOfNotNull("tree-indent", guide))
             }
         }
-        UiTreeRowContent(item, id, width, onToggle, onIconClick, dragAndDrop, Modifier
+        UiTreeRowContent(item, id, width, minimum, onToggle, onIconClick, dragAndDrop, Modifier
             .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
             .dragSource(dragSource, drag)
             .then(dropModifier))
@@ -229,6 +232,7 @@ private fun <T> UiTreeRowContent(
     item: UiTreeItem<T>,
     id: String,
     width: UiLength,
+    minimum: Modifier,
     onToggle: (UiTreeItem<T>) -> Unit,
     onIconClick: ((UiTreeItem<T>) -> Unit)?,
     dragAndDrop: UiDragAndDropState?,
@@ -240,7 +244,7 @@ private fun <T> UiTreeRowContent(
             if (dragAndDrop?.hoveredTargetId == id) {
                 if (dragAndDrop.canDrop) "drop-target" else "drop-rejected"
             } else null),
-        modifier = Modifier.size(width, TreeRowHeight.px)
+        modifier = Modifier.size(width, TreeRowHeight.px).then(minimum)
             .alignItems(vertical = UiAlign.CENTER)
             .input(hoverable = true, clickable = true)
             .cursor(UiCursorShape.HAND)

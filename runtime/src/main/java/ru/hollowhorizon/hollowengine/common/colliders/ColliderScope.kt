@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.addRigBones
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
@@ -78,7 +79,8 @@ internal class PosedModel(
     assetsOf: (String) -> ColliderPoseAssets?,
     depth: Int = 0,
 ) : ColliderScope {
-    override val roots: List<RuntimeNode> = model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, holder) }
+    override val roots: List<RuntimeNode> =
+        addRigBones(model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, holder) }, rig, holder)
     private val nodes = roots.flatMap { it.walk() }
 
     /** The models hung on this model itself, which no bone carries. */

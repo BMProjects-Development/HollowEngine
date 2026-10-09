@@ -24,6 +24,7 @@ class RigAttachmentType<S : RigAttachmentSpec>(
     val createDefault: ((id: String) -> S)? = null,
     val allowedOnModel: Boolean = false,
     val namedAcrossRig: Boolean = false,
+    val editorColor: Int? = null,
 ) {
     val key: ResourceLocation = id.rl
 }
@@ -41,6 +42,7 @@ object RigAttachmentTypes {
                 serializer = ItemSlotAttachmentSpec.serializer(),
                 titleKey = "hollowengine.gui.rig_editor.kind_item",
                 createDefault = { id -> ItemSlotAttachmentSpec(id = id) },
+                editorColor = 0xE8C547,
             )
         )
         register(
@@ -50,6 +52,7 @@ object RigAttachmentTypes {
                 serializer = VfxBoneAttachmentSpec.serializer(),
                 titleKey = "hollowengine.gui.rig_editor.kind_vfx",
                 createDefault = { id -> VfxBoneAttachmentSpec(id = id) },
+                editorColor = 0xFF8A3D,
                 allowedOnModel = true,
             )
         )
@@ -60,6 +63,7 @@ object RigAttachmentTypes {
                 serializer = ModelAttachmentSpec.serializer(),
                 titleKey = "hollowengine.gui.rig_editor.kind_model",
                 createDefault = { id -> ModelAttachmentSpec(id = id) },
+                editorColor = 0x6FBF8A,
                 allowedOnModel = true,
             )
         )

@@ -64,7 +64,11 @@ internal fun DebugLines.Batch.colliders(colliders: List<EntityCollider>, selecte
  * A collider as the gizmo sees it: its center and turn in model space, and its size along its own axes.
  * [with] goes back to the fields of the collider, in the space of what it hangs on.
  */
-internal class ColliderFrame(override val spec: ColliderAttachmentSpec, holder: Mat4f) : RigGizmoFrame {
+internal class ColliderFrame(
+    selection: RigPartSelection,
+    override val spec: ColliderAttachmentSpec,
+    holder: Mat4f,
+) : AttachmentFrame(selection) {
     private val holder = MutableMat4f(holder)
     private val holderRotation: QuatF = holder.getRotation(MutableQuatF()).norm()
 

@@ -5,8 +5,10 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.ikTargetMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.links
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
+import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
 import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.ikChains
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.hypot
@@ -49,6 +51,16 @@ internal fun DebugLines.Batch.ikOverlay(rig: ModelRig, roots: List<RuntimeNode>,
     }
 }
 
+/** The floor of the preview, at the model's origin: where the model stands, and what chains put their feet on. */
+internal fun DebugLines.Batch.floor() {
+    for (step in -FLOOR_LINES..FLOOR_LINES) {
+        val at = step * FLOOR_STEP
+        val reach = FLOOR_LINES * FLOOR_STEP
+        line(Vec3f(at, 0f, -reach), Vec3f(at, 0f, reach), FLOOR_COLOR)
+        line(Vec3f(-reach, 0f, at), Vec3f(reach, 0f, at), FLOOR_COLOR)
+    }
+}
+
 private fun DebugLines.Batch.cross(center: Vec3f, color: Int) {
     line(center - Vec3f(CROSS, 0f, 0f), center + Vec3f(CROSS, 0f, 0f), color)
     line(center - Vec3f(0f, CROSS, 0f), center + Vec3f(0f, CROSS, 0f), color)
@@ -65,8 +77,30 @@ private const val PICK_RADIUS = 8f
 /** Half the size of a target's cross, in model units. */
 private const val CROSS = 0.06f
 
+/** The floor's grid: lines a quarter of a block apart, out to one and a half blocks around the origin. */
+private const val FLOOR_STEP = 0.25f
+private const val FLOOR_LINES = 6
+
 private val TARGET_COLOR = 0xFFB57CFF.toInt()
 private val SELECTED_COLOR = 0xFFFFA333.toInt()
 private val CHAIN_COLOR = 0xFF4FD1FF.toInt()
 private val REACH_COLOR = 0x884FD1FF.toInt()
 private val POLE_COLOR = 0x88B57CFF.toInt()
+private val FLOOR_COLOR = 0x40FFFFFF
+
+/**
+ * The color each bone of [rig] takes in the preview's skeleton: the bones an IK chain bends in the chain's
+ * color, any other bone in the color of the first thing hung on it that has one.
+ */
+internal fun boneColors(rig: ModelRig, roots: List<RuntimeNode>): Map<String, Int> {
+    val colors = HashMap<String, Int>()
+    rig.bones.forEach { (name, bone) ->
+        bone.attachments.firstNotNullOfOrNull { RigAttachmentTypes.of(it)?.editorColor }?.let { colors[name] = it }
+    }
+    val chainColor = IkChainSpec.TYPE.editorColor ?: return colors
+    val nodes = roots.nodesByName()
+    rig.ikChains().forEach { (bone, chain) ->
+        nodes[bone]?.let(chain::links)?.forEach { colors[it.name] = chainColor }
+    }
+    return colors
+}

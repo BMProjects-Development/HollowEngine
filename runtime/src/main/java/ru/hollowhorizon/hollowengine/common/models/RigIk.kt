@@ -44,6 +44,7 @@ data class IkTargetSpec(
             createDefault = { id -> IkTargetSpec(id = id) },
             allowedOnModel = true,
             namedAcrossRig = true,
+            editorColor = 0xB57CFF,
         )
     }
 }
@@ -95,6 +96,7 @@ data class IkChainSpec(
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_ik_chain",
             createDefault = { id -> IkChainSpec(id = id) },
+            editorColor = 0x4FD1FF,
         )
     }
 }
@@ -122,3 +124,12 @@ fun ModelRig.ikChains(): List<Pair<String, IkChainSpec>> =
 /** The target named [id], with the bone it hangs on, null for the model itself. */
 fun ModelRig.ikTarget(id: String): Pair<String?, IkTargetSpec>? =
     allAttachments().firstNotNullOfOrNull { (bone, spec) -> (spec as? IkTargetSpec)?.takeIf { it.id == id }?.let { bone to it } }
+
+/** This rig with the IK target [from] called [to] in every chain that reaches for it or bends toward it. */
+fun ModelRig.withIkTargetRenamed(from: String, to: String): ModelRig {
+    fun RigBone.renamed() = copy(attachments = attachments.map { spec ->
+        if (spec !is IkChainSpec) return@map spec
+        spec.copy(target = if (spec.target == from) to else spec.target, pole = if (spec.pole == from) to else spec.pole)
+    })
+    return copy(bones = bones.mapValues { (_, bone) -> bone.renamed() })
+}
