@@ -10,14 +10,14 @@ import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
-/** Draws an entity's colliders where the client places them, in the hitbox view (F3+B). */
+/** Draws an entity's colliders where the server places them, between ticks, in the hitbox view (F3+B). */
 object ColliderDebugRenderer {
     /**
      * Draws the colliders of [entity] into [lines], with [poseStack] at the entity's position as the
      * dispatcher leaves it. True when the colliders stand in for the entity's box, which then is not drawn.
      */
     fun renderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean {
-        val colliders = ClientColliderPoses.of(entity)
+        val colliders = ClientColliderTickPoses.at(entity, partialTick)
         if (colliders.isNotEmpty()) {
             val origin = hostPosition(entity, partialTick)
             val batch = DebugLines.Batch(lines, poseStack.last())

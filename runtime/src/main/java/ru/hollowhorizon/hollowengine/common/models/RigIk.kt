@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorBone
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
@@ -69,6 +70,14 @@ data class IkChainSpec(
     @EditorName("$LANG.ground")
     @EditorDescription("$LANG.ground.hint")
     val ground: Boolean = false,
+    @EditorName("$LANG.pelvis")
+    @EditorDescription("$LANG.pelvis.hint")
+    @EditorBone
+    val pelvis: String = "",
+    @EditorName("$LANG.blend")
+    @EditorDescription("$LANG.blend.hint")
+    @EditorRange(min = 0.0, max = 2.0)
+    val blend: Float = 0.3f,
     @EditorName("$LANG.weight")
     @EditorDescription("$LANG.weight.hint")
     @EditorWidget(EditorWidgets.ANIMATION_EXPRESSION)

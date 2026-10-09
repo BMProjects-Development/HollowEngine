@@ -14,15 +14,15 @@ import java.util.function.Predicate
 val Entity.colliders: List<EntityCollider> get() = EntityColliders.of(this)
 
 /**
- * The colliders of entities, whichever side asks: the server places them from its own animator, a client
- * takes them from the pose it last drew.
+ * The colliders of entities, whichever side asks: both place them from the animator tick by tick, the same
+ * way, and a client takes them between its last two ticks, where it draws the entity.
  */
 object EntityColliders {
     /** How far a collider may move between the tick that placed it and a frame or a projectile looking for it. */
     private const val TICK_MOTION = 1.0
 
     fun of(entity: Entity): List<EntityCollider> =
-        if (entity.level().isClientSide) ClientColliderPoses.of(entity) else ServerColliderPoses.current(entity)
+        if (entity.level().isClientSide) ClientColliderTickPoses.now(entity) else ServerColliderPoses.current(entity)
 
     /**
      * The colliders of [entity] that act on bodies, over the last ticks, newest first: posed tick by tick

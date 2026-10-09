@@ -17,6 +17,7 @@ import java.util.UUID
  */
 class ModelInstance(val attachment: ModelAttachment) {
     val animator = ModelAnimator()
+    private val grounding = RigGroundingState()
     private var posedFrame = Long.MIN_VALUE
     private var materials: MaterialsComponent? = null
     private var instanceRig: ModelRig? = null
@@ -59,7 +60,7 @@ class ModelInstance(val attachment: ModelAttachment) {
         attachment.beginPose()
         animator.applyTo(attachment, context)
         applyRigPose(attachment.nodes, attachment.rig)
-        applyRigConstraints(attachment.nodes, attachment.rig, context)
+        applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
         attachment.endPose()
     }
 

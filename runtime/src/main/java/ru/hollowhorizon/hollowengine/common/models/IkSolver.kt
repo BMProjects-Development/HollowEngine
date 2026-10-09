@@ -5,6 +5,10 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
+import kotlin.math.acos
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -43,28 +47,83 @@ object IkSolver {
 
         val solved = when (joints.size) {
             2 -> listOf(root, root + direction(root, goal) * lengths[0])
-            3 -> twoBones(joints, lengths[0], lengths[1], reached, bendToward ?: joints[1], bendAxis)
+            3 -> twoBones(joints, lengths[0], lengths[1], reached, bendToward, bendAxis)
             else -> fabrik(joints, lengths, reached, bendToward)
         }
         return Solution(solved, stretch)
     }
 
-    /** The exact answer for a limb of two bones: the elbow goes where both bones still fit, on the bend's side. */
-    private fun twoBones(joints: List<Vec3f>, upper: Float, lower: Float, goal: Vec3f, hint: Vec3f, bendAxis: Vec3f): List<Vec3f> {
+    /**
+     * A limb of two bones bent at its middle joint as at a hinge. The lower bone turns about the hinge until
+     * its end is as far from the root as the goal; then the whole limb swings onto the goal and, with a [pole],
+     * turns about the line to the goal until the bend faces it.
+     */
+    private fun twoBones(
+        joints: List<Vec3f>,
+        upper: Float,
+        lower: Float,
+        goal: Vec3f,
+        pole: Vec3f?,
+        bendAxis: Vec3f,
+    ): List<Vec3f> {
         val root = joints[0]
-        val toGoal = goal - root
-        val along = toGoal.normed()
-        val distance = toGoal.length().coerceIn(abs(upper - lower) + EPSILON, upper + lower - EPSILON)
+        val knee = root + direction(root, joints[1]) * upper
+        val end = knee + direction(joints[1], joints[2]) * lower
+        val straight = knee + direction(root, knee) * lower
 
-        var normal: Vec3f = along.cross(hint - root, MutableVec3f())
-        if (normal.length() < EPSILON) normal = bendAxis - along * (bendAxis dot along)
-        if (normal.length() < EPSILON) normal = perpendicular(along)
-        val side = normal.normed().cross(along, MutableVec3f()).norm()
+        val hinge = hingeAxis(root, knee, end, pole, bendAxis)
+        val fromKnee = end - knee
+        val center = knee + hinge * (hinge dot fromKnee)
+        val radial = fromKnee - hinge * (hinge dot fromKnee)
+        val radius = radial.length()
+        val bent = if (radius < EPSILON) end else {
+            val u = radial / radius
+            val v = hinge.cross(u, MutableVec3f())
+            val toRoot = root - center
+            val flat = toRoot - hinge * (hinge dot toRoot)
+            val spread = flat.length()
+            val base = (toRoot dot toRoot) + radius * radius
+            val nearest = sqrt((base - 2f * radius * spread).coerceAtLeast(0f))
+            val farthest = sqrt(base + 2f * radius * spread)
+            val distance =
+                goal.distance(root).coerceIn(nearest + EPSILON, (farthest - EPSILON).coerceAtLeast(nearest + EPSILON))
+            val facing = atan2(flat dot v, flat dot u)
+            val opening = if (spread < EPSILON) 0f else acos(
+                ((base - distance * distance) / (2f * radius * spread)).coerceIn(
+                    -1f,
+                    1f
+                )
+            )
+            val options = listOf(
+                facing + opening,
+                facing - opening
+            ).map { angle -> center + (u * cos(angle) + v * sin(angle)) * radius }
+            if (pole != null) options.minBy { (it - straight) dot (pole - knee) } else options.minBy { it.distance(end) }
+        }
 
-        val cos = ((upper * upper + distance * distance - lower * lower) / (2f * upper * distance)).coerceIn(-1f, 1f)
-        val sin = sqrt(1f - cos * cos)
-        val middle = root + (along * cos + side * sin) * upper
-        return listOf(root, middle, root + along * distance)
+        val swing = rotationBetween(bent - root, goal - root)
+        var placedKnee = root + rotate(knee - root, swing)
+        val placedEnd = root + direction(root, goal) * root.distance(bent)
+
+        if (pole != null) {
+            val axis = direction(root, goal)
+            val tilted = flatten(rotate(hinge, swing), axis)
+            val wanted = flatten((goal - root).cross(pole - root, MutableVec3f()), axis)
+            if (tilted.length() > EPSILON && wanted.length() > EPSILON) {
+                placedKnee = root + rotate(placedKnee - root, rotationBetween(tilted, wanted))
+            }
+        }
+        return listOf(root, placedKnee, placedEnd)
+    }
+
+    /** What the lower bone turns about: square to the limb and the pole, or the limb's own bend, or [bendAxis]. */
+    private fun hingeAxis(root: Vec3f, knee: Vec3f, end: Vec3f, pole: Vec3f?, bendAxis: Vec3f): Vec3f {
+        val reach = end - root
+        pole?.let { reach.cross(it - root, MutableVec3f()) }?.takeIf { it.length() > EPSILON }
+            ?.let { return it.normed() }
+        (knee - root).cross(end - knee, MutableVec3f()).takeIf { it.length() > EPSILON }?.let { return it.normed() }
+        if (bendAxis.length() > EPSILON) return bendAxis.normed()
+        return perpendicular(direction(root, end))
     }
 
     private fun fabrik(joints: List<Vec3f>, lengths: FloatArray, goal: Vec3f, pole: Vec3f?): List<Vec3f> {
@@ -90,7 +149,8 @@ object IkSolver {
             for (i in 1 until last) {
                 val axis = points[i + 1] - points[i - 1]
                 if (axis.length() < EPSILON) continue
-                val turn = rotationBetween(flatten(points[i] - points[i - 1], axis), flatten(pole - points[i - 1], axis))
+                val turn =
+                    rotationBetween(flatten(points[i] - points[i - 1], axis), flatten(pole - points[i - 1], axis))
                 points[i].set(points[i - 1] + rotate(points[i] - points[i - 1], turn))
             }
         }

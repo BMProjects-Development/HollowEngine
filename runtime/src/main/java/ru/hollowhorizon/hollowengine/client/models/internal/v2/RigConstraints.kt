@@ -1,9 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
-import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
 import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
@@ -17,23 +13,34 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * Bends every IK chain of [rig] on the nodes under [roots].
  *
  * Chains are solved in the order the rig lists them, each on the pose the ones before it left.
  */
-fun applyRigConstraints(roots: List<RuntimeNode>, rig: ModelRig, context: AnimatorEvaluationContext) {
+fun applyRigConstraints(
+    roots: List<RuntimeNode>,
+    rig: ModelRig,
+    context: AnimatorEvaluationContext,
+    grounding: RigGroundingState? = null,
+) {
     val chains = rig.ikChains()
     if (chains.isEmpty()) return
 
     val nodes = HashMap<String, RuntimeNode>()
     roots.forEach { root -> root.walk().forEach { nodes.putIfAbsent(it.name, it) } }
-    val ground = IkGround.of(context)
-    chains.forEach { (bone, chain) -> nodes[bone]?.let { solveChain(chain, it, nodes, rig, context, ground) } }
+    val grounded = chains.filter { it.second.ground }
+    val planted = if (grounding != null && grounded.isNotEmpty()) plantFeet(grounded, nodes, rig, context, grounding) else emptyMap()
+
+    chains.forEach { (bone, chain) ->
+        val end = nodes[bone] ?: return@forEach
+        if (!chain.ground) solveChain(chain, end, nodes, rig, context, goal = null, steps = false)
+        else planted[groundKey(bone, chain)]?.let { solveChain(chain, end, nodes, rig, context, it.goal, steps = it.raised) }
+    }
 }
 
 /** [this] node's matrix in the space of its model, from the local transforms as they are now. */
@@ -75,7 +82,8 @@ private fun solveChain(
     nodes: Map<String, RuntimeNode>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
-    ground: IkGround,
+    goal: Vec3f?,
+    steps: Boolean,
 ) {
     val links = chain.links(end)
     if (links.size < 2) return
@@ -88,17 +96,21 @@ private fun solveChain(
 
     val joints = links.map { it.modelMatrix().getTranslation() }
     val target = rig.ikTargetMatrix(chain.target, nodes::get)
-    var goal: Vec3f = target?.getTranslation() ?: joints.last()
-    if (chain.ground) {
-        val reach = joints.zipWithNext { a, b -> a.distance(b) }.sum()
-        val floor = ground.heightUnder(goal, reach) ?: return
-        val rest = links.last().restModelMatrix().getTranslation().y
-        goal = Vec3f(goal.x, floor + maxOf(goal.y, rest), goal.z)
+    val reached = goal ?: target?.getTranslation() ?: joints.last()
+    if (reached.distance(joints.last()) < UNMOVED && (chain.end != IkEndRotation.TARGET || target == null)) {
+        if (chain.stretch > 1f) stretchGeometry(links, 1f)
+        return
     }
 
     val pole = rig.ikTargetMatrix(chain.pole, nodes::get)?.getTranslation()
     val bendAxis = IkSolver.rotate(Vec3f.X_AXIS, links.first().modelRotation())
-    val solution = IkSolver.solve(joints, goal, pole, bendAxis, chain.stretch, restReach(links))
+    val reach = restReach(links)
+    var solution = IkSolver.solve(joints, reached, pole, bendAxis, chain.stretch, reach)
+    if (steps && links.size == 3 && reached.y - joints.last().y > RAISED) {
+        keepShin(joints, reached, solution.joints[1])?.let { (foot, ahead) ->
+            solution = IkSolver.solve(joints, foot, pole ?: ahead, bendAxis, chain.stretch, reach)
+        }
+    }
 
     val stretch = 1f + (solution.stretch - 1f) * weight
     if (stretch != 1f) {
@@ -136,6 +148,37 @@ private fun solveChain(
     }
 }
 
+private fun keepShin(joints: List<Vec3f>, goal: Vec3f, bent: Vec3f): Pair<Vec3f, Vec3f>? {
+    val (hip, knee, foot) = joints
+    val thigh = hip.distance(knee)
+    val shin = knee.distance(foot)
+    if (shin < MIN_LENGTH) return null
+    val up = (knee - foot).normed()
+
+    val forward = Vec3f(bent.x - (hip.x + goal.x) / 2f, 0f, bent.z - (hip.z + goal.z) / 2f)
+    if (forward.length() < MIN_LENGTH) return null
+    val along = forward.normed()
+
+    val offset = goal + up * shin - hip
+    val half = offset dot along
+    val discriminant = half * half - (offset dot offset) + thigh * thigh
+    if (discriminant < 0f) return null
+    val root = sqrt(discriminant)
+    val slide = -half + root
+    val stepped = goal + along * slide
+    return stepped to stepped + up * shin + along * AHEAD
+}
+
+/** How far a goal has to be raised over the animation before a leg steps up rather than just reaching. */
+private const val RAISED = 1e-3f
+
+/** How near the goal a chain's end already is for it to be left as animated. */
+private const val UNMOVED = 1e-4f
+private const val MIN_LENGTH = 1e-4f
+
+/** How far ahead of the knee a leg with no pole is pointed, for it to bend the way it first did. */
+private const val AHEAD = 4f
+
 /** How far the end of the chain stands from its root in the rest pose, where the limb looks straight. */
 private fun restReach(links: List<RuntimeNode>): Float {
     val rest = MutableMat4f(links.first().definition.baseTransform.matrixF)
@@ -170,52 +213,6 @@ private fun stretchGeometry(links: List<RuntimeNode>, factor: Float) {
             child.transform.translation.set(Vec3f(child.transform.translation) * scale)
             child.transform.scale.set(Vec3f(child.transform.scale) * scale)
             child.transform.markDirty()
-        }
-    }
-}
-
-/**
- * The ground chains put their goal on, as a height in model space, which is taken to stand upright: the world
- * under an entity, or a floor at the model's origin for a model with no world around it, as in an editor's
- * preview.
- */
-private sealed interface IkGround {
-    /** How high the ground under [goal] is in model space; null where there is none within [reach] of the feet. */
-    fun heightUnder(goal: Vec3f, reach: Float): Float?
-
-    object Floor : IkGround {
-        override fun heightUnder(goal: Vec3f, reach: Float): Float = 0f
-    }
-
-    class World(private val entity: Entity, toWorld: TrsTransformF, partialTick: Float) : IkGround {
-        private val feet: Vec3 = entity.getPosition(partialTick)
-        private val rotation: QuatF = MutableQuatF(toWorld.rotation)
-        private val scale: Vec3f = Vec3f(toWorld.scale)
-
-        private val shift: Vec3f = Vec3f(toWorld.translation) - Vec3f(feet.x.toFloat(), feet.y.toFloat(), feet.z.toFloat())
-
-        override fun heightUnder(goal: Vec3f, reach: Float): Float? {
-            val offset = shift + IkSolver.rotate(goal * scale, rotation)
-            val span = (reach * scale.y).coerceAtLeast(MIN_REACH).toDouble()
-            val x = feet.x + offset.x
-            val z = feet.z + offset.z
-            val hit = entity.level().clip(
-                ClipContext(Vec3(x, feet.y + span, z), Vec3(x, feet.y - span, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity)
-            )
-            if (hit.type == HitResult.Type.MISS) return null
-            return ((hit.location.y - feet.y).toFloat() - shift.y) / scale.y
-        }
-
-        private companion object {
-            const val MIN_REACH = 0.5f
-        }
-    }
-
-    companion object {
-        fun of(context: AnimatorEvaluationContext): IkGround {
-            val entity = context.entity ?: return Floor
-            val toWorld = context.modelToWorld ?: return Floor
-            return World(entity, toWorld, context.partialTick)
         }
     }
 }
