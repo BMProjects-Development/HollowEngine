@@ -30,7 +30,16 @@ class RigGroundingState {
         val previous = values[key]
         if (previous != null && previous.floating && ground != null) values.remove(key)
         values[key]?.let { eased ->
-            if (ground == null) eased.value += feet - eased.feet
+            if (ground == null) {
+                val fall = feet - eased.feet
+                if (fall <= 0f && eased.value < eased.feet - LOWER && eased.value < feet) {
+                    eased.feet = feet
+                    eased.velocity = 0f
+                    eased.floating = true
+                    return eased.value
+                }
+                eased.value += fall
+            }
             eased.feet = feet
         }
         return ease(key, ground ?: feet, seconds, duration).also {
@@ -58,6 +67,9 @@ class RigGroundingState {
     private companion object {
         /** Further than this the value is not eased but moved at once. */
         const val JUMP = 3f
+
+        /** How far below the body a foot's ground has to be for the foot to be held on it in the air. */
+        const val LOWER = 0.01f
     }
 }
 
@@ -72,7 +84,7 @@ internal fun groundKey(bone: String, chain: IkChainSpec): String = "$bone/${chai
 
 /**
  * Where the chains of [grounded] put their goal on the ground under it, by [groundKey], and lowers the pelvis
- * they share so a leg above lower ground still reaches it. The goals are taken before the pelvis goes down, so
+ * they share toward the lower ground under its legs. The goals are taken before the pelvis goes down, so
  * the feet stay where they stand and the legs bend.
  */
 internal fun plantFeet(
@@ -99,21 +111,27 @@ internal fun plantFeet(
 
         if (chain.pelvis.isNotBlank()) {
             val weight = AnimatorExpressionEvaluator.float(chain.weight, context, 0f).coerceIn(0f, 1f)
-            legs.getOrPut(chain.pelvis) { mutableListOf() } += Leg(footing.shift * weight, reach, footing.firm)
+            legs.getOrPut(chain.pelvis) { mutableListOf() } += Leg(footing.shift * weight, reach, footing.firm, chain.blend)
         }
     }
 
     legs.forEach { (pelvis, standing) ->
-        if (standing.none(Leg::firm)) return@forEach
         val node = nodes[pelvis] ?: return@forEach
+        val wanted = if (ground.moving || standing.any(Leg::firm)) 1f else 0f
+        val share = state.ease("$PELVIS_KEY$pelvis", wanted, context.deltaTime, standing.maxOf(Leg::blend)).coerceIn(0f, 1f)
+        if (share <= 0f) return@forEach
         val limit = minOf(ground.maxDrop, standing.minOf(Leg::reach) * MAX_LEG_DROP)
-        lower(node, standing.minOf(Leg::shift).coerceIn(-limit, 0f))
+        val drop = standing.map { minOf(it.shift, 0f) }.average().toFloat()
+        lower(node, drop.coerceIn(-limit, 0f) * share)
     }
     return goals
 }
 
-/** One leg standing under a pelvis: how far its foot moves, how long it is, and whether it stands firm. */
-private class Leg(val shift: Float, val reach: Float, val firm: Boolean)
+/** One leg standing under a pelvis: how far its foot moves, how long it is, whether it stands firm, and its [IkChainSpec.blend]. */
+private class Leg(val shift: Float, val reach: Float, val firm: Boolean, val blend: Float)
+
+/** The prefix a pelvis's eased share of its drop is kept under, apart from the chains' ground. */
+private const val PELVIS_KEY = "pelvis:"
 
 /** Moves [node] down by [drop] in model space, whatever its parent turns it by. */
 private fun lower(node: RuntimeNode, drop: Float) {
@@ -151,6 +169,9 @@ private sealed interface IkGround {
     /** The furthest a pelvis goes down here, in model space. */
     val maxDrop: Float
 
+    /** Whether the model walks on, so a body lowered toward the ground ahead stays lowered with no foot firm. */
+    val moving: Boolean
+
     /**
      * How far, in model space, the goal of the chain kept under [key] goes up or down to stand on the ground,
      * eased by [state] over [blend] seconds, and whether the foot stands firm. [goal] is where the animation
@@ -164,6 +185,8 @@ private sealed interface IkGround {
      */
     object Floor : IkGround {
         override val maxDrop: Float = MAX_DROP_BLOCKS
+
+        override val moving: Boolean = false
 
         override fun footing(key: String, goal: Vec3f, rest: Float, reach: Float, state: RigGroundingState, seconds: Float, blend: Float) =
             Footing(state.ease(key, maxOf(goal.y, rest) - goal.y, seconds, blend), firm = true)
@@ -191,6 +214,8 @@ private sealed interface IkGround {
 
         override val maxDrop: Float = MAX_DROP_BLOCKS / scale.y
 
+        override val moving: Boolean = ahead.lengthSqr() >= MIN_MOTION
+
         override fun footing(key: String, goal: Vec3f, rest: Float, reach: Float, state: RigGroundingState, seconds: Float, blend: Float): Footing {
             val offset = shift + IkSolver.rotate(goal * scale, rotation)
             val span = (reach * scale.y).coerceAtLeast(MIN_REACH).toDouble()
@@ -207,7 +232,7 @@ private sealed interface IkGround {
         private fun groundAt(x: Double, z: Double, span: Double): Probe? {
             if (!standing) return null
             val under = probe(x, z, span)
-            if (ahead.lengthSqr() < MIN_MOTION) return under
+            if (!moving) return under
             return listOfNotNull(under, probe(x + ahead.x, z + ahead.z, span)).maxByOrNull(Probe::height)
         }
 
