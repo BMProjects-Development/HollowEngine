@@ -209,6 +209,15 @@ class AnimatorEvaluationContext {
     var data: Map<String, Float> = emptyMap()
 
     /**
+     * The montages the animator played this frame, in the order it played them, for what they lay over the
+     * model's rig once the pose is done.
+     */
+    val montages = ArrayList<MontageMoment>()
+
+    /** Whether this is the client's copy of the model, which reads its assets from resource packs. */
+    val isClientSide: Boolean get() = entity?.level()?.isClientSide ?: true
+
+    /**
      * The value of an entity-derived name when there is no entity, as in a model preview: whatever was
      * put in [variables] under that name, or zero.
      */

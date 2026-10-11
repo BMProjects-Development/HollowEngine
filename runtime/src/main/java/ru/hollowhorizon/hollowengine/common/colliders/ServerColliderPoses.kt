@@ -41,7 +41,7 @@ object ServerColliderPoses {
     /** The rig of [entity]'s model with what it hangs on it, the colliders of nested models gathered in. */
     fun rig(entity: Entity): ModelRig? {
         val node = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull() ?: return null
-        return rigs.of(entity, node.model)
+        return rigs.of(entity, node)
     }
 
     internal fun hostsIn(level: Level): List<ColliderHost> = hosts[level].orEmpty()

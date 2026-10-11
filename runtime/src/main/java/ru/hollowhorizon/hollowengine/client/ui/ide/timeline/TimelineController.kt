@@ -31,9 +31,15 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     companion object {
         const val KEYFRAME_TIME_EPSILON = ChannelCurve.KEY_TIME_EPSILON
         private const val DEFAULT_CURVE_SPAN = 20f
+
+        /** How near the playhead, in seconds, a key is changed by recording instead of getting one beside it. */
+        private const val RECORD_REUSE = 1f / 60f
     }
 
     val groups = mutableStateListOf<TrackGroup>()
+
+    /** Lanes of segments that stand on their own above the groups, such as a montage's clips. */
+    val lanes = mutableStateListOf<SegmentLane>()
 
     var currentTime by mutableStateOf(0f)
     var isPlaying by mutableStateOf(false)
@@ -73,6 +79,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     var onHideProperty: ((AnimProperty<*>) -> Unit)? = null
     var onHideGroup: ((TrackGroup) -> Unit)? = null
+    var onHideLane: ((SegmentLane) -> Unit)? = null
 
     fun group(path: List<String>): TrackGroup {
         require(path.isNotEmpty()) { "Timeline group path must not be empty" }
@@ -207,9 +214,34 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     fun clearSelection() {
         selectedKeyframes.clear()
         isWorkAreaSelected = false
+        selectSegment(null, null)
+    }
+
+    /** The segment the author picked on a [SegmentLane]; picking one lets go of the keys, and keys let go of it. */
+    var selectedSegment by mutableStateOf<TimelineSegment?>(null)
+        private set
+    private var selectedLane: SegmentLane? = null
+
+    /**
+     * Picks [segment] on [lane], or nothing. Without [notify] the lanes are not told, as when the owner rebuilt
+     * its segments and only puts back the one that was picked.
+     */
+    fun selectSegment(lane: SegmentLane?, segment: TimelineSegment?, notify: Boolean = true) {
+        if (segment === selectedSegment) return
+        val previous = selectedLane
+        selectedSegment = segment
+        selectedLane = lane.takeIf { segment != null }
+        if (segment != null) {
+            selectedKeyframes.clear()
+            isWorkAreaSelected = false
+        }
+        if (!notify) return
+        if (previous !== lane) previous?.onSelect?.invoke(null)
+        lane?.onSelect?.invoke(segment)
     }
 
     fun select(keys: List<Keyframe>, additive: Boolean) {
+        if (keys.isNotEmpty()) selectSegment(null, null)
         if (!additive) selectedKeyframes.clear()
         keys.forEach { key -> if (!isSelected(key)) selectedKeyframes.add(key) }
         isWorkAreaSelected = false
@@ -342,7 +374,8 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
                 if (curve.keyframes.isEmpty() && time > KEYFRAME_TIME_EPSILON) {
                     setKey(curve, 0f, before, selectKey = false)
                 }
-                setKey(curve, time, curve.spec.unwrap(value, curve.valueAt(time, before)), selectKey = false)
+                val at = curve.keyframes.minByOrNull { abs(it.time - time) }?.time?.takeIf { abs(it - time) <= RECORD_REUSE } ?: time
+                setKey(curve, at, curve.spec.unwrap(value, curve.valueAt(at, before)), selectKey = false)
             }
         }
     }

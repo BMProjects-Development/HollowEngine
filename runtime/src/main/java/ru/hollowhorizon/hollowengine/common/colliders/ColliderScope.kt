@@ -11,11 +11,13 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstrain
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.montageKey
+import ru.hollowhorizon.hollowengine.common.models.withMontages
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.attachments.components.Model as ModelComponent
 
 /**
  * One model of an entity as its colliders see it: the nodes as posed, the rig laid over them, and the models
@@ -49,20 +51,24 @@ internal fun ModelRig.withNestedColliders(fileRigOf: (String) -> ModelRig, depth
 }
 
 /**
- * The rig of an entity's model with what the entity hangs on it, colliders of nested models gathered in;
- * worked out again only when the model's rig file or the entity's own rig is replaced.
+ * The rig of an entity's model with what the entity hangs on it and what the montages playing on it hang
+ * there now, colliders of nested models gathered in; worked out again only when one of those changes.
  */
 internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
-    private class Cached(val file: ModelRig, val own: ModelRig, val rig: ModelRig)
+    private class Cached(val file: ModelRig, val own: ModelRig, val montages: List<Any>, val rig: ModelRig)
 
-    fun of(entity: Entity, model: ModelComponent): ModelRig {
+    fun of(entity: Entity, node: ModelNodeEntry): ModelRig {
+        val model = node.model
         val file = fileRigOf(model.model)
+        val gameTime = entity.level().gameTime
+        val moments = node.animations?.montages.orEmpty().mapNotNull { it.momentAt(gameTime, entity.level().isClientSide) }
+        val key = montageKey(moments)
         val runtime = AttachmentRegistry.attachmentsOrNull(entity)?.runtime
-        runtime?.getOrNull<Cached>(this)?.takeIf { it.file === file && it.own === model.rig }?.let { return it.rig }
+        runtime?.getOrNull<Cached>(this)?.takeIf { it.file === file && it.own === model.rig && it.montages == key }?.let { return it.rig }
 
-        val rig = file.overlay(model.rig).withNestedColliders(fileRigOf)
+        val rig = file.overlay(model.rig).withMontages(moments).rig.withNestedColliders(fileRigOf)
         runtime?.remove(this)
-        runtime?.getOrPut(this) { Cached(file, model.rig, rig) }
+        runtime?.getOrPut(this) { Cached(file, model.rig, key, rig) }
         return rig
     }
 }
@@ -74,7 +80,7 @@ internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
  */
 internal class PosedModel(
     model: Model,
-    override val rig: ModelRig,
+    override var rig: ModelRig,
     private val holder: Attachment?,
     assetsOf: (String) -> ColliderPoseAssets?,
     depth: Int = 0,

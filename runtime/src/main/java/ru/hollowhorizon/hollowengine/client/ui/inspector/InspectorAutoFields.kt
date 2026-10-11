@@ -28,6 +28,7 @@ internal fun AutoFields(
     query: String = "",
     onChange: (JsonObject) -> Unit,
 ) {
+    val animated = LocalAnimatedFields.current
     for (index in 0 until descriptor.elementsCount) {
         if (ComponentLabels.isHidden(descriptor, index)) continue
 
@@ -39,25 +40,92 @@ internal fun AutoFields(
         val current = value[name] ?: ComponentJson.defaultJson(element)
 
         key(name) {
-            ValueEditor(
-                label = label,
-                description = ComponentLabels.fieldDescription(descriptor, index),
-                owner = owner,
-                descriptor = element,
-                hints = FieldHints(
-                    range = ComponentLabels.range(descriptor, index),
-                    multiline = ComponentLabels.isMultiline(descriptor, index),
-                    asset = ComponentLabels.asset(descriptor, index),
-                    bone = ComponentLabels.isBone(descriptor, index),
-                    widget = ComponentLabels.widget(descriptor, index),
-                ),
-                value = current,
-                path = "$path/$name",
-                onChange = { onChange(value.withField(name, it)) },
-            )
+            CompositionLocalProvider(LocalAnimatedFields provides null) {
+                AnimatedField(animated, name) {
+                    ValueEditor(
+                        label = label,
+                        description = ComponentLabels.fieldDescription(descriptor, index),
+                        owner = owner,
+                        descriptor = element,
+                        hints = FieldHints(
+                            range = ComponentLabels.range(descriptor, index),
+                            multiline = ComponentLabels.isMultiline(descriptor, index),
+                            asset = ComponentLabels.asset(descriptor, index),
+                            bone = ComponentLabels.isBone(descriptor, index),
+                            widget = ComponentLabels.widget(descriptor, index),
+                        ),
+                        value = current,
+                        path = "$path/$name",
+                        onChange = { onChange(value.withField(name, it)) },
+                    )
+                }
+            }
         }
     }
 }
+
+/**
+ * The fields of what an inspector shows that a timeline can animate. A field it animates shows the timeline's
+ * value and its key button is lit; while keys are recorded an edit of it keys it there, otherwise it is locked.
+ */
+interface AnimatedFields {
+    /** Null when [name] cannot be animated; otherwise whether it is. */
+    fun isAnimated(name: String): Boolean?
+
+    /** Starts animating [name], keyed where the timeline is, or stops and lets the authored value back. */
+    fun toggle(name: String)
+
+    /** Whether [name] takes no edits now: it is animated and keys are not being recorded. */
+    fun isLocked(name: String): Boolean = false
+}
+
+/** What the fields [AutoFields] shows at its top level can be animated by, if anything. */
+val LocalAnimatedFields = compositionLocalOf<AnimatedFields?> { null }
+
+@Composable
+private fun AnimatedField(animated: AnimatedFields?, name: String, editor: @Composable () -> Unit) {
+    val state = animated?.isAnimated(name) ?: return editor()
+    KeyedField(name, state, locked = animated.isLocked(name), onToggle = { animated.toggle(name) }, editor = editor)
+}
+
+/**
+ * A field with a key button beside it, lit while a timeline animates the field. A [locked] field shows its
+ * value and takes no input, as one the timeline writes while keys are not being recorded.
+ */
+@Composable
+fun KeyedField(id: String, animated: Boolean, locked: Boolean, onToggle: () -> Unit, editor: @Composable () -> Unit) {
+    Row(tags = listOf("insp-animated-field")) {
+        Box(
+            mode = UiBoxMode.STACK,
+            tags = if (locked) listOf("insp-animated-value", "driven") else listOf("insp-animated-value"),
+            modifier = Modifier.grow(1f),
+        ) {
+            Column(modifier = Modifier.size(100.percent)) { editor() }
+            // The fields under it would still take clicks and keys, so a cover takes them while it is locked.
+            if (locked) Box(
+                id = "locked-$id",
+                modifier = Modifier.size(100.percent, 100.percent)
+                    .input(hoverable = true, clickable = true, draggable = true)
+                    .tooltipOnHover(InspectorLang.lockedByTimeline)
+                    .onPress { it.consume() }
+                    .onClick { it.consume() },
+            )
+        }
+        Image(
+            KeyIcon,
+            id = "animate-$id",
+            tags = if (animated) listOf("insp-key-toggle", "active") else listOf("insp-key-toggle"),
+            modifier = Modifier.input(hoverable = true, clickable = true)
+                .tooltipOnHover(if (animated) InspectorLang.stopAnimating else InspectorLang.animate)
+                .onClick { event ->
+                    onToggle()
+                    event.consume()
+                },
+        )
+    }
+}
+
+private const val KeyIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
 
 @Composable
 internal fun FieldLabel(label: String?, description: String?) {
@@ -177,7 +245,7 @@ private fun NullableEditor(
             )
         }
         if (present) {
-            ValueEditor(null, description, owner, inner, hints, value, path, onChange)
+            ValueEditor(null, null, owner, inner, hints, value, path, onChange)
         } else {
             Text(InspectorLang.notSet, tags = listOf("insp-hint"))
         }

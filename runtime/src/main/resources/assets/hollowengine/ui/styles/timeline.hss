@@ -140,6 +140,32 @@
 
 .timeline-row.muted .timeline-row-label { foreground: $text-faint; }
 
+/* The strips at the ends of a block that trim it: shown only while the pointer is on one. */
+.timeline-segment-grip {
+    background: transparent;
+    transition: background 90ms ease-out;
+}
+
+.timeline-segment-grip:hover { background: alpha($white, 0.25); }
+
+/* Where a fade of a block ends, dragged along its top edge. */
+.timeline-fade-handle {
+    border-radius: 3.5px;
+    background: alpha($white, 0.35);
+    border: 1px alpha(#000000, 0.4);
+    transition: background 90ms ease-out;
+}
+
+.timeline-fade-handle:hover { background: $white; }
+
+/* What a segment or a marker is called, drawn on it in the lane. */
+.timeline-segment-label {
+    foreground: $text-strong;
+    font-size: $font-size-small;
+    wrap: false;
+    padding: 0px 3px;
+}
+
 .timeline-row-toggle {
     size: fit fit;
     padding: 2px;

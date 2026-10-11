@@ -241,7 +241,7 @@ class VfxTimelineSession(
 }
 
 /** On or off, held between keys; the editor draws it as a step curve and never interpolates it. */
-private object TogglePropertyType : PropertyType<Float> {
+internal object TogglePropertyType : PropertyType<Float> {
     override val id = "vfx_toggle"
 
     override val channels = listOf(

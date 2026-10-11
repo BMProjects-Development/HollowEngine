@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorBone
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
@@ -58,6 +59,7 @@ data class IkChainSpec(
     @EditorName("$LANG.bones")
     @EditorDescription("$LANG.bones.hint")
     @EditorRange(min = 1.0, max = MAX_BONES.toDouble())
+    @EditorNotAnimated
     val bones: Int = 2,
     @EditorName("$LANG.target")
     @EditorDescription("$LANG.target.hint")
@@ -69,6 +71,7 @@ data class IkChainSpec(
     val pole: String = "",
     @EditorName("$LANG.ground")
     @EditorDescription("$LANG.ground.hint")
+    @EditorNotAnimated
     val ground: Boolean = false,
     @EditorName("$LANG.pelvis")
     @EditorDescription("$LANG.pelvis.hint")
@@ -77,6 +80,7 @@ data class IkChainSpec(
     @EditorName("$LANG.blend")
     @EditorDescription("$LANG.blend.hint")
     @EditorRange(min = 0.0, max = 2.0)
+    @EditorNotAnimated
     val blend: Float = 0.3f,
     @EditorName("$LANG.weight")
     @EditorDescription("$LANG.weight.hint")

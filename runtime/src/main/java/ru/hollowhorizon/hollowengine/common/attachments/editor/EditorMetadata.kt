@@ -34,6 +34,14 @@ annotation class EditorCategory(val category: String)
 annotation class EditorHidden
 
 /**
+ * A field a timeline does not offer to animate, though it holds a number or a flag: one that is read once, as
+ * whether an effect starts by itself, or that changes what is built rather than how it moves.
+ */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorNotAnimated
+
+/**
  * Bounds a numeric field, and turns it into a slider when [slider] is set. An infinite bound is no bound.
  */
 @SerialInfo

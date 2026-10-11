@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
 import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -28,6 +29,7 @@ data class VfxBoneAttachmentSpec(
     override val scale: Float = 1f,
     /** Whether it starts as soon as the model is drawn; otherwise a script starts it. */
     @EditorName("hollowengine.gui.vfx.auto_play")
+    @EditorNotAnimated
     val autoPlay: Boolean = true,
     @EditorHidden
     val ownEffect: VfxEffect? = null,

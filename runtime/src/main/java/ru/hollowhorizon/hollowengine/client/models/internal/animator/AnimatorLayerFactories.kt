@@ -17,6 +17,7 @@ object AnimatorLayerFactories {
         register("hollowengine:animator/clip") { ClipLayer(it as ClipAnimationLayerSpec) }
         register("hollowengine:animator/controller") { ControllerLayer(it as AnimationControllerLayerSpec) }
         register("hollowengine:animator/procedural") { ProceduralLayer(it as ProceduralLayerSpec) }
+        register("hollowengine:animator/montage") { MontageLayer(it as MontageLayerSpec) }
     }
 
     fun register(typeId: String, factory: AnimatorLayerFactory): ExtensionHandle = point.register(typeId.rl, factory)

@@ -188,6 +188,30 @@
     opacity: 1;
 }
 
+/* A field a timeline can animate: its editor, and the key that starts or stops animating it. */
+.insp-animated-field {
+    size: 100% fit;
+    gap: 3px;
+    align-items: start end;
+}
+
+.insp-animated-value { size: 0px fit; }
+
+/* Written by the timeline, so it reads as keyed and does not take input. */
+.insp-animated-value.driven { opacity: 0.55; }
+
+.insp-key-toggle {
+    size: 10px 10px;
+    margin: 0px 0px 6px 0px;
+    tint: $text-faint;
+    cursor: hand;
+    transition: tint 110ms ease-out;
+}
+
+.insp-key-toggle:hover { tint: $text-strong; }
+
+.insp-key-toggle.active { tint: $accent; }
+
 .insp-hint {
     size: 100% fit;
     foreground: $text-faint;

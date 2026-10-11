@@ -464,6 +464,7 @@ private fun HeaderControls(row: TimelineRow, controller: TimelineController, ref
             val owner = row.property ?: return
             VisibilityToggle("${row.id}-visible", owner.isVisible) {
                 owner.isVisible = !owner.isVisible
+                owner.curves.forEach { it.isVisible = owner.isVisible }
                 refresh()
             }
             LockToggle("${row.id}-lock", owner.isLocked) {
@@ -476,10 +477,23 @@ private fun HeaderControls(row: TimelineRow, controller: TimelineController, ref
             val owner = row.group ?: return
             VisibilityToggle("${row.id}-visible", owner.isVisible) {
                 owner.isVisible = !owner.isVisible
+                owner.allProperties().forEach { property ->
+                    property.isVisible = owner.isVisible
+                    property.curves.forEach { it.isVisible = owner.isVisible }
+                }
                 refresh()
             }
             LockToggle("${row.id}-lock", owner.isLocked) {
                 owner.isLocked = !owner.isLocked
+                refresh()
+            }
+        }
+
+        TimelineRowKind.SEGMENTS -> {
+            val lane = row.lane ?: return
+            val hide = controller.onHideLane ?: return
+            RowToggle("${row.id}-remove", TimelineIcons.CLOSE, CutsceneLang.TRACK_REMOVE.lang, listOf("hide-track")) {
+                hide(lane)
                 refresh()
             }
         }

@@ -71,9 +71,9 @@ internal class RigPartGizmo {
         return true
     }
 
-    fun handles(frame: RigGizmoFrame, mode: GizmoEditMode): List<GizmoHandle> {
-        val modes = if (frame.isWorldAligned && mode == GizmoEditMode.ROTATE) emptySet() else setOf(mode)
-        return geometry.buildHandles(frame.values.translation, frame.values.rotation, modes)
+    fun handles(frame: RigGizmoFrame, modes: Set<GizmoEditMode>): List<GizmoHandle> {
+        val shown = if (frame.isWorldAligned) modes - GizmoEditMode.ROTATE else modes
+        return geometry.buildHandles(frame.values.translation, frame.values.rotation, shown)
     }
 
     fun pick(handles: List<GizmoHandle>, x: Float, y: Float): GizmoHandle? = GizmoPicker.pick(handles, x, y)

@@ -24,7 +24,7 @@ val LocalRigModelInfo = staticCompositionLocalOf { RigModelInfo() }
 internal fun MeshMaterialFields(document: RigEditing, bone: String, current: RigBone, materials: List<String>) {
     fun assign(name: String?) = document.edit { it.withBone(bone, current.copy(material = name)) }
 
-    Section(rigText("section_material")) {
+    Section(rigText("section_material"), help = rigText("material_hint")) {
         PillFlow {
             Pill(rigText("material_default"), active = current.material == null) { assign(null) }
             materials.forEach { name -> Pill(name, active = current.material == name) { assign(name) } }
@@ -32,7 +32,6 @@ internal fun MeshMaterialFields(document: RigEditing, bone: String, current: Rig
                 assign(freeMaterialName(bone, materials + document.occupied.materials.keys))
             }
         }
-        Hint(rigText("material_hint"))
     }
 }
 

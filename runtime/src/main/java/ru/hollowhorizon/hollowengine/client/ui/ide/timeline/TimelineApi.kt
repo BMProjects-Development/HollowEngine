@@ -292,7 +292,7 @@ class AnimProperty<T>(
         val values = FloatArray(size)
         type.decompose(defaultValue, values)
         for (channel in 0 until size) {
-            val curve = curves.getOrNull(channel) ?: continue
+            val curve = curves.getOrNull(channel)?.takeIf { it.isVisible } ?: continue
             val base = values[channel]
             val sampled = curve.valueAt(time, base)
             values[channel] = type.bounds(channel).clamp(
@@ -333,7 +333,10 @@ class TrackGroup(name: String) {
 
     /** Whether anything of this group has a row, which is what decides whether the group has one. */
     val hasListedContent: Boolean
-        get() = isListed || properties.any { it.isListed } || children.any { it.hasListedContent }
+        get() = isListed || lanes.any { it.isListed } || properties.any { it.isListed } || children.any { it.hasListedContent }
+
+    /** Rows of segments shown under the group's own row, above its properties. */
+    val lanes = mutableStateListOf<SegmentLane>()
 
     val children = mutableStateListOf<TrackGroup>()
     val properties = mutableStateListOf<AnimProperty<*>>()

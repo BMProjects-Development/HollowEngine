@@ -58,7 +58,7 @@ object ClientColliderPoses {
     }
 
     /** The rig of [entity]'s model with what it hangs on it, the colliders of nested models gathered in. */
-    fun rig(entity: Entity): ModelRig? = modelNode(entity)?.let { rigs.of(entity, it.model) }
+    fun rig(entity: Entity): ModelRig? = modelNode(entity)?.let { rigs.of(entity, it) }
 
     private fun modelNode(entity: Entity): ModelNodeEntry? =
         AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelNodes()?.firstOrNull()

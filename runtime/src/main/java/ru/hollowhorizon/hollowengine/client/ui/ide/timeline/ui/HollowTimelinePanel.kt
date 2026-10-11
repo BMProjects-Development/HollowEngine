@@ -334,13 +334,13 @@ private fun TimeRuler(
                 onScrubbingChange(true)
                 controller.clearSelection()
                 controller.applyCurrentTime(
-                    timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers)
+                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers), pxPerSec, event.modifiers)
                 )
                 refresh()
             }
             .onDrag { event ->
                 controller.applyCurrentTime(
-                    timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers)
+                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers), pxPerSec, event.modifiers)
                 )
                 event.consume()
                 refresh()

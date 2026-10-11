@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
@@ -13,6 +14,7 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     animatorEditor: HollowIdeFileEditor,
     rigEditor: HollowIdeFileEditor,
     vfxEditor: HollowIdeFileEditor,
+    montageEditor: HollowIdeFileEditor,
     shaderGraphEditor: HollowIdeFileEditor,
     textEditor: HollowIdeFileEditor,
 ) {
@@ -32,6 +34,15 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
             priority = 280,
             loader = { _, bytes -> HollowIdeVfxDocument(bytes) },
             editor = vfxEditor,
+        ),
+    )
+    register(
+        HollowIdeFileType.extensions(
+            id = "montage",
+            extensions = listOf(".montage"),
+            priority = 275,
+            loader = { _, bytes -> HollowIdeMontageDocument(bytes) },
+            editor = montageEditor,
         ),
     )
     register(

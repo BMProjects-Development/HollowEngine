@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TrackGroup
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -26,6 +27,9 @@ internal const val TimelineRulerHeight = 18f
 internal const val TimelineGroupRowHeight = 17f
 internal const val TimelinePropertyRowHeight = 16f
 internal const val TimelineChannelRowHeight = 14f
+
+/** The height of one row of segments within a lane; overlapping segments add rows. */
+internal const val TimelineSegmentRowHeight = 18f
 internal const val TimelineLeftPadding = 40f
 internal const val CurveValueGutter = 40f
 internal const val TimelineMinContentWidth = 600f
@@ -58,6 +62,7 @@ internal enum class TimelineRowKind {
     GROUP,
     PROPERTY,
     CHANNEL,
+    SEGMENTS,
 }
 
 internal data class TimelineRow(
@@ -70,12 +75,14 @@ internal data class TimelineRow(
     val group: TrackGroup? = null,
     val property: AnimProperty<*>? = null,
     val curve: ChannelCurve? = null,
+    val lane: SegmentLane? = null,
     val locked: Boolean = false,
     val visible: Boolean = true,
     val color: Color? = null,
 ) {
     val curves: List<ChannelCurve>
         get() = when {
+            lane != null -> emptyList()
             curve != null -> listOf(curve)
             property != null -> property.curves
             group != null -> group.allProperties().flatMap { it.curves }
@@ -86,6 +93,25 @@ internal data class TimelineRow(
 internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boolean = false): List<TimelineRow> {
     val rows = mutableListOf<TimelineRow>()
     var y = TimelineRulerHeight
+
+    fun appendLane(lane: SegmentLane, depth: Int, locked: Boolean, visible: Boolean) {
+        if (curveEditorOnly || !lane.isListed) return
+        val height = lane.rowCount * TimelineSegmentRowHeight
+        rows += TimelineRow(
+            id = "timeline-lane-${System.identityHashCode(lane)}",
+            label = lane.nameState,
+            depth = depth,
+            y = y,
+            height = height,
+            kind = TimelineRowKind.SEGMENTS,
+            lane = lane,
+            locked = locked,
+            visible = visible,
+        )
+        y += height
+    }
+
+    controller.lanes.forEach { appendLane(it, 0, locked = false, visible = true) }
 
     fun appendGroup(group: TrackGroup, depth: Int, parentLocked: Boolean, parentVisible: Boolean) {
         if (!group.hasListedContent) return
@@ -108,6 +134,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
         y += TimelineGroupRowHeight
         if (group.isCollapsed) return
 
+        group.lanes.forEach { appendLane(it, depth + 1, locked, visible) }
         group.children.forEach { appendGroup(it, depth + 1, locked, visible) }
         group.properties.forEach { property ->
             if (!property.isListed) return@forEach
@@ -278,3 +305,22 @@ internal object TimelineColors {
 /** The playhead turns red while auto-keying is on, so it is clear that edits land on it as keys. */
 internal val TimelineController.playheadColor: UiColor
     get() = if (isRecording) TimelineColors.Recording else TimelineColors.Accent
+
+/** How close, in pixels, the playhead comes to a key or the edge of a segment before it sticks there. */
+private const val PlayheadMagnetPixels = 6f
+
+/**
+ * [time] moved onto the nearest key of a listed track, or edge of a segment, within a few pixels, so a key can be
+ * changed in place by recording over it; Ctrl lets the playhead go anywhere.
+ */
+internal fun TimelineController.snapPlayhead(time: Float, pxPerSec: Float, modifiers: Int): Float {
+    if (modifiers and GLFW.GLFW_MOD_CONTROL != 0) return time
+    val reach = PlayheadMagnetPixels / pxPerSec
+    val keys = allProperties().filter { it.isListed }.flatMap { property -> property.curves.flatMap { curve -> curve.keyframes.map { it.time } } }
+    val lanes = lanes.filter { it.isListed } + groups.flatMap(::listedLanes)
+    val edges = lanes.flatMap { lane -> lane.segments.flatMap { listOf(it.start, it.end) } }
+    return (keys + edges).minByOrNull { abs(it - time) }?.takeIf { abs(it - time) <= reach } ?: time
+}
+
+private fun listedLanes(group: TrackGroup): List<SegmentLane> =
+    group.lanes.filter { it.isListed } + group.children.flatMap(::listedLanes)

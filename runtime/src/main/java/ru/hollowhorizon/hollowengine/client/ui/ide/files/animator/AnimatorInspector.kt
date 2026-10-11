@@ -146,6 +146,18 @@ private fun StateSection(
 
             is BlendStateSpec -> BlendStateFields(document, layerId, state)
 
+            is MontageStateSpec -> {
+                TextRow(animatorText("montage"), state.montage) { value ->
+                    document.edit { it.withState(layerId, state.copy(montage = value)) }
+                }
+                PlayModeRow(state.playMode) { mode ->
+                    document.edit { it.withState(layerId, state.copy(playMode = mode)) }
+                }
+                ExpressionField(animatorText("speed"), state.speed.source) { value ->
+                    document.edit { it.withState(layerId, state.copy(speed = AnimationExpression(value))) }
+                }
+            }
+
             // A state this build has no editor for: an addon's own kind, or one whose addon is missing.
             is UnknownAnimatorStateSpec -> Hint(animatorText("unknown_state"))
 

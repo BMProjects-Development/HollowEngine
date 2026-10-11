@@ -135,7 +135,8 @@ object NpcAnimationRuntime {
         AttachmentRegistry.entitySnapshots(level).forEach { (entity, snapshot) ->
             val animations = snapshot.components.filterIsInstance<AnimationsComponent>().firstOrNull() ?: return@forEach
             val updated = animations.copy(
-                clips = animations.clips.filterNot { clip -> clip.removeAtGameTime?.let { it <= now } == true }
+                clips = animations.clips.filterNot { clip -> clip.removeAtGameTime?.let { it <= now } == true },
+                montages = animations.montages.filterNot { montage -> montage.removeAtGameTime?.let { it <= now } == true },
             )
             if (updated == animations) return@forEach
 

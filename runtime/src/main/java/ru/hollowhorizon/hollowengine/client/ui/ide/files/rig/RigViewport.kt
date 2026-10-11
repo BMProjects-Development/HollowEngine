@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.client.editor.GizmoKeyResult
 import ru.hollowhorizon.hollowengine.client.editor.GizmoKeyboardTransform
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigPreview
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -18,7 +17,12 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
  * The preview of the rig, and how the pointer and the keyboard edit it.
  */
 @Composable
-internal fun RigViewport(document: HollowIdeRigDocument, state: RigEditorState, preview: RigPreview?) {
+internal fun RigViewport(
+    document: RigEditing,
+    state: RigEditorState,
+    preview: RigPreview?,
+    onKey: (UiKeyInput) -> Boolean = { false },
+) {
     val viewer = state.viewer
     Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 100.percent)) {
         Model(
@@ -26,7 +30,7 @@ internal fun RigViewport(document: HollowIdeRigDocument, state: RigEditorState, 
             id = "rig-viewport",
             tags = listOf("ide-file-viewport"),
             modifier = Modifier.size(100.percent, 100.percent).clip().input(hoverable = true, clickable = true).focus()
-                .onKeyInput { input -> if (handleKey(document, state, input)) input.consume() }
+                .onKeyInput { input -> if (onKey(input) || handleKey(document, state, input)) input.consume() }
                 .onPress { event ->
                     state.pointer(event.localX, event.localY)
                     state.swallowClick = state.transform?.let { finishTransform(document, state, it.keyboard.click(event.button)) } == true ||
@@ -67,7 +71,7 @@ internal fun RigViewport(document: HollowIdeRigDocument, state: RigEditorState, 
         )
         Box(
             modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
-                .drawBehind(key = listOf(state.frame, document.revision, state.partSelection, state.gizmoMode, state.hoveredHandle)) {
+                .drawBehind(key = listOf(state.frame, document.rig, state.partSelection, state.gizmoModes, state.hoveredHandle)) {
                     drawGizmo(document, state)
                 },
         )
@@ -81,23 +85,23 @@ internal fun RigViewport(document: HollowIdeRigDocument, state: RigEditorState, 
     }
 }
 
-private fun UiCanvasDrawScope.drawGizmo(document: HollowIdeRigDocument, state: RigEditorState) {
+private fun UiCanvasDrawScope.drawGizmo(document: RigEditing, state: RigEditorState) {
     state.transform?.let { transform ->
         transform.keyboard.draw(this)
         return
     }
     val frame = state.selectedFrame() ?: return
     if (!state.gizmo.capture(state.viewer)) return
-    state.gizmo.draw(this, state.gizmo.handles(frame, state.gizmoMode), state.hoveredHandle, state.handleDrag?.drag)
+    state.gizmo.draw(this, state.gizmo.handles(frame, state.gizmoModes), state.hoveredHandle, state.handleDrag?.drag)
 }
 
-private fun handleAt(document: HollowIdeRigDocument, state: RigEditorState, x: Float, y: Float): GizmoHandle? {
+private fun handleAt(document: RigEditing, state: RigEditorState, x: Float, y: Float): GizmoHandle? {
     val frame = state.selectedFrame() ?: return null
     if (!state.gizmo.capture(state.viewer)) return null
-    return state.gizmo.pick(state.gizmo.handles(frame, state.gizmoMode), x, y)
+    return state.gizmo.pick(state.gizmo.handles(frame, state.gizmoModes), x, y)
 }
 
-private fun beginHandleDrag(document: HollowIdeRigDocument, state: RigEditorState, x: Float, y: Float): Boolean {
+private fun beginHandleDrag(document: RigEditing, state: RigEditorState, x: Float, y: Float): Boolean {
     val selection = state.partSelection ?: return false
     val frame = state.selectedFrame() ?: return false
     val handle = handleAt(document, state, x, y) ?: return false
@@ -106,12 +110,12 @@ private fun beginHandleDrag(document: HollowIdeRigDocument, state: RigEditorStat
     return true
 }
 
-private fun dragHandle(document: HollowIdeRigDocument, state: RigEditorState, x: Float, y: Float, modifiers: Int) {
+private fun dragHandle(document: RigEditing, state: RigEditorState, x: Float, y: Float, modifiers: Int) {
     val drag = state.handleDrag ?: return
     state.gizmo.drag(drag.drag, x, y, modifiers)?.let { values -> document.edit { drag.frame.placed(it, values) } }
 }
 
-private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, input: UiKeyInput): Boolean {
+private fun handleKey(document: RigEditing, state: RigEditorState, input: UiKeyInput): Boolean {
     if (input.repeat) return false
     val transform = state.transform
     if (transform != null) {
@@ -127,7 +131,6 @@ private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, inp
     if (input.alt) return false
 
     val mode = GizmoKeyboardTransform.modeFor(input.key) ?: return false
-    state.gizmoMode = mode
     val selection = state.partSelection ?: return true
     val frame = state.selectedFrame() ?: return true
     if (mode == GizmoEditMode.ROTATE && frame.isWorldAligned) return true
@@ -139,7 +142,7 @@ private fun handleKey(document: HollowIdeRigDocument, state: RigEditorState, inp
 }
 
 /** Ends the transform under way when [result] says so; true when it did. */
-private fun finishTransform(document: HollowIdeRigDocument, state: RigEditorState, result: GizmoKeyResult): Boolean {
+private fun finishTransform(document: RigEditing, state: RigEditorState, result: GizmoKeyResult): Boolean {
     val transform = state.transform ?: return false
     when (result) {
         GizmoKeyResult.CONFIRMED -> Unit
@@ -151,14 +154,14 @@ private fun finishTransform(document: HollowIdeRigDocument, state: RigEditorStat
     return true
 }
 
-private fun moveTransform(document: HollowIdeRigDocument, state: RigEditorState, modifiers: Int) {
+private fun moveTransform(document: RigEditing, state: RigEditorState, modifiers: Int) {
     val transform = state.transform ?: return
     transform.keyboard.update(state.pointerX, state.pointerY, modifiers)
         ?.let { values -> document.edit { transform.frame.placed(it, values) } }
 }
 
 /** An IK target under the pointer wins, then a bone; a collider is picked only where there is neither. */
-private fun pick(document: HollowIdeRigDocument, state: RigEditorState, x: Float, y: Float) {
+private fun pick(document: RigEditing, state: RigEditorState, x: Float, y: Float) {
     val viewer = state.viewer
     if (state.showSkeleton && state.gizmo.capture(viewer)) {
         state.gizmo.ikTargetAt(previewIkTargets(document.rig, viewer.nodes), x, y)?.let { target ->
@@ -173,13 +176,14 @@ private fun pick(document: HollowIdeRigDocument, state: RigEditorState, x: Float
         return
     }
 
-    if (!state.showColliders || !state.gizmo.capture(viewer)) return
-    val (start, end) = state.gizmo.ray(x, y) ?: return
+    // A click on nothing lets go of what was picked, back to the model itself.
+    if (!state.showColliders || !state.gizmo.capture(viewer)) return state.select(null)
+    val (start, end) = state.gizmo.ray(x, y) ?: return state.select(null)
     val hits = previewColliders(document.rig, viewer.nodes)
         .mapNotNull { collider -> collider.volume.clip(start, end)?.let { collider to it.distanceToSqr(start) } }
         .sortedBy { it.second }
         .map { it.first }
-    if (hits.isEmpty()) return
+    if (hits.isEmpty()) return state.select(null)
 
     // Clicking the same spot again goes through to the collider behind the selected one.
     val index = hits.indexOfFirst { it.bone == state.selected && it.name == state.selectedPart }

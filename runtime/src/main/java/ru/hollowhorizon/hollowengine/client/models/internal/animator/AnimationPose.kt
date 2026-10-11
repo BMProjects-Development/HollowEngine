@@ -127,6 +127,7 @@ class BonePose(val node: Int) {
     var rotation: QuatF? = null
     var scale: Vec3f? = null
     var weights: FloatArray? = null
+    var cover: Float = 1f
 }
 
 fun applyAnimationPose(
@@ -144,10 +145,11 @@ fun applyAnimationPose(
         val transform = runtimeNode.transform
         val base = runtimeNode.definition.baseTransform
         val reference = referencePose?.get(nodeIndex)
+        val boneWeight = clampedWeight * bonePose.cover.coerceIn(0f, 1f)
 
         when (blendMode) {
-            LayerBlendMode.Override -> transform.applyOverride(bonePose, base, clampedWeight)
-            LayerBlendMode.Additive -> transform.applyAdditive(bonePose, reference, clampedWeight)
+            LayerBlendMode.Override -> transform.applyOverride(bonePose, base, boneWeight)
+            LayerBlendMode.Additive -> transform.applyAdditive(bonePose, reference, boneWeight)
         }
         transform.markDirty()
 
@@ -157,7 +159,7 @@ fun applyAnimationPose(
                 sampled = weights,
                 reference = reference?.weights ?: runtimeNode.baseMorphWeights,
                 blendMode = blendMode,
-                weight = clampedWeight,
+                weight = boneWeight,
             )
         }
     }

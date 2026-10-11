@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnima
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph.ShaderGraphEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditorPanel
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.montage.MontageEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineDock
@@ -102,6 +103,7 @@ object HollowIdeOverlay {
             animatorEditor = { file -> HollowIdeAnimatorEditor(file) },
             rigEditor = { file -> RigEditorPanel(file) },
             vfxEditor = { file -> VfxEditorPanel(file) },
+            montageEditor = { file -> MontageEditorPanel(file) },
             shaderGraphEditor = { file -> ShaderGraphEditor(file) },
             textEditor = { file -> FileEditor(file) },
         )

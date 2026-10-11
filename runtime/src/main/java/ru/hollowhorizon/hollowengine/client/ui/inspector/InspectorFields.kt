@@ -7,10 +7,14 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 /** A titled group of rows. [boxed] draws the group as a card instead of a ruled heading. */
 @Composable
-fun Section(title: String, id: String? = null, boxed: Boolean = false, content: HollowUiContent) {
+fun Section(title: String, id: String? = null, boxed: Boolean = false, help: String? = null, content: HollowUiContent) {
     Column(id = id, tags = if (boxed) listOf("insp-section", "boxed") else listOf("insp-section")) {
         if (title.isNotEmpty()) {
-            Text(title, tags = listOf("insp-section-title"))
+            if (help == null) Text(title, tags = listOf("insp-section-title"))
+            else Row(tags = listOf("insp-field-head")) {
+                Text(title, tags = listOf("insp-section-title"), modifier = Modifier.grow(1f))
+                FieldHelp(help)
+            }
             if (!boxed) Box(tags = listOf("insp-section-rule"))
         }
         Column(tags = listOf("insp-section-body"), content = content)
@@ -75,10 +79,11 @@ fun TextRow(
     highlighter: UiSyntaxHighlighter? = null,
     diagnostics: List<UiTextDiagnostic> = emptyList(),
     trailing: HollowUiContent? = null,
+    help: String? = null,
     onChange: (String) -> Unit,
 ) {
     Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
+        if (label.isNotEmpty()) FieldLabel(label, help)
         Row(tags = listOf("insp-input-row")) {
             TextField(
                 value = value,
@@ -128,9 +133,10 @@ fun FloatRow(
     id: String? = null,
     min: Float = -Float.MAX_VALUE,
     max: Float = Float.MAX_VALUE,
+    help: String? = null,
     onChange: (Float) -> Unit,
 ) {
-    NumberRow(label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble()) {
+    NumberRow(label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(), help = help) {
         onChange(it.toFloat())
     }
 }
@@ -143,10 +149,11 @@ fun NumberRow(
     id: String? = null,
     min: Double = -Double.MAX_VALUE,
     max: Double = Double.MAX_VALUE,
+    help: String? = null,
     onChange: (Double) -> Unit,
 ) {
     Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
+        if (label.isNotEmpty()) FieldLabel(label, help)
         NumberInput(
             path = id ?: "-$label",
             value = value,

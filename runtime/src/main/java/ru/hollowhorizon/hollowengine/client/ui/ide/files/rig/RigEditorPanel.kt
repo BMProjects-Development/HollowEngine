@@ -128,7 +128,9 @@ private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, previ
         }
         if (state.partSelection != null) {
             GizmoModes.forEach { (mode, icon, tooltip) ->
-                AnimatorIconButton(icon, tooltip.lang, size = 12f, active = state.gizmoMode == mode) { state.gizmoMode = mode }
+                AnimatorIconButton(icon, tooltip.lang, size = 12f, active = mode in state.gizmoModes) {
+                    state.gizmoModes = if (mode in state.gizmoModes) state.gizmoModes - mode else state.gizmoModes + mode
+                }
             }
         }
         if (RigPreviews.isAvailable) {
@@ -175,7 +177,7 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
 /**
  * What the editor is looking at, as opposed to what it is editing.
  */
-internal class RigEditorState(private val document: HollowIdeRigDocument, modelId: String) {
+internal class RigEditorState(private val document: RigEditing, modelId: String) {
     // The floor drawn in the preview is the reference, so the flat grid behind the model goes.
     val viewer = ModelViewerState(modelId).apply { showGrid = false }
 
@@ -195,7 +197,7 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     var rootExpanded by mutableStateOf(true)
 
     val gizmo = RigPartGizmo()
-    var gizmoMode by mutableStateOf(GizmoEditMode.TRANSLATE)
+    var gizmoModes by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
     var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
     var transform by mutableStateOf<RigPartTransform?>(null)
     internal var handleDrag: RigHandleDrag? = null
@@ -225,6 +227,19 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
             document.rig.bone(bone)?.origin != null -> BONE_ORIGIN_PART
             else -> BONE_POSE_PART
         }
+        bone?.let(::reveal)
+    }
+
+    /** Opens the bones above [bone] in the scene window, so a bone picked in the preview shows there too. */
+    private fun reveal(bone: String) {
+        val path = viewer.nodes.firstNotNullOfOrNull { root -> pathTo(root, bone) } ?: return
+        rootExpanded = true
+        path.dropLast(1).forEach { name -> if (name !in expanded) expanded += name }
+    }
+
+    private fun pathTo(node: RuntimeNode, bone: String): List<String>? {
+        if (node.name == bone) return listOf(node.name)
+        return node.children.firstNotNullOfOrNull { child -> pathTo(child, bone) }?.let { listOf(node.name) + it }
     }
 
     fun pointer(x: Float, y: Float) {
@@ -239,6 +254,7 @@ internal class RigEditorState(private val document: HollowIdeRigDocument, modelI
     /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
     fun selectedFrame(): RigGizmoFrame? {
         val selection = partSelection ?: return null
+        if (document.isLocked(selection.bone, selection.id)) return null
         if (selection.id == BONE_POSE_PART) {
             val bone = selection.bone ?: return null
             val node = viewer.nodes.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } } ?: return null

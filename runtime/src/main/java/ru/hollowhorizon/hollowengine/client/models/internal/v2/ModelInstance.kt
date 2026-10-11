@@ -10,6 +10,9 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComp
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.MontageBoneProperty
+import ru.hollowhorizon.hollowengine.common.models.MontageRig
+import ru.hollowhorizon.hollowengine.common.models.withMontages
 import java.util.UUID
 
 /**
@@ -46,7 +49,48 @@ class ModelInstance(val attachment: ModelAttachment) {
         if (instance === instanceRig && asset === assetRig) return
         instanceRig = instance
         assetRig = asset
-        attachment.rig = asset.overlay(instance)
+        baseRig = asset.overlay(instance)
+        attachment.rig = baseRig
+        montageKey = emptyList()
+        pendingRig = null
+    }
+
+    /** The rig before montages: the model's own with what the entity hangs on it. */
+    private var baseRig: ModelRig = attachment.rig
+
+    /** Which attachments the montages hung on the rig last frame; see [MontageRig.key]. */
+    private var montageKey: List<Any> = emptyList()
+
+    /** A rig the montages built that needs the model built again, put in place before the next pose. */
+    private var pendingRig: ModelRig? = null
+
+    private fun layMontages(context: AnimatorEvaluationContext) {
+        showBones(context)
+        if (context.montages.isEmpty() && montageKey.isEmpty()) return
+        val laid = baseRig.withMontages(context.montages)
+        if (laid.key == montageKey) attachment.rig = laid.rig else pendingRig = laid.rig
+        montageKey = laid.key
+    }
+
+    /** The bones montages hid or showed last frame, with whether each was drawn before they did. */
+    private val shownBones = HashMap<RuntimeNode, Boolean>()
+
+    /** Shows or hides the bones the montages playing key, and gives the ones they let go of back. */
+    private fun showBones(context: AnimatorEvaluationContext) {
+        if (context.montages.isEmpty() && shownBones.isEmpty()) return
+        val keyed = HashMap<RuntimeNode, Boolean>()
+        context.montages.forEach { moment ->
+            moment.montage.bones.forEach { track ->
+                if (track.property != MontageBoneProperty.VISIBLE) return@forEach
+                val node = attachment.findNode(track.bone) ?: return@forEach
+                keyed[node] = track.valueAt(moment.time).x >= 0.5f
+            }
+        }
+        shownBones.keys.filter { it !in keyed }.forEach { node -> node.isVisible = shownBones.remove(node) ?: true }
+        keyed.forEach { (node, visible) ->
+            shownBones.getOrPut(node) { node.isVisible }
+            if (node.isVisible != visible) node.isVisible = visible
+        }
     }
 
 
@@ -57,8 +101,13 @@ class ModelInstance(val attachment: ModelAttachment) {
         if (posedFrame == frame) return
         posedFrame = frame
 
+        pendingRig?.let { rig ->
+            pendingRig = null
+            attachment.rig = rig
+        }
         attachment.beginPose()
         animator.applyTo(attachment, context)
+        layMontages(context)
         applyRigPose(attachment.nodes, attachment.rig)
         applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
         attachment.endPose()

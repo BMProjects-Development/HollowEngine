@@ -15,6 +15,9 @@ object InspectorLang {
     val search: String get() = (ROOT + "search").lang
     val nothingFound: String get() = (ROOT + "nothing_found").lang
     val close: String get() = (ROOT + "close").lang
+    val animate: String get() = (ROOT + "animate").lang
+    val stopAnimating: String get() = (ROOT + "stop_animating").lang
+    val lockedByTimeline: String get() = (ROOT + "locked_by_timeline").lang
 
     fun assetMissing(path: String): String = (ROOT + "asset_missing").lang.format(path)
     fun useAsset(path: String): String = (ROOT + "asset_use").lang.format(path)

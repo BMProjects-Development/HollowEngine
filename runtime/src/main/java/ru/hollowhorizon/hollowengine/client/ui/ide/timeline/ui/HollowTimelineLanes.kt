@@ -13,7 +13,7 @@ import kotlin.math.abs
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 private const val TimelineKeyframeSize = 10f
-private const val LaneContentId = "timeline-lane-content"
+internal const val LaneContentId = "timeline-lane-content"
 
 @Composable
 internal fun TimelineLanes(
@@ -68,7 +68,7 @@ internal fun TimelineLanes(
             if (event.isRightClick()) {
                 if (!pan.moved) {
                     val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd, event.modifiers)
-                    menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked)
+                    menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
                 }
                 pan.moved = false
                 refresh()
@@ -94,7 +94,12 @@ internal fun TimelineLanes(
                     contentWidth,
                     visibleTimes,
                     canvas,
-                    refresh
+                    refresh,
+                    onSegmentMenu = { event, segment ->
+                        // Where on the segment it was clicked, which is where "split here" splits it.
+                        val time = timelineTimeAt(event.contentX(), pxPerSec, controller.workAreaEnd)
+                        menu = TimelineMenuState(event.x, event.y, null, time, row.locked, row.lane, segment)
+                    },
                 ) { event, curve, time ->
                     menu = TimelineMenuState(event.x, event.y, curve, time, row.locked)
                 }
@@ -137,6 +142,9 @@ internal class TimelineMenuState(
     val curve: ChannelCurve?,
     val time: Float,
     val locked: Boolean,
+    /** The lane of segments the menu was opened on, whose owner says what it offers. */
+    val lane: SegmentLane? = null,
+    val segment: TimelineSegment? = null,
 )
 
 @Composable
@@ -167,11 +175,13 @@ private fun TimelineLane(
     visibleTimes: ClosedFloatingPointRange<Float>,
     canvas: LaneCanvas,
     refresh: () -> Unit,
+    onSegmentMenu: (UiEvent, TimelineSegment) -> Unit,
     onContextMenu: (UiEvent, ChannelCurve?, Float) -> Unit,
 ) {
     val top = row.y - TimelineRulerHeight
     val background = when {
         row.kind == TimelineRowKind.GROUP -> TimelineColors.Group
+        row.kind == TimelineRowKind.SEGMENTS -> TimelineColors.Row
         row.locked -> UiColor(0.08f, 0.08f, 0.09f, 1f)
         !row.visible -> UiColor(0.09f, 0.09f, 0.1f, 1f)
         row.kind == TimelineRowKind.CHANNEL -> TimelineColors.Row
@@ -187,6 +197,11 @@ private fun TimelineLane(
             modifier = Modifier.position(0.px, (row.height - 1f).px).size(contentWidth.px, 1.px)
                 .background(TimelineColors.Border).inputTransparent(),
         )
+        val lane = row.lane
+        if (lane != null) {
+            SegmentLaneContent(row, lane, controller, pxPerSec, refresh, onSegmentMenu)
+            return@Box
+        }
         val curve = row.curve ?: return@Box
 
         val keys = visibleKeys(row, visibleTimes.start, visibleTimes.endInclusive)
@@ -375,6 +390,8 @@ internal fun TimelineContextMenu(
     val hasCurveSelection = controller.canEditSelectedCurves
 
     val items = when {
+        state.lane != null -> if (state.locked) emptyList() else state.lane.menu?.invoke(state.time, state.segment).orEmpty()
+
         showPresets && presetCategory != null -> CurvePresets.of(presetCategory!!).map { preset ->
             UiDropdownItem(preset.name) {
                 controller.applyPreset(preset)

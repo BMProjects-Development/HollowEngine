@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -23,10 +22,17 @@ private const val AddIcon = "hollowengine:textures/gui/icons/add.svg"
  * The bones as the scene window shows them: the model as the root, its skeleton under it. The eye of
  * a bone hides it in the preview only; whether it is drawn in the game is the inspector's field.
  */
-internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorState, title: String): SceneTarget {
+internal fun rigSceneTarget(
+    document: RigEditing,
+    state: RigEditorState,
+    title: String,
+    /** Whether the rig can add bones of its own; a montage only hangs things on the ones the model has. */
+    addsBones: Boolean = true,
+    sceneId: String = "rig-bones",
+): SceneTarget {
     val nodes = state.viewer.nodes
     return SceneTarget(
-        id = "rig-bones",
+        id = sceneId,
         items = buildList {
             add(
                 UiTreeItem(
@@ -51,7 +57,7 @@ internal fun rigSceneTarget(document: HollowIdeRigDocument, state: RigEditorStat
             }
         },
         hint = rigText("no_bones").takeIf { nodes.isEmpty() },
-        menu = { id -> if (id == null) emptyList() else boneMenu(document, state, id.takeUnless { it == RigRootId }) },
+        menu = { id -> if (id == null) emptyList() else boneMenu(document, state, id.takeUnless { it == RigRootId }, addsBones) },
         onIconClick = { id -> nodes.findBone(id)?.let(state.viewer::toggleNodeVisibility) },
         history = document.history,
     )
@@ -94,7 +100,7 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
  * What a right click on a bone offers: adding a bone under it, hanging something on it, and hiding it in the
  * preview. On the model itself, null [bone], a new bone and only what can hang on the whole model.
  */
-private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone: String?): List<UiDropdownItem> {
+private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?, addsBones: Boolean): List<UiDropdownItem> {
     val node = bone?.let { state.viewer.nodes.findBone(it) }
     val kinds = attachableKinds(bone)
     return listOfNotNull(
@@ -104,7 +110,7 @@ private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone
             document.edit { rig -> rig.freeBoneName(existing).let { name -> added = name; rig.withAddedBone(name, bone) } }
             if (bone != null && bone !in state.expanded) state.expanded += bone
             added?.let(state::select)
-        },
+        }.takeIf { addsBones },
         UiDropdownItem(
             rigText("attach"),
             icon = AddIcon,
@@ -113,7 +119,7 @@ private fun boneMenu(document: HollowIdeRigDocument, state: RigEditorState, bone
                 UiDropdownItem(type.title()) {
                     var added: RigAttachmentSpec? = null
                     document.edit { rig ->
-                        val spec = create(freeAttachmentId(rig, bone, type)).also { added = it }
+                        val spec = create(freeAttachmentId(document.occupied, bone, type)).also { added = it }
                         rig.withHolder(bone, rig.holder(bone).withAttachment(spec))
                     }
                     state.select(bone, added?.takeIf(::hasGizmo)?.id)

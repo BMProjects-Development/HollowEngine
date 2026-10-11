@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.withMontages
 
 /** What a side poses a model's colliders from: the model's rig file, the animator it wears, and the model. */
 class ColliderPoseAssets(val rig: ModelRig, val animator: Animator?, val model: Model)
@@ -26,10 +27,15 @@ internal class ColliderPoseTrack(
     /** What the entity hangs on its model, over the rig file; a track is made again when it changes. */
     val own: ModelRig,
     private val historyTicks: Int,
-    assetsOf: (String) -> ColliderPoseAssets?,
+    private val assetsOf: (String) -> ColliderPoseAssets?,
 ) {
-    private val posed = PosedModel(assets.model, assets.rig.overlay(own), null, assetsOf)
-    private val target = PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig)
+    /** The rig before montages; what they hang on it and animate is laid over it tick by tick. */
+    private val rig = assets.rig.overlay(own)
+    private var posed = PosedModel(assets.model, rig, null, assetsOf)
+    private var target = targetOf(posed)
+
+    /** Which attachments the montages hung on the model as it was last built; see [MontageRig.key]. */
+    private var montageKey: List<Any> = emptyList()
     private val animator = ModelAnimator()
     private val context = AnimatorEvaluationContext()
     private var posedAt = Long.MIN_VALUE
@@ -50,6 +56,15 @@ internal class ColliderPoseTrack(
         fillAnimationVariables(context, entity, 1f)
         context.modelToWorld = resolveNodeWorldTransform(entity, node.transform, 1f)
         animator.applyTo(target, context)
+        val laid = rig.withMontages(context.montages)
+        if (laid.key != montageKey) {
+            montageKey = laid.key
+            posed = PosedModel(assets.model, laid.rig, null, assetsOf)
+            target = targetOf(posed)
+            animator.applyTo(target, context)
+        } else {
+            posed.rig = laid.rig
+        }
         posed.applyRigPoses()
         posed.applyRigConstraints(context)
         posed.updateMatrices()
@@ -59,6 +74,9 @@ internal class ColliderPoseTrack(
         history.addFirst(placed)
         while (history.size > historyTicks) history.removeLast()
     }
+
+    private fun targetOf(posed: PosedModel) =
+        PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig)
 }
 
 /**

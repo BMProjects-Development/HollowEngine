@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonObject
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
@@ -65,11 +64,13 @@ internal fun HolderFields(
     selectedPart: String?,
     kinds: List<RigAttachmentType<*>> = attachableKinds(bone),
     onSelectBone: (String?) -> Unit = {},
+    /** Whether the bone's own fields show: its alias, pose and material, which a montage does not author. */
+    boneFields: Boolean = true,
 ) {
     val current = document.rig.holder(bone)
 
     Column(tags = listOf("insp-body")) {
-        if (bone != null) {
+        if (bone != null && boneFields) {
             Section(rigText("section_bone")) {
                 Readonly(rigText("name"), bone)
                 TextRow(rigText("alias"), current.alias.orEmpty()) { value ->
@@ -83,8 +84,6 @@ internal fun HolderFields(
             if (origin != null) AddedBoneFields(document, bone, origin, onSelectBone) else PoseFields(document, bone, current)
             val model = LocalRigModelInfo.current
             if (bone in model.meshBones) MeshMaterialFields(document, bone, current, model.materials)
-        } else if (current.attachments.isEmpty()) {
-            Hint(rigText("model_hint"))
         }
 
         val targets = document.occupied.allAttachments().mapNotNull { (_, spec) -> (spec as? IkTargetSpec)?.id }
@@ -166,7 +165,12 @@ private fun AttachmentSection(
             Hint(rigText("unknown_attachment"))
         } else {
             val colliders = document.occupied.holder(bone).attachments.filterIsInstance<ColliderAttachmentSpec>().map { it.id }
-            CompositionLocalProvider(LocalEditorColliders provides colliders) {
+            val animation = LocalAttachmentAnimation.current
+            animation?.Header(bone, attachment)
+            CompositionLocalProvider(
+                LocalEditorColliders provides colliders,
+                LocalAnimatedFields provides animation?.fields(bone, attachment),
+            ) {
                 AttachmentFields(type, attachment, path) { changed ->
                     document.edit(mergeKey = path, label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) { rig ->
                         val placed = rig.withHolder(bone, rig.holder(bone).withAttachment(attachment.id, changed))
@@ -241,6 +245,19 @@ private fun AddAttachment(document: RigEditing, bone: String?, current: RigBone,
         onExpandedChange = { if (!it) open = false },
     )
 }
+
+/**
+ * What an editor that animates what hangs on a model adds to each attachment the inspector shows: fields a
+ * timeline can drive, and anything it puts above them, as the stretch of time a montage hangs it for.
+ */
+internal interface AttachmentAnimation {
+    fun fields(bone: String?, attachment: RigAttachmentSpec): AnimatedFields?
+
+    @Composable
+    fun Header(bone: String?, attachment: RigAttachmentSpec)
+}
+
+internal val LocalAttachmentAnimation = compositionLocalOf<AttachmentAnimation?> { null }
 
 /** What can be hung on [bone]; on the model itself, only what works in model space. */
 internal fun attachableKinds(bone: String?): List<RigAttachmentType<*>> =
