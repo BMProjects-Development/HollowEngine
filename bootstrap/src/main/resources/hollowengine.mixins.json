@@ -32,6 +32,7 @@
     "tags.TagLoaderMixin"
   ],
   "client": [
+    "client.ChannelAccessor",
     "LevelRendererMixin",
     "client.AbstractClientPlayerMixin",
     "client.DebugMainMixin",
@@ -47,6 +48,7 @@
     "client.ScreenMixin",
     "client.SkullBlockRendererMixin",
     "client.SoundBufferLibraryMixin",
+    "client.SoundEngineMixin",
     "client.SoundMixin",
     "client.WindowMixin",
     "client.iris.IrisRenderingPipelineMixin",

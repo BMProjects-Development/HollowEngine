@@ -52,6 +52,12 @@ class HollowAttachments internal constructor(entity: MCEntity) {
      */
     val runtime: RuntimeAttachments get() = runtimeState ?: RuntimeAttachments().also { runtimeState = it }
 
+    internal fun closeRuntime() {
+        val previous = runtimeState
+        runtimeState = null
+        previous?.close()
+    }
+
     /** The node scripts attached to this entity, or null when none were ever attached. */
     val nodesOrNull: EntityNodeManager? get() = nodeManager
 
@@ -93,6 +99,7 @@ class HollowAttachments internal constructor(entity: MCEntity) {
 
     init {
         components.onChange = {
+            runtimeState?.pruneInvalid()
             EntityStateSync.markDirty(entity)
             EntityBodies.onComponentsChanged(entity)
             (entity as? WorldObjectEntity)?.onComponentsChanged()

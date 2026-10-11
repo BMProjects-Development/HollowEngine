@@ -87,7 +87,7 @@ Public `@SubscribeEvent` methods declared on the entrypoint, on a Kotlin `object
 
 ### Commands
 
-Command addons use Brigadier directly from a `@SubscribeEvent` on `RegisterCommandsEvent`. That event fires on every datapack load, and enabling, disabling, or reloading an addon reloads the datapacks of every running server, so the command tree is rebuilt with the addon's commands added or gone. The video addon does this for `/he video`.
+Command addons use Brigadier directly from a `@SubscribeEvent` on `RegisterCommandsEvent`. That event fires on every datapack load, and enabling, disabling, or reloading an addon reloads the datapacks of every running server, so the command tree is rebuilt with the addon's commands added or gone. The Media addon does this for `/he video`.
 
 ### Sharing services
 
@@ -102,7 +102,7 @@ override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
 val service = hostServices.find<MyService>()
 ```
 
-The interface (`MyService`) must be visible to both sides, usually by living in the engine or in an addon that others list in `dependsOn`. The video addon publishes `VideoApi` this way; the engine's `Video` UI widget calls `VideoApi.find()` and shows a placeholder if it is missing.
+The interface (`MyService`) must be visible to both sides, usually by living in the engine or in an addon that others list in `dependsOn`. The Media addon publishes `VideoApi` this way; the engine's `Video` UI widget calls `VideoApi.find()` and shows a placeholder if it is missing.
 
 ## Libraries
 

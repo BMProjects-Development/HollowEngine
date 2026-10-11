@@ -53,6 +53,8 @@ internal fun AutoFields(
                             asset = ComponentLabels.asset(descriptor, index),
                             bone = ComponentLabels.isBone(descriptor, index),
                             widget = ComponentLabels.widget(descriptor, index),
+                            initialValue = ComponentLabels.initialValue(descriptor, index),
+                            enumKey = ComponentLabels.fieldKey(owner, descriptor, index),
                         ),
                         value = current,
                         path = "$path/$name",
@@ -159,6 +161,8 @@ internal data class FieldHints(
     val bone: Boolean = false,
     /** The registered editor the field asks for; see [InspectorWidgets]. */
     val widget: String? = null,
+    val initialValue: String? = null,
+    val enumKey: String? = null,
 )
 
 private fun matchesQuery(query: String, vararg candidates: String): Boolean {
@@ -195,7 +199,7 @@ internal fun ValueEditor(
         PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE,
             -> NumberField(label, description, kind as PrimitiveKind, hints, value, path, onChange)
 
-        SerialKind.ENUM -> EnumField(label, description, descriptor, value, onChange)
+        SerialKind.ENUM -> EnumField(label, description, descriptor, value, path, hints.enumKey, onChange)
 
         StructureKind.LIST -> {
             val size = VectorDescriptors.components(descriptor)
@@ -237,11 +241,13 @@ private fun NullableEditor(
             if (label != null) Text(label, tags = listOf("insp-label"), modifier = Modifier.grow(1f))
             FieldHelp(description)
             Checkbox(
+                id = "insp-optional$path",
                 checked = present,
                 onCheckedChange = { checked ->
-                    onChange(if (checked) ComponentJson.defaultJson(inner) else JsonNull)
+                    onChange(if (checked) ComponentJson.initialValue(inner, hints.initialValue) else JsonNull)
                 },
                 tags = listOf("insp-checkbox"),
+                modifier = Modifier.input(hoverable = true, clickable = true),
             )
         }
         if (present) {
@@ -405,6 +411,8 @@ private fun EnumField(
     description: String?,
     descriptor: SerialDescriptor,
     value: JsonElement,
+    path: String,
+    fieldKey: String?,
     onChange: (JsonElement) -> Unit,
 ) {
     val current = (value as? JsonPrimitive)?.contentOrNull
@@ -412,7 +420,9 @@ private fun EnumField(
         FieldLabel(label, description)
         PillFlow {
             descriptor.elementNames.forEachIndexed { index, name ->
-                Pill(ComponentLabels.enumValueName(descriptor, index), name == current) { onChange(JsonPrimitive(name)) }
+                Pill(ComponentLabels.enumValueName(descriptor, index, fieldKey), name == current, id = "insp-choice$path/$name") {
+                    onChange(JsonPrimitive(name))
+                }
             }
         }
     }
@@ -641,7 +651,7 @@ private fun PolymorphicField(
         PillFlow {
             alternatives.forEach { alternative ->
                 val name = alternative.serialName
-                Pill(ComponentLabels.prettify(name.substringAfterLast('/')), name == current) {
+                Pill(ComponentLabels.typeName(alternative), name == current, id = "insp-choice$path/$name") {
                     if (name != current) onChange(ComponentJson.defaultOfSubclass(alternative))
                 }
             }

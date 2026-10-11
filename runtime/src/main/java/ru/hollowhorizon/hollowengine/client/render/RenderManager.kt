@@ -99,6 +99,8 @@ object RenderManager {
                 }
             )
 
+            instance.attachment.updateWorldPose(worldTransform, host)
+
             if (!instance.attachment.isFrustumCullingEnabled || instance.attachment.carriesEffects) {
                 frustumCullingDisabledHosts.add(host)
                 return@forEachModelNodeRecord

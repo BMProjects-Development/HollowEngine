@@ -4,8 +4,14 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import java.nio.file.Path
+import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 
 interface VideoApi {
+    fun play(source: MediaSource, options: VideoPlaybackOptions = VideoPlaybackOptions()) = play(source.externalForm(), options)
+
+    fun createPlayer(source: MediaSource, options: VideoPlaybackOptions = VideoPlaybackOptions()): VideoPlayer? =
+        createPlayer(source.externalForm(), options)
+
     fun play(path: Path, options: VideoPlaybackOptions = VideoPlaybackOptions())
 
     fun play(source: String, options: VideoPlaybackOptions = VideoPlaybackOptions()) =

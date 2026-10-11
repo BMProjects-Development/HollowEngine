@@ -26,8 +26,14 @@ import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.culling.Frustum
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
+import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments
+import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
+import ru.hollowhorizon.hollowengine.client.sounds.SoundStreams
+import ru.hollowhorizon.hollowengine.client.sounds.SoundResourceConverter
+import net.minecraft.client.resources.sounds.SoundInstance
+import net.minecraft.sounds.SoundSource as SoundCategory
+import net.minecraft.client.sounds.ChannelAccess
 import net.minecraft.client.sounds.AudioStream
-import net.minecraft.client.sounds.LoopingAudioStream
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.NonNullList
@@ -83,9 +89,6 @@ import ru.hollowhorizon.hollowengine.bootstrap.runtime.EventBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.PathObstacles
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimeBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
-import ru.hollowhorizon.hollowengine.client.audio.streams.ExtendedSoundConverter
-import ru.hollowhorizon.hollowengine.client.audio.streams.Mp3StreamingAudioStream
-import ru.hollowhorizon.hollowengine.client.audio.streams.WavAudioStream
 import ru.hollowhorizon.hollowengine.client.editor.TransformGizmoEditor
 import ru.hollowhorizon.hollowengine.client.input.ClientKeyWaitManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
@@ -145,13 +148,9 @@ import ru.hollowhorizon.hollowengine.common.utils.*
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 import ru.hollowhorizon.hollowengine.network.CommonNetworkManager
 import ru.hollowhorizon.hollowengine.runtime.bootstrap.ClassGraphRuntimeAnnotationIndex
-import java.io.IOException
-import java.io.InputStream
-import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionException
 
 class RuntimeBridgeEntrypoint : RuntimeBridge {
     init {
@@ -478,49 +477,29 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         resourceManager: ResourceProvider,
         cache: Map<ResourceLocation, CompletableFuture<SoundBuffer>>,
     ): CompletableFuture<SoundBuffer>? {
-        val path = soundId.path
-        if (!path.endsWith(".mp3") && !path.endsWith(".wav")) return null
-
-        @Suppress("UNCHECKED_CAST") val mutableCache =
-            cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>
-        return mutableCache.computeIfAbsent(soundId) { resourceLocation ->
-            CompletableFuture.supplyAsync({
-                try {
-                    resourceManager.open(resourceLocation).use { inputStream ->
-                        loadSoundBuffer(path, inputStream)
-                    }
-                } catch (ioException: IOException) {
-                    throw CompletionException(ioException)
-                }
-            }, Util.backgroundExecutor())
-        }
+        if (!SoundStreams.handles(soundId)) return null
+        @Suppress("UNCHECKED_CAST")
+        return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>)
+            .computeIfAbsent(soundId) { SoundStreams.complete(it, resourceManager)!! }
     }
 
     override fun onLoadStreamSound(
         soundId: ResourceLocation,
         resourceManager: ResourceProvider,
         isWrapper: Boolean,
-    ): CompletableFuture<AudioStream>? {
-        val path = soundId.path
-        if (!path.endsWith(".mp3") && !path.endsWith(".wav")) return null
+    ): CompletableFuture<AudioStream>? = SoundStreams.stream(soundId, resourceManager, isWrapper)
 
-        return CompletableFuture.supplyAsync({
-            try {
-                val inputStream = resourceManager.open(soundId)
-                if (path.endsWith(".wav")) {
-                    if (isWrapper) LoopingAudioStream(::WavAudioStream, inputStream) else WavAudioStream(inputStream)
-                } else {
-                    if (isWrapper) LoopingAudioStream(
-                        ::Mp3StreamingAudioStream, inputStream
-                    ) else Mp3StreamingAudioStream(inputStream)
-                }
-            } catch (ioException: IOException) {
-                throw CompletionException(ioException)
-            }
-        }, Util.backgroundExecutor())
-    }
+    override fun createSoundConverter(): FileToIdConverter = SoundResourceConverter
 
-    override fun createSoundConverter(): FileToIdConverter = ExtendedSoundConverter
+    override fun onSoundEngineTick(paused: Boolean) = ClientSounds.tick(paused)
+
+    override fun onSoundEngineReset() = ClientSounds.clear()
+
+    override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>) =
+        ClientSounds.frame(channels)
+
+    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) =
+        ClientSounds.stopMatching(id, category)
 
     override fun getOpenGlVersionOverride(): String = HollowCoreLoader.openGlVersion
 
@@ -623,6 +602,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onLevelClosed(level: Level) {
+        if (level.isClientSide) {
+            ClientSounds.clear()
+            SoundAttachments.clear()
+        }
         LevelEvent.Unload.post(LevelEvent.Unload(level))
         AttachmentRegistry.close(level)
     }
@@ -1133,20 +1116,6 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     private fun isClassPresent(name: String): Boolean {
         val classPath = name.replace('.', '/') + ".class"
         return javaClass.classLoader.getResource(classPath) != null
-    }
-
-    private fun loadSoundBuffer(path: String, inputStream: InputStream): SoundBuffer {
-        return if (path.endsWith(".wav")) {
-            WavAudioStream(inputStream).use { stream ->
-                val byteBuffer: ByteBuffer = stream.readAll()
-                SoundBuffer(byteBuffer, stream.format)
-            }
-        } else {
-            Mp3StreamingAudioStream(inputStream).use { stream ->
-                val byteBuffer: ByteBuffer = stream.readAll()
-                SoundBuffer(byteBuffer, stream.format)
-            }
-        }
     }
 
     private fun RuntimeBridge.RenderLevelStage.toRenderStage(): RenderStage = when (this) {

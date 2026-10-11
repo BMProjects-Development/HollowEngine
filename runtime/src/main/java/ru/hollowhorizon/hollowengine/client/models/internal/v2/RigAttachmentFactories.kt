@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
+import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
+import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.models.ItemSlotAttachmentSpec
@@ -39,6 +41,9 @@ object RigAttachmentFactories {
     val point = ExtensionPoints.create<RigAttachmentFactory>("hollowengine:rig/attachment_factories".rl)
 
     init {
+        register("hollowengine:rig/sound") { spec, context ->
+            SoundBoneAttachment(spec as SoundBoneAttachmentSpec, context.node, context.owner)
+        }
         register("hollowengine:rig/item") { spec, context ->
             ItemNode(context.entity, (spec as ItemSlotAttachmentSpec).slot.vanilla(), context.node)
         }

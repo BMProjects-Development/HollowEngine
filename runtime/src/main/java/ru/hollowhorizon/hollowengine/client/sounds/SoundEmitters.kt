@@ -1,0 +1,132 @@
+package ru.hollowhorizon.hollowengine.client.sounds
+
+import net.minecraft.client.Minecraft
+import net.minecraft.world.phys.Vec3
+import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
+import ru.hollowhorizon.hollowengine.client.vfx.VfxPlayback
+import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
+import ru.hollowhorizon.hollowengine.common.sounds.SoundEmitterSpec
+import java.util.concurrent.ConcurrentHashMap
+
+sealed interface SoundEmitterState {
+    data object Listener : SoundEmitterState
+    data class Available(val position: Vec3, val velocity: Vec3 = Vec3.ZERO) : SoundEmitterState
+    data object Pending : SoundEmitterState
+    data object TemporarilyUnavailable : SoundEmitterState
+    data object Removed : SoundEmitterState
+}
+
+fun interface SoundEmitter {
+    fun sample(): SoundEmitterState
+}
+
+/** Push bindings keep their last position across culling; closing the owner removes the binding. */
+object SoundAttachments {
+    private val bindings = ConcurrentHashMap<String, Binding>()
+
+    fun register(id: String, alive: () -> Boolean = { true }, source: SoundEmitter? = null): Binding {
+        val binding = Binding(id, alive, source)
+        check(bindings.putIfAbsent(id, binding) == null) { "Sound attachment '$id' is already registered" }
+        return binding
+    }
+
+    fun emitter(id: String): SoundEmitter {
+        var observed: Binding? = null
+        return SoundEmitter {
+            if (observed == null) observed = bindings[id]
+            observed?.sample() ?: SoundEmitterState.Pending
+        }
+    }
+
+    fun rigEmitter(entity: String, attachment: String, modelNode: String?): SoundEmitter {
+        var observed: Binding? = null
+        val prefix = "$entity/" + (modelNode?.let { "$it/" } ?: "")
+        return SoundEmitter {
+            if (observed == null) {
+                val candidates = bindings.filterKeys { it.startsWith(prefix) && it.endsWith("/$attachment") }.values
+                check(candidates.size <= 1) { "Ambiguous sound attachment '$attachment'; specify the model node id" }
+                observed = candidates.singleOrNull()
+            }
+            observed?.sample() ?: SoundEmitterState.Pending
+        }
+    }
+
+    fun clear() {
+        bindings.values.toList().forEach(Binding::close)
+    }
+
+    fun prune() { bindings.values.filter { !it.alive() }.forEach(Binding::close) }
+
+    class Binding internal constructor(
+        private val id: String, internal val alive: () -> Boolean, private val source: SoundEmitter?,
+    ) : AutoCloseable {
+        @Volatile internal var state: SoundEmitterState = SoundEmitterState.Pending
+        private var closed = false
+        internal fun sample() = if (closed) SoundEmitterState.Removed else source?.sample() ?: state
+        fun update(position: Vec3, velocity: Vec3 = Vec3.ZERO) {
+            check(!closed)
+            require(position.isFinite() && velocity.isFinite())
+            state = SoundEmitterState.Available(position, velocity)
+        }
+        fun markTemporarilyUnavailable() {
+            if (!closed) state = SoundEmitterState.TemporarilyUnavailable
+        }
+        override fun close() {
+            if (closed) return
+            closed = true
+            state = SoundEmitterState.Removed
+            bindings.remove(id, this)
+        }
+    }
+}
+
+internal fun Vec3.isFinite() = x.toFloat().isFinite() && y.toFloat().isFinite() && z.toFloat().isFinite()
+
+fun SoundEmitterSpec.createEmitter(): SoundEmitter = when (this) {
+    SoundEmitterSpec.Listener -> SoundEmitter { SoundEmitterState.Listener }
+    is SoundEmitterSpec.Position -> SoundEmitter { SoundEmitterState.Available(position, velocity) }
+    is SoundEmitterSpec.Attachment -> SoundAttachments.emitter(id)
+    is SoundEmitterSpec.Rig -> {
+        var observed: SoundEmitter? = null
+        var owner: Entity? = null
+        SoundEmitter {
+            val entity = owner ?: Minecraft.getInstance().level?.getEntity(entityId)?.also { owner = it }
+            if (entity == null) SoundEmitterState.Pending
+            else if (entity.isRemoved) SoundEmitterState.Removed
+            else {
+                val binding = observed ?: SoundAttachments.rigEmitter(entity.uuid.toString(), attachmentId, modelNodeId).also { observed = it }
+                binding.sample()
+            }
+        }
+    }
+    is SoundEmitterSpec.Effect -> {
+        var observed: VfxPlayback? = null
+        SoundEmitter {
+            val current = VfxScenes.current()?.of(handle)
+            when {
+                observed != null && current !== observed -> SoundEmitterState.Removed
+                current == null -> SoundEmitterState.Pending
+                current.isFinished -> SoundEmitterState.Removed
+                else -> {
+                    observed = current
+                    SoundEmitterState.Available(current.instance.origin)
+                }
+            }
+        }
+    }
+    is SoundEmitterSpec.Entity -> {
+        var observed: Entity? = null
+        SoundEmitter {
+            val entity = observed ?: Minecraft.getInstance().level?.getEntity(id)
+            when {
+                entity == null -> SoundEmitterState.Pending
+                entity.isRemoved -> SoundEmitterState.Removed
+                else -> {
+                    observed = entity
+                    SoundEmitterState.Available(entity.getPosition(TickHandler.partialTick).add(offset), entity.deltaMovement.scale(20.0))
+                }
+            }
+        }
+    }
+}

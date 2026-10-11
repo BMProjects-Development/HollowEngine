@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
@@ -68,6 +69,7 @@ object RigAttachmentTypes {
             )
         )
         register(ColliderAttachmentSpec.TYPE)
+        register(SoundBoneAttachmentSpec.TYPE)
         register(IkTargetSpec.TYPE)
         register(IkChainSpec.TYPE)
     }

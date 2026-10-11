@@ -8,6 +8,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.api.RuntimeAttachment
+import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.MontageBoneProperty
@@ -18,7 +20,9 @@ import java.util.UUID
 /**
  * One model node of one entity.
  */
-class ModelInstance(val attachment: ModelAttachment) {
+class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Boolean = { true }) : RuntimeAttachment {
+    override val isValid: Boolean get() = valid()
+    override fun close() = attachment.close()
     val animator = ModelAnimator()
     private val grounding = RigGroundingState()
     private var posedFrame = Long.MIN_VALUE
@@ -124,7 +128,10 @@ private data class ModelInstanceKey(val nodeId: UUID, val model: String)
  */
 fun MCEntity.modelInstance(nodeId: UUID, model: String): ModelInstance =
     AttachmentRegistry.attachments(this).runtime.getOrPut(ModelInstanceKey(nodeId, model)) {
-        ModelInstance(ModelAttachment(model))
+        ModelInstance(ModelAttachment(model).apply { instanceId = nodeId.toString() }) {
+            AttachmentRegistry.entitySnapshot(level(), uuid)?.modelNodes()
+                ?.any { it.nodeId == nodeId && it.model.model == model } == true
+        }
     }
 
 /** The instance already drawn for this node, or null when nothing has drawn it yet. */

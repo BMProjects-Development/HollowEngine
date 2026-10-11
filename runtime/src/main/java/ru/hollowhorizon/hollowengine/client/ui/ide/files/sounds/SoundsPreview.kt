@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
+import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
 import java.io.File
 
 internal const val SoundsFileName = "sounds.json"
@@ -329,7 +330,7 @@ private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<S
     val soundsRoot = runCatching { "$namespaceDir/sounds".fromReadablePath() }.getOrNull() ?: return emptyList()
     if (!soundsRoot.isDirectory) return emptyList()
     return soundsRoot.walkTopDown()
-        .filter { it.isFile && it.extension.lowercase() in AudioExtensions }
+        .filter { it.isFile && it.extension.lowercase() in SoundDecoders.extensions }
         .map { relativeSoundId(soundsRoot, it, namespace) }
         .distinct()
         .sorted()
@@ -338,7 +339,7 @@ private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<S
 
 private fun relativeSoundId(root: File, file: File, namespace: String): String {
     val relative = root.toPath().relativize(file.toPath()).toString().replace('\\', '/')
-    val withoutExtension = relative.substringBeforeLast('.')
+    val withoutExtension = if (file.extension.lowercase() == "ogg") relative.substringBeforeLast('.') else relative
     return "$namespace:$withoutExtension"
 }
 
@@ -349,5 +350,3 @@ private fun sanitizeEventName(input: String): String =
 /** Same as [sanitizeEventName] but also allows the `:` namespace separator. */
 private fun sanitizeSoundName(input: String): String =
     input.lowercase().filter { it in 'a'..'z' || it in '0'..'9' || it in "_./-:" }
-
-private val AudioExtensions = setOf("ogg", "wav", "mp3")

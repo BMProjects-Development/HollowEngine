@@ -1,12 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
-abstract class Attachment(val parent: Attachment? = null) {
+abstract class Attachment(val parent: Attachment? = null) : AutoCloseable {
+    override fun close() = Unit
+    open fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = Unit
     val transform = TrsTransformF()
     val globalMatrix = MutableMat4f()
 
@@ -42,6 +45,16 @@ open class RuntimeNode(
     }
 
     val attachments = arrayListOf<Attachment>()
+
+    override fun close() {
+        attachments.forEach(Attachment::close)
+        children.forEach(RuntimeNode::close)
+    }
+
+    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
+        attachments.forEach { it.updateWorldPose(modelToWorld, entity) }
+        children.forEach { it.updateWorldPose(modelToWorld, entity) }
+    }
 
     val baseMorphWeights: FloatArray = definition.mesh
         ?.primitives

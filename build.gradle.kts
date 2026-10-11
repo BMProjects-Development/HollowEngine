@@ -41,6 +41,7 @@ fun Project.configureHollowAddon() {
     val fabricLoaderVersion = rootProject.property("fabricLoaderVersion") as String
     val kotlinVersion = rootProject.property("kotlinVersion") as String
     val serializationVersion = rootProject.property("serializationVersion") as String
+    val coroutinesVersion = rootProject.property("coroutinesVersion") as String
     val composeRuntimeVersion = rootProject.property("composeRuntimeVersion") as String
     val koinVersion = rootProject.property("koinVersion") as String
 
@@ -103,7 +104,8 @@ fun Project.configureHollowAddon() {
         add("compileOnly", "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-        add("compileOnly", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+        add("compileOnly", "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+        add("testImplementation", "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
         add("compileOnly", "io.insert-koin:koin-core:$koinVersion")
         add("compileOnly", "androidx.compose.runtime:runtime:$composeRuntimeVersion")
         add("testImplementation", kotlin("test"))

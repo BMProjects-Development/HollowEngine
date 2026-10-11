@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
+import net.minecraft.world.entity.Entity
 import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.max
 import kotlin.math.min
+import java.util.UUID
 
 /**
  * The model at [model] or fallback; a blank path is a model with no geometry, which only carries what
@@ -53,6 +55,16 @@ class ModelAttachment(
     var entity: LivingEntity? = null,
     val location: ResourceLocation? = null,
 ) : Attachment(parent) {
+    var instanceId: String = UUID.randomUUID().toString()
+    val soundScope: String
+        get() {
+            val lineage = generateSequence<Attachment>(this) { it.parent }.toList()
+            val root = lineage.filterIsInstance<ModelAttachment>().last()
+            val nested = lineage.filterIsInstance<NestedModelAttachment>().asReversed().flatMap {
+                listOf((it.parent as RuntimeNode).name, it.spec.id)
+            }
+            return (listOf(root.instanceId) + nested).joinToString("/")
+        }
     private var builtFor: Model? = null
     private var runtimeNodes: List<RuntimeNode> = emptyList()
 
@@ -198,6 +210,8 @@ class ModelAttachment(
     }
 
     private fun rebuild(model: Model) {
+        runtimeNodes.forEach(RuntimeNode::close)
+        modelRoot?.close()
         builtFor = model
         currentRig = authoredRig ?: RigAssets.of(location)
         runtimeMaterials = ModelInstanceMaterials(model)
@@ -218,6 +232,20 @@ class ModelAttachment(
         target = null
         cachedBounds = null
         modelChangeListeners.forEach { it() }
+    }
+
+    override fun close() {
+        runtimeNodes.forEach(RuntimeNode::close)
+        modelRoot?.close()
+        runtimeNodes = emptyList()
+        modelRoot = null
+        renderPipeline = null
+        nodesByIndex = emptyMap()
+    }
+
+    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
+        runtimeNodes.forEach { it.updateWorldPose(modelToWorld, entity) }
+        modelRoot?.updateWorldPose(modelToWorld, entity)
     }
 
     /**

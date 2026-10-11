@@ -88,7 +88,7 @@ internal object ComponentJson {
         decode(serializer, JsonObject(emptyMap()))
             ?: decode(serializer, defaultJson(serializer.descriptor))
 
-    /** A value of the shape [descriptor] describes, with every leaf at its zero. */
+    /** A minimal value of this shape; optional members keep their constructor defaults on decode. */
     fun defaultJson(descriptor: SerialDescriptor): JsonElement {
         if (descriptor.isNullable) return JsonNull
         return when (descriptor.kind) {
@@ -100,7 +100,7 @@ internal object ComponentJson {
             StructureKind.LIST -> JsonArray(List(VectorDescriptors.components(descriptor) ?: 0) { defaultJson(descriptor.getElementDescriptor(0)) })
             StructureKind.MAP -> JsonObject(emptyMap())
             StructureKind.CLASS, StructureKind.OBJECT -> JsonObject(
-                (0 until descriptor.elementsCount).associate { index ->
+                (0 until descriptor.elementsCount).filterNot(descriptor::isElementOptional).associate { index ->
                     descriptor.getElementName(index) to defaultJson(descriptor.getElementDescriptor(index))
                 },
             )
@@ -111,6 +111,9 @@ internal object ComponentJson {
             else -> JsonNull
         }
     }
+
+    fun initialValue(descriptor: SerialDescriptor, json: String?): JsonElement =
+        json?.let(format::parseToJsonElement) ?: defaultJson(descriptor)
 
     private fun defaultJsonOfSubclass(descriptor: SerialDescriptor): JsonObject {
         val body = defaultJson(descriptor) as? JsonObject ?: JsonObject(emptyMap())

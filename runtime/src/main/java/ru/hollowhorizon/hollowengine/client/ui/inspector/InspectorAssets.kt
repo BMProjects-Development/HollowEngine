@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
@@ -157,7 +158,7 @@ object EditorAssetSources {
         val manager = Minecraft.getInstance().resourceManager ?: return emptyList()
         val root = when {
             extension.endsWith("png") -> "textures"
-            extension.endsWith("ogg") || extension.endsWith("wav") -> "sounds"
+            extension.removePrefix(".") in SoundSource.fileExtensions -> "sounds"
             else -> "models"
         }
         return runCatching {

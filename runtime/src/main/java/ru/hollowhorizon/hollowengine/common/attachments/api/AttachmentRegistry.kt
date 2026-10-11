@@ -102,7 +102,10 @@ object AttachmentRegistry {
     fun close(level: Level) {
         NodeRuntimeState.close(level)
         val lastOfItsSide = synchronized(levelStates) {
-            levelStates.remove(level)?.byUuid?.values?.forEach { it.scope.cancel() }
+            levelStates.remove(level)?.byUuid?.values?.forEach {
+                it.scope.cancel()
+                it.closeRuntime()
+            }
             levelStates.keys.none { it.isClientSide == level.isClientSide }
         }
 
@@ -273,6 +276,7 @@ object AttachmentRegistry {
 
         levelState(level).byUuid.remove(entity.uuid)
         state.scope.cancel()
+        state.closeRuntime()
         EntityStateSync.forget(entity)
 
         NoAiRuntime.cleanup(entity)
@@ -327,6 +331,7 @@ object AttachmentRegistry {
             cacheForTransfer(from, old.uuid, state)
             levelState(from).byUuid.remove(old.uuid)
             state.scope.cancel()
+            state.closeRuntime()
         }
         restoreFromTransfer(to, new.uuid, state(new))
     }
@@ -409,7 +414,10 @@ object AttachmentRegistry {
 
         val loaded = entity.detachedState?.also { entity.detachedState = null }
         val state = when {
-            loaded != null -> loaded.also { previous?.scope?.cancel() }
+            loaded != null -> loaded.also {
+                previous?.scope?.cancel()
+                previous?.closeRuntime()
+            }
             previous != null -> rebind(previous, entity)
             else -> createState(entity)
         }
@@ -425,6 +433,7 @@ object AttachmentRegistry {
     private fun rebind(source: HollowAttachments, entity: MCEntity): HollowAttachments {
         val nodes = source.nodesNbt
         source.scope.cancel()
+        source.closeRuntime()
         return source.rebindTo(entity, nodes)
     }
 

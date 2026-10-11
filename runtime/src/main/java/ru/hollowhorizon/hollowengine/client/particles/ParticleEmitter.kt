@@ -3,8 +3,11 @@ package ru.hollowhorizon.hollowengine.client.particles
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.client.audio.SoundBuffer
-import ru.hollowhorizon.hollowengine.client.audio.SoundEffects
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
+import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitter
+import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitterState
+
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateSelfBy
@@ -248,14 +251,12 @@ class ParticleEmitter(
         event.sound?.let { config ->
             val targetSound = effect.referencedSounds[config.eventName] ?: return@let
 
-            SoundEffects.play(SoundBuffer(targetSound)) {
-                setPosition(
-                    transform?.position?.x ?: 0f,
-                    transform?.position?.y ?: 0f,
-                    transform?.position?.z ?: 0f
-                )
-                setRelative(transform == null)
-            }
+            ClientSounds.play(targetSound, emitter = SoundEmitter {
+                if (transform == null) SoundEmitterState.Listener else {
+                    val p = transform.position
+                    SoundEmitterState.Available(Vec3(p.x.toDouble(), p.y.toDouble(), p.z.toDouble()))
+                }
+            })
         }
     }
 }

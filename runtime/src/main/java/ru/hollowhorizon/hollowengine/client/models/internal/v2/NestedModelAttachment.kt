@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
@@ -7,6 +8,7 @@ import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
 /**
  * A model hung on a bone of another. It stands still in its rest pose and is drawn as part of the model it
@@ -45,6 +47,9 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
         super.collectCommands(pipeline)
         model.collectCommands(pipeline)
     }
+
+    override fun close() = model.close()
+    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = model.updateWorldPose(modelToWorld, entity)
 
     companion object {
         /**

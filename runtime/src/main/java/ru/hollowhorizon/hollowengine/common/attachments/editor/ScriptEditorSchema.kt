@@ -32,6 +32,7 @@ data class ScriptField(
     val multiline: Boolean = false,
     val assets: List<String> = emptyList(),
     val hidden: Boolean = false,
+    val initialValue: String? = null,
 )
 
 @Serializable
@@ -112,6 +113,7 @@ object ScriptSchema {
             multiline = annotations.any { it is EditorMultiline },
             assets = annotations.filterIsInstance<EditorAsset>().flatMap { it.extensions.toList() }.distinct(),
             hidden = annotations.any { it is EditorHidden },
+            initialValue = annotations.filterIsInstance<EditorDefault>().firstOrNull()?.json,
         )
     }
 }
@@ -162,4 +164,5 @@ private fun ScriptField.annotations(): List<Annotation> = buildList {
     if (multiline) add(EditorMultiline())
     if (assets.isNotEmpty()) add(EditorAsset(*assets.toTypedArray()))
     if (hidden) add(EditorHidden())
+    initialValue?.let { add(EditorDefault(it)) }
 }

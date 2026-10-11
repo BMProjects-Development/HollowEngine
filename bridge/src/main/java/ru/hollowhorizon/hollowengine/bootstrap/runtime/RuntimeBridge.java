@@ -25,6 +25,9 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.client.sounds.AudioStream;
+import net.minecraft.client.sounds.ChannelAccess;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
@@ -162,6 +165,14 @@ public interface RuntimeBridge extends AutoCloseable {
     @Nullable CompletableFuture<AudioStream> onLoadStreamSound(ResourceLocation soundId, ResourceProvider resourceManager, boolean isWrapper);
 
     @Nullable FileToIdConverter createSoundConverter();
+
+    default void onSoundEngineTick(boolean paused) {}
+
+    default void onSoundEngineReset() {}
+
+    default void onSoundFrame(Map<SoundInstance, ChannelAccess.ChannelHandle> channels) {}
+
+    default void onSoundStop(@Nullable ResourceLocation id, @Nullable SoundSource category) {}
 
     @Nullable String getOpenGlVersionOverride();
 

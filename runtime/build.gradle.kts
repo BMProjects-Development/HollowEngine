@@ -29,6 +29,7 @@ val parchmentVersion: String by rootProject.properties
 val kotlinVersion: String by rootProject.properties
 val composeRuntimeVersion: String by rootProject.properties
 val serializationVersion: String by rootProject.properties
+val coroutinesVersion: String by rootProject.properties
 val koolVersion: String by rootProject.properties
 val koinVersion: String by rootProject.properties
 val hollowcore: String by rootProject.properties
@@ -123,7 +124,7 @@ dependencies {
     addShadow("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     addShadow("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
     addShadow("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-    addShadow("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    addShadow("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
     addShadow("io.insert-koin:koin-core:$koinVersion")
     addShadow("org.jetbrains.kotlin:kotlin-metadata-jvm:$kotlinVersion")
     addShadow("org.jetbrains.kotlin:kotlin-scripting-common:$kotlinVersion")

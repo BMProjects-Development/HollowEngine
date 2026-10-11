@@ -52,6 +52,11 @@ annotation class EditorRange(
     val slider: Boolean = false,
 )
 
+/** JSON value used when enabling a nullable field; leaves its runtime default unchanged. */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorDefault(val json: String)
+
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorBone
