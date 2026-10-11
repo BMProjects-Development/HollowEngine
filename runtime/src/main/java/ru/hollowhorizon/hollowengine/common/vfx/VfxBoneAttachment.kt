@@ -33,6 +33,9 @@ data class VfxBoneAttachmentSpec(
     val autoPlay: Boolean = true,
     @EditorHidden
     val ownEffect: VfxEffect? = null,
+    @EditorHidden
+    @EditorNotAnimated
+    val emitting: Boolean = true,
 ) : RigAttachmentSpec(), PlacedAttachmentSpec {
     override fun withId(id: String) = copy(id = id)
 
@@ -40,4 +43,6 @@ data class VfxBoneAttachmentSpec(
 
     /** The running effect takes every change in place. */
     override fun structure() = VfxBoneAttachmentSpec(id)
+
+    override fun held() = copy(emitting = false)
 }

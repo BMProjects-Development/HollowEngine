@@ -148,6 +148,26 @@ class VfxInstance(
         behaviors.forEach { it.stop(immediate) }
     }
 
+    /**
+     * Whether the effect is held: its emitters make nothing new while what they made lives out its lifetime,
+     * and what the effect draws once rather than on particles is gone until it goes on.
+     */
+    var isPaused: Boolean = false
+        private set
+
+    fun pause() {
+        if (isPaused) return
+        isPaused = true
+        emitters.forEach { it.stop(immediate = false) }
+    }
+
+    /** Goes on from where it was held: the emitters make particles again. */
+    fun resume() {
+        if (!isPaused) return
+        isPaused = false
+        emitters.forEach(VfxEmitter::resume)
+    }
+
     /** Advances everything by [dt] seconds and leaves the nodes ready to draw. */
     fun update(dt: Float) {
         if (dt > 0f) time += dt
@@ -165,7 +185,10 @@ class VfxInstance(
 
     /** Adds what every active node draws; [placement] maps effect space to the space of the view. */
     fun collect(into: VfxDrawList, placement: Matrix4f) {
-        allNodes.forEach { node -> node.behavior?.collect(into, placement) }
+        allNodes.forEach { node ->
+            if (isPaused && node.parent?.behavior !is VfxEmitter) return@forEach
+            node.behavior?.collect(into, placement)
+        }
     }
 
     fun node(id: String): VfxNodeRuntime? = allNodes.firstOrNull { it.spec.id == id }
@@ -192,6 +215,7 @@ class VfxInstance(
     fun restart() {
         time = 0f
         isStopping = false
+        isPaused = false
         behaviors.forEach { it.restart() }
         pose()
     }

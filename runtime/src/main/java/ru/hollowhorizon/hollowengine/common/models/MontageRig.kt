@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.json.*
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
 
@@ -16,25 +17,32 @@ class MontageRig(val rig: ModelRig, val key: List<Any>)
 /** This rig with what [moments] lay over it, in the order they play. */
 fun ModelRig.withMontages(moments: List<MontageMoment>): MontageRig {
     if (moments.isEmpty()) return MontageRig(this, emptyList())
-    val rig = moments.fold(this) { rig, moment -> rig.withMontage(moment, moment.active()) }
+    val rig = moments.fold(this) { rig, moment -> rig.withMontage(moment, moment.present()) }
     return MontageRig(rig, montageKey(moments))
 }
 
 /** What [MontageRig.key] is for [moments], without laying them over anything. */
-fun montageKey(moments: List<MontageMoment>): List<Any> = moments.map { it.montage to it.active() }
+fun montageKey(moments: List<MontageMoment>): List<Any> =
+    moments.map { moment -> moment.montage to moment.present().map { it.bone to it.spec.id } }
 
-private fun MontageMoment.active(): List<MontageAttachment> = montage.attachments.filter { it.isActive(time) }
+/**
+ * What the montage hangs on the model at its moment: what is in one of its stretches, and what stays between
+ * them as [RigAttachmentSpec.held] says, so taking it out of a stretch does not build the model again.
+ */
+private fun MontageMoment.present(): List<MontageAttachment> = montage.attachments.mapNotNull { attachment ->
+    if (attachment.isActive(time)) attachment else attachment.spec.held()?.let { attachment.copy(spec = it) }
+}
 
-private fun ModelRig.withMontage(moment: MontageMoment, active: List<MontageAttachment>): ModelRig {
-    var rig = if (active.isEmpty()) this else overlay(
+private fun ModelRig.withMontage(moment: MontageMoment, present: List<MontageAttachment>): ModelRig {
+    var rig = if (present.isEmpty()) this else overlay(
         ModelRig(
-            bones = active.filter { it.bone != null }.groupBy { it.bone!! }
+            bones = present.filter { it.bone != null }.groupBy { it.bone!! }
                 .mapValues { (_, hung) -> RigBone(attachments = hung.map { it.spec }) },
-            attachments = active.filter { it.bone == null }.map { it.spec },
+            attachments = present.filter { it.bone == null }.map { it.spec },
         )
     )
     return rig.withTracks(moment.montage.tracks, moment.time) { bone, id ->
-        if (active.any { it.bone == bone && it.spec.id == id }) 1f else moment.weight
+        if (present.any { it.bone == bone && it.spec.id == id }) 1f else moment.weight
     }
 }
 
@@ -76,11 +84,11 @@ object RigFields {
             .mapNotNull { (name, value) -> if (name in still) null else field(name, value) }
     }
 
-    /** The fields of [spec]'s kind marked [EditorNotAnimated], with its id and kind. */
+    /** The fields of [spec]'s kind marked [EditorNotAnimated] or hidden from the editor, with its id and kind. */
     private fun stillFields(spec: RigAttachmentSpec): Set<String> {
         val descriptor = RigAttachmentTypes.of(spec)?.serializer?.descriptor ?: return setOf(ID, TYPE)
         return (0 until descriptor.elementsCount).filter { index ->
-                descriptor.getElementAnnotations(index).any { it is EditorNotAnimated }
+                descriptor.getElementAnnotations(index).any { it is EditorNotAnimated || it is EditorHidden }
             }.mapTo(hashSetOf(ID, TYPE)) { descriptor.getElementName(it) }
     }
 

@@ -158,6 +158,12 @@ abstract class RigAttachmentSpec {
      * by the running attachment; any other builds the model again.
      */
     open fun structure(): RigAttachmentSpec = this
+
+    /**
+     * What stays of this attachment between the stretches of time a montage hangs it for, or null when it comes
+     * off: an effect stays and only stops making particles, so what it made does not vanish at once.
+     */
+    open fun held(): RigAttachmentSpec? = null
 }
 
 /** Draws whatever the entity wears in [slot] at this bone. */

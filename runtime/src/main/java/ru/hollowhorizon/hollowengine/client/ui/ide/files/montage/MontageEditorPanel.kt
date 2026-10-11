@@ -284,6 +284,13 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
 
     private fun rigStateFor(model: String): RigEditorState = RigEditorState(rigs, model).also { state ->
         state.viewer.instance.animator.add(PreviewLayer())
+        state.viewer.effectClock = { session.timeline.currentTime }
+        state.viewer.effectEmitting = { bone, id, seconds ->
+            val montage = document.montage
+            val own = montage.attachments.firstOrNull { it.bone == bone && it.spec.id == id }
+                ?: montage.attachments.firstOrNull { it.bone == null && it.spec.id == id }
+            own?.isActive(seconds) ?: true
+        }
     }
 
     /** Plays the montage where the playhead is, and lays what it hangs on the model as it does in the world. */

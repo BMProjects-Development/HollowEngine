@@ -48,6 +48,17 @@ object VfxFrameRenderer {
         }
     }
 
+    /**
+     * Draws [list] into a panel of the editor, over what is there: a model preview. The sky and what reads the
+     * scene or glows are left out, as the panel has no scene of its own to read or bloom.
+     */
+    fun renderInPanel(list: VfxDrawList, view: VfxView) {
+        renderModels(list.models)
+        VfxMeshRenderer.render(list.meshes, view)
+        VfxRibbonRenderer.render(list.ribbons, view)
+        VfxQuadRenderer.render(list.quads, view)
+    }
+
     fun renderModels(draws: List<VfxModelDraw>) {
         if (draws.isEmpty()) return
         val source = Minecraft.getInstance().renderBuffers().bufferSource()

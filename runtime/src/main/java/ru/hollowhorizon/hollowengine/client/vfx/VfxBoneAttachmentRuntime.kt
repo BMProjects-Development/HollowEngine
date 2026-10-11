@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
+import kotlin.math.ceil
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
@@ -32,6 +33,9 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
     /** The effect's space to camera-relative space, as of the last time the carrier was drawn. */
     val placement = Matrix4f()
 
+    /** Whether the effect makes particles; otherwise it is held, and what it made lives out its lifetime. */
+    var emitting: Boolean = true
+
     /** True on the first call of a frame: a carrier is drawn by several passes, the effect only once. */
     fun claimFrame(): Boolean {
         val frame = TickHandler.renderFrame
@@ -41,32 +45,65 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
     }
 
     /** Advances the effect and places it at [local], camera-relative; null while its file is missing. */
-    fun advance(cameraPosition: Vec3, local: Matrix4f): VfxBoneBinding? {
-        val playing = instance ?: create() ?: return null
-
-        val now = TickHandler.gameTime
+    fun advance(
+        cameraPosition: Vec3,
+        local: Matrix4f,
+        environment: VfxEnvironment? = null,
+        now: Float = TickHandler.gameTime,
+    ): VfxBoneBinding? {
+        val playing = instance ?: create(environment) ?: return null
         val dt = when {
             lastGameTime.isNaN() -> 0f
             else -> ((now - lastGameTime) / TICKS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
         }
         lastGameTime = now
 
-        val translation = local.getTranslation(Vector3f())
-        playing.moveTo(
-            Vec3(
-                cameraPosition.x + translation.x,
-                cameraPosition.y + translation.y,
-                cameraPosition.z + translation.z,
-            )
-        )
+        place(playing, cameraPosition, local, now)
+        if (emitting) playing.resume() else playing.pause()
+        playing.update(dt)
+        return VfxBoneBinding(playing, local)
+    }
 
+    /** Seconds into the effect it has played to, on the clock [seek] is given. */
+    private var played = 0f
+
+    /**
+     * Puts the effect where it is [seconds] into its clock, as a preview does that follows a timeline: it stands
+     * still while the clock does, plays on as it moves on, and is played again from the start up to the moment
+     * when the clock goes back. [emittingAt] says when on that clock the effect makes particles.
+     */
+    fun seek(local: Matrix4f, environment: VfxEnvironment, seconds: Float, emittingAt: (Float) -> Boolean): VfxBoneBinding? {
+        val playing = instance ?: create(environment) ?: return null
+        place(playing, Vec3.ZERO, local, seconds * TICKS_PER_SECOND)
+
+        val target = seconds.coerceAtLeast(0f)
+        if (target < played) {
+            playing.restart()
+            played = 0f
+        }
+        val distance = target - played
+        val steps = if (distance <= SEEK_EPSILON) 0 else ceil(distance / SEEK_STEP).toInt().coerceIn(1, MAX_SEEK_STEPS)
+        val step = if (steps == 0) 0f else distance / steps
+        for (index in 1..steps) {
+            if (emittingAt(played + step * index)) playing.resume() else playing.pause()
+            playing.update(step)
+        }
+        if (steps == 0) {
+            if (emittingAt(target)) playing.resume() else playing.pause()
+            playing.update(0f)
+        }
+        played = target
+        return VfxBoneBinding(playing, local)
+    }
+
+    /** Moves [playing] to where [local] puts it and sets what a frame of it reads. */
+    private fun place(playing: VfxInstance, cameraPosition: Vec3, local: Matrix4f, now: Float) {
+        val translation = local.getTranslation(Vector3f())
+        playing.moveTo(Vec3(cameraPosition.x + translation.x, cameraPosition.y + translation.y, cameraPosition.z + translation.z))
         playing.setCamera(cameraPosition)
         playing.partialTick = TickHandler.partialTick
         playing.gameTime = now
         playing.budget = VfxBudget.share(1)
-        playing.update(dt)
-
-        return VfxBoneBinding(playing, local)
     }
 
     /**
@@ -83,15 +120,21 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
         if (!keeps) instance = null
     }
 
-    private fun create(): VfxInstance? {
-        val level = Minecraft.getInstance().level ?: return null
+    /** Starts the effect in [environment], or in the world when none is given. */
+    private fun create(environment: VfxEnvironment?): VfxInstance? {
+        val surroundings = environment ?: VfxWorldEnvironment(Minecraft.getInstance().level ?: return null)
         val effect = own ?: VfxAssets[asset] ?: return null
-        return VfxInstance(effect, asset, VfxWorldEnvironment(level)).also { instance = it }
+        return VfxInstance(effect, asset, surroundings).also { instance = it }
     }
 
     private companion object {
         const val TICKS_PER_SECOND = 20f
         const val MAX_STEP_SECONDS = 0.25f
+
+        /** How finely a seek plays the effect through, and how many steps it takes at most. */
+        const val SEEK_STEP = 1f / 30f
+        const val MAX_SEEK_STEPS = 600
+        const val SEEK_EPSILON = 1e-4f
     }
 }
 
@@ -111,12 +154,13 @@ class VfxBoneAttachment(
     override var spec: VfxBoneAttachmentSpec = spec
         private set
 
-    private val effect = VfxBoundEffect(spec.effect, spec.ownEffect)
+    private val effect = VfxBoundEffect(spec.effect, spec.ownEffect).also { it.emitting = spec.emitting }
 
     override fun respec(spec: RigAttachmentSpec) {
         if (spec !is VfxBoneAttachmentSpec) return
         this.spec = spec
         effect.use(spec.effect, spec.ownEffect)
+        effect.emitting = spec.emitting
     }
 
     override fun collectCommands(pipeline: RenderPipeline) {
@@ -137,6 +181,26 @@ class VfxBoneAttachment(
         return effect.advance(cameraPosition, local)
     }
 
+    /**
+     * Advances the effect in the space [fromDrawn] takes the drawn model's space to, as a preview does: it draws
+     * the model scaled into a panel, and the effect has to play in blocks, as it does in the world.
+     */
+    fun updateIn(fromDrawn: Matrix4f): VfxBoneBinding? {
+        return effect.advance(Vec3.ZERO, previewPlacement(fromDrawn), PreviewFloor, (System.nanoTime() - PreviewEpoch) / NANOS_PER_TICK)
+    }
+
+    /**
+     * As [updateIn], on a clock the preview gives, as a timeline's playhead; the effect makes particles when
+     * [emittingAt] says so on that clock, and is played through again when the clock goes back.
+     */
+    fun seekIn(fromDrawn: Matrix4f, seconds: Float, emittingAt: (Float) -> Boolean): VfxBoneBinding? =
+        effect.seek(previewPlacement(fromDrawn), PreviewFloor, seconds, emittingAt)
+
+    /** The bone this effect hangs on. */
+    val bone: String get() = node.name
+
+    private fun previewPlacement(fromDrawn: Matrix4f): Matrix4f = Matrix4f(fromDrawn).mul(effect.placement).also(::applyOffset)
+
     /** The offset the author gave the attachment, on top of the bone. */
     private fun applyOffset(matrix: Matrix4f) {
         matrix.mul(spec.localTransform().matrixF.asMatrix4f())
@@ -153,8 +217,22 @@ object VfxBoneBindings {
     private val submitted = ArrayList<VfxBindingSource>()
     private val bindings = ArrayList<VfxBoneBinding>()
 
+    /** Where effects go while a preview draws a model, instead of to the world. */
+    private var captured: MutableList<VfxBindingSource>? = null
+
     fun submit(source: VfxBindingSource) {
-        submitted += source
+        (captured ?: submitted) += source
+    }
+
+    /** Runs [draw], keeping the effects submitted meanwhile in [into], for a preview that draws them itself. */
+    fun <T> capturing(into: MutableList<VfxBindingSource>, draw: () -> T): T {
+        val previous = captured
+        captured = into
+        try {
+            return draw()
+        } finally {
+            captured = previous
+        }
     }
 
     fun drain(cameraPosition: Vec3): List<VfxBoneBinding> {
@@ -173,3 +251,11 @@ object VfxBoneBindings {
 
 /** What the attachment plays: its own copy of the effect, or the file; null while the file is missing. */
 fun VfxBoneAttachmentSpec.played(): VfxEffect? = ownEffect ?: VfxAssets[effect]
+
+/** The ground of an effect played in a preview: the floor the model stands on, at its origin. */
+private val PreviewFloor = VfxPlaneEnvironment()
+
+private const val NANOS_PER_TICK = 50_000_000f
+
+/** When previews started counting, so their clock stays small enough for a float to keep its fractions. */
+private val PreviewEpoch = System.nanoTime()

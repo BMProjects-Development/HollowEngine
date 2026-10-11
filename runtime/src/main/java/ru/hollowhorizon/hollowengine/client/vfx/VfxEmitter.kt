@@ -134,6 +134,11 @@ class VfxEmitter(
         stopping = true
     }
 
+    /** Makes particles again after [stop], keeping the ones still alive. */
+    fun resume() {
+        stopping = false
+    }
+
     /**
      * Puts the emitter back where it was when the effect was created.
      */
