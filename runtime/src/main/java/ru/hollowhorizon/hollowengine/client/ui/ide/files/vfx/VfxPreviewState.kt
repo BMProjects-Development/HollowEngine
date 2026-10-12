@@ -16,7 +16,6 @@ import ru.hollowhorizon.hollowengine.client.vfx.VfxBudget
 import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlaneEnvironment
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -106,15 +105,9 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
      */
     fun seek(seconds: Float) {
         val target = seconds.coerceAtLeast(0f)
-        if (target < time) restart()
-
-        val distance = target - time
-        if (distance > CATCH_UP_EPSILON) {
-            val steps = ceil(distance / CATCH_UP_STEP).toInt().coerceIn(1, MAX_CATCH_UP_STEPS)
-            val step = distance / steps
-            repeat(steps) { advanceBy(step) }
-        }
+        instance?.seek(time, target, MAX_CATCH_UP_STEPS, advance = ::advanceBy)
         time = target
+        refreshCount()
     }
 
     private var pendingSeek = Float.NaN
@@ -280,8 +273,6 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         const val MAX_DISTANCE = 60f
         const val ZOOM_PER_NOTCH = 1.1f
 
-        const val CATCH_UP_STEP = 1f / 30f
-        const val CATCH_UP_EPSILON = 1.0e-4f
         const val MAX_CATCH_UP_STEPS = 90
 
         const val CATCH_UP_LIMIT = 4f

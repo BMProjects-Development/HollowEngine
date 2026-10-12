@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.*
+import kotlin.math.ceil
 import kotlin.random.Random
 
 /**
@@ -149,8 +150,8 @@ class VfxInstance(
     }
 
     /**
-     * Whether the effect is held: its emitters make nothing new while what they made lives out its lifetime,
-     * and what the effect draws once rather than on particles is gone until it goes on.
+     * Whether the effect is held: its clock stands and its emitters make nothing new, while what they made lives
+     * out its lifetime, and what the effect draws once rather than on particles is gone until it goes on.
      */
     var isPaused: Boolean = false
         private set
@@ -158,19 +159,22 @@ class VfxInstance(
     fun pause() {
         if (isPaused) return
         isPaused = true
-        emitters.forEach { it.stop(immediate = false) }
+        emitters.forEach(VfxEmitter::hold)
     }
 
     /** Goes on from where it was held: the emitters make particles again. */
     fun resume() {
         if (!isPaused) return
         isPaused = false
-        emitters.forEach(VfxEmitter::resume)
+        emitters.forEach(VfxEmitter::release)
     }
+
+    /** Lets the effect go on when [emitting], holds it otherwise. */
+    fun emit(emitting: Boolean) = if (emitting) resume() else pause()
 
     /** Advances everything by [dt] seconds and leaves the nodes ready to draw. */
     fun update(dt: Float) {
-        if (dt > 0f) time += dt
+        if (dt > 0f && !isPaused) time += dt
         pose()
         behaviors.forEach { it.update(dt) }
     }
@@ -220,6 +224,38 @@ class VfxInstance(
         pose()
     }
 
+    /**
+     * Takes the effect from [from] to [to] seconds of a clock it does not keep, such as a timeline's playhead. Going
+     * on, it plays the way there in steps short enough for particles to move as they do frame by frame, at most
+     * [maxSteps] of them; going back, it starts over and plays up to [to], as a simulation does not run backwards.
+     */
+    fun seek(
+        from: Float,
+        to: Float,
+        maxSteps: Int = MAX_SEEK_STEPS,
+        emittingAt: (Float) -> Boolean = { true },
+        advance: (Float) -> Unit = ::update,
+    ) {
+        val target = to.coerceAtLeast(0f)
+        var at = from
+        if (target < at) {
+            restart()
+            at = 0f
+        }
+        val distance = target - at
+        if (distance <= SEEK_EPSILON) {
+            emit(emittingAt(target))
+            advance(0f)
+            return
+        }
+        val steps = ceil(distance / SEEK_STEP).toInt().coerceIn(1, maxSteps)
+        val step = distance / steps
+        for (index in 1..steps) {
+            emit(emittingAt(at + step * index))
+            advance(step)
+        }
+    }
+
     /** Whether one more particle fits in the global budget. */
     fun requestParticle(): Boolean {
         if (budget <= 0) return false
@@ -244,6 +280,11 @@ class VfxInstance(
 
     companion object {
         const val FULL_BRIGHT = 0xF000F0
+
+        /** How finely [seek] plays an effect through, and how many steps it takes at most unless told otherwise. */
+        const val SEEK_STEP = 1f / 30f
+        const val MAX_SEEK_STEPS = 600
+        private const val SEEK_EPSILON = 1.0e-4f
     }
 }
 

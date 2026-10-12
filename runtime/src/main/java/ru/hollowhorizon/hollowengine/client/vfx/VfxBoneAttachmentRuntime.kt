@@ -4,7 +4,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import kotlin.math.ceil
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
@@ -59,40 +58,26 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
         lastGameTime = now
 
         place(playing, cameraPosition, local, now)
-        if (emitting) playing.resume() else playing.pause()
+        playing.emit(emitting)
         playing.update(dt)
         return VfxBoneBinding(playing, local)
     }
 
-    /** Seconds into the effect it has played to, on the clock [seek] is given. */
+    /** Seconds into the clock [seek] is given that the effect has been played to. */
     private var played = 0f
 
     /**
-     * Puts the effect where it is [seconds] into its clock, as a preview does that follows a timeline: it stands
-     * still while the clock does, plays on as it moves on, and is played again from the start up to the moment
-     * when the clock goes back. [emittingAt] says when on that clock the effect makes particles.
+     * Puts the effect where it is [seconds] into a clock it does not keep, as a preview does that follows a
+     * timeline; see [VfxInstance.seek]. [emittingAt] says when on that clock the effect makes particles.
      */
     fun seek(local: Matrix4f, environment: VfxEnvironment, seconds: Float, emittingAt: (Float) -> Boolean): VfxBoneBinding? {
-        val playing = instance ?: create(environment) ?: return null
+        val playing = instance ?: create(environment)?.also { played = 0f } ?: return null
         place(playing, Vec3.ZERO, local, seconds * TICKS_PER_SECOND)
-
-        val target = seconds.coerceAtLeast(0f)
-        if (target < played) {
-            playing.restart()
-            played = 0f
+        playing.seek(played, seconds, emittingAt = emittingAt) { dt ->
+            playing.budget = VfxBudget.share(1)
+            playing.update(dt)
         }
-        val distance = target - played
-        val steps = if (distance <= SEEK_EPSILON) 0 else ceil(distance / SEEK_STEP).toInt().coerceIn(1, MAX_SEEK_STEPS)
-        val step = if (steps == 0) 0f else distance / steps
-        for (index in 1..steps) {
-            if (emittingAt(played + step * index)) playing.resume() else playing.pause()
-            playing.update(step)
-        }
-        if (steps == 0) {
-            if (emittingAt(target)) playing.resume() else playing.pause()
-            playing.update(0f)
-        }
-        played = target
+        played = seconds.coerceAtLeast(0f)
         return VfxBoneBinding(playing, local)
     }
 
@@ -130,11 +115,6 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
     private companion object {
         const val TICKS_PER_SECOND = 20f
         const val MAX_STEP_SECONDS = 0.25f
-
-        /** How finely a seek plays the effect through, and how many steps it takes at most. */
-        const val SEEK_STEP = 1f / 30f
-        const val MAX_SEEK_STEPS = 600
-        const val SEEK_EPSILON = 1e-4f
     }
 }
 
