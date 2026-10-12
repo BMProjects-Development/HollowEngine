@@ -7,7 +7,7 @@ import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlayback
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.sounds.SoundEmitterSpec
-import java.util.concurrent.ConcurrentHashMap
+import ru.hollowhorizon.hollowengine.HollowEngine
 
 sealed interface SoundEmitterState {
     data object Listener : SoundEmitterState
@@ -21,14 +21,23 @@ fun interface SoundEmitter {
     fun sample(): SoundEmitterState
 }
 
-/** Push bindings keep their last position across culling; closing the owner removes the binding. */
+/**
+ * Push bindings keep their last position across culling; closing the owner removes the binding. Read and written on
+ * the client thread only: the owners publish while the world is drawn, the sounds sample while the engine ticks.
+ */
 object SoundAttachments {
-    private val bindings = ConcurrentHashMap<String, Binding>()
+    private val bindings = HashMap<String, Binding>()
 
+    /**
+     * Publishes [id]. A binding already published under it is closed, and what followed it ends: the owner that
+     * registers last is the live one, as a model built again before the old one was released.
+     */
     fun register(id: String, alive: () -> Boolean = { true }, source: SoundEmitter? = null): Binding {
-        val binding = Binding(id, alive, source)
-        check(bindings.putIfAbsent(id, binding) == null) { "Sound attachment '$id' is already registered" }
-        return binding
+        bindings[id]?.let { stale ->
+            HollowEngine.LOGGER.warn("Sound attachment '{}' was registered again; the previous owner is dropped", id)
+            stale.close()
+        }
+        return Binding(id, alive, source).also { bindings[id] = it }
     }
 
     fun emitter(id: String): SoundEmitter {
@@ -61,11 +70,13 @@ object SoundAttachments {
     class Binding internal constructor(
         private val id: String, internal val alive: () -> Boolean, private val source: SoundEmitter?,
     ) : AutoCloseable {
-        @Volatile internal var state: SoundEmitterState = SoundEmitterState.Pending
+        internal var state: SoundEmitterState = SoundEmitterState.Pending
         private var closed = false
         internal fun sample() = if (closed) SoundEmitterState.Removed else source?.sample() ?: state
+
+        /** Moves the binding; an owner dropped by a later [register] keeps calling this, and is not heard. */
         fun update(position: Vec3, velocity: Vec3 = Vec3.ZERO) {
-            check(!closed)
+            if (closed) return
             require(position.isFinite() && velocity.isFinite())
             state = SoundEmitterState.Available(position, velocity)
         }

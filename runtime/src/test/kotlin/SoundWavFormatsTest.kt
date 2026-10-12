@@ -85,7 +85,20 @@ class SoundWavFormatsTest {
         }
     }
 
-    private fun decode(encoding: Int, bits: Int, data: ByteArray, extensible: Boolean = false): List<Int> {
+    @Test
+    fun `a WAV whose data size was never written ends with the file`() {
+        val data = ByteBuffer.allocate(7).order(ByteOrder.LITTLE_ENDIAN).putShort(1).putShort(-2).putShort(3).put(9)
+            .array()
+        assertEquals(listOf(1, -2, 3), decode(1, 16, data, dataSize = -1))
+    }
+
+    private fun decode(
+        encoding: Int,
+        bits: Int,
+        data: ByteArray,
+        extensible: Boolean = false,
+        dataSize: Int = data.size,
+    ): List<Int> {
         val fmtSize = if (extensible) 40 else 16
         val bytes = ByteBuffer.allocate(28 + fmtSize + data.size).order(ByteOrder.LITTLE_ENDIAN).apply {
             put("RIFF".toByteArray()); putInt(capacity() - 8); put("WAVEfmt ".toByteArray()); putInt(fmtSize)
@@ -95,7 +108,7 @@ class SoundWavFormatsTest {
                 putShort(22); putShort(24); putInt(4); putInt(encoding)
                 putInt(0x00100000); putInt(0xAA000080.toInt()); putInt(0x719B3800)
             }
-            put("data".toByteArray()); putInt(data.size); put(data)
+            put("data".toByteArray()); putInt(dataSize); put(data)
         }.array()
         return WavSoundStream(ByteArrayInputStream(bytes)).use { stream ->
             val samples = stream.read(1000).order(ByteOrder.LITTLE_ENDIAN)

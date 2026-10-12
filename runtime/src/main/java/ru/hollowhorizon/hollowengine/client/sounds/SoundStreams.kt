@@ -11,11 +11,13 @@ import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 
-/** Playback tokens route per-instance streams through Minecraft without registering synthetic assets. */
+/**
+ * Playback tokens route per-instance streams through Minecraft without registering synthetic assets. The tokens are
+ * registered, looked up and removed on the client thread; only opening a stream runs in the background.
+ */
 object SoundStreams {
-    private val streams = ConcurrentHashMap<ResourceLocation, Entry>()
+    private val streams = HashMap<ResourceLocation, Entry>()
 
     fun handles(id: ResourceLocation) = id.path.substringAfterLast('.') in SoundSource.fileExtensions + SoundDecoders.extensions
 

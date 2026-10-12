@@ -3,16 +3,19 @@ package ru.hollowhorizon.hollowengine.client.sounds
 import net.minecraft.client.sounds.AudioStream
 import java.io.BufferedInputStream
 import java.io.DataInputStream
+import java.io.EOFException
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.sound.sampled.AudioFormat
-import java.lang.Long.reverseBytes
 
 /** RIFF/WAVE PCM and IEEE float, including WAVE_FORMAT_EXTENSIBLE. Output is interleaved PCM16. */
 class WavSoundStream(input: InputStream) : AudioStream {
     private val input = DataInputStream(BufferedInputStream(input))
     private var remaining = 0L
+
+    /** Whether the file never says how long its data is, which then runs to the end of the file. */
+    private var open = false
     private var channels = 0
     private var sampleRate = 0
     private var bits = 0
@@ -62,8 +65,10 @@ class WavSoundStream(input: InputStream) : AudioStream {
                 }
                 "data" -> {
                     require(hasFormat) { "WAV data appears before fmt" }
-                    require(size % blockAlign == 0L) { "Incomplete WAV sample frame" }
-                    remaining = size
+                    // A file written as it was recorded may say its data never ends; it ends with the file.
+                    open = size == UNKNOWN_SIZE
+                    require(open || size % blockAlign == 0L) { "Incomplete WAV sample frame" }
+                    remaining = if (open) Long.MAX_VALUE else size
                     return
                 }
                 else -> input.skipNBytes(size)
@@ -75,33 +80,41 @@ class WavSoundStream(input: InputStream) : AudioStream {
     override fun read(size: Int): ByteBuffer {
         check(!closed) { "WAV stream is closed" }
         require(size > 0)
-        val frames = minOf(maxOf(1, size / (channels * 2)).toLong(), remaining / blockAlign).toInt()
+        val wanted = minOf(maxOf(1, size / (channels * 2)).toLong(), remaining / blockAlign).toInt()
+        val bytes = input.readNBytes(wanted * blockAlign)
+        if (!open && bytes.size < wanted * blockAlign) throw EOFException("WAV data ends before its declared size")
+        val frames = bytes.size / blockAlign
+        remaining = if (frames < wanted) 0L else remaining - frames.toLong() * blockAlign
+        val samples = ByteBuffer.wrap(bytes, 0, frames * blockAlign).order(ByteOrder.LITTLE_ENDIAN)
         val output = ByteBuffer.allocateDirect(frames * channels * 2).order(ByteOrder.LITTLE_ENDIAN)
         repeat(frames * channels) {
             val sample = if (encoding == 3) {
-                val value = if (bits == 32) Float.fromBits(int32()).toDouble() else Double.fromBits(int64())
+                val value = if (bits == 32) samples.float.toDouble() else samples.double
                 if (value.isFinite()) (value.coerceIn(-1.0, 1.0) * 32767.0).toInt() else 0
             } else when (bits) {
-                8 -> (input.readUnsignedByte() - 128) shl 8
-                16 -> (input.readUnsignedByte() or (input.readByte().toInt() shl 8))
-                24 -> (input.readUnsignedByte() or (input.readUnsignedByte() shl 8) or
-                    (input.readByte().toInt() shl 16)) shr 8
-                else -> int32() shr 16
+                8 -> ((samples.get().toInt() and 0xff) - 128) shl 8
+                16 -> samples.short.toInt()
+                24 -> ((samples.get().toInt() and 0xff) or ((samples.get().toInt() and 0xff) shl 8) or
+                    (samples.get().toInt() shl 16)) shr 8
+                else -> samples.int shr 16
             }
             output.putShort(sample.toShort())
         }
-        remaining -= frames.toLong() * blockAlign
         return output.flip()
     }
 
     private fun fourCC(): String = String(ByteArray(4).also(input::readFully), Charsets.US_ASCII)
     private fun int32(): Int = Integer.reverseBytes(input.readInt())
-    private fun int64(): Long = reverseBytes(input.readLong())
     private fun uint32(): Long = int32().toLong() and 0xffffffffL
 
     override fun close() {
         if (closed) return
         closed = true
         input.close()
+    }
+
+    private companion object {
+        /** The data size a WAV written to a pipe carries, since it is not known until the recording stops. */
+        const val UNKNOWN_SIZE = 0xFFFFFFFFL
     }
 }

@@ -95,8 +95,7 @@ fun Level.playSound(source: SoundSource, block: SoundBuilder.() -> Unit = {}): S
 
 fun Level.playSound(block: SoundBuilder.() -> Unit): String {
     val builder = SoundBuilder().apply(block)
-    val packet = builder.packet()
-    players().forEach { if (it is ServerPlayer) packet.send(it) else packet.handle(it) }
+    deliver(builder.packet())
     return builder.id
 }
 
@@ -105,7 +104,7 @@ fun Player.stopSound(id: String, fadeOut: Float? = null) {
     if (this is ServerPlayer) packet.send(this) else packet.handle(this)
 }
 
-fun Level.stopSound(id: String, fadeOut: Float? = null) = players().forEach { it.stopSound(id, fadeOut) }
+fun Level.stopSound(id: String, fadeOut: Float? = null) = deliver(StopSoundPacket(id, fadeOut))
 
 fun Player.updateSound(id: String, volume: Float? = null, pitch: Float? = null, emitter: SoundEmitterSpec? = null) {
     val packet = UpdateSoundPacket(id, volume, pitch, emitter)
@@ -113,7 +112,16 @@ fun Player.updateSound(id: String, volume: Float? = null, pitch: Float? = null, 
 }
 
 fun Level.updateSound(id: String, volume: Float? = null, pitch: Float? = null, emitter: SoundEmitterSpec? = null) =
-    players().forEach { it.updateSound(id, volume, pitch, emitter) }
+    deliver(UpdateSoundPacket(id, volume, pitch, emitter))
+
+/**
+ * Sends [packet] to every player of a server level. A client level only has the one game that plays it, however
+ * many players it shows, so it is handled there once.
+ */
+private fun Level.deliver(packet: HollowPacket) {
+    if (isClientSide) players().firstOrNull()?.let(packet::handle)
+    else packet.send(players().filterIsInstance<ServerPlayer>())
+}
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
 @Serializable
