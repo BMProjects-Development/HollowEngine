@@ -73,6 +73,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -170,7 +171,10 @@ public interface RuntimeBridge extends AutoCloseable {
 
     default void onSoundEngineReset() {}
 
-    default void onSoundFrame(Map<SoundInstance, ChannelAccess.ChannelHandle> channels) {}
+    /** The sound engine paused every channel, as the pause menu does, or let them go on. */
+    default void onSoundEnginePaused(boolean paused) {}
+
+    default void onSoundFrame(Map<SoundInstance, ChannelAccess.ChannelHandle> channels, Executor executor) {}
 
     default void onSoundStop(@Nullable ResourceLocation id, @Nullable SoundSource category) {}
 

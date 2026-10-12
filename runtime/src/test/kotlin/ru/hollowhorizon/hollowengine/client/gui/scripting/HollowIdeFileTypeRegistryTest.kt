@@ -90,6 +90,7 @@ class HollowIdeFileTypeRegistryTest {
                 modelEditor = {},
                 imageEditor = {},
                 videoEditor = {},
+                audioEditor = {},
                 animatorEditor = {},
                 rigEditor = {},
                 vfxEditor = {},

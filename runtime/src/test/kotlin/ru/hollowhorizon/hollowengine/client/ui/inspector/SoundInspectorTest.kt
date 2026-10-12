@@ -26,6 +26,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDefault
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptSchema
 import ru.hollowhorizon.hollowengine.common.attachments.editor.toDescriptor
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
 import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
 import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
 import kotlin.test.assertEquals
@@ -37,15 +38,15 @@ import kotlin.test.assertTrue
 
 class SoundInspectorTest {
     @Test
-    fun `enabling range creates a valid override and recomposes its input`() = withLanguage("ru_ru") {
+    fun `enabling the falloff distance creates a valid override and recomposes its input`() = withLanguage("ru_ru") {
         Fixture().use { editor ->
-            assertNull(editor.frame().nodeByIdentifier("insp-number/sound/range"))
-            val enabled = editor.click("insp-optional/sound/range")
-            assertEquals(16f, editor.playback.range)
-            assertNotNull(enabled.nodeByIdentifier("insp-number/sound/range"))
-            val disabled = editor.click("insp-optional/sound/range")
-            assertNull(editor.playback.range)
-            assertNull(disabled.nodeByIdentifier("insp-number/sound/range"))
+            assertNull(editor.frame().nodeByIdentifier("insp-number/sound/falloff/distance"))
+            val enabled = editor.click("insp-optional/sound/falloff/distance")
+            assertEquals(16f, editor.playback.falloff.distance)
+            assertNotNull(enabled.nodeByIdentifier("insp-number/sound/falloff/distance"))
+            val disabled = editor.click("insp-optional/sound/falloff/distance")
+            assertNull(editor.playback.falloff.distance)
+            assertNull(disabled.nodeByIdentifier("insp-number/sound/falloff/distance"))
         }
     }
 
@@ -89,7 +90,7 @@ class SoundInspectorTest {
                 val text = editor.frame().nodes.filterIsInstance<SpanNode>().map { it.text }
                 assertTrue("Один раз" in text)
                 assertTrue("Бесконечно" in text)
-                assertTrue("Радиус слышимости" in text)
+                assertTrue("Затухание с расстоянием" in text)
                 assertFalse(text.any { it.contains("SoundRepeat") || it.contains("sound_repeat") })
             }
         }
@@ -97,9 +98,10 @@ class SoundInspectorTest {
 
     @Test
     fun `initial values survive script schema export and constructor defaults stay intact`() {
+        val falloff = SoundFalloff.serializer().descriptor
+        val distance = ScriptSchema.fieldOf(falloff, falloff.getElementIndex("distance"), 0)
+        val exported = listOf(distance).toDescriptor("test.Falloff")
         val descriptor = SoundPlayback.serializer().descriptor
-        val range = ScriptSchema.fieldOf(descriptor, descriptor.getElementIndex("range"), 0)
-        val exported = listOf(range).toDescriptor("test.Playback")
         assertEquals("16.0", exported.getElementAnnotations(0).filterIsInstance<EditorDefault>().single().json)
         val initial = ComponentJson.defaultJson(descriptor)
         assertEquals(SoundPlayback(), ComponentJson.format.decodeFromJsonElement(SoundPlayback.serializer(), initial))

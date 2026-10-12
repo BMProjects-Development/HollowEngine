@@ -7,6 +7,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpola
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.common.sounds.LowPassFilter
+import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxInterpolation
@@ -151,6 +153,43 @@ class MontageTests {
         // What the montage brought takes its track as it is, whatever the montage's weight.
         assertEquals(Vec3f(0f, 1f, 0f), (during.rig.bone("hand")!!.attachment("cup") as IkTargetSpec).offset)
         assertTrue(during.key != before.key)
+    }
+
+    @Test
+    fun `a sound keeps time with its stretch, is held between them, and animates fields nested in its playback`() {
+        val montage = MontageFormat.read(
+            """
+            {
+              "duration": 4,
+              "attachments": [ { "bone": "hand", "windows": [ { "start": 1, "end": 2 } ], "spec": {
+                "type": "hollowengine:rig/sound", "id": "hum", "source": "minecraft:block.beacon.ambient",
+                "playback": { "filters": [ { "type": "hollowengine:sound/low_pass", "cutoff": 1000 } ] } } } ],
+              "tracks": [
+                { "bone": "hand", "attachment": "hum", "property": "playback.volume",
+                  "curves": [ { "keys": [ { "time": 0, "value": 0.25, "interpolation": "LINEAR" } ] } ] },
+                { "bone": "hand", "attachment": "hum", "property": "playback.filters.0.cutoff",
+                  "curves": [ { "keys": [ { "time": 0, "value": 400, "interpolation": "LINEAR" } ] } ] }
+              ]
+            }
+            """
+        )
+
+        fun sound(time: Float) = ModelRig.EMPTY.withMontages(listOf(MontageMoment(montage, time, 1f)))
+            .rig.bone("hand")!!.attachment("hum") as SoundBoneAttachmentSpec
+
+        val playing = sound(1.5f)
+        assertEquals(0.5f, playing.clock!!, 1e-5f)
+        assertEquals(0.25f, playing.playback.volume)
+        assertEquals(400f, (playing.playback.filters.single() as LowPassFilter).cutoff)
+
+        val held = sound(3f)
+        assertEquals(false, held.playing)
+        assertNull(held.clock)
+
+        val fields = RigFields.animatable(playing).map { it.name }
+        assertTrue("playback.volume" in fields && "playback.filters.0.cutoff" in fields, "$fields")
+        assertTrue(fields.none { it.startsWith("playback.repeat") || it == "playback.fadeIn" || it == "clock" }, "$fields")
+        assertEquals(listOf("playback.pitch"), RigFields.changed(playing, playing.copy(playback = playing.playback.copy(pitch = 2f))))
     }
 
     /** A clip that moves a bone along x by [rate] times the time it is sampled at. */

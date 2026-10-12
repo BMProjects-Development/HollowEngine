@@ -25,5 +25,7 @@
   "pick": "Pick from loaded assets",
   "remove": "Remove",
   "search": "Search",
+  "sound.listen": "Listen",
+  "sound.stop": "Stop",
   "unsupported": "%s cannot be edited here"
 }

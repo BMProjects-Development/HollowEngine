@@ -51,6 +51,7 @@ object VfxNodeTypes {
         builtIn("post_effect", VfxPostEffectSpec.serializer(), "vfx/node_post_effect.svg") { VfxPostEffectSpec() }
         builtIn("sky", VfxSkySpec.serializer(), "vfx/node_sky.svg") { VfxSkySpec() }
         builtIn("camera_shake", VfxCameraShakeSpec.serializer(), "vfx/node_camera_shake.svg") { VfxCameraShakeSpec() }
+        builtIn("sound", VfxSoundSpec.serializer(), "vfx/node_sound.svg") { VfxSoundSpec() }
     }
 
     private inline fun <reified S : VfxNodeSpec> builtIn(

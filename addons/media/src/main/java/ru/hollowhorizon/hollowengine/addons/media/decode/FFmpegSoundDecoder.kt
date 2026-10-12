@@ -13,9 +13,14 @@ class FFmpegSoundDecoder : SoundDecoder, AutoCloseable {
     private val streams = ConcurrentHashMap.newKeySet<AudioStream>()
     override val extensions = setOf("mp3", "flac", "opus", "aac", "m4a", "mp4", "webm", "mkv", "avi", "mov", "aif", "aiff", "wma", "mka")
     override fun accepts(source: MediaSource) = true // FFmpeg probes the container, including extensionless URLs.
-    override fun open(source: MediaSource, resources: ResourceProvider): AudioStream {
+    override fun open(source: MediaSource, resources: ResourceProvider): AudioStream = own(FFmpegSoundStream(FFmpegInput(source, resources)))
+
+    override fun openAt(source: MediaSource, resources: ResourceProvider, start: Double): AudioStream =
+        own(FFmpegSoundStream(FFmpegInput(source, resources), start))
+
+    /** Keeps [stream] until it closes, so unloading the addon closes what is still playing. */
+    private fun own(stream: FFmpegSoundStream): AudioStream {
         check(!closed.get()) { "Media addon is unloading" }
-        val stream = FFmpegSoundStream(FFmpegInput(source, resources))
         val owned = object : AudioStream {
             override fun getFormat() = stream.format
             override fun read(size: Int) = stream.read(size)
@@ -25,6 +30,7 @@ class FFmpegSoundDecoder : SoundDecoder, AutoCloseable {
         if (closed.get()) { owned.close(); error("Media addon was unloaded while opening audio") }
         return owned
     }
+
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         streams.toList().forEach(AudioStream::close)

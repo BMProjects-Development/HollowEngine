@@ -135,6 +135,12 @@ interface VfxNodeBehavior {
 
     /** Adds what the node draws; [placement] maps effect space to the space of the view. */
     fun collect(into: VfxDrawList, placement: Matrix4f) = Unit
+
+    /**
+     * The effect is drawn this frame, held or not: for what a node does once a frame besides drawing, as a sound
+     * keeping time with it. It may come more than once a frame, from several passes.
+     */
+    fun frame() = Unit
 }
 
 /** Makes the behavior of one node. Returning null leaves the node as a plain frame. */
@@ -160,6 +166,7 @@ object VfxNodeRuntimes {
         register("hollowengine:vfx/post_effect") { VfxPostEffectNode(it.spec as VfxPostEffectSpec, it) }
         register("hollowengine:vfx/sky") { VfxSkyNode(it.spec as VfxSkySpec, it) }
         register("hollowengine:vfx/camera_shake") { VfxCameraShake(it.spec as VfxCameraShakeSpec, it) }
+        register("hollowengine:vfx/sound") { VfxSoundNode(it.spec as VfxSoundSpec, it) }
     }
 
     fun register(typeId: String, factory: VfxNodeFactory): ExtensionHandle = point.register(typeId.rl, factory)

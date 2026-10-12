@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.history.HistoryDock
 import ru.hollowhorizon.hollowengine.client.ui.ide.history.IdeHistories
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFilePanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph.ShaderGraphEditor
@@ -100,6 +101,7 @@ object HollowIdeOverlay {
                     modifier = Modifier.size(100.percent, 100.percent),
                 )
             },
+            audioEditor = { file -> AudioFilePanel(file.path) },
             animatorEditor = { file -> HollowIdeAnimatorEditor(file) },
             rigEditor = { file -> RigEditorPanel(file) },
             vfxEditor = { file -> VfxEditorPanel(file) },
@@ -111,6 +113,7 @@ object HollowIdeOverlay {
             imageEditor = { file -> HollowIdeImageEditor(file, file::save) },
             textEditor = { file -> FileEditor(file) },
             jsonModelEditor = { file -> VanillaModelEditorPanel(file.path) },
+            audioEditor = { file -> AudioFilePanel(file.path) },
         )
     }
     private val previews = HollowIdePreviewRegistry().apply { registerBuiltinPreviews() }
@@ -1297,7 +1300,7 @@ object HollowIdeOverlay {
         }
         val modelTypeId = assetFileTypeId(
             scope, asset.location.path, ByteArray(0), forceText
-        )?.takeIf { it == AssetJsonModelFileTypeId || it == "model" }
+        )?.takeIf { it == AssetJsonModelFileTypeId || it == AssetAudioFileTypeId || it == "model" }
         val bytes = if (modelTypeId != null) {
             ByteArray(0)
         } else {

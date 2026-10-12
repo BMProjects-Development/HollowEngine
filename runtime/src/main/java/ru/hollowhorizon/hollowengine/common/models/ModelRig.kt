@@ -164,6 +164,12 @@ abstract class RigAttachmentSpec {
      * off: an effect stays and only stops making particles, so what it made does not vanish at once.
      */
     open fun held(): RigAttachmentSpec? = null
+
+    /**
+     * This attachment [seconds] into the stretch of a montage that hangs it, for one that keeps time with it, as
+     * a sound does that plays from where the playhead is.
+     */
+    open fun inStretch(seconds: Float): RigAttachmentSpec = this
 }
 
 /** Draws whatever the entity wears in [slot] at this bone. */

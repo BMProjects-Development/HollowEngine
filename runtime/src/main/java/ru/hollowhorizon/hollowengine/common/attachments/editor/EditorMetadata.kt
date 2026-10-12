@@ -76,6 +76,9 @@ object EditorWidgets {
 
     /** An expression of the animator's language, with its completion and highlighting. */
     const val ANIMATION_EXPRESSION = "hollowengine:animation_expression"
+
+    /** A sound event or a sound file, offered among those there are, with a button to listen to it. */
+    const val SOUND_SOURCE = "hollowengine:sound_source"
 }
 
 /** A string field that deserves more than one line. */

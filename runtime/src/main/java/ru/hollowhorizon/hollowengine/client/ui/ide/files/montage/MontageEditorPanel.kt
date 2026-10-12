@@ -97,10 +97,10 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
     }
     viewer.debugDraw = { lines ->
         if (rigState.showSkeleton) lines.ikOverlay(viewer.attachment.rig, viewer.nodes, rigState.partSelection)
-        if (rigState.showColliders) lines.colliders(
-            previewColliders(viewer.attachment.rig, viewer.nodes),
-            rigState.partSelection
-        )
+        if (rigState.showColliders) {
+            lines.colliders(previewColliders(viewer.attachment.rig, viewer.nodes), rigState.partSelection)
+            lines.soundAreas(viewer.attachment.rig, viewer.nodes, rigState.partSelection)
+        }
     }
 
     LaunchedEffect(rigState.selected, rigState.selectedPart, document.montage.attachments.size) {
@@ -285,6 +285,7 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
     private fun rigStateFor(model: String): RigEditorState = RigEditorState(rigs, model).also { state ->
         state.viewer.instance.animator.add(PreviewLayer())
         state.viewer.effectClock = { session.timeline.currentTime }
+        state.viewer.playsSounds = true
         state.viewer.effectEmitting = { bone, id, seconds ->
             val montage = document.montage
             val own = montage.attachments.firstOrNull { it.bone == bone && it.spec.id == id }

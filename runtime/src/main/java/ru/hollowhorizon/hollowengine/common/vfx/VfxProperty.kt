@@ -38,6 +38,8 @@ value class VfxProperty(val id: String) {
         val BEAM_NOISE = VfxProperty("beam.noise")
         val SHAKE_STRENGTH = VfxProperty("shake.strength")
         val SHAKE_FREQUENCY = VfxProperty("shake.frequency")
+        val SOUND_VOLUME = VfxProperty("sound.volume")
+        val SOUND_PITCH = VfxProperty("sound.pitch")
 
         fun module(moduleId: String, field: String) = VfxProperty("modules.$moduleId.$field")
 

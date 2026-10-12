@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
+import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
@@ -18,7 +19,8 @@ object ColliderDebugRenderer {
      */
     fun renderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean {
         val colliders = ClientColliderTickPoses.at(entity, partialTick)
-        if (colliders.isNotEmpty()) {
+        val sounds = SoundAttachments.shapesOf(entity.uuid.toString())
+        if (colliders.isNotEmpty() || sounds.isNotEmpty()) {
             val origin = hostPosition(entity, partialTick)
             val batch = DebugLines.Batch(lines, poseStack.last())
             colliders.forEach { collider ->
@@ -26,6 +28,10 @@ object ColliderDebugRenderer {
                 collider.volume.outline { start, end ->
                     batch.line(start.subtract(origin).toVec3f(), end.subtract(origin).toVec3f(), color)
                 }
+            }
+            val drawn = entity.getPosition(partialTick)
+            sounds.forEach { shape ->
+                shape.outline { start, end -> batch.line(start.subtract(drawn).toVec3f(), end.subtract(drawn).toVec3f(), SOUND_COLOR) }
             }
         }
         return EntityColliders.hasTargets(entity)
@@ -45,4 +51,5 @@ object ColliderDebugRenderer {
     private val INTERACT_COLOR = 0xCC59B8FF.toInt()
     private val PUSH_COLOR = 0xCCE0E0E0.toInt()
     private val SOLID_COLOR = 0xCCFFB347.toInt()
+    private val SOUND_COLOR = 0xCC70BCD8.toInt()
 }

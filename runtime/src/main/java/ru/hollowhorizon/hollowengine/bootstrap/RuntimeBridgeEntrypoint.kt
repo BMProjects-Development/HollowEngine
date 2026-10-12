@@ -151,6 +151,7 @@ import ru.hollowhorizon.hollowengine.runtime.bootstrap.ClassGraphRuntimeAnnotati
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 
 class RuntimeBridgeEntrypoint : RuntimeBridge {
     init {
@@ -495,8 +496,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onSoundEngineReset() = ClientSounds.clear()
 
-    override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>) =
-        ClientSounds.frame(channels)
+    override fun onSoundEnginePaused(paused: Boolean) = ClientSounds.enginePaused(paused)
+
+    override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>, executor: Executor) =
+        ClientSounds.frame(channels, executor)
 
     override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) =
         ClientSounds.stopMatching(id, category)

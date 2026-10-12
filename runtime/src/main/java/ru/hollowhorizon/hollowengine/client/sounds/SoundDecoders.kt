@@ -17,6 +17,12 @@ interface SoundDecoder {
     val extensions: Set<String>
     fun accepts(source: MediaSource): Boolean = SoundDecoders.extension(source) in extensions
     fun open(source: MediaSource, resources: ResourceProvider): AudioStream
+
+    /**
+     * Opens [source] [start] seconds in, or null when this decoder cannot go there, and what comes before is read
+     * through instead.
+     */
+    fun openAt(source: MediaSource, resources: ResourceProvider, start: Double): AudioStream? = null
 }
 
 object SoundDecoders {
@@ -31,6 +37,11 @@ object SoundDecoders {
                 input.close()
                 throw error
             }
+        }
+
+        override fun openAt(source: MediaSource, resources: ResourceProvider, start: Double): AudioStream? {
+            if (extension(source) != "wav") return null
+            return WavSoundStream(openInput(source, resources)).also { it.skipSeconds(start) }
         }
     }
 
@@ -58,6 +69,13 @@ object SoundDecoders {
         }
         return (addon ?: error("Unsupported sound format '$extension'. Install the HollowEngine Media addon: $source"))
             .open(source, resources)
+    }
+
+    /** [source] opened [start] seconds in by whichever decoder [open] would pick, or null when it cannot seek. */
+    fun openAt(source: MediaSource, resources: ResourceProvider, start: Double): AudioStream? {
+        val decoder = if (extension(source) in builtin.extensions) builtin
+        else HollowAddonManager.findServices(SoundDecoder::class).lastOrNull { it.accepts(source) } ?: return null
+        return runCatching { decoder.openAt(source, resources, start) }.getOrNull()
     }
 
     fun openInput(source: MediaSource, resources: ResourceProvider): InputStream = when (source) {

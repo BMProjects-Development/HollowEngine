@@ -41,7 +41,7 @@ class SoundStreamsTest {
         val stream = PlaybackSoundStream({
             opened++
             pcm(shortArrayOf(100, 200, 300)) { closed++ }
-        }, SoundPlayback(repeat = SoundRepeat.Count(3)), false)
+        }, SoundPlayback(repeat = SoundRepeat.Count(3)))
         assertEquals(List(3) { listOf(100, 200, 300) }.flatten(), readSamples(stream, 10))
         stream.close(); stream.close()
         assertEquals(3, opened)
@@ -50,7 +50,7 @@ class SoundStreamsTest {
 
     @Test
     fun `empty infinite source terminates instead of spinning`() {
-        PlaybackSoundStream({ pcm(shortArrayOf()) }, SoundPlayback(repeat = SoundRepeat.Forever), false).use {
+        PlaybackSoundStream({ pcm(shortArrayOf()) }, SoundPlayback(repeat = SoundRepeat.Forever)).use {
             assertEquals(emptyList(), readSamples(it, 20))
         }
     }
@@ -60,22 +60,28 @@ class SoundStreamsTest {
         PlaybackSoundStream(
             { pcm(ShortArray(8) { 1000 }) },
             SoundPlayback(fadeIn = 0.004f, fadeOut = 0.004f),
-            false
         ).use {
             assertEquals(listOf(0, 250, 500, 750, 750, 500, 250, 0), readSamples(it, 6))
         }
     }
 
     @Test
-    fun `spatial playback downmixes stereo without clipping`() {
+    fun `a start read through drops what is before it and does not fade in again`() {
         PlaybackSoundStream(
-            { pcm(shortArrayOf(32767, 32767, -32768, 32767), channels = 2) },
-            SoundPlayback(),
-            true
-        ).use {
-            assertEquals(1, it.format.channels)
-            assertEquals(listOf(32767, 0), readSamples(it, 8))
-        }
+            { pcm(shortArrayOf(1, 2, 3, 4, 5)) },
+            SoundPlayback(fadeIn = 0.004f),
+            start = 0.002,
+        ).use { assertEquals(listOf(3, 4, 5), readSamples(it, 4)) }
+    }
+
+    @Test
+    fun `a start past the end of one play goes on in the next`() {
+        PlaybackSoundStream(
+            { pcm(shortArrayOf(1, 2, 3)) },
+            SoundPlayback(repeat = SoundRepeat.Count(2)),
+            start = 0.004,
+            openAt = { pcm(shortArrayOf()) },
+        ).use { assertEquals(listOf(2, 3), readSamples(it, 4)) }
     }
 
     @Test
@@ -83,7 +89,6 @@ class SoundStreamsTest {
         fun samples(eachCycle: Boolean) = PlaybackSoundStream(
             { pcm(ShortArray(4) { 1000 }) },
             SoundPlayback(SoundRepeat.Count(2), fadeIn = 0.002f, fadeOut = 0.002f, fadeEachCycle = eachCycle),
-            false,
         ).use { readSamples(it, 6) }
         assertEquals(listOf(0, 500, 1000, 1000, 1000, 1000, 500, 0), samples(false))
         assertEquals(listOf(0, 500, 500, 0, 0, 500, 500, 0), samples(true))
@@ -103,7 +108,7 @@ class SoundStreamsTest {
 
             override fun close() = Unit
         }
-        PlaybackSoundStream({ source }, SoundPlayback(repeat = SoundRepeat.Forever), false).use {
+        PlaybackSoundStream({ source }, SoundPlayback(repeat = SoundRepeat.Forever)).use {
             assertEquals(100, it.read(200).remaining() / 2)
             assertEquals(1, reads)
         }

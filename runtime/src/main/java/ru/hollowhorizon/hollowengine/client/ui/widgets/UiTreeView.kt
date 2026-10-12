@@ -119,18 +119,34 @@ fun <T> UiTreeView(
                 },
             ),
         ) {
-            items.forEachIndexed { index, item ->
+            // A long tree composes only the rows in view, with spacers standing in for the rest: rows are all one height.
+            val virtual = items.size > VirtualizeFrom
+            val window = if (virtual) visibleRows(scrollState, items.size) else items.indices
+            if (window.first > 0) Box(modifier = Modifier.size(1.px, (window.first * TreeRowHeight).px))
+            for (index in window) {
+                val item = items[index]
                 key(item.id) {
                     UiTreeRow(
                         item, continuations[index], onToggle, onSelect, onIconClick, fillRowWidth, treeWidth, onDrop, canDrop,
-                        draggable = dragItem != null,
+                        draggable = dragItem != null, virtual = virtual,
                     ) {
                         dragItem?.invoke(item)
                     }
                 }
             }
+            val after = items.size - 1 - window.last
+            if (after > 0) Box(modifier = Modifier.size(1.px, (after * TreeRowHeight).px))
         }
     }
+}
+
+/** The rows of a tree of [count] that are in view of [scroll], with a few beyond each edge. */
+private fun visibleRows(scroll: UiScrollHandle, count: Int): IntRange {
+    val viewport = scroll.viewport.height
+    if (viewport <= 0f) return 0 until minOf(count, VirtualOverscan * 4)
+    val first = ((scroll.offsetY / TreeRowHeight).toInt() - VirtualOverscan).coerceIn(0, count - 1)
+    val last = (((scroll.offsetY + viewport) / TreeRowHeight).toInt() + VirtualOverscan).coerceIn(first, count - 1)
+    return first..last
 }
 
 private suspend fun <T> scrollToRow(scroll: UiScrollHandle, itemId: String, items: () -> List<UiTreeItem<T>>) {
@@ -190,6 +206,7 @@ private fun <T> UiTreeRow(
     onDrop: ((UiTreeItem<T>, UiDragItem) -> Boolean)?,
     canDrop: (UiTreeItem<T>, UiDragItem) -> Boolean,
     draggable: Boolean,
+    virtual: Boolean,
     drag: () -> UiDragItem?,
 ) {
     val id = "tree-item-${item.id}"
@@ -220,7 +237,7 @@ private fun <T> UiTreeRow(
                 Box(tags = listOfNotNull("tree-indent", guide))
             }
         }
-        UiTreeRowContent(item, id, width, minimum, onToggle, onIconClick, dragAndDrop, Modifier
+        UiTreeRowContent(item, id, width, minimum, onToggle, onIconClick, dragAndDrop, virtual, Modifier
             .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
             .dragSource(dragSource, drag)
             .then(dropModifier))
@@ -236,11 +253,12 @@ private fun <T> UiTreeRowContent(
     onToggle: (UiTreeItem<T>) -> Unit,
     onIconClick: ((UiTreeItem<T>) -> Unit)?,
     dragAndDrop: UiDragAndDropState?,
+    virtual: Boolean,
     interaction: Modifier,
 ) {
     Row(
         id = id,
-        tags = listOfNotNull("tree-item", "selected".takeIf { item.selected },
+        tags = listOfNotNull("tree-item", "selected".takeIf { item.selected }, "virtual".takeIf { virtual },
             if (dragAndDrop?.hoveredTargetId == id) {
                 if (dragAndDrop.canDrop) "drop-target" else "drop-rejected"
             } else null),
@@ -282,4 +300,8 @@ private fun <T> UiTreeRowContent(
 
 private const val FilterShortcutPriority = 100
 private const val TreeRowHeight = 20f
+
+/** How many rows a tree has before it composes only those in view, and how many it keeps beyond each edge. */
+private const val VirtualizeFrom = 200
+private const val VirtualOverscan = 8
 private const val RevealLayoutFrames = 4

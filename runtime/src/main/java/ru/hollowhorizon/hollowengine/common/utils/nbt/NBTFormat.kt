@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.utils.nbt
 
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -54,6 +55,7 @@ internal val TagModule
         ColliderShapeTypes.registerInto(this)
         VfxNodeTypes.registerInto(this)
         VfxModuleTypes.registerInto(this)
+        SoundFilterTypes.registerInto(this)
 
         polymorphic(Tag::class) {
             subclass(ByteTag::class, ForByteNBT)

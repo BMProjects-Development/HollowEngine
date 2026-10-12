@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.vfx
 
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 
@@ -40,6 +41,7 @@ object VfxFormat {
         val module = SerializersModule {
             VfxNodeTypes.registerInto(this)
             VfxModuleTypes.registerInto(this)
+            SoundFilterTypes.registerInto(this)
         }
         return Json {
             serializersModule = module

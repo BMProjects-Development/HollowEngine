@@ -1,5 +1,10 @@
 package ru.hollowhorizon.hollowengine.common.models
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.elementDescriptors
+import kotlinx.serialization.descriptors.getPolymorphicDescriptors
 import kotlinx.serialization.json.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
@@ -30,7 +35,9 @@ fun montageKey(moments: List<MontageMoment>): List<Any> =
  * them as [RigAttachmentSpec.held] says, so taking it out of a stretch does not build the model again.
  */
 private fun MontageMoment.present(): List<MontageAttachment> = montage.attachments.mapNotNull { attachment ->
-    if (attachment.isActive(time)) attachment else attachment.spec.held()?.let { attachment.copy(spec = it) }
+    val stretch = attachment.windows.firstOrNull { it.contains(time) }
+    if (stretch != null) attachment.copy(spec = attachment.spec.inStretch(time - stretch.start))
+    else attachment.spec.held()?.let { attachment.copy(spec = it) }
 }
 
 private fun ModelRig.withMontage(moment: MontageMoment, present: List<MontageAttachment>): ModelRig {
@@ -77,19 +84,54 @@ object RigFields {
     /** The numbers [property] of [spec] holds, or null when it is no such field or holds no plain numbers. */
     fun read(spec: RigAttachmentSpec, property: String): FloatArray? = tree(spec)?.at(property)?.numbers()
 
-    /** Every field of [spec] a montage can animate, as it is stored; its id and kind are never among them. */
+    /**
+     * Every field of [spec] a montage can animate, as it is stored; its id and kind are never among them. Fields of
+     * nested objects and lists are named by their path, as `playback.volume` or `playback.filters.0.cutoff`.
+     */
     fun animatable(spec: RigAttachmentSpec): List<Field> {
-        val still = stillFields(spec)
-        return tree(spec)?.entries.orEmpty()
-            .mapNotNull { (name, value) -> if (name in still) null else field(name, value) }
+        val tree = tree(spec) ?: return emptyList()
+        val descriptor = RigAttachmentTypes.of(spec)?.serializer?.descriptor
+        return buildList { collect(tree, descriptor, "", this) }
     }
 
-    /** The fields of [spec]'s kind marked [EditorNotAnimated] or hidden from the editor, with its id and kind. */
-    private fun stillFields(spec: RigAttachmentSpec): Set<String> {
-        val descriptor = RigAttachmentTypes.of(spec)?.serializer?.descriptor ?: return setOf(ID, TYPE)
-        return (0 until descriptor.elementsCount).filter { index ->
-                descriptor.getElementAnnotations(index).any { it is EditorNotAnimated || it is EditorHidden }
-            }.mapTo(hashSetOf(ID, TYPE)) { descriptor.getElementName(it) }
+    /** The animatable fields of [value], what [descriptor] says of it, into [into], each named after [prefix]. */
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun collect(value: JsonObject, descriptor: SerialDescriptor?, prefix: String, into: MutableList<Field>) {
+        value.forEach { (name, element) ->
+            if (name == TYPE || name == ID && prefix.isEmpty()) return@forEach
+            val index = descriptor?.getElementIndex(name)?.takeIf { it >= 0 }
+            if (descriptor != null && index == null) return@forEach
+            if (index != null && descriptor.getElementAnnotations(index).any { it is EditorNotAnimated || it is EditorHidden }) {
+                return@forEach
+            }
+            val path = prefix + name
+            field(path, element)?.let { into += it; return@forEach }
+            descend(element, index?.let { descriptor.getElementDescriptor(it) }, "$path.", into)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun descend(element: JsonElement, descriptor: SerialDescriptor?, prefix: String, into: MutableList<Field>) {
+        when (element) {
+            is JsonObject -> collect(element, descriptor?.let { concrete(it, element) }, prefix, into)
+            is JsonArray -> element.forEachIndexed { index, item ->
+                descend(item, descriptor?.takeIf { it.elementsCount > 0 }?.getElementDescriptor(0), "$prefix$index.", into)
+            }
+            else -> Unit
+        }
+    }
+
+    /** What [descriptor] is for [value]: the class it names by its type, when it is one of several. */
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun concrete(descriptor: SerialDescriptor, value: JsonObject): SerialDescriptor? {
+        if (descriptor.kind !is PolymorphicKind) return descriptor
+        val type = (value[TYPE] as? JsonPrimitive)?.contentOrNull ?: return null
+        val candidates = if (descriptor.kind == PolymorphicKind.OPEN) {
+            MontageFormat.fields.serializersModule.getPolymorphicDescriptors(descriptor)
+        } else if (descriptor.elementsCount > 1) {
+            descriptor.getElementDescriptor(1).elementDescriptors.toList()
+        } else emptyList()
+        return candidates.firstOrNull { it.serialName == type }
     }
 
     private fun field(name: String, value: JsonElement): Field? {
@@ -135,19 +177,40 @@ object RigFields {
         }.getOrNull()
     }
 
-    /** The top-level fields [after] holds otherwise than [before]. */
+    /**
+     * The fields [after] holds otherwise than [before], by their paths: as deep as both hold the same shape, so an
+     * edit of one number in a nested object names that number.
+     */
     fun changed(before: RigAttachmentSpec, after: RigAttachmentSpec): List<String> {
         val from = tree(before) ?: return emptyList()
         val to = tree(after) ?: return emptyList()
-        return (from.keys + to.keys).filter { from[it] != to[it] }
+        return buildList { diff(from, to, "", this) }
     }
 
-    /** [into] with the top-level fields [names] taken from [from]; null when that does not read back. */
+    private fun diff(from: JsonElement?, to: JsonElement?, path: String, into: MutableList<String>) {
+        if (from == to) return
+        when {
+            from is JsonObject && to is JsonObject && from[TYPE] == to[TYPE] && from.numbers() == null ->
+                (from.keys + to.keys).forEach { diff(from[it], to[it], join(path, it), into) }
+
+            from is JsonArray && to is JsonArray && from.size == to.size && from.numbers() == null ->
+                from.indices.forEach { diff(from[it], to[it], join(path, it.toString()), into) }
+
+            else -> into += path
+        }
+    }
+
+    private fun join(path: String, name: String) = if (path.isEmpty()) name else "$path.$name"
+
+    /** [into] with the fields at [names] taken from [from]; null when that does not read back. */
     fun copy(from: RigAttachmentSpec, into: RigAttachmentSpec, names: Collection<String>): RigAttachmentSpec? {
         if (names.isEmpty()) return into
         val source = tree(from) ?: return null
         val target = tree(into) ?: return null
-        val merged = JsonObject(target + names.mapNotNull { name -> source[name]?.let { name to it } })
+        val merged = names.fold(target as JsonElement) { tree, name ->
+            val value = source.at(name) ?: return@fold tree
+            if (tree.at(name) == null) tree.withNew(name, value) else tree.with(name.split('.'), value)
+        }
         return runCatching {
             MontageFormat.fields.decodeFromJsonElement(
                 RigAttachmentSpec.serializer(),
@@ -163,14 +226,41 @@ object RigFields {
         ) as? JsonObject
     }.getOrNull()
 
-    private fun JsonElement.at(path: String): JsonElement? =
-        path.split('.').fold(this as JsonElement?) { element, name -> (element as? JsonObject)?.get(name) }
+    /** What lies at [path], its steps names of fields or indices of lists. */
+    private fun JsonElement.at(path: String): JsonElement? = path.split('.').fold(this as JsonElement?) { element, name ->
+        when (element) {
+            is JsonObject -> element[name]
+            is JsonArray -> name.toIntOrNull()?.let(element::getOrNull)
+            else -> null
+        }
+    }
 
+    /** This with [value] at [path], when there is something there to replace. */
     private fun JsonElement.with(path: List<String>, value: JsonElement): JsonElement {
         if (path.isEmpty()) return value
-        val obj = this as? JsonObject ?: return this
-        val child = obj[path.first()] ?: return this
-        return JsonObject(obj + (path.first() to child.with(path.drop(1), value)))
+        val name = path.first()
+        return when (this) {
+            is JsonObject -> {
+                val child = this[name] ?: return this
+                JsonObject(this + (name to child.with(path.drop(1), value)))
+            }
+
+            is JsonArray -> {
+                val index = name.toIntOrNull()?.takeIf { it in indices } ?: return this
+                JsonArray(mapIndexed { at, item -> if (at == index) item.with(path.drop(1), value) else item })
+            }
+
+            else -> this
+        }
+    }
+
+    /** This with a field at [path] that it did not hold, put into the object that holds its last step. */
+    private fun JsonElement.withNew(path: String, value: JsonElement): JsonElement {
+        val steps = path.split('.')
+        val parent = steps.dropLast(1)
+        val holder = (if (parent.isEmpty()) this else at(parent.joinToString("."))) as? JsonObject ?: return this
+        val updated = JsonObject(holder + (steps.last() to value))
+        return if (parent.isEmpty()) updated else with(parent, updated)
     }
 
     private fun JsonElement.numbers(): FloatArray? = when (this) {

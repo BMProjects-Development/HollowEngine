@@ -21,8 +21,8 @@ object SoundStreams {
 
     fun handles(id: ResourceLocation) = id.path.substringAfterLast('.') in SoundSource.fileExtensions + SoundDecoders.extensions
 
-    fun register(id: ResourceLocation, source: MediaSource, settings: SoundPlayback, spatial: Boolean, failure: (Throwable) -> Unit) {
-        streams[id] = Entry(source, settings, spatial, failure)
+    fun register(id: ResourceLocation, source: MediaSource, settings: SoundPlayback, start: Double, failure: (Throwable) -> Unit) {
+        streams[id] = Entry(source, settings, start, failure)
     }
 
     fun remove(id: ResourceLocation) { streams.remove(id)?.close() }
@@ -36,7 +36,6 @@ object SoundStreams {
             if (entry != null) entry.open(resources) else PlaybackSoundStream(
                 { SoundDecoders.open(MediaSource.Resource(id), resources) },
                 SoundPlayback(repeat = if (looping) SoundRepeat.Forever else SoundRepeat.Once),
-                spatial = false,
             )
         }, Util.backgroundExecutor())
     }
@@ -50,12 +49,16 @@ object SoundStreams {
         }, Util.backgroundExecutor())
     }
 
-    private class Entry(val source: MediaSource, val settings: SoundPlayback, val spatial: Boolean, val failure: (Throwable) -> Unit) {
+    private class Entry(val source: MediaSource, val settings: SoundPlayback, val start: Double, val failure: (Throwable) -> Unit) {
         private var closed = false
         private var stream: AudioStream? = null
         fun open(resources: ResourceProvider): AudioStream {
             synchronized(this) { check(!closed) { "Sound was stopped before its stream opened" } }
-            val opened = try { PlaybackSoundStream({ SoundDecoders.open(source, resources) }, settings, spatial) }
+            val opened = try {
+                PlaybackSoundStream({ SoundDecoders.open(source, resources) }, settings, start) { at ->
+                    SoundDecoders.openAt(source, resources, at)
+                }
+            }
             catch (error: Exception) { failure(error); throw error }
             synchronized(this) {
                 if (closed) { opened.close(); error("Sound was stopped while opening its stream") }

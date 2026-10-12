@@ -12,6 +12,7 @@ sealed interface SoundEmitterSpec {
     data class Position(
         val position: @Serializable(ForVec3::class) Vec3,
         val velocity: @Serializable(ForVec3::class) Vec3 = Vec3.ZERO,
+        val areas: List<SoundArea> = emptyList(),
     ) : SoundEmitterSpec
     @Serializable
     data class Entity(val id: Int, val offset: @Serializable(ForVec3::class) Vec3 = Vec3.ZERO) : SoundEmitterSpec

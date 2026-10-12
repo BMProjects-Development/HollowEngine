@@ -190,6 +190,7 @@ class VfxInstance(
     /** Adds what every active node draws; [placement] maps effect space to the space of the view. */
     fun collect(into: VfxDrawList, placement: Matrix4f) {
         allNodes.forEach { node ->
+            node.behavior?.frame()
             if (isPaused && node.parent?.behavior !is VfxEmitter) return@forEach
             node.behavior?.collect(into, placement)
         }

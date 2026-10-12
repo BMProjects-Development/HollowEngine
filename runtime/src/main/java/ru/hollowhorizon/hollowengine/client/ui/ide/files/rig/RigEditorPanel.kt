@@ -84,6 +84,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         }
         if (state.showColliders) {
             lines.colliders(previewColliders(document.rig, viewer.nodes), state.partSelection)
+            lines.soundAreas(document.rig, viewer.nodes, state.partSelection)
             RigOverlays.all.forEach { it.draw(viewer.attachment, lines, state.selected) }
             preview?.draw(lines)
         }

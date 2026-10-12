@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensions
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
@@ -11,6 +12,7 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     modelEditor: HollowIdeFileEditor,
     imageEditor: HollowIdeFileEditor,
     videoEditor: HollowIdeFileEditor,
+    audioEditor: HollowIdeFileEditor,
     animatorEditor: HollowIdeFileEditor,
     rigEditor: HollowIdeFileEditor,
     vfxEditor: HollowIdeFileEditor,
@@ -81,6 +83,16 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
             requiresContent = false,
             loader = { _, _ -> HollowIdeReadOnlyDocument },
             editor = videoEditor,
+        ),
+    )
+    register(
+        HollowIdeFileType.extensions(
+            id = "audio",
+            extensions = AudioFileExtensions,
+            priority = 140,
+            requiresContent = false,
+            loader = { _, _ -> HollowIdeReadOnlyDocument },
+            editor = audioEditor,
         ),
     )
     register(

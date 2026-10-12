@@ -5,6 +5,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.ExpressionField
@@ -44,6 +45,12 @@ object InspectorWidgets {
             @Composable
             override fun Content(field: InspectorWidgetField) =
                 RigTargetField(field.label, field.description, field.value.jsonPrimitive.content) { field.onChange(JsonPrimitive(it)) }
+        })
+        register(EditorWidgets.SOUND_SOURCE, object : InspectorWidget {
+            @Composable
+            override fun Content(field: InspectorWidgetField) = SoundSourceField(
+                field.label, field.description, (field.value as? JsonPrimitive)?.contentOrNull.orEmpty(), "insp-sound${field.path}",
+            ) { field.onChange(JsonPrimitive(it)) }
         })
         register(EditorWidgets.ANIMATION_EXPRESSION, object : InspectorWidget {
             @Composable

@@ -2,6 +2,9 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import androidx.compose.runtime.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
@@ -40,7 +43,8 @@ internal fun AutoFields(
         val current = value[name] ?: ComponentJson.defaultJson(element)
 
         key(name) {
-            CompositionLocalProvider(LocalAnimatedFields provides null) {
+            // What lies inside the field is animated by its path, as `playback.volume`.
+            CompositionLocalProvider(LocalAnimatedFields provides animated?.nested(name)) {
                 AnimatedField(animated, name) {
                     ValueEditor(
                         label = label,
@@ -79,6 +83,16 @@ interface AnimatedFields {
 
     /** Whether [name] takes no edits now: it is animated and keys are not being recorded. */
     fun isLocked(name: String): Boolean = false
+
+    /** The same, for what lies inside the field [name], named by their paths under it. */
+    fun nested(name: String): AnimatedFields = PrefixedAnimatedFields(this, "$name.")
+}
+
+private class PrefixedAnimatedFields(private val parent: AnimatedFields, private val prefix: String) : AnimatedFields {
+    override fun isAnimated(name: String): Boolean? = parent.isAnimated(prefix + name)
+    override fun toggle(name: String) = parent.toggle(prefix + name)
+    override fun isLocked(name: String): Boolean = parent.isLocked(prefix + name)
+    override fun nested(name: String): AnimatedFields = PrefixedAnimatedFields(parent, "$prefix$name.")
 }
 
 /** What the fields [AutoFields] shows at its top level can be animated by, if anything. */
@@ -542,29 +556,47 @@ private fun ListField(
 ) {
     val items = value as? JsonArray ?: JsonArray(emptyList())
     val element = descriptor.getElementDescriptor(0)
+    val animated = LocalAnimatedFields.current
 
     Column(tags = listOf("insp-nested")) {
         Row(tags = listOf("insp-nested-head")) {
             Text("${label.orEmpty()} (${items.size})", tags = listOf("insp-label"), modifier = Modifier.grow(1f))
-            InspectorIconButton(InspectorIcons.ADD, InspectorLang.add) {
-                onChange(items.withItemAdded(ComponentJson.defaultJson(element)))
+            val kinds = if (element.kind is PolymorphicKind) ComponentJson.subclassDescriptors(element) else emptyList()
+            var picking by remember { mutableStateOf(false) }
+            var anchor by remember { mutableStateOf(UiRect.Zero) }
+            Box(modifier = Modifier.onPlaced { anchor = it }) {
+                InspectorIconButton(InspectorIcons.ADD, InspectorLang.add) {
+                    if (kinds.size > 1) picking = true
+                    else onChange(items.withItemAdded(ComponentJson.defaultJson(element)))
+                }
             }
+            if (picking) ContextMenu(
+                "insp-add$path", anchor,
+                kinds.map { kind ->
+                    UiDropdownItem(ComponentLabels.typeName(kind)) {
+                        onChange(items.withItemAdded(ComponentJson.defaultOfSubclass(kind)))
+                    }
+                },
+                onExpandedChange = { picking = it },
+            )
         }
         Column(tags = listOf("insp-nested-body")) {
             items.forEachIndexed { index, item ->
                 key(index) {
                     Row(tags = listOf("insp-list-item")) {
                         Column(modifier = Modifier.grow(1f).gap(4.px)) {
-                            ValueEditor(
-                                label = "#${index + 1}",
-                                description = null,
-                                owner = owner,
-                                descriptor = element,
-                                hints = hints,
-                                value = item,
-                                path = "$path[$index]",
-                                onChange = { onChange(items.withItem(index, it)) },
-                            )
+                            CompositionLocalProvider(LocalAnimatedFields provides animated?.nested(index.toString())) {
+                                ValueEditor(
+                                    label = "#${index + 1}",
+                                    description = null,
+                                    owner = owner,
+                                    descriptor = element,
+                                    hints = hints,
+                                    value = item,
+                                    path = "$path[$index]",
+                                    onChange = { onChange(items.withItem(index, it)) },
+                                )
+                            }
                         }
                         InspectorIconButton(InspectorIcons.REMOVE, InspectorLang.remove) {
                             onChange(items.withoutItem(index))

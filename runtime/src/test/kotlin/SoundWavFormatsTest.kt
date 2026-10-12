@@ -75,7 +75,7 @@ class SoundWavFormatsTest {
     @Test
     fun `native OGG decoder obeys the playback stream PCM contract`() {
         val resource = javaClass.getResourceAsStream("/assets/hollowengine/sounds/button_0.ogg")!!
-        PlaybackSoundStream({ JOrbisAudioStream(resource) }, SoundPlayback(), false).use {
+        PlaybackSoundStream({ JOrbisAudioStream(resource) }, SoundPlayback()).use {
             assertEquals(16, it.format.sampleSizeInBits)
             var bytes = 0
             while (true) {

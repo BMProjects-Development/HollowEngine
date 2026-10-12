@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.sounds
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
+import org.joml.Matrix4f
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlayback
@@ -11,7 +12,11 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 
 sealed interface SoundEmitterState {
     data object Listener : SoundEmitterState
-    data class Available(val position: Vec3, val velocity: Vec3 = Vec3.ZERO) : SoundEmitterState
+    /**
+     * Plays from [position], moving at [velocity] blocks a second; with a [shape], from the nearest point of its
+     * areas and all around inside them.
+     */
+    data class Available(val position: Vec3, val velocity: Vec3 = Vec3.ZERO, val shape: SoundShape? = null) : SoundEmitterState
     data object Pending : SoundEmitterState
     data object TemporarilyUnavailable : SoundEmitterState
     data object Removed : SoundEmitterState
@@ -61,6 +66,10 @@ object SoundAttachments {
         }
     }
 
+    /** The areas the sounds an entity publishes fill now, by its [uuid], for showing where they play. */
+    fun shapesOf(uuid: String): List<SoundShape> = bindings.filterKeys { it.startsWith("$uuid/") }.values
+        .mapNotNull { (it.state as? SoundEmitterState.Available)?.shape }
+
     fun clear() {
         bindings.values.toList().forEach(Binding::close)
     }
@@ -75,10 +84,10 @@ object SoundAttachments {
         internal fun sample() = if (closed) SoundEmitterState.Removed else source?.sample() ?: state
 
         /** Moves the binding; an owner dropped by a later [register] keeps calling this, and is not heard. */
-        fun update(position: Vec3, velocity: Vec3 = Vec3.ZERO) {
+        fun update(position: Vec3, velocity: Vec3 = Vec3.ZERO, shape: SoundShape? = null) {
             if (closed) return
             require(position.isFinite() && velocity.isFinite())
-            state = SoundEmitterState.Available(position, velocity)
+            state = SoundEmitterState.Available(position, velocity, shape)
         }
         fun markTemporarilyUnavailable() {
             if (!closed) state = SoundEmitterState.TemporarilyUnavailable
@@ -96,7 +105,12 @@ internal fun Vec3.isFinite() = x.toFloat().isFinite() && y.toFloat().isFinite() 
 
 fun SoundEmitterSpec.createEmitter(): SoundEmitter = when (this) {
     SoundEmitterSpec.Listener -> SoundEmitter { SoundEmitterState.Listener }
-    is SoundEmitterSpec.Position -> SoundEmitter { SoundEmitterState.Available(position, velocity) }
+    is SoundEmitterSpec.Position -> {
+        val shape = if (areas.isEmpty()) null else SoundShape(
+            Matrix4f().translation(position.x.toFloat(), position.y.toFloat(), position.z.toFloat()), areas,
+        )
+        SoundEmitter { SoundEmitterState.Available(position, velocity, shape) }
+    }
     is SoundEmitterSpec.Attachment -> SoundAttachments.emitter(id)
     is SoundEmitterSpec.Rig -> {
         var observed: SoundEmitter? = null
@@ -135,9 +149,20 @@ fun SoundEmitterSpec.createEmitter(): SoundEmitter = when (this) {
                 entity.isRemoved -> SoundEmitterState.Removed
                 else -> {
                     observed = entity
-                    SoundEmitterState.Available(entity.getPosition(TickHandler.partialTick).add(offset), entity.deltaMovement.scale(20.0))
+                    SoundEmitterState.Available(entity.getPosition(TickHandler.partialTick).add(offset), entity.soundVelocity())
                 }
             }
         }
     }
 }
+
+/**
+ * How fast [this] moves, in blocks a second. On the ground it is not falling, though its motion says so every tick
+ * as gravity pulls it into the floor, which would bend the pitch of what it plays.
+ */
+internal fun Entity.soundVelocity(): Vec3 {
+    val motion = deltaMovement.scale(TICKS_PER_SECOND)
+    return if (onGround()) Vec3(motion.x, 0.0, motion.z) else motion
+}
+
+private const val TICKS_PER_SECOND = 20.0

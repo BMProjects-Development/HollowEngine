@@ -40,6 +40,7 @@
     "client.EntityRendererMixin",
     "client.GameRendererMixin",
     "client.GuiMixin",
+    "client.LibraryMixin",
     "client.LayerDefinitionsMixin",
     "client.MinecraftMixin",
     "client.MultiplayerGameModeMixin",

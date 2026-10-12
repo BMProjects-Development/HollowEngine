@@ -2,21 +2,51 @@ package ru.hollowhorizon.hollowengine.common.sounds
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 
+private const val LANG = "hollowengine.gui.sound_attachment"
+
+/**
+ * A sound that plays where it hangs: at a point of a bone, or through [areas] around it, as music that fills a
+ * house and fades out past its walls.
+ */
 @Serializable
 @SerialName("hollowengine:rig/sound")
 data class SoundBoneAttachmentSpec(
     @EditorHidden override val id: String = "sound",
-    @EditorName("hollowengine.gui.sound_attachment.source") val source: String = "",
-    @EditorName("hollowengine.gui.sound_attachment.auto_play") val autoPlay: Boolean = true,
-    @EditorName("hollowengine.gui.sound_attachment.playback") val playback: SoundPlayback = SoundPlayback(),
+    @EditorName("$LANG.source")
+    @EditorWidget(EditorWidgets.SOUND_SOURCE)
+    @EditorNotAnimated
+    val source: String = "",
+    @EditorName("$LANG.auto_play")
+    @EditorNotAnimated
+    val autoPlay: Boolean = true,
+    @EditorName("$LANG.playback")
+    val playback: SoundPlayback = SoundPlayback(),
+    @EditorName("$LANG.areas")
+    @EditorDescription("$LANG.areas.hint")
+    val areas: List<SoundArea> = emptyList(),
+    @EditorHidden
+    @EditorNotAnimated
+    val clock: Float? = null,
+    @EditorHidden
+    @EditorNotAnimated
+    val playing: Boolean = true,
 ) : RigAttachmentSpec() {
     override fun withId(id: String) = copy(id = id)
+
     override fun structure() = SoundBoneAttachmentSpec(id)
+
+    override fun held() = copy(playing = false, clock = null)
+
+    override fun inStretch(seconds: Float) = copy(clock = seconds)
 
     companion object {
         val TYPE = RigAttachmentType(

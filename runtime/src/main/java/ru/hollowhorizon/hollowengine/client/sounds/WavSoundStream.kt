@@ -103,6 +103,13 @@ class WavSoundStream(input: InputStream) : AudioStream {
         return output.flip()
     }
 
+    /** Moves [seconds] into the data without reading it, or to its end when it is shorter. */
+    fun skipSeconds(seconds: Double) {
+        val frames = (seconds.coerceAtLeast(0.0) * sampleRate).toLong().coerceAtMost(remaining / blockAlign)
+        input.skipNBytes(frames * blockAlign)
+        if (!open) remaining -= frames * blockAlign
+    }
+
     private fun fourCC(): String = String(ByteArray(4).also(input::readFully), Charsets.US_ASCII)
     private fun int32(): Int = Integer.reverseBytes(input.readInt())
     private fun uint32(): Long = int32().toLong() and 0xffffffffL

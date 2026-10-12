@@ -27,6 +27,8 @@ import ru.hollowhorizon.hollowengine.client.render.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBindingSource
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneAttachment
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings
@@ -284,6 +286,7 @@ class ModelViewerState(model: String) {
         }
         bufferSource.endBatch()
         drawEffects(effects, stack)
+        playSounds()
 
         if (showWireframe) {
             GL33.glPolygonMode(GL33.GL_FRONT_AND_BACK, GL33.GL_FILL)
@@ -321,6 +324,16 @@ class ModelViewerState(model: String) {
      * after the clock goes back; null takes whether it makes them now as true for the whole way.
      */
     var effectEmitting: ((bone: String, id: String, seconds: Float) -> Boolean)? = null
+
+    /** Whether the sounds hung on the model play in the preview, as a montage editor plays them along its timeline. */
+    var playsSounds = false
+
+    /** Keeps the sounds hung on the model playing, around the listener, for as long as the preview is drawn. */
+    private fun playSounds() {
+        if (!playsSounds) return
+        val holders = attachment.nodes.flatMap { it.walk() } + listOfNotNull(attachment.modelRoot)
+        holders.forEach { node -> node.attachments.forEach { (it as? SoundBoneAttachment)?.updatePreview() } }
+    }
 
     /**
      * Draws the effects the model's bones carry over the model. They play in the model's own space, in blocks

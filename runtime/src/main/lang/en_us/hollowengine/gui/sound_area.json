@@ -1,0 +1,8 @@
+{
+  "box": "Box",
+  "sphere": "Sphere",
+  "offset": "Offset",
+  "rotation": "Rotation",
+  "size": "Size (in blocks)",
+  "radius": "Radius (in blocks)"
+}

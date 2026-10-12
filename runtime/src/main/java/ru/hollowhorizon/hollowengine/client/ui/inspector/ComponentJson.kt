@@ -2,6 +2,7 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PolymorphicKind
@@ -53,6 +54,7 @@ internal object ComponentJson {
                     ColliderShapeTypes.registerInto(this)
                     VfxNodeTypes.registerInto(this)
                     VfxModuleTypes.registerInto(this)
+                    SoundFilterTypes.registerInto(this)
                 }
             }.also {
                 cached = it
