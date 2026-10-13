@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
+import net.minecraft.core.Direction
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
@@ -18,6 +19,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensi
 import ru.hollowhorizon.hollowengine.client.ui.ide.projectPathReference
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectKind
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
 import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
@@ -25,7 +27,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Models, effects and sounds dragged from the project or the asset manager onto the game panel become world objects. */
+/** Models, effects, sounds and pictures dragged from the project or the asset manager onto the game panel become world objects. */
 internal object GameViewportDrop {
     const val TARGET_ID = "game-viewport-drop"
 
@@ -34,6 +36,9 @@ internal object GameViewportDrop {
 
     /** Where the object goes when the ray meets nothing: in the air, this far along it. */
     private const val MISS_DISTANCE = 8.0
+
+    /** What becomes a decal: pictures, and videos when the Media addon plays them. */
+    private val DecalExtensions = listOf(".png") + DecalSpec.VideoExtensions
 
     private const val MARKER_RADIUS = 0.4
     private const val MARKER_SEGMENTS = 32
@@ -51,6 +56,7 @@ internal object GameViewportDrop {
             reference.endsWith(VfxFormat.EXTENSION) -> WorldObjectKind.VFX to reference
             HollowModelManager.supports(reference) -> WorldObjectKind.MODEL to reference
             AudioFileExtensions.any { reference.endsWith(it, ignoreCase = true) } -> WorldObjectKind.SOUND to reference
+            DecalExtensions.any { reference.endsWith(it, ignoreCase = true) } -> WorldObjectKind.DECAL to reference
             else -> null
         }
     }
@@ -59,14 +65,16 @@ internal object GameViewportDrop {
         placement(item) != null && Minecraft.getInstance().player?.hasPermissions(PlayerPermissions.GAMEMASTER) == true
 
     fun hover(panel: UiRect?, x: Float, y: Float) {
-        preview = panel?.let { pointAt(it, x, y) }
+        preview = panel?.let { hitAt(it, x, y) }?.point
     }
 
     fun drop(item: UiDragItem, panel: UiRect?, x: Float, y: Float): Boolean {
         preview = null
         val (kind, asset) = placement(item) ?: return false
-        val at = panel?.let { pointAt(it, x, y) } ?: return false
-        WorldObjectEditing.spawn(kind, asset, at.x, at.y, at.z)
+
+        val hit = panel?.let { hitAt(it, x, y) } ?: return false
+        val at = hit.point
+        WorldObjectEditing.spawn(kind, asset, at.x, at.y, at.z, face = hit.face)
         return true
     }
 
@@ -74,8 +82,12 @@ internal object GameViewportDrop {
         preview = null
     }
 
-    /** The world point under ([x], [y]) of the IDE surface, through the game image drawn in [image]. */
-    private fun pointAt(image: UiRect, x: Float, y: Float): Vec3? {
+
+    /** Where a ray from the panel met the world, and the face of the block it met there; up off any block. */
+    private class Hit(val point: Vec3, val face: Direction = Direction.UP)
+
+    /** What lies under ([x], [y]) of the IDE surface, through the game image drawn in [image]. */
+    private fun hitAt(image: UiRect, x: Float, y: Float): Hit? {
         if (image.width <= 0f || image.height <= 0f) return null
         val projector = WorldToScreenProjector
         val ray = projector.screenRay(
@@ -95,7 +107,9 @@ internal object GameViewportDrop {
         val collider = EntityColliders.pick(
             level, player, start, blockPoint ?: end, search, { it !is Player }, blockDistance, null
         ) { true }
-        return collider?.location ?: blockPoint ?: start.add(ray.direction.scale(MISS_DISTANCE))
+        collider?.let { return Hit(it.location) }
+        if (blockPoint != null) return Hit(blockPoint, block.direction)
+        return Hit(start.add(ray.direction.scale(MISS_DISTANCE)))
     }
 
     /** A ring on the ground where the object will stand, drawn over the game image laid out in [image]. */

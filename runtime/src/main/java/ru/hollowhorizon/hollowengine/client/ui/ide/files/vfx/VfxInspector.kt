@@ -86,6 +86,7 @@ internal fun VfxNodeFields(document: VfxEditing, state: VfxInspectorState, node:
         is VfxSkySpec -> SkyFields(document, state, node)
         is VfxCameraShakeSpec -> CameraShakeFields(document, state, node)
         is VfxSoundSpec -> SoundFields(document, state, node)
+        is VfxDecalSpec -> DecalFields(document, state, node)
         else -> Unit
     }
 }
@@ -234,6 +235,7 @@ internal object VfxIcons {
     const val SKY = ROOT + "sky.svg"
     const val SHAKE = ROOT + "shake.svg"
     const val SOUND = ROOT + "node_sound.svg"
+    const val DECAL = ROOT + "node_decal.svg"
     const val TIMELINE = ROOT + "timeline.svg"
     const val STATS = ROOT + "stats.svg"
     const val ADD = ROOT + "add.svg"

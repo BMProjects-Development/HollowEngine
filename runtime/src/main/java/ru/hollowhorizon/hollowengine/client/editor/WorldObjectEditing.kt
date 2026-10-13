@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.editor
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import net.minecraft.core.Direction
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
@@ -69,8 +70,16 @@ object WorldObjectEditing {
     private const val LINK_ICON = "hollowengine:textures/gui/icons/link.svg"
     private const val DELETE_ICON = "hollowengine:textures/gui/icons/remove.svg"
 
-    fun spawn(kind: WorldObjectKind, asset: String, x: Double, y: Double, z: Double, parent: WorldObjectEntity? = null) {
-        SpawnWorldObjectPacket(kind, asset, x, y, z, parent?.id).send()
+    fun spawn(
+        kind: WorldObjectKind,
+        asset: String,
+        x: Double,
+        y: Double,
+        z: Double,
+        parent: WorldObjectEntity? = null,
+        face: Direction = Direction.UP,
+    ) {
+        SpawnWorldObjectPacket(kind, asset, x, y, z, parent?.id, face.get3DDataValue()).send()
     }
 
     /** An empty object to group others under: at [parent], or in front of the player. */

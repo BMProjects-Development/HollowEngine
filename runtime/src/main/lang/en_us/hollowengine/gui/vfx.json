@@ -27,6 +27,7 @@
   "node_sky": "Sky",
   "node_camera_shake": "Camera shake",
   "node_sound": "Sound",
+  "node_decal": "Decal",
   "renders_particles": "Drawn on every particle of the emitter above it. Placement is added to each particle.",
   "renders_once": "Drawn once, where it stands. Put it under an emitter to draw it on every particle.",
 
@@ -48,6 +49,9 @@
   "section_sky": "Sky",
   "section_shake": "Shake",
   "section_sound": "Sound",
+  "section_decal": "Decal",
+  "decal_opacity": "Opacity",
+  "decal_opacity_hint": "Multiplies the opacity of the decal. It can be an expression or animated on the timeline.",
   "section_sound_playback": "Playback",
   "section_motion": "Motion",
   "section_material": "Material",

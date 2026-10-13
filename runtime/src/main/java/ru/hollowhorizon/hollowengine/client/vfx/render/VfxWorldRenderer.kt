@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.Decals
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
 import org.joml.Matrix4f
@@ -68,10 +70,11 @@ object VfxWorldRenderer {
         val camera = event.camera.position
         val scene = VfxScenes.current()
         val bones = VfxBoneBindings.drain(camera)
+        val decals = Decals.drain()
         frame.clear()
         deferred = null
         frameView = null
-        if (scene == null && bones.isEmpty()) {
+        if (scene == null && bones.isEmpty() && decals.isEmpty()) {
             shake.fill(0f)
             return
         }
@@ -83,11 +86,14 @@ object VfxWorldRenderer {
             instance.collect(frame, placeInWorld(instance, levelPose, camera.x, camera.y, camera.z))
         }
         bones.forEach { binding -> binding.instance.collect(frame, binding.placement) }
+        frame.decals += decals
         frame.shake.copyInto(shake)
         if (frame.isEmpty) return
 
         val time = RenderSystem.getShaderGameTime() * SECONDS_PER_DAY
-        val view = VfxView.ofCamera(RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), time)
+        val view = VfxView.ofCamera(
+            RenderSystem.getModelViewMatrix(), RenderSystem.getProjectionMatrix(), time, DecalGround.world(camera),
+        )
         frameView = view
         val main = Minecraft.getInstance().mainRenderTarget
         val depthWrite = GL33.glGetBoolean(GL33.GL_DEPTH_WRITEMASK)

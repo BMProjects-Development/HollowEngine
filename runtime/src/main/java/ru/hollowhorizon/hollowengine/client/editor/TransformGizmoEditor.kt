@@ -558,6 +558,7 @@ object TransformGizmoEditor {
         }
 
         val active = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return
+        (active.part as? AttachmentGizmo)?.let { DecalPartOverlay.drawGuide(scope, it) }
         val working = active.working ?: return
 
         keyboard?.let { transform ->

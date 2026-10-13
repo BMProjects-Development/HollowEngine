@@ -7,10 +7,12 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigModelInfo
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.rigText
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.title
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxIcons
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.treeLabel
 import ru.hollowhorizon.hollowengine.client.vfx.played
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
@@ -18,7 +20,7 @@ import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
-import java.util.UUID
+import java.util.*
 
 /** A model hung as [attachment] on [bone] of the model before it, null [bone] being that model itself. */
 internal data class NestStep(val bone: String?, val attachment: String)
@@ -35,7 +37,9 @@ internal data class PartPath(
     val effectNode: String? = null,
 ) {
     fun encode(): String = buildString {
-        steps.forEach { step -> append('s').append(step.bone.orEmpty()).append(FIELD).append(step.attachment).append(SEPARATOR) }
+        steps.forEach { step ->
+            append('s').append(step.bone.orEmpty()).append(FIELD).append(step.attachment).append(SEPARATOR)
+        }
         bone?.let { append('b').append(it).append(SEPARATOR) }
         attachment?.let { append('a').append(it).append(SEPARATOR) }
         material?.let { append('m').append(it).append(SEPARATOR) }
@@ -92,7 +96,8 @@ internal data class ObjectParts(
     val loading: Boolean,
 ) {
     fun find(path: PartPath): PartNode? {
-        fun search(node: PartNode): PartNode? = if (node.path == path) node else node.children.firstNotNullOfOrNull(::search)
+        fun search(node: PartNode): PartNode? =
+            if (node.path == path) node else node.children.firstNotNullOfOrNull(::search)
         return search(root)
     }
 }
@@ -123,7 +128,13 @@ internal class PartsReader {
     private var loading = false
 
     fun read(model: Model, instance: ModelAttachment?): ObjectParts {
-        val root = PartNode(PartPath(), modelTitle(model.model), PartIcons.MODEL, PartKind.MODEL, scope(instance, model.rig, emptyList()))
+        val root = PartNode(
+            PartPath(),
+            modelTitle(model.model),
+            PartIcons.MODEL,
+            PartKind.MODEL,
+            scope(instance, model.rig, emptyList())
+        )
         return ObjectParts(model, root, bones, models, loading)
     }
 
@@ -137,17 +148,37 @@ internal class PartsReader {
             return emptyList()
         }
         val nodes = model.nodes.flatMap { it.walk() }
-        val materials = (model.materials.map { it.name } + model.rig.materials.keys).filter { it.isNotEmpty() }.distinct().sorted()
+        val materials =
+            (model.materials.map { it.name } + model.rig.materials.keys).filter { it.isNotEmpty() }.distinct().sorted()
         bones[steps] = nodes.map { it.name }
-        models[steps] = RigModelInfo(materials, nodes.filter { it.definition.mesh != null }.mapTo(HashSet()) { it.name })
+        models[steps] =
+            RigModelInfo(materials, nodes.filter { it.definition.mesh != null }.mapTo(HashSet()) { it.name })
 
         val materialRows = materials.map { name ->
-            PartNode(PartPath(steps, material = name), name, PartIcons.MATERIAL, PartKind.MATERIAL, emptyList(), inherited = name !in own.materials)
+            PartNode(
+                PartPath(steps, material = name),
+                name,
+                PartIcons.MATERIAL,
+                PartKind.MATERIAL,
+                emptyList(),
+                inherited = name !in own.materials
+            )
         }
-        val materialGroup = PartNode(PartPath(steps, material = ""), rigText("materials"), PartIcons.MATERIALS, PartKind.MATERIALS, materialRows)
-        return attachments(model.modelRoot, null, model.rig, own, steps) +
-            model.nodes.map { bone(it, model.rig, own, steps) } +
-            listOfNotNull(materialGroup.takeIf { materialRows.isNotEmpty() })
+        val materialGroup = PartNode(
+            PartPath(steps, material = ""),
+            rigText("materials"),
+            PartIcons.MATERIALS,
+            PartKind.MATERIALS,
+            materialRows
+        )
+        return attachments(model.modelRoot, null, model.rig, own, steps) + model.nodes.map {
+            bone(
+                it,
+                model.rig,
+                own,
+                steps
+            )
+        } + listOfNotNull(materialGroup.takeIf { materialRows.isNotEmpty() })
     }
 
     private fun bone(node: RuntimeNode, rig: ModelRig, own: ModelRig, steps: List<NestStep>): PartNode {
@@ -165,27 +196,33 @@ internal class PartsReader {
         )
     }
 
-    private fun attachments(holder: RuntimeNode?, bone: String?, rig: ModelRig, own: ModelRig, steps: List<NestStep>): List<PartNode> =
-        rig.holder(bone).attachments.map { spec ->
-            val path = PartPath(steps, bone, spec.id)
-            val children = when (spec) {
-                is ModelAttachmentSpec -> {
-                    val nested = holder?.attachments?.filterIsInstance<NestedModelAttachment>()?.firstOrNull { it.spec.id == spec.id }
-                    scope(nested?.model, spec.rig, steps + NestStep(bone, spec.id))
-                }
-
-                is VfxBoneAttachmentSpec -> spec.played()?.nodes.orEmpty().map { effectNode(it, path) }
-                else -> emptyList()
+    private fun attachments(
+        holder: RuntimeNode?,
+        bone: String?,
+        rig: ModelRig,
+        own: ModelRig,
+        steps: List<NestStep>,
+    ): List<PartNode> = rig.holder(bone).attachments.map { spec ->
+        val path = PartPath(steps, bone, spec.id)
+        val children = when (spec) {
+            is ModelAttachmentSpec -> {
+                val nested = holder?.attachments?.filterIsInstance<NestedModelAttachment>()
+                    ?.firstOrNull { it.spec.id == spec.id }
+                scope(nested?.model, spec.rig, steps + NestStep(bone, spec.id))
             }
-            PartNode(
-                path = path,
-                label = attachmentLabel(spec),
-                icon = attachmentIcon(spec),
-                kind = PartKind.ATTACHMENT,
-                children = children,
-                inherited = own.holder(bone).attachment(spec.id) == null,
-            )
+
+            is VfxBoneAttachmentSpec -> spec.played()?.nodes.orEmpty().map { effectNode(it, path) }
+            else -> emptyList()
         }
+        PartNode(
+            path = path,
+            label = attachmentLabel(spec),
+            icon = attachmentIcon(spec),
+            kind = PartKind.ATTACHMENT,
+            children = children,
+            inherited = own.holder(bone).attachment(spec.id) == null,
+        )
+    }
 
     private fun effectNode(node: VfxNodeSpec, attachment: PartPath): PartNode = PartNode(
         path = attachment.copy(effectNode = node.id),
@@ -197,7 +234,8 @@ internal class PartsReader {
 
     private fun attachmentLabel(spec: RigAttachmentSpec): String = when (spec) {
         is ModelAttachmentSpec -> fileName(spec.model) ?: spec.id
-        is VfxBoneAttachmentSpec -> fileName(spec.effect)?.let { if (spec.ownEffect != null) "$it *" else it } ?: spec.id
+        is VfxBoneAttachmentSpec -> fileName(spec.effect)?.let { if (spec.ownEffect != null) "$it *" else it }
+            ?: spec.id
         else -> "${RigAttachmentTypes.of(spec).title()} · ${spec.id}"
     }
 
@@ -205,6 +243,7 @@ internal class PartsReader {
         is ModelAttachmentSpec -> PartIcons.NESTED_MODEL
         is VfxBoneAttachmentSpec -> PartIcons.EFFECT
         is ColliderAttachmentSpec -> PartIcons.COLLIDER
+        is DecalAttachmentSpec -> VfxIcons.DECAL
         else -> PartIcons.ATTACHMENT
     }
 

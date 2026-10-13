@@ -98,11 +98,13 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
             DebugSkeletonRenderer.fill(viewer.attachment, shapes, rigState.selected, colors::get)
         }
     }
+    viewer.decalOverlay = { key -> rigState.partSelection.picksDecal(key) }
     viewer.debugDraw = { lines ->
         if (rigState.showSkeleton) lines.ikOverlay(viewer.attachment.rig, viewer.nodes, rigState.partSelection)
         if (rigState.showColliders) {
             lines.colliders(previewColliders(viewer.attachment.rig, viewer.nodes), rigState.partSelection)
             lines.soundAreas(viewer.attachment.rig, viewer.nodes, rigState.partSelection)
+            lines.decalShapes(viewer.attachment.rig, viewer.nodes, rigState.partSelection)
         }
     }
 

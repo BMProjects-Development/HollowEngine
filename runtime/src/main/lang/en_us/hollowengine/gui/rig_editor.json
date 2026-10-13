@@ -1,5 +1,6 @@
 {
   "kind_sound": "Sound",
+  "kind_decal": "Decal",
   "parameters": "Parameters",
   "section_bone": "Bone",
   "section_pose": "Pose",

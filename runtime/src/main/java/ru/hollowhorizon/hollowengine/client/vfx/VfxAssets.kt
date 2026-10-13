@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
+import ru.hollowhorizon.hollowengine.client.decals.DecalTextures
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
@@ -35,6 +36,7 @@ object VfxAssets : ResourceManagerReloadListener {
             }
         VfxScenes.onAssetsReloaded()
         VfxShaders.clear()
+        DecalTextures.clearAspects()
         VfxModelSurfaces.clear()
     }
 

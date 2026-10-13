@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.entities.objects
 
 import kotlinx.serialization.Serializable
+import net.minecraft.core.Direction
 import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceKey
@@ -13,6 +14,7 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
+import org.joml.Matrix3f
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
@@ -26,7 +28,11 @@ import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
 import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
 import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
+import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
@@ -43,6 +49,8 @@ enum class WorldObjectKind {
 
     /** A sound that fills a room-sized space around where it stands, on and on. */
     SOUND,
+    /** A picture, or a video, laid on the surface the object stands on. */
+    DECAL,
 }
 
 /** What an object made from a dragged sound plays, and where: a box on the ground it stands on, faded out past. */
@@ -52,6 +60,22 @@ private fun soundOf(asset: String) = SoundBoneAttachmentSpec(
     playback = SoundPlayback(repeat = SoundRepeat.Forever, falloff = SoundFalloff(distance = 4f)),
     areas = listOf(SoundArea.Box(offset = Vec3f(0f, 2f, 0f), size = Vec3f(8f, 4f, 8f))),
 )
+
+/** How far off the face a dropped decal is cast from, in blocks. */
+private const val DECAL_LIFT = 0.25f
+
+internal fun decalOf(asset: String, face: Direction): DecalAttachmentSpec {
+    val normal = face.normal.let { Vector3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
+    val toBottom = if (face.axis == Direction.Axis.Y) Vector3f(0f, 0f, 1f) else Vector3f(0f, -1f, 0f)
+    val right = Vector3f(normal).cross(toBottom)
+    val turn = Quaternionf().setFromNormalized(Matrix3f(right, normal, toBottom))
+    return DecalAttachmentSpec(
+        id = "decal",
+        offset = Vec3f(normal.x, normal.y, normal.z) * DECAL_LIFT,
+        rotation = QuatF(turn.x, turn.y, turn.z, turn.w).eulerDegreesXyz(),
+        decal = DecalSpec(texture = asset),
+    )
+}
 
 /** Places a new object at a point, showing [asset], and selects it for the player who placed it. */
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_SERVER)
@@ -63,6 +87,9 @@ class SpawnWorldObjectPacket(
     val y: Double,
     val z: Double,
     val parentId: Int? = null,
+
+    /** The face of the block the object stands on, by its 3D data value; up unless it was placed on a block. */
+    val face: Int = Direction.UP.get3DDataValue(),
 ) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return
@@ -76,6 +103,7 @@ class SpawnWorldObjectPacket(
             WorldObjectKind.MODEL -> Model(asset)
             WorldObjectKind.VFX -> Model("", ModelRig(attachments = listOf(VfxBoneAttachmentSpec(id = "effect", effect = asset))))
             WorldObjectKind.SOUND -> Model("", ModelRig(attachments = listOf(soundOf(asset))))
+            WorldObjectKind.DECAL -> Model("", ModelRig(attachments = listOf(decalOf(asset, Direction.from3DDataValue(face)))))
             WorldObjectKind.EMPTY -> Model("")
         }
         if (kind != WorldObjectKind.EMPTY) created.customName = asset.substringAfterLast('/').substringBefore('.').literal

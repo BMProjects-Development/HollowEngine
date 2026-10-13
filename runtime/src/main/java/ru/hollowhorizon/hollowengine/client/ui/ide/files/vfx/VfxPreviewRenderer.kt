@@ -2,13 +2,19 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
+import com.mojang.blaze3d.vertex.BufferUploader
+import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.Tesselator
+import com.mojang.blaze3d.vertex.VertexFormat
 import com.mojang.blaze3d.vertex.VertexSorting
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.GameRenderer
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.joml.Vector4f
 import org.lwjgl.opengl.GL33
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -70,6 +76,7 @@ internal class VfxPreviewRenderer {
             frame.clear()
             instance.collect(frame, Matrix4f())
             frame.shake.copyInto(shake)
+            if (frame.decals.isNotEmpty()) drawFloorDepth()
 
             val camera = VfxView(
                 modelView = view,
@@ -78,10 +85,28 @@ internal class VfxPreviewRenderer {
                 up = Vector3f(view.m01(), view.m11(), view.m21()),
                 eye = eye,
                 time = (System.nanoTime() - started) / NANOS_PER_SECOND,
+                decalGround = DecalGround.floor(),
             )
             VfxFrameRenderer.render(frame, camera, offscreen)
             VfxPostProcessor.apply(frame.posts, offscreen, camera)
         }
+    }
+
+    /** Writes the floor the preview stands the effect on into the depth alone, for its decals to lie on. */
+    private fun drawFloorDepth() {
+        RenderSystem.colorMask(false, false, false, false)
+        RenderSystem.enableDepthTest()
+        RenderSystem.depthMask(true)
+        RenderSystem.disableCull()
+        RenderSystem.setShader(GameRenderer::getPositionShader)
+        val builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION)
+        builder.addVertex(-FLOOR_DEPTH_SIZE, 0f, -FLOOR_DEPTH_SIZE)
+        builder.addVertex(-FLOOR_DEPTH_SIZE, 0f, FLOOR_DEPTH_SIZE)
+        builder.addVertex(FLOOR_DEPTH_SIZE, 0f, FLOOR_DEPTH_SIZE)
+        builder.addVertex(FLOOR_DEPTH_SIZE, 0f, -FLOOR_DEPTH_SIZE)
+        BufferUploader.drawWithShader(builder.buildOrThrow())
+        RenderSystem.enableCull()
+        RenderSystem.colorMask(true, true, true, true)
     }
 
     fun close() {
@@ -121,6 +146,9 @@ internal class VfxPreviewRenderer {
     }
 
     private companion object {
+        /** How far the floor reaches each way that decals in the preview lie on, in blocks. */
+        const val FLOOR_DEPTH_SIZE = 256f
+
         val Background = AnimatorColors.Canvas
         const val MAX_SIZE = 8192
         const val NANOS_PER_SECOND = 1_000_000_000f

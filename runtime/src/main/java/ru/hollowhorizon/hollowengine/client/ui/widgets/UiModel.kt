@@ -1,5 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
+import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
+import ru.hollowhorizon.hollowengine.client.decals.Decals
 import androidx.compose.runtime.*
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
@@ -278,13 +282,21 @@ class ModelViewerState(model: String) {
         RenderSystem.setShaderLights(CUSTOM_IMGUI_LIGHT_0, CUSTOM_IMGUI_LIGHT_1)
 
         val bufferSource = Minecraft.getInstance().renderBuffers().bufferSource()
+        attachment.pipeline.render(
+            RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
+        )
+        bufferSource.endBatch()
         val effects = ArrayList<VfxBindingSource>()
-        VfxBoneBindings.capturing(effects) {
-            attachment.pipeline.render(
-                RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
-            )
+        val decals = ArrayList<DecalDraw>()
+        Decals.capturing(decals) {
+            VfxBoneBindings.capturing(effects) {
+                attachment.pipeline.render(
+                    RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
+                )
+            }
         }
         bufferSource.endBatch()
+        drawDecals(decals + decals.filter { draw -> draw.key?.let { decalOverlay?.invoke(it) } == true }.map(DecalDraw::asOverlay), stack)
         drawEffects(effects, stack)
         playSounds()
 
@@ -311,6 +323,20 @@ class ModelViewerState(model: String) {
         }
     }
 
+    /** Which decals the preview also shows where they land, by the `bone/id` key of their attachment; none when null. */
+    var decalOverlay: ((String) -> Boolean)? = null
+
+    /** Draws the decals hung on the model, over the model itself, in the space the panel draws it in; the floor is at its feet. */
+    private fun drawDecals(decals: List<DecalDraw>, stack: PoseStack) {
+        if (decals.isEmpty()) return
+        val view = VfxView.ofCamera(
+            Matrix4f(RenderSystem.getModelViewMatrix()),
+            Matrix4f(RenderSystem.getProjectionMatrix()),
+            TickHandler.gameTime / TICKS_PER_SECOND,
+            DecalGround.floor(Matrix4f(stack.last().pose()).invert()),
+        )
+        DecalRenderer.render(decals, view)
+    }
     private val effectFrame = VfxDrawList()
 
     /**
@@ -363,7 +389,8 @@ class ModelViewerState(model: String) {
             val view = VfxView.ofCamera(
                 Matrix4f(modelView),
                 Matrix4f(RenderSystem.getProjectionMatrix()),
-                TickHandler.gameTime / TICKS_PER_SECOND
+                TickHandler.gameTime / TICKS_PER_SECOND,
+                DecalGround.floor(),
             )
             VfxFrameRenderer.renderInPanel(effectFrame, view)
         } finally {

@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
@@ -29,13 +31,14 @@ object VfxFrameRenderer {
     }
 
     /**
-     * Everything drawn with the effect shaders: the sky, then meshes, ribbons and planes, then the glow
+     * Everything drawn with the effect shaders: the sky, then decals, meshes, ribbons and planes, then the glow
      * of whatever glows, over all of them.
      */
     fun renderSurfaces(list: VfxDrawList, view: VfxView, target: RenderTarget) {
         if (list.readsScene) VfxSceneTextures.capture(target)
 
         VfxSkyRenderer.render(list.skies, view)
+        DecalRenderer.render(list.decals, view)
         VfxMeshRenderer.render(list.meshes, view)
         VfxRibbonRenderer.render(list.ribbons, view)
         VfxQuadRenderer.render(list.quads, view)
@@ -54,6 +57,7 @@ object VfxFrameRenderer {
      */
     fun renderInPanel(list: VfxDrawList, view: VfxView) {
         renderModels(list.models)
+        DecalRenderer.render(list.decals, view)
         VfxMeshRenderer.render(list.meshes, view)
         VfxRibbonRenderer.render(list.ribbons, view)
         VfxQuadRenderer.render(list.quads, view)
@@ -123,7 +127,12 @@ object VfxFrameRenderer {
 /**
  * The view of the game camera, whose space is camera-relative world space.
  */
-fun VfxView.Companion.ofCamera(modelView: Matrix4f, projection: Matrix4f, time: Float): VfxView {
+fun VfxView.Companion.ofCamera(
+    modelView: Matrix4f,
+    projection: Matrix4f,
+    time: Float,
+    decalGround: DecalGround? = null,
+): VfxView {
     val screenToWorld = Matrix4f(projection).mul(modelView).invert()
     val center = screenToWorld.transformProject(Vector3f(0f, 0f, 0.5f))
     return VfxView(
@@ -133,5 +142,6 @@ fun VfxView.Companion.ofCamera(modelView: Matrix4f, projection: Matrix4f, time: 
         up = screenToWorld.transformProject(Vector3f(0f, 1f, 0.5f)).sub(center).normalize(),
         eye = Vector3f(),
         time = time,
+        decalGround = decalGround,
     )
 }

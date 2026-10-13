@@ -27,6 +27,7 @@ import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.utils.ModList
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeReloadListener
 import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.RecipeEditorsReloadListener
+import ru.hollowhorizon.hollowengine.client.decals.DecalAttachment
 
 @ClientOnly
 object HollowCoreClient {
@@ -34,6 +35,7 @@ object HollowCoreClient {
     init {
         RenderSystem.recordRenderCall(RenderManager::onInitialize)
         VfxBoneBindings.register()
+        DecalAttachment.register()
         NestedModelAttachment.register()
     }
 

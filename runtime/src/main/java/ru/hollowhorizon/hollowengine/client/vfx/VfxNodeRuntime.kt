@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxBeamRenderer
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxCameraShake
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDecalNode
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMeshNode
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxModelNode
@@ -167,6 +168,7 @@ object VfxNodeRuntimes {
         register("hollowengine:vfx/sky") { VfxSkyNode(it.spec as VfxSkySpec, it) }
         register("hollowengine:vfx/camera_shake") { VfxCameraShake(it.spec as VfxCameraShakeSpec, it) }
         register("hollowengine:vfx/sound") { VfxSoundNode(it.spec as VfxSoundSpec, it) }
+        register("hollowengine:vfx/decal") { VfxDecalNode(it.spec as VfxDecalSpec, it) }
     }
 
     fun register(typeId: String, factory: VfxNodeFactory): ExtensionHandle = point.register(typeId.rl, factory)

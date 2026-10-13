@@ -40,6 +40,7 @@ value class VfxProperty(val id: String) {
         val SHAKE_FREQUENCY = VfxProperty("shake.frequency")
         val SOUND_VOLUME = VfxProperty("sound.volume")
         val SOUND_PITCH = VfxProperty("sound.pitch")
+        val DECAL_OPACITY = VfxProperty("decal.opacity")
 
         fun module(moduleId: String, field: String) = VfxProperty("modules.$moduleId.$field")
 

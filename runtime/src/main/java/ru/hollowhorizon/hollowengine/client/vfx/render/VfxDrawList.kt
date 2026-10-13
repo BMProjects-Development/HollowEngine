@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
+import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
@@ -27,6 +29,7 @@ class VfxView(
     val up: Vector3f,
     val eye: Vector3f,
     val time: Float,
+    val decalGround: DecalGround? = null,
 ) {
     companion object
 }
@@ -114,12 +117,15 @@ class VfxDrawList {
     val posts = ArrayList<VfxPostDraw>()
     val skies = ArrayList<VfxSkyDraw>()
 
+    /** Decals of decal nodes and of models drawn this frame; drawn first, onto the scene alone. */
+    val decals = ArrayList<DecalDraw>()
+
     /** Camera shake in degrees: pitch, yaw and roll, summed over every shaking node. */
     val shake = FloatArray(3)
 
     val isEmpty: Boolean
         get() = quads.isEmpty() && meshes.isEmpty() && models.isEmpty() && ribbons.isEmpty() && posts.isEmpty() &&
-                skies.isEmpty()
+                skies.isEmpty() && decals.isEmpty()
 
     /**
      * Whether anything reads the scene textures: a surface with a shader of the author, which may,
@@ -143,6 +149,7 @@ class VfxDrawList {
         ribbons.clear()
         posts.clear()
         skies.clear()
+        decals.clear()
         shake.fill(0f)
     }
 }

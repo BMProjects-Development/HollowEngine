@@ -6,6 +6,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
@@ -31,7 +33,11 @@ internal sealed class PartGizmo(
     abstract val label: String
 
     /** The part in the world, [partialTick] into the tick. */
-    fun worldTransform(partialTick: Float): TrsTransformF = decompose(toWorld(partialTick).mul(local(), MutableMat4f()))
+    fun worldTransform(partialTick: Float): TrsTransformF = decompose(worldMatrix(partialTick))
+
+    /** The part in the world, [partialTick] into the tick, as a matrix. */
+    fun worldMatrix(partialTick: Float): Mat4f = toWorld(partialTick).mul(local(), MutableMat4f())
+
 
     /** Moves the part so it ends up where the gizmo puts it. */
     fun apply(values: GizmoTransformValues, partialTick: Float) {
@@ -111,6 +117,9 @@ internal class AttachmentGizmo(
 
     private val spec: PlacedAttachmentSpec?
         get() = editing.occupied.holder(bone).attachment(attachmentId) as? PlacedAttachmentSpec
+
+    /** The decal this part is, or null when it is something else. */
+    val decal: DecalSpec? get() = (spec as? DecalAttachmentSpec)?.decal
 
     override fun local(): Mat4f {
         val placed = spec?.localTransform() ?: return holder.globalMatrix
