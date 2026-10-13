@@ -96,7 +96,7 @@ class UiSvgDocumentRenderTest {
         val gradient = assertIs<UiPaint.LinearGradient>(document.elements.first().paint)
 
         // The icon's own axis runs down and to the left, so the angle has to as well.
-        assertTrue(gradient.angleDegrees > 90f && gradient.angleDegrees < 180f, "angle ${gradient.angleDegrees}")
+        assertTrue(gradient.angleDegrees > 180f && gradient.angleDegrees < 270f, "angle ${gradient.angleDegrees}")
         assertEquals(0f, gradient.stops.first().offset)
         assertEquals(1f, gradient.stops.last().offset)
         assertTrue(gradient.stops.zipWithNext().all { (a, b) -> a.offset <= b.offset }, "stops out of order")

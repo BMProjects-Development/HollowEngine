@@ -294,6 +294,7 @@ fun Modifier.position(x: UiLength, y: UiLength, z: Float = 0f) = prop(UiProps.Po
 
 fun Modifier.background(color: UiColor) = prop(UiProps.Background, UiPaint.Color(color))
 
+/** Linear gradient with CSS angles: 0° up, 90° right, 180° down, 270° left. */
 fun Modifier.background(angleDegrees: Float, stops: List<UiGradientStop>) =
     prop(UiProps.Background, UiPaint.LinearGradient(angleDegrees, stops))
 
@@ -337,6 +338,7 @@ fun Modifier.border(width: UiLength, color: UiColor, radius: Float = 0f) =
 fun Modifier.border(width: UiLength, paint: UiPaint, radius: Float = 0f) =
     prop(UiProps.BorderWidth, UiInsets.all(width)).prop(UiProps.BorderPaint, paint).prop(UiProps.BorderRadius, radius)
 
+/** Linear border gradient using the same CSS angles as [background]. */
 fun Modifier.border(width: UiLength, angleDegrees: Float, stops: List<UiGradientStop>, radius: Float = 0f) =
     border(width, UiPaint.LinearGradient(angleDegrees, stops), radius)
 

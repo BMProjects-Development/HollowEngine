@@ -39,6 +39,9 @@ internal object BuiltinComponentEditors {
         ComponentEditors.register("hollowengine:materials".rl) { scope -> MaterialsExtras(scope) }
         ComponentEditors.register("hollowengine:animations".rl) { scope -> AnimationsExtras(scope) }
         ComponentEditors.register("hollowengine:entity/body".rl) { scope -> BodyExtras(scope) }
+        ComponentEditors.register("hollowengine:editor/attributes".rl, replacesFields = true) { scope ->
+            EntityAttributesEditor(scope)
+        }
     }
 }
 

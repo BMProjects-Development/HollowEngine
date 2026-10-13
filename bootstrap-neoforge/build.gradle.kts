@@ -106,12 +106,8 @@ dependencies {
 
     neoForge("net.neoforged:neoforge:$neoForgeVersion")
 
-    implementation("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
-    runtimeOnly("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
-
-    implementation("lib:sodium-neoforge:0.8.13+mc1.21.1")
-    runtimeOnly("lib:sodium-neoforge:0.8.13+mc1.21.1")
-    runtimeOnly("lib:sodium-api-neoforge:0.8.13+mc1.21.1-mod")
+    modImplementation("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
+    "forgeRuntimeLibrary"("lib:sodium-neoforge:0.8.13+mc1.21.1")
 
     implementation("org.anarres:jcpp:1.4.14")
     implementation("io.github.douira:glsl-transformer:3.0.0-pre3")

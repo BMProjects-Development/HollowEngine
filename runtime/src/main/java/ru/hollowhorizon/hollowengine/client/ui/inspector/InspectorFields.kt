@@ -266,9 +266,21 @@ fun InspectorIconButton(
     active: Boolean = false,
     tags: List<String> = emptyList(),
     onClick: () -> Unit,
+) = InspectorIconButton(null, icon, tooltip, modifier, active, tags, onClick)
+
+@Composable
+fun InspectorIconButton(
+    id: String?,
+    icon: String,
+    tooltip: String,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    tags: List<String> = emptyList(),
+    onClick: () -> Unit,
 ) {
     Image(
         icon,
+        id = id,
         tags = listOf("insp-icon-button") + tags + if (active) listOf("active") else emptyList(),
         modifier = modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).tooltipOnHover(tooltip)
             .onClick { event ->

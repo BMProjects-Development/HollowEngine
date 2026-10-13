@@ -318,7 +318,7 @@
     max-width: 320px;
     padding: 3px 5px;
     background: alpha(#100010, 0.94);
-    border: 1px linear-gradient(180deg, alpha(#5000FF, 0.5), alpha(#28007F, 0.5));
+    border: 1px linear-gradient(to left, alpha(#5000FF, 0.5), alpha(#28007F, 0.5));
     border-radius: $radius-small;
 }
 

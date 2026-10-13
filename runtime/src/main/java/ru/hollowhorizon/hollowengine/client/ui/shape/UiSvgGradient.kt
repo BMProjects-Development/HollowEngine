@@ -62,7 +62,7 @@ private fun linearSvgPaint(
     val span = boxOffset(end.x, end.y) - from
     if (abs(span) <= 0.0001f) return UiPaint.Color(stops.first().color)
 
-    val angle = Math.toDegrees(atan2(directionY, directionX).toDouble()).toFloat()
+    val angle = Math.toDegrees(atan2(directionX, -directionY).toDouble()).toFloat().mod(360f)
     return UiPaint.LinearGradient(angle, stops.remappedTo(from, span))
 }
 

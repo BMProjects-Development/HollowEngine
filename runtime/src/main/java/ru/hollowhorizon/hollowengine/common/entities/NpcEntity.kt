@@ -76,7 +76,6 @@ class NpcEntity : PathfinderMob {
         goalSelector.addGoal(1, MeleeAttackGoal(this, 1.0, false))
     }
 
-    override fun isInvulnerable() = true
     override fun shouldDespawnInPeaceful() = false
     override fun canPickUpLoot() = true
     override fun wantsToPickUp(pStack: ItemStack) = false

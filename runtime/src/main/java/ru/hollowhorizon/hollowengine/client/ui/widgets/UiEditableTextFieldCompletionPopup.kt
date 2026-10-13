@@ -331,7 +331,7 @@ private fun CompletionRowContent(
                     .position(CompletionFadeOvershoot.px, 0.px)
                     .opacity(if (atEnd) 0f else 1f)
                     .transition(UiTransition("opacity", durationMillis = CompletionFadeDurationMillis))
-                    .background(0f, completionFadeStops(fadeColor)),
+                    .background(90f, completionFadeStops(fadeColor)),
             )
             Box(
                 tags = listOf("ide-completion-fade"),
@@ -340,7 +340,7 @@ private fun CompletionRowContent(
                     .position((-CompletionFadeOvershoot).px, 0.px)
                     .opacity(if (atEnd) 1f else 0f)
                     .transition(UiTransition("opacity", durationMillis = CompletionFadeDurationMillis))
-                    .background(180f, completionFadeStops(fadeColor)),
+                    .background(270f, completionFadeStops(fadeColor)),
             )
         }
     }

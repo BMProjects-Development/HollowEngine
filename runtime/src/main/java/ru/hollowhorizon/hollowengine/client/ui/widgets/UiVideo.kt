@@ -409,7 +409,7 @@ private val SliderTrackColor = UiColor(1f, 1f, 1f, 0.25f)
 private val ThumbColor = UiColor(1f, 1f, 1f, 1f)
 private val TimeTextColor = UiColor(1f, 1f, 1f, 0.85f)
 
-private const val ScrimAngleDegrees = 90f
+private const val ScrimAngleDegrees = 180f
 private val ScrimStops = listOf(
     UiGradientStop(0f, UiColor(0f, 0f, 0f, 0f)),
     UiGradientStop(1f, UiColor(0f, 0f, 0f, 0.8f)),

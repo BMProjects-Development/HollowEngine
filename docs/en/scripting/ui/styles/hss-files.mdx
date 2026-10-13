@@ -72,7 +72,7 @@ State rules stack with each other and are applied over everything else, which is
 .quest-card {
     padding: 12px;
     gap: 6px;
-    background: linear-gradient(135deg, #14203D, #2B4D78);
+    background: linear-gradient(225deg, #14203D, #2B4D78);
     border: 1px #8FB8FFB3;
     border-radius: 8px;
     box-shadow: 0px 3px 8px #00000073;
@@ -80,7 +80,7 @@ State rules stack with each other and are applied over everything else, which is
 }
 
 .quest-card:hover {
-    background: linear-gradient(135deg, #1C2D54, #39649B);
+    background: linear-gradient(225deg, #1C2D54, #39649B);
     scale: 1.03;
 }
 ```
@@ -137,7 +137,9 @@ Alignment values are `auto`, `start`/`flex-start`, `center`, `end`/`flex-end`, `
 | `clip` or `clip-path` | boolean, `path(...)`, `svg-path(...)`, or `svg(...)` | Clips children to bounds or a vector shape |
 | `layer` | integer | Local drawing order |
 
-`linear-gradient(angle?, colour [stop], colour [stop], ...)` accepts degrees and stop offsets from `0..1` or percentages. `radial-gradient(radius? at x y?, colour [stop], ...)` accepts a radius and centre in lengths or percentages.
+`linear-gradient(direction?, colour [stop], colour [stop], ...)` accepts a degree angle or `to top`, `to right`, `to bottom`, `to left`, and stop offsets from `0..1` or percentages. Angles follow CSS: `0deg` points up, `90deg` right, `180deg` down, `270deg` left, rotating clockwise. Omitting the direction means `to bottom` (`180deg`). Backgrounds, borders, shape fills and masks share this convention, as does the Kotlin gradient API.
+
+`radial-gradient(radius? at x y?, colour [stop], ...)` accepts a radius and centre in lengths or percentages.
 
 ### Transform and filters
 

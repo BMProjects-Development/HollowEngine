@@ -17,7 +17,7 @@ internal fun visualHssProperties(): List<HssProperty> = hssProperties {
         "background",
         summary = "Fill drawn behind the node: color, image, shader or gradient.",
         syntax = syntax(paintSlot()),
-        examples = listOf("#1E2128", "transparent", "image(\"\")", "linear-gradient(180deg, #000000, #FFFFFF)"),
+        examples = listOf("#1E2128", "transparent", "image(\"\")", "linear-gradient(to left, #000000, #FFFFFF)"),
     ) { set(UiProps.Background, parsePaint(value)) }
 
     property(
@@ -55,7 +55,7 @@ internal fun visualHssProperties(): List<HssProperty> = hssProperties {
         examples = listOf(
             "1px #5F6677",
             "2px rgba(255, 255, 255, 0.5)",
-            "1px linear-gradient(120deg, #9BF763, #70A832)",
+            "1px linear-gradient(210deg, #9BF763, #70A832)",
         ),
     ) {
         style {
@@ -69,7 +69,7 @@ internal fun visualHssProperties(): List<HssProperty> = hssProperties {
         "border-color",
         summary = "Border fill: a color, or a gradient stroked around the node.",
         syntax = syntax(paintSlot("color")),
-        examples = listOf("#5F6677", "linear-gradient(120deg, #9BF763, #70A832)"),
+        examples = listOf("#5F6677", "linear-gradient(210deg, #9BF763, #70A832)"),
     ) { style { it.borderPaint = parsePaint(value) } }
 
     property(

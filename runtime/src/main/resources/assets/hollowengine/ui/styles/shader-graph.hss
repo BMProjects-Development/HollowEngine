@@ -12,7 +12,7 @@ $node-radius: 8px;
 $node-field-radius: 5px;
 
 /* The outline of a title bar: lighter than its color along the top and the sides, darker along the bottom.
-   Gradient angles run from the right turning clockwise, so 90deg is downwards. */
+   CSS gradient angles run from the top clockwise, so to bottom is 180deg. */
 $head-light: alpha(#FFFFFF, 0.14);
 $head-dark: alpha(#000000, 0.28);
 
@@ -48,7 +48,7 @@ $category-output: #CF5E54;
     padding: 0px 10px;
     gap: 5px;
     background: $category-math;
-    border: 1px linear-gradient(90deg, $head-light 0%, $head-light 96.875%, $head-dark 96.875%, $head-dark 100%);
+    border: 1px linear-gradient(to bottom, $head-light 0%, $head-light 96.875%, $head-dark 96.875%, $head-dark 100%);
     border-radius: $node-radius;
 }
 

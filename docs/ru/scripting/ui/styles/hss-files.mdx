@@ -72,7 +72,7 @@ $card {
 .quest-card {
     padding: 12px;
     gap: 6px;
-    background: linear-gradient(135deg, #14203D, #2B4D78);
+    background: linear-gradient(225deg, #14203D, #2B4D78);
     border: 1px #8FB8FFB3;
     border-radius: 8px;
     box-shadow: 0px 3px 8px #00000073;
@@ -80,7 +80,7 @@ $card {
 }
 
 .quest-card:hover {
-    background: linear-gradient(135deg, #1C2D54, #39649B);
+    background: linear-gradient(225deg, #1C2D54, #39649B);
     scale: 1.03;
 }
 ```
@@ -137,7 +137,9 @@ HSS поддерживает градиенты, текстурные фоны, 
 | `clip` или `clip-path` | boolean, `path(...)`, `svg-path(...)` или `svg(...)` | Обрезает детей по границам или векторной форме |
 | `layer` | целое число | Локальный порядок рисования |
 
-`linear-gradient(angle?, colour [stop], colour [stop], ...)` принимает градусы и stop offset от `0..1` или в процентах. `radial-gradient(radius? at x y?, colour [stop], ...)` принимает радиус и центр как длины или проценты.
+`linear-gradient(direction?, colour [stop], colour [stop], ...)` принимает угол в градусах или `to top`, `to right`, `to bottom`, `to left`, а позиции остановок - от `0..1` или в процентах. Углы соответствуют CSS: `0deg` - вверх, `90deg` - вправо, `180deg` - вниз, `270deg` - влево, двигаясь по часовой стрелке. Без направления используется `to bottom` (`180deg`). Это правило общее для фона, границ, заливки фигур, масок и Kotlin API градиентов.
+
+`radial-gradient(radius? at x y?, colour [stop], ...)` принимает радиус и центр как длины или проценты.
 
 ### Трансформации и фильтры
 

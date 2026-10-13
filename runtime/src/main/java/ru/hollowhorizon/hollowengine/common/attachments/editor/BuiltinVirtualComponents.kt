@@ -2,10 +2,9 @@ package ru.hollowhorizon.hollowengine.common.attachments.editor
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.core.registries.Registries
-import net.minecraft.resources.ResourceKey
+import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.ai.attributes.DefaultAttributes
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
@@ -61,6 +60,7 @@ data class ObjectPlacement(
 data class EntityAttributes(
     val health: Float = 20f,
     val attributes: Map<String, Double> = emptyMap(),
+    @EditorHidden val defaults: Map<String, Double> = emptyMap(),
 )
 
 
@@ -147,22 +147,18 @@ object BuiltinVirtualComponents {
         )
     }
 
-    private fun readAttributes(entity: LivingEntity): EntityAttributes = EntityAttributes(
-        health = entity.health,
-        attributes = BuiltInRegistries.ATTRIBUTE.entrySet().mapNotNull { (key, _) ->
-                val holder = BuiltInRegistries.ATTRIBUTE.getHolder(key).orElse(null) ?: return@mapNotNull null
-                if (!entity.attributes.hasAttribute(holder)) return@mapNotNull null
-                key.location().toString() to entity.getAttributeBaseValue(holder)
-            }.sortedBy { it.first }.toMap(),
-    )
+    private fun readAttributes(entity: LivingEntity): EntityAttributes {
+        @Suppress("UNCHECKED_CAST")
+        val supplier = DefaultAttributes.getSupplier(entity.type as EntityType<out LivingEntity>)
+        return EntityAttributes(
+            health = entity.health,
+            attributes = EntityAttributeEditing.read(entity.attributes),
+            defaults = EntityAttributeEditing.defaults(entity.attributes, supplier),
+        )
+    }
 
     private fun writeAttributes(entity: LivingEntity, values: EntityAttributes) {
-        values.attributes.forEach { (id, value) ->
-            val key = ResourceKey.create(Registries.ATTRIBUTE, runCatching { id.rl }.getOrNull() ?: return@forEach)
-            val holder = BuiltInRegistries.ATTRIBUTE.getHolder(key).orElse(null) ?: return@forEach
-            val instance = entity.getAttribute(holder) ?: return@forEach
-            instance.baseValue = value
-        }
-        entity.health = values.health.coerceIn(0f, entity.maxHealth)
+        EntityAttributeEditing.apply(entity.attributes, values.attributes)
+        if (values.health.isFinite()) entity.health = values.health.coerceIn(0f, entity.maxHealth)
     }
 }

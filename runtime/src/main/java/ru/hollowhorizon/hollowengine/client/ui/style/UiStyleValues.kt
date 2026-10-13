@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
 import ru.hollowhorizon.hollowengine.client.ui.*
+import kotlin.math.PI
 
 enum class StyleOrigin(val priority: Int) {
     THEME_DEFAULTS(1), STYLESHEET(2), STATE_STYLESHEET(3),
@@ -56,6 +57,9 @@ sealed interface UiPaint {
     data class Image(val source: String) : UiPaint
     data class Shader(val name: String) : UiPaint
 }
+
+/** Converts a CSS gradient angle to radians in the UI's rightward-X, downward-Y coordinates. */
+internal fun linearGradientRadians(angleDegrees: Float): Double = (angleDegrees.mod(360f) - 90f) * PI / 180.0
 
 data class UiRadialGradient(
     val centerX: UiLength = 50.percent,

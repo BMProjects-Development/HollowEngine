@@ -20,7 +20,7 @@ enum class HssValueKind(val display: String, val candidates: List<String> = empt
             "transparent",
             "none",
             "image(\"\")",
-            "linear-gradient(180deg, #000000, #FFFFFF)",
+            "linear-gradient(to left, #000000, #FFFFFF)",
             "radial-gradient(#000000, #FFFFFF)",
         ),
     ),
