@@ -90,6 +90,7 @@ object RenderManager {
             val instance = host.modelInstance(node.nodeId, node.model.model)
 
             instance.attachment.entity = host as? LivingEntity
+            instance.attachment.carrier = host
             instance.configure(node.animations, node.materials, node.model.rig)
             val worldTransform = resolveNodeWorldTransform(host, node.transform, partialTick)
             instance.update(
@@ -144,6 +145,7 @@ object RenderManager {
             val instance = entity.modelInstance(node.nodeId, node.model.model)
             val attachment = instance.attachment
             attachment.entity = entity as? LivingEntity
+            attachment.carrier = entity
             instance.configure(node.animations, node.materials, node.model.rig)
             val worldTransform = resolveNodeWorldTransform(entity, node.transform, partialTick)
             instance.update(

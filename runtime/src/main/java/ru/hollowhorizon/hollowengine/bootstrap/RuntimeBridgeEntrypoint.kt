@@ -99,6 +99,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeGameViewport
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlayPoint
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCameraSystem
+import ru.hollowhorizon.hollowengine.client.ui.panels.UiPanels
 import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost
 import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
 import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
@@ -942,6 +943,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleKey(key, scanCode, action, modifiers)) return true
         if (WorldObjectContextMenu.handleKey(key, scanCode, action, modifiers)) return true
         if (TransformGizmoEditor.handleKey(key, scanCode, action, modifiers)) return true
+        if (UiPanels.handleKey(key, scanCode, action, modifiers)) return true
         if (UiScriptHudHost.handleKey(key, scanCode, action, modifiers)) return true
         return false
     }
@@ -949,6 +951,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onKeyboardChar(windowPointer: Long, codePoint: Int, modifiers: Int): Boolean {
         if (HollowIdeOverlay.handleChar(codePoint, modifiers)) return true
         if (TransformGizmoEditor.handleChar(codePoint, modifiers)) return true
+        if (UiPanels.handleChar(codePoint, modifiers)) return true
         if (UiScriptHudHost.handleChar(codePoint, modifiers)) return true
         return false
     }
@@ -1021,6 +1024,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
                 TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
                 WorldInspector.pickAt(world.x, world.y, button, action) ||
                 UiScriptHudHost.handleMouseButton(guiX, guiY, button, action) ||
+                minecraft.screen == null && UiPanels.handleMouseButton(button, action) ||
                 TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
@@ -1039,6 +1043,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
         return TransformGizmoEditor.handleMouseScroll(world.x, world.y, xOffset, yOffset) ||
                 UiScriptHudHost.handleMouseScroll(guiX, guiY, xOffset, yOffset) ||
+                minecraft.screen == null && UiPanels.handleMouseScroll(xOffset, yOffset) ||
                 TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 

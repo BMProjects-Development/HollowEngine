@@ -191,6 +191,7 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.Zone",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.NavigationComponent",
                     "ru.hollowhorizon.hollowengine.common.entities.*",
+                    "ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity",
                     "ru.hollowhorizon.hollowengine.common.attachments.components.*",
                     "ru.hollowhorizon.hollowengine.common.models.*",
                     "ru.hollowhorizon.hollowengine.common.colliders.*",

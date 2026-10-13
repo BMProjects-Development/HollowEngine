@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
@@ -19,6 +20,8 @@ class RigAttachmentContext(
     val node: RuntimeNode,
     val entity: () -> LivingEntity?,
     val owner: ModelAttachment? = null,
+    /** The entity that carries the model, living or not; see [ModelAttachment.carrier]. */
+    val carrier: () -> Entity? = { null },
 )
 
 /**

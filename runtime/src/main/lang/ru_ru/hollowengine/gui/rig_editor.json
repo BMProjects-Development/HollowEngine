@@ -1,6 +1,7 @@
 {
   "kind_sound": "Звук",
   "kind_decal": "Декаль",
+  "kind_ui_panel": "UI-панель",
   "parameters": "Параметры",
   "section_bone": "Кость",
   "section_pose": "Поза",

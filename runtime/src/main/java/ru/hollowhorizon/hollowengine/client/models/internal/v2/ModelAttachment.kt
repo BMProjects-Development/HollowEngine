@@ -58,6 +58,9 @@ class ModelAttachment(
     val location: ResourceLocation? = null,
 ) : Attachment(parent) {
     var instanceId: String = UUID.randomUUID().toString()
+
+    /** The entity that carries this model, living or not, for what hangs on it and talks to it, as a panel does. */
+    var carrier: Entity? = null
     val soundScope: String
         get() {
             val lineage = generateSequence<Attachment>(this) { it.parent }.toList()
@@ -244,7 +247,7 @@ class ModelAttachment(
         nodesByIndex = runtimeNodes.byIndex()
         nodesByIndex.values.forEach(::customizeNode)
         modelRoot = RuntimeNode(NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF()), this).also { root ->
-            val context = RigAttachmentContext(root, { entity }, this)
+            val context = RigAttachmentContext(root, { entity }, this) { carrier }
             currentRig.attachments.forEach { spec -> RigAttachmentFactories.create(spec, context)?.let(root.attachments::add) }
         }
         carriesEffects = currentRig.carriesEffects()
@@ -282,7 +285,7 @@ class ModelAttachment(
             return
         }
 
-        val context = RigAttachmentContext(node, { entity }, this)
+        val context = RigAttachmentContext(node, { entity }, this) { carrier }
         bone.attachments.forEach { spec ->
             RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
         }

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
@@ -39,6 +40,7 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
     override fun updateGlobalMatrix() {
         super.updateGlobalMatrix()
         model.entity = context.entity()
+        model.carrier = context.carrier()
         model.beginPose()
         applyRigPose(model.nodes, model.rig)
         model.endPose()
@@ -70,5 +72,5 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
 
 /** Whether an effect hangs anywhere on this rig, models nested in it included. */
 internal fun ModelRig.carriesEffects(): Boolean = allAttachments().any { (_, spec) ->
-    spec is VfxBoneAttachmentSpec || spec is DecalAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesEffects()
+    spec is VfxBoneAttachmentSpec || spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesEffects()
 }

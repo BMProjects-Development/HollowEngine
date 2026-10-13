@@ -1,6 +1,7 @@
 {
   "kind_sound": "Sound",
   "kind_decal": "Decal",
+  "kind_ui_panel": "UI panel",
   "parameters": "Parameters",
   "section_bone": "Bone",
   "section_pose": "Pose",

@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -72,6 +73,7 @@ object RigAttachmentTypes {
         register(ColliderAttachmentSpec.TYPE)
         register(SoundBoneAttachmentSpec.TYPE)
         register(DecalAttachmentSpec.TYPE)
+        register(UiPanelAttachmentSpec.TYPE)
         register(IkTargetSpec.TYPE)
         register(IkChainSpec.TYPE)
     }
