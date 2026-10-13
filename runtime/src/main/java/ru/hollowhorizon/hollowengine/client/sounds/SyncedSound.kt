@@ -32,9 +32,9 @@ class SyncedSound(private val id: String = UUID.randomUUID().toString()) : AutoC
         val elapsed = if (lastNanos == 0L) 0.0 else (now - lastNanos) / NANOS_PER_SECOND
         lastNanos = now
         if (source != this.source) {
+            if (this.source != null) ClientSounds.stop(id, 0f)
             this.source = source
             ended = false
-            ClientSounds.stop(id, 0f)
         }
 
         val previous = lastClock

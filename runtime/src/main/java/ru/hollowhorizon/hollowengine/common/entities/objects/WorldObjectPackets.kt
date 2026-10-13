@@ -21,6 +21,12 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.SoundArea
+import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
+import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
+import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
@@ -34,7 +40,18 @@ enum class WorldObjectKind {
     EMPTY,
     MODEL,
     VFX,
+
+    /** A sound that fills a room-sized space around where it stands, on and on. */
+    SOUND,
 }
+
+/** What an object made from a dragged sound plays, and where: a box on the ground it stands on, faded out past. */
+private fun soundOf(asset: String) = SoundBoneAttachmentSpec(
+    id = "sound",
+    source = asset,
+    playback = SoundPlayback(repeat = SoundRepeat.Forever, falloff = SoundFalloff(distance = 4f)),
+    areas = listOf(SoundArea.Box(offset = Vec3f(0f, 2f, 0f), size = Vec3f(8f, 4f, 8f))),
+)
 
 /** Places a new object at a point, showing [asset], and selects it for the player who placed it. */
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_SERVER)
@@ -58,6 +75,7 @@ class SpawnWorldObjectPacket(
         created set when (kind) {
             WorldObjectKind.MODEL -> Model(asset)
             WorldObjectKind.VFX -> Model("", ModelRig(attachments = listOf(VfxBoneAttachmentSpec(id = "effect", effect = asset))))
+            WorldObjectKind.SOUND -> Model("", ModelRig(attachments = listOf(soundOf(asset))))
             WorldObjectKind.EMPTY -> Model("")
         }
         if (kind != WorldObjectKind.EMPTY) created.customName = asset.substringAfterLast('/').substringBefore('.').literal

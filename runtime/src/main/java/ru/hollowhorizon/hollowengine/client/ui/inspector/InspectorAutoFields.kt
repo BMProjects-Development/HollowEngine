@@ -2,6 +2,8 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
@@ -165,6 +167,23 @@ internal fun FieldHelp(description: String?) {
 }
 
 private const val HelpIcon = "hollowengine:textures/gui/icons/info.svg"
+
+/** Lets a dragged slider hand on its value no more often than every [SliderIntervalNanos]. */
+private class SliderPace {
+    private var last = 0L
+
+    fun due(): Boolean {
+        val now = System.nanoTime()
+        if (now - last < SliderIntervalNanos) return false
+        last = now
+        return true
+    }
+}
+
+private const val SliderIntervalNanos = 100_000_000L
+
+/** How many kinds a polymorphic field shows as a row of pills before it lists them in a dropdown. */
+private const val MaxKindPills = 4
 
 internal data class FieldRange(val min: Double, val max: Double, val slider: Boolean)
 
@@ -366,17 +385,26 @@ private fun NumberField(
     Column(tags = listOf("insp-field")) {
         FieldLabel(label, description)
         if (range != null && range.slider && range.min.isFinite() && range.max.isFinite()) {
+            val pace = remember(path) { SliderPace() }
+            var shown by remember(path) { mutableStateOf<Float?>(null) }
             Row(tags = listOf("insp-input-row")) {
                 Slider(
                     value = number.toFloat(),
                     min = range.min.toFloat(),
                     max = range.max.toFloat(),
                     step = if (whole) 1f else 0f,
-                    onValueChange = { onChange(numberJson(kind, it.toDouble())) },
+                    onValueChange = {
+                        shown = it
+                        if (pace.due()) onChange(numberJson(kind, it.toDouble()))
+                    },
+                    onValueCommit = {
+                        shown = null
+                        onChange(numberJson(kind, it.toDouble()))
+                    },
                     modifier = Modifier.grow(1f),
                     tags = listOf("insp-slider"),
                 )
-                Text(formatNumber(number, whole), tags = listOf("insp-slider-value"))
+                Text(formatNumber(shown?.toDouble() ?: number, whole), tags = listOf("insp-slider-value"))
             }
         } else {
             NumberInput(path, number, whole) { next ->
@@ -680,7 +708,20 @@ private fun PolymorphicField(
 
     Column(tags = listOf("insp-nested")) {
         FieldLabel(label, description = null)
-        PillFlow {
+        if (alternatives.size > MaxKindPills) {
+            var expanded by remember { mutableStateOf(false) }
+            UiDropdown(
+                id = "insp-kind$path",
+                label = selected?.let(ComponentLabels::typeName).orEmpty(),
+                expanded = expanded,
+                onExpandedChange = { expanded = it },
+                items = alternatives.map { alternative ->
+                    UiDropdownItem(ComponentLabels.typeName(alternative), checked = alternative.serialName == current, mark = UiDropdownMark.RADIO) {
+                        if (alternative.serialName != current) onChange(ComponentJson.defaultOfSubclass(alternative))
+                    }
+                },
+            )
+        } else PillFlow {
             alternatives.forEach { alternative ->
                 val name = alternative.serialName
                 Pill(ComponentLabels.typeName(alternative), name == current, id = "insp-choice$path/$name") {

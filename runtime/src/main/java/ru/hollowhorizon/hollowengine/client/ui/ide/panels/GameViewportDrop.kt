@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelM
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.ui.UiDragItem
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDrag
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensions
 import ru.hollowhorizon.hollowengine.client.ui.ide.projectPathReference
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
@@ -24,7 +25,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Models and effects dragged from the project or the asset manager onto the game panel become world objects. */
+/** Models, effects and sounds dragged from the project or the asset manager onto the game panel become world objects. */
 internal object GameViewportDrop {
     const val TARGET_ID = "game-viewport-drop"
 
@@ -49,6 +50,7 @@ internal object GameViewportDrop {
         return when {
             reference.endsWith(VfxFormat.EXTENSION) -> WorldObjectKind.VFX to reference
             HollowModelManager.supports(reference) -> WorldObjectKind.MODEL to reference
+            AudioFileExtensions.any { reference.endsWith(it, ignoreCase = true) } -> WorldObjectKind.SOUND to reference
             else -> null
         }
     }

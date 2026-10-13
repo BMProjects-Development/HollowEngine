@@ -29,8 +29,13 @@ class VfxSoundNode(private val spec: VfxSoundSpec, private val node: VfxNodeRunt
             .onFailure { HollowEngine.LOGGER.error("Invalid sound '{}' in effect {}", text, node.instance.asset, it) }
             .getOrNull()
     }
-    private val sound = SyncedSound()
     private val inWorld = node.instance.environment is VfxWorldEnvironment
+
+    /**
+     * In a preview the effect is built anew on every edit, so its sound goes by a name the next build finds again
+     * and takes the edit as it plays, rather than starting over beside the old one.
+     */
+    private val sound = if (inWorld) SyncedSound() else SyncedSound("hollowengine:vfx-preview/${node.instance.asset}/${spec.id}")
 
     /** The effect's time when the node turned on, NaN while it is off. */
     private var since = Float.NaN
