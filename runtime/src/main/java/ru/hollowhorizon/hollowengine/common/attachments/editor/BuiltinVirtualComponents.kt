@@ -2,9 +2,7 @@ package ru.hollowhorizon.hollowengine.common.attachments.editor
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.ai.attributes.DefaultAttributes
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
@@ -18,6 +16,8 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.rotateByEulers
 import ru.hollowhorizon.hollowengine.common.utils.math.toEulers
 import ru.hollowhorizon.hollowengine.common.utils.literal
+import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
+import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntityAndSelf
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 @Serializable
@@ -61,6 +61,7 @@ data class EntityAttributes(
     val health: Float = 20f,
     val attributes: Map<String, Double> = emptyMap(),
     @EditorHidden val defaults: Map<String, Double> = emptyMap(),
+    @EditorHidden val removable: Set<String> = emptySet(),
 )
 
 
@@ -148,17 +149,18 @@ object BuiltinVirtualComponents {
     }
 
     private fun readAttributes(entity: LivingEntity): EntityAttributes {
-        @Suppress("UNCHECKED_CAST")
-        val supplier = DefaultAttributes.getSupplier(entity.type as EntityType<out LivingEntity>)
+        val attributes = entity.attributes.mutableAttributes
         return EntityAttributes(
             health = entity.health,
-            attributes = EntityAttributeEditing.read(entity.attributes),
-            defaults = EntityAttributeEditing.defaults(entity.attributes, supplier),
+            attributes = EntityAttributeEditing.read(attributes),
+            defaults = EntityAttributeEditing.defaults(attributes),
+            removable = attributes.additionalAttributes().mapTo(linkedSetOf()) { it.unwrapKey().orElseThrow().location().toString() },
         )
     }
 
     private fun writeAttributes(entity: LivingEntity, values: EntityAttributes) {
-        EntityAttributeEditing.apply(entity.attributes, values.attributes)
+        val removed = EntityAttributeEditing.replace(entity.attributes.mutableAttributes, values.attributes)
+        if (removed.isNotEmpty()) RemovedEntityAttributesPacket(entity.id, removed).sendTrackingEntityAndSelf(entity)
         if (values.health.isFinite()) entity.health = values.health.coerceIn(0f, entity.maxHealth)
     }
 }

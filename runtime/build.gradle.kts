@@ -116,7 +116,7 @@ dependencies {
     modImplementation("lib:iris-fabric:1.8.14-beta.1+mc1.21.1-devpatch")
     modImplementation("lib:sodium-fabric:0.8.13+mc1.21.1")
 
-    implementation(project(":bridge"))
+    implementation(project(path = ":bridge", configuration = "namedElements"))
 
     addShadow("net.peanuuutz.tomlkt:tomlkt:0.5.0")
     addShadow("com.github.weisj:jsvg:2.1.0")

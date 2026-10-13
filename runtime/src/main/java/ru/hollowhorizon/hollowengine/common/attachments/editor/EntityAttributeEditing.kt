@@ -2,31 +2,35 @@ package ru.hollowhorizon.hollowengine.common.attachments.editor
 
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.entity.ai.attributes.AttributeMap
-import net.minecraft.world.entity.ai.attributes.AttributeSupplier
+import ru.hollowhorizon.hollowengine.bridge.attributes.MutableAttributeState
 
-/** Attribute names belong to the entity's supplier; the editor changes their base values only. */
+/** Edits registered per-entity attributes while retaining the type's required attributes. */
 internal object EntityAttributeEditing {
-    fun read(attributes: AttributeMap): Map<String, Double> = BuiltInRegistries.ATTRIBUTE.holders()
+    fun read(attributes: MutableAttributeState): Map<String, Double> = BuiltInRegistries.ATTRIBUTE.holders()
         .filter { attributes.hasAttribute(it) }
-        .map { it.key().location().toString() to attributes.getBaseValue(it) }
+        .map { it.key().location().toString() to attributes.baseValue(it) }
         .toList().sortedBy { it.first }.toMap()
 
-    fun defaults(attributes: AttributeMap, supplier: AttributeSupplier?): Map<String, Double> {
-        if (supplier == null) return emptyMap()
-        return BuiltInRegistries.ATTRIBUTE.holders()
-            .filter { attributes.hasAttribute(it) && supplier.hasAttribute(it) }
-            .map { it.key().location().toString() to supplier.getBaseValue(it) }
-            .toList().toMap()
-    }
+    fun defaults(attributes: MutableAttributeState): Map<String, Double> = BuiltInRegistries.ATTRIBUTE.holders()
+        .filter { attributes.hasAttribute(it) }
+        .map { it.key().location().toString() to attributes.defaultValue(it) }
+        .toList().toMap()
 
-    fun apply(attributes: AttributeMap, values: Map<String, Double>) {
+    fun apply(attributes: MutableAttributeState, values: Map<String, Double>) {
         values.forEach { (id, value) ->
             if (!value.isFinite()) return@forEach
             val location = ResourceLocation.tryParse(id) ?: return@forEach
             val holder = BuiltInRegistries.ATTRIBUTE.getHolder(location).orElse(null) ?: return@forEach
-            val instance = attributes.getInstance(holder) ?: return@forEach
+            val instance = attributes.getOrCreate(holder)
             instance.baseValue = holder.value().sanitizeValue(value)
         }
+    }
+
+    fun replace(attributes: MutableAttributeState, values: Map<String, Double>): Set<String> {
+        val requested = values.keys.mapNotNull(ResourceLocation::tryParse).toSet()
+        val removed = attributes.additionalAttributes().filter { it.unwrapKey().orElseThrow().location() !in requested }
+        removed.forEach(attributes::remove)
+        apply(attributes, values)
+        return removed.mapTo(linkedSetOf()) { it.unwrapKey().orElseThrow().location().toString() }
     }
 }

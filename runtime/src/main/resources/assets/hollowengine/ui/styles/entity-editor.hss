@@ -415,3 +415,36 @@
     size: 14px 14px;
     tint: $accent;
 }
+
+/* ---- attributes ---- */
+
+.ee-attributes { size: 100% fit; gap: 3px; }
+.ee-attribute-row { size: 100% 26px; gap: 4px; align-items: start center; }
+.ee-attribute-label {
+    size: 0px fit;
+    grow: 1;
+    min-width: 0px;
+    font-size: 9px;
+    foreground: $text;
+    wrap: false;
+    text-overflow: dots;
+}
+.ee-attribute-value { size: 78px 22px; }
+.ee-attribute-value .insp-input { size: 100% 22px; text-align: right; }
+.ee-attribute-actions { size: 32px fit; gap: 4px; align-items: end center; }
+.ee-attribute-tools { size: 100% fit; gap: 6px; align-items: start center; margin: 3px 0px; }
+.ee-attribute-search { size: 0px 22px; grow: 1; min-width: 0px; }
+.ee-attribute-tools .disabled { tint: $text-muted; opacity: 0.4; }
+.ee-attribute-picker {
+    size: 280px fit;
+    gap: 4px;
+    padding: 6px;
+    background: $bg-panel;
+    border: 1px $border;
+    border-radius: $radius;
+    shadow: 0px 3px 10px alpha(#000000, 0.4);
+}
+.ee-attribute-choices { size: 100% fit; max-height: 180px; gap: 1px; }
+.ee-attribute-choice { size: 100% fit; min-height: 22px; padding: 4px 6px; border-radius: $radius-small; }
+.ee-attribute-choice:hover { background: $bg-hover; }
+.ee-attribute-choice-label { size: 100% fit; font-size: 9px; foreground: $text; wrap: false; text-overflow: dots; }

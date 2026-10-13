@@ -5,6 +5,7 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.PathfinderMob
@@ -25,7 +26,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathNavigation
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.maxDrop
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.utils.FakePlayer
-import ru.hollowhorizon.hollowengine.common.utils.rl
+import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
 import java.util.UUID
 
 class NpcEntity : PathfinderMob {
@@ -129,12 +130,10 @@ class NpcEntity : PathfinderMob {
 
     fun setAttributes(attributes: Map<String, Float>) {
         attributes.forEach { (attributeName, value) ->
-            BuiltInRegistries.ATTRIBUTE.getHolder(attributeName.rl).orElseThrow()
-                ?.let { attribute ->
-                    this.attributes.getInstance(attribute)?.let { instance ->
-                        instance.baseValue = value.toDouble()
-                    }
-                }
+            if (!value.isFinite()) return@forEach
+            val location = ResourceLocation.tryParse(attributeName) ?: return@forEach
+            val attribute = BuiltInRegistries.ATTRIBUTE.getHolder(location).orElse(null) ?: return@forEach
+            this.attributes.mutableAttributes.getOrCreate(attribute).baseValue = attribute.value().sanitizeValue(value.toDouble())
         }
     }
 
