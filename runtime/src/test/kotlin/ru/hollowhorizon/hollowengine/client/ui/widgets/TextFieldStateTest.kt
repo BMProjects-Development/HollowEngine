@@ -123,6 +123,44 @@ class TextFieldStateTest {
     // --- newlines & indentation -----------------------------------------------------------------
 
     @Test
+    fun `enter does not remove literal or comment whitespace near braces`() {
+        for (source in listOf("val text = \"{  }\"", "// comment {  }", "val text = \"\"\"{  }\"\"\"")) {
+            val position = source.indexOf("{  }") + 2
+            val state = field(source, caret = position)
+            assertTrue(state.insertNewlineWithIndent())
+            assertEquals(source.substring(0, position) + "\n" + source.substring(position), state.text)
+        }
+    }
+
+    @Test
+    fun `enter removes inline block padding and undo restores it`() {
+        val state = field("    functionWithLambda {   }", caret = 26)
+        val original = state.text
+        assertTrue(state.insertNewlineWithIndent())
+        assertEquals("    functionWithLambda {\n        \n    }", state.text)
+        assertEquals(state.text.indexOf("\n    }"), state.caret)
+        assertTrue(state.undo())
+        assertEquals(original, state.text)
+        assertEquals(26, state.caret)
+    }
+
+    @Test
+    fun `each caret gets its own newline indent`() {
+        val state = field("one { }\n    two { }")
+        state.setCarets(listOf(UiTextCaret(6), UiTextCaret(17)))
+        assertTrue(state.insertNewlineWithIndent())
+        assertEquals("one {\n    \n}\n    two {\n        \n    }", state.text)
+        assertEquals(listOf(10, 31), state.caretRanges.map { it.position })
+    }
+
+    @Test
+    fun `enter preserves tab indentation and trims opening delimiter padding`() {
+        val state = field("\tfoo {  ")
+        assertTrue(state.insertNewlineWithIndent())
+        assertEquals("\tfoo {\n\t    ", state.text)
+    }
+
+    @Test
     fun `enter preserves the current line indent`() {
         val state = field("    foo")
         assertTrue(state.insertNewlineWithIndent())

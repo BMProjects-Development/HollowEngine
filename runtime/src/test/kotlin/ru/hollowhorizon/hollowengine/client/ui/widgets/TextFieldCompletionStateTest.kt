@@ -11,6 +11,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TextFieldCompletionStateTest {
+    @Test
+    fun `typing inside a word matches the prefix and replaces the entire word`() {
+        val (state, completion) = editor("someOldFunction()", 4)
+        completion.contributor = contributorOf("someOtherFunction")
+        state.typeCharacter('O')
+        completion.onCharTyped('O')
+        assertEquals("someOtherFunction", completion.items.single().label)
+        assertTrue(completion.accept())
+        assertEquals("someOtherFunction()", state.text)
+        assertTrue(state.undo())
+        assertEquals("someOOldFunction()", state.text)
+    }
+
+    @Test
+    fun `manual completion in the middle of an identifier ignores its suffix`() {
+        val (state, completion) = editor("someOldFunction", 4)
+        completion.contributor = contributorOf("someNewFunction")
+        assertTrue(completion.open())
+        assertTrue(completion.accept())
+        assertEquals("someNewFunction", state.text)
+    }
     private fun editor(text: String, caret: Int = text.length): Pair<TextFieldState, TextFieldCompletionState> {
         val state = TextFieldState(initialText = text, initialCaret = caret, multiline = true, autoPairs = false)
         val completion = TextFieldCompletionState(state)

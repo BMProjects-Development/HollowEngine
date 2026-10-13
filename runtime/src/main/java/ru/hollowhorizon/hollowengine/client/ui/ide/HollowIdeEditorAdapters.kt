@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
+import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -126,10 +127,36 @@ internal class HollowIdeEditorSession(
     val completions: UiCompletionContributor = UiCompletionContributor { context ->
         val analyzer = currentAnalyzer()
         requestCompletions(context.text, context.caret, analyzer)
-        completionSnapshot.takeIf { it.matches(context.text, context.caret, analyzer) }?.items.orEmpty()
+        val items = completionSnapshot.takeIf { it.matches(context.text, context.caret, analyzer) }?.items.orEmpty()
+        val candidates = (items + ideContextCompletions(path, context)).toMutableList()
+        IdeCompletionEvent.post(IdeCompletionEvent(path, context.text, context.caret, candidates)).items.toList()
     }
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
+    private var intentionJob: Job? = null
+    val intentions = UiIntentionActionsProvider { context, publish ->
+        intentionJob?.cancel()
+        intentionJob = scope.launch {
+            val actions = runCatching {
+                currentAnalyzer().intentionActions(path, context.text, context.caret)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("intentions", failure)
+                emptyList()
+            }.map { fix ->
+                UiTextQuickFix(
+                    fix.title.lang(*fix.titleArgs.toTypedArray()),
+                    fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
+                )
+            }
+            ensureActive()
+            Minecraft.getInstance().execute {
+                if (scope.isActive) {
+                    publish(actions)
+                    onUpdated()
+                }
+            }
+        }
+    }
 
     fun inlayHints(text: String): List<UiInlayHint> {
         val analyzer = currentAnalyzer()

@@ -480,6 +480,7 @@ fun EditableTextField(
     inlayRevision: Long = 0L,
     onInlayAction: ((UiInlayAction) -> Unit)? = null,
     completionContributor: UiCompletionContributor? = null,
+    intentionActionsProvider: UiIntentionActionsProvider? = null,
     completionRevision: Long = 0L,
     signatureHelpProvider: UiSignatureHelpProvider? = null,
     hoverInfoProvider: UiHoverInfoProvider? = null,
@@ -551,6 +552,7 @@ fun EditableTextField(
         completion.contributor = completionContributor
         autoScroll.follow(state, layout, scrollState, gutterWidth)
         completion.onFrame(completionRevision)
+        quickFix.onFrame(state)
         state.offsetAtPoint = { rootX, rootY ->
             val viewport = scrollState.viewport
             layout.offsetAt(
@@ -582,7 +584,9 @@ fun EditableTextField(
             }
             // Low priority: user onKeyInput handlers (default priority 0) get first refusal.
             .onKeyInput(TextFieldDefaultKeyPriority) { input ->
-                val handled = handleEditableFieldQuickFixKey(state, input, quickFix, diagnostics) ||
+                val intentionHandled = handleEditableFieldQuickFixKey(state, input, quickFix, diagnostics, intentionActionsProvider)
+                if (intentionHandled) completion.close()
+                val handled = intentionHandled ||
                         handleEditableFieldKey(state, input, layout, completion, codeInsight)
                 if (handled || !state.readOnly && input.typesCharacter()) input.consume()
             }.onPress { event ->
@@ -1292,7 +1296,7 @@ internal fun handleEditableFieldKey(
     }
     if (!state.multiline && !input.shift && (input.key == GLFW.GLFW_KEY_UP || input.key == GLFW.GLFW_KEY_DOWN)) return false
     if (input.key == GLFW.GLFW_KEY_ESCAPE && codeInsight?.dismissSignature() == true) return true
-    if (completion != null && (input.command && input.key == GLFW.GLFW_KEY_SPACE || input.alt && (input.key == GLFW.GLFW_KEY_ENTER || input.key == GLFW.GLFW_KEY_KP_ENTER))) {
+    if (completion != null && input.command && input.key == GLFW.GLFW_KEY_SPACE) {
         completion.open()
         return true
     }

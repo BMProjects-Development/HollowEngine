@@ -189,33 +189,22 @@ class TextFieldState(
         val size = indentSize ?: return insert("\n")
         if (activeCaretRanges().any { it.hasSelection }) return insert("\n")
 
-        val position = caret.coerceIn(0, text.length)
-        val lineStart = if (position == 0) 0 else {
-            val lastLineBreak = text.lastIndexOf('\n', position - 1)
-            if (lastLineBreak < 0) 0 else lastLineBreak + 1
+        val edits = activeCaretRanges().map { newlineEdit(text, it.position, size) }
+            .distinctBy { it.start to it.end }.sortedBy { it.start }
+        if (edits.zipWithNext().any { (left, right) -> right.start < left.end }) return false
+        val carets = ArrayList<UiTextCaret>()
+        val next = buildString {
+            var cursor = 0
+            for (edit in edits) {
+                append(text, cursor, edit.start)
+                carets += UiTextCaret(length + edit.caretOffset)
+                append(edit.replacement)
+                cursor = edit.end
+            }
+            append(text, cursor, text.length)
         }
-        val lineEnd = text.indexOf('\n', position).let { if (it < 0) text.length else it }
-        val line = text.substring(lineStart, lineEnd)
-        val column = position - lineStart
-        val context = newlineIndentContext(lineStart, line, column, size)
-        val baseIndent = context.baseIndent
-        val beforeCaret = line.substring(0, column).trimEnd()
-        val afterCaret = line.substring(column).trimStart()
-        val opensBlock = beforeCaret.endsWith("{") || beforeCaret.endsWith("(") || beforeCaret.endsWith("[") ||
-                line.isBlank() && context.previousOpensBlock
-        val closesBlock = afterCaret.startsWith("}") || afterCaret.startsWith(")") || afterCaret.startsWith("]")
-
-        return if (opensBlock && closesBlock) {
-            val innerIndent = baseIndent + " ".repeat(size)
-            val changed = insert("\n$innerIndent\n$baseIndent")
-            if (changed) moveCarets({ range -> range.position - baseIndent.length - 1 })
-            changed
-        } else {
-            val nextIndent = if (opensBlock) baseIndent + " ".repeat(size) else baseIndent
-            insert("\n$nextIndent")
-        }
+        return applyEdit(next, carets)
     }
-
     /**
      * Applies a programmatic edit (e.g. accepting a completion item) as a single undoable step:
      * the whole next text plus the carets it should leave behind.
@@ -228,9 +217,11 @@ class TextFieldState(
             setCarets(carets)
             return false
         }
+        breakHistoryGroup()
         recordHistorySnapshot()
         text = normalized
         setCaretsAfterEdit(carets)
+        breakHistoryGroup()
         return true
     }
 
@@ -501,24 +492,6 @@ class TextFieldState(
         return starts.toList()
     }
 
-    private fun newlineIndentContext(lineStart: Int, line: String, column: Int, indentSize: Int): NewlineIndentContext {
-        if (line.isNotBlank()) return NewlineIndentContext(line.takeWhile { it == ' ' }, previousOpensBlock = false)
-
-        var scanEnd = (lineStart - 1).coerceAtLeast(0)
-        while (scanEnd > 0) {
-            val previousStart = text.lastIndexOf('\n', scanEnd - 1).let { if (it < 0) 0 else it + 1 }
-            val previousLine = text.substring(previousStart, scanEnd)
-            if (previousLine.isNotBlank()) {
-                val indent = previousLine.takeWhile { it == ' ' }
-                val opens = previousLine.trimEnd().let { it.endsWith("{") || it.endsWith("(") || it.endsWith("[") }
-                return NewlineIndentContext(indent, opens)
-            }
-            scanEnd = (previousStart - 1).coerceAtLeast(0)
-            if (previousStart == 0) break
-        }
-        return NewlineIndentContext(" ".repeat((column / indentSize) * indentSize), previousOpensBlock = false)
-    }
-
     private fun recordHistorySnapshot() {
         if (restoringHistory) return
         history.record(SnapshotStep(this, TypingLabel, historyEntry(), ::historyEntry, ::restoreHistory), TypingMergeKey)
@@ -541,7 +514,6 @@ class TextFieldState(
 
     private data class TextEditRange(val start: Int, val end: Int)
     private data class TextEdit(val range: TextEditRange, val replacement: String)
-    private data class NewlineIndentContext(val baseIndent: String, val previousOpensBlock: Boolean)
     private data class TextFieldHistoryEntry(val text: String, val caretRanges: List<UiTextCaret>)
 }
 

@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide
 
 interface ScriptingAnalyzer {
+    /** Compiler-backed Java services when available, with a lexer-only runtime fallback. */
+    val javaAnalyzer: ScriptingAnalyzer get() = JavaScriptingAnalyzer
     fun highlight(name: String, text: String, offset: Int): List<TextLine>
 
     /** Ranges to highlight for the symbol/bracket at [offset]; cheap compared to [highlight]. */
@@ -25,6 +27,8 @@ interface ScriptingAnalyzer {
     fun format(name: String, text: String): String? = null
 
     fun definition(name: String, text: String, offset: Int): DefinitionLocation? = null
+    /** On-demand actions at the caret, including diagnostic fixes and import suggestions. */
+    fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>

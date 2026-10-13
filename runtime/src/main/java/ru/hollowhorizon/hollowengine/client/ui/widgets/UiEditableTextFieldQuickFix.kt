@@ -12,11 +12,13 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 
 /**
- * The Alt+Enter menu: the fixes offered by the diagnostics under the caret. Kept apart from the
- * completion popup because it is driven by the diagnostics list rather than by typing, and because
+ * The Alt+Enter menu: diagnostic fixes and asynchronous intention actions. Kept apart from the
+ * completion popup because actions are requested explicitly, and because
  * accepting one rewrites arbitrary parts of the document instead of the word being typed.
  */
 internal class EditableFieldQuickFixState {
+    private var requestVersion = 0L
+    private var requestedContext: UiCompletionContext? = null
     var fixes: List<UiTextQuickFix> by mutableStateOf(emptyList())
         private set
     var anchor: Int by mutableStateOf(0)
@@ -25,15 +27,19 @@ internal class EditableFieldQuickFixState {
         private set
 
     val active: Boolean get() = fixes.isNotEmpty()
+    val pending: Boolean get() = requestedContext != null && fixes.isEmpty()
 
-    fun open(anchor: Int, fixes: List<UiTextQuickFix>) {
-        if (fixes.isEmpty()) return
-        this.anchor = anchor
+    fun open(state: TextFieldState, fixes: List<UiTextQuickFix>) {
+        close()
+        requestedContext = UiCompletionContext(state.text, state.caret)
+        this.anchor = state.caret
         this.fixes = fixes
         selectedIndex = 0
     }
 
     fun close() {
+        requestVersion++
+        requestedContext = null
         if (fixes.isEmpty()) return
         fixes = emptyList()
         selectedIndex = 0
@@ -46,6 +52,25 @@ internal class EditableFieldQuickFixState {
     }
 
     fun selected(): UiTextQuickFix? = fixes.getOrNull(selectedIndex)
+
+    fun request(state: TextFieldState, provider: UiIntentionActionsProvider) {
+        val context = UiCompletionContext(state.text, state.caret)
+        requestedContext = context
+        val version = ++requestVersion
+        provider.request(context) { actions ->
+            if (version != requestVersion || state.text != context.text || state.caret != context.caret) return@request
+            val selected = selected()
+            fixes = (fixes + actions).distinct()
+            anchor = context.caret
+            selectedIndex = fixes.indexOf(selected).coerceAtLeast(0)
+            if (fixes.isEmpty()) requestedContext = null
+        }
+    }
+
+    fun onFrame(state: TextFieldState) {
+        val context = requestedContext ?: return
+        if (state.text != context.text || state.caret != context.caret || state.readOnly) close()
+    }
 }
 
 /** The fixes offered at [caret], in diagnostic order and without duplicate titles. */
@@ -57,16 +82,20 @@ internal fun quickFixesAt(diagnostics: List<UiTextDiagnostic>, caret: Int): List
         .distinctBy { it.title }
 }
 
-/**
- * Alt+Enter and the popup's own navigation keys. Returns false when there is nothing to fix, so
- * Alt+Enter keeps falling through to the completion popup.
- */
+/** Alt+Enter requests intentions; Ctrl+Space remains the explicit completion shortcut. */
 internal fun handleEditableFieldQuickFixKey(
     state: TextFieldState,
     input: UiKeyInput,
     quickFix: EditableFieldQuickFixState,
     diagnostics: List<UiTextDiagnostic>,
+    intentions: UiIntentionActionsProvider? = null,
 ): Boolean {
+    quickFix.onFrame(state)
+    if (input.key == GLFW.GLFW_KEY_ESCAPE) {
+        val hadRequest = quickFix.active || quickFix.pending
+        quickFix.close()
+        if (hadRequest) return true
+    }
     if (quickFix.active) {
         when (input.key) {
             GLFW.GLFW_KEY_UP -> {
@@ -100,40 +129,38 @@ internal fun handleEditableFieldQuickFixKey(
     if (state.readOnly) return false
     if (!input.alt || input.key != GLFW.GLFW_KEY_ENTER && input.key != GLFW.GLFW_KEY_KP_ENTER) return false
     val fixes = quickFixesAt(diagnostics, state.caret)
-    if (fixes.isEmpty()) return false
-    quickFix.open(state.caret, fixes)
+    if (fixes.isEmpty() && intentions == null) return true
+    quickFix.open(state, fixes)
+    if (intentions != null) quickFix.request(state, intentions)
     return true
 }
 
-/** Applies every edit of [fix] as one undoable step, leaving the caret where the first edit ended. */
+/** Applies all edits atomically, preserving carets and leaving a single undo step. */
 internal fun applyEditableFieldQuickFix(state: TextFieldState, fix: UiTextQuickFix): Boolean {
     val text = state.text
-    val edits = fix.edits
-        .map { UiTextEdit(it.start.coerceIn(0, text.length), it.end.coerceIn(0, text.length), it.replacement) }
-        .filter { it.end >= it.start }
-        .sortedWith(compareBy({ it.start }, { it.end }))
-    if (edits.isEmpty()) return false
-
-    var caret = state.caret
+    val edits = fix.edits.sortedWith(compareBy({ it.start }, { it.end }))
+    if (edits.isEmpty() || edits.any { it.start < 0 || it.end < it.start || it.end > text.length }) return false
+    if (edits.zipWithNext().any { (left, right) -> right.start < left.end }) return false
     val next = buildString {
         var cursor = 0
-        var shift = 0
         for (edit in edits) {
-            if (edit.start < cursor) continue
             append(text, cursor, edit.start)
             append(edit.replacement)
-            val delta = edit.replacement.length - (edit.end - edit.start)
-            // The caret rides the edits: past one it shifts, inside one it snaps to the new end.
-            if (caret >= edit.end) shift += delta
-            else if (caret > edit.start) caret = edit.start + edit.replacement.length - shift
             cursor = edit.end
         }
         append(text, cursor, text.length)
-        caret = (caret + shift).coerceIn(0, length)
     }
-    return state.applyEdit(next, listOf(UiTextCaret(caret)))
+    fun mapOffset(offset: Int): Int {
+        var shift = 0
+        for (edit in edits) {
+            if (offset < edit.start) break
+            if (offset <= edit.end) return edit.start + shift + edit.replacement.length
+            shift += edit.replacement.length - (edit.end - edit.start)
+        }
+        return offset + shift
+    }
+    return state.applyEdit(next, state.caretRanges.map { UiTextCaret(mapOffset(it.position)) })
 }
-
 @Composable
 internal fun EditableFieldQuickFixPopup(
     quickFix: EditableFieldQuickFixState,
@@ -177,6 +204,7 @@ internal fun EditableFieldQuickFixPopup(
         fixes.forEachIndexed { index, fix ->
             key(index) {
                 Row(
+                    id = "editable-text-field-quick-fix-$index",
                     tags = listOf("ide-quick-fix-row", if (index == quickFix.selectedIndex) "selected" else "idle"),
                     modifier = Modifier.input(clickable = true, hoverable = true)
                         .cursor(UiCursorShape.HAND)

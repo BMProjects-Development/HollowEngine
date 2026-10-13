@@ -50,8 +50,7 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
     override fun getModule(element: PsiElement, useSiteModule: KaModule?): KaModule {
         val containingFile = element.containingFile
 
-        val virtualFile: VirtualFile = containingFile.virtualFile
-            ?: error("Virtual file for $containingFile not found")
+        val virtualFile: VirtualFile = containingFile.virtualFile ?: containingFile.viewProvider.virtualFile
         virtualFile.kaModule?.let { return it }
 
         for (jarLibraryModule in libraryModules) {
@@ -78,11 +77,15 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
     }
 
     fun setModule(file: PsiFile, module: KaModule) {
-        setModule(file.virtualFile, module)
+        setModule(file.virtualFile ?: file.viewProvider.virtualFile, module)
         if (file is KtFile) {
             file.contextModule = module
             scriptModules[file] = module
         }
+    }
+
+    internal fun setLibraryContext(file: PsiFile) {
+        setModule(file, getNotUnderContentRootModule(file.project))
     }
 
     fun removeModule(file: PsiFile) {
@@ -90,7 +93,7 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
             file.contextModule = null
             scriptModules.remove(file)
         }
-        file.virtualFile?.kaModule = null
+        (file.virtualFile ?: file.viewProvider.virtualFile).kaModule = null
     }
 
     fun registerLibraryModule(module: KaRekotLibraryModule) {

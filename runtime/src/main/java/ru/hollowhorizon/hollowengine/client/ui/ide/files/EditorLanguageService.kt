@@ -27,7 +27,7 @@ object KotlinEditorLanguageService : EditorLanguageService {
 
 object JavaEditorLanguageService : EditorLanguageService {
     override val analyzer: ScriptingAnalyzer
-        get() = JavaScriptingAnalyzer
+        get() = ScriptingEnvironment.currentOrNull()?.analyzer?.javaAnalyzer ?: JavaScriptingAnalyzer
 }
 
 object PlainEditorLanguageService : EditorLanguageService {

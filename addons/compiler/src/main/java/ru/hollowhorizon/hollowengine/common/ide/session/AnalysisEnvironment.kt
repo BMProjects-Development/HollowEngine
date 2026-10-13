@@ -61,6 +61,7 @@ import org.jetbrains.kotlin.serialization.deserialization.METADATA_FILE_EXTENSIO
 import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 import ru.hollowhorizon.hollowengine.common.ide.session.index.JavaClassNameIndex
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJarLibraryModuleImpl
+import org.jetbrains.kotlin.analysis.decompiled.light.classes.ClsJavaStubByVirtualFileCache
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJdkLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import java.nio.file.Path
@@ -483,6 +484,7 @@ class AnalysisEnvironment(
     }
 
     private fun MockProject.registerFirAnalysisServices() {
+        registerServiceIfMissing(ClsJavaStubByVirtualFileCache::class.java, ClsJavaStubByVirtualFileCache())
         registerServiceIfMissing(
             "org.jetbrains.kotlin.resolve.jvm.KotlinJavaPsiFacade",
             "org.jetbrains.kotlin.analysis.api.impl.base.java.KaBaseKotlinJavaPsiFacade",

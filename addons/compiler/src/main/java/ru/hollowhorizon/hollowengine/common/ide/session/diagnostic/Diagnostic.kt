@@ -8,6 +8,9 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaSeverity
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtProperty
+import ru.hollowhorizon.hollowengine.common.scripting.ide.DiagnosticFix
+import ru.hollowhorizon.hollowengine.common.scripting.ide.TextEdit
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Position
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Range
@@ -24,7 +27,20 @@ fun diagnosticCode(file: KtFile): List<Diagnostic> {
                     KaSeverity.WARNING -> Severity.WARNING
                 }
                 val range = diagnostic.textRanges.firstOrNull() ?: diagnostic.psi.textRange
-                Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage)
+                val property = diagnostic.psi as? KtProperty
+                val fixes = if (diagnostic.factoryName == "UNUSED_VARIABLE" && property?.isLocal == true &&
+                    !property.hasDelegate() && property.accessors.isEmpty()
+                ) {
+                    val initializer = property.initializer?.text.orEmpty()
+                    val replacement = property.typeReference?.text?.let { type ->
+                        if (initializer.isEmpty()) "" else "run<$type> { $initializer }"
+                    } ?: initializer
+                    listOf(DiagnosticFix(
+                        "hollowengine.gui.ide.editor.fix.remove_unused_variable",
+                        listOf(TextEdit(property.textRange.startOffset, property.textRange.endOffset, replacement)),
+                    ))
+                } else emptyList()
+                Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
             }
     }
     val syntaxDiagnostics = PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java).map { error ->

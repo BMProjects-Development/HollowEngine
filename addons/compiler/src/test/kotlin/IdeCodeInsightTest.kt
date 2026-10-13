@@ -1,0 +1,271 @@
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.io.TempDir
+import ru.hollowhorizon.hollowengine.common.ScriptingEnvironmentImpl
+import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibrarySourceRepository
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationIdentity
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationIdentity.Kind
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationMatcher
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
+import ru.hollowhorizon.hollowengine.common.scripting.ide.DiagnosticFix
+import java.io.File
+import java.nio.file.Path
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
+import javax.tools.ToolProvider
+import kotlin.io.path.createDirectories
+import kotlin.io.path.outputStream
+import kotlin.io.path.writeText
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.jvm.JvmName
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class IdeCodeInsightTest {
+    private val fixture = AnalysisEnvironmentTestFixture {
+        ScriptingEnvironmentImpl(javaHome = File(System.getProperty("java.home")),
+            classpath = System.getProperty("java.class.path").split(File.pathSeparator).map(::File).filter(File::exists) + directory.resolve("classes").toFile(),
+            scriptTypes = listOf(ScriptClassProvider("kts", "kotlin.Any")), mappings = Mappings.EMPTY)
+    }
+    private val analyzer get() = fixture.environment.analyzer
+    private lateinit var directory: Path
+    @BeforeAll fun start(@TempDir root: Path) {
+        directory = root
+        val source = directory.resolve("NavigationFixture.java").also { it.writeText(JavaFixtureSource) }
+        val classes = directory.resolve("classes").createDirectories()
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(), source.toString()))
+        fixture.start()
+    }
+    @AfterAll fun close() = fixture.close()
+
+    @Test
+    fun `Kotlin navigation chooses the overload matching the arguments`() {
+        val text = "fun choose(value: String) = value\nfun choose(value: Int) = value\nchoose(42)"
+        val target = assertNotNull(analyzer.definition("overloads.kts", text, text.lastIndexOf("choose") + 2))
+        assertEquals(text.indexOf("choose(value: Int)"), target.offset)
+    }
+
+    @Test
+    fun `completion inside identifiers uses only the text before the caret`() {
+        val text = "fun someOtherFunction() = Unit\nsomeOldFunction()"
+        val items = analyzer.collectCompletions("middle.kts", text, text.lastIndexOf("some") + 4)
+        assertTrue(items.any { it.name == "someOtherFunction" }, items.toString())
+        assertEquals("someOtherFunction", items.first { it.name == "someOtherFunction" }.insert)
+    }
+
+    @Test
+    fun `completion preserves existing lambda bodies and callable references`() {
+        for (usage in listOf("someOldFunction { println(42) }", "::someOldFunction")) {
+            val text = "fun someOtherFunction(block: () -> Unit) = block()\nval action = $usage"
+            val items = analyzer.collectCompletions("call-shape.kts", text, text.lastIndexOf("someOld") + 4)
+            assertEquals("someOtherFunction", items.first { it.name == "someOtherFunction" }.insert)
+        }
+    }
+
+    @Test
+    fun `intentions offer exact Java imports and keep file annotations and package`() {
+        val text = "@file:Suppress(\"unused\")\n\npackage sample\n\nval uri: URI? = null"
+        val actions = analyzer.intentionActions("imports.kts", text, text.indexOf("URI") + 1)
+        val fix = assertNotNull(actions.firstOrNull { "java.net.URI" in it.titleArgs }, actions.toString())
+        val edited = text.apply(fix)
+        assertTrue(edited.indexOf("package sample") < edited.indexOf("import java.net.URI"), edited)
+        assertFalse(analyzer.diagnostic("imports.kts", edited).any { it.severity.isError() }, edited)
+    }
+
+    @Test
+    fun `intentions expose cleanup away from the imports and preserve initializer effects`() {
+        val text = "import java.net.URI\n\nfun run() {\n    val unused = println(\"effect\")\n}\n"
+        val actions = analyzer.intentionActions("unused.kts", text, text.indexOf("unused") + 2)
+        val remove = assertNotNull(actions.firstOrNull { it.title.endsWith("remove_unused_variable") }, actions.toString())
+        assertTrue("println(\"effect\")" in text.apply(remove))
+        assertFalse("val unused" in text.apply(remove))
+        assertTrue(actions.any { it.title.endsWith("remove_unused_imports") })
+    }
+
+    @Test
+    fun `removing an unused variable preserves its initializer expected type`() {
+        val text = "fun run() { val unused: List<Int> = emptyList() }"
+        val action = assertNotNull(analyzer.intentionActions("typed-unused.kts", text, text.indexOf("unused"))
+            .firstOrNull { it.title.endsWith("remove_unused_variable") })
+        val edited = text.apply(action)
+        assertFalse(analyzer.diagnostic("typed-unused.kts", edited).any { it.severity.isError() }, edited)
+    }
+
+    @Test
+    fun `source matching distinguishes boxed primitive overloads and qualified parameter types`() {
+        val matcher = SourceDeclarationMatcher(analyzer.project)
+        val kotlin = "fun select(x: Int) = x\nfun select(x: Int?) = x"
+        val target = SourceDeclarationIdentity("select", emptyList(), Kind.FUNCTION, listOf("java.lang.Integer"))
+        assertEquals(kotlin.indexOf("select(x: Int?)"), matcher.offset("Example.kt", kotlin, target))
+        val java = "class Example { void select(java.sql.Date value) {} }"
+        val wrongPackage = SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("java.util.Date"))
+        assertNull(matcher.offset("Example.java", java, wrongPackage))
+        val aliased = "import java.util.Date as Timestamp\nfun select(x: Timestamp) = x"
+        assertEquals(aliased.indexOf("select"), matcher.offset("Example.kt", aliased,
+            target.copy(parameters = listOf("java.util.Date"))))
+    }
+
+    @Test
+    fun `Java navigation resolves local overloads by parameter types`() {
+        val text = """
+            class Example {
+                void run() { select(42); }
+                void select(String value) {}
+                void select(int value) {}
+            }
+        """.trimIndent()
+        val target = assertNotNull(analyzer.javaAnalyzer.definition("Example.java", text, text.indexOf("select") + 2))
+        assertEquals(text.indexOf("select(int"), target.offset)
+        assertNotNull(analyzer.javaAnalyzer.hover("Example.java", text, text.indexOf("select") + 2))
+        assertEquals(2, analyzer.javaAnalyzer.occurrences("Example.java", text, text.indexOf("select") + 2).size)
+    }
+
+    @Test
+    fun `Java syntax diagnostics report invalid declarations`() {
+        assertTrue(analyzer.javaAnalyzer.diagnostic("Broken.java", "class Broken { void run( }").isNotEmpty())
+    }
+
+    @Test
+    fun `library navigation prefers attached source archives and selects the called overload`() {
+        val archive = DirectoryManager.LIBRARY_SOURCES.resolve("navigation-test-sources.jar")
+        JarOutputStream(archive.outputStream()).use { jar ->
+            jar.putNextEntry(JarEntry("insight/NavigationFixture.java"))
+            jar.write(JavaFixtureSource.toByteArray())
+            jar.closeEntry()
+        }
+        try {
+            val text = "insight.NavigationFixture.select(42)"
+            val target = assertNotNull(analyzer.definition("library.kts", text, text.indexOf("select") + 1))
+            assertTrue(target.path.contains("navigation-test-sources.jar"), target.path)
+            assertEquals(JavaFixtureSource.indexOf("select(int"), target.offset)
+            val java = "class Use { void run() { insight.NavigationFixture.select(\"text\"); } }"
+            val javaTarget = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", java, java.indexOf("select") + 1))
+            assertEquals(JavaFixtureSource.indexOf("select(String"), javaTarget.offset)
+        } finally {
+            archive.toFile().delete()
+        }
+    }
+
+    @Test
+    fun `decompiler navigation selects a signature rather than the first name occurrence`() {
+        val text = "insight.NavigationFixture.select(42)"
+        val target = assertNotNull(analyzer.definition("decompiled.kts", text, text.indexOf("select") + 1))
+        assertTrue(target.path.startsWith("decompiled/"), target.path)
+        assertTrue(target.text!!.substring(target.offset).startsWith("select(int"), target.text)
+    }
+
+    @Test
+    fun `Kotlin library navigation handles file facades suspend functions and JVM names`() {
+        for ((text, name, expected) in listOf(
+            Triple("navigationKotlinOverload(42)", "navigationKotlinOverload", "navigationKotlinOverload(int"),
+            Triple("suspend fun call() = navigationKotlinSuspending(42)", "navigationKotlinSuspending", "navigationKotlinSuspending(int"),
+            Triple("navigationKotlinRenamed(42)", "navigationKotlinRenamed", "renamedNavigation(int"),
+            Triple("val result = navigationKotlinProperty", "navigationKotlinProperty", "getNavigationKotlinProperty("),
+        )) {
+            val target = assertNotNull(analyzer.definition("kotlin-library.kts", text, text.indexOf(name) + 2), name)
+            assertTrue(target.text!!.startsWith(expected, target.offset), "${target.path}: ${target.text?.substring(target.offset)}")
+        }
+    }
+
+    @Test
+    fun `Java resolves generic receivers inherited methods and constructors`() {
+        val text = """
+            class Use {
+                void run() {
+                    var list = new java.util.ArrayList<String>();
+                    list.add("value");
+                    new insight.NavigationFixture(42);
+                }
+            }
+        """.trimIndent()
+        val method = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", text, text.indexOf("add(") + 1))
+        assertTrue(method.text!!.startsWith("add(", method.offset), method.path)
+        val constructor = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", text, text.lastIndexOf("NavigationFixture") + 2))
+        assertTrue(constructor.text!!.startsWith("NavigationFixture(int", constructor.offset), constructor.text)
+    }
+
+    @Test
+    fun `source matcher ignores comments calls and overloads of the same arity`() {
+        val text = """
+            package sample;
+            class Example {
+                // select is intentionally used before its declaration
+                void run() { select(42); }
+                void select(String value) {}
+                void select(int value) {}
+                class Nested { void select(int value) {} }
+            }
+        """.trimIndent()
+        val matcher = SourceDeclarationMatcher(analyzer.project)
+        val target = SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("int"))
+        assertEquals(text.indexOf("select(int"), matcher.offset("Example.java", text, target))
+        val nested = target.copy(owners = listOf("Example", "Nested"))
+        assertEquals(text.lastIndexOf("select(int"), matcher.offset("Example.java", text, nested))
+        assertNull(matcher.offset("Example.java", text, target.copy(parameters = listOf("long"))))
+    }
+
+    @Test
+    fun `source matcher handles constructors arrays and Kotlin overloads`() {
+        val matcher = SourceDeclarationMatcher(analyzer.project)
+        val java = "class Example { Example(String x) {} Example(int... x) {} }"
+        val constructor = SourceDeclarationIdentity("Example", listOf("Example"), Kind.CONSTRUCTOR, listOf("int[]"))
+        assertEquals(java.indexOf("Example(int"), matcher.offset("Example.java", java, constructor))
+        val implicit = "class Example {}"
+        assertEquals(implicit.indexOf("Example"), matcher.offset("Example.java", implicit, constructor.copy(parameters = emptyList())))
+        val record = "record Example(int value) {}"
+        assertEquals(record.indexOf("Example"), matcher.offset("Example.java", record, constructor.copy(parameters = listOf("int"))))
+        val kotlin = "fun select(x: String) = x\nfun select(x: Int) = x"
+        val target = SourceDeclarationIdentity("select", emptyList(), Kind.FUNCTION, listOf("int"))
+        assertEquals(kotlin.indexOf("select(x: Int)"), matcher.offset("Example.kt", kotlin, target))
+    }
+
+    @Test
+    fun `source archives can be attached and replaced without restarting the analyzer`() {
+        val jar = directory.resolve("mod-sources.jar")
+        val target = SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("int"))
+        val repository = LibrarySourceRepository(analyzer.project, emptyList()) { listOf(jar) }
+        fun write(text: String) {
+            JarOutputStream(jar.outputStream()).use { archive ->
+                archive.putNextEntry(JarEntry("sample/Example.java"))
+                archive.write(text.toByteArray())
+                archive.closeEntry()
+            }
+        }
+        assertNull(repository.find(target, null, "sample"))
+        val original = "package sample; class Example { void select(int value) {} }"
+        write(original)
+        val found = assertNotNull(repository.find(target, null, "sample"))
+        assertEquals(original.indexOf("select"), found.offset)
+        assertEquals(original, found.text)
+        val updated = "// updated\n$original"
+        write(updated)
+        assertEquals(updated.indexOf("select"), repository.find(target, null, "sample")?.offset)
+    }
+
+    private fun String.apply(fix: DiagnosticFix): String = fix.edits.sortedByDescending { it.start }
+        .fold(this) { text, edit -> text.replaceRange(edit.start, edit.end, edit.replacement) }
+}
+
+private val JavaFixtureSource = """
+    package insight;
+    public class NavigationFixture {
+        public NavigationFixture(String value) {}
+        public NavigationFixture(int value) {}
+        public static String select(String value) { return value; }
+        public static int select(int value) { return value; }
+    }
+""".trimIndent()
+
+fun navigationKotlinOverload(value: String): String = value
+fun navigationKotlinOverload(value: Int): Int = value
+suspend fun navigationKotlinSuspending(value: Int): Int = value
+@JvmName("renamedNavigation")
+fun navigationKotlinRenamed(value: Int): Int = value
+val navigationKotlinProperty: Int get() = 42

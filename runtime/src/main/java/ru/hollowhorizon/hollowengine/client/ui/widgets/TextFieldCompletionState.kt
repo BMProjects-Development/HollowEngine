@@ -48,7 +48,7 @@ class TextFieldCompletionState(
         val caret = state.caret
         lastText = text
         val replacement = completionWordRange(text, caret)
-        val prefix = text.substring(replacement.first.coerceAtMost(text.length), replacement.last.coerceAtMost(text.length))
+        val prefix = text.substring(replacement.first, caret.coerceIn(0, text.length))
         val found = rankAgainst(contributor.complete(UiCompletionContext(text, caret)), prefix)
         val line = completionLineRange(text, caret)
         val keepSelection = opened && prefix == lastPrefix

@@ -14,7 +14,11 @@ import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibrarySourceRepository
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationMatcher
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.CfrDefinitionDecompiler
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.intentionActions
 import ru.hollowhorizon.hollowengine.common.ide.session.format.formatKotlinCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.highlightCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.occurrencesCode
@@ -41,6 +45,10 @@ class ScriptingAnalyzerImpl(
     val project: Project
         get() = kotlinCoreProjectEnvironment.project
     private val factory = KtPsiFactory(project, eventSystemEnabled = true)
+    internal val librarySources by lazy { LibrarySourceRepository(project, libraries.flatMap { it.binaryRoots }) }
+    internal val sourceDeclarationMatcher by lazy { SourceDeclarationMatcher(project) }
+    internal val definitionDecompiler = CfrDefinitionDecompiler()
+    override val javaAnalyzer: ScriptingAnalyzer by lazy { JavaLanguageAnalyzer(this) }
 
     internal val fileCache = object : LinkedHashMap<String, CachedFile>(5, 0.75f, true) {
         override fun removeEldestEntry(entry: MutableMap.MutableEntry<String, CachedFile>?): Boolean {
@@ -305,6 +313,11 @@ class ScriptingAnalyzerImpl(
     override fun diagnostic(name: String, text: String): List<Diagnostic> {
         val file = getOrCreateFile(name, text)
         return collectImportDiagnostics(name, file) + diagnosticCode(file)
+    }
+
+    @Synchronized
+    override fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> {
+        return intentionActions(getOrCreateFile(name, text), offset)
     }
 
     @Synchronized

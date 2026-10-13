@@ -22,6 +22,9 @@ object DirectoryManager {
     /** Ahead-of-time compiled artifacts extracted from addon jars. */
     val SCRIPT_BUNDLE_CACHE: File get() = HOLLOW_ENGINE.resolve("cache/script-bundles").toFile()
 
+    /** User-attached library/mod source archives, independent of the script classpath. */
+    val LIBRARY_SOURCES: Path get() = HOLLOW_ENGINE.resolve("sources").also { it.toFile().mkdirs() }
+
     @JvmStatic
     fun File.toReadablePath(): String {
         return toPath().toReadablePath()

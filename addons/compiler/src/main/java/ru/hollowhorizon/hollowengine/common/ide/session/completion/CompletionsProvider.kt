@@ -135,7 +135,13 @@ private fun createItems(ktFile: KtFile, element: PsiElement, parentKtElement: Kt
             else -> CompletionItemsCollector.SymbolFilter { true }
         }
 
-        val collector = CompletionItemsCollector(applicabilityChecker, visibilityChecker, filter, symbolFilter, sink)
+        val reference = element.parentOfType<KtSimpleNameExpression>(withSelf = true)
+        val call = reference?.parent as? KtCallExpression
+        val existingCall = call?.calleeExpression == reference && (call?.valueArgumentList != null || call?.lambdaArguments?.isNotEmpty() == true)
+        val referenceOnly = reference?.parent is KtCallableReferenceExpression ||
+            element.parentOfType<KtImportDirective>(withSelf = true) != null
+        val collector = CompletionItemsCollector(applicabilityChecker, visibilityChecker, filter, symbolFilter, sink,
+            insertCallSyntax = !existingCall && !referenceOnly)
         with(collector) {
             when (position) {
                 is CompletionPosition.AfterDot -> completeAfterDot(
@@ -573,7 +579,11 @@ private fun getPosition(element: KtElement): CompletionPosition? {
             when (val parent = element.parent) {
                 is KtDotQualifiedExpression if parent.selectorExpression == element -> getPosition(parent)
                 is KtUserType if parent.referenceExpression == element -> getPositionByUserType(parent)
-                is KtCallExpression if parent.parent is KtElement -> getPosition(parent.parent as KtElement)
+                is KtCallExpression -> {
+                    val qualified = parent.parent as? KtQualifiedExpression
+                    if (qualified?.selectorExpression == parent) getPosition(qualified)
+                    else CompletionPosition.Identifier(element.getReferencedName().removeFakeIdentifier(COMPLETION_FAKE_IDENTIFIER))
+                }
                 else -> CompletionPosition.Identifier(
                     element.getReferencedName().removeFakeIdentifier(COMPLETION_FAKE_IDENTIFIER)
                 )
