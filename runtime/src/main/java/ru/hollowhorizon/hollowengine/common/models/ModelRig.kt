@@ -226,6 +226,14 @@ interface PlacedAttachmentSpec {
         TrsTransformF().setCompositionOf(offset, eulerRotationXyz(rotation), Vec3f(scale, scale, scale))
 }
 
+/**
+ * An attachment that works only while [activeWhile] holds for the entity it is on, a blank condition always; the
+ * client asks every frame. Without an entity, as in a preview, it always works.
+ */
+interface ConditionalAttachmentSpec {
+    val activeWhile: AnimationExpression
+}
+
 @Serializable
 enum class RigItemSlot {
     MAINHAND,

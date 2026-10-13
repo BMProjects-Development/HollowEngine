@@ -6,7 +6,9 @@ import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
 import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackSections
 import ru.hollowhorizon.hollowengine.common.vfx.*
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -71,8 +73,21 @@ class VfxInstance(
     var time: Float = 0f
         private set
 
-    /** Where the timeline is, looped when the timeline loops. */
-    val timelineTime: Float get() = timeline.localTime(time)
+    /**
+     * Where the timeline is: it runs with the clock, starts over when it loops, and goes where the rules of its
+     * sections send it.
+     */
+    var timelineTime: Float = 0f
+        private set
+
+    /** Whether the timeline has just arrived where it is, so a section starting there checks its rules. */
+    private var entering = true
+
+    /** Whether a rule or a jump moved the timeline since the start, so it no longer runs with the clock. */
+    private var detoured = false
+
+    private val conditionContext = VfxEvalContext()
+    private val compiledConditions = HashMap<String, (VfxEvalContext) -> Float>()
 
     /** How fast the origin is moving, for particles that inherit it. */
     var velocityX: Float = 0f
@@ -105,7 +120,7 @@ class VfxInstance(
         get() = when {
             isStopping -> behaviors.all { it.isIdle }
             emitters.isNotEmpty() -> emitters.all { it.isFinished }
-            else -> !effect.timeline.loop && time >= effect.timeline.duration
+            else -> !effect.timeline.loop && timelineTime >= effect.timeline.duration
         }
 
     /** How many particles this effect may still create this frame; the scene refills it. */
@@ -119,6 +134,11 @@ class VfxInstance(
 
     fun readData(store: NbtDataStore) {
         data = store.numericPaths()
+    }
+
+    /** Takes [values] as the data expressions read as `d.`, by path, as a preview does that has no handle. */
+    fun useData(values: Map<String, Float>) {
+        data = values
     }
 
     /** Puts effect space somewhere in the world. The anchor only moves when asked. */
@@ -174,15 +194,63 @@ class VfxInstance(
 
     /** Advances everything by [dt] seconds and leaves the nodes ready to draw. */
     fun update(dt: Float) {
-        if (dt > 0f && !isPaused) time += dt
+        if (dt > 0f && !isPaused) {
+            time += dt
+            advanceTimeline(dt)
+        }
         pose()
         behaviors.forEach { it.update(dt) }
+    }
+
+    /** Whether [seek] is playing the effect through, which takes the timeline straight along with the clock. */
+    private var seeking = false
+
+    /** Moves the timeline on by [dt] seconds, through its sections unless [seeking], starting over when it loops. */
+    private fun advanceTimeline(dt: Float) {
+        val spec = effect.timeline
+        val duration = spec.duration
+        val next = timelineTime + dt
+        val straight = if (spec.loop && duration > 0f) next.mod(duration) else next
+        if (seeking || !spec.hasRules) {
+            timelineTime = straight
+            entering = false
+            return
+        }
+        var at = PlaybackSections.advance(spec.sections, spec.events, timelineTime, dt, entering, ::holds).time
+        if (spec.loop && duration > 0f && at >= duration) {
+            at = PlaybackSections.advance(spec.sections, spec.events, 0f, (at - duration).mod(duration), true, ::holds).time
+        }
+        if (abs(at - straight) > PlaybackSections.EPSILON) detoured = true
+        entering = false
+        timelineTime = at
+    }
+
+    /** Whether the condition [source] of a section holds now. */
+    private fun holds(source: String): Boolean {
+        val compiled = compiledConditions.getOrPut(source) { expressions.float(source) }
+        conditionContext.age = timelineTime
+        conditionContext.effectTime = time
+        conditionContext.emitterAge = time
+        conditionContext.gameTime = gameTime
+        conditionContext.partialTick = partialTick
+        conditionContext.data = data
+        return compiled(conditionContext) != 0f
+    }
+
+    /** Moves the timeline to the event [name] and plays on from there; false when the effect has no such event. */
+    fun jumpTo(name: String): Boolean {
+        val target = effect.timeline.events.firstOrNull { it.name == name }?.time ?: return false
+        timelineTime = target
+        entering = true
+        detoured = true
+        pose()
+        return true
     }
 
     /** Places every node for the current time: the authored transform, then the timeline over it. */
     private fun pose() {
         nodes.forEach { it.reset() }
-        if (!timeline.isEmpty) timeline.apply(time)
+        if (!timeline.isEmpty) timeline.apply(timelineTime)
         nodes.forEach { it.place(root) }
         allNodes.forEach { it.fillContext() }
     }
@@ -219,6 +287,9 @@ class VfxInstance(
      */
     fun restart() {
         time = 0f
+        timelineTime = 0f
+        entering = true
+        detoured = false
         isStopping = false
         isPaused = false
         behaviors.forEach { it.restart() }
@@ -239,10 +310,19 @@ class VfxInstance(
     ) {
         val target = to.coerceAtLeast(0f)
         var at = from
-        if (target < at) {
+        if (target < at || detoured) {
             restart()
             at = 0f
         }
+        seeking = true
+        try {
+            playTo(at, target, maxSteps, emittingAt, advance)
+        } finally {
+            seeking = false
+        }
+    }
+
+    private fun playTo(at: Float, target: Float, maxSteps: Int, emittingAt: (Float) -> Boolean, advance: (Float) -> Unit) {
         val distance = target - at
         if (distance <= SEEK_EPSILON) {
             emit(emittingAt(target))
@@ -315,11 +395,9 @@ class VfxTimelinePlayer(private val spec: VfxTimelineSpec, nodes: List<VfxNodeRu
         tracks = spec.tracks.mapNotNull { track -> prepare(track, byId) }
     }
 
-    fun localTime(time: Float): Float = if (spec.loop && spec.duration > 0f) time.mod(spec.duration) else time
-
+    /** Writes the tracks at [time] of the timeline onto their nodes. */
     fun apply(time: Float) {
-        val local = localTime(time)
-        tracks.forEach { track -> apply(track, local) }
+        tracks.forEach { track -> apply(track, time) }
     }
 
     private fun prepare(track: VfxTrack, byId: Map<String, VfxNodeRuntime>): PreparedTrack? {

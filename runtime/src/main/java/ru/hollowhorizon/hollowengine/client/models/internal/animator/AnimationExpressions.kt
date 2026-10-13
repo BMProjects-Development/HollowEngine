@@ -256,6 +256,20 @@ object AnimatorExpressionEvaluator {
         return ready.eval(context)
     }
 
+    /**
+     * Whether [source] holds, compiled on the spot the first time rather than in the background: a rule of a
+     * section is asked once, at its boundary, and has no later frame to get it right.
+     */
+    fun condition(source: String, context: AnimatorEvaluationContext): Boolean {
+        if (source.isBlank()) return true
+        source.toFloatOrNull()?.let { return it != 0f }
+        val ready = bakedBooleans[source] ?: run {
+            prepareNow(listOf(source))
+            bakedBooleans[source]
+        } ?: return false
+        return ready.eval(context)
+    }
+
     fun vector(expression: AnimationVectorExpression, context: AnimatorEvaluationContext): Vec3f = Vec3f(
         float(expression.x, context),
         float(expression.y, context),

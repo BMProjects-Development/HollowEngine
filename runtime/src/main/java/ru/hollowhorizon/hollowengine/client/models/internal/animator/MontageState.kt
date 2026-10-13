@@ -110,7 +110,8 @@ class MontageLayer(montage: MontageLayerSpec) : SpecLayer(montage) {
     override fun sample(target: PoseTarget, context: AnimatorEvaluationContext): LayerPose? {
         val montage = MontageAssets.of(layer.montage, context.isClientSide) ?: return null
         val speed = layer.speed.coerceAtLeast(MIN_SPEED)
-        val played = age * speed
+        val played = layer.played(montage, context.gameTicks, context.partialTick, { evaluator.condition(it, context) })
+            ?.time ?: (age * speed)
         time = played.coerceIn(0f, montage.duration)
 
         val fadeOut = fadeOutScale(context, (played - montage.duration) / speed)
@@ -144,9 +145,19 @@ class MontageLayer(montage: MontageLayerSpec) : SpecLayer(montage) {
 class MontageState(private var spec: MontageStateSpec) : AnimationState {
     private val playback = ClipPlayback()
 
-    override val time: Float get() = playback.time
+    /** Where a montage with rules in its sections is, played forward through them rather than by [playback]. */
+    private var sectioned = 0f
+    private var entering = true
 
-    override fun enter(from: AnimationPose?) = playback.reset()
+    override var time: Float = 0f
+        private set
+
+    override fun enter(from: AnimationPose?) {
+        playback.reset()
+        sectioned = 0f
+        entering = true
+        time = 0f
+    }
 
     override fun reconfigure(spec: AnimationControllerStateSpec): Boolean {
         this.spec = spec as? MontageStateSpec ?: return false
@@ -155,11 +166,32 @@ class MontageState(private var spec: MontageStateSpec) : AnimationState {
 
     override fun sample(target: PoseTarget, allowed: Set<Int>, context: AnimatorEvaluationContext): AnimationPose? {
         val montage = MontageAssets.of(spec.montage, context.isClientSide) ?: return null
-        context.stateTime = playback.time
+        context.stateTime = time
         val speed = evaluator.float(spec.speed, context, 1f)
-        val time = playback.advance(montage.duration, spec.playMode, speed, context.deltaTime)
+        val time = if (montage.hasRules) throughSections(montage, speed, context)
+        else playback.advance(montage.duration, spec.playMode, speed, context.deltaTime)
+        this.time = if (montage.hasRules) time else playback.time
         context.montages += MontageMoment(montage, time, 1f)
         return MontageSampler.sample(montage, time, target, allowed)
             .also { pose -> pose.entries.forEach { it.value.cover = 1f } }
+    }
+
+    /**
+     * Plays forward through the sections, starting over at the end when the state loops and holding the last frame
+     * otherwise; sections send the playhead where they will, so it never plays backwards.
+     */
+    private fun throughSections(montage: Montage, speed: Float, context: AnimatorEvaluationContext): Float {
+        val condition = { source: String -> evaluator.condition(source, context) }
+        val by = (context.deltaTime * speed).coerceAtLeast(0f)
+        var at = montage.advance(sectioned, by, entering, condition).time
+        entering = false
+        val duration = montage.duration
+        if (duration > 0f && at >= duration) {
+            at = if (spec.playMode == AnimationPlayMode.Loop) {
+                montage.advance(0f, (at - duration).coerceAtMost(duration), true, condition).time.coerceAtMost(duration)
+            } else duration
+        }
+        sectioned = at
+        return at
     }
 }

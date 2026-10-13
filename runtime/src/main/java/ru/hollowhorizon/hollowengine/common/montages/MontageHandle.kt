@@ -4,38 +4,43 @@ import kotlinx.coroutines.CompletableDeferred
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.withMontage
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.models.Montage
 import ru.hollowhorizon.hollowengine.common.models.MontageAssets
-import ru.hollowhorizon.hollowengine.common.models.MontageEvent
 import ru.hollowhorizon.hollowengine.common.models.MontageLayerSpec
 import kotlin.math.ceil
 
 /**
  * A montage playing on an entity, as the server that started it sees it: what stops it, what waits for it,
- * and what runs at its events. It ends when it has played through, is stopped, is replaced by the same
- * montage started again, or its entity is gone.
+ * what runs at its events and what moves it to one. It ends when it has played through, is stopped, is replaced by
+ * the same montage started again, or its entity is gone.
  */
 class MontageHandle internal constructor(
     val entity: Entity,
     val montage: String,
-    private val layer: MontageLayerSpec,
-    private val duration: Float,
-    private val events: List<MontageEvent>,
+    private var layer: MontageLayerSpec,
+    private val asset: Montage,
 ) {
     private val done = CompletableDeferred<Boolean>()
     private val listeners = HashMap<String, MutableList<() -> Unit>>()
-    private var reached = -1f
+
+    /** Where the montage was at the last tick, and whether it had just arrived there. */
+    private var cursor = layer.anchorTime
+    private var entering = layer.anchorEntering
+    private var tickedAt = layer.startGameTime ?: entity.level().gameTime
 
     /** Whether the montage is still playing; false once it has ended, however it did. */
     val isPlaying: Boolean get() = !done.isCompleted
 
-    /** Seconds into the montage, at its own speed. */
-    val time: Float get() = (secondsSinceStart() * layer.speed).coerceIn(0f, duration)
+    /** Seconds into the montage, where it was at the last tick. */
+    val time: Float get() = cursor.coerceIn(0f, asset.duration)
 
     /** Runs [action] each time the montage reaches the event [name]. */
     fun onEvent(name: String, action: () -> Unit): MontageHandle {
@@ -46,30 +51,49 @@ class MontageHandle internal constructor(
     /** Waits until the montage ends: true if it played through, false if it was stopped or cut short. */
     suspend fun await(): Boolean = done.await()
 
+    /**
+     * Moves the montage to the event [name] and plays on from there, its actions run as it arrives; false when the
+     * montage has no such event or no longer plays.
+     */
+    fun jumpTo(name: String): Boolean {
+        if (!isPlaying) return false
+        val target = asset.events.firstOrNull { it.name == name }?.time ?: return false
+        val now = entity.level().gameTime
+        cursor = target
+        entering = true
+        tickedAt = now
+        anchor(now, target, entering = true)
+        return true
+    }
+
     /** Stops the montage, fading it out over [fadeOut] seconds. */
     fun stop(fadeOut: Float = layer.fadeOut) {
         if (!isPlaying) return
         val now = entity.level().gameTime
-        MontagePlayback.edit(entity) { animations ->
-            val playing =
-                animations.montages.firstOrNull { it.id == layer.id && it.startGameTime == layer.startGameTime }
-                    ?: return@edit animations
-            animations.withMontage(
-                playing.copy(fadeOut = fadeOut, stopAtGameTime = now, removeAtGameTime = now + ticks(fadeOut))
-            )
-        }
+        edit { playing -> playing.copy(fadeOut = fadeOut, stopAtGameTime = now, removeAtGameTime = now + ticks(fadeOut)) }
         done.complete(false)
     }
 
-    /** Fires the events it has passed since the last tick; false once it no longer plays. */
+    /** Plays on to this tick, firing the events on the way; false once it no longer plays. */
     internal fun tick(): Boolean {
         if (!isPlaying) return false
         if (entity.isRemoved || !isStillOn()) return false.also { done.complete(false) }
 
-        val now = time
-        events.forEach { event -> if (event.time > reached && event.time <= now) fire(event.name) }
-        reached = now
-        if (now < duration) return true
+        val now = entity.level().gameTime
+        val by = (now - tickedAt) / TICKS_PER_SECOND * layer.speed
+        tickedAt = now
+        val step = asset.advance(cursor, by, entering, EntityConditions(entity)) { from, to, landed ->
+            asset.events.forEach { event ->
+                val reached = if (landed) event.time >= from else event.time > from
+                if (reached && event.time <= to) fire(event.name)
+            }
+        }
+        entering = false
+        cursor = step.time
+        if (step.decided) anchor(now, cursor, entering = false)
+        if (cursor < asset.duration) return true
+
+        if (layer.removeAtGameTime == null) edit { it.copy(removeAtGameTime = now + ticks(it.fadeOut)) }
         done.complete(true)
         return false
     }
@@ -78,24 +102,28 @@ class MontageHandle internal constructor(
         done.complete(false)
     }
 
+    /** Tells both sides the montage is at [time] as of [gameTime]. */
+    private fun anchor(gameTime: Long, time: Float, entering: Boolean) = edit {
+        it.copy(anchorGameTime = gameTime, anchorTime = time, anchorEntering = entering)
+    }
+
+    private fun edit(change: (MontageLayerSpec) -> MontageLayerSpec) {
+        MontagePlayback.edit(entity) { animations ->
+            val playing = animations.montages.firstOrNull(::isThis) ?: return@edit animations
+            animations.withMontage(change(playing).also { layer = it })
+        }
+    }
+
+    private fun isThis(spec: MontageLayerSpec) = spec.id == layer.id && spec.startGameTime == layer.startGameTime
+
     private fun fire(name: String) {
         listeners[name]?.toList()?.forEach { action ->
-            runCatching(action).onFailure {
-                HollowEngine.LOGGER.error(
-                    "Montage {} event '{}' failed",
-                    montage,
-                    name,
-                    it
-                )
-            }
+            runCatching(action).onFailure { HollowEngine.LOGGER.error("Montage {} event '{}' failed", montage, name, it) }
         }
     }
 
     private fun isStillOn(): Boolean =
-        MontagePlayback.animationsOf(entity)?.montages?.any { it.id == layer.id && it.startGameTime == layer.startGameTime && it.stopAtGameTime == null } == true
-
-    private fun secondsSinceStart(): Float =
-        (entity.level().gameTime - (layer.startGameTime ?: 0L)).toFloat() / TICKS_PER_SECOND
+        MontagePlayback.animationsOf(entity)?.montages?.any { isThis(it) && it.stopAtGameTime == null } == true
 
     internal companion object {
         const val TICKS_PER_SECOND = 20f
@@ -118,6 +146,7 @@ object MontagePlayback {
             HollowEngine.LOGGER.warn("Montage '{}' could not be read, so {} plays nothing", montage, entity)
             return null
         }
+        AnimatorExpressionEvaluator.prepareNow(asset.conditions())
 
         val now = entity.level().gameTime
         val pace = speed.coerceAtLeast(MIN_SPEED)
@@ -128,13 +157,11 @@ object MontagePlayback {
             fadeIn = fadeIn,
             fadeOut = fadeOut,
             startGameTime = now,
-            removeAtGameTime = now + MontageHandle.ticks(asset.duration / pace + fadeOut),
+            removeAtGameTime = if (asset.hasRules) null else now + MontageHandle.ticks(asset.duration / pace + fadeOut),
         )
         playing.filter { it.entity === entity && it.montage == montage }.forEach(MontageHandle::replaced)
         edit(entity) { it.withMontage(layer) }
-        return MontageHandle(entity, montage, layer, asset.duration, asset.events.sortedBy(MontageEvent::time)).also(
-                playing::add
-            )
+        return MontageHandle(entity, montage, layer, asset).also(playing::add)
     }
 
     /** Stops [montage] on [entity] however it was started, as a script that kept no handle does. */

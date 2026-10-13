@@ -6,7 +6,10 @@ import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.ConditionalAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
@@ -130,17 +133,25 @@ fun interface VfxBindingSource {
 class VfxBoneAttachment(
     spec: VfxBoneAttachmentSpec,
     private val node: RuntimeNode,
-) : Attachment(node), VfxBindingSource, RespecAttachment {
+) : Attachment(node), VfxBindingSource, RespecAttachment, ConditionalAttachment {
     override var spec: VfxBoneAttachmentSpec = spec
         private set
 
     private val effect = VfxBoundEffect(spec.effect, spec.ownEffect).also { it.emitting = spec.emitting }
 
+    /** Whether the condition of the attachment held at the last frame; see [VfxBoneAttachmentSpec.activeWhile]. */
+    private var active = true
+
     override fun respec(spec: RigAttachmentSpec) {
         if (spec !is VfxBoneAttachmentSpec) return
         this.spec = spec
         effect.use(spec.effect, spec.ownEffect)
-        effect.emitting = spec.emitting
+        effect.emitting = spec.emitting && active
+    }
+
+    override fun evaluate(context: AnimatorEvaluationContext) {
+        active = context.entity == null || AnimatorExpressionEvaluator.condition(spec.activeWhile.source, context)
+        effect.emitting = spec.emitting && active
     }
 
     override fun collectCommands(pipeline: RenderPipeline) {

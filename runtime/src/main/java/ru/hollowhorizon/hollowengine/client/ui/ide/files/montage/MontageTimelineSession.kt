@@ -6,6 +6,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.TogglePropertyType
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.toEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.toStored
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackLanes
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackParts
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.Color
@@ -16,7 +19,7 @@ import kotlin.math.abs
 /** What the author picked on the montage's timeline. */
 internal sealed interface MontagePick {
     data class Clip(val id: String) : MontagePick
-    data class Event(val index: Int) : MontagePick
+    data class Playback(val pick: PlaybackPick) : MontagePick
     data class Attachment(val bone: String?, val id: String) : MontagePick
 }
 
@@ -33,7 +36,16 @@ internal class MontageTimelineSession(
     var onPick: ((MontagePick?) -> Unit)? = null
 
     val clipLane = SegmentLane("clips", montageText("lane_clips"), arranged = true, exclusive = true)
-    val eventLane = SegmentLane("events", montageText("lane_events"), markers = true)
+    /** The events and sections of the montage, on lanes of their own. */
+    val playback = PlaybackLanes(
+        read = { PlaybackParts(montage.events, montage.sections) },
+        duration = { montage.duration },
+        edit = { label, mergeKey, change ->
+            document.edit(mergeKey = mergeKey, label = UndoLabel(label)) { montage ->
+                change(PlaybackParts(montage.events, montage.sections)).let { montage.copy(events = it.events, sections = it.sections) }
+            }
+        },
+    )
     private val windows = HashMap<Pair<String?, String>, SegmentLane>()
 
     /** Fields the author asked to animate, as property ids; with keys or without. */
@@ -70,16 +82,13 @@ internal class MontageTimelineSession(
         timeline.onHideLane = { lane -> lane.isListed = false }
 
         clipLane.isListed = montage.clips.isNotEmpty()
-        eventLane.isListed = montage.events.isNotEmpty()
         clipLane.onEdit = ::clipMoved
         clipLane.onSelect = { segment -> onPick?.invoke(segment?.let { MontagePick.Clip(it.id) }) }
         clipLane.menu = ::clipMenu
-        eventLane.onEdit =
-            { segment -> segment.index()?.let { index -> editEvent(index) { it.copy(time = segment.start) } } }
-        eventLane.onSelect = { segment -> onPick?.invoke(segment?.index()?.let(MontagePick::Event)) }
-        eventLane.menu = ::eventMenu
+        playback.onPick = { pick -> onPick?.invoke(pick?.let(MontagePick::Playback)) }
         timeline.lanes += clipLane
-        timeline.lanes += eventLane
+        timeline.lanes += playback.lanes
+        timeline.advance = playback::advance
     }
 
     /** The group of each attachment and bone, by the key [touched] keeps it under. */
@@ -370,10 +379,7 @@ internal class MontageTimelineSession(
                 row = clip.row,
             )
         }
-        eventLane.segments.clear()
-        montage.events.forEachIndexed { index, event ->
-            eventLane.segments += TimelineSegment("$INDEXED$index", event.time, 0f, event.name, EventColor)
-        }
+        playback.refresh()
         windows.forEach { (key, lane) ->
             val attachment =
                 montage.attachments.firstOrNull { it.bone == key.first && it.spec.id == key.second } ?: return@forEach
@@ -386,7 +392,7 @@ internal class MontageTimelineSession(
                 )
             }
         }
-        val lanes = listOf(clipLane, eventLane) + windows.values
+        val lanes = listOf(clipLane) + playback.lanes + windows.values
         val again = picked?.let { id ->
             lanes.firstNotNullOfOrNull { lane ->
                 lane.segments.firstOrNull { it.id == id }?.let { lane to it }
@@ -471,25 +477,6 @@ internal class MontageTimelineSession(
         }
     }
 
-    private fun eventMenu(time: Float, segment: TimelineSegment?): List<UiDropdownItem> {
-        val index = segment?.index()
-        if (index != null) return listOf(
-            UiDropdownItem(montageText("remove_event")) {
-                document.edit(label = UndoLabel(montageKey("remove_event"))) { montage ->
-                    montage.copy(events = montage.events.filterIndexed { at, _ -> at != index })
-                }
-            },
-        )
-        return listOf(UiDropdownItem(montageText("add_event")) { addEvent(time) })
-    }
-
-    fun addEvent(time: Float) {
-        eventLane.isListed = true
-        document.edit(label = UndoLabel(montageKey("add_event"))) { montage ->
-            montage.copy(events = montage.events + MontageEvent(time, freeEventName(montage)))
-        }
-    }
-
     private fun windowMenu(bone: String?, id: String, time: Float, segment: TimelineSegment?): List<UiDropdownItem> {
         val index = segment?.index()
         val attachment = montage.attachments.firstOrNull { it.bone == bone && it.spec.id == id } ?: return emptyList()
@@ -535,12 +522,6 @@ internal class MontageTimelineSession(
     private fun editAttachment(bone: String?, id: String, change: (MontageAttachment) -> MontageAttachment) {
         document.edit(label = UndoLabel(montageKey("edit_window"))) { montage ->
             montage.copy(attachments = montage.attachments.map { if (it.bone == bone && it.spec.id == id) change(it) else it })
-        }
-    }
-
-    fun editEvent(index: Int, change: (MontageEvent) -> MontageEvent) {
-        document.edit(label = UndoLabel(montageKey("edit_event"))) { montage ->
-            montage.copy(events = montage.events.mapIndexed { at, event -> if (at == index) change(event) else event })
         }
     }
 
@@ -671,12 +652,6 @@ private fun freeRow(montage: Montage, clip: MontageClip, from: Int = 0): Int {
     var row = from
     while (montage.clips.any { it.id != clip.id && it.row == row && it.start < clip.end && it.end > clip.start }) row++
     return row
-}
-
-private fun freeEventName(montage: Montage): String {
-    var index = montage.events.size + 1
-    while (montage.events.any { it.name == "event$index" }) index++
-    return "event$index"
 }
 
 /** What of a bone is its pose: what the gizmo moves and the bone fields key, its visibility apart. */

@@ -203,6 +203,9 @@
 
   "model": "Model",
   "auto_play": "Start with the model",
+  "active_while": "Active while",
+  "active_while.hint": "A condition on the entity the effect hangs on, such as d.burning: while it holds, the effect makes particles; otherwise it is held and what it made lives out its lifetime. Empty means always.",
+  "event_hint": "Scripts move the effect here with jumpTo(\"name\") on its handle; rules of sections jump here too.",
   "align_to_velocity": "Turn along motion",
   "emissive": "Emissive",
 

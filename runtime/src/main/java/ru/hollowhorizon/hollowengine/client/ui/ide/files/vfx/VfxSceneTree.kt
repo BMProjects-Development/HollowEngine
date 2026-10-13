@@ -5,6 +5,7 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -23,6 +24,9 @@ internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorStat
     history = document.history,
     items = buildList {
         val nodes = document.effect.nodes
+        val timeline = document.effect.timeline
+        add(laneItem(VfxEventsId, "${playbackText("events")}  ●${timeline.events.size}", EventsIcon))
+        add(laneItem(VfxSectionsId, "${playbackText("sections")}  ●${timeline.sections.size}", SectionsIcon))
         add(
             UiTreeItem(
                 id = VfxRootId,
@@ -37,7 +41,13 @@ internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorStat
         )
         if (state.rootExpanded) appendNodes(nodes, state.expanded, state.selected, depth = 1)
     },
-    onSelect = { id -> state.select(id.takeUnless { it == VfxRootId }) },
+    onSelect = { id ->
+        when (id) {
+            VfxEventsId -> state.session.playback.eventLane.isListed = true
+            VfxSectionsId -> state.session.playback.sectionLane.isListed = true
+            else -> state.select(id.takeUnless { it == VfxRootId })
+        }
+    },
     onToggle = { id ->
         when (id) {
             VfxRootId -> state.rootExpanded = !state.rootExpanded
@@ -46,10 +56,38 @@ internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorStat
         }
     },
     hint = vfxText("no_nodes").takeIf { document.effect.nodes.isEmpty() },
-    menu = { id -> vfxNodeMenu(document, state, id.takeUnless { it == VfxRootId }) },
+    menu = { id ->
+        val playback = state.session.playback
+        val time = state.session.timeline.currentTime
+        when (id) {
+            VfxEventsId -> listOf(UiDropdownItem(playbackText("add_event")) { playback.addEvent(time) })
+            VfxSectionsId -> listOf(UiDropdownItem(playbackText("add_section")) { playback.addSection(time) })
+            else -> vfxNodeMenu(document, state, id.takeUnless { it == VfxRootId })
+        }
+    },
     onKey = { input -> handleVfxNodeKey(document, state, input.key, input.modifiers, input.repeat) },
     onMove = { dragged, target -> move(document, state, dragged, target.takeUnless { it == VfxRootId }) },
-    canMove = { dragged, target -> target == VfxRootId || !document.effect.isWithin(target, dragged) },
+    canMove = { dragged, target ->
+        dragged !in LaneItems && target !in LaneItems && (target == VfxRootId || !document.effect.isWithin(target, dragged))
+    },
+)
+
+/** The events and the sections of the timeline as objects of the scene, which open their lanes when picked. */
+private const val VfxEventsId = "vfx-events"
+private const val VfxSectionsId = "vfx-sections"
+private val LaneItems = setOf(VfxEventsId, VfxSectionsId)
+private const val EventsIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
+private const val SectionsIcon = "hollowengine:textures/gui/icons/loops.svg"
+
+private fun laneItem(id: String, label: String, icon: String) = UiTreeItem<Any?>(
+    id = id,
+    label = label,
+    depth = 0,
+    payload = null,
+    icon = icon,
+    hasChildren = false,
+    expanded = false,
+    selected = false,
 )
 
 private fun MutableList<UiTreeItem<Any?>>.appendNodes(

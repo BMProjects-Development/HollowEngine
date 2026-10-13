@@ -112,6 +112,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         attachment.beginPose()
         animator.applyTo(attachment, context)
         layMontages(context)
+        attachment.evaluateConditions(context)
         applyRigPose(attachment.nodes, attachment.rig)
         applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
         attachment.endPose()

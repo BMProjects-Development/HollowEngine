@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.addRigBones
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
@@ -61,7 +62,8 @@ internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
         val model = node.model
         val file = fileRigOf(model.model)
         val gameTime = entity.level().gameTime
-        val moments = node.animations?.montages.orEmpty().mapNotNull { it.momentAt(gameTime, entity.level().isClientSide) }
+        val conditions = EntityConditions(entity)
+        val moments = node.animations?.montages.orEmpty().mapNotNull { it.momentAt(gameTime, entity.level().isClientSide, conditions) }
         val key = montageKey(moments)
         val runtime = AttachmentRegistry.attachmentsOrNull(entity)?.runtime
         runtime?.getOrNull<Cached>(this)?.takeIf { it.file === file && it.own === model.rig && it.montages == key }?.let { return it.rig }

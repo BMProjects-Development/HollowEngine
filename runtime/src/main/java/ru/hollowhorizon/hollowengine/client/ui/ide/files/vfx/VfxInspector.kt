@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -195,6 +196,7 @@ internal fun vfxEffectInspector(document: HollowIdeVfxDocument, state: VfxEditor
                 document.edit { it.copy(timeline = it.timeline.copy(loop = loop)) }
             }
         }
+        PreviewDataSection(state.playbackPreview)
         Folding(state, "stats", vfxText("section_stats"), VfxIcons.STATS) {
             Readonly(vfxText("nodes"), effect.walk().size.toString())
             Readonly(vfxText("expressions"), effect.expressions().size.toString())

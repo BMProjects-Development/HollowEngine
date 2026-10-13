@@ -157,6 +157,10 @@ object VfxScenes {
         scene?.of(handle)?.stop(immediate)
     }
 
+    fun jump(handle: Int, event: String) {
+        scene?.of(handle)?.instance?.jumpTo(event)
+    }
+
     fun move(handle: Int, position: Vec3) {
         scene?.of(handle)?.moveTo(position)
     }

@@ -1,7 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackLanes
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -27,6 +30,18 @@ class VfxTimelineSession(
     /** Nodes that were selected at some point, so their group row stays. */
     private val touched = LinkedHashSet<String>()
 
+    /** The events and sections of the effect's timeline, on lanes of their own. */
+    internal val playback = PlaybackLanes(
+        read = { document.effect.timeline.let { PlaybackParts(it.events, it.sections) } },
+        duration = { document.effect.timeline.duration },
+        edit = { label, mergeKey, change ->
+            document.edit(mergeKey = mergeKey, label = UndoLabel(label)) { effect ->
+                val parts = change(PlaybackParts(effect.timeline.events, effect.timeline.sections))
+                effect.copy(timeline = effect.timeline.copy(events = parts.events, sections = parts.sections))
+            }
+        },
+    )
+
     private var suppressCommit = false
     private var builtFor: Int = -1
     private var signature: List<Any> = emptyList()
@@ -39,12 +54,16 @@ class VfxTimelineSession(
         timeline.onTimeChanged = { preview.requestSeek(timeline.currentTime) }
         timeline.onHideProperty = { property -> hide(property.id) }
         timeline.onHideGroup = { group -> hideNode(group) }
+        timeline.onHideLane = { lane -> lane.isListed = false }
+        timeline.lanes += playback.lanes
+        playback.refresh()
     }
 
     /** Rebuilds the tracks when the node tree, or the properties it offers, changed under the timeline. */
     fun sync() {
         if (builtFor == document.revision) return
         builtFor = document.revision
+        playback.refresh()
 
         val next = signatureOf()
         if (next == signature && timeline.groups.isNotEmpty()) return
@@ -178,11 +197,7 @@ class VfxTimelineSession(
             if (curves.isEmpty()) null else VfxTrack(node, animatable, curves)
         }
 
-        val spec = VfxTimelineSpec(
-            duration = timeline.workAreaEnd,
-            loop = document.effect.timeline.loop,
-            tracks = tracks,
-        )
+        val spec = document.effect.timeline.copy(duration = timeline.workAreaEnd, tracks = tracks)
         if (spec == document.effect.timeline) return
 
         suppressCommit = true

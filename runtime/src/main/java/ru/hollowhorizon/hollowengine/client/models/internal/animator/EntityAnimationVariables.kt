@@ -61,3 +61,13 @@ internal fun signedLocomotionSpeed(horizontalSpeed: Float, localForwardSpeed: Fl
     else horizontalSpeed
 
 private const val LOCAL_MOVEMENT_EPSILON = 0.001f
+
+/**
+ * The conditions of an entity's montage sections, asked of the entity as it is at [partialTick]; what they read
+ * is gathered the first time one is asked, as most playback asks none.
+ */
+class EntityConditions(private val entity: Entity, private val partialTick: Float = 1f) : (String) -> Boolean {
+    private val context by lazy { AnimatorEvaluationContext().also { fillAnimationVariables(it, entity, partialTick) } }
+
+    override fun invoke(source: String): Boolean = AnimatorExpressionEvaluator.condition(source, context)
+}

@@ -47,6 +47,17 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
     var time by mutableStateOf(0f)
         private set
 
+    /** Where the timeline of the effect is, which the rules of its sections may have taken off [time]. */
+    var timelineTime by mutableStateOf(0f)
+        private set
+
+    /** What the effect reads as `d.` in the preview, where there is no handle; see [PlaybackPreview]. */
+    var data: Map<String, Float> = emptyMap()
+        set(value) {
+            field = value
+            instance?.useData(value)
+        }
+
     /** Bumped whenever [instance] is replaced, so what reads its nodes knows to look again. */
     var revision by mutableStateOf(0)
         private set
@@ -74,8 +85,11 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
             return false
         }
 
-        val at = time
-        instance = VfxInstance(effect, asset, VfxPlaneEnvironment(0.0), seed = PREVIEW_SEED).also { it.update(0f) }
+        val at = timelineTime
+        instance = VfxInstance(effect, asset, VfxPlaneEnvironment(0.0), seed = PREVIEW_SEED).also {
+            it.useData(data)
+            it.update(0f)
+        }
         revision++
         time = 0f
         lastFrameNanos = 0L
@@ -86,6 +100,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
     fun restart() {
         instance?.restart()
         time = 0f
+        timelineTime = 0f
         lastFrameNanos = 0L
         refreshCount()
     }
@@ -107,6 +122,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         val target = seconds.coerceAtLeast(0f)
         instance?.seek(time, target, MAX_CATCH_UP_STEPS, advance = ::advanceBy)
         time = target
+        timelineTime = instance?.timelineTime ?: target
         refreshCount()
     }
 
@@ -139,6 +155,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         playing.budget = VfxBudget.share(1)
         playing.update(dt)
         time = playing.time
+        timelineTime = playing.timelineTime
         refreshCount()
     }
 

@@ -5,6 +5,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackSection
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackSections
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackStep
+import ru.hollowhorizon.hollowengine.common.playback.TimelineEvent
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -28,7 +32,23 @@ data class Montage(
     val tracks: List<MontageTrack> = emptyList(),
     val bones: List<MontageBoneTrack> = emptyList(),
     val events: List<MontageEvent> = emptyList(),
+    val sections: List<PlaybackSection> = emptyList(),
 ) {
+    /** Every condition of its sections, to compile before playback asks them. */
+    fun conditions(): List<String> = sections.flatMap(PlaybackSection::conditions).distinct()
+
+    /** Plays from [from] for [by] seconds through the sections; see [PlaybackSections.advance]. */
+    fun advance(
+        from: Float,
+        by: Float,
+        entering: Boolean,
+        condition: (String) -> Boolean,
+        onSpan: (from: Float, to: Float, landed: Boolean) -> Unit = { _, _, _ -> },
+    ): PlaybackStep = PlaybackSections.advance(sections, events, from, by, entering, condition, onSpan)
+
+    /** Whether any section has rules, so where it is cannot be told from the time alone. */
+    val hasRules: Boolean get() = sections.any(PlaybackSection::hasRules)
+
     companion object {
         val EMPTY = Montage()
     }
@@ -118,12 +138,8 @@ data class MontageTrack(
     val curves: List<VfxTrackCurve> = emptyList(),
 )
 
-/** A named moment of the montage, for scripts to act on. */
-@Serializable
-data class MontageEvent(
-    val time: Float,
-    val name: String,
-)
+/** A named moment of the montage, for scripts to act on and for its sections to jump to. */
+typealias MontageEvent = TimelineEvent
 
 /** Plays a montage for as long as the controller stays in the state, looped by default like a clip. */
 @Serializable
@@ -159,6 +175,9 @@ data class MontageLayerSpec(
     val startGameTime: Long? = null,
     val stopAtGameTime: Long? = null,
     val removeAtGameTime: Long? = null,
+    val anchorGameTime: Long? = null,
+    val anchorTime: Float = 0f,
+    val anchorEntering: Boolean = true,
 ) : AnimatorLayerSpec() {
     override fun withCommon(
         id: String,
@@ -177,11 +196,26 @@ data class MontageLayerSpec(
      * Where this playback is at [gameTime] on the level clock, counted fully, for what asks which things it
      * hangs on the model rather than how it looks; null when it has no start or its montage cannot be read.
      */
-    fun momentAt(gameTime: Long, client: Boolean): MontageMoment? {
-        val start = startGameTime ?: return null
+    fun momentAt(gameTime: Long, client: Boolean, condition: (String) -> Boolean): MontageMoment? {
         val montage = MontageAssets.of(this.montage, client) ?: return null
-        val time = ((gameTime - start) / TICKS_PER_SECOND * speed).coerceIn(0f, montage.duration)
-        return MontageMoment(montage, time, 1f)
+        val step = played(montage, gameTime, 0f, condition) ?: return null
+        return MontageMoment(montage, step.time.coerceIn(0f, montage.duration), 1f)
+    }
+
+    /**
+     * How far [montage] has played at [gameTicks] and [partialTick] on the level clock, past its end once it has
+     * played through, with [condition] answering the rules of its sections; null without a start.
+     */
+    fun played(
+        montage: Montage,
+        gameTicks: Long,
+        partialTick: Float,
+        condition: (String) -> Boolean,
+        onSpan: (from: Float, to: Float, landed: Boolean) -> Unit = { _, _, _ -> },
+    ): PlaybackStep? {
+        val anchor = anchorGameTime ?: startGameTime ?: return null
+        val elapsed = ((gameTicks - anchor) + partialTick) / TICKS_PER_SECOND * speed
+        return montage.advance(anchorTime, elapsed.coerceAtLeast(0f), anchorEntering, condition, onSpan)
     }
 
     companion object {

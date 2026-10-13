@@ -19,6 +19,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PREVIEW_RESET_ICON
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.PublishTimeline
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.hasInspectableSelection
@@ -104,7 +107,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
     }
 
     LaunchedEffect(rigState.selected, rigState.selectedPart, document.montage.attachments.size) {
-        if (state.pick is MontagePick.Clip || state.pick is MontagePick.Event) session.timeline.selectSegment(
+        if (state.pick is MontagePick.Clip || state.pick is MontagePick.Playback) session.timeline.selectSegment(
             null,
             null
         )
@@ -189,6 +192,7 @@ private fun Toolbar(state: MontageEditorState) {
             size = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
+        AnimatorIconButton(PREVIEW_RESET_ICON, playbackText("preview_reset"), size = 12f) { state.preview.reset() }
         AnimatorIconButton(KeyIcon, montageText("key_picked"), size = 12f) {
             state.session.keyPicked(rigState.selected, rigState.selectedPart)
         }
@@ -258,6 +262,16 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
         }
     }
 
+    /** The data the preview plays the montage with, in place of an entity, which its sections' rules read. */
+    val preview = PlaybackPreview().also { preview ->
+        val context = AnimatorEvaluationContext()
+        session.playback.condition = { source ->
+            context.data = preview.values
+            AnimatorExpressionEvaluator.condition(source, context)
+        }
+        preview.onReset = { session.timeline.applyCurrentTime(0f) }
+    }
+
     /** The block or marker picked on the timeline, which the inspector shows instead of the scene's pick. */
     var pick by mutableStateOf<MontagePick?>(null)
 
@@ -314,8 +328,11 @@ private const val SAME_TURN = 0.99999f
 
 private const val ClipsItem = "montage-clips"
 private const val EventsItem = "montage-events"
+private const val SectionsItem = "montage-sections"
+private val VirtualItems = setOf(ClipsItem, EventsItem, SectionsItem)
 private const val ClipsIcon = "hollowengine:textures/gui/icons/timeline/film.svg"
 private const val EventsIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
+private const val SectionsIcon = "hollowengine:textures/gui/icons/loops.svg"
 
 /**
  * The scene of the montage: the clips and the events as objects of their own above the model, which open their
@@ -338,11 +355,13 @@ private fun montageSceneTarget(state: MontageEditorState, bones: SceneTarget): S
         items = listOf(
             item(ClipsItem, "${montageText("group_clips")}  ●${state.document.montage.clips.size}", ClipsIcon),
             item(EventsItem, "${montageText("group_events")}  ●${state.document.montage.events.size}", EventsIcon),
+            item(SectionsItem, "${playbackText("sections")}  ●${state.document.montage.sections.size}", SectionsIcon),
         ) + bones.items,
         onSelect = { id ->
             when (id) {
                 ClipsItem -> session.show(session.clipLane)
-                EventsItem -> session.show(session.eventLane)
+                EventsItem -> session.show(session.playback.eventLane)
+                SectionsItem -> session.show(session.playback.sectionLane)
                 else -> bones.onSelect(id)
             }
         },
@@ -360,11 +379,12 @@ private fun montageSceneTarget(state: MontageEditorState, bones: SceneTarget): S
                     }
                 }.let { listOf(UiDropdownItem(montageText("add_clip"), children = it)) }
 
-                EventsItem -> listOf(UiDropdownItem(montageText("add_event")) { session.addEvent(session.timeline.currentTime) })
+                EventsItem -> listOf(UiDropdownItem(playbackText("add_event")) { session.playback.addEvent(session.timeline.currentTime) })
+                SectionsItem -> listOf(UiDropdownItem(playbackText("add_section")) { session.playback.addSection(session.timeline.currentTime) })
                 else -> bones.menu?.invoke(id).orEmpty()
             }
         },
-        onIconClick = { id -> if (id != ClipsItem && id != EventsItem) bones.onIconClick?.invoke(id) },
+        onIconClick = { id -> if (id !in VirtualItems) bones.onIconClick?.invoke(id) },
         history = bones.history,
     )
 }

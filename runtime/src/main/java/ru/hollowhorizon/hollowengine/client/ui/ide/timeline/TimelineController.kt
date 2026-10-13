@@ -71,6 +71,12 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     private var transactionStart: TimelineSnapshot? = null
     private var transactionLabel = UndoLabel.EDIT
 
+    /**
+     * Where the playhead gets to from a time, played on for some seconds; straight on unless the owner has places
+     * it goes instead, as sections with rules do.
+     */
+    var advance: ((from: Float, by: Float) -> Float)? = null
+
     var onChanged: (() -> Unit)? = null
     var onTimeChanged: (() -> Unit)? = null
     var onPreviewChanged: (() -> Unit)? = null
@@ -145,7 +151,8 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     fun onUpdate(deltaSeconds: Float) {
         if (isPlaying) {
-            applyCurrentTime(currentTime + deltaSeconds * playbackSpeed.value)
+            val by = deltaSeconds * playbackSpeed.value
+            applyCurrentTime(advance?.invoke(currentTime, by) ?: (currentTime + by))
 
             val end = workAreaEnd
             if (currentTime >= end) {

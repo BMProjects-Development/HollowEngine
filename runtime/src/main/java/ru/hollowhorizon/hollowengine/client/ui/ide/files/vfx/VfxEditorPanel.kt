@@ -14,6 +14,10 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.PublishTimeline
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.hasInspectableSelection
@@ -70,11 +74,12 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
             withFrameNanos { frameNanos ->
                 state.preview.advanceCamera(frameNanos)
                 val rebuilt = state.preview.sync(document.effect, file.path)
+                state.playbackPreview.values.let { if (state.preview.data !== it) state.preview.data = it }
                 val sought = state.preview.applyPendingSeek()
                 val delta = state.preview.deltaSinceLastFrame(frameNanos)
                 if (session.timeline.isPlaying && delta > 0f) state.preview.advanceBy(delta)
                 if (rebuilt || session.timeline.isPlaying && !sought) {
-                    session.timeline.followPlayhead(state.preview.time)
+                    session.timeline.followPlayhead(state.preview.timelineTime)
                 }
             }
         }
@@ -83,9 +88,18 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
     val selected = state.selected?.takeIf { document.effect.node(it) != null }
 
     val timelineHasSelection = session.timeline.hasInspectableSelection()
-    PublishInspector(source = "vfx-${file.path}", key = selected to timelineHasSelection) {
+    val playbackPick = state.playbackPick
+    PublishInspector(source = "vfx-${file.path}", key = listOf(selected, timelineHasSelection, playbackPick)) {
         when {
             timelineHasSelection -> null
+            playbackPick != null -> playbackInspectorTarget(
+                lanes = session.playback,
+                pick = playbackPick,
+                conditions = VfxExpressionEditing,
+                eventHint = vfxText("event_hint"),
+                onRemoved = { state.playbackPick = null },
+            )
+
             selected != null -> vfxNodeInspector(document, state, selected)
             else -> vfxEffectInspector(document, state)
         }
@@ -141,10 +155,7 @@ private fun Toolbar(state: VfxEditorState) {
             size = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
-        AnimatorIconButton(RestartIcon, vfxText("restart"), size = 12f) {
-            preview.restart()
-            timeline.followPlayhead(0f)
-        }
+        AnimatorIconButton(RestartIcon, playbackText("preview_reset"), size = 12f) { state.playbackPreview.reset() }
         AnimatorIconButton(FloorIcon, vfxText("toggle_floor"), size = 12f, active = preview.showFloor) {
             preview.showFloor = !preview.showFloor
         }
@@ -164,8 +175,20 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     val preview = VfxPreviewState()
     val session = VfxTimelineSession(document, preview).also { it.timeline.isPlaying = true }
 
+    /** The data the preview plays the effect with, in place of a handle's. */
+    val playbackPreview = PlaybackPreview()
+
+    /** The event or section picked on the timeline, which the inspector shows instead of the node. */
+    var playbackPick by mutableStateOf<PlaybackPick?>(null)
+
     init {
         document.onEdit = session::recordEdit
+        session.playback.onPick = { pick -> playbackPick = pick }
+        playbackPreview.onReset = {
+            preview.data = playbackPreview.values
+            preview.restart()
+            session.timeline.followPlayhead(0f)
+        }
     }
 
     /** A drag in the viewport: one step back in the file, the keys it records included. */
@@ -208,6 +231,7 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
             endGesture()
         }
         selected = id
+        playbackPick = null
         id?.let(session::touch)
         session.timeline.clearSelection()
     }

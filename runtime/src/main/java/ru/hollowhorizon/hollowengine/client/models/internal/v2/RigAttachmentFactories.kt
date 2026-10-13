@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
@@ -35,6 +36,12 @@ interface RespecAttachment {
     val spec: RigAttachmentSpec
 
     fun respec(spec: RigAttachmentSpec)
+}
+
+/** An attachment that works only while a condition of its entity holds; see [ConditionalAttachmentSpec]. */
+interface ConditionalAttachment {
+    /** Asks the condition of [context]'s entity, once a frame after the animator. */
+    fun evaluate(context: AnimatorEvaluationContext)
 }
 
 object RigAttachmentFactories {

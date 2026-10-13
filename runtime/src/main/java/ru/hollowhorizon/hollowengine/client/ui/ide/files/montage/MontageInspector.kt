@@ -7,7 +7,11 @@ import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Row
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimationExpressionEditing
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.AttachmentAnimation
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.HolderFields
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.LocalAttachmentAnimation
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
@@ -15,7 +19,6 @@ import ru.hollowhorizon.hollowengine.common.models.*
 
 private const val MontageIcon = "hollowengine:textures/gui/icons/files/rig.svg"
 private const val ClipIcon = "hollowengine:textures/gui/icons/timeline/film.svg"
-private const val EventIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"
 
 private val ModelExtensions = listOf("gltf", "glb", "geo.json", "fbx", "bbmodel")
@@ -37,12 +40,13 @@ internal fun montageInspectorTarget(
             subtitle = montageText("section_clip"),
         ) { ClipFields(document, state, pick.id) }
 
-        is MontagePick.Event -> return InspectorTarget(
-            id = "montage-event-${pick.index}",
-            title = document.montage.events.getOrNull(pick.index)?.name ?: "",
-            icon = EventIcon,
-            subtitle = montageText("section_event"),
-        ) { EventFields(document, state, pick.index) }
+        is MontagePick.Playback -> return playbackInspectorTarget(
+            lanes = state.session.playback,
+            pick = pick.pick,
+            conditions = AnimationExpressionEditing,
+            eventHint = montageText("event_hint"),
+            onRemoved = { state.pick = null },
+        )
 
         is MontagePick.Attachment, null -> Unit
     }
@@ -59,7 +63,7 @@ internal fun montageInspectorTarget(
             LocalEditorBones provides bones,
             LocalAttachmentAnimation provides MontageAttachmentAnimation(state),
         ) {
-            if (bone == null) MontageFields(document) else BoneFields(state, bone)
+            if (bone == null) MontageFields(document, state.preview) else BoneFields(state, bone)
             key(bone) {
                 HolderFields(
                     state.rigs,
@@ -74,7 +78,7 @@ internal fun montageInspectorTarget(
 }
 
 @Composable
-private fun MontageFields(document: HollowIdeMontageDocument) {
+private fun MontageFields(document: HollowIdeMontageDocument, preview: PlaybackPreview) {
     val montage = document.montage
     Column(tags = listOf("insp-body")) {
         Section(montageText("section_montage")) {
@@ -89,6 +93,7 @@ private fun MontageFields(document: HollowIdeMontageDocument) {
                 document.edit(mergeKey = "duration") { it.copy(duration = value) }
             }
         }
+        PreviewDataSection(preview)
     }
 }
 
@@ -194,30 +199,6 @@ private fun ClipFields(document: HollowIdeMontageDocument, state: MontageEditorS
         }
         InspectorButton(montageText("remove_clip"), tags = listOf("danger")) {
             document.edit(label = UndoLabel(montageKey("remove_clip"))) { montage -> montage.copy(clips = montage.clips.filterNot { it.id == id }) }
-            state.pick = null
-        }
-    }
-}
-
-@Composable
-private fun EventFields(document: HollowIdeMontageDocument, state: MontageEditorState, index: Int) {
-    val event = document.montage.events.getOrNull(index) ?: return Hint(montageText("event_removed"))
-    Column(tags = listOf("insp-body")) {
-        Section(montageText("section_event"), help = montageText("event_hint")) {
-            NameRow(
-                montageText("event_name"),
-                event.name
-            ) { value -> state.session.editEvent(index) { it.copy(name = value) } }
-            FloatRow(
-                montageText("time"),
-                event.time,
-                min = 0f
-            ) { value -> state.session.editEvent(index) { it.copy(time = value) } }
-        }
-        InspectorButton(montageText("remove_event"), tags = listOf("danger")) {
-            document.edit(label = UndoLabel(montageKey("remove_event"))) { montage ->
-                montage.copy(events = montage.events.filterIndexed { at, _ -> at != index })
-            }
             state.pick = null
         }
     }

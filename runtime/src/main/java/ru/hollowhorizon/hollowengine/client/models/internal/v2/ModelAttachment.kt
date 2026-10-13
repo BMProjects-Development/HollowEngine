@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
@@ -19,6 +20,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.addedBones
@@ -125,6 +127,25 @@ class ModelAttachment(
             root.walk().forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
         }
     }
+
+    /** Asks the conditions of the attachments that have one; see [ConditionalAttachment]. */
+    fun evaluateConditions(context: AnimatorEvaluationContext) {
+        if (conditionsOf !== currentRig) {
+            conditionsOf = currentRig
+            hasConditions = currentRig.allAttachments().any { (_, spec) ->
+                (spec as? ConditionalAttachmentSpec)?.activeWhile?.source?.isNotBlank() == true
+            }
+        }
+        if (!hasConditions) return
+        runtimeNodes.forEach { root ->
+            root.walk().forEach { node -> node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
+        }
+        modelRoot?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
+    }
+
+    /** Whether any attachment of [conditionsOf] works only while a condition holds, so a frame asks nothing otherwise. */
+    private var hasConditions = false
+    private var conditionsOf: ModelRig? = null
 
     /** Hands the running attachments their specs again, after a change that left the rig's structure as it was. */
     private fun respecAttachments() {
