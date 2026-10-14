@@ -14,8 +14,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Covers the component storage that replaced the immutable-snapshot indirection: writes have to land in
- * the backing map through every mutable path, including the ones that go via `keys` / `entries`.
+ * Mutations must reach both the backing map and the notification used by entity synchronization,
+ * including changes through collection views.
  */
 class ComponentStoreTests {
     private val keptId = "test:store_kept".rl
@@ -51,47 +51,35 @@ class ComponentStoreTests {
     }
 
     @Test
-    fun `a new store is empty and has no snapshot to write`() {
-        val store = ComponentStore()
-
-        assertTrue(store.isEmpty)
-        assertTrue(store.copyOf().isEmpty())
-    }
-
-    @Test
-    fun `writing through the mutable view reaches the backing map`() {
-        val store = ComponentStore()
-
-        store.asMutableMap()[keptId] = KeptComponent("hello")
-
-        assertFalse(store.isEmpty)
-        assertEquals(KeptComponent("hello"), store.readOnly[keptId])
-    }
-
-    @Test
-    fun `overwriting a component returns the previous value and keeps one entry`() {
+    fun `map writes publish changes while reads and absent removals do not`() {
         val store = ComponentStore()
         val map = store.asMutableMap()
+        var changes = 0
+        store.onChange = { changes++ }
+
         map[keptId] = KeptComponent("first")
+        assertEquals(1, changes)
+        assertFalse(store.isEmpty)
+        assertEquals(KeptComponent("first"), store.readOnly[keptId])
 
         val previous = map.put(keptId, KeptComponent("second"))
-
         assertEquals(KeptComponent("first"), previous)
         assertEquals(1, store.readOnly.size)
         assertEquals(KeptComponent("second"), store.readOnly[keptId])
-    }
-
-    @Test
-    fun `removing through the view empties the store`() {
-        val store = ComponentStore()
-        val map = store.asMutableMap()
-        map[keptId] = KeptComponent("gone")
+        assertEquals(2, changes)
 
         val removed = map.remove(keptId)
-
-        assertEquals(KeptComponent("gone"), removed)
+        assertEquals(KeptComponent("second"), removed)
         assertTrue(store.isEmpty)
+        assertEquals(3, changes)
         assertNull(map.remove(keptId))
+        assertTrue(store.copyOf().isEmpty())
+        assertEquals(3, changes, "reads and a missing removal must not publish changes")
+
+        map[keptId] = KeptComponent("cleared")
+        map.clear()
+        assertTrue(store.isEmpty)
+        assertEquals(5, changes)
     }
 
     @Test
@@ -100,10 +88,13 @@ class ComponentStoreTests {
         val map = store.asMutableMap()
         map[keptId] = KeptComponent("keep")
         map[looseId] = DroppedComponent("drop")
+        var changes = 0
+        store.onChange = { changes++ }
 
         map.keys.removeIf { it == looseId }
 
         assertEquals(setOf(keptId), store.readOnly.keys)
+        assertEquals(1, changes)
     }
 
     @Test
@@ -111,20 +102,26 @@ class ComponentStoreTests {
         val store = ComponentStore()
         val map = store.asMutableMap()
         map[keptId] = KeptComponent("before")
+        var changes = 0
+        store.onChange = { changes++ }
 
         map.entries.single { it.key == keptId }.setValue(KeptComponent("after"))
 
         assertEquals(KeptComponent("after"), store.readOnly[keptId])
+        assertEquals(1, changes)
     }
 
     @Test
     fun `replaceAll swaps the whole set of components`() {
         val store = ComponentStore()
         store.asMutableMap()[keptId] = KeptComponent("old")
+        var changes = 0
+        store.onChange = { changes++ }
 
         store.replaceAll(listOf(DroppedComponent("new")))
 
         assertEquals(setOf(looseId), store.readOnly.keys)
+        assertEquals(1, changes)
     }
 
     @Test
@@ -154,10 +151,13 @@ class ComponentStoreTests {
     fun `clear empties the store`() {
         val store = ComponentStore()
         store.replaceAll(listOf(KeptComponent("a"), DroppedComponent("b")))
+        var changes = 0
+        store.onChange = { changes++ }
 
         store.clear()
 
         assertTrue(store.isEmpty)
+        assertEquals(1, changes)
     }
 }
 

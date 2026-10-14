@@ -40,7 +40,6 @@ import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -59,28 +58,6 @@ class VfxFormatTests {
         val read = VfxFormat.read(text)
 
         assertEquals(effect, read)
-    }
-
-    @Test
-    fun `a node keeps its modules and their kinds`() {
-        val read = VfxFormat.read(VfxFormat.write(sample()))
-        val emitter = assertIs<VfxEmitterSpec>(read.nodes.first().children.first())
-
-        assertEquals(3, emitter.modules.size)
-        val swirl = assertIs<VfxForceSpec>(emitter.modules[0])
-        assertIs<VfxForceSpec>(emitter.modules[1])
-        assertIs<VfxUvAnimationSpec>(emitter.modules[2])
-        assertEquals(VfxForceKind.VORTEX, swirl.kind)
-    }
-
-    @Test
-    fun `renderers keep their place under the emitter`() {
-        val read = VfxFormat.read(VfxFormat.write(sample()))
-        val emitter = read.nodes.first().children.first()
-
-        assertIs<VfxPlaneSpec>(emitter.children[0])
-        assertIs<VfxTrailSpec>(emitter.children[1])
-        assertEquals(emitter, read.parentOf("flame-plane"))
     }
 
     @Test

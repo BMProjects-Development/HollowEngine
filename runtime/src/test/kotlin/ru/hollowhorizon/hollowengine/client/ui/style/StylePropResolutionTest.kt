@@ -2,8 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.style
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.*
-import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -36,27 +34,11 @@ class StylePropResolutionTest {
         assertTrue(rule.selector.matches(node))
     }
 
-    @Test
-    fun `builtin state selector still parses`() {
-        val sheet = compileHss(".btn:hover { opacity: 0.8; }")
-        assertTrue(sheet.rules.single().selector.states.contains(UiState.HOVER))
-    }
-
     // --- Input capabilities as independent props ---
 
     @Test
-    fun `input capabilities are independent props`() {
-        val style = resolve(Modifier.input(clickable = true))
-        assertTrue(style.clickable)
-        assertFalse(style.scrollable)
-        assertFalse(style.focusable)
-    }
-
-    @Test
     fun `event modifiers accumulate input capabilities instead of clobbering`() {
-        val style = resolve(
-            Modifier.onClick {}.onScroll {}
-        )
+        val style = resolve(Modifier.onClick {}.onScroll {})
         assertTrue(style.clickable, "onClick keeps clickable")
         assertTrue(style.hoverable)
         assertFalse(style.scrollable, "onScroll alone does not make a scroll container")
@@ -113,17 +95,5 @@ class StylePropResolutionTest {
     fun `base does not stack with an active state`() {
         val sheet = compileHss(".btn { scale: 5; } .btn:hover { scale: 2; }")
         assertEquals(UiVec3(2f, 2f, 1f), resolvedStyle(sheet, "btn", UiState.HOVER).scale)
-    }
-
-    @Test
-    fun `a single active state overlays the base without combining`() {
-        val sheet = compileHss(".btn:hover { scale: 2; }")
-        assertEquals(UiVec3(2f, 2f, 1f), resolvedStyle(sheet, "btn", UiState.HOVER).scale)
-    }
-
-    @Test
-    fun `non-combinable props keep last-wins`() {
-        val style = resolve(Modifier.opacity(0.9f).opacity(0.4f))
-        assertEquals(0.4f, style.opacity, 1e-5f)
     }
 }

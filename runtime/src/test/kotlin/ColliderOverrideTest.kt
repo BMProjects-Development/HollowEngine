@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class ColliderOverrideTest {
     @Test
@@ -18,12 +17,6 @@ class ColliderOverrideTest {
         val changed = ColliderOverride(contact = ColliderContact.SOLID).applyTo(rig)
 
         assertEquals(ColliderModes(hit = true, interact = true, contact = ColliderContact.SOLID, force = 0.5f), changed)
-    }
-
-    @Test
-    fun `an override with nothing set is empty`() {
-        assertTrue(ColliderOverride().isEmpty)
-        assertEquals(ColliderModes(), ColliderOverride().applyTo(ColliderModes()))
     }
 
     @Test

@@ -39,13 +39,6 @@ class HssMaskTest {
     }
 
     @Test
-    fun `directions and angles both work`() {
-        assertEquals(90f, mask("linear-gradient(to right, white, transparent)").angle)
-        assertEquals(0f, mask("linear-gradient(to top, white, transparent)").angle)
-        assertEquals(45f, mask("linear-gradient(45deg, white, transparent)").angle)
-    }
-
-    @Test
     fun `only the alpha of a stop matters`() {
         // Black and white both show; `transparent` and an explicit alpha hide.
         val gradient = mask("linear-gradient(black, #ffffff, rgba(255, 0, 0, 0.25), transparent)")

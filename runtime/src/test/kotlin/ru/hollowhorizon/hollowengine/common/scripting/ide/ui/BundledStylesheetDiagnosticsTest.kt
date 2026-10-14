@@ -1,53 +1,35 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
+import io.github.classgraph.ClassGraph
+import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * The stylesheets the engine ships are the best available sample of real HSS: if the
  * schema drifts away from what the compiler accepts, they start reporting diagnostics.
  */
 class BundledStylesheetDiagnosticsTest {
-    private val stylesheets = listOf(
-        "animator-editor.hss",
-        "asset-manager.hss",
-        "docking.hss",
-        "entity-editor.hss",
-        "graph.hss",
-        "ide.hss",
-        "image-editor.hss",
-        "inspector.hss",
-        "model-editor.hss",
-        "notifications.hss",
-        "shader-graph.hss",
-        "sounds-editor.hss",
-        "theme.hss",
-        "timeline.hss",
-        "widgets.hss",
-    )
+    private val stylesheets = ClassGraph()
+        .overrideClassLoaders(javaClass.classLoader)
+        .acceptPaths("assets/hollowengine/ui")
+        .scan().use { scan ->
+            scan.getResourcesWithExtension("hss").associate { resource ->
+                resource.path to resource.contentAsString.replace("\r\n", "\n")
+            }
+        }
 
     @Test
-    fun `bundled stylesheets report no diagnostics`() {
-        for (name in stylesheets) {
-            val source = readStylesheet(name)
+    fun `bundled stylesheets compile without diagnostics and highlight without losing text`() {
+        assertTrue(stylesheets.isNotEmpty(), "No bundled stylesheets found on the test classpath")
+        for ((name, source) in stylesheets) {
             val diagnostics = HssScriptingAnalyzer.diagnostic(name, source)
             assertEquals(emptyList(), diagnostics, "$name: $diagnostics")
-        }
-    }
-
-    @Test
-    fun `highlighting a bundled stylesheet keeps its text intact`() {
-        for (name in stylesheets) {
-            val source = readStylesheet(name)
+            compileHss(source)
             val highlighted = HssScriptingAnalyzer.highlight(name, source, 0)
                 .joinToString("\n") { line -> line.spans.joinToString("") { it.first } }
-            assertEquals(source.replace("\r\n", "\n"), highlighted, name)
+            assertEquals(source, highlighted, name)
         }
     }
-
-    private fun readStylesheet(name: String): String =
-        requireNotNull(javaClass.getResourceAsStream("/assets/hollowengine/ui/styles/$name")) { name }
-            .bufferedReader()
-            .use { it.readText() }
-            .replace("\r\n", "\n")
 }

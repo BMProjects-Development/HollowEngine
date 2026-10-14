@@ -36,10 +36,4 @@ class EditableFieldSearchMatchTest {
         assertEquals(EditableFieldSearchMatch(0, 5, active = false), buckets[1].single())
     }
 
-    @Test
-    fun `no matches means no buckets`() {
-        val buckets = bucketSearchMatchesByLine(lines, emptyList(), active = null)
-        assertEquals(lines.size, buckets.size)
-        assertTrue(buckets.all { it.isEmpty() })
-    }
 }

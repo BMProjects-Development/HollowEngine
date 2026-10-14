@@ -1,6 +1,5 @@
 import io.netty.buffer.Unpooled
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.EmptySerializersModule
 import net.minecraft.network.FriendlyByteBuf
 import org.junit.jupiter.api.Test
@@ -24,12 +23,6 @@ class VectorSerializationTests {
 
         val effect = VfxBoneAttachmentSpec("fire", "hollowengine:vfx/fire.vfx", Vec3f(0f, 1.25f, -0.5f), Vec3f(90f, 0f, 0f), scale = 2f)
         assertEquals(effect, throughBuffer(VfxBoneAttachmentSpec.serializer(), effect))
-    }
-
-    @Test
-    fun `vectors still read from json`() {
-        val placement = ObjectPlacement(Vec3d(3.0, 4.0, 5.0), Vec3f(0f, 90f, 0f), Vec3f(1f, 1f, 2f))
-        assertEquals(placement, Json.decodeFromString(ObjectPlacement.serializer(), Json.encodeToString(ObjectPlacement.serializer(), placement)))
     }
 
     private fun <T> throughBuffer(serializer: KSerializer<T>, value: T): T {

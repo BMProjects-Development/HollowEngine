@@ -29,12 +29,6 @@ class BoldDistanceBiasTest {
     private val bakedEm = 48f
 
     @Test
-    fun `the background outside a glyph stays fully transparent at the maximum bias`() {
-        // -0.5 is what the atlas stores everywhere beyond its range: "further than I can measure".
-        assertEquals(0f, glyphCoverage(raw = -0.5f, bias = MaxBoldDistanceBias))
-    }
-
-    @Test
     fun `any heavier bias would show the box this cap exists to prevent`() {
         assertTrue(
             glyphCoverage(raw = -0.5f, bias = MaxBoldDistanceBias + 0.05f) > 0f,

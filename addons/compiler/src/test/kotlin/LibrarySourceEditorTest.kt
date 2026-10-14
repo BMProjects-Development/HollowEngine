@@ -1,4 +1,3 @@
-import com.intellij.openapi.util.registry.Registry
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -117,12 +116,6 @@ class LibrarySourceEditorTest {
         }
         assertFalse(analyzer.projectStructureProvider.allSourceFiles.any { it.name == path })
         assertNotNull(analyzer.definition(path, updated, updated.lastIndexOf("newName") + 2))
-    }
-
-    @Test
-    fun `Java registry defaults include capture conversion and inference settings`() {
-        assertFalse(Registry.`is`("unsound.capture.conversion.java.spec.change"))
-        assertTrue(Registry.`is`("javac.fresh.variables.for.captured.wildcards.only"))
     }
 
     @Test

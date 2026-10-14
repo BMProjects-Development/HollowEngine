@@ -42,6 +42,8 @@ class VfxEffectTreeTests {
         val moved = effect.withMoved("plane-b", "emitter-a", 0)
         assertEquals(listOf("group-a"), moved.nodes.map { it.id })
         assertEquals(listOf("plane-b", "plane-a"), moved.node("emitter-a")?.children?.map { it.id })
+        assertEquals(moved.node("emitter-a"), moved.parentOf("plane-b"))
+        assertEquals(moved.node("emitter-a"), moved.parentOf("plane-a"))
     }
 
     @Test

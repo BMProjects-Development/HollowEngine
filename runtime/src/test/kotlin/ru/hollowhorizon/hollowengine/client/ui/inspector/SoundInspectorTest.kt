@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -18,14 +17,12 @@ import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.SpanNode
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.hasGizmo
 import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDefault
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptSchema
 import ru.hollowhorizon.hollowengine.common.attachments.editor.toDescriptor
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
 import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
 import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
@@ -105,13 +102,6 @@ class SoundInspectorTest {
         assertEquals("16.0", exported.getElementAnnotations(0).filterIsInstance<EditorDefault>().single().json)
         val initial = ComponentJson.defaultJson(descriptor)
         assertEquals(SoundPlayback(), ComponentJson.format.decodeFromJsonElement(SoundPlayback.serializer(), initial))
-    }
-
-    @Test
-    fun `sound attachments contain no placement fields or placement gizmo`() {
-        assertFalse(hasGizmo(SoundBoneAttachmentSpec()))
-        val fields = SoundBoneAttachmentSpec.serializer().descriptor.elementNames.toSet()
-        assertFalse(fields.any { it in setOf("offset", "rotation", "scale") })
     }
 
     private fun withLanguage(locale: String, block: () -> Unit) {

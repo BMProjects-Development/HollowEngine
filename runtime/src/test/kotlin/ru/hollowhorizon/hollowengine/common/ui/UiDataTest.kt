@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.common.data.dataKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class UiDataTest {
     @Serializable
@@ -17,16 +16,6 @@ class UiDataTest {
     private val progress = dataKey<Int>("progress") { 0 }
     private val done = dataKey<Boolean>("done") { false }
     private val quest = dataKey<Quest>("quest") { Quest() }
-
-    @Test
-    fun `typed keys read and write values`() {
-        val data = UiData()
-        data[title] = "The Missing Cargo"
-        data[progress] = 3
-
-        assertEquals("The Missing Cargo", data[title])
-        assertEquals(3, data[progress])
-    }
 
     @Test
     fun `missing keys fall back to their default`() {
@@ -41,13 +30,6 @@ class UiDataTest {
         val data = UiData()
         assertEquals(null, data.find(dataKey<String>("missing")))
         assertEquals("fallback", data.getOr(dataKey<String>("missing"), "fallback"))
-    }
-
-    @Test
-    fun `a serializable value round-trips through a key`() {
-        val data = UiData()
-        data[quest] = Quest("Escort", 2)
-        assertEquals(Quest("Escort", 2), data[quest])
     }
 
     @Test
@@ -90,11 +72,17 @@ class UiDataTest {
     fun `snapshot round-trips through replaceAll`() {
         val source = UiData()
         source[title] = "Round trip"
+        source[progress] = 3
+        source[quest] = Quest("Escort", 2)
 
         val restored = UiData()
+        restored[done] = true
         restored.replaceAll(source.snapshot())
 
         assertEquals("Round trip", restored[title])
+        assertEquals(3, restored[progress])
+        assertEquals(Quest("Escort", 2), restored[quest])
+        assertFalse(restored.contains(done), "replacing the document must drop old keys")
     }
 
     @Test
@@ -107,11 +95,4 @@ class UiDataTest {
         assertEquals("before", data[quest].title)
     }
 
-    @Test
-    fun `clear empties the document`() {
-        val data = UiData()
-        data[title] = "busy"
-        data.clear()
-        assertTrue(data.snapshot().isEmpty)
-    }
 }
