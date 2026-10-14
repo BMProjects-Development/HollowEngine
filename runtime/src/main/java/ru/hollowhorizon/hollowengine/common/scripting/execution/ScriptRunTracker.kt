@@ -4,28 +4,30 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.Serializable
-import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
 enum class ScriptExecutionStatus { IDLE, STARTING, RUNNING, STOPPING }
 
-/** Reserves a script before compilation starts and retains that reservation until cancellation finishes. */
+/** Owned by the scope's game thread. A reservation lasts until the job and all its children finish. */
 internal class ScriptRunTracker(private val scope: CoroutineScope, private val changed: () -> Unit = {}) {
     private class Entry(val job: Job) {
-        @Volatile var running = false
+        var running = false
     }
-    private val entries = ConcurrentHashMap<String, Entry>()
-    fun paths(): Set<String> = entries.keys.toSet()
+    private val entries = mutableMapOf<String, Entry>()
+
+    fun paths(): Set<String> {
+        removeCompleted()
+        return entries.keys.toSet()
+    }
 
     fun start(path: String, execute: suspend () -> Unit): Boolean {
+        if (!scope.isActive) return false
+        if (status(path) != ScriptExecutionStatus.IDLE) return false
         val job = scope.launch(start = CoroutineStart.LAZY) { execute() }
         val entry = Entry(job)
-        if (entries.putIfAbsent(path, entry) != null) {
-            job.cancel()
-            return false
-        }
-        job.invokeOnCompletion { if (entries.remove(path, entry)) changed() }
+        entries[path] = entry
         changed()
         job.start()
         return true
@@ -36,12 +38,11 @@ internal class ScriptRunTracker(private val scope: CoroutineScope, private val c
 
     /** Command execution is synchronous, but shares the same reservation and notifications. */
     fun <T> execute(path: String, action: () -> T): T {
+        check(scope.isActive) { "Script execution scope is closed" }
+        check(status(path) == ScriptExecutionStatus.IDLE) { "Script '$path' is already running" }
         val job = Job(scope.coroutineContext[Job])
         val entry = Entry(job).apply { running = true }
-        if (entries.putIfAbsent(path, entry) != null) {
-            job.complete()
-            error("Script '$path' is already running")
-        }
+        entries[path] = entry
         changed()
         try {
             return action()
@@ -54,11 +55,18 @@ internal class ScriptRunTracker(private val scope: CoroutineScope, private val c
 
     fun status(path: String): ScriptExecutionStatus {
         val entry = entries[path] ?: return ScriptExecutionStatus.IDLE
+        if (entry.job.isCompleted) {
+            entries.remove(path)
+            return ScriptExecutionStatus.IDLE
+        }
         return when {
-            entry.job.isCompleted -> ScriptExecutionStatus.IDLE
             entry.job.isCancelled -> ScriptExecutionStatus.STOPPING
             entry.running -> ScriptExecutionStatus.RUNNING
             else -> ScriptExecutionStatus.STARTING
         }
+    }
+
+    private fun removeCompleted() {
+        entries.entries.removeAll { it.value.job.isCompleted }
     }
 }

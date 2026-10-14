@@ -21,16 +21,14 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.coroutineContext
 
 class ScriptRunService(private val server: MinecraftServer) {
-    @Volatile
     private var disposed = false
     private val tracker = ScriptRunTracker(server.runtimeContext.scope) {
-        if (!disposed) server.execute { if (!disposed) synchronize() }
+        if (!disposed) synchronize()
     }
-    private val failures = ConcurrentHashMap<String, String>()
+    private val failures = mutableMapOf<String, String>()
     private val updates = ScriptExecutionUpdates<ServerPlayer, ScriptExecutionState>(ScriptExecutionState())
 
     fun dispose() {

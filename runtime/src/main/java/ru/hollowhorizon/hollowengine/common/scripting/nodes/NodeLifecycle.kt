@@ -6,20 +6,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
-/** Serializes replacement of a node with completion of its old scope, including `onStop`. */
+/** Game-thread-owned replacement of a node after its old scope, including `onStop`, completes. */
 internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
-    private val stopping = ConcurrentHashMap<String, Job>()
-    private val pending = ConcurrentHashMap<String, Job>()
+    private val stopping = mutableMapOf<String, Job>()
+    private val pending = mutableMapOf<String, Job>()
 
-    fun pendingPaths(): Set<String> = pending.keys.toSet()
-    fun stoppingPaths(): Set<String> = stopping.keys.toSet()
+    fun pendingPaths(): Set<String> = pending.activePaths()
+    fun stoppingPaths(): Set<String> = stopping.activePaths()
 
-    fun isPending(path: String): Boolean = pending.containsKey(path)
+    fun isPending(path: String): Boolean = pending[path]?.isCompleted == false
     fun isStopping(path: String): Boolean = stopping[path]?.isCompleted == false
 
     fun cancelStart(path: String) {
+        removeCompleted()
         pending.remove(path)?.cancel()
     }
 
@@ -27,7 +27,6 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
         cancelStart(path)
         if (!job.isCompleted) {
             stopping[path] = job
-            job.invokeOnCompletion { stopping.remove(path, job) }
         }
         job.cancel()
     }
@@ -50,7 +49,16 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
             start()
         }
         pending[path] = next
-        next.invokeOnCompletion { pending.remove(path, next) }
         next.start()
+    }
+
+    private fun MutableMap<String, Job>.activePaths(): Set<String> {
+        removeCompleted()
+        return keys.toSet()
+    }
+
+    private fun removeCompleted() {
+        stopping.entries.removeAll { it.value.isCompleted }
+        pending.entries.removeAll { it.value.isCompleted }
     }
 }

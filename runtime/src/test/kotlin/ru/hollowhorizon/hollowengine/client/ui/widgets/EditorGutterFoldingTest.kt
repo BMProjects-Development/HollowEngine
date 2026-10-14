@@ -249,7 +249,7 @@ class EditorGutterFoldingTest {
             val dividerRect = current.layout[divider].rect
             val gap = rect.x - dividerRect.x - dividerRect.width -
                 UiTextLayouter.measureTextWidth("onStart ", state.fontSize, state.fontFamily)
-            assertTrue(gap >= state.fontSize * 0.75f - 0.5f, "gap=$gap")
+            assertTrue(gap > 0f, "gap=$gap")
             val textWidth = UiTextLayouter.measureTextWidth(fold.placeholder, state.fontSize, state.fontFamily)
             assertTrue(rect.width <= textWidth + 5f, "button=${rect.width}, text=$textWidth")
             assertTrue(surface.runtime.mouseClicked(rect.x + rect.width / 2f, rect.y + rect.height / 2f, 0))

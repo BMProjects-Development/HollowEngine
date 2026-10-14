@@ -16,7 +16,7 @@ class ServerRuntimeContext(
     val scope: CoroutineScope =
         CoroutineScope(server.dispatcher + SupervisorJob(server.coroutineScope.coroutineContext[Job]))
     val nodes = NodeManager(server)
-    private val scriptRunService = lazy { ScriptRunService(server) }
+    private val scriptRunService = lazy(LazyThreadSafetyMode.NONE) { ScriptRunService(server) }
     val scriptRuns: ScriptRunService get() = scriptRunService.value
 
     fun serialize(tag: CompoundTag) {

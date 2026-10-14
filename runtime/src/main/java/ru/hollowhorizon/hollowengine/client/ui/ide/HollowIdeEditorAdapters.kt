@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
 import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
+import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -41,9 +42,7 @@ internal class HollowIdeEditorSession(
     private var analysisJob: Job? = null
     @Volatile
     private var completionJob: Job? = null
-    @Volatile
     private var definitionJob: Job? = null
-    @Volatile
     private var formatJob: Job? = null
     @Volatile
     private var occurrenceJob: Job? = null
@@ -135,25 +134,24 @@ internal class HollowIdeEditorSession(
     val hover: UiHoverInfoProvider get() = codeInsight.hover
     private var intentionJob: Job? = null
     val intentions = UiIntentionActionsProvider { context, publish ->
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
         intentionJob?.cancel()
         intentionJob = scope.launch {
             val actions = runCatching {
-                currentAnalyzer().intentionActions(path, context.text, context.caret)
+                analyzer.intentionActions(path, context.text, context.caret)
             }.getOrElse { failure ->
                 reportAnalysisFailure("intentions", failure)
                 emptyList()
-            }.map { fix ->
-                UiTextQuickFix(
-                    fix.title.lang(*fix.titleArgs.toTypedArray()),
-                    fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
-                )
             }
-            ensureActive()
-            Minecraft.getInstance().execute {
-                if (scope.isActive) {
-                    publish(actions)
-                    onUpdated()
-                }
+            withContext(publicationDispatcher) {
+                publish(actions.map { fix ->
+                    UiTextQuickFix(
+                        fix.title.lang(*fix.titleArgs.toTypedArray()),
+                        fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
+                    )
+                })
+                onUpdated()
             }
         }
     }
@@ -200,13 +198,14 @@ internal class HollowIdeEditorSession(
      */
     fun format(text: String, onFormatted: (String?) -> Unit) {
         val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
         formatJob?.cancel()
         formatJob = scope.launch {
             val formatted = runCatching { analyzer.format(path, text) }.getOrElse { failure ->
                 reportAnalysisFailure("format", failure)
                 null
             }
-            Minecraft.getInstance().execute {
+            withContext(publicationDispatcher) {
                 onFormatted(formatted)
             }
         }
@@ -214,6 +213,7 @@ internal class HollowIdeEditorSession(
 
     fun resolveDefinition(text: String, caret: Int, onResolved: (DefinitionLocation?) -> Unit) {
         val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
         val safeCaret = caret.coerceIn(0, text.length)
         definitionJob?.cancel()
         definitionJob = scope.launch {
@@ -223,8 +223,7 @@ internal class HollowIdeEditorSession(
                 reportAnalysisFailure("definition", failure)
                 null
             }
-            ensureActive()
-            Minecraft.getInstance().execute {
+            withContext(publicationDispatcher) {
                 onResolved(definition)
             }
         }
@@ -356,7 +355,7 @@ internal class HollowIdeEditorSession(
         HollowEngine.LOGGER.error("Scripting analysis ({}) failed for '{}'", stage, path, failure)
     }
 
-    private val reportedFailures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val reportedFailures = HashSet<String>()
 
     private fun currentAnalyzer(): ScriptingAnalyzer {
         return languageService.analyzer
