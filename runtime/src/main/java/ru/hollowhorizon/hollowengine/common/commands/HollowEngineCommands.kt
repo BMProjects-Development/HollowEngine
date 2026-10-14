@@ -470,7 +470,7 @@ private fun runPlainScript(source: CommandSourceStack, id: ScriptId): Int {
     if (!isPlainScriptPath(id.path)) {
         return source.sendFailure("'$display' is not a script /he scripting run can execute".literal).let { 0 }
     }
-    return ScriptLoader.execute<Any?>(id).fold(
+    return source.server.runtimeContext.scriptRuns.executePlain(id).fold(
         onSuccess = {
             source.sendSuccess({ "Executed '$display'".literal }, true)
             1

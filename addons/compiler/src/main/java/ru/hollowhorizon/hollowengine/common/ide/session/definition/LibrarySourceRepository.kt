@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.withNormalizedLineSepa
 import java.io.IOException
 import java.lang.System.Logger.Level
 import java.nio.file.Path
+import java.nio.file.InvalidPathException
 import java.util.zip.ZipFile
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -23,6 +24,17 @@ internal class LibrarySourceRepository(
 ) {
     private val matcher = SourceDeclarationMatcher(project)
     private val reportedFailures = HashSet<Pair<Path, String?>>()
+
+    /** A restored source tab has no preceding definition request to establish its library context. */
+    fun ownsSourcePath(name: String): Boolean {
+        val location = name.removePrefix("library-sources/").substringBefore("!/")
+        val path = try {
+            Path.of(location).toAbsolutePath().normalize()
+        } catch (_: InvalidPathException) {
+            return false
+        }
+        return sourceRoots(null).any { root -> if (root.isDirectory()) path.startsWith(root) else path == root }
+    }
 
     fun find(target: SourceDeclarationIdentity, classFile: VirtualFile?, packageName: String): DefinitionLocation? {
         val packagePath = packageName.replace('.', '/').let { if (it.isEmpty()) "" else "$it/" }

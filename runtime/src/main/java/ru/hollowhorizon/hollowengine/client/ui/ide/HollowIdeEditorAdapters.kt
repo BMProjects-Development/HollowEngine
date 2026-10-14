@@ -184,6 +184,14 @@ internal class HollowIdeEditorSession(
         }
     }
 
+    fun structure(text: String): EditorStructure {
+        val analyzer = currentAnalyzer()
+        val current = snapshot
+        if (current.matchesText(text, analyzer)) return current.structure
+        requestAnalysis(text, analyzer)
+        return EditorStructure(folds = shiftCodeFoldsThroughEdit(current.text, text, current.structure.folds))
+    }
+
     val canFormat: Boolean get() = currentAnalyzer().canFormat
 
     /**
@@ -259,6 +267,10 @@ internal class HollowIdeEditorSession(
                 highlights = lines.toHighlights(text, lineStarts),
                 inlayHints = lines.toInlayHints(lineStarts, text.length),
                 diagnostics = diagnostics,
+                structure = runCatching { analyzer.structure(path, text) }.getOrElse { failure ->
+                    reportAnalysisFailure("structure", failure)
+                    EditorStructure()
+                },
             )
             publishAnalysisIfCurrent(requestRevision) {
                 snapshot = next
@@ -420,6 +432,7 @@ private data class EditorAnalysisSnapshot(
     val highlights: List<UiTextHighlight>,
     val inlayHints: List<UiInlayHint>,
     val diagnostics: List<UiTextDiagnostic>,
+    val structure: EditorStructure = EditorStructure(),
 ) {
     fun matchesText(text: String, analyzer: ScriptingAnalyzer): Boolean {
         return textHash == text.hashCode() && textLength == text.length && this.analyzer === analyzer

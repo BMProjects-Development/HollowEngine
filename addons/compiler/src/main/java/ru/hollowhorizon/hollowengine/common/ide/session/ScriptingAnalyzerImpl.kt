@@ -30,6 +30,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaKotlinSourceMo
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaScriptModule
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
+import ru.hollowhorizon.hollowengine.common.ide.session.structure.editorStructure
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
@@ -130,7 +131,10 @@ class ScriptingAnalyzerImpl(
             add(builtins.kaModule)
         }.distinct()
         val module = if (file.isScript()) KaScriptModule(file, project, dependencies)
-        else KaKotlinSourceModule(file, dependencies, listOfNotNull(projectStructureProvider.librarySourceOwner(name)))
+        else KaKotlinSourceModule(file, dependencies, listOfNotNull(
+            projectStructureProvider.librarySourceOwner(name) ?: libraries.filterNot { it.isSdk }.singleOrNull()
+                ?.takeIf { librarySources.ownsSourcePath(name) }
+        ))
         projectStructureProvider.setModule(file, module)
         return file
     }
@@ -298,6 +302,9 @@ class ScriptingAnalyzerImpl(
         val file = getOrCreateFile(name, text)
         return findDefinition(file, offset)
     }
+
+    @Synchronized
+    override fun structure(name: String, text: String): EditorStructure = editorStructure(getOrCreateFile(name, text))
 
     @Synchronized
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? {

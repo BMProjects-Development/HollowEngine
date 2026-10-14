@@ -36,6 +36,7 @@ class TextFieldState(
 ) : UndoOwner {
     val scroll: UiScrollHandle = UiScrollHandle()
     internal val autoScroll = TextFieldAutoScroll()
+    val folding = TextFieldFolding()
 
     var fontSize: Float by mutableStateOf(fontSize)
     var fontFamily: String? by mutableStateOf(fontFamily)
@@ -147,7 +148,8 @@ class TextFieldState(
         }
         val ranges = activeCaretRanges().mapNotNull { range ->
             if (range.position <= 0) null
-            else TextEditRange(if (word) wordLeft(text, range.position) else range.position - 1, range.position)
+            else TextEditRange(folding.visibleOffset(if (word) wordLeft(text, range.position) else range.position - 1,
+                range.position), range.position)
         }
         return replaceRanges(ranges, "")
     }
@@ -157,7 +159,8 @@ class TextFieldState(
         if (activeCaretRanges().any { it.hasSelection }) return replaceSelectedRanges("")
         val ranges = activeCaretRanges().mapNotNull { range ->
             if (range.position >= text.length) null
-            else TextEditRange(range.position, if (word) wordRight(text, range.position) else range.position + 1)
+            else TextEditRange(range.position, folding.visibleOffset(
+                if (word) wordRight(text, range.position) else range.position + 1, range.position))
         }
         return replaceRanges(ranges, "")
     }
@@ -250,7 +253,7 @@ class TextFieldState(
 
     fun moveCarets(transform: (UiTextCaret) -> Int, select: Boolean = false) {
         val next = activeCaretRanges().map { range ->
-            val position = transform(range).coerceIn(0, text.length)
+            val position = folding.visibleOffset(transform(range).coerceIn(0, text.length), range.position)
             UiTextCaret(position, if (select) range.selectionAnchor ?: range.position else null)
         }
         setCarets(next)
@@ -262,7 +265,8 @@ class TextFieldState(
     ) {
         val next = activeCaretRanges().map { range ->
             val moved = transform(range).coerceIn(text.length)
-            moved.copy(selectionAnchor = if (select) range.selectionAnchor ?: range.position else null)
+            moved.copy(position = folding.visibleOffset(moved.position, range.position),
+                selectionAnchor = if (select) range.selectionAnchor ?: range.position else null)
         }
         setCarets(next)
     }
@@ -343,6 +347,8 @@ class TextFieldState(
     }
 
     fun setCarets(ranges: List<UiTextCaret>) {
+        folding.synchronizeText(text)
+        ranges.forEach { folding.reveal(it.position) }
         val previous = caretRanges
         applyCaretRanges(ranges)
         if (caretRanges != previous) caretVisibilityRevision++

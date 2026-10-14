@@ -608,6 +608,7 @@ internal object UiTextLayouter {
             var measuredTextHeight = 0f
             var baseline = 0f
             var gaps = 0
+            var widgetSourceCorrection = 0
             for (unit in units) {
                 measuredWidth += unit.width.toDouble()
                 measuredLineHeight = maxOf(measuredLineHeight, unit.height)
@@ -629,7 +630,11 @@ internal object UiTextLayouter {
                     }
 
                     is InlineUnit.Widget -> {
-                        if (unit.sourceLength > 0) textBuilder.append(unit.widget.alt.ifBlank { "\uFFFC" })
+                        if (unit.sourceLength > 0) {
+                            val label = unit.widget.alt.ifBlank { "\uFFFC" }
+                            textBuilder.append(label)
+                            widgetSourceCorrection += unit.sourceLength - label.length
+                        }
                         if (unit.widget.align == UiInlineAlign.BASELINE) baseline = maxOf(baseline, unit.height)
                     }
                 }
@@ -638,7 +643,7 @@ internal object UiTextLayouter {
             width = measuredWidth.toFloat()
             naturalWidth = width
             justifyGapCount = gaps
-            sourceLength = text.length + trailingSourceCharacters
+            sourceLength = text.length + trailingSourceCharacters + widgetSourceCorrection
             val textHeight = measuredTextHeight.takeIf { it > 0f }
                 ?: UiTextFonts.resolve(null).lineHeight(baseFontSize)
             val lineHeight = maxOf(measuredLineHeight, textHeight)
@@ -832,7 +837,7 @@ fun UiTextLayout.caretIndexAt(x: Float, y: Float, fontSize: Float, fontFamily: S
     }
     var bestOffset = 0
     var bestDistance = Float.POSITIVE_INFINITY
-    for (offset in 0..line.sourceLength) {
+    for (offset in line.caretOffsets()) {
         val distance = abs(line.xAt(offset, fontSize, fontFamily) - x)
         if (distance < bestDistance) {
             bestDistance = distance
@@ -978,7 +983,7 @@ internal fun UiTextLayout.verticalCaretIndex(index: Int, lineDelta: Int, fontSiz
     }
     var bestOffset = 0
     var bestDistance = Float.POSITIVE_INFINITY
-    for (offset in 0..targetLine.sourceLength) {
+    for (offset in targetLine.caretOffsets()) {
         val distance = abs(targetLine.xAt(offset, fontSize, fontFamily) - x)
         if (distance < bestDistance) {
             bestDistance = distance
@@ -1054,7 +1059,7 @@ private fun UiTextLayout.firstLineIndexStartingAfterSource(offset: Int): Int {
 }
 
 private fun UiTextLine.xAt(offset: Int, fontSize: Float, fontFamily: String?): Float {
-    val textOffset = offset.coerceIn(0, text.length)
+    val textOffset = offset.coerceIn(0, sourceLength)
     if (fragments.isEmpty()) return x + UiTextLayouter.measureTextWidth(text.take(textOffset), fontSize, fontFamily)
 
     var remaining = textOffset
@@ -1100,4 +1105,27 @@ private fun UiTextLine.xAt(offset: Int, fontSize: Float, fontFamily: String?): F
         }
     }
     return x + cursor
+}
+
+/** A replacement widget has only boundary carets, regardless of how much source it represents. */
+private fun UiTextLine.caretOffsets(): Sequence<Int> = sequence {
+    yield(0)
+    if (fragments.isEmpty()) {
+        yieldAll(1..sourceLength)
+        return@sequence
+    }
+    var offset = 0
+    for (fragment in fragments) {
+        val length = when (fragment) {
+            is UiTextRun -> fragment.text.length
+            is UiTextSpaceRun -> 1
+            is UiInlineImageRun -> fragment.image.alt.ifBlank { "\uFFFC" }.length
+            is UiInlineWidgetRun -> fragment.widget.sourceLength
+        }
+        if (fragment is UiInlineWidgetRun) {
+            if (length > 0) yield(offset + length)
+        } else yieldAll(offset + 1..offset + length)
+        offset += length
+    }
+    if (offset < sourceLength) yield(sourceLength)
 }

@@ -159,6 +159,7 @@ object HollowIdeOverlay {
     private val histories = IdeHistories(model) { file -> editorStates[file.path]?.history }
     private val fileViews = mutableMapOf<String, HollowIdeFileView>()
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
+    private var gutterNavigation by mutableStateOf<List<Pair<String, DefinitionLocation>>>(emptyList())
     private val dragAndDrop = UiDragAndDropState()
     private var refreshFilesRequested = false
     private val externalFiles = HollowIdeExternalFiles(
@@ -602,6 +603,7 @@ object HollowIdeOverlay {
 
     private fun restoreLayout() {
         val stored = HollowIdeLayoutStore.load()
+        stored?.readOnlyDocuments?.forEach { (path, text) -> model.openReadOnly(path, text) }
         if (stored != null && dock.restore(stored, ::restoreDockItem)) return
         applyDefaultLayout()
     }
@@ -804,6 +806,14 @@ object HollowIdeOverlay {
                     HollowIdeProjectDialogs(packaging)
                     HollowIdeShortcutsDialog(shortcutsVisible) { shortcutsVisible = false }
                     EditorColorPickerPopup()
+                    if (gutterNavigation.isNotEmpty()) ContextMenu(
+                        id = "ide-gutter-navigation",
+                        anchorBounds = UiRect(lastMouseX, lastMouseY, 0f, 0f),
+                        items = gutterNavigation.map { (label, location) ->
+                            UiDropdownItem(label = label, onClick = { openDefinition(location) })
+                        },
+                        onExpandedChange = { if (!it) gutterNavigation = emptyList() },
+                    )
                     UiDragGhost(dragAndDrop)
                 }
                 HollowIdeHideToolbarDialog(
@@ -817,7 +827,8 @@ object HollowIdeOverlay {
 
     @Composable
     private fun RememberLayout() {
-        val layout = dock.capture()
+        val layout = dock.capture().copy(readOnlyDocuments = model.files.values
+            .filter { it.readOnly && it.type.id == BuiltinTextFileTypeId && it.textOrNull != null }.associate { it.path to it.text })
         LaunchedEffect(layout) {
             delay(LayoutSaveDelayMillis.milliseconds)
             HollowIdeLayoutStore.save(layout)
@@ -1169,6 +1180,11 @@ object HollowIdeOverlay {
         val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
         val diagnostics = editorSession.diagnostics(file.text)
         val inlayHints = editorSession.inlayHints(file.text)
+        val structure = editorSession.structure(file.text)
+        val gutterMarkers = ideGutterMarkers(file, structure, { model.save(file.path) }) { targets ->
+            if (targets.size == 1) openDefinition(targets.single().second)
+            else gutterNavigation = targets
+        }
         val fontSize = HollowIdeFontSize.size
         val editorId = "editor-${file.id}"
         val find = findStates[file.path]
@@ -1214,6 +1230,8 @@ object HollowIdeOverlay {
                     signatureHelp = editorSession.signatures,
                     hoverInfo = editorSession.hover,
                     diagnostics = diagnostics,
+                    folds = structure.folds,
+                    gutterMarkers = gutterMarkers,
                     searchMatches = matches,
                     activeSearchMatch = find?.let { matches.getOrNull(it.currentIndex) },
                     inlayHints = inlayHints,

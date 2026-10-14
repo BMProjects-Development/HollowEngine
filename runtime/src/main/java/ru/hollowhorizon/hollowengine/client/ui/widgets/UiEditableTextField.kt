@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkPeriodMillis
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.margin
 import ru.hollowhorizon.hollowengine.client.ui.text.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 import kotlin.math.abs
 
 /** One logical line of the field's text: its offset in the document and its text (no newline). */
@@ -52,6 +53,7 @@ internal class EditableFieldLayout(
     private val verticalOverscroll: Boolean = true,
     /** Height of one unwrapped line in the field's font; the caret spans it. */
     val lineHeight: Float = fontSize,
+    val hiddenLines: Set<Int> = emptySet(),
 ) {
     private val trailingMargin = if (verticalOverscroll) fontSize else 0f
     val height: Float get() = (offsets.lastOrNull() ?: 0f) + trailingMargin
@@ -72,6 +74,7 @@ internal class EditableFieldLayout(
                 lo = mid + 1
             }
         }
+        while (result in hiddenLines && result > 0) result--
         return result.coerceIn(0, lines.size - 1)
     }
 
@@ -110,7 +113,8 @@ internal class EditableFieldLayout(
     /** Document offset -> content-space caret top-left. */
     fun caretAt(offset: Int, inlayAffinity: UiInlayCaretAffinity = UiInlayCaretAffinity.AFTER): UiVec3 {
         if (lines.isEmpty()) return UiVec3()
-        val index = lines.indexOfLast { it.start <= offset }.coerceIn(0, lines.size - 1)
+        var index = lines.lineIndex(offset).coerceIn(0, lines.size - 1)
+        while (index in hiddenLines && index > 0) index--
         val line = lines[index]
         val column = (offset - line.start).coerceIn(0, line.text.length)
         val local = lineLayouts[index]
@@ -142,6 +146,7 @@ internal class EditableFieldLayout(
 
     private fun visualLines(): List<EditableFieldVisualLine> = buildList {
         for (lineIndex in lines.indices) {
+            if (lineIndex in hiddenLines) continue
             val line = lines[lineIndex]
             val layout = lineLayouts[lineIndex]
             if (layout == null || layout.lines.isEmpty()) {
@@ -180,11 +185,11 @@ private fun UiTextLayout.inlayCaretHitAt(x: Float, y: Float): EditableFieldCaret
     for (fragment in visual.fragments) {
         when (fragment) {
             is UiInlineWidgetRun -> {
-                if (fragment.widget.sourceLength == 0 && x >= visual.x + fragment.x && x <= visual.x + fragment.x + fragment.width) {
+                if (x >= visual.x + fragment.x && x <= visual.x + fragment.x + fragment.width) {
                     return if (x < visual.x + fragment.x + fragment.width / 2f) {
                         EditableFieldCaretHit(sourceOffset, UiInlayCaretAffinity.BEFORE)
                     } else {
-                        EditableFieldCaretHit(sourceOffset, UiInlayCaretAffinity.AFTER)
+                        EditableFieldCaretHit(sourceOffset + fragment.widget.sourceLength, UiInlayCaretAffinity.AFTER)
                     }
                 }
                 sourceOffset += fragment.widget.sourceLength
@@ -297,8 +302,10 @@ internal fun computeEditableFieldLayout(
     inlayMetrics: EditableFieldInlayMetrics = EditableFieldInlayMetrics(),
     previous: EditableFieldLayout? = null,
     multiline: Boolean = true,
+    hiddenLines: Set<Int> = emptySet(),
+    projectedLines: List<EditableFieldLine>? = null,
 ): EditableFieldLayout {
-    val lines = editableFieldLines(text)
+    val lines = projectedLines ?: editableFieldLines(text)
     val offsets = FloatArray(lines.size + 1)
     val layouts = arrayOfNulls<UiTextLayout>(lines.size)
     val lineInputs = arrayOfNulls<EditableFieldLineInput>(lines.size)
@@ -322,6 +329,7 @@ internal fun computeEditableFieldLayout(
     for (index in lines.indices) {
         val line = lines[index]
         offsets[index] = y
+        if (index in hiddenLines) continue
 
         val localHighlights = highlightBuckets[index]
         val localInlays = inlayBuckets[index]
@@ -362,9 +370,10 @@ internal fun computeEditableFieldLayout(
     val contentWidth = maxOf(naturalWidth, viewportWidth)
     return EditableFieldLayout(
         lines, offsets, layouts, fontSize, fontFamily, contentWidth, naturalWidth, hintsById, inlayRevision,
-        inlayHints.mapTo(HashSet(inlayHints.size)) { it.offset }, layoutWidth, lineInputs,
+        inlayHints.filter { it.sourceLength == 0 }.mapTo(HashSet(inlayHints.size)) { it.offset }, layoutWidth, lineInputs,
         verticalOverscroll = multiline,
         lineHeight = uniformHeight,
+        hiddenLines = hiddenLines,
     )
 }
 
@@ -490,6 +499,8 @@ fun EditableTextField(
     activeSearchMatch: IntRange? = null,
     placeholder: String = "",
     lineNumbers: Boolean = false,
+    folds: List<CodeFold> = emptyList(),
+    gutterMarkers: List<UiGutterMarker> = emptyList(),
     lineNumberColor: UiColor = EditableFieldLineNumberColor,
     indentGuides: Boolean = false,
     indentGuideColor: UiColor = EditableFieldIndentGuideColor,
@@ -510,19 +521,27 @@ fun EditableTextField(
         inlayHintsProvider = inlayHintsProvider,
         inlayRevision = inlayRevision,
     )
+    state.folding.update(text, folds)
+    val foldProjection = state.folding.projection()
+    val hiddenLines = foldProjection.hiddenLines
+    val displayedHints = presentation.inlayHints + foldProjection.placeholders
     val uiViewport = LocalUiViewport.current
-    val gutterWidth = if (lineNumbers && state.multiline) {
-        editableFieldGutterWidth(text, fontSize)
+    val actionGutterWidth = remember(text, fontSize, folds, gutterMarkers) {
+        editableFieldActionGutterWidth(folds, gutterMarkers, foldProjection.lines, fontSize)
+    }
+    val gutterPanelWidth = if (lineNumbers && state.multiline) {
+        editableFieldGutterWidth(text, fontSize) + actionGutterWidth
     } else {
         0f
     }
+    val gutterWidth = if (gutterPanelWidth > 0f) gutterPanelWidth + fontSize * 0.25f else 0f
     val viewportWidth = (scrollState.viewport.width - gutterWidth).coerceAtLeast(0f)
     val multiline = state.multiline
     val layoutHolder = remember { EditableFieldLayoutHolder() }
     val inlayMetrics = remember { EditableFieldInlayMetrics() }
     val layout = remember(
         text, fontSize, fontFamily, wrap, viewportWidth, presentation.highlights, presentation.inlayHints, multiline,
-        inlayMetrics.revision,
+        inlayMetrics.revision, hiddenLines, displayedHints,
     ) {
         computeEditableFieldLayout(
             text = text,
@@ -531,10 +550,12 @@ fun EditableTextField(
             wrap = wrap,
             viewportWidth = viewportWidth,
             highlights = presentation.highlights,
-            inlayHints = presentation.inlayHints,
+            inlayHints = displayedHints,
             inlayMetrics = inlayMetrics,
             previous = layoutHolder.last,
             multiline = multiline,
+            hiddenLines = hiddenLines,
+            projectedLines = foldProjection.lines,
         ).also { layoutHolder.last = it }
     }
     val completion = remember(state) { TextFieldCompletionState(state) }
@@ -656,6 +677,7 @@ fun EditableTextField(
                 )
             }
             for (index in visible) {
+                if (index in layout.hiddenLines) continue
                 key(index) {
                     EditableFieldRow(
                         state = state,
@@ -666,13 +688,16 @@ fun EditableTextField(
                         indentGuides = indentGuides,
                         indentGuideColor = indentGuideColor,
                         inlayMetrics = inlayMetrics,
-                        onInlayAction = onInlayAction,
+                        onInlayAction = { action ->
+                            if (!state.folding.activate(action)) onInlayAction?.invoke(action)
+                        },
                     )
                 }
             }
         }
         if (gutterWidth > 0f) {
-            EditableFieldGutter(layout, visible, gutterWidth, lineNumberColor)
+            EditableFieldGutter(layout, visible, gutterPanelWidth, lineNumberColor, state, folds, gutterMarkers,
+                id ?: "text-field-${System.identityHashCode(state)}", indentGuideColor)
         }
         if (completion.items.isNotEmpty()) {
             EditableFieldCompletionPopup(completion, layout, scrollState, gutterWidth)
@@ -707,32 +732,6 @@ internal fun editableFieldGutterWidth(text: String, fontSize: Float): Float {
     val lines = text.count { it == '\n' } + 1
     val digits = lines.toString().length.coerceAtLeast(2)
     return digits * fontSize * 0.62f + EditableFieldLineNumberGap
-}
-
-@Composable
-private fun EditableFieldGutter(
-    layout: EditableFieldLayout,
-    visible: IntRange,
-    width: Float,
-    color: UiColor,
-) {
-    Box(
-        mode = UiBoxMode.STACK,
-        tags = listOf("editable-text-field-gutter", "code-editor-gutter"),
-        modifier = Modifier.position(0.px, 0.px, 5f)
-            .size(width.px, layout.height.px).layer(5)
-            .pinnedToViewport(horizontal = true, vertical = false),
-    ) {
-        for (index in visible) {
-            key(index) {
-                Text(
-                    (index + 1).toString(),
-                    modifier = Modifier.position(0.px, layout.lineTop(index).px)
-                        .foreground(color).textWrap(false),
-                )
-            }
-        }
-    }
 }
 
 internal fun handleEditableFieldPress(
@@ -956,6 +955,7 @@ private fun EditableFieldRow(
     if (lineLayout != null) {
         EditableFieldLineFragments(
             lineLayout, layout.inlayHints[index], top, fontSize, fontFamily, state.textShadow, inlayMetrics, onInlayAction,
+            inlayIdPrefix = "text-field-${System.identityHashCode(state)}",
         )
     } else if (line.text.isNotEmpty()) {
         val effects = listOfNotNull(state.textShadow)
@@ -997,6 +997,7 @@ private fun EditableFieldLineFragments(
     textShadow: Shadow? = null,
     inlayMetrics: EditableFieldInlayMetrics,
     onInlayAction: ((UiInlayAction) -> Unit)? = null,
+    inlayIdPrefix: String,
 ) {
     lineLayout.lines.forEachIndexed { visualIndex, visual ->
         visual.fragments.forEachIndexed { fragmentIndex, fragment ->
@@ -1042,7 +1043,7 @@ private fun EditableFieldLineFragments(
                     val hint = inlayHints[fragment.widget.id]
                     if (hint != null) {
                         key("inlay", visualIndex, fragmentIndex, fragment.widget.id) {
-                            InlayHint(hint, x, y, inlayMetrics, onInlayAction)
+                            InlayHint("$inlayIdPrefix-${fragment.widget.id}", hint, x, y, inlayMetrics, onInlayAction)
                         }
                     }
                 }
@@ -1060,6 +1061,7 @@ private fun EditableFieldLineFragments(
  */
 @Composable
 private fun InlayHint(
+    id: String,
     hint: UiInlayHint,
     x: Float,
     y: Float,
@@ -1069,6 +1071,7 @@ private fun InlayHint(
     val action = hint.action?.takeIf { onInlayAction != null }
     val footprint = remember(hint, metrics) { InlayFootprint(hint, metrics) }
     Row(
+        id = id,
         tags = InlayTags + hint.tags + listOfNotNull("inlay-action".takeIf { action != null }),
         modifier = Modifier.position(x.px, y.px).size(UiLength.Fit, UiLength.Fit).onResolvedStyle(footprint::styled)
             .onPlaced(footprint::placed).let { base ->

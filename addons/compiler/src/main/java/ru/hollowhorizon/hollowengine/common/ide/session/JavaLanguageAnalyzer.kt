@@ -18,6 +18,8 @@ import com.intellij.psi.PsiPackage
 import com.intellij.psi.PsiVariable
 import com.intellij.psi.util.PsiTreeUtil
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.definitionForPsi
+import ru.hollowhorizon.hollowengine.common.ide.session.structure.javaEditorStructure
+import ru.hollowhorizon.hollowengine.common.scripting.ide.EditorStructure
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import ru.hollowhorizon.hollowengine.common.scripting.ide.HoverInfo
@@ -54,6 +56,10 @@ internal class JavaLanguageAnalyzer(private val owner: ScriptingAnalyzerImpl) : 
         if (element.containingFile == file) {
             DefinitionLocation(name, element.nameOffset())
         } else owner.definitionForPsi(element)
+    }
+
+    override fun structure(name: String, text: String): EditorStructure = synchronized(owner) {
+        owner.javaEditorStructure(file(name, text))
     }
 
     override fun hover(name: String, text: String, offset: Int): HoverInfo? = synchronized(owner) {

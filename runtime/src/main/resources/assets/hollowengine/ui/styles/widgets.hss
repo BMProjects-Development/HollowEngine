@@ -266,6 +266,39 @@
 
 .editable-text-field-gutter {
     background: $bg-field;
+    cursor: default;
+}
+
+.gutter-marker {
+    border-radius: 3px;
+    cursor: default;
+}
+
+.gutter-action { cursor: hand; }
+.fold-marker { opacity: 0; transition: opacity 140ms ease-in-out; }
+.editable-text-field-gutter:hover .fold-marker { opacity: 1; }
+
+.gutter-marker:hover {
+    background: $bg-hover;
+}
+
+.fold-placeholder {
+    foreground: $text-muted;
+    background: $bg-panel;
+    border-radius: 3px;
+}
+
+.editable-text-field-inlay.fold-placeholder {
+    padding: 0px 2px;
+    margin: 0px;
+    gap: 0px;
+    align-items: center center;
+}
+
+.fold-placeholder .editable-text-field-inlay-text {
+    font-size: 100%;
+    padding: 0px;
+    foreground: $text-muted;
 }
 
 .editable-text-field-inlay {

@@ -8,6 +8,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeManager
+import ru.hollowhorizon.hollowengine.common.scripting.execution.ScriptRunService
 
 class ServerRuntimeContext(
     server: MinecraftServer,
@@ -15,6 +16,8 @@ class ServerRuntimeContext(
     val scope: CoroutineScope =
         CoroutineScope(server.dispatcher + SupervisorJob(server.coroutineScope.coroutineContext[Job]))
     val nodes = NodeManager(server)
+    private val scriptRunService = lazy { ScriptRunService(server) }
+    val scriptRuns: ScriptRunService get() = scriptRunService.value
 
     fun serialize(tag: CompoundTag) {
         tag.put("nodes", CompoundTag().also(nodes::serialize))
@@ -25,6 +28,7 @@ class ServerRuntimeContext(
     }
 
     fun dispose() {
+        if (scriptRunService.isInitialized()) scriptRunService.value.dispose()
         nodes.dispose()
         scope.cancel()
         SharedScriptClasses.clearInstances()

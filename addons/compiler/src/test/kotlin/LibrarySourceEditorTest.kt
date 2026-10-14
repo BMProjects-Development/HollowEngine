@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.common.ScriptingEnvironmentImpl
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarkerKind
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import java.io.File
 import kotlin.test.*
@@ -75,6 +76,10 @@ class LibrarySourceEditorTest {
         assertNotNull(analyzer.hover(target.path, text, node + 2))
         val next = assertNotNull(analyzer.definition(target.path, text, node + 2))
         assertTrue(next.path.endsWith("NodeScript.kt"), next.path)
+        val structure = analyzer.structure(target.path, text)
+        assertTrue(structure.folds.isNotEmpty())
+        assertTrue(structure.markers.any { it.kind == GutterMarkerKind.COROUTINE })
+        assertTrue(structure.runTargets.isEmpty())
     }
 
     @Test
@@ -133,5 +138,8 @@ class LibrarySourceEditorTest {
         assertTrue("net.minecraft" in hover.signature, hover.signature)
         val spans = analyzer.javaAnalyzer.highlight(target.path, text, target.offset).flatMap { it.spans }
         assertTrue(spans.any { (part, style) -> part == "getInstance" && style.color == TokenType.METHOD })
+        val structure = analyzer.javaAnalyzer.structure(target.path, text)
+        assertTrue(structure.folds.isNotEmpty())
+        assertTrue(structure.markers.any { it.kind == GutterMarkerKind.OVERRIDE })
     }
 }

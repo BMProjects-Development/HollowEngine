@@ -27,6 +27,7 @@ interface ScriptingAnalyzer {
     fun format(name: String, text: String): String? = null
 
     fun definition(name: String, text: String, offset: Int): DefinitionLocation? = null
+    fun structure(name: String, text: String): EditorStructure = EditorStructure()
     /** On-demand actions at the caret, including diagnostic fixes and import suggestions. */
     fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null

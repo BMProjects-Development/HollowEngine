@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 
 @Composable
 fun UiCodeEditor(
@@ -15,6 +16,8 @@ fun UiCodeEditor(
     signatureHelp: UiSignatureHelpProvider? = null,
     hoverInfo: UiHoverInfoProvider? = null,
     diagnostics: List<UiTextDiagnostic> = emptyList(),
+    folds: List<CodeFold> = emptyList(),
+    gutterMarkers: List<UiGutterMarker> = emptyList(),
     searchMatches: List<IntRange> = emptyList(),
     activeSearchMatch: IntRange? = null,
     inlayHints: List<UiInlayHint> = emptyList(),
@@ -46,6 +49,8 @@ fun UiCodeEditor(
         autoPairs = true,
         readOnly = readOnly,
         diagnostics = diagnostics,
+        folds = folds,
+        gutterMarkers = gutterMarkers,
         searchMatches = searchMatches,
         activeSearchMatch = activeSearchMatch,
         inlayHints = inlayHints,

@@ -101,7 +101,14 @@ internal class HollowIdeModel(
 
     fun openFile(path: String): HollowIdeOpenResult {
         selectedTreePath = path
-        val file = path.fromReadablePath()
+        files[path]?.takeIf { it.readOnly }?.let { return HollowIdeOpenResult.File(it, created = false) }
+        readLibrarySource(path)?.let { return HollowIdeOpenResult.File(openReadOnly(path, it), created = true) }
+        if (path.isVirtualIdePath()) return HollowIdeOpenResult.Unsupported
+        val file = try {
+            path.fromReadablePath()
+        } catch (_: InvalidPathException) {
+            return HollowIdeOpenResult.Unsupported
+        }
         if (!file.isFile) return HollowIdeOpenResult.Unsupported
         if (file.isExtractedScript()) {
             val created = path !in files
@@ -470,7 +477,7 @@ class HollowIdeOpenFile internal constructor(
     private var saveHandler: (() -> Boolean)? = null
 
     val readOnly: Boolean get() = document.readOnly
-    val virtual: Boolean get() = path.startsWith("resource://")
+    val virtual: Boolean get() = path.isVirtualIdePath()
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
     val id: String = fileDockItemId(path)

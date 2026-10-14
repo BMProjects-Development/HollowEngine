@@ -96,8 +96,11 @@ class NodeManager(val server: MinecraftServer) {
     }
 
     fun contains(path: String): Boolean = canonicalNodePath(path).let { nodes.containsKey(it) || lifecycle.isPending(it) }
+    internal fun isStopping(path: String): Boolean = lifecycle.isStopping(canonicalNodePath(path))
+    internal fun isStarting(path: String): Boolean = lifecycle.isPending(canonicalNodePath(path))
 
     fun paths(): Set<String> = nodes.keys + lifecycle.pendingPaths()
+    internal fun executionPaths(): Set<String> = paths() + lifecycle.stoppingPaths()
 
     internal fun reloadChanged(plan: NodeReloadPlan) {
         val waiting = dormant.filterKeys { it !in nodes && !lifecycle.isPending(it) }

@@ -21,6 +21,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiStylesheetReference
 import ru.hollowhorizon.hollowengine.client.ui.style.fontFamily
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.roundToInt
 
@@ -531,6 +532,8 @@ fun TextField(
     caretColor: UiColor? = null,
     selectionColor: UiColor? = null,
     lineNumbers: Boolean = false,
+    folds: List<CodeFold> = emptyList(),
+    gutterMarkers: List<UiGutterMarker> = emptyList(),
     lineNumberColor: UiColor? = null,
     indentGuides: Boolean = false,
     indentGuideColor: UiColor? = null,
@@ -627,6 +630,8 @@ fun TextField(
         activeSearchMatch = activeSearchMatch,
         placeholder = placeholder,
         lineNumbers = lineNumbers,
+        folds = folds,
+        gutterMarkers = gutterMarkers,
         lineNumberColor = lineNumberColor ?: EditableFieldLineNumberColor,
         indentGuides = indentGuides,
         indentGuideColor = indentGuideColor ?: EditableFieldIndentGuideColor,

@@ -14,8 +14,10 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
     private val pending = ConcurrentHashMap<String, Job>()
 
     fun pendingPaths(): Set<String> = pending.keys.toSet()
+    fun stoppingPaths(): Set<String> = stopping.keys.toSet()
 
     fun isPending(path: String): Boolean = pending.containsKey(path)
+    fun isStopping(path: String): Boolean = stopping[path]?.isCompleted == false
 
     fun cancelStart(path: String) {
         pending.remove(path)?.cancel()

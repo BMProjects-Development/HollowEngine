@@ -81,6 +81,9 @@ class AnalysisEnvironment(
     val javaHome: Path? = null,
 ) {
     private val projectDisposable = Disposer.newDisposable("AnalysisEnvironment")
+    private val decompilerDisposable = Disposer.newDisposable("Analysis decompilers").also {
+        Disposer.register(projectDisposable, it)
+    }
     private val compilerPluginSupport = AnalysisCompilerPluginSupport.create()
     private var scriptConfigurationsProvider: ClassLiteralScriptConfigurationsProvider? = null
     private val resolvedJavaHome = javaHome ?: Path.of(System.getProperty("java.home"))
@@ -289,7 +292,8 @@ class AnalysisEnvironment(
 
     private fun registerDecompilers() {
         val applicationEnvironment = kotlinCoreProjectEnvironment.environment
-        val applicationDisposable = kotlinCoreProjectEnvironment.environment.parentDisposable
+        val registrationDisposable = decompilerDisposable
+        registerAnalysisEventDrain(applicationEnvironment.application)
 
         applicationEnvironment.registerFileType(
             KotlinBuiltInFileType,
@@ -302,28 +306,28 @@ class AnalysisEnvironment(
             FileTypeFileViewProviders.INSTANCE.addExplicitExtension(
                 fileType,
                 ClassFileViewProviderFactory(),
-                applicationDisposable,
+                registrationDisposable,
             )
 
             BinaryFileStubBuilders.INSTANCE.addExplicitExtension(
                 fileType,
                 ClassFileStubBuilder(),
-                applicationDisposable
+                registrationDisposable
             )
             BinaryFileTypeDecompilers.getInstance()
-                .addExplicitExtension(fileType, ClassFileDecompiler(), applicationDisposable)
+                .addExplicitExtension(fileType, ClassFileDecompiler(), registrationDisposable)
         }
 
         ClassFileDecompilers.getInstance().EP_NAME.point.apply {
-            registerExtension(KotlinClassFileDecompiler(), LoadingOrder.FIRST, applicationDisposable)
-            registerExtension(KotlinBuiltInDecompiler(), LoadingOrder.FIRST, applicationDisposable)
+            registerExtension(KotlinClassFileDecompiler(), LoadingOrder.FIRST, registrationDisposable)
+            registerExtension(KotlinBuiltInDecompiler(), LoadingOrder.FIRST, registrationDisposable)
             registerExtension(
                 KotlinKlibMetadataDecompiler(),
                 LoadingOrder.FIRST,
-                applicationDisposable,
+                registrationDisposable,
             )
 
-            registerExtension(ClsDecompilerImpl(), LoadingOrder.FIRST, applicationDisposable)
+            registerExtension(ClsDecompilerImpl(), LoadingOrder.FIRST, registrationDisposable)
         }
     }
 
@@ -640,6 +644,8 @@ class AnalysisEnvironment(
 
     fun dispose() {
         scriptConfigurationsProvider?.close()
+        Disposer.dispose(decompilerDisposable)
+        awaitAnalysisEvents()
         Disposer.dispose(projectDisposable)
     }
 
