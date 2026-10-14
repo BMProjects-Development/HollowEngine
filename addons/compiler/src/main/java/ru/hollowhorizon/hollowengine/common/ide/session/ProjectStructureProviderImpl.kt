@@ -23,13 +23,14 @@ import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryMo
 
 class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), KotlinProjectStructureProvider {
     private val libraryModules = mutableListOf<KaRekotLibraryModule>()
-    private val scriptModules = linkedMapOf<KtFile, KaModule>()
+    private val sourceModules = linkedMapOf<KtFile, KaModule>()
+    private val librarySourceOwners = mutableMapOf<String, KaModule>()
 
     override val allModules: List<KaModule>
-        get() = libraryModules + scriptModules.values
+        get() = libraryModules + sourceModules.values
 
     override val allSourceFiles: List<PsiFileSystemItem>
-        get() = scriptModules.keys.toList()
+        get() = sourceModules.keys.toList()
 
     private val notUnderContentRootModules = mutableMapOf<Project, KaNotUnderContentRootModule>()
 
@@ -80,7 +81,7 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
         setModule(file.virtualFile ?: file.viewProvider.virtualFile, module)
         if (file is KtFile) {
             file.contextModule = module
-            scriptModules[file] = module
+            sourceModules[file] = module
         }
     }
 
@@ -88,10 +89,16 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
         setModule(file, getNotUnderContentRootModule(file.project))
     }
 
+    internal fun registerLibrarySource(path: String, declaration: PsiElement) {
+        librarySourceOwners[path] = getModule(declaration, null)
+    }
+
+    internal fun librarySourceOwner(path: String): KaModule? = librarySourceOwners[path]
+
     fun removeModule(file: PsiFile) {
         if (file is KtFile) {
             file.contextModule = null
-            scriptModules.remove(file)
+            sourceModules.remove(file)
         }
         (file.virtualFile ?: file.viewProvider.virtualFile).kaModule = null
     }

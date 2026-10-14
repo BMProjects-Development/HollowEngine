@@ -20,7 +20,8 @@ internal class CfrDefinitionDecompiler {
         }
         return DefinitionLocation(
             path = "decompiled/${ClassReader(outerFile.contentsToByteArray()).className}.java",
-            offset = matcher.offset("decompiled.java", text, target) ?: return null,
+            offset = matcher.offset("decompiled.java", text,
+                target.copy(name = CfrSourceDecompiler.sourceIdentifier(target.name))) ?: return null,
             text = text,
             readOnly = true,
         )

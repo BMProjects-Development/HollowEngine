@@ -39,6 +39,7 @@ import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
+import ru.hollowhorizon.hollowengine.common.scripting.ide.withNormalizedLineSeparators
 import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.hssColorLiteralText
@@ -1680,7 +1681,8 @@ object HollowIdeOverlay {
         colorPicker = picker.copy(text = next, end = picker.start + literal.length, color = color)
     }
 
-    private fun openDefinition(definition: DefinitionLocation) {
+    private fun openDefinition(location: DefinitionLocation) {
+        val definition = location.withNormalizedLineSeparators()
         val file = if (definition.text != null || definition.readOnly) {
             model.openReadOnly(definition.path, definition.text.orEmpty())
         } else {

@@ -10,21 +10,22 @@ import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiNameIdentifierOwner
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtConstructor
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunctionType
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtNullableType
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtPsiFactory
-import org.jetbrains.kotlin.psi.KtNullableType
+import org.jetbrains.kotlin.psi.KtSecondaryConstructor
+import org.jetbrains.kotlin.psi.KtTypeAlias
 import org.jetbrains.kotlin.psi.KtTypeElement
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.psi.KtUserType
-import org.jetbrains.kotlin.psi.KtTypeAlias
-import org.jetbrains.kotlin.psi.KtSecondaryConstructor
 import org.jetbrains.kotlin.psi.psiUtil.parents
 
 /** The declaration's identity survives attaching sources or decompiling a class. */
@@ -55,7 +56,9 @@ internal data class SourceDeclarationIdentity(
                 )
                 is KtNamedFunction -> element.name?.let { name ->
                     SourceDeclarationIdentity(name, element.kotlinOwners(), Kind.FUNCTION,
-                        listOfNotNull(element.receiverTypeReference?.sourceType()) + element.valueParameters.map {
+                        element.contextParameters.map { it.typeReference.sourceType() } +
+                            element.contextReceivers.map { it.typeReference().sourceType() } +
+                            listOfNotNull(element.receiverTypeReference?.sourceType()) + element.valueParameters.map {
                             it.typeReference.sourceType() + if (it.isVarArg) "[]" else ""
                         })
                 }
@@ -75,22 +78,28 @@ internal data class SourceDeclarationIdentity(
 
 internal class SourceDeclarationMatcher(private val project: Project) {
     fun offset(fileName: String, text: String, target: SourceDeclarationIdentity): Int? {
+        val normalized = text.replace("\r\n", "\n").replace('\r', '\n')
+        val offset = normalizedOffset(fileName, normalized, target) ?: return null
+        var originalOffset = 0
+        repeat(offset) {
+            if (text[originalOffset] == '\r' && text.getOrNull(originalOffset + 1) == '\n') originalOffset++
+            originalOffset++
+        }
+        return originalOffset
+    }
+
+    private fun normalizedOffset(fileName: String, text: String, target: SourceDeclarationIdentity): Int? {
         val candidates = if (fileName.endsWith(".java")) javaDeclarations(fileName, text) else kotlinDeclarations(fileName, text)
         val named = candidates.filter { it.identity.name == target.name && it.identity.kind == target.kind &&
             it.identity.owners == target.owners && (target.packageName == null || target.packageName == it.identity.packageName) }
         val exact = named.filter { candidate ->
-            candidate.identity.parameters.map(::normalizedSourceType) == target.parameters.map(::normalizedSourceType)
+            sourceParametersMatch(candidate.identity.parameters, target.parameters, allowShortNames = false)
         }
         if (exact.size == 1) return exact.single().offset
         if (exact.size > 1) return null
         // Unresolved source PSI can spell a type with a short name. Only accept a unique signature.
         val short = named.filter { candidate ->
-            candidate.identity.parameters.size == target.parameters.size &&
-                candidate.identity.parameters.zip(target.parameters).all { (source, binary) ->
-                    val left = normalizedSourceType(source)
-                    val right = normalizedSourceType(binary)
-                    left == right || ('.' !in left || '.' !in right) && left.substringAfterLast('.') == right.substringAfterLast('.')
-                }
+            sourceParametersMatch(candidate.identity.parameters, target.parameters, allowShortNames = true)
         }
         return short.singleOrNull()?.offset
     }
@@ -139,6 +148,14 @@ internal class SourceDeclarationMatcher(private val project: Project) {
 
 private data class SourceDeclaration(val identity: SourceDeclarationIdentity, val offset: Int)
 
+internal fun sourceParametersMatch(source: List<String>, target: List<String>, allowShortNames: Boolean): Boolean =
+    source.size == target.size && source.zip(target).all { (leftType, rightType) ->
+        val left = normalizedSourceType(leftType)
+        val right = normalizedSourceType(rightType)
+        left == right || allowShortNames && ('.' !in left || '.' !in right) &&
+            left.substringAfterLast('.') == right.substringAfterLast('.')
+    }
+
 private fun PsiElement.javaOwners(): List<String> = generateSequence(parent) { it.parent }
     .filterIsInstance<PsiClass>().mapNotNull { it.name }.toList().asReversed()
 
@@ -152,7 +169,10 @@ private fun KtTypeReference?.sourceType(): String {
         else -> null
     }
     val function = functionType(this?.typeElement)
-    if (function != null) return "kotlin.jvm.functions.Function${function.parameters.size + if (function.receiverTypeReference != null) 1 else 0}"
+    if (function != null) {
+        val arity = function.totalParameterCount + if (this?.hasModifier(KtTokens.SUSPEND_KEYWORD) == true) 1 else 0
+        return "kotlin.jvm.functions.Function$arity"
+    }
     val reference = this ?: return ""
     val type = (reference.typeElement as? KtNullableType)?.innerType ?: reference.typeElement
     val userType = type as? KtUserType ?: return reference.text

@@ -5,26 +5,24 @@ import com.intellij.openapi.vfs.VirtualFile
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.Opcodes
-import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
-import java.nio.file.Files
+import ru.hollowhorizon.hollowengine.common.scripting.ide.withNormalizedLineSeparators
+import java.io.IOException
+import java.lang.System.Logger.Level
 import java.nio.file.Path
 import java.util.zip.ZipFile
-import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.io.path.nameWithoutExtension
-import kotlin.io.path.readLines
 import kotlin.io.path.readText
 
 /** Sources are navigation inputs, never additional binary dependencies of the compiler. */
 internal class LibrarySourceRepository(
     project: Project,
     private val binaryRoots: List<Path>,
-    private val attachedRoots: () -> List<Path> = ::attachedSourceRoots,
+    private val attachedRoots: (() -> List<Path>)? = null,
 ) {
     private val matcher = SourceDeclarationMatcher(project)
+    private val reportedFailures = HashSet<Pair<Path, String?>>()
 
     fun find(target: SourceDeclarationIdentity, classFile: VirtualFile?, packageName: String): DefinitionLocation? {
         val packagePath = packageName.replace('.', '/').let { if (it.isEmpty()) "" else "$it/" }
@@ -40,9 +38,15 @@ internal class LibrarySourceRepository(
                 for (entry in directEntries) {
                     val file = root.resolve(entry).normalize()
                     if (!file.startsWith(root.normalize()) || !file.isRegularFile()) continue
-                    val text = file.readText()
+                    val text = try {
+                        file.readText()
+                    } catch (failure: IOException) {
+                        reportFailure(file, failure)
+                        continue
+                    }
                     val offset = matcher.offset(entry, text, target) ?: continue
                     return DefinitionLocation(file.toAbsolutePath().toString(), offset, text, readOnly = true)
+                        .withNormalizedLineSeparators()
                 }
             } else {
                 findInArchive(root, packagePath, directEntries, target)?.let { return it }
@@ -54,7 +58,7 @@ internal class LibrarySourceRepository(
     private fun findInArchive(
         archive: Path, packagePath: String, directEntries: List<String>, target: SourceDeclarationIdentity,
     ): DefinitionLocation? {
-        return runCatching {
+        return try {
             ZipFile(archive.toFile()).use { zip ->
                 val direct = directEntries.mapNotNull(zip::getEntry)
                 val others = zip.entries().asSequence().filter { entry ->
@@ -68,54 +72,35 @@ internal class LibrarySourceRepository(
                     if (entry !in direct && SourcePackage.find(text)?.groupValues?.get(1).orEmpty() != packagePath.removeSuffix("/").replace('/', '.')) continue
                     val offset = matcher.offset(entry.name, text, target.copy(packageName = packagePath.removeSuffix("/").replace('/', '.'))) ?: continue
                     return DefinitionLocation("library-sources/${archive.toAbsolutePath()}!/${entry.name}", offset, text, true)
+                        .withNormalizedLineSeparators()
                 }
             }
             null
-        }.getOrNull()
+        } catch (failure: IOException) {
+            reportFailure(archive, failure)
+            null
+        }
     }
 
     private fun sourceRoots(classFile: VirtualFile?): Sequence<Path> = sequence {
-        yieldAll(attachedRoots())
+        yieldAll(attachedRoots?.invoke() ?: attachedLibrarySources(listOf(Path.of("")) + binaryRoots, ::reportFailure))
         val binary = classFile?.path?.substringBefore("!/")?.let { runCatching { Path.of(it) }.getOrNull() }
-        if (binary != null) yieldAll(binary.adjacentSources())
-        for (root in binaryRoots) yieldAll(root.adjacentSources())
+        if (binary != null) yieldAll(adjacentLibrarySources(binary, ::reportFailure))
+        for (root in binaryRoots) yieldAll(adjacentLibrarySources(root, ::reportFailure))
         val javaHome = Path.of(System.getProperty("java.home"))
         yield(javaHome.resolve("lib/src.zip"))
         javaHome.parent?.resolve("lib/src.zip")?.let { yield(it) }
     }.map { it.toAbsolutePath().normalize() }.distinct().filter { it.isDirectory() || it.isRegularFile() }
-}
 
-private val SourcePackage = Regex("(?m)^\\s*package\\s+([\\w.]+)")
-
-private fun Path.adjacentSources(): List<Path> {
-    if (isDirectory()) {
-        // Gradle outputs carry their project sources alongside build/classes/{java,kotlin}/main.
-        val build = generateSequence(this) { it.parent }.firstOrNull { it.name == "build" }
-        return build?.parent?.resolve("src/main")?.let { listOf(it.resolve("java"), it.resolve("kotlin")) }.orEmpty()
-    }
-    if (extension != "jar") return emptyList()
-    return buildList {
-        if (name.endsWith("-sources.jar")) add(this@adjacentSources)
-        parent?.resolve("${nameWithoutExtension}-sources.jar")?.let(::add)
-        // Maven/Gradle store sibling artifacts in different checksum directories of one version.
-        val versionDirectory = parent?.parent ?: return@buildList
-        if (versionDirectory.isDirectory()) Files.walk(versionDirectory, 2).use { paths ->
-            paths.filter { it.name == "${this@adjacentSources.nameWithoutExtension}-sources.jar" }.forEach(::add)
+    private fun reportFailure(path: Path, failure: IOException) {
+        if (reportedFailures.add(path to failure.message)) {
+            SourceLogger.log(Level.WARNING, "Cannot read library sources at '$path'; continuing source lookup", failure)
         }
     }
 }
 
-private fun attachedSourceRoots(): List<Path> = buildList {
-    val folder = DirectoryManager.LIBRARY_SOURCES
-    add(folder)
-    Files.walk(folder).use { paths ->
-        paths.filter { it.isRegularFile() && it.extension in setOf("jar", "zip") }.sorted().forEach(::add)
-    }
-    System.getProperty("hollowengine.ide.sourceRoots")?.let { manifest ->
-        val file = Path.of(manifest)
-        if (file.isRegularFile()) addAll(file.readLines().filter(String::isNotBlank).map(Path::of))
-    }
-}
+private val SourcePackage = Regex("(?m)^\\s*package\\s+([\\w.]+)")
+private val SourceLogger = System.getLogger(LibrarySourceRepository::class.java.name)
 
 private fun VirtualFile.sourceFileName(): String? {
     if (extension != "class") return null

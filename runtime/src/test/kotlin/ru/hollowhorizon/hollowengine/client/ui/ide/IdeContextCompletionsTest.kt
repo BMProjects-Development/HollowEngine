@@ -18,6 +18,8 @@ class IdeContextCompletionsTest {
         val snippets = contextSnippetCompletions(Vec3(-1.25, 64.0, 0.125), "minecraft:diamond", 7)
         assertEquals("pos(-1.25, 64.0, 0.125)", snippets.first().insertText)
         assertEquals("item(\"minecraft:diamond\", 7)", snippets.last().insertText)
+        assertEquals(snippets.first().insertText, snippets.first().label)
+        assertEquals(snippets.last().insertText, snippets.last().label)
         assertTrue(snippets.first().importFqName!!.endsWith(".pos"))
         assertTrue(snippets.last().importFqName!!.endsWith(".item"))
         assertEquals(1, contextSnippetCompletions(Vec3.ZERO, null, 0).size)

@@ -2,7 +2,7 @@
   "completion.player_position": "player position",
   "completion.held_item": "held item",
   "fix.import_declaration": "Import %s",
-  "fix.remove_unused_variable": "Remove unused variable (keep initializer)",
+  "fix.remove_unused_variable": "Remove unused variable",
   "color_moved": "Color moved; edit it directly",
   "fix.remove_import": "Remove import",
   "fix.remove_unused_imports": "Remove all unused imports (%s)",

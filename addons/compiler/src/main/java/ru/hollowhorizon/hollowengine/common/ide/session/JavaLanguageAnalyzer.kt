@@ -11,8 +11,10 @@ import com.intellij.psi.PsiJavaCodeReferenceElement
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiNameIdentifierOwner
+import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.PsiNewExpression
 import com.intellij.psi.PsiParameter
+import com.intellij.psi.PsiPackage
 import com.intellij.psi.PsiVariable
 import com.intellij.psi.util.PsiTreeUtil
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.definitionForPsi
@@ -58,7 +60,8 @@ internal class JavaLanguageAnalyzer(private val owner: ScriptingAnalyzerImpl) : 
         val reference = file(name, text).referenceAt(offset) ?: return@synchronized null
         val target = reference.resolvedTarget() ?: return@synchronized null
         val range = reference.referenceNameElement?.textRange ?: reference.textRange
-        HoverInfo(range.startOffset, range.endOffset, target.presentation())
+        val presentation = target.presentation()?.takeIf(String::isNotBlank) ?: return@synchronized null
+        HoverInfo(range.startOffset, range.endOffset, presentation)
     }
 
     override fun occurrences(name: String, text: String, offset: Int): List<OccurrenceRange> = synchronized(owner) {
@@ -130,7 +133,7 @@ private fun PsiElement.tokenType(): TokenType? = when (this) {
     else -> null
 }
 
-private fun PsiElement.presentation(): String = when (this) {
+private fun PsiElement.presentation(): String? = when (this) {
     is PsiMethod -> buildString {
         returnType?.let { append(it.presentableText).append(' ') }
         append(containingClass?.qualifiedName?.let { "$it." }.orEmpty()).append(name)
@@ -138,5 +141,7 @@ private fun PsiElement.presentation(): String = when (this) {
     }
     is PsiClass -> qualifiedName ?: name.orEmpty()
     is PsiVariable -> "${type.presentableText} $name"
+    is PsiPackage -> qualifiedName
+    is PsiNamedElement -> name
     else -> text
 }

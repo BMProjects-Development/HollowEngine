@@ -2,6 +2,7 @@
 import dev.architectury.plugin.ArchitectPluginExtension
 import me.modmuss50.mpp.ReleaseType
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.task.GenerateSourcesTask
 import net.fabricmc.loom.task.RemapJarTask
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -214,6 +215,20 @@ fun releaseTypeProvider(): Provider<ReleaseType> {
 apply(from = rootProject.file("gradle/universal-jar.gradle.kts"))
 apply(from = rootProject.file("gradle/development-jar.gradle.kts"))
 apply(from = rootProject.file("gradle/ide-sources.gradle.kts"))
+
+subprojects {
+    plugins.withId("dev.architectury.loom") {
+        val sourceGeneration = tasks.withType<GenerateSourcesTask>()
+        // Loom also updates the game's line numbers in the binary JAR while generating sources.
+        tasks.withType<JavaCompile>().configureEach { mustRunAfter(sourceGeneration) }
+        tasks.withType<KotlinCompile>().configureEach { mustRunAfter(sourceGeneration) }
+        extensions.configure<LoomGradleExtensionAPI> {
+            runs.configureEach {
+                jvmArguments.add("-Dhollowengine.ide.sourceRoots=${rootProject.layout.buildDirectory.file("ide/source-roots.txt").get().asFile.absolutePath}")
+            }
+        }
+    }
+}
 
 publishMods {
     changelog.set(providers.gradleProperty("publish.changelog").orElse(providers.provider {

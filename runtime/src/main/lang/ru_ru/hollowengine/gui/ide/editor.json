@@ -2,7 +2,7 @@
   "completion.player_position": "позиция игрока",
   "completion.held_item": "предмет в руке",
   "fix.import_declaration": "Импортировать %s",
-  "fix.remove_unused_variable": "Удалить неиспользуемую переменную (сохранить инициализатор)",
+  "fix.remove_unused_variable": "Удалить неиспользуемую переменную",
   "color_moved": "Цвет сместился, отредактируйте его вручную",
   "fix.remove_import": "Удалить импорт",
   "fix.remove_unused_imports": "Удалить все неиспользуемые импорты (%s)",

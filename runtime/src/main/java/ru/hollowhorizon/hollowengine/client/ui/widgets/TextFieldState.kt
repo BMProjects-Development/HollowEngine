@@ -35,6 +35,7 @@ class TextFieldState(
     nanoTime: () -> Long = System::nanoTime,
 ) : UndoOwner {
     val scroll: UiScrollHandle = UiScrollHandle()
+    internal val autoScroll = TextFieldAutoScroll()
 
     var fontSize: Float by mutableStateOf(fontSize)
     var fontFamily: String? by mutableStateOf(fontFamily)
@@ -220,7 +221,7 @@ class TextFieldState(
         breakHistoryGroup()
         recordHistorySnapshot()
         text = normalized
-        setCaretsAfterEdit(carets)
+        setCaretsAndReveal(carets)
         breakHistoryGroup()
         return true
     }
@@ -243,7 +244,7 @@ class TextFieldState(
     ) {
         val previous = primaryCaret
         val anchor = if (select) previous.selectionAnchor ?: previous.position else null
-        setCarets(listOf(UiTextCaret(position.coerceIn(0, text.length), anchor, inlayAffinity)))
+        setCaretsAndReveal(listOf(UiTextCaret(position.coerceIn(0, text.length), anchor, inlayAffinity)))
         if (caretRanges.last() != previous) breakHistoryGroup()
     }
 
@@ -388,7 +389,7 @@ class TextFieldState(
             UiTextCaret(position)
         }
         text = nextValue
-        setCaretsAfterEdit(nextCarets)
+        setCaretsAndReveal(nextCarets)
         return true
     }
 
@@ -430,11 +431,11 @@ class TextFieldState(
             if (selectInserted && edit.replacement.isNotEmpty()) UiTextCaret(position, insertStart) else UiTextCaret(position)
         }
         text = nextValue
-        setCaretsAfterEdit(nextCarets)
+        setCaretsAndReveal(nextCarets)
         return true
     }
 
-    private fun setCaretsAfterEdit(ranges: List<UiTextCaret>) {
+    private fun setCaretsAndReveal(ranges: List<UiTextCaret>) {
         val previousRevision = caretVisibilityRevision
         setCarets(ranges)
         if (caretVisibilityRevision == previousRevision) caretVisibilityRevision++

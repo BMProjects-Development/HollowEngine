@@ -211,7 +211,11 @@ internal class HollowIdeEditorSession(
         definitionJob = scope.launch {
             val definition = runCatching {
                 analyzer.definition(path, text, safeCaret)
-            }.getOrNull()
+            }.getOrElse { failure ->
+                reportAnalysisFailure("definition", failure)
+                null
+            }
+            ensureActive()
             Minecraft.getInstance().execute {
                 onResolved(definition)
             }

@@ -38,14 +38,14 @@ internal fun contextSnippetCompletions(position: Vec3, heldItem: String?, count:
     buildList {
         add(
             contextSnippet(
-                "pos(${position.x}, ${position.y}, ${position.z})",
+                "pos",
                 "pos(${position.x}, ${position.y}, ${position.z})",
                 "player_position"
             )
         )
         if (heldItem != null) add(
             contextSnippet(
-                "item(\"${heldItem.escapeForRegularKotlinString()}\", $count)",
+                "item",
                 "item(\"${heldItem.escapeForRegularKotlinString()}\", $count)",
                 "held_item"
             )
@@ -53,7 +53,7 @@ internal fun contextSnippetCompletions(position: Vec3, heldItem: String?, count:
     }
 
 private fun contextSnippet(name: String, insertion: String, label: String) = UiTextCompletion(
-    label = name,
+    label = insertion,
     tail = "hollowengine.gui.ide.editor.completion.$label".lang,
     insertText = insertion,
     filterText = name,

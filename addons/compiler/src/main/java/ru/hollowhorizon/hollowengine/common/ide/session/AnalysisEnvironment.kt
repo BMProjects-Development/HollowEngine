@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.ide.session
 
+import com.intellij.codeInsight.JavaExpressionTypeNullabilityPatcher
 import com.intellij.core.CoreApplicationEnvironment
 import com.intellij.ide.highlighter.JavaClassFileType
 import com.intellij.lang.LanguageExtensionPoint
@@ -44,6 +45,8 @@ import org.jetbrains.kotlin.analysis.api.standalone.base.modification.KotlinStan
 import org.jetbrains.kotlin.analysis.api.standalone.base.permissions.KotlinStandaloneAnalysisPermissionOptions
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.FirStandaloneServiceRegistrar
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.StandaloneProjectFactory
+import org.jetbrains.kotlin.analysis.decompiled.light.classes.ClsJavaStubByVirtualFileCache
+import org.jetbrains.kotlin.analysis.decompiled.light.classes.origin.KotlinDeclarationInCompiledFileSearcher
 import org.jetbrains.kotlin.analysis.decompiler.konan.KlibMetaFileType
 import org.jetbrains.kotlin.analysis.decompiler.konan.KotlinKlibMetadataDecompiler
 import org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInDecompiler
@@ -61,7 +64,6 @@ import org.jetbrains.kotlin.serialization.deserialization.METADATA_FILE_EXTENSIO
 import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
 import ru.hollowhorizon.hollowengine.common.ide.session.index.JavaClassNameIndex
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJarLibraryModuleImpl
-import org.jetbrains.kotlin.analysis.decompiled.light.classes.ClsJavaStubByVirtualFileCache
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJdkLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import java.nio.file.Path
@@ -210,8 +212,19 @@ class AnalysisEnvironment(
 
     private fun registerApplicationServices() {
         KotlinCoreEnvironment.underApplicationLock {
+            registerJavaAnalysisRegistryKeys()
             val applicationEnvironment = kotlinCoreProjectEnvironment.environment
             val application = applicationEnvironment.application
+
+            application.registerApplicationServiceIfMissing(
+                KotlinDeclarationInCompiledFileSearcher::class.java,
+                KotlinDeclarationInCompiledFileSearcher(),
+            )
+
+            registerApplicationExtensionPoint(
+                JavaExpressionTypeNullabilityPatcher.EP_NAME.name,
+                JavaExpressionTypeNullabilityPatcher::class.java.name,
+            )
 
             registerApplicationExtensionPoint(
                 "com.intellij.syntax.elementTypeConverter",
@@ -386,6 +399,7 @@ class AnalysisEnvironment(
                     kotlinCoreProjectEnvironment,
                     builtins,
                     jdkClasses + classpath,
+                    projectStructureProvider,
                 ).also { declarationProviderFactory ->
                     registerService(JavaClassNameIndex::class.java, declarationProviderFactory.javaClassNameIndex)
                 }

@@ -52,16 +52,11 @@ loom {
     runs {
         configureEach {
             runDirectory.set(rootProject.layout.projectDirectory.dir("run"))
-            vmArgs("-Dhollowengine.ide.sourceRoots=${rootProject.layout.buildDirectory.file("ide/source-roots.txt").get().asFile.absolutePath}")
             if (name == "client") {
                 programArguments.addAll("--username", "TheHollowHorizon")
             }
         }
     }
-}
-
-tasks.matching { it.name.startsWith("run") || it.name in setOf("configureLaunch", "ideaSyncTask", "genEclipseRuns", "vscode") }.configureEach {
-    dependsOn(":writeIdeSourceRoots")
 }
 
 configurations {

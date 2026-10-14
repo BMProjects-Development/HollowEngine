@@ -3,21 +3,17 @@ package ru.hollowhorizon.hollowengine.common.ide.session.definition
 import com.intellij.psi.PsiClassOwner
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNameIdentifierOwner
-import org.objectweb.asm.ClassReader
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.components.resolveToCallCandidates
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
+import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtStringTemplateExpression
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import ru.hollowhorizon.hollowengine.common.ide.session.ScriptingAnalyzerImpl
@@ -46,13 +42,10 @@ private fun KtFile.referenceExpressionAt(offset: Int): KtSimpleNameExpression? {
         .filterIsInstance<KtSimpleNameExpression>().firstOrNull()
 }
 
-internal fun ScriptingAnalyzerImpl.definitionForSymbol(symbol: KaDeclarationSymbol): DefinitionLocation? {
-    val annotation = symbol.annotations.firstOrNull { it.classId?.asFqNameString() == "kotlin.jvm.JvmName" }
-    val jvmName = (annotation?.arguments?.firstOrNull()?.expression as? KaAnnotationValue.ConstantValue)?.value?.value as? String
-    return symbol.psi?.let { definitionForPsi(it, jvmName) }
-}
+internal fun ScriptingAnalyzerImpl.definitionForSymbol(symbol: KaDeclarationSymbol): DefinitionLocation? =
+    symbol.psi?.let(::definitionForPsi)
 
-internal fun ScriptingAnalyzerImpl.definitionForPsi(element: PsiElement, jvmName: String? = null): DefinitionLocation? {
+internal fun ScriptingAnalyzerImpl.definitionForPsi(element: PsiElement): DefinitionLocation? {
     val file = element.containingFile ?: return null
     val virtualFile = file.virtualFile
     if (virtualFile?.extension != "class" && !file.name.endsWith(".class")) {
@@ -71,25 +64,20 @@ internal fun ScriptingAnalyzerImpl.definitionForPsi(element: PsiElement, jvmName
         is PsiClassOwner -> file.packageName
         else -> ""
     }
-    librarySources.find(target, virtualFile, packageName)?.let { return it }
-    return virtualFile?.let { binary ->
-        val binaryOwners = ClassReader(binary.contentsToByteArray()).className.substringAfterLast('/').split('$')
-        val jvmTarget = if (element is KtNamedFunction || element is KtProperty) {
-            target.copy(owners = binaryOwners)
-        } else target
-        val functionTarget = if (element is KtNamedFunction) {
-            val psiJvmName = element.annotationEntries.firstOrNull { it.shortName?.asString() == "JvmName" }
-                ?.valueArguments?.firstOrNull()?.getArgumentExpression() as? KtStringTemplateExpression
-            jvmTarget.copy(
-                name = jvmName ?: psiJvmName?.entries?.singleOrNull()?.text ?: jvmTarget.name,
-                parameters = jvmTarget.parameters + if (element.hasModifier(KtTokens.SUSPEND_KEYWORD)) listOf("kotlin.coroutines.Continuation") else emptyList(),
-            )
-        } else jvmTarget
-        definitionDecompiler.decompile(binary, functionTarget, sourceDeclarationMatcher)?.let { return it }
-        if (element is KtProperty) {
-            val getter = if (target.name.startsWith("is") && target.name.getOrNull(2)?.isUpperCase() == true) target.name
-                else "get${target.name.replaceFirstChar(Char::uppercaseChar)}"
-            definitionDecompiler.decompile(binary, jvmTarget.copy(name = getter, kind = SourceDeclarationIdentity.Kind.FUNCTION), sourceDeclarationMatcher)
-        } else null
+    librarySources.find(target, virtualFile, packageName)?.let {
+        projectStructureProvider.registerLibrarySource(it.path, element)
+        return it
     }
+    val jvmDeclarations = if (element is KtElement) element.toLightElements() else listOf(element)
+    for (declaration in jvmDeclarations) {
+        val jvmTarget = SourceDeclarationIdentity.from(declaration) ?: continue
+        val binary = declaration.containingFile?.virtualFile ?: virtualFile ?: continue
+        definitionDecompiler.decompile(binary, jvmTarget, sourceDeclarationMatcher)?.let { return it }
+    }
+    if (element is KtElement && virtualFile != null) {
+        kotlinJvmFunction(virtualFile, target)?.let { (binary, jvmTarget) ->
+            definitionDecompiler.decompile(binary, jvmTarget, sourceDeclarationMatcher)?.let { return it }
+        }
+    }
+    return null
 }

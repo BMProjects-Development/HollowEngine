@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiManager
 import com.intellij.psi.impl.PsiFileEx
 import com.intellij.psi.impl.PsiManagerEx
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
@@ -25,6 +26,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.highlight.occurrencesCod
 import ru.hollowhorizon.hollowengine.common.ide.session.insight.findHoverInfo
 import ru.hollowhorizon.hollowengine.common.ide.session.insight.findSignatureHelp
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
+import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaKotlinSourceModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaScriptModule
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
@@ -115,21 +117,21 @@ class ScriptingAnalyzerImpl(
         files[name] = file
         activeFiles += name
         val imports = try {
-            resolveImports(file, files, activeFiles)
+            if (file.isScript()) resolveImports(file, files, activeFiles)
+            else ImportResolution(emptyList(), emptyList())
         } finally {
             activeFiles -= name
         }
         importDiagnostics[file] = imports.diagnostics
 
-        projectStructureProvider.setModule(
-            file, KaScriptModule(
-                file, project, buildList {
-                    addAll(libraries)
-                    addAll(importedModules(imports.files))
-                    add(builtins.kaModule)
-                }.distinct()
-            )
-        )
+        val dependencies = buildList {
+            addAll(libraries)
+            addAll(importedModules(imports.files))
+            add(builtins.kaModule)
+        }.distinct()
+        val module = if (file.isScript()) KaScriptModule(file, project, dependencies)
+        else KaKotlinSourceModule(file, dependencies, listOfNotNull(projectStructureProvider.librarySourceOwner(name)))
+        projectStructureProvider.setModule(file, module)
         return file
     }
 
@@ -337,7 +339,7 @@ class ScriptingAnalyzerImpl(
 }
 
 private fun removeFromPsiManager(file: KtFile) {
-    val psiManager = com.intellij.psi.PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
+    val psiManager = PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
     val fileManager = psiManager.fileManager
     fileManager.setViewProvider(file.virtualFile, null)
 }

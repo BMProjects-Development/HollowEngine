@@ -31,10 +31,26 @@ subprojects {
                 output.parentFile.mkdirs()
                 val mappedSources = classpath.files.map { it.resolveSibling("${it.nameWithoutExtension}-sources.jar") }
                     .filter { it.isFile }
-                output.writeText((directories + mappedSources + sources).map { it.absolutePath }.distinct().joinToString("\n"))
+                val gameSources = sourceProject.tasks.matching { it.name.startsWith("genSourcesWith") }
+                    .flatMap { it.outputs.files.files }.filter { it.isFile && it.name.endsWith("-sources.jar") }
+                output.writeText((directories + mappedSources + gameSources + sources).map { it.absolutePath }.distinct().joinToString("\n"))
             }
         }
         sourceManifests.from(collect)
+        plugins.withId("dev.architectury.loom") {
+            collect.configure { mustRunAfter(sourceProject.tasks.matching { it.name.startsWith("genSourcesWith") }) }
+        }
+    }
+    plugins.withId("dev.architectury.loom") {
+        tasks.matching {
+            it.name.startsWith("run") || it.name.startsWith("configure") && it.name.endsWith("Launch") ||
+                it.name in setOf("ideaSyncTask", "genEclipseRuns", "vscode")
+        }.configureEach {
+            dependsOn(":writeIdeSourceRoots")
+        }
+        tasks.matching { it.name.startsWith("genSourcesWith") }.configureEach {
+            finalizedBy(":writeIdeSourceRoots")
+        }
     }
 }
 
