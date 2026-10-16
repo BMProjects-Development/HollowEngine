@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.Image
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.Row
@@ -150,7 +151,7 @@ internal fun AnimatorGraphCanvas(
             menu = CanvasMenu(target, pointer.screenX, pointer.screenY, GraphPoint(pointer.graphX, pointer.graphY))
         },
         onKey = { input ->
-            handleKey(document, layerId, controller, selection, onSelect, input.key, input.control) {
+            handleKey(document, layerId, controller, selection, onSelect, input.key, input.modifiers) {
                 GraphPoint(view.toGraphX(canvas.width / 2f), view.toGraphY(canvas.height / 2f))
             }
         },
@@ -292,11 +293,11 @@ private fun handleKey(
     selection: AnimatorSelection,
     onSelect: (AnimatorSelection) -> Unit,
     key: Int,
-    control: Boolean,
+    modifiers: Int,
     middle: () -> GraphPoint,
 ): Boolean {
     when {
-        key == GLFW.GLFW_KEY_DELETE -> {
+        HollowKeys.DELETE.matches(key, modifiers) -> {
             when (selection) {
                 is AnimatorSelection.State -> document.edit {
                     if (selection.stateId == ANY_STATE) it.withoutAnyState(layerId) else it.withoutState(layerId, selection.stateId)
@@ -310,12 +311,12 @@ private fun handleKey(
 
         key == GLFW.GLFW_KEY_ESCAPE -> onSelect(AnimatorSelection.None)
 
-        key == GLFW.GLFW_KEY_E -> {
+        HollowKeys.ENTRY_STATE.matches(key, modifiers) -> {
             val target = selection as? AnimatorSelection.State ?: return false
             document.edit { it.withEntryState(layerId, target.stateId) }
         }
 
-        key == GLFW.GLFW_KEY_INSERT || control && key == GLFW.GLFW_KEY_N -> {
+        HollowKeys.ADD_NODE.matches(key, modifiers) -> {
             val id = freeStateId(controller)
             document.edit { it.withState(layerId, ClipStateSpec(id = id, animation = id), at = middle()) }
             onSelect(AnimatorSelection.State(layerId, id))

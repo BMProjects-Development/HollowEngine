@@ -1,4 +1,5 @@
 @import "hollowengine:ui/styles/theme.hss";
+@import "hollowengine:ui/styles/buttons.hss";
 
 .dropdown-button {
     height: 24px;
@@ -135,7 +136,7 @@
     border-radius: $radius;
 }
 
-.tree-filter-icon, .tree-filter-close {
+.tree-filter-icon, .tree-filter-close .button-icon {
     size: 12px 12px;
     tint: $text-soft;
 }
@@ -145,10 +146,6 @@
     padding: 2px;
     caret-color: $caret;
     selection-color: $selection;
-}
-
-.tree-filter-close:hover {
-    tint: $white;
 }
 
 .tree-item {

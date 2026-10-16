@@ -3,11 +3,11 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.Entity
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.editor.AttachmentGizmo
 import ru.hollowhorizon.hollowengine.client.editor.BoneGizmo
 import ru.hollowhorizon.hollowengine.client.editor.PartGizmo
 import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.NestedModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
@@ -269,7 +269,7 @@ internal object WorldObjectParts {
             val effect = effectEditing(ref, editing) ?: return false
             return handleVfxNodeKey(effect, EffectNodes(ref), key, modifiers, repeat = false)
         }
-        if (key != GLFW.GLFW_KEY_DELETE || modifiers != 0) return false
+        if (!HollowKeys.DELETE.matches(key, modifiers)) return false
         val node = objectParts.find(ref.path) ?: return false
         val id = ref.path.attachment ?: return false
         if (node.kind != PartKind.ATTACHMENT || node.inherited) return false

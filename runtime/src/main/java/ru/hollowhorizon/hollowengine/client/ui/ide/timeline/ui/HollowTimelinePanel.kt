@@ -149,10 +149,7 @@ fun HollowTimelineEditor(
             .style(TimelineStylesheet)
             .focusScope()
             .onKeyInput { input ->
-                if (keyboardActive) {
-                    if (!input.repeat) onKeyInput(input.key, input.modifiers)
-                    input.consume()
-                }
+                if (keyboardActive && !input.repeat && onKeyInput(input.key, input.modifiers)) input.consume()
             },
     ) {
         TimelineToolbar(controller, onCapture, onSave, onLoad, bump, features)
@@ -476,7 +473,7 @@ private fun SaveCutsceneDialog(session: CutsceneEditorSession, onClose: () -> Un
         )
         Row(modifier = Modifier.size(100.percent, UiLength.Auto).gap(8.px).align(horizontal = UiAlign.END)) {
             ToolbarButton(CutsceneLang.CANCEL.lang, "cutscene-save-cancel") { onClose() }
-            ToolbarButton(CutsceneLang.SAVE.lang, "cutscene-save-confirm", TimelineColors.Blue) {
+            ToolbarButton(CutsceneLang.SAVE.lang, "cutscene-save-confirm", primary = true) {
                 if (name.isNotBlank()) {
                     session.exportCutscene("", name.trim())
                     onClose()

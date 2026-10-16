@@ -8,7 +8,8 @@ import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.generated.Assets
 
@@ -230,57 +231,21 @@ private fun findStatusText(state: HollowIdeFindState, matchCount: Int, invalidRe
 }
 
 @Composable
-private fun FindToggle(label: String, tooltip: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Box(
-        tags = listOf("ide-find-toggle", if (checked) "on" else "off"),
-        modifier = Modifier.input(clickable = true, hoverable = true)
-            .cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                onChange(!checked)
-                event.consume()
-            }
-            .tooltipOnHover(tooltip),
-    ) {
-        Text(label, tags = listOf("ide-find-toggle-label"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
-}
+private fun FindToggle(label: String, tooltip: String, checked: Boolean, onChange: (Boolean) -> Unit) =
+    Button(label, active = checked, tooltip = tooltip, tags = listOf("ide-find-toggle")) { onChange(!checked) }
 
 @Composable
-private fun FindButton(icon: String, tooltip: String, flip: Boolean = false, action: () -> Unit) {
-    Box(
-        tags = listOf("ide-find-button"),
-        modifier = Modifier.input(clickable = true, hoverable = true)
-            .cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                action()
-                event.consume()
-            }
-            .tooltipOnHover(tooltip),
-    ) {
-        Image(
-            icon,
-            tags = listOf("ide-find-button-icon"),
-            modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
-                .let { if (flip) it.rotate(z = 180f) else it },
-        )
-    }
-}
+private fun FindButton(icon: String, tooltip: String, flip: Boolean = false, action: () -> Unit) = IconButton(
+    icon,
+    tooltip,
+    tags = listOf("ide-find-button"),
+    modifier = if (flip) Modifier.rotate(z = 180f) else Modifier,
+    onClick = action,
+)
 
 @Composable
-private fun FindTextButton(label: String, tooltip: String, action: () -> Unit) {
-    Box(
-        tags = listOf("ide-find-text-button"),
-        modifier = Modifier.input(clickable = true, hoverable = true)
-            .cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                action()
-                event.consume()
-            }
-            .tooltipOnHover(tooltip),
-    ) {
-        Text(label, modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER).textWrap(false))
-    }
-}
+private fun FindTextButton(label: String, tooltip: String, action: () -> Unit) =
+    Button(label, tooltip = tooltip, tags = listOf("ide-find-text-button"), onClick = action)
 
 private val ArrowIcon = Assets.Hollowengine.Textures.Gui.Icons.ARROW.toString()
 private val CrossIcon = Assets.Hollowengine.Textures.Gui.Icons.CROSS.toString()

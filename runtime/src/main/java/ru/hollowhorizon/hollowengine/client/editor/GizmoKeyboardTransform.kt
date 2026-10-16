@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.editor
 
 import net.minecraft.world.phys.Vec3
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
@@ -23,7 +24,7 @@ enum class GizmoKeyResult {
 }
 
 /**
- * A transform started from the keyboard, the way Blender does it: T, R or S begins it where the pointer
+ * A transform started from the keyboard, the way Blender does it: G, R or S begins it where the pointer
  * is, the pointer drives it, X, Y or Z holds it to an axis (the world's first, the object's own on a
  * second press, free again on a third), a click or Enter applies it and Escape or the right button puts
  * the object back. Scale is always along the object's own axes.
@@ -52,15 +53,18 @@ class GizmoKeyboardTransform(
     /** Where the pointer at ([x], [y]) takes the object, or null while it cannot tell. */
     fun update(x: Float, y: Float, modifiers: Int): GizmoTransformValues? = manipulator.update(drag, x, y, modifiers)
 
-    fun key(key: Int): GizmoKeyResult = when (key) {
-        GLFW.GLFW_KEY_X, GLFW.GLFW_KEY_Y, GLFW.GLFW_KEY_Z -> {
-            constrain(key - GLFW.GLFW_KEY_X)
-            GizmoKeyResult.CHANGED
-        }
+    fun key(key: Int, modifiers: Int): GizmoKeyResult {
+        val axis = AXIS_ACTIONS.indexOfFirst { it.matches(key, modifiers) }
+        return when {
+            axis >= 0 -> {
+                constrain(axis)
+                GizmoKeyResult.CHANGED
+            }
 
-        GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> GizmoKeyResult.CONFIRMED
-        GLFW.GLFW_KEY_ESCAPE -> GizmoKeyResult.CANCELLED
-        else -> GizmoKeyResult.IGNORED
+            key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER -> GizmoKeyResult.CONFIRMED
+            key == GLFW.GLFW_KEY_ESCAPE -> GizmoKeyResult.CANCELLED
+            else -> GizmoKeyResult.IGNORED
+        }
     }
 
     fun click(button: Int): GizmoKeyResult =
@@ -76,8 +80,12 @@ class GizmoKeyboardTransform(
     val hint: String
         get() {
             val held = axis?.let { "XYZ"[it] + if (local) " " + "hollowengine.gui.ide.gizmo.local".lang else "" }
-            return listOfNotNull("hollowengine.gui.ide.gizmo.${mode.name.lowercase()}".lang, held, "hollowengine.gui.ide.gizmo.keys".lang)
-                .joinToString("  ·  ")
+            val axes = AXIS_ACTIONS.joinToString("/") { it.shortcut ?: "-" }
+            return listOfNotNull(
+                "hollowengine.gui.ide.gizmo.${mode.name.lowercase()}".lang,
+                held,
+                "hollowengine.gui.ide.gizmo.keys".lang(axes)
+            ).joinToString("  ·  ")
         }
 
     /**
@@ -137,13 +145,15 @@ class GizmoKeyboardTransform(
     private fun Vec3f.toVec3() = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
 
     companion object {
-        /** The transform T, R or S starts, or null for any other key. */
-        fun modeFor(key: Int): GizmoEditMode? = when (key) {
-            GLFW.GLFW_KEY_T -> GizmoEditMode.TRANSLATE
-            GLFW.GLFW_KEY_R -> GizmoEditMode.ROTATE
-            GLFW.GLFW_KEY_S -> GizmoEditMode.SCALE
+        /** The transform a key starts (G, R or S unless rebound), or null for any other key. */
+        fun modeFor(key: Int, modifiers: Int): GizmoEditMode? = when {
+            HollowKeys.GRAB.matches(key, modifiers) -> GizmoEditMode.TRANSLATE
+            HollowKeys.ROTATE.matches(key, modifiers) -> GizmoEditMode.ROTATE
+            HollowKeys.SCALE.matches(key, modifiers) -> GizmoEditMode.SCALE
             else -> null
         }
+
+        private val AXIS_ACTIONS = listOf(HollowKeys.AXIS_X, HollowKeys.AXIS_Y, HollowKeys.AXIS_Z)
 
         private const val GUIDE_REACH_PIXELS = 4000f
         private const val GUIDE_WIDTH = 1.5f

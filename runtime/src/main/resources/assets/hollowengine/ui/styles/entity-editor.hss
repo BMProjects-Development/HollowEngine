@@ -258,7 +258,7 @@
     wrap: false;
 }
 
-.ee-card-remove { tint: $danger; }
+.ee-card-remove .button-icon { tint: $danger; }
 
 .ee-card-body {
     size: 100% fit;

@@ -30,7 +30,6 @@ class EditableFieldSearchMatchTest {
 
     @Test
     fun `a match spanning a line break is split across both rows`() {
-        // "two\nthree" — one range covering the newline.
         val buckets = bucketSearchMatchesByLine(lines, listOf(4..12), active = null)
         assertEquals(EditableFieldSearchMatch(4, 7, active = false), buckets[0].single())
         assertEquals(EditableFieldSearchMatch(0, 5, active = false), buckets[1].single())

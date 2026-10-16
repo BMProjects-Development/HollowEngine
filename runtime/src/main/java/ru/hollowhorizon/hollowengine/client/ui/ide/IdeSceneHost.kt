@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
@@ -109,7 +110,7 @@ internal fun SceneHeaderActions() {
             PanelActionButton(
                 id = "scene-search-button",
                 icon = SceneSearchIcon,
-                tooltip = "hollowengine.gui.ide.windows.scene_search".lang,
+                tooltip = HollowKeys.FIND.hint("hollowengine.gui.ide.windows.scene_search".lang),
                 active = filter.expanded,
             ) {
                 if (filter.expanded) filter.close() else filter.open()

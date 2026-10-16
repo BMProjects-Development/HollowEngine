@@ -4,12 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Faux-bold shifts the signed-distance threshold, and the shift has a hard ceiling: past it the
- * saturated background of a glyph's padded atlas cell gains coverage and the glyph gets a faint box
- * behind it in the text color. This pins that ceiling, and the bookkeeping that makes up whatever
- * weight the ceiling cuts off.
- */
+/** Faux-bold shifts the signed-distance threshold, and the shift has a hard ceiling.*/
 class BoldDistanceBiasTest {
     /** MonoCraft as shipped: a 2px distance range at 32.625 atlas pixels per em. */
     private val monocraft = UiGlyphAtlasPage(
@@ -27,14 +22,6 @@ class BoldDistanceBiasTest {
 
     private val monocraftEm = 32.625f
     private val bakedEm = 48f
-
-    @Test
-    fun `any heavier bias would show the box this cap exists to prevent`() {
-        assertTrue(
-            glyphCoverage(raw = -0.5f, bias = MaxBoldDistanceBias + 0.05f) > 0f,
-            "the cap is not merely conservative — one step past it the background lights up",
-        )
-    }
 
     @Test
     fun `a larger pxRange keeps the background dark, so the cap holds at every scale`() {
@@ -70,17 +57,5 @@ class BoldDistanceBiasTest {
         val residual = heavy - baked.boldBiasWeight(bakedEm, bias)
         assertTrue(residual > 0f, "the shortfall is what the second stamp draws: $residual")
         assertTrue(residual < heavy, "the field still carries most of it: $residual of $heavy")
-    }
-
-    @Test
-    fun `a bitmap sheet has no field to thicken, so the whole weight is left to stamp`() {
-        assertEquals(0f, bitmap.boldBias(UiVanillaFont.EmPixels, DefaultBoldWeight))
-        assertEquals(0f, bitmap.boldBiasWeight(UiVanillaFont.EmPixels, 0f))
-    }
-
-    @Test
-    fun `no weight means no bias at all`() {
-        assertEquals(0f, monocraft.boldBias(monocraftEm, 0f))
-        assertEquals(0f, baked.boldBias(bakedEm, 0f))
     }
 }

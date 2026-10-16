@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 
 @Composable
 internal fun PanelActions(content: HollowUiContent) {
@@ -16,17 +16,4 @@ internal fun PanelActionButton(
     tooltip: String,
     active: Boolean = false,
     onClick: () -> Unit,
-) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOfNotNull("panel-action", "active".takeIf { active }),
-        modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).tooltipOnHover(tooltip)
-            .onClick { event ->
-                onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("panel-action-icon"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
-}
+) = IconButton(icon, tooltip, id = id, active = active, tags = listOf("panel-action"), onClick = onClick)

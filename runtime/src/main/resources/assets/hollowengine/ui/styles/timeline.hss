@@ -25,34 +25,9 @@
     align-items: start center;
 }
 
-.timeline-button {
-    size: fit fit;
-    padding: 3px;
-    border-radius: $radius-small;
-    background: transparent;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
+.timeline-text-button {
+    height: 20px;
 }
-
-.timeline-button:hover { background: $bg-hover; }
-
-.timeline-button.active { background: $bg-selected; }
-
-.timeline-button-icon {
-    size: 12px 12px;
-    tint: $text-soft;
-    transition: tint 110ms ease-out;
-}
-
-.timeline-button:hover .timeline-button-icon { tint: $white; }
-
-.timeline-button.active .timeline-button-icon { tint: $accent; }
-
-/* Auto-keying reads as recording: red, not the accent of an ordinary toggle. */
-.timeline-button.record.active { background: $danger-soft; }
-
-.timeline-button.record.active .timeline-button-icon { tint: $danger; }
 
 .timeline-separator {
     size: 1px 12px;
@@ -167,28 +142,17 @@
 }
 
 .timeline-row-toggle {
-    size: fit fit;
     padding: 2px;
-    border-radius: $radius-small;
-    background: transparent;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
 }
 
-.timeline-row-toggle:hover { background: $bg-hover; }
-
-.timeline-row-icon {
+.timeline-row-toggle .button-icon {
     size: 10px 10px;
     tint: $text-faint;
-    transition: tint 110ms ease-out;
 }
 
-.timeline-row-toggle:hover .timeline-row-icon { tint: $white; }
+.timeline-row-toggle.on .button-icon { tint: $text-soft; }
 
-.timeline-row-toggle.on .timeline-row-icon { tint: $text-soft; }
-
-.timeline-row-toggle.warn .timeline-row-icon { tint: $accent; }
+.timeline-row-toggle:hover .button-icon { tint: $white; }
 
 /* Taking a track off the list is rare; the cross only shows on the row the pointer is on. */
 .timeline-row-toggle.hide-track {

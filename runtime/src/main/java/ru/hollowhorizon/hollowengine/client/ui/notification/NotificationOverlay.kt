@@ -2,9 +2,10 @@ package ru.hollowhorizon.hollowengine.client.ui.notification
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.MinecraftHssResourceLoader
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
@@ -82,18 +83,9 @@ private fun NotificationCard(notification: Notification) {
                 ActionButton(notification, action)
             }
             if (notification.closable) {
-                Image(
-                    CloseIcon,
-                    id = "notif-close-${notification.id}",
-                    tags = listOf("notif-close"),
-                    modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
-                        .onClick { event ->
-                            if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-                                HollowNotifications.dismiss(notification.id)
-                            }
-                            event.consume()
-                        },
-                )
+                IconButton(CloseIcon, tooltip = null, id = "notif-close-${notification.id}", tags = listOf("notif-close")) {
+                    HollowNotifications.dismiss(notification.id)
+                }
             }
         }
 
@@ -102,19 +94,11 @@ private fun NotificationCard(notification: Notification) {
 }
 
 @Composable
-private fun ActionButton(notification: Notification, action: NotificationAction) {
-    Box(
-        id = "notif-action-${notification.id}-${action.label}",
-        mode = UiBoxMode.STACK,
-        tags = listOf("notif-action"),
-        modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
-            if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) HollowNotifications.run(notification, action)
-            event.consume()
-        },
-    ) {
-        Text(action.label, tags = listOf("notif-action-label"))
-    }
-}
+private fun ActionButton(notification: Notification, action: NotificationAction) = Button(
+    action.label,
+    id = "notif-action-${notification.id}-${action.label}",
+    tags = listOf("notif-action"),
+) { HollowNotifications.run(notification, action) }
 
 @Composable
 private fun ProgressBar(progress: Float) {

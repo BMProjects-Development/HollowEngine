@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
@@ -88,7 +89,7 @@ fun <T> UiTreeView(
     Column(
         tags = listOf("tree-view") + tags,
         modifier = modifier.focus().onKeyInput(FilterShortcutPriority) { input ->
-            if (filterState == null || input.repeat || !input.command || input.key != GLFW.GLFW_KEY_F) {
+            if (filterState == null || input.repeat || !HollowKeys.FIND.matches(input)) {
                 return@onKeyInput
             }
             filterState.open()
@@ -108,15 +109,17 @@ fun <T> UiTreeView(
         var treeWidth by remember { mutableStateOf(0f) }
         Column(
             tags = listOf("tree-view-scroll"),
-            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState).onPlaced { treeWidth = it.width }.then(
-                if (onBackgroundClick == null && onBackgroundContextMenu == null) Modifier else Modifier.input(clickable = true).onClick { event ->
-                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && onBackgroundContextMenu != null) {
-                        onBackgroundContextMenu(event)
-                    } else {
-                        onBackgroundClick?.invoke()
-                    }
-                    event.consume()
-                },
+            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState)
+                .onPlaced { treeWidth = it.width }.then(
+                if (onBackgroundClick == null && onBackgroundContextMenu == null) Modifier else Modifier.input(clickable = true)
+                    .onClick { event ->
+                        if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && onBackgroundContextMenu != null) {
+                            onBackgroundContextMenu(event)
+                        } else {
+                            onBackgroundClick?.invoke()
+                        }
+                        event.consume()
+                    },
             ),
         ) {
             // A long tree composes only the rows in view, with spacers standing in for the rest: rows are all one height.
@@ -127,8 +130,17 @@ fun <T> UiTreeView(
                 val item = items[index]
                 key(item.id) {
                     UiTreeRow(
-                        item, continuations[index], onToggle, onSelect, onIconClick, fillRowWidth, treeWidth, onDrop, canDrop,
-                        draggable = dragItem != null, virtual = virtual,
+                        item,
+                        continuations[index],
+                        onToggle,
+                        onSelect,
+                        onIconClick,
+                        fillRowWidth,
+                        treeWidth,
+                        onDrop,
+                        canDrop,
+                        draggable = dragItem != null,
+                        virtual = virtual,
                     ) {
                         dragItem?.invoke(item)
                     }
@@ -169,7 +181,10 @@ private fun UiTreeFilter(
     placeholder: String,
     onClose: () -> Unit,
 ) {
-    Row(tags = listOf("tree-filter-row"), modifier = Modifier.dropTarget(accepts = { false }, onDrop = { _, _, _ -> false })) {
+    Row(
+        tags = listOf("tree-filter-row"),
+        modifier = Modifier.dropTarget(accepts = { false }, onDrop = { _, _, _ -> false })
+    ) {
         Image(SearchIcon, tags = listOf("tree-filter-icon"))
         TextField(
             value = state.query,
@@ -183,14 +198,7 @@ private fun UiTreeFilter(
                 input.consume()
             },
         )
-        Image(
-            CloseIcon,
-            tags = listOf("tree-filter-close"),
-            modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-                onClose()
-                event.consume()
-            },
-        )
+        IconButton(CloseIcon, tooltip = null, tags = listOf("inline", "tree-filter-close"), onClick = onClose)
     }
 }
 
@@ -237,10 +245,17 @@ private fun <T> UiTreeRow(
                 Box(tags = listOfNotNull("tree-indent", guide))
             }
         }
-        UiTreeRowContent(item, id, width, minimum, onToggle, onIconClick, dragAndDrop, virtual, Modifier
-            .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
-            .dragSource(dragSource, drag)
-            .then(dropModifier))
+        UiTreeRowContent(
+            item,
+            id,
+            width,
+            minimum,
+            onToggle,
+            onIconClick,
+            dragAndDrop,
+            virtual,
+            Modifier.then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
+                .dragSource(dragSource, drag).then(dropModifier))
     }
 }
 
@@ -258,15 +273,16 @@ private fun <T> UiTreeRowContent(
 ) {
     Row(
         id = id,
-        tags = listOfNotNull("tree-item", "selected".takeIf { item.selected }, "virtual".takeIf { virtual },
+        tags = listOfNotNull(
+            "tree-item",
+            "selected".takeIf { item.selected },
+            "virtual".takeIf { virtual },
             if (dragAndDrop?.hoveredTargetId == id) {
                 if (dragAndDrop.canDrop) "drop-target" else "drop-rejected"
-            } else null),
-        modifier = Modifier.size(width, TreeRowHeight.px).then(minimum)
-            .alignItems(vertical = UiAlign.CENTER)
-            .input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND)
-            .then(interaction)
+            } else null
+        ),
+        modifier = Modifier.size(width, TreeRowHeight.px).then(minimum).alignItems(vertical = UiAlign.CENTER)
+            .input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).then(interaction)
     ) {
         repeat(item.depth) { Box(tags = listOf("tree-indent-space")) }
         Box(
@@ -281,9 +297,7 @@ private fun <T> UiTreeRowContent(
         )
         if (item.icon != null) {
             val iconModifier = if (onIconClick != null) {
-                Modifier.input(hoverable = true, clickable = true)
-                    .cursor(UiCursorShape.HAND)
-                    .onClick { event ->
+                Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
                         onIconClick(item)
                         event.consume()
                     }

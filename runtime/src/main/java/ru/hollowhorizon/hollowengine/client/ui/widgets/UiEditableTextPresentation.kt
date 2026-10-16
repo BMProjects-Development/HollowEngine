@@ -16,7 +16,6 @@ internal fun rememberEditableTextPresentation(
     val cache = remember { EditableTextPresentationCache() }
     val safeCaret = normalizePresentationCaret(caret, text.length)
     val deferredAnalyzer = highlighter as? UiDeferredTextAnalyzer
-    // Only caret-aware highlighters (occurrence brackets/identifiers) re-analyze on caret moves.
     val analysisCaretKey = when {
         deferredAnalyzer != null -> safeCaret
         highlighter is UiDeferredSyntaxHighlighter -> UiNoCaretOffset
@@ -124,18 +123,12 @@ internal class EditableTextPresentationCache {
         estimate = presentation
     }
 
-    /**
-     * Inlays already computed for [text] under the same [inlayHintsProvider]/[inlayRevision] — i.e. this
-     * is a caret-only change. Reused so the inlays don't blink for a frame while a caret-driven highlight
-     * re-analysis re-queries a provider that is momentarily empty (mid-analysis). Null if nothing matches.
-     */
+    /** Inlays already computed for [text] under the same [inlayHintsProvider]/[inlayRevision]. Null if nothing matches. */
     fun reusableInlays(
         text: String,
         inlayHintsProvider: UiInlayHintsProvider?,
         inlayRevision: Long,
     ): List<UiInlayHint>? {
-        // Only reuse from an already-accepted EXACT analysis of this exact text+revision (a caret-only
-        // change). Never from the initial estimate, or we'd clobber the first real analysis with empties.
         if (!exact.hasText) return null
         if (exact.textHash != text.hashCode() || exact.textLength != text.length) return null
         if (exact.inlayHintsProvider !== inlayHintsProvider || exact.inlayRevision != inlayRevision) return null
@@ -164,8 +157,7 @@ internal data class EditableTextPresentation(
         inlayRevision: Long,
     ): Boolean {
         return textHash == text.hashCode() && textLength == text.length && this.caret == normalizePresentationCaret(
-            caret,
-            text.length
+            caret, text.length
         ) && this.highlighter === highlighter && this.inlayHintsProvider === inlayHintsProvider && this.inlayRevision == inlayRevision
     }
 
@@ -204,9 +196,7 @@ internal data class EditableTextPresentation(
         }
         val shiftedInlays = when {
             nextInlayHintsProvider != null || nextHighlighter is UiDeferredTextAnalyzer -> shiftTextInlayHintsThroughEdit(
-                text,
-                nextText,
-                inlayHints
+                text, nextText, inlayHints
             )
 
             else -> staticInlayHints

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import ru.hollowhorizon.hollowengine.client.editor.EditorMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.TransformGizmoEditor
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockLang
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockingState
 import ru.hollowhorizon.hollowengine.client.ui.docking.isOnScreen
@@ -47,8 +48,8 @@ internal fun hollowIdeFileMenuItems(
 ): List<UiDropdownItem> {
     val focused = focusedFile()
     return listOfNotNull(
-        UiDropdownItem("$MenuLang.search".lang, SearchIcon, shortcut = "Ctrl+N", onClick = onSearch),
-        UiDropdownItem("$MenuLang.save".lang, SaveIcon, enabled = focused != null, shortcut = "Ctrl+S", separatorBefore = true) {
+        UiDropdownItem("$MenuLang.search".lang, SearchIcon, shortcut = HollowKeys.SEARCH.shortcut, onClick = onSearch),
+        UiDropdownItem("$MenuLang.save".lang, SaveIcon, enabled = focused != null, shortcut = HollowKeys.SAVE.shortcut, separatorBefore = true) {
             focused?.let { file ->
                 model.save(file.path)
                 dock.updateItem(file.dockItem())
@@ -62,7 +63,7 @@ internal fun hollowIdeFileMenuItems(
             label = "$MenuLang.reformat".lang,
             icon = ReformatIcon,
             enabled = focused != null && canReformat(focused),
-            shortcut = "Ctrl+Alt+L",
+            shortcut = HollowKeys.FORMAT.shortcut,
         ) {
             focused?.let(onReformat)
         },
@@ -182,10 +183,10 @@ internal fun hollowIdeToolMenuItems(
     )
 }
 
-internal fun hollowIdeHelpMenuItems(onShowShortcuts: () -> Unit): List<UiDropdownItem> {
+internal fun hollowIdeHelpMenuItems(onShowKeymap: () -> Unit): List<UiDropdownItem> {
     return listOf(
         UiDropdownItem("hollowengine.gui.ide.docs".lang, DocsIcon) { openUrl(DocsUrl) },
-        UiDropdownItem("$MenuLang.shortcuts".lang, KeyboardIcon, onClick = onShowShortcuts),
+        UiDropdownItem("$MenuLang.shortcuts".lang, KeyboardIcon, shortcut = HollowKeys.KEYMAP.shortcut, onClick = onShowKeymap),
         UiDropdownItem("GitHub", GitHubIcon, separatorBefore = true) { openUrl(RepositoryUrl) },
         UiDropdownItem("Telegram", TelegramIcon) { openUrl("https://t.me/hollowengine") },
         UiDropdownItem("Discord", DiscordIcon) { openUrl("https://discord.gg/qKpPhkwGCY") },

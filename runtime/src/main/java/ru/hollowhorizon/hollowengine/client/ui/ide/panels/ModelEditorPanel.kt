@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -132,11 +133,8 @@ private fun ModelAnimationBar(viewer: ModelViewerState, frameTick: State<Long>) 
             )
 
             val playing = viewer.isPlaying(viewer.selectedAnimation)
-            Box(
-                tags = if (playing) listOf("model-play", "active") else listOf("model-play"),
-                modifier = Modifier.cursor(UiCursorShape.HAND).onClick { viewer.togglePlayback() },
-            ) {
-                Image(if (playing) PauseIcon else PlayIcon, tags = listOf("model-play-icon"))
+            IconButton(if (playing) PauseIcon else PlayIcon, tooltip = null, active = playing, tags = listOf("model-play")) {
+                viewer.togglePlayback()
             }
         }
 

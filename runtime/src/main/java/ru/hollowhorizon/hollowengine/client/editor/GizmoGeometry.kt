@@ -15,11 +15,7 @@ data class Pt(val x: Float, val y: Float)
 
 /** Which manipulator a screen handle drives. */
 enum class GizmoHandleId {
-    AXIS_X, AXIS_Y, AXIS_Z,
-    PLANE_X, PLANE_Y, PLANE_Z,
-    ROTATE_X, ROTATE_Y, ROTATE_Z,
-    SCALE_X, SCALE_Y, SCALE_Z,
-    CENTER, SCALE_UNIFORM,
+    AXIS_X, AXIS_Y, AXIS_Z, PLANE_X, PLANE_Y, PLANE_Z, ROTATE_X, ROTATE_Y, ROTATE_Z, SCALE_X, SCALE_Y, SCALE_Z, CENTER, SCALE_UNIFORM,
 }
 
 /** The screen shape a handle is hit-tested against (see [GizmoPicker]). */
@@ -88,7 +84,8 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         val ly = Vec3f.Y_AXIS.rotateBy(rotation)
         val lz = Vec3f.Z_AXIS.rotateBy(rotation)
         val translate = GizmoEditMode.TRANSLATE in modes
-        val combined = modes.size > 1
+        val rotate = GizmoEditMode.ROTATE in modes
+        val ringRadius = if (modes.size > 1) COMBINED_RING_RADIUS_PX else RING_RADIUS_PX
 
         return buildList {
             if (translate) {
@@ -101,14 +98,23 @@ class GizmoGeometry(private val projector: GizmoProjector) {
                 planeQuad(GizmoHandleId.PLANE_X, origin, wx, wy, wz, perPixel, GizmoColors.AXIS_X)?.let(::add)
                 planeQuad(GizmoHandleId.PLANE_Y, origin, wy, wz, wx, perPixel, GizmoColors.AXIS_Y)?.let(::add)
                 planeQuad(GizmoHandleId.PLANE_Z, origin, wz, wx, wy, perPixel, GizmoColors.AXIS_Z)?.let(::add)
-                add(discHandle(GizmoHandleId.CENTER, origin, originPt, CENTER_RADIUS_PX, GizmoColors.CENTER, originScreen.depth))
+                add(
+                    discHandle(
+                        GizmoHandleId.CENTER, origin, originPt, CENTER_RADIUS_PX, GizmoColors.CENTER, originScreen.depth
+                    )
+                )
             }
 
-            if (GizmoEditMode.ROTATE in modes) {
-                val radius = if (combined) COMBINED_RING_RADIUS_PX else RING_RADIUS_PX
-                rotationRing(GizmoHandleId.ROTATE_X, origin, lx, ly, lz, perPixel, radius, GizmoColors.AXIS_X)?.let(::add)
-                rotationRing(GizmoHandleId.ROTATE_Y, origin, ly, lz, lx, perPixel, radius, GizmoColors.AXIS_Y)?.let(::add)
-                rotationRing(GizmoHandleId.ROTATE_Z, origin, lz, lx, ly, perPixel, radius, GizmoColors.AXIS_Z)?.let(::add)
+            if (rotate) {
+                rotationRing(GizmoHandleId.ROTATE_X, origin, lx, ly, lz, perPixel, ringRadius, GizmoColors.AXIS_X)?.let(
+                    ::add
+                )
+                rotationRing(GizmoHandleId.ROTATE_Y, origin, ly, lz, lx, perPixel, ringRadius, GizmoColors.AXIS_Y)?.let(
+                    ::add
+                )
+                rotationRing(GizmoHandleId.ROTATE_Z, origin, lz, lx, ly, perPixel, ringRadius, GizmoColors.AXIS_Z)?.let(
+                    ::add
+                )
             }
 
             if (GizmoEditMode.SCALE in modes) {
@@ -117,10 +123,10 @@ class GizmoGeometry(private val projector: GizmoProjector) {
                 scaleAxis(GizmoHandleId.SCALE_X, origin, lx, basis, perPixel, translate, GizmoColors.AXIS_X)?.let(::add)
                 scaleAxis(GizmoHandleId.SCALE_Y, origin, ly, basis, perPixel, translate, GizmoColors.AXIS_Y)?.let(::add)
                 scaleAxis(GizmoHandleId.SCALE_Z, origin, lz, basis, perPixel, translate, GizmoColors.AXIS_Z)?.let(::add)
-                if (!translate) {
-                    cubeHandle(GizmoHandleId.SCALE_UNIFORM, origin, basis, perPixel * (SCALE_CUBE_PX + 1.5f), GizmoColors.CENTER)
-                        ?.let(::add)
-                }
+                val depth = originScreen.depth
+                if (!translate) add(screenRing(origin, originPt, UNIFORM_INNER_RADIUS_PX, depth))
+                val outer = if (rotate) ringRadius + UNIFORM_RING_GAP_PX else UNIFORM_OUTER_RADIUS_PX
+                add(screenRing(origin, originPt, outer, depth))
             }
         }
     }
@@ -162,7 +168,15 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         return convexHull(points)
     }
 
-    private fun planeQuad(id: GizmoHandleId, origin: Vec3, normal: Vec3f, spanA: Vec3f, spanB: Vec3f, perPixel: Float, color: UiColor): GizmoHandle? {
+    private fun planeQuad(
+        id: GizmoHandleId,
+        origin: Vec3,
+        normal: Vec3f,
+        spanA: Vec3f,
+        spanB: Vec3f,
+        perPixel: Float,
+        color: UiColor,
+    ): GizmoHandle? {
         val length = perPixel * AXIS_LENGTH_PX
         val offset = length * PLANE_OFFSET
         val half = length * PLANE_HALF
@@ -286,23 +300,20 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         return GizmoHandle(
             id, origin, direction, lines,
             fillPolygon = cube, color = color, width = AXIS_WIDTH, depth = end.depth,
-            pick = if (besideArrows) PickPrimitive.Polygon(cube) else PickPrimitive.Line(listOf(startPt, endPt), closed = false),
+            pick = if (besideArrows) PickPrimitive.Polygon(cube) else PickPrimitive.Line(
+                listOf(startPt, endPt), closed = false
+            ),
             emphasis = facingEmphasis(origin, direction),
         )
     }
 
-    private fun cubeHandle(
-        id: GizmoHandleId,
-        origin: Vec3,
-        basis: Triple<Vec3f, Vec3f, Vec3f>,
-        half: Float,
-        color: UiColor,
-    ): GizmoHandle? {
-        val cube = projectedCube(origin, basis, half) ?: return null
-        val depth = projector.project(origin)?.depth ?: return null
+    /** A circle facing the view around [center] that scales evenly, picked along its line. */
+    private fun screenRing(origin: Vec3, center: Pt, radiusPx: Float, depth: Float): GizmoHandle {
+        val circle = screenCircle(center, radiusPx)
         return GizmoHandle(
-            id, origin, worldAxis = null, listOf(GizmoStroke(cube, closed = true)), fillPolygon = cube,
-            color = color, width = RING_WIDTH, depth = depth, pick = PickPrimitive.Polygon(cube),
+            GizmoHandleId.SCALE_UNIFORM, origin, worldAxis = null, listOf(GizmoStroke(circle, closed = true)),
+            fillPolygon = null, color = GizmoColors.CENTER, width = RING_WIDTH, depth = depth,
+            pick = PickPrimitive.Line(circle, closed = true),
         )
     }
 
@@ -323,7 +334,14 @@ class GizmoGeometry(private val projector: GizmoProjector) {
 
     private val SIGNS = floatArrayOf(-1f, 1f)
 
-    private fun discHandle(id: GizmoHandleId, origin: Vec3, center: Pt, radiusPx: Float, color: UiColor, depth: Float): GizmoHandle {
+    private fun discHandle(
+        id: GizmoHandleId,
+        origin: Vec3,
+        center: Pt,
+        radiusPx: Float,
+        color: UiColor,
+        depth: Float,
+    ): GizmoHandle {
         return GizmoHandle(
             id, origin, worldAxis = null, listOf(GizmoStroke(screenCircle(center, radiusPx), closed = true)),
             fillPolygon = null, color = color, width = 2f, depth = depth, pick = PickPrimitive.Disc(center, radiusPx),
@@ -348,13 +366,19 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         fun cross(o: Pt, a: Pt, b: Pt) = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
         val hull = ArrayList<Pt>(sorted.size + 1)
         for (point in sorted) {
-            while (hull.size >= 2 && cross(hull[hull.size - 2], hull[hull.size - 1], point) <= 0f) hull.removeAt(hull.size - 1)
+            while (hull.size >= 2 && cross(
+                    hull[hull.size - 2], hull[hull.size - 1], point
+                ) <= 0f
+            ) hull.removeAt(hull.size - 1)
             hull += point
         }
         val lowerSize = hull.size + 1
         for (i in sorted.size - 2 downTo 0) {
             val point = sorted[i]
-            while (hull.size >= lowerSize && cross(hull[hull.size - 2], hull[hull.size - 1], point) <= 0f) hull.removeAt(hull.size - 1)
+            while (hull.size >= lowerSize && cross(
+                    hull[hull.size - 2], hull[hull.size - 1], point
+                ) <= 0f
+            ) hull.removeAt(hull.size - 1)
             hull += point
         }
         hull.removeAt(hull.size - 1)
@@ -374,7 +398,13 @@ class GizmoGeometry(private val projector: GizmoProjector) {
      * The filled sector between [startAngle] and [endAngle] (radians) in the plane perpendicular to
      * [axis], for the rotation drag readout. Basis matches [GizmoManipulator.anglePlane].
      */
-    fun buildRotationSector(origin: Vec3, axis: Vec3, startAngle: Double, endAngle: Double, perPixel: Float): List<Pt>? {
+    fun buildRotationSector(
+        origin: Vec3,
+        axis: Vec3,
+        startAngle: Double,
+        endAngle: Double,
+        perPixel: Float,
+    ): List<Pt>? {
         val radius = perPixel * RING_RADIUS_PX * 0.92f
         val u = perpendicular(axis)
         val v = axis.cross(u)
@@ -458,6 +488,9 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         private const val CONE_SEGMENTS = 16
         private const val COMBINED_RING_RADIUS_PX = 52f
         private const val COMBINED_SCALE_LENGTH_PX = 24f
+        private const val UNIFORM_INNER_RADIUS_PX = 12f
+        private const val UNIFORM_OUTER_RADIUS_PX = 48f
+        private const val UNIFORM_RING_GAP_PX = 10f
         private const val AWAY_DIMMING = 0.6f
         private const val RING_BACK_EMPHASIS = 0.3f
         private const val EDGE_ON_PLANE_EMPHASIS = 0.35f

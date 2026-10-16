@@ -3,8 +3,8 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.montage
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
@@ -19,6 +19,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PREVIEW_RESET_ICON
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
@@ -157,7 +158,9 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
 
     Column(
         tags = listOf("ide-file-panel"),
-        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas).focusScope(),
+        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas).focusScope().onKeyInput { input ->
+            if (!input.repeat && TimelineKeys.handlePlayback(session.timeline, input.key, input.modifiers)) input.consume()
+        },
     ) {
         document.error?.let { message ->
             Text(
@@ -168,7 +171,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
             key(rigState) {
                 RigViewport(state.rigs, rigState, null) { input ->
-                    val keying = input.key == GLFW.GLFW_KEY_K && !input.control && !input.alt && !input.repeat
+                    val keying = !input.repeat && HollowKeys.INSERT_KEY.matches(input)
                     if (keying) session.keyPicked(rigState.selected, rigState.selectedPart)
                     keying
                 }
@@ -190,12 +193,12 @@ private fun Toolbar(state: MontageEditorState) {
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
         AnimatorIconButton(
             icon = if (timeline.isPlaying) PauseIcon else PlayIcon,
-            tooltip = montageText(if (timeline.isPlaying) "pause" else "play"),
+            tooltip = HollowKeys.PLAY.hint(montageText(if (timeline.isPlaying) "pause" else "play")),
             size = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
         AnimatorIconButton(PREVIEW_RESET_ICON, playbackText("preview_reset"), size = 12f) { state.preview.reset() }
-        AnimatorIconButton(KeyIcon, montageText("key_picked"), size = 12f) {
+        AnimatorIconButton(KeyIcon, HollowKeys.INSERT_KEY.hint(montageText("key_picked")), size = 12f) {
             state.session.keyPicked(rigState.selected, rigState.selectedPart)
         }
         AnimatorIconButton(

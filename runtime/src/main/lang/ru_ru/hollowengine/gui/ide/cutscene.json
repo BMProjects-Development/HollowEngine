@@ -73,7 +73,7 @@
   "track.remove": "Убрать из списка",
   "action.to_start": "В начало (Home)",
   "action.to_end": "В конец",
-  "action.play": "Пуск или пауза (Пробел)",
+  "action.play": "Пуск или пауза",
   "action.prev_key": "Предыдущий ключ (Вниз)",
   "action.next_key": "Следующий ключ (Вверх)",
   "action.zoom_in": "Приблизить (Ctrl+колесо)",

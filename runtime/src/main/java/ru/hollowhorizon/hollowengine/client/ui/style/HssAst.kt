@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
-import ru.hollowhorizon.hollowengine.client.ui.UiNode
-import ru.hollowhorizon.hollowengine.client.ui.UiState
-import ru.hollowhorizon.hollowengine.client.ui.attributeValue
-import ru.hollowhorizon.hollowengine.client.ui.hasAttribute
-import ru.hollowhorizon.hollowengine.client.ui.hasEffectiveStates
+import ru.hollowhorizon.hollowengine.client.ui.*
 
 data class HssDocument(
     val rules: List<HssRule>,
@@ -91,17 +87,12 @@ data class HssSelector(
     val attributes: Set<HssAttributeSelector> = emptySet(),
     val ancestor: HssSelector? = null,
 ) {
-    val specificity: Int =
-        (ancestor?.specificity ?: 0) +
-                (if (id != null) 100 else 0) +
-                (tags.size + states.size + attributes.size) * 10 +
-                if (type != null) 1 else 0
+    val specificity: Int = (ancestor?.specificity
+        ?: 0) + (if (id != null) 100 else 0) + (tags.size + states.size + attributes.size) * 10 + if (type != null) 1 else 0
 
     /**
-     * Whether the rule only applies while some node is in a state — the matched node itself
-     * (`.button:hover`) or one of its ancestors (`.button:hover .icon`). Both are transient
-     * effects, so the resolver treats them alike: they stack with each other and overlay the
-     * base layer instead of cascading inside it.
+     * Whether the rule only applies while some node is in a state, the matched node itself
+     * (`.button:hover`) or one of its ancestors (`.button:hover .icon`).
      */
     val stateDependent: Boolean = states.isNotEmpty() || ancestor?.stateDependent == true
 

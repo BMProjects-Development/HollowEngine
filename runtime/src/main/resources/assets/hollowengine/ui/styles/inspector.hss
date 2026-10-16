@@ -303,7 +303,7 @@
     padding: 1px 4px;
 }
 
-.insp-icon-button.insp-inline-icon {
+.insp-icon-button.insp-inline-icon .button-icon {
     size: 11px 11px;
 }
 
@@ -486,19 +486,9 @@
 
 .insp-pill.active .insp-pill-label { foreground: $white; }
 
-.insp-icon-button {
+.insp-icon-button .button-icon {
     size: 14px 14px;
-    tint: $text-muted;
-    hoverable: true;
-    clickable: true;
-    transition: tint 110ms ease-out;
 }
-
-.insp-icon-button:hover { tint: $white; }
-
-.insp-icon-button.active { tint: $accent; }
-
-.insp-icon-button.danger:hover { tint: $danger; }
 
 .insp-pick-button {
     size: 18px 18px;
@@ -513,43 +503,13 @@
 .insp-button {
     size: 100% fit;
     min-height: 18px;
-    gap: 5px;
     padding: 3px 8px;
-    align-items: center center;
-    background: $bg-hover;
-    border-radius: $radius;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
-}
-
-.insp-button:hover { background: $bg-pressed; }
-
-.insp-button.primary { background: $accent-fill; }
-
-.insp-button.primary:hover { background: $accent-fill-hover; }
-
-.insp-button.danger { background: $danger-soft; }
-
-.insp-button.danger:hover { background: alpha($danger, 0.32); }
-
-.insp-button-icon {
-    size: 11px 11px;
-    tint: $text;
-}
-
-.insp-button.primary .insp-button-icon { tint: $white; }
-
-.insp-button-label {
-    size: fit fit;
-    foreground: $text;
     font-size: $font-size-small;
-    wrap: false;
 }
 
-.insp-button.primary .insp-button-label { foreground: $white; }
-
-.insp-button.danger .insp-button-label { foreground: $danger; }
+.insp-button .button-icon {
+    size: 11px 11px;
+}
 
 /* ---- asset picker ---- */
 

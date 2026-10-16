@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.world.entity.LivingEntity
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.slots.SlotTooltips
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -58,8 +59,7 @@ internal class EntityEditorScreen(
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
-        val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-        if (control && keyCode == GLFW.GLFW_KEY_F) {
+        if (HollowKeys.FIND.matches(keyCode, modifiers)) {
             session.searchOpen = true
             Minecraft.getInstance().execute { focusInput(EntityEditorSearchInput) }
             return true

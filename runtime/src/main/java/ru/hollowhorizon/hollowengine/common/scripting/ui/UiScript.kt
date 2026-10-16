@@ -245,8 +245,7 @@ class UiOverlayBuilder internal constructor(id: ResourceLocation) : UiHostBuilde
 
     /**
      * Whether this overlay takes pointer/keyboard input. Draw-only ([OverlayInput.NONE]) is the
-     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks. The engine does not
-     * force a round trip either way — an interactive overlay can still handle everything client-side.
+     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks.
      */
     var input: OverlayInput = OverlayInput.NONE
 

@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.Box
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
@@ -197,7 +198,7 @@ fun GraphCanvas(
             .onKeyInput { input ->
                 when {
                     onKey(input) -> input.consume()
-                    input.key == GLFW.GLFW_KEY_F -> {
+                    HollowKeys.FRAME.matches(input) -> {
                         view.reset()
                         input.consume()
                     }

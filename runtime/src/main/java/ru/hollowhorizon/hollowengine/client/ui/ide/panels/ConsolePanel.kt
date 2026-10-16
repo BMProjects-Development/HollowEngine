@@ -11,21 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeConsoleFontSize
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeProblems
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeProblemsList
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
-import ru.hollowhorizon.hollowengine.client.ui.widgets.EditableTextField
-import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeFontFamily
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCheckboxVariant
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiInlayHintsProvider
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiInlineStyle
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiSyntaxHighlighter
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextHighlight
-import ru.hollowhorizon.hollowengine.client.ui.widgets.withColor
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.logging.HollowLogEntry
 import ru.hollowhorizon.hollowengine.common.logging.HollowLogStore
@@ -77,8 +63,7 @@ private fun ConsoleTabButton(console: HollowIdeConsole, tab: ConsoleTab, problem
     Row(
         id = "console-tab-${tab.name.lowercase()}",
         tags = listOfNotNull("tool-window-tab", "selected".takeIf { console.tab == tab }),
-        modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
-            .onClick { event ->
+        modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
                 console.tab = tab
                 event.consume()
             },
@@ -252,8 +237,7 @@ private fun ConsoleInput(console: HollowIdeConsole) {
                         console.run()
                         input.consume()
                     }
-                }
-                .onKeyInput(TextFieldDefaultKeyPriority - 1) { input ->
+                }.onKeyInput(TextFieldDefaultKeyPriority - 1) { input ->
                     if (multiline || input.repeat && input.isEnter()) return@onKeyInput
                     val handled = when (input.key) {
                         GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> true.also { console.run() }
@@ -295,22 +279,7 @@ private fun ConsoleIconButton(
     tooltip: String,
     enabled: Boolean = true,
     onClick: () -> Unit,
-) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOfNotNull("console-button", "disabled".takeUnless { enabled }),
-        modifier = Modifier.input(hoverable = true, clickable = true)
-            .cursor(if (enabled) UiCursorShape.HAND else UiCursorShape.DEFAULT)
-            .tooltipOnHover(tooltip)
-            .onClick { event ->
-                if (enabled && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("console-button-icon"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
-}
+) = IconButton(icon, tooltip, id = id, enabled = enabled, tags = listOf("console-button"), onClick = onClick)
 
 private fun UiKeyInput.isEnter(): Boolean = key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER
 
@@ -387,16 +356,19 @@ private class ConsoleLogDocument {
 private class ConsoleLogFilter private constructor(private val regex: Regex?) {
     fun matches(entry: HollowLogEntry): Boolean {
         val matcher = regex ?: return true
-        return matcher.containsMatchIn(entry.message) ||
-                entry.loggerName?.let(matcher::containsMatchIn) == true
+        return matcher.containsMatchIn(entry.message) || entry.loggerName?.let(matcher::containsMatchIn) == true
     }
 
     companion object {
         fun compile(value: String): ConsoleLogFilter {
             val query = value.trim()
             if (query.isEmpty()) return ConsoleLogFilter(null)
-            val regex = runCatching { Regex(query, RegexOption.IGNORE_CASE) }
-                .getOrElse { Regex(Regex.escape(query), RegexOption.IGNORE_CASE) }
+            val regex = runCatching { Regex(query, RegexOption.IGNORE_CASE) }.getOrElse {
+                    Regex(
+                        Regex.escape(query),
+                        RegexOption.IGNORE_CASE
+                    )
+                }
             return ConsoleLogFilter(regex)
         }
     }
@@ -432,8 +404,8 @@ private val ConsoleLevelColors = mapOf(
     StandardLevel.ALL to LevelColors(MessageColor, MessageColor),
 )
 
-private val LogTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-    .withZone(ZoneId.systemDefault())
+private val LogTimeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
 private const val LogFontFamily = UiCodeFontFamily
 private const val LevelLabelWidth = 5
 private const val FilterWidth = 140f

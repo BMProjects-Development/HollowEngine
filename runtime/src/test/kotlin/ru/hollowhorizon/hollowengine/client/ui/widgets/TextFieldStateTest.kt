@@ -7,9 +7,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Unit coverage for the consolidated [TextFieldState] edit model — typing, deletion, newlines,
- * indentation, multi-caret and undo. The holder is render-free, so every case reads back plain
- * text plus caret positions.
+ * Unit coverage for the consolidated [TextFieldState] edit model: typing, deletion, newlines,
+ * indentation, multi-caret and undo.
  */
 class TextFieldStateTest {
     private fun field(
@@ -32,8 +31,6 @@ class TextFieldStateTest {
 
     private fun TextFieldState.type(chars: String) = chars.forEach { typeCharacter(it) }
     private val TextFieldState.caretPositions get() = caretRanges.map { it.position }
-
-    // --- typing ---------------------------------------------------------------------------------
 
     @Test
     fun `typing inserts characters and advances the caret`() {
@@ -65,8 +62,6 @@ class TextFieldStateTest {
         assertEquals("a b", state.text)
         assertFalse(state.insertNewlineWithIndent())
     }
-
-    // --- backspace / delete ---------------------------------------------------------------------
 
     @Test
     fun `backspace removes the character before the caret`() {
@@ -119,8 +114,6 @@ class TextFieldStateTest {
         assertTrue(state.deleteForward(word = true))
         assertEquals(" bar", state.text)
     }
-
-    // --- newlines & indentation -----------------------------------------------------------------
 
     @Test
     fun `enter does not remove literal or comment whitespace near braces`() {
@@ -180,7 +173,6 @@ class TextFieldStateTest {
         val state = field("foo {}", caret = 5)
         state.insertNewlineWithIndent()
         assertEquals("foo {\n    \n}", state.text)
-        // caret rests on the indented middle line, after its whitespace
         assertEquals(state.text.indexOf('\n', 6), state.caret)
     }
 
@@ -216,8 +208,6 @@ class TextFieldStateTest {
         assertEquals("ab", state.text)
     }
 
-    // --- multi-caret ----------------------------------------------------------------------------
-
     @Test
     fun `typing at multiple carets inserts at each and shifts trailing carets`() {
         val state = field("ab", caret = 0)
@@ -244,8 +234,6 @@ class TextFieldStateTest {
         state.addCaret(2)
         assertEquals(listOf(0), state.caretPositions)
     }
-
-    // --- selection ------------------------------------------------------------------------------
 
     @Test
     fun `select all then type replaces the whole document`() {
@@ -289,8 +277,6 @@ class TextFieldStateTest {
         assertEquals("foo", state.text)
     }
 
-    // --- auto pairs -----------------------------------------------------------------------------
-
     @Test
     fun `typing an opening bracket inserts the pair and places the caret inside`() {
         val state = field(autoPairs = true)
@@ -316,8 +302,6 @@ class TextFieldStateTest {
         assertEquals("", state.text)
     }
 
-    // --- filter ---------------------------------------------------------------------------------
-
     @Test
     fun `integer filter rejects non-numeric input`() {
         val state = field(filter = UiTextInputFilter.INTEGER)
@@ -325,8 +309,6 @@ class TextFieldStateTest {
         assertTrue(state.insert("42"))
         assertEquals("42", state.text)
     }
-
-    // --- undo / redo ----------------------------------------------------------------------------
 
     @Test
     fun `rapid typing stays ordered and undoes as one history group`() {
@@ -346,7 +328,6 @@ class TextFieldStateTest {
 
     @Test
     fun `undo reverts an edit and redo re-applies it`() {
-        // Distinct, strictly-increasing timestamps + zero merge window => one group per edit.
         var clock = 0L
         val state = TextFieldState(historyMergeWindowNanos = 0L, nanoTime = { clock++ })
         state.insert("a")

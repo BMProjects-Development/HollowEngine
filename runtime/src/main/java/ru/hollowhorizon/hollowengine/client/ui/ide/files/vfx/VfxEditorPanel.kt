@@ -7,6 +7,7 @@ import kotlinx.coroutines.isActive
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
@@ -14,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
@@ -127,7 +129,9 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
     Column(
         tags = listOf("ide-file-panel"),
         modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas)
-            .focusScope(),
+            .focusScope().onKeyInput { input ->
+                if (!input.repeat && TimelineKeys.handlePlayback(session.timeline, input.key, input.modifiers)) input.consume()
+            },
     ) {
         document.error?.let { message ->
             Text(
@@ -151,7 +155,7 @@ private fun Toolbar(state: VfxEditorState) {
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
         AnimatorIconButton(
             icon = if (timeline.isPlaying) PauseIcon else PlayIcon,
-            tooltip = vfxText(if (timeline.isPlaying) "pause" else "play"),
+            tooltip = HollowKeys.PLAY.hint(vfxText(if (timeline.isPlaying) "pause" else "play")),
             size = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }

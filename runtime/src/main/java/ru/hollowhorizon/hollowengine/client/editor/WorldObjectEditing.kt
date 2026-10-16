@@ -3,8 +3,8 @@ package ru.hollowhorizon.hollowengine.client.editor
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import net.minecraft.core.Direction
 import net.minecraft.client.Minecraft
+import net.minecraft.core.Direction
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
@@ -12,10 +12,9 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
-import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
-import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.client.ui.entity.EntityEditorClient
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
@@ -25,23 +24,13 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.ROOT_COMPONENT_I
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelOrNull
 import ru.hollowhorizon.hollowengine.common.attachments.binding.transformOrNull
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
-import ru.hollowhorizon.hollowengine.common.entities.objects.DuplicateWorldObjectPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.GoToWorldObjectPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.ObjectPose
-import ru.hollowhorizon.hollowengine.common.entities.objects.RemoveWorldObjectsPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.RequestWorldObjectFavoritesPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.SetWorldObjectFavoritePacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.SpawnWorldObjectPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectFavorite
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectKind
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectParentPacket
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectPosePacket
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
+import ru.hollowhorizon.hollowengine.common.entities.objects.*
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import java.util.UUID
+import java.util.*
 
 /** What editor does to world objects: placing, selecting, moving, regrouping and removing them. */
 @ClientOnly
@@ -160,7 +149,15 @@ object WorldObjectEditing {
         val player = minecraft.player ?: return
         val pose = target.pose(1f)
         val from = Vec3(pose.position.x, pose.position.y + GROUND_PROBE_LIFT, pose.position.z)
-        val hit = level.clip(ClipContext(from, from.subtract(0.0, GROUND_PROBE_DEPTH, 0.0), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player))
+        val hit = level.clip(
+            ClipContext(
+                from,
+                from.subtract(0.0, GROUND_PROBE_DEPTH, 0.0),
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                player
+            )
+        )
         if (hit.type == HitResult.Type.MISS) return
         place(target, ObjectPose(Vector3d(pose.position.x, hit.location.y, pose.position.z), pose.rotation, pose.scale))
     }
@@ -170,11 +167,26 @@ object WorldObjectEditing {
      * makes sense from a list, like going to an object that is not in view.
      */
     fun menu(target: WorldObjectEntity, inScene: Boolean): List<UiDropdownItem> = buildList {
-        add(UiDropdownItem("$LANG.duplicate".lang, icon = COPY_ICON, shortcut = "Ctrl+D") { duplicate(target) })
+        add(
+            UiDropdownItem(
+                "$LANG.duplicate".lang,
+                icon = COPY_ICON,
+                shortcut = HollowKeys.DUPLICATE.shortcut
+            ) { duplicate(target) })
         add(UiDropdownItem("$LANG.create_child".lang, icon = EMPTY_ICON) { spawnEmpty(target) })
-        if (target.parentId != null) add(UiDropdownItem("$LANG.unparent".lang, icon = WORLD_ICON) { setParent(target, null) })
+        if (target.parentId != null) add(UiDropdownItem("$LANG.unparent".lang, icon = WORLD_ICON) {
+            setParent(
+                target,
+                null
+            )
+        })
 
-        add(UiDropdownItem("$LANG.reset_transform".lang, icon = RESET_ICON, separatorBefore = true) { resetRotationAndScale(target) })
+        add(
+            UiDropdownItem(
+                "$LANG.reset_transform".lang,
+                icon = RESET_ICON,
+                separatorBefore = true
+            ) { resetRotationAndScale(target) })
         add(UiDropdownItem("$LANG.drop_to_ground".lang, icon = DROP_ICON) { dropToGround(target) })
         if (inScene) add(UiDropdownItem("$LANG.go_to".lang, icon = GO_TO_ICON) { goTo(target.uuid) })
 
@@ -184,19 +196,23 @@ object WorldObjectEditing {
                 if (favorite) "$LANG.favorite_remove".lang else "$LANG.favorite_add".lang,
                 icon = FAVORITE_ICON,
                 separatorBefore = true,
-            ) { setFavorite(target.uuid, !favorite) }
-        )
+            ) { setFavorite(target.uuid, !favorite) })
         add(UiDropdownItem("$LANG.copy_id".lang, icon = LINK_ICON) { copyId(target.uuid) })
-        add(UiDropdownItem("$LANG.delete".lang, icon = DELETE_ICON, separatorBefore = true, shortcut = "Delete") { delete(listOf(target)) })
+        add(
+            UiDropdownItem(
+                "$LANG.delete".lang,
+                icon = DELETE_ICON,
+                separatorBefore = true,
+                shortcut = HollowKeys.DELETE.shortcut
+            ) { delete(listOf(target)) })
     }
 
-    /** Delete and Ctrl+D on the selected object; true when [key] was one of them. */
+    /** Delete and duplicate on the selected object; true when [key] was one of them. */
     fun handleShortcut(key: Int, modifiers: Int): Boolean {
         val target = selected() ?: return false
-        val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
         when {
-            key == GLFW.GLFW_KEY_DELETE && modifiers == 0 -> delete(listOf(target))
-            key == GLFW.GLFW_KEY_D && control -> duplicate(target)
+            HollowKeys.DELETE.matches(key, modifiers) -> delete(listOf(target))
+            HollowKeys.DUPLICATE.matches(key, modifiers) -> duplicate(target)
             else -> return false
         }
         return true
@@ -218,7 +234,8 @@ object WorldObjectEditing {
     fun bounds(target: WorldObjectEntity, partialTick: Float): AABB {
         val snapshot = AttachmentRegistry.entitySnapshot(target.level(), target.uuid)
         val model = snapshot?.modelOrNull()
-        val local = model?.let { target.modelInstanceOrNull(ROOT_COMPONENT_ID, it.model)?.attachment?.calculateBounds() }
+        val local =
+            model?.let { target.modelInstanceOrNull(ROOT_COMPONENT_ID, it.model)?.attachment?.calculateBounds() }
         if (local == null) {
             val position = target.pose(partialTick).position
             return target.boundingBox.move(position.x - target.x, position.y - target.y, position.z - target.z)
@@ -230,7 +247,11 @@ object WorldObjectEditing {
     /** Moves the object to where the gizmo left it. */
     internal fun applyGizmo(target: WorldObjectEntity, values: GizmoTransformValues) {
         val pose = ObjectPose(
-            position = Vector3d(values.translation.x.toDouble(), values.translation.y.toDouble(), values.translation.z.toDouble()),
+            position = Vector3d(
+                values.translation.x.toDouble(),
+                values.translation.y.toDouble(),
+                values.translation.z.toDouble()
+            ),
             rotation = Quaternionf(values.rotation.x, values.rotation.y, values.rotation.z, values.rotation.w),
             scale = Vector3f(values.scale.x, values.scale.y, values.scale.z),
         )
@@ -252,7 +273,10 @@ object WorldObjectEditing {
     }
 
     internal fun refreshInspector(target: WorldObjectEntity) {
-        if (WorldInspector.holds(target.id)) EntityEditorClient.request(target, EntityEditorClient.Destination.INSPECTOR)
+        if (WorldInspector.holds(target.id)) EntityEditorClient.request(
+            target,
+            EntityEditorClient.Destination.INSPECTOR
+        )
     }
 
     internal fun place(target: WorldObjectEntity, world: ObjectPose) {

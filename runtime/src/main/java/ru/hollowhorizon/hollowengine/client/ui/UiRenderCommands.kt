@@ -66,6 +66,7 @@ data class DrawShadowCommand(
     val filter: UiFilterChain,
     val backfaceVisibility: UiBackfaceVisibility,
     val image: UiImageShadow? = null,
+    val borderWidth: Float = 0f,
 ) : UiRenderCommand
 
 data class PushClipCommand(
@@ -451,6 +452,7 @@ class UiCommandRenderer {
         layoutBoundsMatchVisualBounds: Boolean,
     ) {
         appendBackgroundCommand(node, style, layoutNode, localOpacity, baseFilter, commands)
+        appendInsetShadows(node, style, layoutNode, localOpacity, baseFilter, commands)
         appendCanvasModifiers(
             node,
             layoutNode,
@@ -715,6 +717,33 @@ class UiCommandRenderer {
             backfaceVisibility = node.resolvedSnapshot.backfaceVisibility,
             phase = UiRenderPhase.BACKGROUND,
             uv = style.imageUv,
+        )
+    }
+
+    /** Inset shadows lie over the background, inside the border. Only a plain rounded box casts them. */
+    private fun appendInsetShadows(
+        node: UiNode,
+        style: UiComputedStyle,
+        layoutNode: UiLayoutNode,
+        opacity: Float,
+        filter: UiFilterChain,
+        commands: UiRenderSink,
+    ) {
+        if (style.shadows.isEmpty() || style.shape != null || layoutNode.inlineDecoration != null) return
+        val shadows = style.shadows.filter { it.inset }
+        val rect = layoutNode.rect
+        if (shadows.isEmpty() || !rect.isDrawable() || opacity <= 0f) return
+        commands += DrawShadowCommand(
+            node = node,
+            rect = rect,
+            radius = style.border.radius,
+            shape = null,
+            shadows = shadows,
+            opacity = opacity,
+            transform = layoutNode.worldTransform,
+            filter = filter,
+            backfaceVisibility = style.backfaceVisibility,
+            borderWidth = style.border.width.left.resolve(rect.width),
         )
     }
 

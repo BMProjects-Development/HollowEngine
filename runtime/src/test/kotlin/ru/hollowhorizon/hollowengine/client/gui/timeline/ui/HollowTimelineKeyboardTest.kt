@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class HollowTimelineKeyboardTest {
     @Test
-    fun `active timeline consumes its complete keyboard stream inside the focus system`() {
+    fun `active timeline takes the keys it uses and lets the rest reach the editor`() {
         HollowUiSurface().use { surface ->
             val active = mutableStateOf(true)
             val received = mutableListOf<Int>()
@@ -31,18 +31,18 @@ class HollowTimelineKeyboardTest {
             surface.frame(800f, 500f, -1f, -1f, 0L)
 
             assertTrue(surface.runtime.keyPressed(GLFW.GLFW_KEY_SPACE, 0, 0))
-            assertTrue(surface.runtime.keyPressed(GLFW.GLFW_KEY_W, 0, 0))
+            assertFalse(surface.runtime.keyPressed(GLFW.GLFW_KEY_W, 0, 0), "a key the timeline has no use for goes on")
             assertEquals(listOf(GLFW.GLFW_KEY_SPACE, GLFW.GLFW_KEY_W), received)
-            assertTrue(surface.runtime.keyPressed(GLFW.GLFW_KEY_W, 0, 0, repeat = true))
+            surface.runtime.keyPressed(GLFW.GLFW_KEY_SPACE, 0, 0, repeat = true)
             assertEquals(
                 listOf(GLFW.GLFW_KEY_SPACE, GLFW.GLFW_KEY_W),
                 received,
-                "repeats are consumed without retriggering one-shot timeline commands",
+                "repeats do not retrigger one-shot timeline commands",
             )
 
             active.value = false
             surface.frame(800f, 500f, -1f, -1f, 16_000_000L)
-            assertFalse(surface.runtime.keyPressed(GLFW.GLFW_KEY_W, 0, 0))
+            assertFalse(surface.runtime.keyPressed(GLFW.GLFW_KEY_SPACE, 0, 0))
         }
     }
 }

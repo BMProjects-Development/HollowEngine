@@ -7,29 +7,10 @@
 }
 
 .image-editor-tool {
+    height: fit;
     padding: 3px 5px;
-    align-items: center center;
-    background: $border;
-    border: 1px $border;
-    border-radius: $radius;
-    foreground: $text-strong;
 }
 
-.image-editor-tool:hover {
-    background: $bg-pressed;
-}
-
-.image-editor-tool.selected {
-    background: $bg-selected;
-    border: 1px $accent;
-    foreground: $white;
-}
-
-.image-editor-tool.disabled {
-    opacity: 0.42;
-}
-
-.image-editor-tool-label,
 .image-editor-label {
     height: fit;
     text-wrap: false;

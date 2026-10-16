@@ -8,7 +8,7 @@
   "bone_scale": "Scale",
   "bone_visible": "Shown",
   "group_weights": "Clip weights",
-  "key_picked": "Key what is picked where the playhead is (K): a bone whole, or where an attachment is placed and its animated fields",
+  "key_picked": "Key what is picked where the playhead is: a bone whole, or where an attachment is placed and its animated fields",
   "remove_window": "Remove this stretch",
   "section_bone_keys": "Keys of the bone",
   "split_window": "Split here",

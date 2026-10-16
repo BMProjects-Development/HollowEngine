@@ -1,10 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
 import androidx.compose.runtime.Composable
-import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.inspector.TextRow
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 
 internal const val AnimatorStylesheet = "hollowengine:ui/styles/animator-editor.hss"
 
@@ -16,17 +15,7 @@ internal fun AnimatorIconButton(
     active: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-) {
-    Image(
-        icon,
-        tags = if (active) listOf("animator-icon-button", "active") else listOf("animator-icon-button"),
-        modifier = modifier.size((size + 6f).px, (size + 6f).px).input(hoverable = true, clickable = true)
-            .tooltipOnHover(tooltip).onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    )
-}
+) = IconButton(icon, tooltip, active = active, iconSize = size, modifier = modifier, onClick = onClick)
 
 /**
  * Field that holding an animation expression.

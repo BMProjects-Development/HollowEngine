@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCheckboxVariant
 import ru.hollowhorizon.hollowengine.client.ui.widgets.checkerboard
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.ceil
@@ -327,23 +327,7 @@ private fun ToolButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-) {
-    val enabledState by rememberUpdatedState(enabled)
-    val tags = buildList {
-        add("image-editor-tool")
-        if (selected) add("selected")
-        if (!enabledState) add("disabled")
-    }
-    Box(
-        tags = tags,
-        modifier = modifier.cursor(if (enabledState) UiCursorShape.HAND else UiCursorShape.DEFAULT).onClick { event ->
-            if (enabledState && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-            event.consume()
-        },
-    ) {
-        Text(label, tags = listOf("image-editor-tool-label"))
-    }
-}
+) = Button(label, active = selected, enabled = enabled, tags = listOf("image-editor-tool"), modifier = modifier, onClick = onClick)
 
 @Composable
 private fun RecentColor(color: UiColor, onClick: () -> Unit) {

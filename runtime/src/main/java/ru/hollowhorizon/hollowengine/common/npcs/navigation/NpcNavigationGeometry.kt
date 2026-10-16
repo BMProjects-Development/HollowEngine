@@ -10,11 +10,8 @@ import net.minecraft.world.level.pathfinder.WalkNodeEvaluator
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderPathObstacles
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcNavigationGeometry.SPOT_REACH
+import kotlin.math.*
 
 internal object NpcNavigationGeometry {
     private const val COLLISION_EPSILON = 1.0e-3
@@ -82,15 +79,6 @@ internal object NpcNavigationGeometry {
         return null
     }
 
-    /**
-     * Диагональное "протискивание" сквозь угол: игрок проскакивает такие проходы, идя прямо на
-     * скорости, даже если с одной стороны стоит блок, а с другой — щель/лава без опоры под ногами.
-     *
-     * В отличие от [findWalkableWaypoint] здесь опора под ногами требуется только в конечных точках
-     * (там нода реально стоит), а вдоль самого прохода достаточно свободного места под тело — так же
-     * как проскакивает игрок, не задерживаясь над щелью. Полностью закрытый угол (блоки с обеих
-     * сторон) по-прежнему отбраковывается: свободного зазора там нет.
-     */
     fun canSqueezeDiagonally(
         level: CollisionGetter,
         mob: Mob,
@@ -103,10 +91,6 @@ internal object NpcNavigationGeometry {
         return findSqueezeWaypoint(level, mob, from, to) != null
     }
 
-    /**
-     * Точка, огибая которую тело NPC проходит сквозь угол без столкновений. Опора под ногами не
-     * проверяется — проход считается транзитным. Возвращает саму цель, если прямой путь свободен.
-     */
     fun findSqueezeWaypoint(level: CollisionGetter, mob: Mob, from: Vec3, to: Vec3): Vec3? {
         if (hasBodyClearance(level, mob, from, to)) return to
 
@@ -182,14 +166,9 @@ internal object NpcNavigationGeometry {
         if (shape.isEmpty) return false
         val localX = (approachPosition.x - surfacePos.x).coerceIn(COLLISION_EPSILON, 1.0 - COLLISION_EPSILON)
         val localZ = (approachPosition.z - surfacePos.z).coerceIn(COLLISION_EPSILON, 1.0 - COLLISION_EPSILON)
-        val surfaceHeight = shape.toAabbs()
-            .asSequence()
-            .filter { box ->
-                localX >= box.minX - COLLISION_EPSILON && localX <= box.maxX + COLLISION_EPSILON &&
-                        localZ >= box.minZ - COLLISION_EPSILON && localZ <= box.maxZ + COLLISION_EPSILON
-            }
-            .maxOfOrNull(AABB::maxY)
-            ?: return false
+        val surfaceHeight = shape.toAabbs().asSequence().filter { box ->
+                localX >= box.minX - COLLISION_EPSILON && localX <= box.maxX + COLLISION_EPSILON && localZ >= box.minZ - COLLISION_EPSILON && localZ <= box.maxZ + COLLISION_EPSILON
+            }.maxOfOrNull(AABB::maxY) ?: return false
         return surfaceHeight > COLLISION_EPSILON && surfaceHeight <= maxStepHeight + COLLISION_EPSILON
     }
 
@@ -263,8 +242,13 @@ internal object NpcNavigationGeometry {
     )
 
     /** The friction of the ground under a body standing at [position]. */
-    fun frictionUnder(level: BlockGetter, position: Vec3): Double =
-        level.getBlockState(BlockPos.containing(position.x, position.y - GROUND_PROBE, position.z)).block.friction.toDouble()
+    fun frictionUnder(level: BlockGetter, position: Vec3): Double = level.getBlockState(
+        BlockPos.containing(
+            position.x,
+            position.y - GROUND_PROBE,
+            position.z
+        )
+    ).block.friction.toDouble()
 
     /**
      * The point nearest [target] where [mob] can stand: on a floor, its body clear of blocks and of what it plans
@@ -301,7 +285,11 @@ internal object NpcNavigationGeometry {
         if (floor <= cell.y - 1.0 + COLLISION_EPSILON) return null
         val middle = nodeCenter(mob, cell.x, floor, cell.z)
         if (!stands(level, mob, middle)) return null
-        val aim = Vec3(target.x.coerceIn(cell.x.toDouble(), cell.x + 1.0), floor, target.z.coerceIn(cell.z.toDouble(), cell.z + 1.0))
+        val aim = Vec3(
+            target.x.coerceIn(cell.x.toDouble(), cell.x + 1.0),
+            floor,
+            target.z.coerceIn(cell.z.toDouble(), cell.z + 1.0)
+        )
         if (stands(level, mob, aim)) return aim
         val alongX = Vec3(aim.x, floor, middle.z)
         val alongZ = Vec3(middle.x, floor, aim.z)

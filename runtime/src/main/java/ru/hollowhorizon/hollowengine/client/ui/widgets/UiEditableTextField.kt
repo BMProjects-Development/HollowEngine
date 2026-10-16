@@ -3,10 +3,10 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
-import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
 import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkKeyframes
 import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkPeriodMillis
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
@@ -369,8 +369,18 @@ internal fun computeEditableFieldLayout(
     val naturalWidth = if (wrapping) viewportWidth else maxWidth + trailingWidth
     val contentWidth = maxOf(naturalWidth, viewportWidth)
     return EditableFieldLayout(
-        lines, offsets, layouts, fontSize, fontFamily, contentWidth, naturalWidth, hintsById, inlayRevision,
-        inlayHints.filter { it.sourceLength == 0 }.mapTo(HashSet(inlayHints.size)) { it.offset }, layoutWidth, lineInputs,
+        lines,
+        offsets,
+        layouts,
+        fontSize,
+        fontFamily,
+        contentWidth,
+        naturalWidth,
+        hintsById,
+        inlayRevision,
+        inlayHints.filter { it.sourceLength == 0 }.mapTo(HashSet(inlayHints.size)) { it.offset },
+        layoutWidth,
+        lineInputs,
         verticalOverscroll = multiline,
         lineHeight = uniformHeight,
         hiddenLines = hiddenLines,
@@ -600,8 +610,14 @@ fun EditableTextField(
             }
             // Low priority: user onKeyInput handlers (default priority 0) get first refusal.
             .onKeyInput(TextFieldDefaultKeyPriority) { input ->
-                val handled = handleEditableFieldIntentionKey(state, input, completion, diagnostics) ||
-                        handleEditableFieldKey(state, input, layout, completion, codeInsight)
+                val handled =
+                    handleEditableFieldIntentionKey(state, input, completion, diagnostics) || handleEditableFieldKey(
+                        state,
+                        input,
+                        layout,
+                        completion,
+                        codeInsight
+                    )
                 if (handled || !state.readOnly && input.typesCharacter()) input.consume()
             }.onPress { event ->
                 state.focus()
@@ -640,8 +656,7 @@ fun EditableTextField(
             }.onExit {
                 hoverTooltip = null
                 codeHoverTarget = null
-            }.then(modifier ?: Modifier)
-            .scrollable(
+            }.then(modifier ?: Modifier).scrollable(
                 vertical = multiline,
                 horizontal = !wrap,
                 hasVerticalScrollbar = multiline,
@@ -690,8 +705,17 @@ fun EditableTextField(
             }
         }
         if (gutterWidth > 0f) {
-            EditableFieldGutter(layout, visible, gutterPanelWidth, lineNumberColor, state, folds, gutterMarkers,
-                id ?: "text-field-${System.identityHashCode(state)}", indentGuideColor)
+            EditableFieldGutter(
+                layout,
+                visible,
+                gutterPanelWidth,
+                lineNumberColor,
+                state,
+                folds,
+                gutterMarkers,
+                id ?: "text-field-${System.identityHashCode(state)}",
+                indentGuideColor
+            )
         }
         if (completion.items.isNotEmpty()) {
             EditableFieldCompletionPopup(completion, layout, scrollState, gutterWidth)
@@ -898,11 +922,9 @@ private fun EditableFieldRow(
         ).forEachIndexed { rectIndex, rect ->
             key("match", matchIndex, rectIndex) {
                 Box(
-                    modifier = Modifier
-                        .position((rect.x - padding).px, (top + rect.y - padding).px)
+                    modifier = Modifier.position((rect.x - padding).px, (top + rect.y - padding).px)
                         .size((rect.width + padding * 2f).px, (rect.height + padding * 2f).px)
-                        .background(if (match.active) ActiveSearchMatchColor else SearchMatchColor)
-                        .border(
+                        .background(if (match.active) ActiveSearchMatchColor else SearchMatchColor).border(
                             1.px,
                             if (match.active) ActiveSearchMatchBorderColor else SearchMatchBorderColor,
                             radius = SearchMatchRadius,
@@ -931,18 +953,25 @@ private fun EditableFieldRow(
         selectionRectsForRow(
             line, lineLayout, localStart, localEnd, crossesNewline, fontSize, fontFamily, layout.contentWidth
         ).forEachIndexed { rectIndex, rect ->
-                key("sel", rangeIndex, rectIndex) {
-                    Box(
-                        modifier = Modifier.position(rect.x.px, (top + rect.y).px).size(rect.width.px, rect.height.px)
-                            .background(state.selectionColor),
-                    )
-                }
+            key("sel", rangeIndex, rectIndex) {
+                Box(
+                    modifier = Modifier.position(rect.x.px, (top + rect.y).px).size(rect.width.px, rect.height.px)
+                        .background(state.selectionColor),
+                )
             }
+        }
     }
 
     if (lineLayout != null) {
         EditableFieldLineFragments(
-            lineLayout, layout.inlayHints[index], top, fontSize, fontFamily, state.textShadow, inlayMetrics, onInlayAction,
+            lineLayout,
+            layout.inlayHints[index],
+            top,
+            fontSize,
+            fontFamily,
+            state.textShadow,
+            inlayMetrics,
+            onInlayAction,
             inlayIdPrefix = "text-field-${System.identityHashCode(state)}",
         )
     } else if (line.text.isNotEmpty()) {
@@ -950,8 +979,8 @@ private fun EditableFieldRow(
         Text(
             line.text,
             modifier = Modifier.position(0.px, top.px).fontSize(fontSize)
-                .let { if (fontFamily != null) it.fontFamily(fontFamily) else it }
-                .textEffects(*effects.toTypedArray()).textWrap(false),
+                .let { if (fontFamily != null) it.fontFamily(fontFamily) else it }.textEffects(*effects.toTypedArray())
+                .textWrap(false),
         )
     }
 
@@ -964,8 +993,9 @@ private fun EditableFieldRow(
             val caret = layout.caretAt(range.position, range.inlayAffinity)
             key("caret", caretIndex) {
                 Box(
-                    modifier = Modifier.position(caret.x.px, caret.y.px).size(TextFieldCaretWidth.px, layout.lineHeight.px)
-                        .background(state.caretColor).layer(1).animation(
+                    modifier = Modifier.position(caret.x.px, caret.y.px)
+                        .size(TextFieldCaretWidth.px, layout.lineHeight.px).background(state.caretColor).layer(1)
+                        .animation(
                             UiCaretBlinkKeyframes, UiCaretBlinkPeriodMillis, iterationCount = Float.POSITIVE_INFINITY
                         ),
                 )
@@ -1081,8 +1111,7 @@ private fun InlayHint(
                         modifier = Modifier.checkerboard(3f).clip(true),
                     ) {
                         Box(
-                            modifier = Modifier.size(100.percent, 100.percent)
-                                .background(UiColor.fromArgb(part.argb)),
+                            modifier = Modifier.size(100.percent, 100.percent).background(UiColor.fromArgb(part.argb)),
                         )
                     }
                 }
@@ -1137,8 +1166,7 @@ internal fun selectionRectsForRow(
     crossesNewline: Boolean,
     fontSize: Float,
     fontFamily: String?,
-    @Suppress("UNUSED_PARAMETER")
-    fullWidth: Float,
+    @Suppress("UNUSED_PARAMETER") fullWidth: Float,
 ): List<UiRect> {
     val newlineWidth = UiTextLayouter.measureTextWidth(" ", fontSize, fontFamily).coerceAtLeast(1f)
     if (lineLayout != null) {
@@ -1226,7 +1254,7 @@ internal fun handleEditableFieldKey(
     }
     if (!state.multiline && !input.shift && (input.key == GLFW.GLFW_KEY_UP || input.key == GLFW.GLFW_KEY_DOWN)) return false
     if (input.key == GLFW.GLFW_KEY_ESCAPE && codeInsight?.dismissSignature() == true) return true
-    if (completion != null && input.command && input.key == GLFW.GLFW_KEY_SPACE) {
+    if (completion != null && HollowKeys.COMPLETION.matches(input)) {
         completion.open()
         return true
     }
@@ -1234,23 +1262,19 @@ internal fun handleEditableFieldKey(
     if (input.control && input.alt && (input.key == GLFW.GLFW_KEY_UP || input.key == GLFW.GLFW_KEY_DOWN)) {
         val delta = if (input.key == GLFW.GLFW_KEY_UP) -1 else 1
         val position = layout?.visualCaretMove(state.primaryCaret.position, delta) ?: verticalCaretMove(
-            text,
-            state.primaryCaret.position,
-            delta
+            text, state.primaryCaret.position, delta
         )
         state.addCaret(position)
         return true
     }
-    if (input.command) {
-        when (input.key) {
-            GLFW.GLFW_KEY_A -> return state.selectAll().let { true }
-            GLFW.GLFW_KEY_C -> return copySelection(state)
-            GLFW.GLFW_KEY_D -> return state.duplicateSelections()
-            GLFW.GLFW_KEY_X -> return cutSelection(state)
-            GLFW.GLFW_KEY_V -> return pasteClipboard(state)
-            GLFW.GLFW_KEY_Z -> return if (input.shift) state.redo() else state.undo()
-            GLFW.GLFW_KEY_Y -> return state.redo()
-        }
+    when {
+        HollowKeys.SELECT_ALL.matches(input) -> return state.selectAll().let { true }
+        HollowKeys.COPY.matches(input) -> return copySelection(state)
+        HollowKeys.DUPLICATE.matches(input) -> return state.duplicateSelections()
+        HollowKeys.CUT.matches(input) -> return cutSelection(state)
+        HollowKeys.PASTE.matches(input) -> return pasteClipboard(state)
+        HollowKeys.UNDO.matches(input) -> return state.undo()
+        HollowKeys.REDO.matches(input) -> return state.redo()
     }
     return when (input.key) {
         GLFW.GLFW_KEY_BACKSPACE -> state.backspace(word = input.control)
@@ -1392,6 +1416,7 @@ internal const val TextFieldCaretWidth = 1f
 private const val EditableFieldRowBlock = 16
 private const val EditableFieldDoubleClickMillis = 350L
 internal const val EditableFieldLineNumberGap = 8f
+
 /** A find-in-file match on one row, in that row's own column offsets. */
 internal data class EditableFieldSearchMatch(val start: Int, val end: Int, val active: Boolean)
 

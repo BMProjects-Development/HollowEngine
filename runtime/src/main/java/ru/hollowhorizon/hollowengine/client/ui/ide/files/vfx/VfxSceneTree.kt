@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import net.minecraft.client.Minecraft
-import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
@@ -134,17 +134,17 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
     val index = siblings.indexOfFirst { it.id == node.id }
     return listOf(
         add,
-        UiDropdownItem(vfxText("duplicate"), icon = VfxIcons.DUPLICATE, shortcut = "Ctrl+D", separatorBefore = true) {
+        UiDropdownItem(vfxText("duplicate"), icon = VfxIcons.DUPLICATE, shortcut = HollowKeys.DUPLICATE.shortcut, separatorBefore = true) {
             duplicate(document, state, node.id)
         },
-        UiDropdownItem(vfxText("rename"), icon = VfxIcons.RENAME, shortcut = "F2") { rename(state, node.id) },
+        UiDropdownItem(vfxText("rename"), icon = VfxIcons.RENAME, shortcut = HollowKeys.RENAME.shortcut) { rename(state, node.id) },
         UiDropdownItem(vfxText(if (node.enabled) "disable" else "enable"), icon = VfxIcons.TOGGLE) {
             document.replace(node.withCommon(enabled = !node.enabled))
         },
-        UiDropdownItem(vfxText("move_up"), shortcut = "Alt+↑", enabled = index > 0, separatorBefore = true) {
+        UiDropdownItem(vfxText("move_up"), shortcut = HollowKeys.MOVE_UP.shortcut, enabled = index > 0, separatorBefore = true) {
             document.edit { it.withShifted(node.id, -1) }
         },
-        UiDropdownItem(vfxText("move_down"), shortcut = "Alt+↓", enabled = index < siblings.lastIndex) {
+        UiDropdownItem(vfxText("move_down"), shortcut = HollowKeys.MOVE_DOWN.shortcut, enabled = index < siblings.lastIndex) {
             document.edit { it.withShifted(node.id, 1) }
         },
         UiDropdownItem(vfxText("move_out"), enabled = document.effect.parentOf(node.id) != null) {
@@ -153,7 +153,7 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
             val at = (grand?.children ?: document.effect.nodes).indexOfFirst { it.id == parent.id } + 1
             document.edit { it.withMoved(node.id, grand?.id, at) }
         },
-        UiDropdownItem(vfxText("remove_node"), icon = VfxIcons.REMOVE, shortcut = "Del", separatorBefore = true) {
+        UiDropdownItem(vfxText("remove_node"), icon = VfxIcons.REMOVE, shortcut = HollowKeys.DELETE.shortcut, separatorBefore = true) {
             remove(document, state, node.id)
         },
     )
@@ -161,16 +161,14 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
 
 /** Undo and redo, and what the menu of the selected node offers by key. */
 internal fun handleVfxNodeKey(document: VfxEditing, state: VfxNodeSelection, key: Int, modifiers: Int, repeat: Boolean): Boolean {
-    val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-    val alt = modifiers and GLFW.GLFW_MOD_ALT != 0
     if (!repeat && UndoKeys.handle(document.history, key, modifiers)) return true
     val id = state.selected ?: return false
     return when {
-        key == GLFW.GLFW_KEY_DELETE -> remove(document, state, id).let { true }
-        key == GLFW.GLFW_KEY_F2 -> rename(state, id).let { true }
-        control && key == GLFW.GLFW_KEY_D && !repeat -> duplicate(document, state, id).let { true }
-        alt && key == GLFW.GLFW_KEY_UP -> document.edit { it.withShifted(id, -1) }.let { true }
-        alt && key == GLFW.GLFW_KEY_DOWN -> document.edit { it.withShifted(id, 1) }.let { true }
+        HollowKeys.DELETE.matches(key, modifiers) -> remove(document, state, id).let { true }
+        HollowKeys.RENAME.matches(key, modifiers) -> rename(state, id).let { true }
+        HollowKeys.DUPLICATE.matches(key, modifiers) && !repeat -> duplicate(document, state, id).let { true }
+        HollowKeys.MOVE_UP.matches(key, modifiers) -> document.edit { it.withShifted(id, -1) }.let { true }
+        HollowKeys.MOVE_DOWN.matches(key, modifiers) -> document.edit { it.withShifted(id, 1) }.let { true }
         else -> false
     }
 }

@@ -6,19 +6,16 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.Box
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Image
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.Row
 import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiBoxMode
 import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.align
 import ru.hollowhorizon.hollowengine.client.ui.cursor
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockTags
 import ru.hollowhorizon.hollowengine.client.ui.docking.LocalDockPanelTitle
@@ -32,10 +29,10 @@ import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.textOverflow
 import ru.hollowhorizon.hollowengine.client.ui.textWrap
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val LANG = UndoLabel.LANG
@@ -85,8 +82,8 @@ private fun HistoryHeader(histories: IdeHistories, contexts: List<HistoryContext
         )
         Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
         val history = context?.history
-        HistoryButton("history-undo", UNDO_ICON, "$LANG.undo".lang, history?.canUndo == true) { history?.undo() }
-        HistoryButton("history-redo", REDO_ICON, "$LANG.redo".lang, history?.canRedo == true) { history?.redo() }
+        HistoryButton("history-undo", UNDO_ICON, HollowKeys.UNDO.hint("$LANG.undo".lang), history?.canUndo == true) { history?.undo() }
+        HistoryButton("history-redo", REDO_ICON, HollowKeys.REDO.hint("$LANG.redo".lang), history?.canRedo == true) { history?.redo() }
     }
 }
 
@@ -132,19 +129,5 @@ private fun StepRow(context: HistoryContext, history: UndoHistory, target: Int, 
 }
 
 @Composable
-private fun HistoryButton(id: String, icon: String, tooltip: String, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOfNotNull("console-button", "disabled".takeUnless { enabled }),
-        modifier = Modifier.input(hoverable = true, clickable = true)
-            .cursor(if (enabled) UiCursorShape.HAND else UiCursorShape.DEFAULT)
-            .tooltipOnHover(tooltip)
-            .onClick { event ->
-                if (enabled && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("console-button-icon"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
-}
+private fun HistoryButton(id: String, icon: String, tooltip: String, enabled: Boolean, onClick: () -> Unit) =
+    IconButton(icon, tooltip, id = id, enabled = enabled, tags = listOf("console-button"), onClick = onClick)

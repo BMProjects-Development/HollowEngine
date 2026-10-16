@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.UiInsets
 import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
 import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
+import ru.hollowhorizon.hollowengine.client.ui.UiVec3
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.style.UiBackfaceVisibility
@@ -244,6 +245,37 @@ class UiAnalyticRectBatchTest {
 
         assertEquals(1, batch.instanceCount)
         assertEquals(UiAnalyticRectBatch.RecordStride, batch.recordFloatCount)
+    }
+
+    @Test
+    fun `inset shadow stays on the box and moves its hole, not its quad`() {
+        val command = DrawShadowCommand(
+            node = BoxNode(),
+            rect = UiRect(0f, 0f, 80f, 48f),
+            radius = 4f,
+            shape = null,
+            shadows = emptyList(),
+            opacity = 1f,
+            transform = UiMatrix4.identity(),
+            filter = UiFilterChain.Empty,
+            backfaceVisibility = UiBackfaceVisibility.VISIBLE,
+            borderWidth = 1f,
+        )
+
+        val batch = UiAnalyticRectBatch()
+        val shadow = UiShadow(offset = UiVec3(0f, 1f, 0f), blur = 3f, spread = 2f, color = UiColor.White, inset = true)
+        batch.appendShadow(command, shadow, command.transform, UiShaderClip.None)
+
+        val instance = FloatArray(batch.instanceFloatCount)
+        batch.writeInstances(java.nio.FloatBuffer.wrap(instance))
+        assertEquals(0f, instance[16]); assertEquals(0f, instance[17])
+        assertEquals(80f, instance[18]); assertEquals(48f, instance[19])
+
+        val records = FloatArray(batch.recordFloatCount)
+        batch.writeRecords(java.nio.FloatBuffer.wrap(records))
+        assertEquals(1f, records[3], "border width the shadow starts inside")
+        assertTrue(records[7] > 1.5f, "inset mode, apart from the outer shadow's")
+        assertEquals(0f, records[8]); assertEquals(1f, records[9])
     }
 
     private fun command(

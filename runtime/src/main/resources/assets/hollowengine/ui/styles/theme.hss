@@ -59,6 +59,10 @@ $success: #6FBF8A;
 $shadow: alpha(#000000, 0.45);
 $scrim: alpha(#000000, 0.5);
 
+$button: $bg-pressed;
+$button-hover: $border;
+$button-highlight: alpha($white, 0.08);
+
 /* ---- sizes ---- */
 
 /* How far a panel's content sits from its edge: headers, toolbars, lists and fields alike. */
@@ -89,6 +93,8 @@ $font-size-title: 11px;
 
 $scroll-thumb: alpha(#9BA9C2, 0.28);
 $scroll-thumb-hover: alpha(#AFBCD2, 0.6);
+
+$scroll-gutter: 12px;
 
 /* ---- shared looks, taken in with `@apply $name;` ---- */
 

@@ -288,7 +288,6 @@ internal fun UiColor.withAlpha(multiplier: Float) =
 internal object TimelineColors {
     val Background = UiColor(0.110f, 0.118f, 0.133f, 1f)
     val Panel = UiColor(0.110f, 0.118f, 0.133f, 1f)
-    val PanelAlt = UiColor(0.169f, 0.180f, 0.208f, 1f)
     val Row = UiColor(0.118f, 0.125f, 0.141f, 1f)
     val Group = UiColor(0.129f, 0.137f, 0.157f, 1f)
     val Muted = UiColor(0.561f, 0.608f, 0.678f, 1f)
@@ -296,7 +295,6 @@ internal object TimelineColors {
     val Accent = UiColor(0.431f, 0.608f, 0.863f, 1f)
     val Blue = UiColor(0.682f, 0.722f, 0.792f, 1f)
     val Border = UiColor(0.149f, 0.157f, 0.180f, 1f)
-    val Danger = UiColor(0.76f, 0.23f, 0.23f, 1f)
     val Recording = UiColor(0.878f, 0.478f, 0.478f, 1f)
     val Grid = UiColor(0.176f, 0.188f, 0.216f, 1f)
     val Handle = UiColor(0.72f, 0.74f, 0.8f, 1f)

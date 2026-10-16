@@ -48,14 +48,14 @@ Imported rules come before the current file's rules. Local variables and sets ov
 
 ## Selectors
 
-| Selector | Matches |
-| --- | --- |
-| `box`, `text`, `image` | Nodes of that type |
-| `.tag` | Nodes carrying the tag |
-| `#id` | The node with that id |
+| Selector                                                             | Matches                                                                                  |
+|----------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `box`, `text`, `image`                                               | Nodes of that type                                                                       |
+| `.tag`                                                               | Nodes carrying the tag                                                                   |
+| `#id`                                                                | The node with that id                                                                    |
 | `:hover`, `:active`, `:focus`, `:selected`, `:disabled`, `:dragging` | Nodes in that state; any name works, including your own via `Modifier.state("expanded")` |
-| `[attribute]`, `[attribute="value"]` | Nodes with the attribute |
-| `.panel .title` | A descendant of a match, at any depth |
+| `[attribute]`, `[attribute="value"]`                                 | Nodes with the attribute                                                                 |
+| `.panel .title`                                                      | A descendant of a match, at any depth                                                    |
 
 A state anywhere in the chain makes the whole rule state-dependent, so a parent's state can restyle its children:
 
@@ -95,47 +95,47 @@ HSS accepts `px`, `%`, bare numbers (pixels), `fill`, `fit`, and `auto` where a 
 
 ### Size, spacing, and layout
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `size` | `<width> <height>` | Width and height together |
-| `width`, `height` | length | One dimension |
-| `min-size`, `max-size` | `<width> <height>` | Minimum or maximum dimensions |
-| `min-width`, `min-height`, `max-width`, `max-height` | length | One size boundary |
-| `aspect-ratio` | `number` or `width / height` | Preserves the requested ratio |
-| `padding`, `margin` | 1–4 lengths | Inner or outer insets |
-| `padding-left/top/right/bottom`, `margin-left/top/right/bottom` | length | One inset side |
-| `padding-x`, `padding-y`, `margin-x`, `margin-y` | length | Horizontal or vertical insets; `*-horizontal`, `*-vertical`, `*-inline`, and `*-block` are aliases |
-| `gap` | length | Space between children in a row/column |
-| `grow` | non-negative number | Share of remaining row/column space |
-| `position` | `<x> <y> [z]` | Position in a free/stacked container |
-| `align` | `<horizontal> [vertical]` | Aligns this node |
-| `align-items` | `<horizontal> [vertical]` | Aligns a container’s children |
-| `align-x`/`align-horizontal`, `align-y`/`align-vertical` | alignment value | One self-alignment axis |
-| `align-self`, `justify-self`, `justify`/`justify-content` | alignment value | Fine-grained alignment |
+| Property                                                        | Value                        | Purpose                                                                                            |
+|-----------------------------------------------------------------|------------------------------|----------------------------------------------------------------------------------------------------|
+| `size`                                                          | `<width> <height>`           | Width and height together                                                                          |
+| `width`, `height`                                               | length                       | One dimension                                                                                      |
+| `min-size`, `max-size`                                          | `<width> <height>`           | Minimum or maximum dimensions                                                                      |
+| `min-width`, `min-height`, `max-width`, `max-height`            | length                       | One size boundary                                                                                  |
+| `aspect-ratio`                                                  | `number` or `width / height` | Preserves the requested ratio                                                                      |
+| `padding`, `margin`                                             | 1–4 lengths                  | Inner or outer insets                                                                              |
+| `padding-left/top/right/bottom`, `margin-left/top/right/bottom` | length                       | One inset side                                                                                     |
+| `padding-x`, `padding-y`, `margin-x`, `margin-y`                | length                       | Horizontal or vertical insets; `*-horizontal`, `*-vertical`, `*-inline`, and `*-block` are aliases |
+| `gap`                                                           | length                       | Space between children in a row/column                                                             |
+| `grow`                                                          | non-negative number          | Share of remaining row/column space                                                                |
+| `position`                                                      | `<x> <y> [z]`                | Position in a free/stacked container                                                               |
+| `align`                                                         | `<horizontal> [vertical]`    | Aligns this node                                                                                   |
+| `align-items`                                                   | `<horizontal> [vertical]`    | Aligns a container’s children                                                                      |
+| `align-x`/`align-horizontal`, `align-y`/`align-vertical`        | alignment value              | One self-alignment axis                                                                            |
+| `align-self`, `justify-self`, `justify`/`justify-content`       | alignment value              | Fine-grained alignment                                                                             |
 
 Alignment values are `auto`, `start`/`flex-start`, `center`, `end`/`flex-end`, `stretch`, `space-between`, `space-around`, `space-evenly`, and `justify` where meaningful.
 
 ### Paint, borders, images, and shapes
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `background` | colour, `none`, `image(...)`, `url(...)`, `shader(...)`, `linear-gradient(...)`, or `radial-gradient(...)` | Main background paint |
-| `background-image` | image resource | Shorthand for an image background |
-| `foreground` or `color` | colour | Inherited text colour |
-| `image` | image resource | Content image for an `Image` node |
-| `shader` | shader name | Content shader |
-| `border` | `<width> [colour]` | Border width and colour |
-| `border-width`, `border-color`, `border-radius` | inset, colour, number | Individual border parts |
-| `border-top`, `border-right`, `border-bottom`, `border-left` | `<width> [color]` | One edge's width; the colour is shared by the whole border |
-| `shadows` (`shadow`, `box-shadow`) | `inset? <x> <y> <blur> [spread] <color>`, comma-separated | One or more drop/inset shadows; `none` clears them |
-| `opacity`, `tint` | number, colour | Overall alpha or image tint |
-| `image-fit` or `fit` | `stretch`, `contain`/`fit`, `cover`/`zoom`, `none`, `9-slice`, `3-slice-vertical`, `3-slice-horizontal` | Image scaling mode |
-| `image-slice` or `slice` | 1–4 lengths | Nine-/three-slice edges; it can follow `image-fit` |
-| `image-uv` or `uv` | `none` or `<x> <y> <width> <height>` | Part of the source texture to draw, in the texture's own coordinates: `px`/bare numbers are source pixels, `%` is a fraction of the source. `image-fit`, cover cropping and nine-slice all measure against that rectangle, so one atlas can back many nodes |
-| `shape` | `path("...")`, `svg-path("..." [, viewBox])`, or `svg("namespace:path")` | Vector node shape |
-| `shape-fill`/`fill`, `shape-stroke`/`stroke`, `shape-stroke-width`/`stroke-width` | paint, paint, length | Shape rendering |
-| `clip` or `clip-path` | boolean, `path(...)`, `svg-path(...)`, or `svg(...)` | Clips children to bounds or a vector shape |
-| `layer` | integer | Local drawing order |
+| Property                                                                          | Value                                                                                                      | Purpose                                                                                                                                                                                                                                                     |
+|-----------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `background`                                                                      | colour, `none`, `image(...)`, `url(...)`, `shader(...)`, `linear-gradient(...)`, or `radial-gradient(...)` | Main background paint                                                                                                                                                                                                                                       |
+| `background-image`                                                                | image resource                                                                                             | Shorthand for an image background                                                                                                                                                                                                                           |
+| `foreground` or `color`                                                           | colour                                                                                                     | Inherited text colour                                                                                                                                                                                                                                       |
+| `image`                                                                           | image resource                                                                                             | Content image for an `Image` node                                                                                                                                                                                                                           |
+| `shader`                                                                          | shader name                                                                                                | Content shader                                                                                                                                                                                                                                              |
+| `border`                                                                          | `<width> [colour]`                                                                                         | Border width and colour                                                                                                                                                                                                                                     |
+| `border-width`, `border-color`, `border-radius`                                   | inset, colour, number                                                                                      | Individual border parts                                                                                                                                                                                                                                     |
+| `border-top`, `border-right`, `border-bottom`, `border-left`                      | `<width> [color]`                                                                                          | One edge's width; the colour is shared by the whole border                                                                                                                                                                                                  |
+| `shadows` (`shadow`, `box-shadow`)                                                | `inset? <x> <y> <blur> [spread] <color>`, comma-separated                                                  | One or more drop/inset shadows; `none` clears them                                                                                                                                                                                                          |
+| `opacity`, `tint`                                                                 | number, colour                                                                                             | Overall alpha or image tint                                                                                                                                                                                                                                 |
+| `image-fit` or `fit`                                                              | `stretch`, `contain`/`fit`, `cover`/`zoom`, `none`, `9-slice`, `3-slice-vertical`, `3-slice-horizontal`    | Image scaling mode                                                                                                                                                                                                                                          |
+| `image-slice` or `slice`                                                          | 1–4 lengths                                                                                                | Nine-/three-slice edges; it can follow `image-fit`                                                                                                                                                                                                          |
+| `image-uv` or `uv`                                                                | `none` or `<x> <y> <width> <height>`                                                                       | Part of the source texture to draw, in the texture's own coordinates: `px`/bare numbers are source pixels, `%` is a fraction of the source. `image-fit`, cover cropping and nine-slice all measure against that rectangle, so one atlas can back many nodes |
+| `shape`                                                                           | `path("...")`, `svg-path("..." [, viewBox])`, or `svg("namespace:path")`                                   | Vector node shape                                                                                                                                                                                                                                           |
+| `shape-fill`/`fill`, `shape-stroke`/`stroke`, `shape-stroke-width`/`stroke-width` | paint, paint, length                                                                                       | Shape rendering                                                                                                                                                                                                                                             |
+| `clip` or `clip-path`                                                             | boolean, `path(...)`, `svg-path(...)`, or `svg(...)`                                                       | Clips children to bounds or a vector shape                                                                                                                                                                                                                  |
+| `layer`                                                                           | integer                                                                                                    | Local drawing order                                                                                                                                                                                                                                         |
 
 `linear-gradient(direction?, colour [stop], colour [stop], ...)` accepts a degree angle or `to top`, `to right`, `to bottom`, `to left`, and stop offsets from `0..1` or percentages. Angles follow CSS: `0deg` points up, `90deg` right, `180deg` down, `270deg` left, rotating clockwise. Omitting the direction means `to bottom` (`180deg`). Backgrounds, borders, shape fills and masks share this convention, as does the Kotlin gradient API.
 
@@ -143,64 +143,64 @@ Alignment values are `auto`, `start`/`flex-start`, `center`, `end`/`flex-end`, `
 
 ### Transform and filters
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `translate`, `rotate` | `<x> [y] [z]` | Translation in pixels or rotation in degrees |
-| `scale` | `<x> [y] [z]` | Per-axis scale; omitted y uses x |
-| `translate-x/y/z`, `rotate-x/y/z`, `scale-x/y/z` | number | One axis, leaving the other two alone, handy inside `@keyframes` |
-| `transform` | `translate(...) scale(...) rotate(...) perspective(...)` | Combines 2D/3D transforms; `none` resets all |
-| `pivot` or `transform-origin` | named pivot or `<x> <y> [z]` | Transform origin; names include `top-left`, `center`, and `bottom-right` |
-| `perspective` | number | 3D perspective distance |
-| `backface-visibility` | `visible` or `hidden` | Back side of a rotated node |
-| `filter`, `backdrop-filter` | `grayscale(amount)`, `blur(radius)`, `shader(name)` | Filter the node or the pixels behind it; `none` clears the chain |
+| Property                                         | Value                                                    | Purpose                                                                  |
+|--------------------------------------------------|----------------------------------------------------------|--------------------------------------------------------------------------|
+| `translate`, `rotate`                            | `<x> [y] [z]`                                            | Translation in pixels or rotation in degrees                             |
+| `scale`                                          | `<x> [y] [z]`                                            | Per-axis scale; omitted y uses x                                         |
+| `translate-x/y/z`, `rotate-x/y/z`, `scale-x/y/z` | number                                                   | One axis, leaving the other two alone, handy inside `@keyframes`         |
+| `transform`                                      | `translate(...) scale(...) rotate(...) perspective(...)` | Combines 2D/3D transforms; `none` resets all                             |
+| `pivot` or `transform-origin`                    | named pivot or `<x> <y> [z]`                             | Transform origin; names include `top-left`, `center`, and `bottom-right` |
+| `perspective`                                    | number                                                   | 3D perspective distance                                                  |
+| `backface-visibility`                            | `visible` or `hidden`                                    | Back side of a rotated node                                              |
+| `filter`, `backdrop-filter`                      | `grayscale(amount)`, `blur(radius)`, `shader(name)`      | Filter the node or the pixels behind it; `none` clears the chain         |
 
 ### Input and scrollbars
 
 Scrolling itself is not a stylesheet property: a scroll container owns an offset, so `Modifier.scrollable` declares it in code (and binds that offset). A stylesheet styles the bars it produces.
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `hoverable`, `clickable`, `focusable`, `draggable`, `input-transparent` | boolean | Enables a corresponding input capability or pointer pass-through |
-| `cursor` | `default`, `hand`, `move`, `text`, `crosshair`, `resize-horizontal`, `resize-vertical`, `resize-nesw`, `resize-nwse` | Pointer shape over the node; inherited by children |
-| `scrollbar`/`scrollbar-width`/`scrollbar-thickness` | length | Scrollbar thickness; `0px` styles the bar away |
-| `scrollbar-margin`, `scrollbar-min-thumb` | length | Outer gap and minimum thumb size |
-| `scrollbar-overlay` | boolean | Draws the bar over the content instead of reserving a gutter that displaces it |
-| `scrollbar-track`, `scrollbar-thumb` | paint | Track or thumb background |
-| `scrollbar-track-border`, `scrollbar-thumb-border` | border value | Track or thumb border |
-| `scrollbar-track-radius`, `scrollbar-thumb-radius` | number | Corner radius |
-| `scrollbar-track-fit`, `scrollbar-thumb-fit` | image-fit value | Image scaling for a part |
-| `scrollbar-track-slice`, `scrollbar-thumb-slice` | 1–4 lengths | Slice edges for a part |
+| Property                                                                | Value                                                                                                                | Purpose                                                                        |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `hoverable`, `clickable`, `focusable`, `draggable`, `input-transparent` | boolean                                                                                                              | Enables a corresponding input capability or pointer pass-through               |
+| `cursor`                                                                | `default`, `hand`, `move`, `text`, `crosshair`, `resize-horizontal`, `resize-vertical`, `resize-nesw`, `resize-nwse` | Pointer shape over the node; inherited by children                             |
+| `scrollbar`/`scrollbar-width`/`scrollbar-thickness`                     | length                                                                                                               | Scrollbar thickness; `0px` styles the bar away                                 |
+| `scrollbar-margin`, `scrollbar-min-thumb`                               | length                                                                                                               | Outer gap and minimum thumb size                                               |
+| `scrollbar-overlay`                                                     | boolean                                                                                                              | Draws the bar over the content instead of reserving a gutter that displaces it |
+| `scrollbar-track`, `scrollbar-thumb`                                    | paint                                                                                                                | Track or thumb background                                                      |
+| `scrollbar-track-border`, `scrollbar-thumb-border`                      | border value                                                                                                         | Track or thumb border                                                          |
+| `scrollbar-track-radius`, `scrollbar-thumb-radius`                      | number                                                                                                               | Corner radius                                                                  |
+| `scrollbar-track-fit`, `scrollbar-thumb-fit`                            | image-fit value                                                                                                      | Image scaling for a part                                                       |
+| `scrollbar-track-slice`, `scrollbar-thumb-slice`                        | 1–4 lengths                                                                                                          | Slice edges for a part                                                         |
 
 ### Widget-specific properties
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `slider-track-thickness`/`slider-track-width` | length | Slider track thickness |
-| `slider-track`, `slider-active-track`/`slider-fill`, `slider-thumb` | paint | Slider track, filled track, and thumb paint |
-| `slider-thumb-border` | border value | Thumb border |
-| `slider-thumb-size` | `<width> <height>` | Thumb dimensions |
-| `slider-radius` | number | Slider corner radius |
-| `checkbox-mark`, `checkbox-active`/`checkbox-fill` | paint | Check mark and active background |
-| `checkbox-variant`/`checkbox-style` | `checkbox`, `radio`/`radio-button`, or `switch`/`toggle` | Checkbox presentation |
-| `caret-color`/`text-field-caret`, `selection-color`/`text-selection` | colour | Text-field caret and selection |
-| `text-shadow`/`text-field-shadow` | `<x>, <y>, [blur], [colour]` or `none` | Shadow under the field's glyphs |
-| `line-number-color` | colour | Editor line-number colour |
-| `line-numbers`, `inlay-hints` | boolean | Shows editor line numbers and inlay hints |
+| Property                                                             | Value                                                    | Purpose                                     |
+|----------------------------------------------------------------------|----------------------------------------------------------|---------------------------------------------|
+| `slider-track-thickness`/`slider-track-width`                        | length                                                   | Slider track thickness                      |
+| `slider-track`, `slider-active-track`/`slider-fill`, `slider-thumb`  | paint                                                    | Slider track, filled track, and thumb paint |
+| `slider-thumb-border`                                                | border value                                             | Thumb border                                |
+| `slider-thumb-size`                                                  | `<width> <height>`                                       | Thumb dimensions                            |
+| `slider-radius`                                                      | number                                                   | Slider corner radius                        |
+| `checkbox-mark`, `checkbox-active`/`checkbox-fill`                   | paint                                                    | Check mark and active background            |
+| `checkbox-variant`/`checkbox-style`                                  | `checkbox`, `radio`/`radio-button`, or `switch`/`toggle` | Checkbox presentation                       |
+| `caret-color`/`text-field-caret`, `selection-color`/`text-selection` | colour                                                   | Text-field caret and selection              |
+| `text-shadow`/`text-field-shadow`                                    | `<x>, <y>, [blur], [colour]` or `none`                   | Shadow under the field's glyphs             |
+| `line-number-color`                                                  | colour                                                   | Editor line-number colour                   |
+| `line-numbers`, `inlay-hints`                                        | boolean                                                  | Shows editor line numbers and inlay hints   |
 
 ### Text
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `text-wrap`/`wrap` | `wrap`/`true` or `nowrap`/`false` | Enables line wrapping |
-| `text-overflow` | `show`, `hidden`/`clip`, or `dots`/`ellipsis` | Overflow policy |
-| `text-align` | `left`/`start`, `right`/`end`, `center`, `justify` | Line alignment |
-| `white-space`/`whitespace` | `normal`/`collapse` or `pre`/`preserve`/`pre-wrap` | Whitespace handling |
-| `line-spacing`/`text-line-spacing`/`leading` | non-negative number | Extra line spacing |
-| `space-width`/`text-space-width` | non-negative number | Explicit space width |
-| `font-size` | length, `85%`, or `0.85em` | Font size; a share is taken from the text around it |
-| `font-family` | font name | Font family |
-| `box-decoration-break` | `slice` or `clone` | How an inline decoration spans wrapped lines |
-| `text-effects` (`text-effect`) | comma-separated effects | Inline text decorations and animations |
+| Property                                     | Value                                              | Purpose                                             |
+|----------------------------------------------|----------------------------------------------------|-----------------------------------------------------|
+| `text-wrap`/`wrap`                           | `wrap`/`true` or `nowrap`/`false`                  | Enables line wrapping                               |
+| `text-overflow`                              | `show`, `hidden`/`clip`, or `dots`/`ellipsis`      | Overflow policy                                     |
+| `text-align`                                 | `left`/`start`, `right`/`end`, `center`, `justify` | Line alignment                                      |
+| `white-space`/`whitespace`                   | `normal`/`collapse` or `pre`/`preserve`/`pre-wrap` | Whitespace handling                                 |
+| `line-spacing`/`text-line-spacing`/`leading` | non-negative number                                | Extra line spacing                                  |
+| `space-width`/`text-space-width`             | non-negative number                                | Explicit space width                                |
+| `font-size`                                  | length, `85%`, or `0.85em`                         | Font size; a share is taken from the text around it |
+| `font-family`                                | font name                                          | Font family                                         |
+| `box-decoration-break`                       | `slice` or `clone`                                 | How an inline decoration spans wrapped lines        |
+| `text-effects` (`text-effect`)               | comma-separated effects                            | Inline text decorations and animations              |
 
 `font-size: 85%` and `font-size: 0.85em` mean the same thing: a share of the inherited size, resolved when the style is built. A label written that way keeps up when the text around it changes size, which is how an inlay hint follows the code editor's font.
 
@@ -208,11 +208,11 @@ Text effects are `bold`, `italic`, `underline`, `strikethrough`, `code`, `link(u
 
 ### Motion
 
-| Property | Value | Purpose |
-| --- | --- | --- |
-| `transitions` (`transition`) | `<property> <duration> [easing]`, comma-separated | Interpolates property changes; `none` removes transitions |
-| `animations` (`animation`) | `<name> <duration>? <easing>? <count>? <direction>? <fill>? <state>?`, comma-separated | Starts keyframe animations; `none` clears them |
-| `animation-name`, `animation-duration`, `animation-timing-function`, `animation-delay`, `animation-iteration-count`, `animation-direction`, `animation-fill-mode`, `animation-play-state` | comma-separated lists | Individual animation fields |
+| Property                                                                                                                                                                                  | Value                                                                                  | Purpose                                                   |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| `transitions` (`transition`)                                                                                                                                                              | `<property> <duration> [easing]`, comma-separated                                      | Interpolates property changes; `none` removes transitions |
+| `animations` (`animation`)                                                                                                                                                                | `<name> <duration>? <easing>? <count>? <direction>? <fill>? <state>?`, comma-separated | Starts keyframe animations; `none` clears them            |
+| `animation-name`, `animation-duration`, `animation-timing-function`, `animation-delay`, `animation-iteration-count`, `animation-direction`, `animation-fill-mode`, `animation-play-state` | comma-separated lists                                                                  | Individual animation fields                               |
 
 Durations accept `ms`, `s`, or bare milliseconds. Easing accepts `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, `step-start`, `step-end`, `steps(count, start|end)`, and `cubic-bezier(x1,y1,x2,y2)`. Iteration count is a non-negative number or `infinite`; direction is `normal`, `reverse`, `alternate`, or `alternate-reverse`; fill mode is `none`, `forwards`, `backwards`, or `both`; play state is `running` or `paused`.
 
@@ -220,8 +220,8 @@ Durations accept `ms`, `s`, or bare milliseconds. Easing accepts `linear`, `ease
 
 The in-game editor reads the same property schema the compiler does, so what it offers is what the engine accepts.
 
-- Completion lists a property with its signature — `margin: <top> <right> <bottom> <left>` — and, after the colon, the values of the exact slot the caret is in. Animation names come from the `@keyframes` blocks in the file, and `transitions` completes the property names that can actually be transitioned.
+- Completion lists a property with its signature (`margin: <top> <right> <bottom> <left>`), and after the colon, the values of the exact slot the caret is in. Animation names come from the `@keyframes` blocks in the file, and `transitions` completes the property names that can actually be transitioned.
 - Inlay hints name the parts of a shorthand, so `margin: 8px 8px 60px 8px` reads as `top=8px right=8px bottom=60px left=8px`. Values of a single token are left alone.
 - Diagnostics point at the token they are about: an unknown property (with a suggestion), a value the compiler would reject, or an animation naming a `@keyframes` block that does not exist. A syntax error no longer hides the rest of the file.
 - `@keyframes` blocks are highlighted as such, and go-to-definition jumps from an animation name to its block.
-- A `namespace:path` literal — in a stylesheet or in a Kotlin script — gets a button that opens the file it names. Files under `hollowengine/assets` open for editing; resources served by the game open read-only.
+- A `namespace:path` literal in a stylesheet or in a Kotlin script gets a button that opens the file it names. Files under `hollowengine/assets` open for editing; resources served by the game open read-only.

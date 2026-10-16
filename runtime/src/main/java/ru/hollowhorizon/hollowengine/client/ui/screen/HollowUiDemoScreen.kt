@@ -6,8 +6,8 @@ import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiBackfaceVisibility
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Video
-import ru.hollowhorizon.hollowengine.client.utils.mc
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.client.utils.mc
 
 class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
     private var selectedTab by mutableStateOf("overview")
@@ -47,7 +47,11 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 tab("docking", "Docking", "hollowengine:textures/gui/icons/code_editor.svg")
                 tab("effects", "Эффекты", "hollowengine:textures/gui/npc_menu/character.png")
                 tab("shapes", "Shapes", "hollowengine:textures/gui/icons/code_editor.svg")
-                tab("particles", "hollowengine.gui.particles.title".lang, "hollowengine:textures/gui/npc_menu/character.png")
+                tab(
+                    "particles",
+                    "hollowengine.gui.particles.title".lang,
+                    "hollowengine:textures/gui/npc_menu/character.png"
+                )
                 tab("video", "Видео", "hollowengine:textures/gui/icons/play.svg")
             }
             Box(id = "content", tags = listOf("content")) {
@@ -74,12 +78,11 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
     @Composable
     private fun tab(id: String, label: String, icon: String) {
         Row(
-            id = "tab-$id", tags = listOf("tab"), modifier = Modifier
-                .input(hoverable = true, clickable = true)
-                .onClick {
+            id = "tab-$id",
+            tags = listOf("tab"),
+            modifier = Modifier.input(hoverable = true, clickable = true).onClick {
                     selectedTab = id
-                }
-        ) {
+                }) {
             Image(icon, tags = listOf("tab-icon"))
             Text(label, tags = listOf("tab-label"))
         }
@@ -90,15 +93,13 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
         Column(tags = listOf("panel", "scroll-panel"), modifier = Modifier.scrollable()) {
             Text("Какой-то интерфейс", tags = listOf("title"))
             Text(
-                "Здесь могла быть ваша реклама, но у вас нет денег :)",
-                tags = listOf("body")
+                "Здесь могла быть ваша реклама, но у вас нет денег :)", tags = listOf("body")
             )
             repeat(18) { index ->
                 Row(tags = listOf("row")) {
                     Image("hollowengine:textures/gui/quests/quest_icon.png", tags = listOf("small-icon"))
                     Text(
-                        "Какая-то фигня для прокрутки под номером ${index + 1}.",
-                        tags = listOf("body")
+                        "Какая-то фигня для прокрутки под номером ${index + 1}.", tags = listOf("body")
                     )
                 }
             }
@@ -180,8 +181,6 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 Text("Rich text (Text {})", tags = listOf("card-title"))
                 Text(tags = listOf("textflow-para")) {
                     Span("Text{} flows spans, a ")
-                    // A nested Text{} is an inline group: its spans flatten into this line breaking
-                    // while its padded rounded background is sliced continuously across wrap points.
                     Text(tags = listOf("group-slice")) {
                         Span("sliced group whose highlight stays continuous across wrapped lines")
                     }
@@ -206,15 +205,11 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 Row(
                     id = "popup-anchor",
                     tags = listOf("popup-anchor"),
-                    modifier = Modifier.input(hoverable = true, clickable = true)
-                        .onPlaced { popupAnchorBounds = it }
-                        .onEnter { popupTooltipVisible = true }
-                        .onExit { popupTooltipVisible = false }
-                        .onClick {
+                    modifier = Modifier.input(hoverable = true, clickable = true).onPlaced { popupAnchorBounds = it }
+                        .onEnter { popupTooltipVisible = true }.onExit { popupTooltipVisible = false }.onClick {
                             popupAnchorExpanded = !popupAnchorExpanded
                             it.consume()
-                        }
-                ) {
+                        }) {
                     Text("Click: toggle popup · hover: tooltip", tags = listOf("popup-anchor-label"))
                 }
                 if (popupAnchorExpanded) {
@@ -251,8 +246,7 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
     @Composable
     private fun inlineFlowLab() {
         Column(
-            tags = listOf("panel", "textlab-panel"),
-            modifier = Modifier.scrollable()
+            tags = listOf("panel", "textlab-panel"), modifier = Modifier.scrollable()
         ) {
             Row(tags = listOf("textlab-controls")) {
                 toggle("wrap", textLabWrap) { textLabWrap = !textLabWrap }
@@ -308,8 +302,6 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 }
                 Box(
                     tags = listOf("textlab-handle"),
-                    // draggable=true so the drag owns the pointer and the resize cursor stays put
-                    // instead of flickering as the mouse leaves the thin handle mid-drag.
                     modifier = Modifier.input(hoverable = true, draggable = true)
                         .cursor(UiCursorShape.RESIZE_HORIZONTAL)
                         .onDrag { textLabWidth = (textLabWidth + it.deltaX).coerceIn(120f, 900f) },
@@ -341,8 +333,6 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
 
     @Composable
     private fun toggle(label: String, checked: Boolean, onToggle: () -> Unit) {
-        // A plain non-interactive indicator (not a Checkbox widget) so the whole row — icon
-        // included — routes the click to onClick instead of the checkbox eating it.
         Row(
             tags = listOf("textlab-toggle"),
             modifier = Modifier.input(hoverable = true, clickable = true).onClick { onToggle() },
@@ -374,15 +364,13 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                     id = "free-node-$index",
                     tags = listOf("free-node"),
                     modifier = Modifier.position((40 + index * 96 + offset.x).px, (40 + index % 4 * 82 + offset.y).px)
-                        .input(hoverable = true, draggable = true)
-                        .onDrag {
+                        .input(hoverable = true, draggable = true).onDrag {
                             val nodeKey = it.node.id
                             val index = nodeKey?.removePrefix("free-node-")?.toIntOrNull() ?: return@onDrag
                             val current = freeNodeOffsets[index] ?: DemoOffset.Zero
                             freeNodeOffsets[index] = DemoOffset(current.x + it.deltaX, current.y + it.deltaY)
                             it.consume()
-                        }
-                ) {
+                        }) {
                     Text("Нода ${index + 1}", tags = listOf("free-label"))
                 }
             }
@@ -390,12 +378,10 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 id = "layout-glass",
                 tags = listOf("layout-glass", "glass-card"),
                 modifier = Modifier.position((140 + layoutGlassOffset.x).px, (260 + layoutGlassOffset.y).px)
-                    .input(hoverable = true, draggable = true)
-                    .onDrag {
+                    .input(hoverable = true, draggable = true).onDrag {
                         layoutGlassOffset = DemoOffset(layoutGlassOffset.x + it.deltaX, layoutGlassOffset.y + it.deltaY)
                         it.consume()
-                    }
-            ) {
+                    }) {
                 Text("Стекляшка", tags = listOf("card-title"))
                 Text("Ну и нафиг я это делал? Кому вообещ нужно размывать чате по центру...", tags = listOf("body"))
             }
@@ -410,10 +396,7 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
             modifier = Modifier.size(100.percent, 100.percent),
         ) { item ->
             Column(
-                id = "dock-demo-${item.id}",
-                tags = listOf("panel"),
-                modifier = Modifier.padding(12.px)
-                    .gap(8.px)
+                id = "dock-demo-${item.id}", tags = listOf("panel"), modifier = Modifier.padding(12.px).gap(8.px)
             ) {
                 Text(item.title, tags = listOf("title"))
                 when (item.id) {
@@ -421,9 +404,7 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                     "editor" -> dockDemoRows("fun main() {", "    scene(\"intro\")", "    character(\"Ada\")", "}")
                     "preview" -> dockPreview()
                     "console" -> dockDemoRows(
-                        "[info] Runtime started",
-                        "[info] UI hot reload ready",
-                        "[warn] Missing optional icon"
+                        "[info] Runtime started", "[info] UI hot reload ready", "[warn] Missing optional icon"
                     )
 
                     "inspector" -> dockDemoRows("Transform", "Position: 0, 0, 0", "Rotation: 0, 0, 0", "Scale: 1, 1, 1")
@@ -445,8 +426,7 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
     @Composable
     private fun dockPreview() {
         Box(
-            modifier = Modifier.size(100.percent, 100.percent)
-                .background(UiColor(0.08f, 0.1f, 0.13f, 1f))
+            modifier = Modifier.size(100.percent, 100.percent).background(UiColor(0.08f, 0.1f, 0.13f, 1f))
                 .border(1.px, UiColor(0.24f, 0.28f, 0.34f, 1f), 6f)
         ) {
             Text("Viewport", tags = listOf("body"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
@@ -474,15 +454,12 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
             Box(
                 id = "flip-zone",
                 tags = listOf("flip-zone"),
-                modifier = Modifier.position(420.px, 18.px)
-                    .input(hoverable = true)
-                    .onEnter { flipHovered = true }
+                modifier = Modifier.position(420.px, 18.px).input(hoverable = true).onEnter { flipHovered = true }
                     .onExit { flipHovered = false },
             ) {
                 Column(
                     tags = listOf("effect-card", "flip-face", "flip-front"),
-                    modifier = Modifier.position(0.px, 0.px)
-                        .rotate(y = frontRotation, z = frontRotation / 4f)
+                    modifier = Modifier.position(0.px, 0.px).rotate(y = frontRotation, z = frontRotation / 4f)
                         .backfaceVisibility(UiBackfaceVisibility.HIDDEN),
                 ) {
                     Text("Лицевая сторона", tags = listOf("card-title"))
@@ -490,8 +467,7 @@ class HollowUiDemoScreen : HollowComposeUiScreen("Hollow UI Demo", DemoStyles) {
                 }
                 Column(
                     tags = listOf("effect-card", "flip-face", "flip-back"),
-                    modifier = Modifier.position(0.px, 0.px)
-                        .rotate(y = backRotation, z = frontRotation / 4f)
+                    modifier = Modifier.position(0.px, 0.px).rotate(y = backRotation, z = frontRotation / 4f)
                         .backfaceVisibility(UiBackfaceVisibility.HIDDEN)
                 ) {
                     Text("Задняя сторона", tags = listOf("card-title"))

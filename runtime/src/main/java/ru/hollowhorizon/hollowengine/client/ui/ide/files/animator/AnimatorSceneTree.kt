@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
-import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
@@ -124,7 +124,7 @@ private fun handleSceneKey(
     onSelect: (AnimatorSelection) -> Unit,
     input: UiKeyInput,
 ): Boolean {
-    if (input.key != GLFW.GLFW_KEY_DELETE) return false
+    if (!HollowKeys.DELETE.matches(input)) return false
     when (selection) {
         is AnimatorSelection.Layer -> {
             document.edit { it.withoutLayer(selection.layerId) }

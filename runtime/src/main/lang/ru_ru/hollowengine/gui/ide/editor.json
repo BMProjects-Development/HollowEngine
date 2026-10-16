@@ -18,7 +18,7 @@
   "status.resource_not_found": "Не удалось найти «%s»",
   "status.unsupported_action": "Это действие не поддерживается",
   "status.unsupported_definition": "Не удалось открыть определение в %s",
-  "completion.navigate": "— выбор,",
+  "completion.navigate": "для выбора,",
   "completion.or": "или",
-  "completion.insert": "— вставка"
+  "completion.insert": "для навигации"
 }

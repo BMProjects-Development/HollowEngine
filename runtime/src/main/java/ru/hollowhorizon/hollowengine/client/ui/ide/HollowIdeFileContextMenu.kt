@@ -50,8 +50,8 @@ private fun FileMenuItem(entry: FileContextMenuEntry, onClick: () -> Unit) {
             Image(action.icon, tags = listOf("dropdown-item-icon", "file-context-menu-icon"))
         }
         Text(action.label, tags = listOf("dropdown-item-label", "file-context-menu-label"))
-        if (action.shortcut.isNotBlank()) {
-            Text(action.shortcut, tags = listOf("dropdown-item-shortcut", "file-context-menu-shortcut"))
+        if (action.shortcutText.isNotBlank()) {
+            Text(action.shortcutText, tags = listOf("dropdown-item-shortcut", "file-context-menu-shortcut"))
         }
     }
 }

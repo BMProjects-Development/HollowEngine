@@ -9,21 +9,37 @@ import java.io.File
  * belongs on a background thread, never on the render thread.
  */
 internal object NativeFileDialogs {
-    fun saveJar(title: String, suggested: File): File? = MemoryStack.stackPush().use { stack ->
-        val filters = stack.mallocPointer(1).put(stack.UTF8(JAR_PATTERN)).flip()
-        TinyFileDialogs.tinyfd_saveFileDialog(title, suggested.absolutePath, filters, JAR_DESCRIPTION)
-            ?.let(::File)
-            ?.let { file -> if (file.extension.equals("jar", ignoreCase = true)) file else File(file.path + ".jar") }
+    fun saveJar(title: String, suggested: File): File? = save(title, suggested, JAR)
+
+    fun openJar(title: String, directory: File): File? = open(title, directory, JAR)
+
+    fun saveJson(title: String, suggested: File): File? = save(title, suggested, JSON)
+
+    fun openJson(title: String, directory: File): File? = open(title, directory, JSON)
+
+    private fun save(title: String, suggested: File, type: FileType): File? = MemoryStack.stackPush().use { stack ->
+        val filters = stack.mallocPointer(1).put(stack.UTF8(type.pattern)).flip()
+        TinyFileDialogs.tinyfd_saveFileDialog(title, suggested.absolutePath, filters, type.description)?.let(::File)
+            ?.let { file ->
+                if (file.extension.equals(
+                        type.extension,
+                        ignoreCase = true
+                    )
+                ) file else File(file.path + "." + type.extension)
+            }
     }
 
-    fun openJar(title: String, directory: File): File? = MemoryStack.stackPush().use { stack ->
-        val filters = stack.mallocPointer(1).put(stack.UTF8(JAR_PATTERN)).flip()
+    private fun open(title: String, directory: File, type: FileType): File? = MemoryStack.stackPush().use { stack ->
+        val filters = stack.mallocPointer(1).put(stack.UTF8(type.pattern)).flip()
         val start = directory.absolutePath + File.separator
-        TinyFileDialogs.tinyfd_openFileDialog(title, start, filters, JAR_DESCRIPTION, false)
-            ?.let(::File)
+        TinyFileDialogs.tinyfd_openFileDialog(title, start, filters, type.description, false)?.let(::File)
             ?.takeIf(File::isFile)
     }
 
-    private const val JAR_PATTERN = "*.jar"
-    private const val JAR_DESCRIPTION = "Java archive (*.jar)"
+    private class FileType(val extension: String, val description: String) {
+        val pattern = "*.$extension"
+    }
+
+    private val JAR = FileType("jar", "Java archive (*.jar)")
+    private val JSON = FileType("json", "JSON (*.json)")
 }

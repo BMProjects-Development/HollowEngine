@@ -1291,6 +1291,7 @@ class MinecraftUiRenderer {
         val transform = effective(command.transform)
         if (isBackfaceHidden(command.rect.width, command.rect.height, transform, command.backfaceVisibility)) return
         command.shadows.forEach { shadow ->
+            if (shadow.inset) return@forEach
             drawProjectedShadow(
                 command.rect.width,
                 command.rect.height,
@@ -1393,9 +1394,11 @@ class MinecraftUiRenderer {
     private fun appendAnalyticRectShadows(command: DrawShadowCommand): Boolean {
         if (!analyticRectRenderer.isAvailable) return false
         for (shadow in command.shadows) {
-            val transform = effective(
-                UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform
-            )
+            val transform = if (shadow.inset) {
+                effective(command.transform)
+            } else {
+                effective(UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform)
+            }
             if (isBackfaceHidden(
                     command.rect.width,
                     command.rect.height,
@@ -1403,7 +1406,7 @@ class MinecraftUiRenderer {
                     command.backfaceVisibility,
                 )
             ) continue
-            val padding = abs(shadow.spread) + shadow.blur.coerceAtLeast(0f) * 3f + 1f
+            val padding = if (shadow.inset) 0f else abs(shadow.spread) + shadow.blur.coerceAtLeast(0f) * 3f + 1f
             computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
             flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
             analyticRectBatch.appendShadow(command, shadow, transform, phaseShaderClip())

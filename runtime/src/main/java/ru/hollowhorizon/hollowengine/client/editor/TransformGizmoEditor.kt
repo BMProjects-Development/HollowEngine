@@ -5,45 +5,48 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.mojang.blaze3d.systems.RenderSystem
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import net.minecraft.world.entity.Entity
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.render.ResolvedNodeTransform
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
+import ru.hollowhorizon.hollowengine.client.render.ResolvedNodeTransform
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
 import ru.hollowhorizon.hollowengine.client.render.resolveNodeTransform
 import ru.hollowhorizon.hollowengine.client.render.worldTransformToComponent
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
-import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeModifierMask
 import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
+import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeModifierMask
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeWorldPoint
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiShadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.common.attachments.binding.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
+import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStageEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
-import ru.hollowhorizon.hollowengine.common.attachments.binding.*
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
 
 /**
  * The scene-node transform editor. The gizmo handles, bounds and light previews are projected
@@ -156,8 +159,7 @@ object TransformGizmoEditor {
         enabledValue = HollowEngineConfig.gizmoEnabled
         modesValue = HollowEngineConfig.gizmoModes.split(',')
             .mapNotNull { name -> GizmoEditMode.entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } }
-            .toSet()
-            .ifEmpty { setOf(GizmoEditMode.TRANSLATE) }
+            .toSet().ifEmpty { setOf(GizmoEditMode.TRANSLATE) }
     }
 
     @SubscribeEvent
@@ -286,11 +288,11 @@ object TransformGizmoEditor {
         return overlay.handleKey(key, scanCode, action, modifiers)
     }
 
-    /** T, R and S on the selected node, and the keys of a transform under way. */
+    /** G, R and S on the selected node, and the keys of a transform under way. */
     private fun handleTransformKey(key: Int, modifiers: Int): Boolean {
         val transform = keyboard
         if (transform != null) {
-            val result = transform.key(key)
+            val result = transform.key(key, modifiers)
             if (result == GizmoKeyResult.CHANGED) {
                 draggingKey?.let(entries::get)?.let { applyFromGizmo(it, transform.start) }
                 keyboardHint = keyboardHint?.copy(text = transform.hint)
@@ -298,13 +300,15 @@ object TransformGizmoEditor {
             }
             return finishKeyboardTransform(result) || result == GizmoKeyResult.CHANGED
         }
-        if (modifiers != 0 || pointerOverIde()) return false
+        if (pointerOverIde()) return false
 
-        val mode = GizmoKeyboardTransform.modeFor(key) ?: return false
+        val mode = GizmoKeyboardTransform.modeFor(key, modifiers) ?: return false
         val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return false
         val working = entry.working ?: return false
         val (x, y) = pointerLogical(lastPhysX, lastPhysY)
-        keyboard = GizmoKeyboardTransform(mode, working, x, y, WorldToScreenProjector, GizmoGeometry.World, GizmoManipulator.World)
+        keyboard = GizmoKeyboardTransform(
+            mode, working, x, y, WorldToScreenProjector, GizmoGeometry.World, GizmoManipulator.World
+        )
         beginEdit(entry)
         keyboardHint = KeyboardHintState(x, y, keyboard?.hint.orEmpty())
         draggingKey = entry.entryId
@@ -482,36 +486,27 @@ object TransformGizmoEditor {
     private fun GizmoOverlayContent() {
         Box(
             id = "transform-gizmo-root",
-            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss")
-                .size(100.percent, 100.percent)
+            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").size(100.percent, 100.percent)
                 .drawBehind(key = "transform-gizmo-layer") { drawGizmoLayer(this) },
         ) {
             labelState?.let { label ->
                 Text(
                     formatLabelValue(label.value),
-                    modifier = Modifier.position((label.x - 36f).px, (label.y - 18f).px)
-                        .padding(9.px, 5.px)
+                    modifier = Modifier.position((label.x - 36f).px, (label.y - 18f).px).padding(9.px, 5.px)
                         .background(UiColor(0.08f, 0.10f, 0.14f, 0.95f))
-                        .border(1.px, UiColor(0.45f, 0.55f, 0.70f, 0.75f), 7f)
-                        .shadow(
+                        .border(1.px, UiColor(0.45f, 0.55f, 0.70f, 0.75f), 7f).shadow(
                             UiShadow(
-                                offset = UiVec3(0f, 2f),
-                                blur = 7f,
-                                spread = 0f,
-                                color = UiColor(0f, 0f, 0f, 0.55f)
+                                offset = UiVec3(0f, 2f), blur = 7f, spread = 0f, color = UiColor(0f, 0f, 0f, 0.55f)
                             )
-                        )
-                        .foreground(UiColor(0.94f, 0.96f, 1f)),
+                        ).foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
 
             keyboardHint?.let { hint ->
                 Text(
                     hint.text,
-                    modifier = Modifier.position((hint.x + 16f).px, (hint.y + 16f).px)
-                        .padding(6.px, 3.px)
-                        .background(UiColor(0.08f, 0.10f, 0.14f, 0.9f))
-                        .foreground(UiColor(0.94f, 0.96f, 1f)),
+                    modifier = Modifier.position((hint.x + 16f).px, (hint.y + 16f).px).padding(6.px, 3.px)
+                        .background(UiColor(0.08f, 0.10f, 0.14f, 0.9f)).foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
 
@@ -553,7 +548,9 @@ object TransformGizmoEditor {
             }
             entry.lastBounds?.let { bounds ->
                 val width = boundsLineWidth(bounds)
-                for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) GizmoRenderer.strokeLine(scope, edge, boundsColor, width)
+                for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) GizmoRenderer.strokeLine(
+                    scope, edge, boundsColor, width
+                )
             }
         }
 
@@ -614,13 +611,12 @@ object TransformGizmoEditor {
 
     private fun pointerOverIde(): Boolean = HollowIdeOverlay.holdsPointer()
 
-    private fun pointerLogical(physX: Float, physY: Float): Pair<Float, Float> =
-        if (crosshairMode()) {
-            WorldToScreenProjector.screenCenter()
-        } else {
-            val point = hollowIdeWorldPoint(physX, physY)
-            point.x to point.y
-        }
+    private fun pointerLogical(physX: Float, physY: Float): Pair<Float, Float> = if (crosshairMode()) {
+        WorldToScreenProjector.screenCenter()
+    } else {
+        val point = hollowIdeWorldPoint(physX, physY)
+        point.x to point.y
+    }
 
     private fun isEditorAvailable(): Boolean = isEnabled && EditorMode.isAvailable()
 
@@ -632,11 +628,10 @@ object TransformGizmoEditor {
         target: TransformGizmoTarget,
         resolved: ResolvedNodeTransform,
         localBounds: Pair<Vec3f, Vec3f>?,
-    ): AABB =
-        when (target.type) {
-            TransformGizmoTargetType.MODEL -> buildNodeRenderBounds(localBounds, resolved.transform)
-            TransformGizmoTargetType.TRANSFORM -> buildGenericBounds(resolved.transform)
-        }
+    ): AABB = when (target.type) {
+        TransformGizmoTargetType.MODEL -> buildNodeRenderBounds(localBounds, resolved.transform)
+        TransformGizmoTargetType.TRANSFORM -> buildGenericBounds(resolved.transform)
+    }
 
     /** The local box of what is drawn for a node, or null while nothing has drawn it yet. */
     private fun localBoundsOf(entity: Entity?, nodeId: UUID, model: Model?): Pair<Vec3f, Vec3f>? {
@@ -753,7 +748,9 @@ object TransformGizmoEditor {
         }
         entry.worldObject?.let { target ->
             val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, TickHandler.partialTick), 0)
-            entry.updateFromResolved(resolved, WorldObjectEditing.bounds(target, TickHandler.partialTick), dragging = false)
+            entry.updateFromResolved(
+                resolved, WorldObjectEditing.bounds(target, TickHandler.partialTick), dragging = false
+            )
             return
         }
         val level = Minecraft.getInstance().level ?: return
@@ -921,9 +918,7 @@ object TransformGizmoEditor {
 }
 
 enum class GizmoEditMode {
-    TRANSLATE,
-    ROTATE,
-    SCALE,
+    TRANSLATE, ROTATE, SCALE,
 }
 
 private fun formatLabelValue(value: Double): String {

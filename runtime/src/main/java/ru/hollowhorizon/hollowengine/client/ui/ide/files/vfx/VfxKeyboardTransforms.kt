@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
 
 /**
- * T, R and S on the selected node, and the keys of a transform under way. A part of the placement the
+ * G, R and S on the selected node, and the keys of a transform under way. A part of the placement the
  * timeline drives cannot be moved unless the timeline records, the same as with the handles.
  */
 internal fun handleTransformKeys(
@@ -21,16 +21,14 @@ internal fun handleTransformKeys(
     if (input.repeat) return false
     val transform = state.keyboard
     if (transform != null) {
-        val result = transform.keyboard.key(input.key)
+        val result = transform.keyboard.key(input.key, input.modifiers)
         if (result == GizmoKeyResult.CHANGED) {
             place(document, transform, transform.start)
             moveKeyboardTransform(document, state, input.modifiers)
         }
         return finishKeyboardTransform(document, state, result) || result == GizmoKeyResult.CHANGED
     }
-    if (input.command || input.alt) return false
-
-    val mode = GizmoKeyboardTransform.modeFor(input.key) ?: return false
+    val mode = GizmoKeyboardTransform.modeFor(input.key, input.modifiers) ?: return false
     val nodeId = state.selected ?: return false
     val node = document.effect.node(nodeId) ?: return false
     val runtime = state.preview.instance?.node(nodeId) ?: return false

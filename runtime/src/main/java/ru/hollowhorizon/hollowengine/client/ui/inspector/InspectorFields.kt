@@ -245,18 +245,7 @@ fun InspectorButton(
     modifier: Modifier = Modifier,
     tags: List<String> = emptyList(),
     onClick: () -> Unit,
-) {
-    Row(
-        tags = listOf("insp-button") + tags,
-        modifier = modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        icon?.let { Image(it, tags = listOf("insp-button-icon")) }
-        Text(label, tags = listOf("insp-button-label"))
-    }
-}
+) = Button(label, icon = icon, tags = listOf("insp-button") + tags, modifier = modifier, onClick = onClick)
 
 @Composable
 fun InspectorIconButton(
@@ -268,6 +257,7 @@ fun InspectorIconButton(
     onClick: () -> Unit,
 ) = InspectorIconButton(null, icon, tooltip, modifier, active, tags, onClick)
 
+/** A small icon in a row of the inspector: no fill of its own, only its color answers the pointer. */
 @Composable
 fun InspectorIconButton(
     id: String?,
@@ -277,18 +267,15 @@ fun InspectorIconButton(
     active: Boolean = false,
     tags: List<String> = emptyList(),
     onClick: () -> Unit,
-) {
-    Image(
-        icon,
-        id = id,
-        tags = listOf("insp-icon-button") + tags + if (active) listOf("active") else emptyList(),
-        modifier = modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).tooltipOnHover(tooltip)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    )
-}
+) = IconButton(
+    icon,
+    tooltip,
+    id = id,
+    active = active,
+    tags = listOf("inline", "insp-icon-button") + tags,
+    modifier = modifier,
+    onClick = onClick,
+)
 
 @Composable
 fun DisclosureArrow(expanded: Boolean) {

@@ -9,6 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
@@ -297,32 +299,12 @@ private fun LabeledField(label: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SoundsButton(labelKey: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(
-        tags = listOf("sounds-editor-button"),
-        modifier = modifier.cursor(UiCursorShape.HAND).alignItems(UiAlign.CENTER, UiAlign.CENTER).gap(4.px)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("sounds-editor-button-icon"))
-        Text(labelKey.lang, tags = listOf("sounds-editor-button-label"))
-    }
-}
+private fun SoundsButton(labelKey: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) =
+    Button(labelKey.lang, icon = icon, modifier = modifier, onClick = onClick)
 
 @Composable
-private fun SoundsIconButton(icon: String, tags: List<String>, onClick: () -> Unit) {
-    Image(
-        icon,
-        tags = listOf("sounds-editor-icon-button") + tags,
-        modifier = Modifier.size(16.px, 16.px).cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    )
-}
+private fun SoundsIconButton(icon: String, tags: List<String>, onClick: () -> Unit) =
+    IconButton(icon, tooltip = null, tags = listOf("inline", "danger") + tags, modifier = Modifier.size(16.px, 16.px), onClick = onClick)
 
 /** Enumerates audio files under `<namespace>/sounds/` as `namespace:path` ids for name suggestions. */
 private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<String> {

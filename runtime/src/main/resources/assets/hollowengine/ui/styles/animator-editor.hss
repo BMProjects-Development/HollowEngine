@@ -1,40 +1,5 @@
 @import "hollowengine:ui/styles/theme.hss";
 
-.animator-button {
-    size: 100% 22px;
-    align-items: center;
-    justify-content: center;
-    padding: 4px 6px;
-    background: $bg-selected;
-    border: 1px alpha($white, 0.1);
-    border-radius: $radius-small;
-    cursor: hand;
-    transition: background 250ms ease-out, border-color 250ms ease-out;
-}
-
-.animator-icon-button {
-    padding: 3px;
-    background: transparent;
-    border-radius: $radius-small;
-    tint: $text-soft;
-    cursor: hand;
-    transition: background 110ms ease-out, tint 110ms ease-out;
-}
-
-.animator-icon-button:hover {
-    background: $bg-hover;
-    tint: $white;
-}
-
-.animator-icon-button.active {
-    background: $bg-selected;
-    tint: $accent;
-}
-
-.animator-icon-button.active:hover {
-    background: $bg-selected;
-}
-
 .viewport-toolbar {
     padding: 2px;
     gap: 1px;

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val SplitterWidth = 2f
@@ -52,22 +52,13 @@ private fun SplitDivider(view: HollowIdeFileView, id: String) {
 internal fun HollowIdeViewModeSwitch(view: HollowIdeFileView, id: String) {
     Row(tags = listOf("ide-view-modes"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
         HollowIdeViewMode.entries.forEach { mode ->
-            Box(
+            IconButton(
+                mode.icon,
+                mode.tooltip.lang,
                 id = "$id-view-${mode.name.lowercase()}",
-                mode = UiBoxMode.STACK,
-                tags = listOfNotNull("ide-view-mode", "selected".takeIf { view.mode == mode }),
-                modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
-                    .tooltipOnHover(mode.tooltip.lang).onClick { event ->
-                        view.mode = mode
-                        event.consume()
-                    },
-            ) {
-                Image(
-                    mode.icon,
-                    tags = listOf("ide-view-mode-icon"),
-                    modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
-                )
-            }
+                active = view.mode == mode,
+                tags = listOf("ide-view-mode"),
+            ) { view.mode = mode }
         }
     }
 }

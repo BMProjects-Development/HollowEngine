@@ -206,7 +206,7 @@ class InlineFlowTest {
         val word = span("aaaaaaaaaa")
         val comma = span(",")
         val (layout, container) = flow(67f, word, comma)
-        assertEquals(Line, layout.nodes.getValue(container).rect.height, 0.6f, "single line — comma glued to the word")
+        assertEquals(Line, layout.nodes.getValue(container).rect.height, 0.6f, "single line, comma glued to the word")
     }
 
     @Test

@@ -73,7 +73,7 @@
   "track.remove": "Take off the list",
   "action.to_start": "To the start (Home)",
   "action.to_end": "To the end",
-  "action.play": "Play or pause (Space)",
+  "action.play": "Play or pause",
   "action.prev_key": "Previous key (Down)",
   "action.next_key": "Next key (Up)",
   "action.zoom_in": "Zoom in (Ctrl+wheel)",

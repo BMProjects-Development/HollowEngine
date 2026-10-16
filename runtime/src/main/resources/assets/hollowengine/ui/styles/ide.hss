@@ -69,37 +69,14 @@
 }
 
 .ide-toolbar-button {
-    size: fit fit;
     margin: 1px;
     padding: 4px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 110ms ease-out;
-}
-
-.ide-toolbar-button:hover {
-    background: $bg-hover;
-}
-
-.ide-toolbar-button.active {
-    background: $bg-selected;
 }
 
 #ide-toolbar-search {
     size: $rail $rail;
     margin: 0px;
     padding: 5px;
-}
-
-.ide-toolbar-button-icon {
-    size: 12px 12px;
-    tint: $text-soft;
-    transition: all 110ms ease-out;
-}
-
-.ide-toolbar-button:hover .ide-toolbar-button-icon,
-.ide-toolbar-button.active .ide-toolbar-button-icon {
-    tint: $white;
 }
 
 .ide-panel, .ide-empty-editor, .ide-editor-shell {
@@ -222,49 +199,90 @@
     foreground: $text-faint;
 }
 
-.ide-shortcuts-dialog {
+.ide-keymap-dialog {
     padding: 12px;
 }
 
-.ide-shortcuts-content {
-    gap: 3px;
-    padding: 0px 8px 0px 0px;
-    @apply $thin-scroll;
+.ide-keymap-content {
+    gap: 6px;
 }
 
-.ide-shortcuts-title {
-    margin-bottom: 4px;
+.ide-keymap-header {
+    gap: 4px;
+}
+
+.ide-keymap-title {
     font-size: $font-size-title;
     foreground: $caret;
 }
 
-.ide-shortcuts-group {
+.ide-keymap-list {
+    gap: 2px;
+    padding: 0px $scroll-gutter 0px 0px;
+    @apply $thin-scroll;
+}
+
+.ide-keymap-group {
     margin-top: 6px;
-    font-size: $font-size;
     foreground: $text-muted;
 }
 
-.ide-shortcuts-row {
-    min-height: 20px;
+.ide-keymap-row {
+    min-height: 22px;
     padding: 0px 6px;
-    gap: 12px;
+    gap: 4px;
     background: $bg-hover;
     border-radius: $radius-small;
 }
 
-.ide-shortcuts-description {
-    width: 0px;
+.ide-keymap-label {
     foreground: $text-strong;
 }
 
-.ide-shortcuts-keys {
-    wrap: false;
-    padding: 1px 5px;
+/* A rebound action reads in the accent, so what differs from the defaults is found at a glance. */
+.ide-keymap-row.changed .ide-keymap-label {
+    foreground: $accent;
+}
+
+.ide-keymap-chord {
+    height: 16px;
+    padding: 0px 3px 0px 5px;
+    gap: 3px;
+    background: $border;
+    border-radius: $radius-small;
     font-size: $font-size-small;
     foreground: $caret;
-    background: $border;
-    border: 1px $border;
-    border-radius: $radius-small;
+    transition: background 100ms ease-out;
+}
+
+.ide-keymap-chord:hover {
+    background: $border-strong;
+}
+
+.ide-keymap-chord.conflict {
+    background: $danger-soft;
+    foreground: $danger;
+}
+
+.ide-keymap-chord.capturing {
+    padding: 0px 5px;
+    background: $accent-soft;
+    foreground: $accent;
+    shadow: inset 0px 0px 0px 1px $accent;
+}
+
+.ide-keymap-chord-text {
+    wrap: false;
+    align-y: center;
+}
+
+.ide-keymap-chord-remove .button-icon {
+    size: 7px 7px;
+}
+
+.ide-keymap-hint {
+    foreground: $text-faint;
+    font-size: $font-size-small;
 }
 
 .ui-profiler-panel {
@@ -275,19 +293,6 @@
     width: 100%;
     height: fit;
     gap: 4px;
-}
-
-.ui-profiler-button {
-    width: fit;
-    height: fit;
-    padding: 3px 8px;
-    background: $bg-selected;
-    border-radius: $radius-small;
-    foreground: $text-strong;
-}
-
-.ui-profiler-button:hover {
-    background: $bg-pressed;
 }
 
 .ui-profiler-scroll {
@@ -427,26 +432,6 @@
 
 .console-button {
     size: 22px 22px;
-    border-radius: $radius;
-    background: transparent;
-    transition: background 110ms ease-out;
-}
-
-.console-button:hover {
-    background: $bg-hover;
-}
-
-.console-button.disabled, .console-button.disabled:hover {
-    background: transparent;
-}
-
-.console-button-icon {
-    size: 13px 13px;
-    tint: $text-strong;
-}
-
-.console-button.disabled .console-button-icon {
-    tint: $text-faint;
 }
 
 .project-context-menu {
@@ -498,26 +483,7 @@
 }
 
 .panel-action {
-    size: fit fit;
     margin: 2px 0px;
-    padding: 3px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 110ms ease-out;
-}
-
-.panel-action:hover {
-    background: $bg-hover;
-}
-
-.panel-action-icon {
-    size: 13px 13px;
-    tint: $text-soft;
-}
-
-.panel-action:hover .panel-action-icon,
-.panel-action.active .panel-action-icon {
-    tint: $white;
 }
 
 /* A choice kept in a tool window's header, like the part of the level the scene lists. */
@@ -544,7 +510,7 @@
 
 .project-dialog-scroll {
     gap: 7px;
-    padding: 0px 8px 0px 0px;
+    padding: 0px $scroll-gutter 0px 0px;
     @apply $thin-scroll;
 }
 
@@ -623,30 +589,6 @@
 
 .project-dialog-button {
     min-width: 72px;
-    padding: 0px 10px;
-    border-radius: $radius;
-    border: 1px $text-strong;
-    background: $border;
-    transition: background 80ms ease-out;
-}
-
-.project-dialog-button:hover {
-    background: $bg-pressed;
-}
-
-.project-dialog-button.primary {
-    background: $accent;
-    foreground: $white;
-}
-
-.project-dialog-button.primary:hover {
-    background: $accent;
-}
-
-.project-dialog-button.disabled, .project-dialog-button.disabled:hover {
-    background: $bg-hover;
-    foreground: $text-faint;
-    border: 1px $border;
 }
 
 .ide-hide-toolbar-dialog {
@@ -678,31 +620,7 @@
 }
 
 .ide-hide-toolbar-dialog-button {
-    border-radius: $radius;
-    border: 1px $text-strong;
-    background: $border;
-    transition: background 80ms ease-out;
-}
-
-.ide-hide-toolbar-dialog-button:hover {
-    background: $bg-pressed;
-}
-
-.ide-hide-toolbar-dialog-button:active {
-    background: $bg-selected;
-}
-
-.ide-hide-toolbar-dialog-button.primary {
-    background: $accent;
-    foreground: $white;
-}
-
-.ide-hide-toolbar-dialog-button.primary:hover {
-    background: $accent;
-}
-
-.ide-hide-toolbar-dialog-button.primary:active {
-    background: $accent;
+    width: 88px;
 }
 
 .ide-editor-stack {
@@ -805,23 +723,7 @@
 
 .ide-find-toggle {
     size: 20px 20px;
-    border-radius: $radius-small;
-    foreground: $text-muted;
-    background: transparent;
-    transition: all 110ms ease-out;
-}
-
-.ide-find-toggle:hover {
-    background: $bg-pressed;
-}
-
-.ide-find-toggle.on {
-    background: alpha($accent-fill-hover, 0.62);
-    foreground: $caret;
-}
-
-.ide-find-toggle-label {
-    wrap: false;
+    padding: 0px;
     font-size: $font-size-small;
 }
 
@@ -838,31 +740,15 @@
 
 .ide-find-button {
     size: 20px 20px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 110ms ease-out;
 }
 
-.ide-find-button:hover {
-    background: $bg-pressed;
-}
-
-.ide-find-button-icon {
+.ide-find-button .button-icon {
     size: 11px 11px;
-    tint: $text-soft;
 }
 
 .ide-find-text-button {
-    width: fit;
     height: 20px;
     padding: 0px 8px;
-    background: $border;
-    foreground: $text-strong;
-    border-radius: $radius-small;
-}
-
-.ide-find-text-button:hover {
-    background: $bg-pressed;
 }
 
 
@@ -1063,22 +949,16 @@
 
 .problem-copy {
     size: 16px 16px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 100ms ease-out;
+    padding: 0px;
 }
 
-.problem-copy:hover {
-    background: $bg-hover;
-}
-
-.problem-copy-icon {
+/* Faint until its row is under the pointer. */
+.problem-copy .button-icon {
     size: 10px 10px;
     tint: $text-faint;
 }
 
-.problem-row:hover .problem-copy-icon,
-.problem-copy:hover .problem-copy-icon {
+.problem-row:hover .problem-copy .button-icon {
     tint: $text-strong;
 }
 
@@ -1240,30 +1120,7 @@
 }
 
 .ide-view-mode {
-    size: fit fit;
     margin: 2px 0px;
-    padding: 3px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 110ms ease-out;
-}
-
-.ide-view-mode:hover {
-    background: $bg-hover;
-}
-
-.ide-view-mode.selected {
-    background: $bg-selected;
-}
-
-.ide-view-mode-icon {
-    size: 13px 13px;
-    tint: $text-soft;
-}
-
-.ide-view-mode:hover .ide-view-mode-icon,
-.ide-view-mode.selected .ide-view-mode-icon {
-    tint: $white;
 }
 
 .ide-preview-divider {

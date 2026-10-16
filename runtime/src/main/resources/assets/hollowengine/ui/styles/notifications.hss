@@ -5,6 +5,7 @@
  */
 
 @import "hollowengine:ui/styles/theme.hss";
+@import "hollowengine:ui/styles/buttons.hss";
 
 
 .notif-stack {
@@ -50,37 +51,16 @@
 }
 
 .notif-action {
-    size: fit fit;
-    min-height: 18px;
-    padding: 2px 8px;
-    background: $bg-hover;
-    border-radius: $radius;
-    hoverable: true;
-    clickable: true;
-    transition: background 120ms ease-out;
-}
-
-.notif-action:hover { background: $bg-pressed; }
-
-.notif-action-label {
-    align: center center;
-    size: fit fit;
-    foreground: $text-strong;
-    wrap: false;
+    height: 18px;
+    padding: 0px 8px;
 }
 
 .notif-close {
     size: 16px 16px;
-    padding: 4px;
-    background: transparent;
-    border-radius: $radius;
-    tint: $text-faint;
-    transition: tint 120ms ease-out, background 120ms ease-out;
 }
 
-.notif-close:hover {
-    background: $bg-hover;
-    tint: $text-strong;
+.notif-close .button-icon {
+    size: 8px 8px;
 }
 
 .notif-track {

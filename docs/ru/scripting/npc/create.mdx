@@ -37,18 +37,18 @@ fun npc(
 ): NpcEntity
 ```
 
-| Параметр | Тип | По умолчанию | Назначение |
-|----------|-----|--------------|------------|
-| `pos` | `Vec3` | — | Позиция появления NPC. |
-| `name` | `String` | `"NPC"` | Имя над головой NPC. |
-| `model` | `String` | `"hollowengine:models/entity/player_model.gltf"` | Resource location `.gltf` модели. |
-| `rotation` | `Vec2` | `rotation(0, 0)` | Начальный yaw/pitch. |
-| `world` | `String` | `"minecraft:overworld"` | ID измерения, куда будет добавлен NPC. |
-| `attributes` | `Map<String, Float>` | `emptyMap()` | Базовые значения атрибутов через registry id. |
-| `transform` | `TrsTransformF` | `TrsTransformF()` | Локальная трансформация модели. В v2.3 не стоит полагаться на него как на стабильный публичный способ настройки. |
-| `nameplateMode` | `NameplateMode` | `NameplateMode.SHOW` | Начальный режим отображения неймплейта. |
-| `inverseHeadRotation` | `Boolean` | `false` | Зарезервировано для особенностей поворота головы/модели. |
-| `inventorySize` | `Int` | `36` | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
+| Параметр              | Тип                  | По умолчанию                                     | Назначение                                                                                                                                 |
+|-----------------------|----------------------|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `pos`                 | `Vec3`               | Отсутствует                                      | Позиция появления NPC.                                                                                                                     |
+| `name`                | `String`             | `"NPC"`                                          | Имя над головой NPC.                                                                                                                       |
+| `model`               | `String`             | `"hollowengine:models/entity/player_model.gltf"` | Resource location `.gltf` модели.                                                                                                          |
+| `rotation`            | `Vec2`               | `rotation(0, 0)`                                 | Начальный yaw/pitch.                                                                                                                       |
+| `world`               | `String`             | `"minecraft:overworld"`                          | ID измерения, куда будет добавлен NPC.                                                                                                     |
+| `attributes`          | `Map<String, Float>` | `emptyMap()`                                     | Базовые значения атрибутов через registry id.                                                                                              |
+| `transform`           | `TrsTransformF`      | `TrsTransformF()`                                | Локальная трансформация модели. В v2.3 не стоит полагаться на него как на стабильный публичный способ настройки.                           |
+| `nameplateMode`       | `NameplateMode`      | `NameplateMode.SHOW`                             | Начальный режим отображения неймплейта.                                                                                                    |
+| `inverseHeadRotation` | `Boolean`            | `false`                                          | Зарезервировано для особенностей поворота головы/модели.                                                                                   |
+| `inventorySize`       | `Int`                | `36`                                             | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
 
 :::caution
 Часть параметров уже присутствует в сигнатуре, но ещё не является полноценным стабильным пользовательским API. В v2.3 надёжно применяются позиция, поворот, мир, модель, имя, `nameplateMode`, атрибуты и стандартный аниматор. Для тонкой настройки модели, текстур и анимаций лучше явно назначать компоненты; как NPC толкается и не пускает других, задаёт компонент [Тело](/docs/hollowengine/scripting/colliders#the-body-of-an-entity).

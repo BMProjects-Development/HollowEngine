@@ -4,10 +4,7 @@ import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
 
-/**
- * Declarations within one HSS rule (and separate base rules) are last-wins; only simultaneously
- * active state rules stack — that stacking is covered in [StylePropResolutionTest].
- */
+/** Declarations within one HSS rule (and separate base rules) are last-wins. */
 class HssRuleCombiningTest {
     private fun styleOf(modifiers: List<Modifier>): UiComputedStyle =
         modifiers.flattenModifiers().toStylePatch().resolve()

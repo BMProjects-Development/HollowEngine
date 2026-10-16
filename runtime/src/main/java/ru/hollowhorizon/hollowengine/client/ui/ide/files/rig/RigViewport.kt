@@ -119,7 +119,7 @@ private fun handleKey(document: RigEditing, state: RigEditorState, input: UiKeyI
     if (input.repeat) return false
     val transform = state.transform
     if (transform != null) {
-        val result = transform.keyboard.key(input.key)
+        val result = transform.keyboard.key(input.key, input.modifiers)
         if (result == GizmoKeyResult.CHANGED) {
             document.edit { transform.frame.restored(it) }
             moveTransform(document, state, input.modifiers)
@@ -127,10 +127,9 @@ private fun handleKey(document: RigEditing, state: RigEditorState, input: UiKeyI
         return finishTransform(document, state, result) || result == GizmoKeyResult.CHANGED
     }
 
-    if (input.command) return UndoKeys.handle(document.history, input.key, input.modifiers)
-    if (input.alt) return false
+    if (UndoKeys.handle(document.history, input.key, input.modifiers)) return true
 
-    val mode = GizmoKeyboardTransform.modeFor(input.key) ?: return false
+    val mode = GizmoKeyboardTransform.modeFor(input.key, input.modifiers) ?: return false
     val selection = state.partSelection ?: return true
     val frame = state.selectedFrame() ?: return true
     if (mode == GizmoEditMode.ROTATE && frame.isWorldAligned) return true
