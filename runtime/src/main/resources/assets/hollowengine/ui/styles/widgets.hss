@@ -367,37 +367,6 @@
     text-wrap: false;
 }
 
-.ide-quick-fix-popup {
-    padding: 3px;
-    gap: 1px;
-    background: $bg-raised;
-    border: 1px $border;
-    border-radius: $radius-large;
-    shadow: 0px 6px 16px 0px $shadow;
-}
-
-.ide-quick-fix-row {
-    width: 100%;
-    height: fit;
-    min-height: 18px;
-    padding: 2px 8px;
-    border-radius: $radius;
-    foreground: $text-strong;
-    text-wrap: false;
-}
-
-.ide-quick-fix-row.selected {
-    background: alpha($accent, 0.24);
-}
-
-.ide-quick-fix-row:hover {
-    background: alpha($accent, 0.18);
-}
-
-.ide-quick-fix-label {
-    text-wrap: false;
-}
-
 .editable-text-field-inlay-swatch {
     size: 8px 8px;
     border-radius: 2px;

@@ -17,9 +17,8 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
 fun diagnosticCode(file: KtFile): List<Diagnostic> {
     val document = file.fileDocument
     val analysisDiagnostics = analyze(file) {
-        file.collectDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS)
-            .map { diagnostic ->
-                val severity = when(diagnostic.severity) {
+        file.collectDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS).map { diagnostic ->
+                val severity = when (diagnostic.severity) {
                     KaSeverity.INFO -> Severity.INFO
                     KaSeverity.ERROR -> Severity.ERROR
                     KaSeverity.WARNING -> Severity.WARNING
@@ -32,13 +31,20 @@ fun diagnosticCode(file: KtFile): List<Diagnostic> {
                 Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
             }
     }
-    val syntaxDiagnostics = PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java).map { error ->
-        Diagnostic(document.rangeOf(error.textRange), Severity.ERROR, error.errorDescription)
-    }
-    val inspections = listOf(::unusedImportDiagnostics, ::subscribeEventDiagnostics)
-        .flatMap { inspection -> runCatching { inspection(file) }.getOrDefault(emptyList()) }
-    return (analysisDiagnostics + syntaxDiagnostics + inspections).distinctBy { diagnostic ->
+    val inspections = listOf(::unusedImportDiagnostics, ::subscribeEventDiagnostics).flatMap { inspection ->
+            runCatching {
+                inspection(file)
+            }.getOrDefault(emptyList())
+        }
+    return (analysisDiagnostics + syntaxDiagnostics(file) + inspections).distinctBy { diagnostic ->
         Triple(diagnostic.range, diagnostic.severity, diagnostic.message)
+    }
+}
+
+fun syntaxDiagnostics(file: KtFile): List<Diagnostic> {
+    val document = file.fileDocument
+    return PsiTreeUtil.collectElementsOfType(file, PsiErrorElement::class.java).map { error ->
+        Diagnostic(document.rangeOf(error.textRange), Severity.ERROR, error.errorDescription)
     }
 }
 

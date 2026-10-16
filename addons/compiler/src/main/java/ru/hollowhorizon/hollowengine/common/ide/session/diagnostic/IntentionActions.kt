@@ -10,15 +10,15 @@ import ru.hollowhorizon.hollowengine.common.ide.session.completion.createComplet
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItem
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DiagnosticFix
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Position
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TextEdit
 
+/**
+ * Actions at [offset] beyond the fixes of the diagnostics there, which the editor already holds:
+ * importing an unresolved name and removing every unused import from anywhere in the file.
+ */
 internal fun ScriptingAnalyzerImpl.intentionActions(file: KtFile, offset: Int): List<DiagnosticFix> {
     val caret = offset.coerceIn(0, file.textLength)
-    val line = Position.at(file.text, caret).line
-    val diagnostics = diagnosticCode(file)
-    val actions = diagnostics.filter { line in it.range.start.line..it.range.end.line }
-        .flatMapTo(ArrayList()) { it.fixes }
+    val actions = ArrayList<DiagnosticFix>()
     val unusedImports = unusedImportDiagnostics(file).flatMap { it.fixes.take(1) }.flatMap { it.edits }
     if (unusedImports.isNotEmpty()) {
         actions += DiagnosticFix(
@@ -26,16 +26,15 @@ internal fun ScriptingAnalyzerImpl.intentionActions(file: KtFile, offset: Int): 
             listOf(unusedImports.size.toString()),
         )
     }
-    val expression = sequenceOf(caret, caret - 1).filter { it in 0 until file.textLength }
-        .mapNotNull(file::findElementAt).flatMap { it.parentsWithSelf }
-        .filterIsInstance<KtSimpleNameExpression>().firstOrNull()
-        ?: return actions.distinct()
+    val expression =
+        sequenceOf(caret, caret - 1).filter { it in 0 until file.textLength }.mapNotNull(file::findElementAt)
+            .flatMap { it.parentsWithSelf }.filterIsInstance<KtSimpleNameExpression>().firstOrNull()
+            ?: return actions.distinct()
     val unresolved = analyze(file) { expression.mainReference.resolveToSymbols().isEmpty() }
     if (!unresolved) return actions.distinct()
     val name = expression.getReferencedName()
     createCompletions(file, expression.textRange.endOffset, CompletionSink { items ->
-        items.filterIsInstance<CompletionItem.Declaration>()
-            .filter { it.import && it.name == name }
+        items.filterIsInstance<CompletionItem.Declaration>().filter { it.import && it.name == name }
             .mapNotNull { it.fqName }.distinct().forEach { fqName ->
                 actions += DiagnosticFix(
                     "hollowengine.gui.ide.editor.fix.import_declaration",

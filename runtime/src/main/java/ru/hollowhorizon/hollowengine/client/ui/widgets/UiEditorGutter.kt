@@ -35,6 +35,15 @@ internal fun List<EditableFieldLine>.lineIndex(offset: Int): Int {
     return high.coerceAtLeast(0)
 }
 
+data class UiGutterMarker(
+    val id: String,
+    val offset: Int,
+    val icon: String,
+    val tooltip: String,
+    val tags: List<String> = emptyList(),
+    val onClick: (() -> Unit)? = null,
+)
+
 internal fun editableFieldActionGutterWidth(folds: List<CodeFold>, markers: List<UiGutterMarker>, lines: List<EditableFieldLine>, fontSize: Float): Float {
     val slots = markers.groupingBy { lines.lineIndex(it.offset) }.eachCount().values.maxOrNull() ?: 0
     return (slots + if (folds.isEmpty()) 0 else 1) * gutterSlotSize(fontSize)

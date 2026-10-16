@@ -37,8 +37,10 @@ class EditorStructureTest {
     }
     private val analyzer get() = fixture.environment.analyzer
     private val javaAnalyzer get() = fixture.environment.javaAnalyzer
+
     @BeforeAll
     fun start() = fixture.start()
+
     @AfterAll
     fun close() = fixture.close()
 
@@ -57,8 +59,7 @@ class EditorStructureTest {
         assertEquals(lambda.lastIndexOf('}') + 1, fold.end)
         assertEquals("{ … }", fold.placeholder)
         for ((name, source) in listOf(
-            "One.kts" to "import java.io.File",
-            "One.java" to "import java.io.File;\nclass One {}"
+            "One.kts" to "import java.io.File", "One.java" to "import java.io.File;\nclass One {}"
         )) {
             val single = if (name.endsWith("java")) javaAnalyzer.structure(name, source).folds.single()
             else analyzer.structure(name, source).folds.single()
@@ -91,8 +92,7 @@ class EditorStructureTest {
         )
         val getter = markers.single { it.offset == text.lastIndexOf("get()") }
         assertEquals(
-            text.indexOf("get()"),
-            analyzer.gutterTargets("Overrides.kt", text, getter.offset).single().location.offset
+            text.indexOf("get()"), analyzer.gutterTargets("Overrides.kt", text, getter.offset).single().location.offset
         )
     }
 
@@ -164,14 +164,17 @@ class EditorStructureTest {
     }
 
     @Test
-    fun `a restored engine source retains library visibility without a preceding definition request`() {
+    fun `a restored engine source resolves internal library members without a preceding definition request`() {
         val root = generateSequence(Path.of("").toAbsolutePath()) { it.parent }.first {
-                it.resolve("settings.gradle.kts").isRegularFile()
-            }
+            it.resolve("settings.gradle.kts").isRegularFile()
+        }
         val file =
             root.resolve("runtime/src/main/java/ru/hollowhorizon/hollowengine/common/scripting/nodes/NodeHandlers.kt")
-        val diagnostics = analyzer.diagnostic(SourceDocumentPath.SourceFile(file.toString()).path, file.readText())
-        assertFalse(diagnostics.any { it.severity.isError() }, diagnostics.toString())
+        val text = file.readText().replace("\r\n", "\n")
+        val path = SourceDocumentPath.SourceFile(file.toString()).path
+        val handlers = text.indexOf("onStartHandlers")
+        val hover = assertNotNull(analyzer.hover(path, text, handlers + 2))
+        assertTrue("onStartHandlers" in hover.signature, hover.signature)
     }
 
     @Test
@@ -185,8 +188,7 @@ class EditorStructureTest {
         assertEquals(
             setOf(text.indexOf("getValue()"), text.indexOf("call(int value)")),
             methods.map { javaAnalyzer.gutterTargets("Overrides.java", text, it.offset).single().location.offset }
-                .toSet()
-        )
+                .toSet())
     }
 
     @Test

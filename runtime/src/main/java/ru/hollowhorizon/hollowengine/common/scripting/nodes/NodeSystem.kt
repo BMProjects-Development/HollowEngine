@@ -228,15 +228,7 @@ internal fun buildNode(
         constructorArgs(canonicalPath, binding)
         implicitReceivers(*receivers.toTypedArray())
     }
-    val evaluated = if (compiled == null) {
-        ScriptLoader.executeCompiled<NodeScript>(id, validate, configure)
-    } else {
-        runCatching {
-            validate(compiled)
-            compiled.execute<NodeScript>(configure).getOrThrow()
-        }
-    }
-    val script = evaluated.onFailure {
+    val script = ScriptLoader.executeCompiled<NodeScript>(id, validate, compiled, configure).onFailure {
         HollowEngine.LOGGER.error("Error while loading $canonicalPath", it)
         nodeScope.cancel()
     }.getOrNull() ?: return null

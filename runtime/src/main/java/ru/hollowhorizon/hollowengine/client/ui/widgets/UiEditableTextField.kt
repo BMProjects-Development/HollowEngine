@@ -489,7 +489,6 @@ fun EditableTextField(
     inlayRevision: Long = 0L,
     onInlayAction: ((UiInlayAction) -> Unit)? = null,
     completionContributor: UiCompletionContributor? = null,
-    intentionActionsProvider: UiIntentionActionsProvider? = null,
     completionRevision: Long = 0L,
     signatureHelpProvider: UiSignatureHelpProvider? = null,
     hoverInfoProvider: UiHoverInfoProvider? = null,
@@ -560,7 +559,6 @@ fun EditableTextField(
     }
     val completion = remember(state) { TextFieldCompletionState(state) }
     val codeInsight = remember(state) { EditableFieldCodeInsightState() }
-    val quickFix = remember(state) { EditableFieldQuickFixState() }
     val diagnosticsByLine = remember(layout, diagnostics) { bucketDiagnosticsByLine(layout.lines, diagnostics) }
     val matchesByLine = remember(layout, searchMatches, activeSearchMatch) {
         bucketSearchMatchesByLine(layout.lines, searchMatches, activeSearchMatch)
@@ -572,7 +570,6 @@ fun EditableTextField(
         completion.contributor = completionContributor
         state.autoScroll.follow(state, layout, scrollState, gutterWidth)
         completion.onFrame(completionRevision)
-        quickFix.onFrame(state)
         state.offsetAtPoint = { rootX, rootY ->
             val viewport = scrollState.viewport
             layout.offsetAt(
@@ -593,7 +590,6 @@ fun EditableTextField(
             .let { if (fontFamily != null) it.fontFamily(fontFamily) else it }.onFocus { state.focus() }.onUnfocus {
                 state.unfocus()
                 completion.close()
-                quickFix.close()
                 codeInsight.clearSignature()
             }.onCharTyped { event ->
                 val char = event.codePoint.toChar()
@@ -604,9 +600,7 @@ fun EditableTextField(
             }
             // Low priority: user onKeyInput handlers (default priority 0) get first refusal.
             .onKeyInput(TextFieldDefaultKeyPriority) { input ->
-                val intentionHandled = handleEditableFieldQuickFixKey(state, input, quickFix, diagnostics, intentionActionsProvider)
-                if (intentionHandled) completion.close()
-                val handled = intentionHandled ||
+                val handled = handleEditableFieldIntentionKey(state, input, completion, diagnostics) ||
                         handleEditableFieldKey(state, input, layout, completion, codeInsight)
                 if (handled || !state.readOnly && input.typesCharacter()) input.consume()
             }.onPress { event ->
@@ -701,12 +695,6 @@ fun EditableTextField(
         }
         if (completion.items.isNotEmpty()) {
             EditableFieldCompletionPopup(completion, layout, scrollState, gutterWidth)
-        }
-        if (quickFix.active) {
-            EditableFieldQuickFixPopup(quickFix, layout, scrollState, gutterWidth) { fix ->
-                applyEditableFieldQuickFix(state, fix)
-                quickFix.close()
-            }
         }
         hoverTooltip?.let { tooltip ->
             EditableFieldDiagnosticTooltipOverlay(tooltip, visible = completion.items.isEmpty())

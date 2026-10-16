@@ -1244,7 +1244,6 @@ object HollowIdeOverlay {
                     },
                     highlighter = editorSession.highlighter,
                     completions = if (file.readOnly) null else editorSession.completions,
-                    intentionActions = editorSession.intentions,
                     signatureHelp = editorSession.signatures,
                     hoverInfo = editorSession.hover,
                     diagnostics = diagnostics,

@@ -1,15 +1,15 @@
 package ru.hollowhorizon.hollowengine.common.ide.session
 
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KaModuleBase
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaNotUnderContentRootModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.contextModule
@@ -24,10 +24,9 @@ import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryMo
 class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), KotlinProjectStructureProvider {
     private val libraryModules = mutableListOf<KaRekotLibraryModule>()
     private val sourceModules = linkedMapOf<KtFile, KaModule>()
-    private val librarySourceOwners = mutableMapOf<String, KaModule>()
 
     override val allModules: List<KaModule>
-        get() = libraryModules + sourceModules.values
+        get() = libraryModules + sourceModules.values.distinct()
 
     override val allSourceFiles: List<PsiFileSystemItem>
         get() = sourceModules.keys.toList()
@@ -61,11 +60,13 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
                         return jarLibraryModule
                     }
                 }
+
                 is KaJdkLibraryModuleImpl -> {
                     if (jarLibraryModule.baseContentScope.contains(virtualFile)) {
                         return jarLibraryModule
                     }
                 }
+
                 else -> error("Unknown library module type: $jarLibraryModule")
             }
         }
@@ -88,12 +89,6 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
     internal fun setLibraryContext(file: PsiFile) {
         setModule(file, getNotUnderContentRootModule(file.project))
     }
-
-    internal fun registerLibrarySource(path: String, declaration: PsiElement) {
-        librarySourceOwners[path] = getModule(declaration, null)
-    }
-
-    internal fun librarySourceOwner(path: String): KaModule? = librarySourceOwners[path]
 
     fun removeModule(file: PsiFile) {
         if (file is KtFile) {

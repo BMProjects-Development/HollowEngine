@@ -9,26 +9,20 @@ import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclara
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationIdentity.Kind
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.SourceDeclarationMatcher
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
-import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DiagnosticFix
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import java.io.File
 import java.nio.file.Path
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import javax.tools.ToolProvider
 import kotlin.io.path.createDirectories
+import kotlin.io.path.isDirectory
 import kotlin.io.path.outputStream
 import kotlin.io.path.writeText
-import kotlin.io.path.isDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.jvm.JvmName
+import kotlin.test.*
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class IdeCodeInsightTest {
@@ -55,6 +49,7 @@ class IdeCodeInsightTest {
     private lateinit var directory: Path
     private var previousSourceManifest: String? = null
     private val sourceManifestProperty = "hollowengine.ide.sourceRoots"
+
     @BeforeAll
     fun start(@TempDir root: Path) {
         directory = root
@@ -64,8 +59,7 @@ class IdeCodeInsightTest {
         val source = directory.resolve("NavigationFixture.java").also { it.writeText(JavaFixtureSource) }
         val classes = directory.resolve("classes").createDirectories()
         assertEquals(
-            0,
-            ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(), source.toString())
+            0, ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(), source.toString())
         )
         fixture.start()
     }
@@ -118,8 +112,7 @@ class IdeCodeInsightTest {
     fun `intentions expose cleanup away from the imports and preserve initializer effects`() {
         val text = "import java.net.URI\n\nfun run() {\n    val unused = println(\"effect\")\n}\n"
         val actions = analyzer.intentionActions("unused.kts", text, text.indexOf("unused") + 2)
-        val remove =
-            assertNotNull(actions.firstOrNull { it.title.endsWith("remove_unused_variable") }, actions.toString())
+        val remove = assertNotNull(unusedVariableFix("unused.kts", text), actions.toString())
         assertTrue("println(\"effect\")" in text.apply(remove))
         assertFalse("val unused" in text.apply(remove))
         assertTrue(actions.any { it.title.endsWith("remove_unused_imports") })
@@ -129,8 +122,8 @@ class IdeCodeInsightTest {
     fun `removing an unused variable preserves its initializer expected type`() {
         val text = "fun run() { val unused: List<Int> = emptyList() }"
         val action = assertNotNull(
-            analyzer.intentionActions("typed-unused.kts", text, text.indexOf("unused"))
-                .firstOrNull { it.title.endsWith("remove_unused_variable") })
+            unusedVariableFix("typed-unused.kts", text)
+        )
         val edited = text.apply(action)
         assertFalse(analyzer.diagnostic("typed-unused.kts", edited).any { it.severity.isError() }, edited)
     }
@@ -147,11 +140,9 @@ class IdeCodeInsightTest {
             "insight.NavigationFixture.OBJECT"
         )) {
             val text = "fun run() {\n    val unused = $initializer\n}"
-            val action =
-                assertNotNull(
-                    analyzer.intentionActions("constant-unused.kts", text, text.indexOf("unused"))
-                        .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer
-                )
+            val action = assertNotNull(
+                unusedVariableFix("constant-unused.kts", text), initializer
+            )
             val edited = text.apply(action)
             assertEquals("fun run() {\n}", edited, initializer)
             assertFalse(analyzer.diagnostic("constant-unused.kts", edited).any { it.severity.isError() }, edited)
@@ -167,11 +158,9 @@ class IdeCodeInsightTest {
             "\"\${println(42)}\""
         )) {
             val text = "fun run() { val unused = $initializer }"
-            val action =
-                assertNotNull(
-                    analyzer.intentionActions("effect-unused.kts", text, text.indexOf("unused"))
-                        .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer
-                )
+            val action = assertNotNull(
+                unusedVariableFix("effect-unused.kts", text), initializer
+            )
             assertEquals("fun run() { $initializer }", text.apply(action), initializer)
         }
     }
@@ -186,8 +175,7 @@ class IdeCodeInsightTest {
             if (name == "onUpdate") {
                 assertTrue(declaration.startsWith("cfr_renamed_"), declaration)
                 assertTrue(
-                    "NodeScript" in declaration && "int" in declaration && "Function2" in declaration,
-                    declaration
+                    "NodeScript" in declaration && "int" in declaration && "Function2" in declaration, declaration
                 )
                 assertFalse("\$default" in declaration, declaration)
             } else assertTrue(declaration.startsWith("$name("), declaration)
@@ -290,8 +278,7 @@ class IdeCodeInsightTest {
         """.trimIndent()
         val spans = javaAnalyzer.highlight("decompiled/sample/Model.java", text, 0).flatMap { it.spans }
         assertTrue(
-            spans.any { (text, style) -> text == "substring" && style.color == TokenType.METHOD },
-            spans.toString()
+            spans.any { (text, style) -> text == "substring" && style.color == TokenType.METHOD }, spans.toString()
         )
         assertTrue(spans.any { (text, style) -> text == "length" && style.color == TokenType.METHOD }, spans.toString())
     }
@@ -325,22 +312,19 @@ class IdeCodeInsightTest {
             )
             assertTrue(game.text!!.startsWith("Vec3", game.offset), game.path)
             for ((arguments, signature) in listOf(
-                "1.0, 2.0, 3.0" to "add(double",
-                "net.minecraft.world.phys.Vec3.ZERO" to "add(Vec3"
+                "1.0, 2.0, 3.0" to "add(double", "net.minecraft.world.phys.Vec3.ZERO" to "add(Vec3"
             )) {
                 val call = "net.minecraft.world.phys.Vec3.ZERO.add($arguments)"
                 val method =
                     assertNotNull(analyzer.definition("minecraft-call.kts", call, call.indexOf("add") + 1), call)
                 assertTrue(method.path.startsWith("library-sources/"), method.path)
                 assertTrue(
-                    method.text!!.startsWith(signature, method.offset),
-                    method.text!!.substring(method.offset).take(150)
+                    method.text!!.startsWith(signature, method.offset), method.text!!.substring(method.offset).take(150)
                 )
             }
         } finally {
             if (previous == null) System.clearProperty(sourceManifestProperty) else System.setProperty(
-                sourceManifestProperty,
-                previous
+                sourceManifestProperty, previous
             )
         }
     }
@@ -508,6 +492,10 @@ class IdeCodeInsightTest {
         assertEquals(JavaFixtureSource.indexOf("select(int"), location.offset)
     }
 
+    // The editor offers diagnostic fixes from the diagnostics it already holds.
+    private fun unusedVariableFix(name: String, text: String) =
+        analyzer.diagnostic(name, text).flatMap { it.fixes }.firstOrNull { it.title.endsWith("remove_unused_variable") }
+
     private fun String.apply(fix: DiagnosticFix): String = fix.edits.sortedByDescending { it.start }
         .fold(this) { text, edit -> text.replaceRange(edit.start, edit.end, edit.replacement) }
 }
@@ -536,6 +524,7 @@ val navigationKotlinProperty: Int get() = 42
 
 @JvmInline
 value class NavigationTicks(val count: Int)
+
 @JvmInline
 value class NavigationDistance(val count: Int)
 

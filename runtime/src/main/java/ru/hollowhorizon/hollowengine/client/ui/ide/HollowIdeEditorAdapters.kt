@@ -3,16 +3,16 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import kotlinx.coroutines.*
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.EditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.PlainEditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.pathExtension
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
-import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
 import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
+import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -65,6 +65,15 @@ internal class HollowIdeEditorSession(
 
     @Volatile
     private var contextCompletionSnapshot = CompletionSnapshot.Empty
+
+    @Volatile
+    private var requestedIntentions: CompletionKey? = null
+
+    @Volatile
+    private var intentionJob: Job? = null
+
+    @Volatile
+    private var intentionSnapshot = CompletionSnapshot.Empty
 
     @Volatile
     private var occurrenceSnapshot = OccurrenceSnapshot.Empty
@@ -144,6 +153,10 @@ internal class HollowIdeEditorSession(
     /** Called while the UI frame is built, off the client thread: it only reads published snapshots. */
     val completions: UiCompletionContributor = UiCompletionContributor { context ->
         val analyzer = currentAnalyzer()
+        if (context.intentions) {
+            requestIntentions(context.text, context.caret, analyzer)
+            return@UiCompletionContributor intentionSnapshot.itemsAt(context.text, context.caret, analyzer)
+        }
         requestCompletions(context.text, context.caret, analyzer)
         completionSnapshot.itemsAt(
             context.text, context.caret, analyzer
@@ -151,29 +164,6 @@ internal class HollowIdeEditorSession(
     }
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
-    private var intentionJob: Job? = null
-    val intentions = UiIntentionActionsProvider { context, publish ->
-        val analyzer = currentAnalyzer()
-        val publicationDispatcher = Minecraft.getInstance().dispatcher
-        intentionJob?.cancel()
-        intentionJob = scope.launch {
-            val actions = runCatching {
-                analyzer.intentionActions(path, context.text, context.caret)
-            }.getOrElse { failure ->
-                reportAnalysisFailure("intentions", failure)
-                emptyList()
-            }
-            withContext(publicationDispatcher) {
-                publish(actions.map { fix ->
-                    UiTextQuickFix(
-                        fix.title.lang(*fix.titleArgs.toTypedArray()),
-                        fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
-                    )
-                })
-                onUpdated()
-            }
-        }
-    }
 
     fun inlayHints(text: String): List<UiInlayHint> {
         val analyzer = currentAnalyzer()
@@ -397,6 +387,24 @@ internal class HollowIdeEditorSession(
         update()
         publishedRevision.incrementAndGet()
         Minecraft.getInstance().execute(onUpdated)
+    }
+
+    private fun requestIntentions(text: String, caret: Int, analyzer: ScriptingAnalyzer) {
+        val key = CompletionKey(text.hashCode(), text.length, caret.coerceIn(0, text.length), analyzer)
+        if (requestedIntentions == key) return
+        requestedIntentions = key
+        intentionJob?.cancel()
+        intentionJob = scope.launch {
+            val items = runCatching { analyzer.intentionActions(path, text, key.caret) }.getOrElse { failure ->
+                reportAnalysisFailure("intentions", failure)
+                emptyList()
+            }.map { it.toUi().toCompletion() }
+            ensureActive()
+            if (requestedIntentions != key) return@launch
+            intentionSnapshot = CompletionSnapshot(key.textHash, key.textLength, key.caret, analyzer, items)
+            publishedRevision.incrementAndGet()
+            Minecraft.getInstance().execute(onUpdated)
+        }
     }
 
     private fun publishCompletionIfCurrent(requestRevision: Long, update: () -> Unit) {
@@ -760,14 +768,14 @@ private fun Diagnostic.toUi(text: String, lineStarts: List<Int>): UiTextDiagnost
         severity = severity.toUi(),
         line = range.start.line + 1,
         column = range.start.column + 1,
-        fixes = fixes.map { fix ->
-            UiTextQuickFix(
-                title = fix.title.lang(*fix.titleArgs.toTypedArray()),
-                edits = fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
-            )
-        },
+        fixes = fixes.map(DiagnosticFix::toUi),
     )
 }
+
+private fun DiagnosticFix.toUi() = UiTextQuickFix(
+    title = title.lang(*titleArgs.toTypedArray()),
+    edits = edits.map { UiTextEdit(it.start, it.end, it.replacement) },
+)
 
 private fun Severity.toUi(): UiTextDiagnosticSeverity {
     return when (this) {

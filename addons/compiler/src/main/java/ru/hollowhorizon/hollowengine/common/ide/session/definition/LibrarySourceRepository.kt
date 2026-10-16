@@ -10,7 +10,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.SourceDocumentPath
 import ru.hollowhorizon.hollowengine.common.scripting.ide.withNormalizedLineSeparators
 import java.io.IOException
 import java.lang.System.Logger.Level
-import java.nio.file.*
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.util.zip.ZipEntry
@@ -32,21 +35,6 @@ internal class LibrarySourceRepository(
     private val jdkSources by lazy {
         val javaHome = Path.of(System.getProperty("java.home"))
         listOfNotNull(javaHome.resolve("lib/src.zip"), javaHome.parent?.resolve("lib/src.zip")).existing()
-    }
-
-    /** A restored source tab has no preceding definition request to establish its library context. */
-    fun ownsSourcePath(name: String): Boolean {
-        val location = when (val document = SourceDocumentPath.parse(name)) {
-            is SourceDocumentPath.SourceFile -> document.file
-            is SourceDocumentPath.ArchiveEntry -> document.archive
-            else -> return false
-        }
-        val path = try {
-            Path.of(location).toAbsolutePath().normalize()
-        } catch (_: InvalidPathException) {
-            return false
-        }
-        return sourceRoots(null).any { root -> if (root.isDirectory()) path.startsWith(root) else path == root }
     }
 
     fun find(target: SourceDeclarationIdentity, classFile: VirtualFile?, packageName: String): DefinitionLocation? {
@@ -80,10 +68,7 @@ internal class LibrarySourceRepository(
             }
             val offset = matcher.offset(entry, text, target) ?: continue
             return DefinitionLocation(
-                SourceDocumentPath.SourceFile(file.toString()).path,
-                offset,
-                text,
-                readOnly = true
+                SourceDocumentPath.SourceFile(file.toString()).path, offset, text, readOnly = true
             ).withNormalizedLineSeparators()
         }
         return null
@@ -109,10 +94,7 @@ internal class LibrarySourceRepository(
                     if (!name.isInPackage(packageDirectory) && text.declaredPackage() != packageName) continue
                     val offset = matcher.offset(name, text, target.copy(packageName = packageName)) ?: continue
                     return DefinitionLocation(
-                        SourceDocumentPath.ArchiveEntry(archive.toString(), name).path,
-                        offset,
-                        text,
-                        true
+                        SourceDocumentPath.ArchiveEntry(archive.toString(), name).path, offset, text, true
                     ).withNormalizedLineSeparators()
                 }
                 null
@@ -143,8 +125,7 @@ internal class LibrarySourceRepository(
 
     private fun adjacentSources(binary: Path): List<Path> = adjacent.getOrPut(binary.toAbsolutePath().normalize()) {
         adjacentLibrarySources(
-            binary,
-            ::reportFailure
+            binary, ::reportFailure
         ).existing()
     }
 

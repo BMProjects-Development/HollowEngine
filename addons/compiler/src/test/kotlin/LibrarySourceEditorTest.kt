@@ -83,6 +83,26 @@ class LibrarySourceEditorTest {
     }
 
     @Test
+    fun `opened library sources see declarations that exist only in each other`() {
+        val first = "library-sources/neighbors/First.kt"
+        val second = "library-sources/neighbors/Second.kt"
+        val firstText = "package neighbors\n\ninternal fun onlyInSources() = 1"
+        val secondText = "package neighbors\n\nfun call() = onlyInSources()"
+        analyzer.highlight(first, firstText, -1)
+        val target = assertNotNull(analyzer.definition(second, secondText, secondText.lastIndexOf("onlyInSources") + 2))
+        assertEquals(first, target.path)
+        assertEquals(firstText.indexOf("onlyInSources"), target.offset)
+    }
+
+    @Test
+    fun `library sources report syntax errors only`() {
+        val path = "library-sources/broken/Internals.kt"
+        val semantic = "package broken\n\nfun call(): Int = \"not an int\""
+        assertTrue(analyzer.diagnostic(path, semantic).isEmpty())
+        assertTrue(analyzer.diagnostic(path, "package broken\n\nfun call( = 1").any { it.severity.isError() })
+    }
+
+    @Test
     fun `hovering Java package references uses their qualified names`() {
         val text = "package net.minecraft.client; class Example {}"
         val hover = assertNotNull(

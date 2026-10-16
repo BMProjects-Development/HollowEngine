@@ -13,17 +13,21 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import ru.hollowhorizon.hollowengine.common.ide.session.HollowEngineLanguageSettings
 
-/** An opened Kotlin source is compiled as a file in its library, rather than as a script. */
+/**
+ * Kotlin sources open in editor, compiled as ordinary files rather than as scripts. As a friend of
+ * classpath they also see its `internal` declarations, which sources of a library use freely.
+ */
 @OptIn(KaExperimentalApi::class)
 internal class KaKotlinSourceModule(
-    file: KtFile,
+    override val project: Project,
+    files: List<KtFile>,
     override val directRegularDependencies: List<KaModule>,
     override val directFriendDependencies: List<KaModule>,
 ) : KaSourceModule, KaModuleBase() {
-    override val name: String = file.name
-    override val project: Project = file.project
-    override val psiRoots: List<PsiFileSystemItem> = listOf(file)
-    override val baseContentScope: GlobalSearchScope = GlobalSearchScope.fileScope(file)
+    override val name: String = "Opened Kotlin sources"
+    override val psiRoots: List<PsiFileSystemItem> = files
+    override val baseContentScope: GlobalSearchScope =
+        GlobalSearchScope.filesScope(project, files.map { it.virtualFile ?: it.viewProvider.virtualFile })
     override val directDependsOnDependencies: List<KaModule> = emptyList()
     override val languageVersionSettings: LanguageVersionSettings = HollowEngineLanguageSettings.INSTANCE
     override val targetPlatform: TargetPlatform = JvmPlatforms.defaultJvmPlatform

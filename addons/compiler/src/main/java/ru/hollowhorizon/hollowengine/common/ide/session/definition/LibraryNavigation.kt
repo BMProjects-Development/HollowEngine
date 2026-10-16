@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.asJava.toLightElements
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedDeclaration
-import ru.hollowhorizon.hollowengine.common.ide.session.ProjectStructureProviderImpl
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
 import ru.hollowhorizon.hollowengine.common.scripting.ide.SourceDocumentPath
 import java.nio.file.Path
@@ -21,12 +20,11 @@ import java.nio.file.Path
  */
 internal class LibraryNavigation(
     private val project: Project,
-    private val projectStructure: ProjectStructureProviderImpl,
     binaryRoots: List<Path>,
 ) {
     private val matcher = SourceDeclarationMatcher(project)
     private val decompiler = CfrDefinitionDecompiler()
-    val sources = LibrarySourceRepository(matcher, binaryRoots)
+    private val sources = LibrarySourceRepository(matcher, binaryRoots)
 
     fun definitionFor(element: PsiElement): DefinitionLocation? {
         val file = element.containingFile ?: return null
@@ -46,10 +44,7 @@ internal class LibraryNavigation(
             is PsiClassOwner -> file.packageName
             else -> ""
         }
-        sources.find(target, virtualFile, packageName)?.let {
-            projectStructure.registerLibrarySource(it.path, element)
-            return it
-        }
+        sources.find(target, virtualFile, packageName)?.let { return it }
         val jvmDeclarations = if (element is KtElement) element.toLightElements() else listOf(element)
         for (declaration in jvmDeclarations) {
             val jvmTarget = SourceDeclarationIdentity.from(declaration) ?: continue

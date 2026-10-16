@@ -11,7 +11,9 @@ import com.intellij.openapi.extensions.DefaultPluginDescriptor
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.Key
 import com.intellij.psi.ClassFileViewProviderFactory
 import com.intellij.psi.FileTypeFileViewProviders
 import com.intellij.psi.compiled.ClassFileDecompilers
@@ -83,9 +85,6 @@ class AnalysisEnvironment(
     val javaHome: Path? = null,
 ) {
     private val projectDisposable = Disposer.newDisposable("AnalysisEnvironment")
-    private val decompilerDisposable = Disposer.newDisposable("Analysis decompilers").also {
-        Disposer.register(projectDisposable, it)
-    }
     private val compilerPluginSupport = AnalysisCompilerPluginSupport.create()
     private var scriptConfigurationsProvider: ClassLiteralScriptConfigurationsProvider? = null
     private val resolvedJavaHome = javaHome ?: Path.of(System.getProperty("java.home"))
@@ -128,7 +127,7 @@ class AnalysisEnvironment(
         registerProjectServices(builtins, libraries, projectStructureProvider)
 
         // Создание структуры проекта
-        val navigation = LibraryNavigation(project, projectStructureProvider, libraries.flatMap { it.binaryRoots })
+        val navigation = LibraryNavigation(project, libraries.flatMap { it.binaryRoots })
         val analysisLock = Any()
         analyzer = ScriptingAnalyzerImpl(
             kotlinCoreProjectEnvironment,
@@ -298,10 +297,17 @@ class AnalysisEnvironment(
         }
     }
 
-    private fun registerDecompilers() {
+    /**
+     * Decompilers belong to the application, which every analysis and compilation project shares.
+     * Registering them per project would stack duplicates, and removing them with a project makes
+     * IntelliJ post decompiler-change notifications that may outlive the application.
+     */
+    private fun registerDecompilers() = KotlinCoreEnvironment.underApplicationLock {
         val applicationEnvironment = kotlinCoreProjectEnvironment.environment
-        val registrationDisposable = decompilerDisposable
-        registerAnalysisEventDrain(applicationEnvironment.application)
+        val application = applicationEnvironment.application
+        if (application.getUserData(DecompilersRegistered) == true) return@underApplicationLock
+        application.putUserData(DecompilersRegistered, true)
+        val registrationDisposable = applicationEnvironment.parentDisposable
 
         applicationEnvironment.registerFileType(
             KotlinBuiltInFileType,
@@ -651,16 +657,23 @@ class AnalysisEnvironment(
     }
 
     fun dispose() {
+        if (Disposer.isDisposed(projectDisposable)) return
         scriptConfigurationsProvider?.close()
-        Disposer.dispose(decompilerDisposable)
-        awaitAnalysisEvents()
-        Disposer.dispose(projectDisposable)
+        val application = kotlinCoreProjectEnvironment.environment.application
+        if (application.isDispatchThread) {
+            application.invokeLater { Disposer.dispose(projectDisposable) }
+        } else {
+            application.invokeAndWait({}, ModalityState.any())
+            Disposer.dispose(projectDisposable)
+        }
     }
 
     fun warmUpClassIndex() {
         JavaClassNameIndex.getInstance(project).warmUp()
     }
 }
+
+private val DecompilersRegistered = Key.create<Boolean>("hollowengine.decompilers")
 
 private fun SourceCode.matchesExtension(extension: String): Boolean {
     return sequenceOf(locationId, name)

@@ -67,6 +67,7 @@ interface UiDeferredSyntaxHighlighter : UiCaretAwareSyntaxHighlighter {
 data class UiCompletionContext(
     val text: String,
     val caret: Int,
+    val intentions: Boolean = false,
 )
 
 data class UiTextCompletion(
@@ -89,6 +90,7 @@ data class UiTextCompletion(
      * [ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionCloseness].
      */
     val closeness: Int = 0,
+    val edits: List<UiTextEdit> = emptyList(),
 )
 
 fun interface UiCompletionContributor {

@@ -121,7 +121,7 @@ class ScriptRunService(
                         path, tag = null, context = state?.let { StateContext(nextState = it) }, compiled = compiled
                     )
                     check(nodes.contains(path)) { "Node initialization failed; see the server log" }
-                } else ScriptLoader.execute<Any?>(id).getOrThrow()
+                } else ScriptLoader.executeCompiled<Any?>(id, precompiled = compiled).getOrThrow()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {

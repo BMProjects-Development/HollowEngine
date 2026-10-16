@@ -101,15 +101,6 @@ internal data class EditableFieldFoldProjection(
     val placeholders: List<UiInlayHint>,
 )
 
-data class UiGutterMarker(
-    val id: String,
-    val offset: Int,
-    val icon: String,
-    val tooltip: String,
-    val tags: List<String> = emptyList(),
-    val onClick: (() -> Unit)? = null,
-)
-
 fun shiftCodeFoldsThroughEdit(original: String, edited: String, folds: List<CodeFold>): List<CodeFold> {
     if (original == edited) return folds
     val edit = uiTextEditSpan(original, edited)

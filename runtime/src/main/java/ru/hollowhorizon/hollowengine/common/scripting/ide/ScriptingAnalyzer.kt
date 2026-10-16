@@ -39,7 +39,9 @@ interface ScriptingAnalyzer {
      */
     fun documentText(path: String): String? = null
 
-    /** On-demand actions at the caret, including diagnostic fixes and import suggestions. */
+    /**
+     * Alt+Enter actions at the caret, such as import suggestions.
+     */
     fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null

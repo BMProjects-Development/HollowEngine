@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNaviga
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.intentionActions
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.syntaxDiagnostics
 import ru.hollowhorizon.hollowengine.common.ide.session.format.formatKotlinCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.highlightCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.occurrencesCode
@@ -72,6 +73,9 @@ class ScriptingAnalyzerImpl internal constructor(
     private data class ImportResolution(val files: List<KtFile>, val diagnostics: List<Diagnostic>)
 
     private val importDiagnostics = IdentityHashMap<KtFile, List<Diagnostic>>()
+    private val librarySources = LinkedHashSet<KtFile>()
+    private val sourceDependencies by lazy { libraries + builtins.kaModule }
+    private val classpath by lazy { libraries.filterNot { it.isSdk } }
 
     private fun getOrCreateFile(name: String, original: String): KtFile {
         val text = original.withUnixLineSeparators()
@@ -114,10 +118,21 @@ class ScriptingAnalyzerImpl internal constructor(
 
         val file = factory.createFile(name, text)
         files[name] = file
+        if (!file.isScript()) {
+            if (SourceDocumentPath.parse(name) != null) {
+                librarySources += file
+                updateLibrarySourcesModule()
+            } else {
+                projectStructureProvider.setModule(
+                    file,
+                    KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
+                )
+            }
+            return file
+        }
         activeFiles += name
         val imports = try {
-            if (file.isScript()) resolveImports(file, files, activeFiles)
-            else ImportResolution(emptyList(), emptyList())
+            resolveImports(file, files, activeFiles)
         } finally {
             activeFiles -= name
         }
@@ -128,16 +143,18 @@ class ScriptingAnalyzerImpl internal constructor(
             addAll(importedModules(imports.files))
             add(builtins.kaModule)
         }.distinct()
-        val module = if (file.isScript()) KaScriptModule(file, project, dependencies)
-        else KaKotlinSourceModule(
-            file,
-            dependencies,
-            listOfNotNull(
-                projectStructureProvider.librarySourceOwner(name) ?: libraries.filterNot { it.isSdk }.singleOrNull()
-                    ?.takeIf { navigation.sources.ownsSourcePath(name) })
-        )
-        projectStructureProvider.setModule(file, module)
+        projectStructureProvider.setModule(file, KaScriptModule(file, project, dependencies))
         return file
+    }
+
+    /**
+     * Opened library sources share one module, rebuilt whenever the set changes, so each sees the
+     * declarations of the others even where the classpath has no binary for them.
+     */
+    private fun updateLibrarySourcesModule() {
+        if (librarySources.isEmpty()) return
+        val module = KaKotlinSourceModule(project, librarySources.toList(), sourceDependencies, classpath)
+        librarySources.forEach { projectStructureProvider.setModule(it, module) }
     }
 
     /**
@@ -246,6 +263,7 @@ class ScriptingAnalyzerImpl internal constructor(
     internal fun cleanupFile(file: KtFile) {
         importDiagnostics.remove(file)
         projectStructureProvider.removeModule(file)
+        if (librarySources.remove(file)) updateLibrarySourcesModule()
         (file as? PsiFileEx)?.markInvalidated()
         removeFromPsiManager(file)
     }
@@ -310,7 +328,8 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun diagnostic(name: String, text: String): List<Diagnostic> = synchronized(lock) {
         val file = getOrCreateFile(name, text)
-        collectImportDiagnostics(name, file) + diagnosticCode(file)
+        if (SourceDocumentPath.parse(name) != null) syntaxDiagnostics(file)
+        else collectImportDiagnostics(name, file) + diagnosticCode(file)
     }
 
     override fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = synchronized(lock) {
