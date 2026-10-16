@@ -64,7 +64,6 @@ internal data class StoredDockLayout(
     val bottomHeight: Float = DefaultBottomHeight,
     val bottomFraction: Float = 0.5f,
     val sideSplit: Map<DockSide, Float> = emptyMap(),
-    val readOnlyDocuments: Map<String, String> = emptyMap(),
 )
 
 /**

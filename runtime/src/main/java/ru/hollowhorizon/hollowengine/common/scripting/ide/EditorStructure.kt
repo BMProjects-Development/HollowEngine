@@ -16,15 +16,16 @@ data class CodeFold(
     val collapsedByDefault: Boolean = false,
 )
 
-enum class GutterMarkerKind { OVERRIDE, COROUTINE, EVENT }
+/** A [navigable] marker leads somewhere through [ScriptingAnalyzer.gutterTargets]. */
+enum class GutterMarkerKind(val navigable: Boolean) {
+    OVERRIDE(true),
+    COROUTINE(false),
+    EVENT(false),
+}
 
 data class GutterNavigationTarget(val label: String, val location: DefinitionLocation)
 
-data class GutterMarker(
-    val offset: Int,
-    val kind: GutterMarkerKind,
-    val targets: List<GutterNavigationTarget> = emptyList(),
-)
+data class GutterMarker(val offset: Int, val kind: GutterMarkerKind)
 
 enum class ScriptRunKind { PLAIN, NODE }
 

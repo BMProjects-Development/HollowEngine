@@ -7,8 +7,8 @@ import kotlinx.coroutines.cancel
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
-import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeManager
 import ru.hollowhorizon.hollowengine.common.scripting.execution.ScriptRunService
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeManager
 
 class ServerRuntimeContext(
     server: MinecraftServer,
@@ -16,8 +16,7 @@ class ServerRuntimeContext(
     val scope: CoroutineScope =
         CoroutineScope(server.dispatcher + SupervisorJob(server.coroutineScope.coroutineContext[Job]))
     val nodes = NodeManager(server)
-    private val scriptRunService = lazy(LazyThreadSafetyMode.NONE) { ScriptRunService(server) }
-    val scriptRuns: ScriptRunService get() = scriptRunService.value
+    val scriptRuns = ScriptRunService(server, scope, nodes)
 
     fun serialize(tag: CompoundTag) {
         tag.put("nodes", CompoundTag().also(nodes::serialize))
@@ -28,7 +27,7 @@ class ServerRuntimeContext(
     }
 
     fun dispose() {
-        if (scriptRunService.isInitialized()) scriptRunService.value.dispose()
+        scriptRuns.dispose()
         nodes.dispose()
         scope.cancel()
         SharedScriptClasses.clearInstances()

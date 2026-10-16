@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionCloseness
 import ru.hollowhorizon.hollowengine.common.scripting.ide.isKotlinCodeAt
 
+/** Reads player and world, so it runs on client thread. */
 internal fun ideContextCompletions(path: String, context: UiCompletionContext): List<UiTextCompletion> {
     if (!path.isKotlinSource() || !context.text.isKotlinCodeAt(context.caret)) return emptyList()
     val word = completionWordRange(context.text, context.caret)
@@ -38,16 +39,12 @@ internal fun contextSnippetCompletions(position: Vec3, heldItem: String?, count:
     buildList {
         add(
             contextSnippet(
-                "pos",
-                "pos(${position.x}, ${position.y}, ${position.z})",
-                "player_position"
+                "pos", "pos(${position.x}, ${position.y}, ${position.z})", "player_position"
             )
         )
         if (heldItem != null) add(
             contextSnippet(
-                "item",
-                "item(\"${heldItem.escapeForRegularKotlinString()}\", $count)",
-                "held_item"
+                "item", "item(\"${heldItem.escapeForRegularKotlinString()}\", $count)", "held_item"
             )
         )
     }

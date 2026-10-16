@@ -1,14 +1,16 @@
 package ru.hollowhorizon.hollowengine.common.scripting.nodes
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
-/** Game-thread-owned replacement of a node after its old scope, including `onStop`, completes. */
-internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
+/**
+ * Game-thread-owned replacement of a node after its old scope, including `onStop`, completes.
+ * [changed] fires on the game thread whenever a node starts or finishes stopping or waiting. It may run
+ * inside `cancel`, so it must only schedule work.
+ */
+internal class NodeLifecycle(
+    private val changed: () -> Unit = {},
+    private val scope: () -> CoroutineScope,
+) {
     private val stopping = mutableMapOf<String, Job>()
     private val pending = mutableMapOf<String, Job>()
 
@@ -27,6 +29,7 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
         cancelStart(path)
         if (!job.isCompleted) {
             stopping[path] = job
+            job.notifyOnCompletion()
         }
         job.cancel()
     }
@@ -49,7 +52,14 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
             start()
         }
         pending[path] = next
+        next.notifyOnCompletion()
         next.start()
+        changed()
+    }
+
+    /** A node's last child may finish on a worker thread; the notification still belongs to the game thread. */
+    private fun Job.notifyOnCompletion() {
+        invokeOnCompletion { scope().launch { changed() } }
     }
 
     private fun MutableMap<String, Job>.activePaths(): Set<String> {

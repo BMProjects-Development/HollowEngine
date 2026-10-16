@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.toReadablePath
+import ru.hollowhorizon.hollowengine.common.scripting.ide.SourceDocumentPath
 import java.io.File
 import java.io.IOException
 import java.nio.file.*
@@ -102,7 +103,8 @@ internal class HollowIdeModel(
     fun openFile(path: String): HollowIdeOpenResult {
         selectedTreePath = path
         files[path]?.takeIf { it.readOnly }?.let { return HollowIdeOpenResult.File(it, created = false) }
-        readLibrarySource(path)?.let { return HollowIdeOpenResult.File(openReadOnly(path, it), created = true) }
+        SourceDocumentPath.parse(path)?.let(::readSourceDocument)
+            ?.let { return HollowIdeOpenResult.File(openReadOnly(path, it), created = true) }
         if (path.isVirtualIdePath()) return HollowIdeOpenResult.Unsupported
         val file = try {
             path.fromReadablePath()
@@ -331,12 +333,18 @@ internal class HollowIdeModel(
 
     /** Reads every open file without unsaved edits again from disk. */
     fun rereadUnchangedFiles() {
-        files.values.toList().filter { !it.dirty && !it.readOnly && !it.virtual && it.type.requiresContent }.forEach { file ->
-            val source = file.path.fromReadablePath()
-            if (!source.isFile) return@forEach
-            runCatching { file.refresh(source.readBytes()) }
-                .onFailure { HollowEngine.LOGGER.warn("Could not read '{}' again: {}", file.path, it.message) }
-        }
+        files.values.toList().filter { !it.dirty && !it.readOnly && !it.virtual && it.type.requiresContent }
+            .forEach { file ->
+                val source = file.path.fromReadablePath()
+                if (!source.isFile) return@forEach
+                runCatching { file.refresh(source.readBytes()) }.onFailure {
+                        HollowEngine.LOGGER.warn(
+                            "Could not read '{}' again: {}",
+                            file.path,
+                            it.message
+                        )
+                    }
+            }
     }
 
     /** Reconcile once on return from another application, without polling the filesystem per frame. */
@@ -594,12 +602,12 @@ internal class HollowIdeFileNode(
         val files = path.fromReadablePath().listFiles().orEmpty()
         children.clear()
         children += files.sortedWith(compareBy<File> { it.isFile }.thenBy { it.name.lowercase() }).map { file ->
-                val childPath = if (path.isEmpty()) file.name else "$path/${file.name}"
-                HollowIdeFileNode(file.name, childPath, depth + 1, file.isDirectory).apply {
-                    expanded = childPath in expandedPaths
-                    if (expanded) refresh(expandedPaths)
-                }
+            val childPath = if (path.isEmpty()) file.name else "$path/${file.name}"
+            HollowIdeFileNode(file.name, childPath, depth + 1, file.isDirectory).apply {
+                expanded = childPath in expandedPaths
+                if (expanded) refresh(expandedPaths)
             }
+        }
     }
 
     fun expandedPaths(): Set<String> = buildSet {
@@ -663,8 +671,7 @@ private fun targetDirectory(path: String): File {
 private fun File.isExtractedScript(): Boolean {
     val path = toPath().toAbsolutePath().normalize()
     return sequenceOf(
-        DirectoryManager.SCRIPT_SOURCE_CACHE,
-        DirectoryManager.SCRIPT_BUNDLE_CACHE
+        DirectoryManager.SCRIPT_SOURCE_CACHE, DirectoryManager.SCRIPT_BUNDLE_CACHE
     ).any { root -> path.startsWith(root.toPath().toAbsolutePath().normalize()) }
 }
 

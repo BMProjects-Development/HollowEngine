@@ -4,8 +4,8 @@ import org.junit.jupiter.api.TestInstance
 import ru.hollowhorizon.hollowengine.common.ScriptingEnvironmentImpl
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarkerKind
+import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import java.io.File
 import kotlin.test.*
@@ -30,6 +30,7 @@ class LibrarySourceEditorTest {
         )
     }
     private val analyzer get() = fixture.environment.analyzer
+    private val javaAnalyzer get() = fixture.environment.javaAnalyzer
     private var previousManifest: String? = null
 
     @BeforeAll
@@ -85,10 +86,8 @@ class LibrarySourceEditorTest {
     fun `hovering Java package references uses their qualified names`() {
         val text = "package net.minecraft.client; class Example {}"
         val hover = assertNotNull(
-            analyzer.javaAnalyzer.hover(
-                "library-sources/Example.java",
-                text,
-                text.indexOf("minecraft") + 2
+            javaAnalyzer.hover(
+                "library-sources/Example.java", text, text.indexOf("minecraft") + 2
             )
         )
         assertEquals("net.minecraft", hover.signature)
@@ -97,8 +96,7 @@ class LibrarySourceEditorTest {
     @Test
     fun `Java calls navigate to the actual Minecraft method in attached sources`() {
         val text = "class Example { void run() { net.minecraft.client.Minecraft.getInstance().getWindow(); } }"
-        val target =
-            assertNotNull(analyzer.javaAnalyzer.definition("Example.java", text, text.indexOf("getWindow") + 2))
+        val target = assertNotNull(javaAnalyzer.definition("Example.java", text, text.indexOf("getWindow") + 2))
         assertTrue(target.path.endsWith("!/net/minecraft/client/Minecraft.java"), target.path)
         assertTrue(target.text!!.startsWith("getWindow(", target.offset))
     }
@@ -125,13 +123,12 @@ class LibrarySourceEditorTest {
         assertTrue(target.path.endsWith("!/net/minecraft/client/Minecraft.java"), target.path)
         val text = target.text!!
         assertTrue(text.startsWith("getInstance(", target.offset))
-        assertFalse(analyzer.javaAnalyzer.diagnostic(target.path, text).any { it.severity.isError() })
-        val hover =
-            assertNotNull(analyzer.javaAnalyzer.hover(target.path, text, text.indexOf("package net.minecraft") + 14))
+        assertFalse(javaAnalyzer.diagnostic(target.path, text).any { it.severity.isError() })
+        val hover = assertNotNull(javaAnalyzer.hover(target.path, text, text.indexOf("package net.minecraft") + 14))
         assertTrue("net.minecraft" in hover.signature, hover.signature)
-        val spans = analyzer.javaAnalyzer.highlight(target.path, text, target.offset).flatMap { it.spans }
+        val spans = javaAnalyzer.highlight(target.path, text, target.offset).flatMap { it.spans }
         assertTrue(spans.any { (part, style) -> part == "getInstance" && style.color == TokenType.METHOD })
-        val structure = analyzer.javaAnalyzer.structure(target.path, text)
+        val structure = javaAnalyzer.structure(target.path, text)
         assertTrue(structure.folds.isNotEmpty())
         assertTrue(structure.markers.any { it.kind == GutterMarkerKind.OVERRIDE })
     }

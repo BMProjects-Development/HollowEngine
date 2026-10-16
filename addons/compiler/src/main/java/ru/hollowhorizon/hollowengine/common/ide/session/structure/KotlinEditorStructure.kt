@@ -2,21 +2,20 @@ package ru.hollowhorizon.hollowengine.common.ide.session.structure
 
 import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.analysis.api.KaSession
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotationValue
 import org.jetbrains.kotlin.analysis.api.resolution.KaFunctionCall
 import org.jetbrains.kotlin.analysis.api.resolution.KaSuccessCallInfo
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaCallableSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
+import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionProvider
 import org.jetbrains.kotlin.scripting.resolve.KtFileScriptSource
 import ru.hollowhorizon.hollowengine.common.ide.session.ScriptingAnalyzerImpl
@@ -71,8 +70,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
                 return@forEach
             }
             val offset = declaration.textOffset
-            val symbol =
-                if (declaration is KtParameter) (declaration.symbol as? KaValueParameterSymbol)?.generatedPrimaryConstructorProperty else declaration.symbol
+            val symbol = declaration.markerSymbol()
             if (symbol is KaNamedFunctionSymbol) {
                 if (EventClassId in symbol.annotations) markers += GutterMarker(offset, GutterMarkerKind.EVENT)
                 if (node && !attached && StateClassId in symbol.annotations && declaration is KtNamedFunction && declaration.parent == file.script?.blockExpression && symbol.isSuspend && symbol.valueParameters.isEmpty() && !symbol.isExtension && symbol.contextParameters.isEmpty() && declaration.bodyExpression != null) {
@@ -84,27 +82,10 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
                     runs += ScriptRunTarget(offset, ScriptRunKind.NODE, stateName)
                 }
             }
-            if (declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD) && symbol is KaCallableSymbol) {
-                val bases = symbol.directlyOverriddenSymbols.toList()
-                fun targets(accessor: KtPropertyAccessor? = null) = bases.mapNotNull { base ->
-                    val property = base as? KaPropertySymbol
-                    val target = when {
-                        accessor == null -> base
-                        accessor.isGetter -> property?.getter ?: base
-                        else -> property?.setter ?: base
-                    }
-                    definitionForSymbol(target)?.let { location ->
-                        GutterNavigationTarget(
-                            base.callableId?.asSingleFqName()?.asString() ?: base.psi?.text.orEmpty(), location
-                        )
-                    }
-                }.distinctBy { it.location.path to it.location.offset }
-                targets().takeIf { it.isNotEmpty() }
-                    ?.let { markers += GutterMarker(offset, GutterMarkerKind.OVERRIDE, it) }
+            if (declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD) && symbol is KaCallableSymbol && symbol.directlyOverriddenSymbols.any()) {
+                markers += GutterMarker(offset, GutterMarkerKind.OVERRIDE)
                 (declaration as? KtProperty)?.accessors?.forEach { accessor ->
-                    targets(accessor).takeIf { it.isNotEmpty() }?.let {
-                        markers += GutterMarker(accessor.textOffset, GutterMarkerKind.OVERRIDE, it)
-                    }
+                    markers += GutterMarker(accessor.textOffset, GutterMarkerKind.OVERRIDE)
                 }
             }
         }
@@ -120,8 +101,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             val call = (expression.resolveToCall() as? KaSuccessCallInfo)?.call as? KaFunctionCall<*> ?: return@forEach
             if ((call.symbol as? KaNamedFunctionSymbol)?.isSuspend == true && coroutineLines.add(
                     file.text.lastIndexOf(
-                        '\n',
-                        offset
+                        '\n', offset
                     ) + 1
                 )
             ) {
@@ -130,6 +110,40 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
         }
     }
     return EditorStructure(folds.distinctBy { it.start to it.end }, markers.distinctBy { it.offset to it.kind }, runs)
+}
+
+/** The declarations an override marker at [offset] leads to; an accessor marker leads to the base accessors. */
+internal fun ScriptingAnalyzerImpl.kotlinGutterTargets(file: KtFile, offset: Int): List<GutterNavigationTarget> {
+    val owner = file.findElementAt(offset)?.parentsWithSelf?.firstOrNull { element ->
+        (element is KtPropertyAccessor || element is KtCallableDeclaration) && element.textOffset == offset
+    } ?: return emptyList()
+    val accessor = owner as? KtPropertyAccessor
+    val declaration = accessor?.property ?: owner as KtCallableDeclaration
+    return analyze(file) {
+        val symbol = declaration.markerSymbol() as? KaCallableSymbol ?: return@analyze emptyList()
+        symbol.directlyOverriddenSymbols.mapNotNull { base ->
+            val property = base as? KaPropertySymbol
+            val target = when {
+                accessor == null -> base
+                accessor.isGetter -> property?.getter ?: base
+                else -> property?.setter ?: base
+            }
+            definitionForSymbol(target)?.let { location ->
+                GutterNavigationTarget(
+                    base.callableId?.asSingleFqName()?.asString() ?: base.psi?.text.orEmpty(),
+                    location
+                )
+            }
+        }.distinctBy { it.location.path to it.location.offset }.toList()
+    }
+}
+
+/** A constructor parameter declares its property through the symbol generated for it. */
+context(session: KaSession)
+private fun KtDeclaration.markerSymbol(): KaDeclarationSymbol? = with(session) {
+    val declaration = this@markerSymbol
+    if (declaration is KtParameter) (declaration.symbol as? KaValueParameterSymbol)?.generatedPrimaryConstructorProperty
+    else declaration.symbol
 }
 
 internal fun PsiElement.fold(placeholder: String): CodeFold? =

@@ -1,21 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.scripting.execution
 
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -48,9 +36,11 @@ class ScriptRunTrackerTest {
             release.countDown()
             assertTrue(completed.await(10, TimeUnit.SECONDS))
             assertEquals(before, notifications.size, "Worker completion must wait for the owner to observe it")
-            assertTrue(notifications.all { it === owner })
             assertEquals(ScriptExecutionStatus.IDLE, tracker.status("script"))
             assertTrue(tracker.paths().isEmpty())
+            runCurrent()
+            assertEquals(before + 1, notifications.size, "The owner is told that the run finished")
+            assertTrue(notifications.all { it === owner })
             assertTrue(tracker.start("script") {})
             advanceUntilIdle()
         } finally {
@@ -103,7 +93,11 @@ class ScriptRunTrackerTest {
     fun `stopping retains the reservation until non cancellable cleanup completes`() = runTest {
         val tracker = ScriptRunTracker(this)
         tracker.start("script") {
-            try { awaitCancellation() } finally { withContext(NonCancellable) { delay(100) } }
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) { delay(100) }
+            }
         }
         runCurrent()
         tracker.stop("script")

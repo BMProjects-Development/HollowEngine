@@ -27,7 +27,7 @@ object KotlinEditorLanguageService : EditorLanguageService {
 
 object JavaEditorLanguageService : EditorLanguageService {
     override val analyzer: ScriptingAnalyzer
-        get() = ScriptingEnvironment.currentOrNull()?.analyzer?.javaAnalyzer ?: JavaScriptingAnalyzer
+        get() = ScriptingEnvironment.currentOrNull()?.javaAnalyzer ?: JavaScriptingAnalyzer
 }
 
 object PlainEditorLanguageService : EditorLanguageService {
@@ -74,9 +74,8 @@ class HollowIdeLanguageService(
             extensions: Collection<String>,
             analyzer: () -> ScriptingAnalyzer,
         ): HollowIdeLanguageService {
-            val normalized = extensions.map { it.trim().removePrefix(".").lowercase() }
-                .filter(String::isNotBlank)
-                .distinct()
+            val normalized =
+                extensions.map { it.trim().removePrefix(".").lowercase() }.filter(String::isNotBlank).distinct()
             require(normalized.isNotEmpty()) { "At least one language extension is required" }
             return HollowIdeLanguageService(
                 id = id,

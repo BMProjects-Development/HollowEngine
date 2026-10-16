@@ -1,19 +1,19 @@
 package ru.hollowhorizon.hollowengine.common.scripting.execution
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
-import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
 import ru.hollowhorizon.hollowengine.common.network.ScriptExecutionState
 import ru.hollowhorizon.hollowengine.common.network.ScriptExecutionStatePacket
 import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeManager
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.nodeStateFunctions
@@ -21,24 +21,49 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
 
-class ScriptRunService(private val server: MinecraftServer) {
+/**
+ * Runs scripts from the editor and tells authorized players what is running, including nodes started
+ * by commands, reloads and world restoration. Owned by the server thread.
+ */
+class ScriptRunService(
+    private val server: MinecraftServer,
+    scope: CoroutineScope,
+    private val nodes: NodeManager,
+) {
     private var disposed = false
-    private val tracker = ScriptRunTracker(server.runtimeContext.scope) {
-        if (!disposed) synchronize()
-    }
+    private var synchronizationScheduled = false
+    private val tracker = ScriptRunTracker(scope, ::requestSynchronize)
     private val failures = mutableMapOf<String, String>()
     private val updates = ScriptExecutionUpdates<ServerPlayer, ScriptExecutionState>(ScriptExecutionState())
+
+    init {
+        nodes.onExecutionChanged(::requestSynchronize)
+    }
 
     fun dispose() {
         disposed = true
     }
 
-    /** Runs on the server thread; includes nodes started by commands, reloads and world restoration. */
-    fun synchronize() {
+    /**
+     * Sends what changed once the current server task finishes. Change hooks call this from inside
+     * node and job transitions, so the update never reads state that is halfway through changing, and a
+     * burst of changes becomes one packet.
+     */
+    fun requestSynchronize() {
+        if (disposed || synchronizationScheduled) return
+        synchronizationScheduled = true
+        server.dispatcher.dispatch(EmptyCoroutineContext, Runnable {
+            synchronizationScheduled = false
+            synchronize()
+        })
+    }
+
+    private fun synchronize() {
         if (disposed) return
-        val paths = tracker.paths() + server.runtimeContext.nodes.executionPaths() + failures.keys
+        val paths = tracker.paths() + nodes.executionPaths() + failures.keys
         val current = paths.associateWith { ScriptExecutionState(status(it), failure(it)) }
         val players = server.playerList.players.filter { it.hasPermissions(PlayerPermissions.GAMEMASTER) }.toSet()
         updates.synchronize(current, players) { player, allowed, reset, states ->
@@ -50,7 +75,6 @@ class ScriptRunService(private val server: MinecraftServer) {
         val path = ScriptRegistry.display(ScriptRegistry.parse(raw))
         val compiling = tracker.status(path)
         if (compiling != ScriptExecutionStatus.IDLE) return compiling
-        val nodes = server.runtimeContext.nodes
         return when {
             nodes.isStopping(path) -> ScriptExecutionStatus.STOPPING
             nodes.isStarting(path) -> ScriptExecutionStatus.STARTING
@@ -69,7 +93,10 @@ class ScriptRunService(private val server: MinecraftServer) {
                 failures.remove(path)
                 ScriptLoader.execute<Any?>(id).getOrThrow()
             }
-        }.onFailure { failures[path] = it.message ?: it.javaClass.simpleName }
+        }.onFailure {
+            failures[path] = it.message ?: it.javaClass.simpleName
+            requestSynchronize()
+        }
     }
 
     fun start(raw: String, state: String? = null) {
@@ -89,15 +116,11 @@ class ScriptRunService(private val server: MinecraftServer) {
                 if (node) {
                     require(compiled.implicitReceiverCount == 1) { "An attached node must be started on its entity" }
                     require(state == null || state in compiled.type.java.nodeStateFunctions()) { "Unknown node state: $state" }
-                    val nodes = server.runtimeContext.nodes
                     if (nodes.contains(path) || nodes.isStopping(path)) return@start
                     server.addNode(
-                        path,
-                        tag = null,
-                        context = state?.let { StateContext(nextState = it) },
-                        compiled = compiled
+                        path, tag = null, context = state?.let { StateContext(nextState = it) }, compiled = compiled
                     )
-                    check(server.runtimeContext.nodes.contains(path)) { "Node initialization failed; see the server log" }
+                    check(nodes.contains(path)) { "Node initialization failed; see the server log" }
                 } else ScriptLoader.execute<Any?>(id).getOrThrow()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -111,11 +134,26 @@ class ScriptRunService(private val server: MinecraftServer) {
     fun stop(raw: String) {
         val path = ScriptRegistry.display(ScriptRegistry.parse(raw))
         tracker.stop(path)
-        server.runtimeContext.nodes.removeNode(path)
+        nodes.removeNode(path)
     }
 }
 
+/** Joining, leaving and op or deop change who receives the run states. */
 @SubscribeEvent
-fun onServerTick(event: TickEvent.Server) {
-    event.server.runtimeContext.scriptRuns.synchronize()
+fun onPlayerJoinSynchronizeScriptRuns(event: PlayerEvent.Join) {
+    event.player.requestScriptRunsSynchronize()
+}
+
+@SubscribeEvent
+fun onPlayerLeaveSynchronizeScriptRuns(event: PlayerEvent.Leave) {
+    event.player.requestScriptRunsSynchronize()
+}
+
+@SubscribeEvent
+fun onPermissionsSynchronizeScriptRuns(event: PlayerEvent.PermissionsChanged) {
+    event.player.requestScriptRunsSynchronize()
+}
+
+private fun Player.requestScriptRunsSynchronize() {
+    if (this is ServerPlayer) server.runtimeContext.scriptRuns.requestSynchronize()
 }

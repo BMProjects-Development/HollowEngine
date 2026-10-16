@@ -30,7 +30,6 @@ class RequestScriptExecutionPacket(
                 ScriptExecutionOperation.RUN -> runs.start(path, state)
                 ScriptExecutionOperation.STOP -> runs.stop(path)
             }
-            runs.synchronize()
         }.onFailure { failure ->
             ScriptExecutionStatePacket(mapOf(path to ScriptExecutionState(error = failure.message ?: failure.javaClass.simpleName)))
                 .send(serverPlayer)

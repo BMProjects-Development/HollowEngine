@@ -1,8 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide
 
 interface ScriptingAnalyzer {
-    /** Compiler-backed Java services when available, with a lexer-only runtime fallback. */
-    val javaAnalyzer: ScriptingAnalyzer get() = JavaScriptingAnalyzer
     fun highlight(name: String, text: String, offset: Int): List<TextLine>
 
     /** Ranges to highlight for the symbol/bracket at [offset]; cheap compared to [highlight]. */
@@ -28,6 +26,19 @@ interface ScriptingAnalyzer {
 
     fun definition(name: String, text: String, offset: Int): DefinitionLocation? = null
     fun structure(name: String, text: String): EditorStructure = EditorStructure()
+
+    /**
+     * Where the navigable gutter marker at [offset] leads. Resolved only on click: the targets may
+     * live in library sources or need decompiling, which is too slow for every analysis pass.
+     */
+    fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> = emptyList()
+
+    /**
+     * Text of a read-only document this language produces on demand, such as a decompiled class, so a
+     * tab restored from the saved layout can be filled again. Null when [path] is not such a document.
+     */
+    fun documentText(path: String): String? = null
+
     /** On-demand actions at the caret, including diagnostic fixes and import suggestions. */
     fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null

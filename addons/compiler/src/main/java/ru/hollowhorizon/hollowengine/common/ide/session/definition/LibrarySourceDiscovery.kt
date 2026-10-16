@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.ide.session.definition
 
-import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -33,15 +32,20 @@ internal fun adjacentLibrarySources(binary: Path, onFailure: (Path, IOException)
     }
 }
 
+/**
+ * Manifests listing a development build's own sources and the source jars of its dependencies. One
+ * named by the launch wins over the [discovered] ones next to the build.
+ */
+internal fun attachedSourceManifests(discovered: List<Path>): List<Path> =
+    System.getProperty("hollowengine.ide.sourceRoots")?.let { listOf(Path.of(it)) } ?: discovered
+
 internal fun attachedLibrarySources(
-    developmentDirectories: List<Path>,
+    folder: Path,
+    manifests: List<Path>,
     onFailure: (Path, IOException) -> Unit,
 ): List<Path> = buildList {
-    val folder = DirectoryManager.LIBRARY_SOURCES
     add(folder)
     addAll(collectSourceArchives(folder, onFailure = onFailure).sorted())
-    val manifests = System.getProperty("hollowengine.ide.sourceRoots")?.let { listOf(Path.of(it)) }
-        ?: developmentDirectories.mapNotNull(::developmentSourceManifest).distinct()
     for (file in manifests) {
         try {
             if (file.isRegularFile()) addAll(file.readLines().filter(String::isNotBlank).map(Path::of))

@@ -62,10 +62,12 @@ import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionProvider
 import org.jetbrains.kotlin.serialization.deserialization.METADATA_FILE_EXTENSION
 import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.index.JavaClassNameIndex
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJarLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJdkLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
+import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
 import java.nio.file.Path
 import java.util.*
 import kotlin.io.path.absolutePathString
@@ -93,6 +95,7 @@ class AnalysisEnvironment(
     val kotlinCoreProjectEnvironment: KotlinCoreProjectEnvironment
     val project: MockProject
     val analyzer: ScriptingAnalyzerImpl
+    val javaAnalyzer: ScriptingAnalyzer
 
     init {
         // Установка временной директории для Idea
@@ -125,12 +128,17 @@ class AnalysisEnvironment(
         registerProjectServices(builtins, libraries, projectStructureProvider)
 
         // Создание структуры проекта
+        val navigation = LibraryNavigation(project, projectStructureProvider, libraries.flatMap { it.binaryRoots })
+        val analysisLock = Any()
         analyzer = ScriptingAnalyzerImpl(
             kotlinCoreProjectEnvironment,
             libraries,
             builtins,
-            projectStructureProvider
+            projectStructureProvider,
+            navigation,
+            analysisLock,
         )
+        javaAnalyzer = JavaLanguageAnalyzer(project, projectStructureProvider, navigation, analysisLock)
 
         // Настройка провайдера скриптов
         setupScriptDefinitions()

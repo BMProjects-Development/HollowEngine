@@ -11,15 +11,15 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.history.HistoryDock
-import ru.hollowhorizon.hollowengine.client.ui.ide.history.IdeHistories
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFilePanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.montage.MontageEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph.ShaderGraphEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFilePanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditorPanel
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.montage.MontageEditorPanel
+import ru.hollowhorizon.hollowengine.client.ui.ide.history.HistoryDock
+import ru.hollowhorizon.hollowengine.client.ui.ide.history.IdeHistories
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineDock
@@ -38,14 +38,11 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
-import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
-import ru.hollowhorizon.hollowengine.common.scripting.ide.withNormalizedLineSeparators
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.hssColorLiteralText
-import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -159,7 +156,7 @@ object HollowIdeOverlay {
     private val histories = IdeHistories(model) { file -> editorStates[file.path]?.history }
     private val fileViews = mutableMapOf<String, HollowIdeFileView>()
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
-    private var gutterNavigation by mutableStateOf<List<Pair<String, DefinitionLocation>>>(emptyList())
+    private var gutterNavigation by mutableStateOf<List<GutterNavigationTarget>>(emptyList())
     private val dragAndDrop = UiDragAndDropState()
     private var refreshFilesRequested = false
     private val externalFiles = HollowIdeExternalFiles(
@@ -603,18 +600,28 @@ object HollowIdeOverlay {
 
     private fun restoreLayout() {
         val stored = HollowIdeLayoutStore.load()
-        stored?.readOnlyDocuments?.forEach { (path, text) -> model.openReadOnly(path, text) }
         if (stored != null && dock.restore(stored, ::restoreDockItem)) return
         applyDefaultLayout()
     }
 
-    private fun toolWindow(id: String): HollowIdeToolWindow? = HollowIdeToolWindows.byId(id) ?: contributions.toolWindow(id)
+    private fun toolWindow(id: String): HollowIdeToolWindow? =
+        HollowIdeToolWindows.byId(id) ?: contributions.toolWindow(id)
 
     private fun restoreDockItem(itemId: String): DockItem? {
         toolWindow(itemId)?.let { return it.dockItem() }
         val path = fileDockItemPath(itemId) ?: return null
+        if (SourceDocumentPath.parse(path) is SourceDocumentPath.Decompiled) return restoreDecompiledDocument(path)
         val opened = model.openFile(path) as? HollowIdeOpenResult.File ?: return null
         return opened.file.dockItem()
+    }
+
+    /** The tab comes back at once; its text follows when the class has been decompiled again. */
+    private fun restoreDecompiledDocument(path: String): DockItem {
+        val file = model.openReadOnly(path, "")
+        editorSession(path).loadDocument { text ->
+            if (text != null) model.openReadOnly(path, text) else dock.close(file.id)
+        }
+        return file.dockItem()
     }
 
     private fun applyDefaultLayout() {
@@ -827,8 +834,7 @@ object HollowIdeOverlay {
 
     @Composable
     private fun RememberLayout() {
-        val layout = dock.capture().copy(readOnlyDocuments = model.files.values
-            .filter { it.readOnly && it.type.id == BuiltinTextFileTypeId && it.textOrNull != null }.associate { it.path to it.text })
+        val layout = dock.capture()
         LaunchedEffect(layout) {
             delay(LayoutSaveDelayMillis.milliseconds)
             HollowIdeLayoutStore.save(layout)
@@ -1017,8 +1023,12 @@ object HollowIdeOverlay {
             label = "hollowengine.gui.ide.windows".lang,
             expanded = openDropdown == "windows",
             onExpandedChange = { openDropdown = if (it) "windows" else null },
-            items = hollowIdeWindowMenuItems(model, dock, contributions.windowMenu(), ::applyDefaultLayout) +
-                contributions.menuItems(HollowIdeMenu.WINDOW),
+            items = hollowIdeWindowMenuItems(
+                model,
+                dock,
+                contributions.windowMenu(),
+                ::applyDefaultLayout
+            ) + contributions.menuItems(HollowIdeMenu.WINDOW),
         )
         UiDropdown(
             id = "ide-tools-menu",
@@ -1044,8 +1054,9 @@ object HollowIdeOverlay {
             label = "hollowengine.gui.ide.help".lang,
             expanded = openDropdown == "help",
             onExpandedChange = { openDropdown = if (it) "help" else null },
-            items = hollowIdeHelpMenuItems(onShowShortcuts = { shortcutsVisible = true }) +
-                contributions.menuItems(HollowIdeMenu.HELP),
+            items = hollowIdeHelpMenuItems(onShowShortcuts = { shortcutsVisible = true }) + contributions.menuItems(
+                HollowIdeMenu.HELP
+            ),
         )
     }
 
@@ -1154,7 +1165,12 @@ object HollowIdeOverlay {
                 onShowInExplorer = project::showInExplorer,
                 onDelete = project::delete,
                 onDismiss = { project.closePopups() },
-                contributedActions = { menu -> contributions.projectActions(menu.path, menu.path.fromReadablePath().isDirectory) },
+                contributedActions = { menu ->
+                    contributions.projectActions(
+                        menu.path,
+                        menu.path.fromReadablePath().isDirectory
+                    )
+                },
             )
             val dialog = project.nameDialog
             HollowIdeProjectNameDialog(
@@ -1181,9 +1197,11 @@ object HollowIdeOverlay {
         val diagnostics = editorSession.diagnostics(file.text)
         val inlayHints = editorSession.inlayHints(file.text)
         val structure = editorSession.structure(file.text)
-        val gutterMarkers = ideGutterMarkers(file, structure, { model.save(file.path) }) { targets ->
-            if (targets.size == 1) openDefinition(targets.single().second)
-            else gutterNavigation = targets
+        val gutterMarkers = ideGutterMarkers(file, structure, { model.save(file.path) }) { offset ->
+            editorSession.resolveGutterTargets(file.text, offset) { targets ->
+                if (targets.size == 1) openDefinition(targets.single().location)
+                else gutterNavigation = targets
+            }
         }
         val fontSize = HollowIdeFontSize.size
         val editorId = "editor-${file.id}"

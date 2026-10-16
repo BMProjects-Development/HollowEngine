@@ -3,28 +3,40 @@ package ru.hollowhorizon.hollowengine.common.ide.session.definition
 import com.intellij.openapi.vfs.VirtualFile
 import org.objectweb.asm.ClassReader
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
+import ru.hollowhorizon.hollowengine.common.scripting.ide.SourceDocumentPath
 import java.nio.file.Files
 import kotlin.io.path.absolutePathString
 
 internal class CfrDefinitionDecompiler {
-    private val cache = linkedMapOf<String, String>()
+    /** Recently opened classes only. Decompiled game class easily weighs hundreds of kilobytes. */
+    private val cache = object : LinkedHashMap<String, String>(CacheSize, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > CacheSize
+    }
 
     fun decompile(classFile: VirtualFile, target: SourceDeclarationIdentity, matcher: SourceDeclarationMatcher): DefinitionLocation? {
-        val outerName = classFile.nameWithoutExtension.substringBefore('$')
-        val outerFile = classFile.parent?.findChild("$outerName.class") ?: classFile
-        val classPath = outerFile.path
-        if (!classPath.endsWith(".class")) return null
-        val key = "$classPath:${outerFile.modificationStamp}"
-        val text = cache.getOrPut(key) {
-            decompileClass(outerFile) ?: return null
-        }
+        val outerFile = classFile.outerClassFile()
+        val text = text(outerFile) ?: return null
         return DefinitionLocation(
-            path = "decompiled/${ClassReader(outerFile.contentsToByteArray()).className}.java",
+            path = SourceDocumentPath.Decompiled(ClassReader(outerFile.contentsToByteArray()).className).path,
             offset = matcher.offset("decompiled.java", text,
                 target.copy(name = CfrSourceDecompiler.sourceIdentifier(target.name))) ?: return null,
             text = text,
             readOnly = true,
         )
+    }
+
+    /** Source of the outermost class [classFile] belongs to. */
+    fun text(classFile: VirtualFile): String? {
+        val outerFile = classFile.outerClassFile()
+        if (!outerFile.path.endsWith(".class")) return null
+        val key = "${outerFile.path}:${outerFile.modificationStamp}"
+        cache[key]?.let { return it }
+        return decompileClass(outerFile)?.also { cache[key] = it }
+    }
+
+    private fun VirtualFile.outerClassFile(): VirtualFile {
+        val outerName = nameWithoutExtension.substringBefore('$')
+        return parent?.findChild("$outerName.class") ?: this
     }
 
     /**
@@ -48,3 +60,4 @@ internal class CfrDefinitionDecompiler {
     }
 }
 
+private const val CacheSize = 20

@@ -33,31 +33,45 @@ import kotlin.jvm.JvmName
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class IdeCodeInsightTest {
     private val fixture = AnalysisEnvironmentTestFixture {
-        ScriptingEnvironmentImpl(javaHome = File(System.getProperty("java.home")),
-            classpath = (System.getProperty("java.class.path").split(File.pathSeparator) +
-                System.getProperty("hollowengine.ide.testClasspath").orEmpty().split(File.pathSeparator))
-                .filter(String::isNotBlank).map(::File).filter(File::exists) + directory.resolve("classes").toFile(),
+        ScriptingEnvironmentImpl(
+            javaHome = File(System.getProperty("java.home")),
+            classpath = (System.getProperty("java.class.path")
+                .split(File.pathSeparator) + System.getProperty("hollowengine.ide.testClasspath").orEmpty()
+                .split(File.pathSeparator)).filter(String::isNotBlank).map(::File)
+                .filter(File::exists) + directory.resolve("classes").toFile(),
             scriptTypes = listOf(
                 ScriptClassProvider("kts", "kotlin.Any"),
-                ScriptClassProvider("node.kts", NodeScript::class.qualifiedName!!,
-                    defaultImports = listOf("ru.hollowhorizon.hollowengine.common.scripting.nodes.*")),
-            ), mappings = Mappings.EMPTY)
+                ScriptClassProvider(
+                    "node.kts",
+                    NodeScript::class.qualifiedName!!,
+                    defaultImports = listOf("ru.hollowhorizon.hollowengine.common.scripting.nodes.*")
+                ),
+            ),
+            mappings = Mappings.EMPTY
+        )
     }
     private val analyzer get() = fixture.environment.analyzer
+    private val javaAnalyzer get() = fixture.environment.javaAnalyzer
     private lateinit var directory: Path
     private var previousSourceManifest: String? = null
     private val sourceManifestProperty = "hollowengine.ide.sourceRoots"
-    @BeforeAll fun start(@TempDir root: Path) {
+    @BeforeAll
+    fun start(@TempDir root: Path) {
         directory = root
         previousSourceManifest = System.getProperty(sourceManifestProperty)
         val emptyManifest = directory.resolve("empty-source-roots.txt").also { it.writeText("") }
         System.setProperty(sourceManifestProperty, emptyManifest.toString())
         val source = directory.resolve("NavigationFixture.java").also { it.writeText(JavaFixtureSource) }
         val classes = directory.resolve("classes").createDirectories()
-        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(), source.toString()))
+        assertEquals(
+            0,
+            ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.toString(), source.toString())
+        )
         fixture.start()
     }
-    @AfterAll fun close() {
+
+    @AfterAll
+    fun close() {
         try {
             fixture.close()
         } finally {
@@ -104,7 +118,8 @@ class IdeCodeInsightTest {
     fun `intentions expose cleanup away from the imports and preserve initializer effects`() {
         val text = "import java.net.URI\n\nfun run() {\n    val unused = println(\"effect\")\n}\n"
         val actions = analyzer.intentionActions("unused.kts", text, text.indexOf("unused") + 2)
-        val remove = assertNotNull(actions.firstOrNull { it.title.endsWith("remove_unused_variable") }, actions.toString())
+        val remove =
+            assertNotNull(actions.firstOrNull { it.title.endsWith("remove_unused_variable") }, actions.toString())
         assertTrue("println(\"effect\")" in text.apply(remove))
         assertFalse("val unused" in text.apply(remove))
         assertTrue(actions.any { it.title.endsWith("remove_unused_imports") })
@@ -113,18 +128,30 @@ class IdeCodeInsightTest {
     @Test
     fun `removing an unused variable preserves its initializer expected type`() {
         val text = "fun run() { val unused: List<Int> = emptyList() }"
-        val action = assertNotNull(analyzer.intentionActions("typed-unused.kts", text, text.indexOf("unused"))
-            .firstOrNull { it.title.endsWith("remove_unused_variable") })
+        val action = assertNotNull(
+            analyzer.intentionActions("typed-unused.kts", text, text.indexOf("unused"))
+                .firstOrNull { it.title.endsWith("remove_unused_variable") })
         val edited = text.apply(action)
         assertFalse(analyzer.diagnostic("typed-unused.kts", edited).any { it.severity.isError() }, edited)
     }
 
     @Test
     fun `removing an unused variable discards literals and constant expressions`() {
-        for (initializer in listOf("\"unused\"", "42", "true", "null", "1 + 2", "insight.NavigationFixture.TEXT", "insight.NavigationFixture.OBJECT")) {
+        for (initializer in listOf(
+            "\"unused\"",
+            "42",
+            "true",
+            "null",
+            "1 + 2",
+            "insight.NavigationFixture.TEXT",
+            "insight.NavigationFixture.OBJECT"
+        )) {
             val text = "fun run() {\n    val unused = $initializer\n}"
-            val action = assertNotNull(analyzer.intentionActions("constant-unused.kts", text, text.indexOf("unused"))
-                .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer)
+            val action =
+                assertNotNull(
+                    analyzer.intentionActions("constant-unused.kts", text, text.indexOf("unused"))
+                        .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer
+                )
             val edited = text.apply(action)
             assertEquals("fun run() {\n}", edited, initializer)
             assertFalse(analyzer.diagnostic("constant-unused.kts", edited).any { it.severity.isError() }, edited)
@@ -133,10 +160,18 @@ class IdeCodeInsightTest {
 
     @Test
     fun `removing an unused variable keeps calls mutable fields and interpolated effects`() {
-        for (initializer in listOf("println(42)", "insight.NavigationFixture.mutable", "insight.NavigationFixture(42).dynamic", "\"\${println(42)}\"")) {
+        for (initializer in listOf(
+            "println(42)",
+            "insight.NavigationFixture.mutable",
+            "insight.NavigationFixture(42).dynamic",
+            "\"\${println(42)}\""
+        )) {
             val text = "fun run() { val unused = $initializer }"
-            val action = assertNotNull(analyzer.intentionActions("effect-unused.kts", text, text.indexOf("unused"))
-                .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer)
+            val action =
+                assertNotNull(
+                    analyzer.intentionActions("effect-unused.kts", text, text.indexOf("unused"))
+                        .firstOrNull { it.title.endsWith("remove_unused_variable") }, initializer
+                )
             assertEquals("fun run() { $initializer }", text.apply(action), initializer)
         }
     }
@@ -150,7 +185,10 @@ class IdeCodeInsightTest {
             val declaration = target.text!!.substring(target.offset).substringBefore('{')
             if (name == "onUpdate") {
                 assertTrue(declaration.startsWith("cfr_renamed_"), declaration)
-                assertTrue("NodeScript" in declaration && "int" in declaration && "Function2" in declaration, declaration)
+                assertTrue(
+                    "NodeScript" in declaration && "int" in declaration && "Function2" in declaration,
+                    declaration
+                )
                 assertFalse("\$default" in declaration, declaration)
             } else assertTrue(declaration.startsWith("$name("), declaration)
         }
@@ -158,8 +196,9 @@ class IdeCodeInsightTest {
 
     @Test
     fun `node handler definitions use the development source manifest`() {
-        val sourceRoot = generateSequence(Path.of("").toAbsolutePath()) { it.parent }
-            .map { it.resolve("runtime/src/main/java") }.first { it.isDirectory() }
+        val sourceRoot =
+            generateSequence(Path.of("").toAbsolutePath()) { it.parent }.map { it.resolve("runtime/src/main/java") }
+                .first { it.isDirectory() }
         val manifest = directory.resolve("source-roots.txt").also { it.writeText(sourceRoot.toString()) }
         val property = "hollowengine.ide.sourceRoots"
         val previous = System.getProperty(property)
@@ -182,25 +221,41 @@ class IdeCodeInsightTest {
         val target = SourceDeclarationIdentity("select", emptyList(), Kind.FUNCTION, listOf("java.lang.Integer"))
         assertEquals(kotlin.indexOf("select(x: Int?)"), matcher.offset("Example.kt", kotlin, target))
         val java = "class Example { void select(java.sql.Date value) {} }"
-        val wrongPackage = SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("java.util.Date"))
+        val wrongPackage =
+            SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("java.util.Date"))
         assertNull(matcher.offset("Example.java", java, wrongPackage))
         val aliased = "import java.util.Date as Timestamp\nfun select(x: Timestamp) = x"
-        assertEquals(aliased.indexOf("select"), matcher.offset("Example.kt", aliased,
-            target.copy(parameters = listOf("java.util.Date"))))
+        assertEquals(
+            aliased.indexOf("select"), matcher.offset(
+                "Example.kt", aliased, target.copy(parameters = listOf("java.util.Date"))
+            )
+        )
     }
 
     @Test
     fun `source matching preserves offsets across line separators and context parameters`() {
         val matcher = SourceDeclarationMatcher(analyzer.project)
         for (separator in listOf("\n", "\r\n", "\r")) {
-            val kotlin = listOf("package sample", "context(script: NodeScript)",
-                "fun start(block: suspend CoroutineScope.() -> Unit) {}").joinToString(separator)
-            val target = SourceDeclarationIdentity("start", emptyList(), Kind.FUNCTION,
-                listOf("sample.NodeScript", "kotlin.jvm.functions.Function2"), "sample")
+            val kotlin = listOf(
+                "package sample",
+                "context(script: NodeScript)",
+                "fun start(block: suspend CoroutineScope.() -> Unit) {}"
+            ).joinToString(separator)
+            val target = SourceDeclarationIdentity(
+                "start",
+                emptyList(),
+                Kind.FUNCTION,
+                listOf("sample.NodeScript", "kotlin.jvm.functions.Function2"),
+                "sample"
+            )
             assertEquals(kotlin.indexOf("start("), matcher.offset("Handlers.kt", kotlin, target), separator)
-            val java = listOf("package sample;", "class Example {", "void start(int value) {}", "}").joinToString(separator)
-            assertEquals(java.indexOf("start("), matcher.offset("Example.java", java,
-                target.copy(owners = listOf("Example"), parameters = listOf("int"))), separator)
+            val java =
+                listOf("package sample;", "class Example {", "void start(int value) {}", "}").joinToString(separator)
+            assertEquals(
+                java.indexOf("start("), matcher.offset(
+                    "Example.java", java, target.copy(owners = listOf("Example"), parameters = listOf("int"))
+                ), separator
+            )
         }
     }
 
@@ -213,15 +268,15 @@ class IdeCodeInsightTest {
                 void select(int value) {}
             }
         """.trimIndent()
-        val target = assertNotNull(analyzer.javaAnalyzer.definition("Example.java", text, text.indexOf("select") + 2))
+        val target = assertNotNull(javaAnalyzer.definition("Example.java", text, text.indexOf("select") + 2))
         assertEquals(text.indexOf("select(int"), target.offset)
-        assertNotNull(analyzer.javaAnalyzer.hover("Example.java", text, text.indexOf("select") + 2))
-        assertEquals(2, analyzer.javaAnalyzer.occurrences("Example.java", text, text.indexOf("select") + 2).size)
+        assertNotNull(javaAnalyzer.hover("Example.java", text, text.indexOf("select") + 2))
+        assertEquals(2, javaAnalyzer.occurrences("Example.java", text, text.indexOf("select") + 2).size)
     }
 
     @Test
     fun `Java syntax diagnostics report invalid declarations`() {
-        assertTrue(analyzer.javaAnalyzer.diagnostic("Broken.java", "class Broken { void run( }").isNotEmpty())
+        assertTrue(javaAnalyzer.diagnostic("Broken.java", "class Broken { void run( }").isNotEmpty())
     }
 
     @Test
@@ -233,8 +288,11 @@ class IdeCodeInsightTest {
                 }
             }
         """.trimIndent()
-        val spans = analyzer.javaAnalyzer.highlight("decompiled/sample/Model.java", text, 0).flatMap { it.spans }
-        assertTrue(spans.any { (text, style) -> text == "substring" && style.color == TokenType.METHOD }, spans.toString())
+        val spans = javaAnalyzer.highlight("decompiled/sample/Model.java", text, 0).flatMap { it.spans }
+        assertTrue(
+            spans.any { (text, style) -> text == "substring" && style.color == TokenType.METHOD },
+            spans.toString()
+        )
         assertTrue(spans.any { (text, style) -> text == "length" && style.color == TokenType.METHOD }, spans.toString())
     }
 
@@ -243,9 +301,10 @@ class IdeCodeInsightTest {
         val text = "val model: ru.hollowhorizon.hollowengine.common.attachments.components.Model? = null"
         val definition = assertNotNull(analyzer.definition("decompiled-model.kts", text, text.indexOf("Model") + 2))
         assertTrue(definition.path.startsWith("decompiled/"), definition.path)
-        val spans = analyzer.javaAnalyzer.highlight(definition.path, definition.text!!, definition.offset).flatMap { it.spans }
+        val spans = javaAnalyzer.highlight(definition.path, definition.text!!, definition.offset).flatMap { it.spans }
         assertTrue(spans.any { (text, style) -> text == "Model" && style.color == TokenType.CLASS }, spans.toString())
         assertTrue(spans.any { (text, style) -> text == "getRig" && style.color == TokenType.METHOD }, spans.toString())
+        assertEquals(definition.text, javaAnalyzer.documentText(definition.path), "A restored tab is decompiled again")
     }
 
     @Test
@@ -260,16 +319,29 @@ class IdeCodeInsightTest {
             assertTrue(model.path.endsWith("Model.kt"), model.path)
             val gameText = "val point = net.minecraft.world.phys.Vec3.ZERO"
             val game = assertNotNull(analyzer.definition("minecraft.kts", gameText, gameText.indexOf("Vec3") + 2))
-            assertTrue(game.path.startsWith("library-sources/") && game.path.endsWith("!/net/minecraft/world/phys/Vec3.java"), game.path)
+            assertTrue(
+                game.path.startsWith("library-sources/") && game.path.endsWith("!/net/minecraft/world/phys/Vec3.java"),
+                game.path
+            )
             assertTrue(game.text!!.startsWith("Vec3", game.offset), game.path)
-            for ((arguments, signature) in listOf("1.0, 2.0, 3.0" to "add(double", "net.minecraft.world.phys.Vec3.ZERO" to "add(Vec3")) {
+            for ((arguments, signature) in listOf(
+                "1.0, 2.0, 3.0" to "add(double",
+                "net.minecraft.world.phys.Vec3.ZERO" to "add(Vec3"
+            )) {
                 val call = "net.minecraft.world.phys.Vec3.ZERO.add($arguments)"
-                val method = assertNotNull(analyzer.definition("minecraft-call.kts", call, call.indexOf("add") + 1), call)
+                val method =
+                    assertNotNull(analyzer.definition("minecraft-call.kts", call, call.indexOf("add") + 1), call)
                 assertTrue(method.path.startsWith("library-sources/"), method.path)
-                assertTrue(method.text!!.startsWith(signature, method.offset), method.text!!.substring(method.offset).take(150))
+                assertTrue(
+                    method.text!!.startsWith(signature, method.offset),
+                    method.text!!.substring(method.offset).take(150)
+                )
             }
         } finally {
-            if (previous == null) System.clearProperty(sourceManifestProperty) else System.setProperty(sourceManifestProperty, previous)
+            if (previous == null) System.clearProperty(sourceManifestProperty) else System.setProperty(
+                sourceManifestProperty,
+                previous
+            )
         }
     }
 
@@ -287,7 +359,7 @@ class IdeCodeInsightTest {
             assertTrue(target.path.contains("navigation-test-sources.jar"), target.path)
             assertEquals(JavaFixtureSource.indexOf("select(int"), target.offset)
             val java = "class Use { void run() { insight.NavigationFixture.select(\"text\"); } }"
-            val javaTarget = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", java, java.indexOf("select") + 1))
+            val javaTarget = assertNotNull(javaAnalyzer.definition("Use.java", java, java.indexOf("select") + 1))
             assertEquals(JavaFixtureSource.indexOf("select(String"), javaTarget.offset)
         } finally {
             archive.toFile().delete()
@@ -306,12 +378,19 @@ class IdeCodeInsightTest {
     fun `Kotlin library navigation handles file facades suspend functions and JVM names`() {
         for ((text, name, expected) in listOf(
             Triple("navigationKotlinOverload(42)", "navigationKotlinOverload", "navigationKotlinOverload(int"),
-            Triple("suspend fun call() = navigationKotlinSuspending(42)", "navigationKotlinSuspending", "navigationKotlinSuspending(int"),
+            Triple(
+                "suspend fun call() = navigationKotlinSuspending(42)",
+                "navigationKotlinSuspending",
+                "navigationKotlinSuspending(int"
+            ),
             Triple("navigationKotlinRenamed(42)", "navigationKotlinRenamed", "renamedNavigation(int"),
             Triple("val result = navigationKotlinProperty", "navigationKotlinProperty", "getNavigationKotlinProperty("),
         )) {
             val target = assertNotNull(analyzer.definition("kotlin-library.kts", text, text.indexOf(name) + 2), name)
-            assertTrue(target.text!!.startsWith(expected, target.offset), "${target.path}: ${target.text?.substring(target.offset)}")
+            assertTrue(
+                target.text!!.startsWith(expected, target.offset),
+                "${target.path}: ${target.text?.substring(target.offset)}"
+            )
         }
     }
 
@@ -339,9 +418,10 @@ class IdeCodeInsightTest {
                 }
             }
         """.trimIndent()
-        val method = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", text, text.indexOf("add(") + 1))
+        val method = assertNotNull(javaAnalyzer.definition("Use.java", text, text.indexOf("add(") + 1))
         assertTrue(method.text!!.startsWith("add(", method.offset), method.path)
-        val constructor = assertNotNull(analyzer.javaAnalyzer.definition("Use.java", text, text.lastIndexOf("NavigationFixture") + 2))
+        val constructor =
+            assertNotNull(javaAnalyzer.definition("Use.java", text, text.lastIndexOf("NavigationFixture") + 2))
         assertTrue(constructor.text!!.startsWith("NavigationFixture(int", constructor.offset), constructor.text)
     }
 
@@ -372,9 +452,15 @@ class IdeCodeInsightTest {
         val constructor = SourceDeclarationIdentity("Example", listOf("Example"), Kind.CONSTRUCTOR, listOf("int[]"))
         assertEquals(java.indexOf("Example(int"), matcher.offset("Example.java", java, constructor))
         val implicit = "class Example {}"
-        assertEquals(implicit.indexOf("Example"), matcher.offset("Example.java", implicit, constructor.copy(parameters = emptyList())))
+        assertEquals(
+            implicit.indexOf("Example"),
+            matcher.offset("Example.java", implicit, constructor.copy(parameters = emptyList()))
+        )
         val record = "record Example(int value) {}"
-        assertEquals(record.indexOf("Example"), matcher.offset("Example.java", record, constructor.copy(parameters = listOf("int"))))
+        assertEquals(
+            record.indexOf("Example"),
+            matcher.offset("Example.java", record, constructor.copy(parameters = listOf("int")))
+        )
         val kotlin = "fun select(x: String) = x\nfun select(x: Int) = x"
         val target = SourceDeclarationIdentity("select", emptyList(), Kind.FUNCTION, listOf("int"))
         assertEquals(kotlin.indexOf("select(x: Int)"), matcher.offset("Example.kt", kotlin, target))
@@ -384,7 +470,9 @@ class IdeCodeInsightTest {
     fun `source archives can be attached and replaced without restarting the analyzer`() {
         val jar = directory.resolve("mod-sources.jar")
         val target = SourceDeclarationIdentity("select", listOf("Example"), Kind.FUNCTION, listOf("int"))
-        val repository = LibrarySourceRepository(analyzer.project, emptyList()) { listOf(jar) }
+        val repository =
+            LibrarySourceRepository(SourceDeclarationMatcher(analyzer.project), emptyList()) { listOf(jar) }
+
         fun write(text: String) {
             JarOutputStream(jar.outputStream()).use { archive ->
                 archive.putNextEntry(JarEntry("sample/Example.java"))
@@ -413,7 +501,8 @@ class IdeCodeInsightTest {
             jar.closeEntry()
         }
         val target = SourceDeclarationIdentity("select", listOf("NavigationFixture"), Kind.FUNCTION, listOf("int"))
-        val repository = LibrarySourceRepository(analyzer.project, emptyList()) { listOf(broken, archive) }
+        val repository =
+            LibrarySourceRepository(SourceDeclarationMatcher(analyzer.project), emptyList()) { listOf(broken, archive) }
         val location = assertNotNull(repository.find(target, null, "insight"))
         assertTrue(location.path.contains("valid-sources.jar"), location.path)
         assertEquals(JavaFixtureSource.indexOf("select(int"), location.offset)
@@ -440,12 +529,16 @@ private val JavaFixtureSource = """
 fun navigationKotlinOverload(value: String): String = value
 fun navigationKotlinOverload(value: Int): Int = value
 suspend fun navigationKotlinSuspending(value: Int): Int = value
+
 @JvmName("renamedNavigation")
 fun navigationKotlinRenamed(value: Int): Int = value
 val navigationKotlinProperty: Int get() = 42
 
-@JvmInline value class NavigationTicks(val count: Int)
-@JvmInline value class NavigationDistance(val count: Int)
+@JvmInline
+value class NavigationTicks(val count: Int)
+@JvmInline
+value class NavigationDistance(val count: Int)
+
 fun navigationValueOverload(value: NavigationTicks): String = "ticks"
 fun navigationValueOverload(value: NavigationDistance): String = "distance"
 class NavigationValueOwner {

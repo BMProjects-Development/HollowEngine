@@ -108,6 +108,9 @@ public interface RuntimeBridge extends AutoCloseable {
 
     void onPlayerRespawn(ServerPlayer original, boolean returnFromEnd);
 
+    /** The server has just sent {@code player} its permission level: on join, op and deop. */
+    void onPlayerPermissionsChanged(ServerPlayer player);
+
     ChatResult onServerChat(ServerPlayer player, Component content);
 
     void onServerLevelSave(ServerLevel level);

@@ -32,24 +32,40 @@ internal class HollowIdeEditorSession(
     private val scope = CoroutineScope(SupervisorJob() + analysisDispatcher)
     private val analysisRevision = AtomicLong()
     private val completionRevision = AtomicLong()
+
     @Volatile
     private var requestedAnalysis: AnalysisKey? = null
+
     @Volatile
     private var requestedCompletion: CompletionKey? = null
+
     @Volatile
     private var requestedOccurrence: OccurrenceKey? = null
+
     @Volatile
     private var analysisJob: Job? = null
+
     @Volatile
     private var completionJob: Job? = null
     private var definitionJob: Job? = null
+    private var gutterJob: Job? = null
     private var formatJob: Job? = null
+
     @Volatile
     private var occurrenceJob: Job? = null
+
     @Volatile
     private var snapshot = EditorAnalysisSnapshot.Empty
+
     @Volatile
     private var completionSnapshot = CompletionSnapshot.Empty
+
+    @Volatile
+    private var contextCompletionJob: Job? = null
+
+    @Volatile
+    private var contextCompletionSnapshot = CompletionSnapshot.Empty
+
     @Volatile
     private var occurrenceSnapshot = OccurrenceSnapshot.Empty
     private val publishedRevision = AtomicLong()
@@ -87,6 +103,7 @@ internal class HollowIdeEditorSession(
                     inlayHints = current.inlayHints,
                     exact = true,
                 )
+
                 current.hasText -> {
                     requestAnalysis(text, analyzer)
                     if (exactOnly) {
@@ -99,6 +116,7 @@ internal class HollowIdeEditorSession(
                         )
                     }
                 }
+
                 else -> {
                     requestAnalysis(text, analyzer)
                     null
@@ -123,12 +141,13 @@ internal class HollowIdeEditorSession(
     }
     val highlighter: UiCaretAwareSyntaxHighlighter = textAnalyzer
 
+    /** Called while the UI frame is built, off the client thread: it only reads published snapshots. */
     val completions: UiCompletionContributor = UiCompletionContributor { context ->
         val analyzer = currentAnalyzer()
         requestCompletions(context.text, context.caret, analyzer)
-        val items = completionSnapshot.takeIf { it.matches(context.text, context.caret, analyzer) }?.items.orEmpty()
-        val candidates = (items + ideContextCompletions(path, context)).toMutableList()
-        IdeCompletionEvent.post(IdeCompletionEvent(path, context.text, context.caret, candidates)).items.toList()
+        completionSnapshot.itemsAt(
+            context.text, context.caret, analyzer
+        ) + contextCompletionSnapshot.itemsAt(context.text, context.caret, analyzer)
     }
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
@@ -225,6 +244,36 @@ internal class HollowIdeEditorSession(
             }
             withContext(publicationDispatcher) {
                 onResolved(definition)
+            }
+        }
+    }
+
+    fun resolveGutterTargets(text: String, offset: Int, onResolved: (List<GutterNavigationTarget>) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        gutterJob?.cancel()
+        gutterJob = scope.launch {
+            val targets = runCatching { analyzer.gutterTargets(path, text, offset) }.getOrElse { failure ->
+                reportAnalysisFailure("gutter targets", failure)
+                emptyList()
+            }
+            withContext(publicationDispatcher) {
+                onResolved(targets)
+            }
+        }
+    }
+
+    /** Fills a read-only document whose text the language produces, such as a restored decompiled class. */
+    fun loadDocument(onLoaded: (String?) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        scope.launch {
+            val text = runCatching { analyzer.documentText(path) }.getOrElse { failure ->
+                reportAnalysisFailure("document", failure)
+                null
+            }
+            withContext(publicationDispatcher) {
+                onLoaded(text)
             }
         }
     }
@@ -327,6 +376,20 @@ internal class HollowIdeEditorSession(
             }
             if (publishedSize != collected.size) publish()
         }
+        contextCompletionJob?.cancel()
+        contextCompletionJob = scope.launch(Minecraft.getInstance().dispatcher) {
+            val context = UiCompletionContext(text, key.caret)
+            val items = runCatching {
+                val candidates = ideContextCompletions(path, context).toMutableList()
+                IdeCompletionEvent.post(IdeCompletionEvent(path, text, key.caret, candidates)).items.toList()
+            }.getOrElse { failure ->
+                HollowEngine.LOGGER.error("Context completions failed for '{}'", path, failure)
+                emptyList()
+            }
+            publishCompletionIfCurrent(requestRevision) {
+                contextCompletionSnapshot = CompletionSnapshot(key.textHash, key.textLength, key.caret, analyzer, items)
+            }
+        }
     }
 
     private fun publishAnalysisIfCurrent(requestRevision: Long, update: () -> Unit) {
@@ -386,10 +449,9 @@ private data class OccurrenceSnapshot(
     val ranges: List<OccurrenceRange>,
 ) {
     fun matches(text: String, offset: Int, analyzer: ScriptingAnalyzer): Boolean {
-        return textHash == text.hashCode() &&
-                textLength == text.length &&
-                caret == offset.coerceIn(0, text.length) &&
-                this.analyzer === analyzer
+        return textHash == text.hashCode() && textLength == text.length && caret == offset.coerceIn(
+            0, text.length
+        ) && this.analyzer === analyzer
     }
 
     companion object {
@@ -411,11 +473,11 @@ private data class CompletionSnapshot(
     val analyzer: ScriptingAnalyzer,
     val items: List<UiTextCompletion>,
 ) {
-    fun matches(text: String, offset: Int, analyzer: ScriptingAnalyzer): Boolean {
-        return textHash == text.hashCode() &&
-                textLength == text.length &&
-                caret == offset.coerceIn(0, text.length) &&
-                this.analyzer === analyzer
+    fun itemsAt(text: String, offset: Int, analyzer: ScriptingAnalyzer): List<UiTextCompletion> {
+        val matches = textHash == text.hashCode() && textLength == text.length && caret == offset.coerceIn(
+            0, text.length
+        ) && this.analyzer === analyzer
+        return if (matches) items else emptyList()
     }
 
     companion object {
@@ -468,11 +530,10 @@ private data class EditorAnalysisSnapshot(
 internal fun mapCaretThroughFormat(original: String, formatted: String, caret: Int): Int {
     val position = caret.coerceIn(0, original.length)
 
-    fun after(index: Int) = (codeCharOffset(formatted, codeCharsBefore(original, index)) + 1)
-        .coerceIn(0, formatted.length)
+    fun after(index: Int) =
+        (codeCharOffset(formatted, codeCharsBefore(original, index)) + 1).coerceIn(0, formatted.length)
 
-    fun before(index: Int) = codeCharOffset(formatted, codeCharsBefore(original, index))
-        .coerceIn(0, formatted.length)
+    fun before(index: Int) = codeCharOffset(formatted, codeCharsBefore(original, index)).coerceIn(0, formatted.length)
 
     if (position > 0 && !original[position - 1].isWhitespace()) return after(position - 1)
 
@@ -482,8 +543,8 @@ internal fun mapCaretThroughFormat(original: String, formatted: String, caret: I
         return before(index)
     }
 
-    val lineStart = original.lastIndexOf('\n', (position - 1).coerceAtLeast(0))
-        .let { if (it < 0 || position == 0) 0 else it + 1 }
+    val lineStart =
+        original.lastIndexOf('\n', (position - 1).coerceAtLeast(0)).let { if (it < 0 || position == 0) 0 else it + 1 }
     for (index in position - 1 downTo lineStart) {
         if (original[index].isWhitespace()) continue
         return after(index)
@@ -607,11 +668,11 @@ internal fun shiftDiagnosticsForEditedText(
 
 internal fun languageServiceForPath(path: String): EditorLanguageService {
     val contributed = HollowIdeExtensionPoints.LANGUAGES.registrations.firstOrNull { extension ->
-        runCatching { extension.invoke { language -> language.matches(path) } }
-            .onFailure { failure ->
-                HollowEngine.LOGGER.error("IDE language extension '{}' failed while matching '{}'", extension.qualifiedId, path, failure)
-            }
-            .getOrDefault(false)
+        runCatching { extension.invoke { language -> language.matches(path) } }.onFailure { failure ->
+            HollowEngine.LOGGER.error(
+                "IDE language extension '{}' failed while matching '{}'", extension.qualifiedId, path, failure
+            )
+        }.getOrDefault(false)
     }
     if (contributed != null) return ExtensionEditorLanguageService(contributed)
     return runCatching { EditorLanguageService(pathExtension(path)) }.getOrNull() ?: PlainEditorLanguageService
@@ -680,7 +741,9 @@ private fun CompletionItemTag.completionIcon(): String {
     val name = when (this) {
         CompletionItemTag.FUNCTION -> "method"
         CompletionItemTag.PROPERTY,
-        CompletionItemTag.LOCAL_VARIABLE -> "variable"
+        CompletionItemTag.LOCAL_VARIABLE,
+            -> "variable"
+
         CompletionItemTag.CLASS -> "class"
         CompletionItemTag.KEYWORD -> "package"
     }
@@ -709,11 +772,13 @@ private fun Diagnostic.toUi(text: String, lineStarts: List<Int>): UiTextDiagnost
 private fun Severity.toUi(): UiTextDiagnosticSeverity {
     return when (this) {
         Severity.ERROR,
-        Severity.FATAL -> UiTextDiagnosticSeverity.ERROR
+        Severity.FATAL,
+            -> UiTextDiagnosticSeverity.ERROR
 
         Severity.WARNING -> UiTextDiagnosticSeverity.WARNING
         Severity.DEBUG,
-        Severity.INFO -> UiTextDiagnosticSeverity.INFO
+        Severity.INFO,
+            -> UiTextDiagnosticSeverity.INFO
     }
 }
 

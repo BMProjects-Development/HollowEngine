@@ -10,7 +10,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class ScriptExecutionStatus { IDLE, STARTING, RUNNING, STOPPING }
 
-/** Owned by the scope's game thread. A reservation lasts until the job and all its children finish. */
+/**
+ * Owned by the scope's game thread. A reservation lasts until the job and all its children finish.
+ * [changed] always runs on that thread, also when a job's last child finishes on a worker.
+ */
 internal class ScriptRunTracker(private val scope: CoroutineScope, private val changed: () -> Unit = {}) {
     private class Entry(val job: Job) {
         var running = false
@@ -28,6 +31,7 @@ internal class ScriptRunTracker(private val scope: CoroutineScope, private val c
         val job = scope.launch(start = CoroutineStart.LAZY) { execute() }
         val entry = Entry(job)
         entries[path] = entry
+        job.invokeOnCompletion { scope.launch { changed() } }
         changed()
         job.start()
         return true

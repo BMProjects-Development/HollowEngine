@@ -265,6 +265,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         PlayerEvent.Respawn.post(PlayerEvent.Respawn(original, returnFromEnd))
     }
 
+    override fun onPlayerPermissionsChanged(player: ServerPlayer) {
+        PlayerEvent.PermissionsChanged.post(PlayerEvent.PermissionsChanged(player))
+    }
+
     override fun onServerChat(player: ServerPlayer, content: Component): RuntimeBridge.ChatResult {
         val event = ServerChatEvent(player, content)
         ServerChatEvent.post(event)

@@ -5,9 +5,10 @@ import ru.hollowhorizon.hollowengine.common.events.ClientEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
 /**
- * Posted on the client thread for an IDE completion request. Handlers can contribute declarations
- * or snippets with imports, insertion text and a caret position, using the current world safely.
- * [items] starts with the language service's results and the engine's context snippets.
+ * Posted on client thread once per caret position of an IDE completion request. Handlers can
+ * contribute declarations or snippets with imports, insertion text and a caret position, using
+ * current world safely. [items] starts with engine's context snippets; language service's
+ * results are computed in background and shown next to them.
  */
 class IdeCompletionEvent(
     val path: String,

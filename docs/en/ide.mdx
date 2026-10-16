@@ -89,7 +89,7 @@ Place library and mod source archives (`*-sources.jar`, or `.zip`) in `holloweng
 
 ### Custom completion
 
-`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. Its `path`, `text`, and `caret` identify the request; `items` contains the current results and accepts additional `UiTextCompletion` entries. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
+`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. It is posted once per caret position. Its `path`, `text`, and `caret` identify the request; `items` starts with the engine's context snippets and accepts additional `UiTextCompletion` entries. The language service's own results are computed in the background and shown next to them. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
