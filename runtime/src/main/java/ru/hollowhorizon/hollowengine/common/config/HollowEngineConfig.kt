@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.config
 
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
+import ru.hollowhorizon.hollowengine.client.editor.GizmoOrientation
 
 @ConfigName("hollowengine")
 object HollowEngineConfig : Config() {
@@ -40,6 +41,10 @@ object HollowEngineConfig : Config() {
     @PropertyComment("Gizmo editing modes shown together, separated by commas: TRANSLATE, ROTATE, SCALE")
     @PropertyName("transform_gizmo_modes")
     var gizmoModes by property(GizmoEditMode.TRANSLATE.name)
+
+    @PropertyComment("Which axes the gizmo's handles follow: GLOBAL (the world's), LOCAL (the object's) or VIEW (the camera's)")
+    @PropertyName("transform_gizmo_orientation")
+    var gizmoOrientation by property(GizmoOrientation.GLOBAL.name)
 
     @PropertyComment("Whether nodes dragged in a graph land on its grid")
     @PropertyName("graph_snap_to_grid")

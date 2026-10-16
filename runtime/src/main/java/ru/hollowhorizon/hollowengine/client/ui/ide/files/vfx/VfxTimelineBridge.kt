@@ -214,7 +214,7 @@ class VfxTimelineSession(
     private fun buildProperty(node: VfxNodeSpec, animatable: VfxAnimatable): AnimProperty<*> {
         val id = propertyId(node.id, animatable.property)
         val title = animatable.titleKey.lang
-        val name = animatable.ownerTitleKey?.let { "${it.lang} · $title" } ?: title
+        val name = animatable.ownerTitleKey?.let { "${it.lang} | $title" } ?: title
         val defaults = animatable.read()
 
         return when (animatable.kind) {

@@ -3,23 +3,17 @@ package ru.hollowhorizon.hollowengine.client.ui.shape
 import kotlin.math.abs
 
 internal fun triangulatePath(contours: List<UiPathContour>): List<UiPathTriangle> {
-    val rings = contours
-        .filter { it.closed }
-        .mapNotNull { contour -> contour.points.cleanedRing().takeIf { it.size >= 3 } }
-        .map(::TriangulationRing)
+    val rings =
+        contours.filter { it.closed }.mapNotNull { contour -> contour.points.cleanedRing().takeIf { it.size >= 3 } }
+            .map(::TriangulationRing)
     if (rings.isEmpty()) return emptyList()
 
     rings.forEach { ring ->
-        ring.parent = rings
-            .asSequence()
-            .filter { candidate -> candidate !== ring && candidate.absArea > ring.absArea }
-            .filter { candidate -> candidate.contains(ring.points.first()) }
-            .minByOrNull { it.absArea }
+        ring.parent = rings.asSequence().filter { candidate -> candidate !== ring && candidate.absArea > ring.absArea }
+            .filter { candidate -> candidate.contains(ring.points.first()) }.minByOrNull { it.absArea }
     }
 
-    return rings
-        .filter { it.depth % 2 == 0 }
-        .flatMap { outer ->
+    return rings.filter { it.depth % 2 == 0 }.flatMap { outer ->
             val holes = rings.filter { it.depth % 2 == 1 && it.outerParent == outer }
             triangulatePolygon(outer.points, holes.map { it.points })
         }
@@ -58,9 +52,7 @@ private class TriangulationRing(
 
 private fun triangulatePolygon(outer: List<UiPathPoint>, holes: List<List<UiPathPoint>>): List<UiPathTriangle> {
     var polygon = orient(outer, clockwise = false)
-    holes
-        .map { orient(it, clockwise = true) }
-        .sortedByDescending { hole -> hole.maxOf { it.x } }
+    holes.map { orient(it, clockwise = true) }.sortedByDescending { hole -> hole.maxOf { it.x } }
         .forEach { hole -> polygon = bridgeHole(polygon, hole) ?: return@forEach }
     return triangulateSimple(polygon.cleanedRing().withoutCollinear())
 }
@@ -69,10 +61,8 @@ private fun bridgeHole(outer: List<UiPathPoint>, hole: List<UiPathPoint>): List<
     if (outer.size < 3 || hole.size < 3) return null
     val holeIndex = hole.indices.maxWith(compareBy<Int> { hole[it].x }.thenBy { -hole[it].y })
     val holePoint = hole[holeIndex]
-    val outerIndex = outer.indices
-        .filter { index -> isVisibleBridge(holePoint, outer[index], outer, hole) }
-        .minByOrNull { index -> holePoint.distanceSquaredTo(outer[index]) }
-        ?: return null
+    val outerIndex = outer.indices.filter { index -> isVisibleBridge(holePoint, outer[index], outer, hole) }
+        .minByOrNull { index -> holePoint.distanceSquaredTo(outer[index]) } ?: return null
 
     val result = ArrayList<UiPathPoint>(outer.size + hole.size + 2)
     result += outer.take(outerIndex + 1)
@@ -94,8 +84,12 @@ private fun isVisibleBridge(
 ): Boolean {
     if (start == end) return false
     if (!pointInPolygon(midpoint(start, end), outer)) return false
-    return !segmentsIntersectAny(start, end, outer, ignored = end) &&
-            !segmentsIntersectAny(start, end, hole, ignored = start)
+    return !segmentsIntersectAny(start, end, outer, ignored = end) && !segmentsIntersectAny(
+        start,
+        end,
+        hole,
+        ignored = start
+    )
 }
 
 private fun segmentsIntersectAny(
@@ -184,12 +178,6 @@ private fun isEar(
     return true
 }
 
-/**
- * True only for a *simple* convex polygon: every turn is a left turn AND the vertices wind exactly
- * once (total turning == 2π). The turning check is what separates a real convex polygon from a
- * self-intersecting all-left-turns loop (e.g. a stroke outline that folds over itself, winding 2π·k)
- * - the latter would fan into overlapping, inverted triangles.
- */
 private fun List<UiPathPoint>.isConvex(): Boolean {
     if (size < 3) return false
     var totalTurn = 0.0
@@ -249,9 +237,8 @@ private fun pointInPolygon(point: UiPathPoint, polygon: List<UiPathPoint>): Bool
     for (index in polygon.indices) {
         val a = polygon[index]
         val b = polygon[(index + 1) % polygon.size]
-        if (a.y > point.y != b.y > point.y &&
-            point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x
-        ) inside = !inside
+        if (a.y > point.y != b.y > point.y && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) inside =
+            !inside
     }
     return inside
 }

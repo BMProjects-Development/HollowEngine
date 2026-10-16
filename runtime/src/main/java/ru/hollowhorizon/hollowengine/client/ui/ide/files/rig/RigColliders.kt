@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.colliders.ServerColliderAssets
 import org.joml.Quaternionf
@@ -89,6 +90,12 @@ internal class ColliderFrame(
             rotation = if (isWorldAligned) spec.rotation else eulerDegrees(local),
             size = Vec3f(values.scale.x.sized(), values.scale.y.sized(), values.scale.z.sized()),
         )
+    }
+
+    override fun resting(mode: GizmoEditMode): ColliderAttachmentSpec? = when (mode) {
+        GizmoEditMode.TRANSLATE -> spec.copy(offset = Vec3f.ZERO)
+        GizmoEditMode.ROTATE -> spec.copy(rotation = Vec3f.ZERO).takeUnless { isWorldAligned }
+        GizmoEditMode.SCALE -> spec.copy(size = Vec3f.ONES)
     }
 
     private fun Float.sized(): Float = abs(this).coerceAtLeast(MIN_SIZE)

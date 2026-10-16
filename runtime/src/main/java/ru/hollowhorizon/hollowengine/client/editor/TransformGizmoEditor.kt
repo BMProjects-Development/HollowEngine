@@ -67,21 +67,19 @@ object TransformGizmoEditor {
 
     /** The entry of the part the scene window last selected, which the gizmo takes up on its own. */
     private var selectedPartKey: GizmoEntryId? = null
-    private var hoveredHandleId: GizmoHandleId? = null
-    private var draggingHandleId: GizmoHandleId? = null
-    private var currentDrag: GizmoDrag? = null
+
+    /** Every drag and keyboard transform of the world goes through one session, the same as in the previews. */
+    private val session = GizmoSession(WorldToScreenProjector)
     private var isInitialized = false
     private var lastPhysX = 0f
     private var lastPhysY = 0f
 
     private var labelState by mutableStateOf<OverlayLabelState?>(null)
 
-    /** A transform from the keyboard under way, and where its hint is shown. */
-    private var keyboard: GizmoKeyboardTransform? = null
-    private var keyboardHint by mutableStateOf<KeyboardHintState?>(null)
+    /** Where the hint of a transform from the keyboard is shown: where the pointer was when it began. */
+    private var keyboardHintAt by mutableStateOf<Pair<Float, Float>?>(null)
     private var contextMenuState by mutableStateOf<ContextMenuState?>(null)
 
-    private var modesValue by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
     private var enabledValue by mutableStateOf(false)
 
     val isEnabled: Boolean
@@ -99,7 +97,7 @@ object TransformGizmoEditor {
     }
 
     /** The manipulators drawn together; never empty, the last one stays remembered while the gizmo is off. */
-    val modes: Set<GizmoEditMode> get() = modesValue
+    val modes: Set<GizmoEditMode> get() = GizmoSettings.modes
 
     /**
      * Entities the gizmo already boxes, because a node of theirs is on screen.
@@ -120,7 +118,7 @@ object TransformGizmoEditor {
         }
     }
 
-    fun isModeShown(mode: GizmoEditMode): Boolean = isEnabled && mode in modesValue
+    fun isModeShown(mode: GizmoEditMode): Boolean = isEnabled && mode in modes
 
     /**
      * Shows or hides gizmo manipulator and it's mode.
@@ -133,23 +131,19 @@ object TransformGizmoEditor {
                 setEnabled(true)
             }
 
-            shown -> setModes(modesValue + mode)
-            !isEnabled || mode !in modesValue -> Unit
-            modesValue.size == 1 -> setEnabled(false)
-            else -> setModes(modesValue - mode)
+            shown -> setModes(modes + mode)
+            !isEnabled || mode !in modes -> Unit
+            modes.size == 1 -> setEnabled(false)
+            else -> setModes(modes - mode)
         }
     }
 
     fun toggleMode(mode: GizmoEditMode) = setModeShown(mode, !isModeShown(mode))
 
     private fun setModes(modes: Set<GizmoEditMode>) {
-        if (modes.isEmpty() || modesValue == modes) return
-        modesValue = modes
-        HollowEngineConfig.gizmoModes = GizmoEditMode.entries.filter(modes::contains).joinToString(",") { it.name }
-        currentDrag = null
-        draggingKey = null
-        draggingHandleId = null
-        hoveredHandleId = null
+        if (modes.isEmpty() || GizmoSettings.modes == modes) return
+        GizmoSettings.modes = modes
+        session.settle()
         labelState = null
     }
 
@@ -157,9 +151,6 @@ object TransformGizmoEditor {
         if (isInitialized) return
         isInitialized = true
         enabledValue = HollowEngineConfig.gizmoEnabled
-        modesValue = HollowEngineConfig.gizmoModes.split(',')
-            .mapNotNull { name -> GizmoEditMode.entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } }
-            .toSet().ifEmpty { setOf(GizmoEditMode.TRANSLATE) }
     }
 
     @SubscribeEvent
@@ -188,17 +179,8 @@ object TransformGizmoEditor {
         if (!isEditorAvailable()) return
         syncVisibleEntries()
         if (crosshairMode()) {
-            val drag = currentDrag
-            val entry = draggingKey?.let(entries::get)
-            if (drag != null && entry != null) {
-                val (cx, cy) = WorldToScreenProjector.screenCenter()
-                GizmoManipulator.World.update(drag, cx, cy, hollowIdeModifierMask())?.let { values ->
-                    entry.working = values
-                    applyFromGizmo(entry, values)
-                    updateLabel(entry, drag)
-                }
-            }
             val (cx, cy) = WorldToScreenProjector.screenCenter()
+            if (session.dragTo(cx, cy, hollowIdeModifierMask())) updateLabel()
             updateHover(cx, cy)
         }
         overlay.render()
@@ -211,7 +193,7 @@ object TransformGizmoEditor {
             UiCursorManager.release(window, this)
             return
         }
-        val hovering = hoveredHandleId != null || hoveredKey != null || overlay.isMouseOver(lastPhysX, lastPhysY)
+        val hovering = session.hovered != null || hoveredKey != null || overlay.isMouseOver(lastPhysX, lastPhysY)
         UiCursorManager.claim(
             window = window,
             owner = this,
@@ -226,9 +208,7 @@ object TransformGizmoEditor {
         if (!crosshairMode() && pointerOverIde() && action == GLFW.GLFW_PRESS) return false
         if (!crosshairMode() && overlay.handleMouseButton(physX, physY, button, action)) return true
         val (x, y) = pointerLogical(physX, physY)
-        keyboard?.let { transform ->
-            return action != GLFW.GLFW_PRESS || finishKeyboardTransform(transform.click(button))
-        }
+        if (session.keyboard != null) return action != GLFW.GLFW_PRESS || session.press(null, x, y, button)
         return when (action) {
             GLFW.GLFW_PRESS -> onPress(x, y, button)
             GLFW.GLFW_RELEASE -> onRelease(button)
@@ -241,8 +221,8 @@ object TransformGizmoEditor {
      * its handle: it is being held, not hovered.
      */
     fun releasePointer() {
-        if (currentDrag != null) return
-        hoveredHandleId = null
+        if (session.drag != null) return
+        session.clearHover()
         hoveredKey = null
     }
 
@@ -253,28 +233,18 @@ object TransformGizmoEditor {
         if (!isEditorAvailable() || crosshairMode()) return false
         overlay.handleMouseMove(physX, physY)
         val (x, y) = pointerLogical(physX, physY)
-        keyboard?.let { transform ->
-            moveKeyboardTransform(transform, hollowIdeModifierMask())
+        if (session.moveTo(x, y, hollowIdeModifierMask())) return true
+        if (session.dragTo(x, y, hollowIdeModifierMask())) {
+            updateLabel()
             return true
         }
-        val drag = currentDrag
-        if (drag == null && pointerOverIde()) {
-            hoveredHandleId = null
+        if (pointerOverIde()) {
+            session.clearHover()
             hoveredKey = null
             return false
         }
-        if (drag != null) {
-            val entry = draggingKey?.let(entries::get)
-            val values = GizmoManipulator.World.update(drag, x, y, hollowIdeModifierMask())
-            if (values != null && entry != null) {
-                entry.working = values
-                applyFromGizmo(entry, values)
-                updateLabel(entry, drag)
-            }
-            return true
-        }
         updateHover(x, y)
-        return hoveredHandleId != null
+        return session.hovered != null
     }
 
     fun handleMouseScroll(physX: Float, physY: Float, scrollX: Double, scrollY: Double): Boolean {
@@ -290,58 +260,16 @@ object TransformGizmoEditor {
 
     /** G, R and S on the selected node, and the keys of a transform under way. */
     private fun handleTransformKey(key: Int, modifiers: Int): Boolean {
-        val transform = keyboard
-        if (transform != null) {
-            val result = transform.key(key, modifiers)
-            if (result == GizmoKeyResult.CHANGED) {
-                draggingKey?.let(entries::get)?.let { applyFromGizmo(it, transform.start) }
-                keyboardHint = keyboardHint?.copy(text = transform.hint)
-                moveKeyboardTransform(transform, modifiers)
-            }
-            return finishKeyboardTransform(result) || result == GizmoKeyResult.CHANGED
-        }
-        if (pointerOverIde()) return false
-
-        val mode = GizmoKeyboardTransform.modeFor(key, modifiers) ?: return false
-        val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return false
-        val working = entry.working ?: return false
+        val idle = session.keyboard == null
+        if (idle && pointerOverIde()) return false
         val (x, y) = pointerLogical(lastPhysX, lastPhysY)
-        keyboard = GizmoKeyboardTransform(
-            mode, working, x, y, WorldToScreenProjector, GizmoGeometry.World, GizmoManipulator.World
-        )
-        beginEdit(entry)
-        keyboardHint = KeyboardHintState(x, y, keyboard?.hint.orEmpty())
-        draggingKey = entry.entryId
-        contextMenuState = null
-        return true
-    }
-
-    private fun moveKeyboardTransform(transform: GizmoKeyboardTransform, modifiers: Int) {
-        val entry = draggingKey?.let(entries::get) ?: return
-        val (x, y) = pointerLogical(lastPhysX, lastPhysY)
-        val values = transform.update(x, y, modifiers) ?: return
-        entry.working = values
-        applyFromGizmo(entry, values)
-    }
-
-    /** Ends the transform from the keyboard when [result] says so; true when it did. */
-    private fun finishKeyboardTransform(result: GizmoKeyResult): Boolean {
-        val transform = keyboard ?: return false
-        val entry = draggingKey?.let(entries::get)
-        when (result) {
-            GizmoKeyResult.CONFIRMED -> Unit
-            GizmoKeyResult.CANCELLED -> entry?.let {
-                it.working = transform.start
-                applyFromGizmo(it, transform.start)
-            }
-
-            else -> return false
+        val taken = session.key(activeTarget(), key, modifiers, x, y)
+        keyboardHintAt = when {
+            session.keyboard == null -> null
+            idle -> (x to y).also { contextMenuState = null }
+            else -> keyboardHintAt
         }
-        keyboard = null
-        keyboardHint = null
-        draggingKey = null
-        entry?.let(::finishEdit)
-        return true
+        return taken
     }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean {
@@ -351,7 +279,7 @@ object TransformGizmoEditor {
 
     fun shouldBlockScreenInput(physX: Float, physY: Float): Boolean {
         if (!isInitialized || !isEditorAvailable()) return false
-        if (draggingKey != null) return true
+        if (session.isBusy) return true
         if (!crosshairMode()) {
             if (pointerOverIde()) return false
             if (overlay.isMouseOver(physX, physY)) return true
@@ -367,10 +295,7 @@ object TransformGizmoEditor {
             val entry = activeKey?.let(entries::get) ?: return false
             when (button) {
                 GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
-                    currentDrag = GizmoManipulator.World.begin(handle, entry.working ?: return false, x, y)
-                    beginEdit(entry)
-                    draggingKey = entry.entryId
-                    draggingHandleId = handle.id
+                    if (!session.press(activeTarget(), x, y, button)) return false
                     contextMenuState = null
                     return true
                 }
@@ -408,13 +333,8 @@ object TransformGizmoEditor {
     }
 
     private fun onRelease(button: Int): Boolean {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || draggingKey == null) return false
-        val entry = draggingKey?.let(entries::get)
-        draggingKey = null
-        draggingHandleId = null
-        currentDrag = null
+        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !session.release()) return false
         labelState = null
-        entry?.let(::finishEdit)
         return true
     }
 
@@ -439,15 +359,41 @@ object TransformGizmoEditor {
     }
 
     private fun updateHover(x: Float, y: Float) {
-        hoveredHandleId = activeEntryHandleAt(x, y)?.id
-        hoveredKey = if (hoveredHandleId != null) activeKey else pickBounds(x, y)
+        session.hover(activeTarget(), x, y)
+        hoveredKey = if (session.hovered != null) activeKey else pickBounds(x, y)
     }
 
-    private fun activeEntryHandleAt(x: Float, y: Float): GizmoHandle? {
-        val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return null
-        val working = entry.working ?: return null
-        val handles = GizmoGeometry.World.buildHandles(working.translation, working.rotation, modes)
-        return GizmoPicker.pick(handles, x, y)
+    private fun activeEntryHandleAt(x: Float, y: Float): GizmoHandle? = session.handleAt(activeTarget(), x, y)
+
+    /** The selected node as the gizmo moves it, when it is on screen; made anew for each event. */
+    private fun activeTarget(): EntryTarget? =
+        activeKey?.let(entries::get)?.takeIf { it.visible && it.working != null }?.let(::EntryTarget)
+
+    /**
+     * A node of the world as the gizmo moves it. While a drag or a keyboard transform holds it, it is the node the
+     * scene keeps showing where the gizmo put it.
+     */
+    private class EntryTarget(private val entry: GizmoEntry) : GizmoTarget {
+        private val start = checkNotNull(entry.working)
+
+        override val values: GizmoTransformValues get() = start
+
+        override fun place(values: GizmoTransformValues, mode: GizmoEditMode) {
+            entry.working = values
+            applyFromGizmo(entry, values)
+        }
+
+        override fun restore() = place(start, GizmoEditMode.TRANSLATE)
+
+        override fun beginEdit() {
+            draggingKey = entry.entryId
+            beginEdit(entry)
+        }
+
+        override fun endEdit() {
+            draggingKey = null
+            finishEdit(entry)
+        }
     }
 
     /** A world object gets the menu it has everywhere; any other node, the gizmo's own. */
@@ -465,18 +411,14 @@ object TransformGizmoEditor {
     private fun clearSelection() {
         activeKey = null
         hoveredKey = null
-        hoveredHandleId = null
+        session.clearHover()
         contextMenuState = null
     }
 
     private fun cancelInteraction() {
-        keyboard = null
-        keyboardHint = null
-        currentDrag = null
-        draggingKey = null
-        draggingHandleId = null
+        session.cancel()
+        keyboardHintAt = null
         hoveredKey = null
-        hoveredHandleId = null
         activeKey = null
         labelState = null
         contextMenuState = null
@@ -502,10 +444,12 @@ object TransformGizmoEditor {
                 )
             }
 
-            keyboardHint?.let { hint ->
+            val hint = session.hint
+            val hintAt = keyboardHintAt
+            if (hint != null && hintAt != null) {
                 Text(
-                    hint.text,
-                    modifier = Modifier.position((hint.x + 16f).px, (hint.y + 16f).px).padding(6.px, 3.px)
+                    hint,
+                    modifier = Modifier.position((hintAt.first + 16f).px, (hintAt.second + 16f).px).padding(6.px, 3.px)
                         .background(UiColor(0.08f, 0.10f, 0.14f, 0.9f)).foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
@@ -556,20 +500,7 @@ object TransformGizmoEditor {
 
         val active = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return
         (active.part as? AttachmentGizmo)?.let { DecalPartOverlay.drawGuide(scope, it) }
-        val working = active.working ?: return
-
-        keyboard?.let { transform ->
-            transform.draw(scope)
-            return
-        }
-
-        val drag = currentDrag
-        if (drag != null && draggingKey == active.entryId) {
-            GizmoRenderer.drawRotationSector(scope, GizmoGeometry.World, WorldToScreenProjector, drag)
-        }
-
-        val handles = GizmoGeometry.World.buildHandles(working.translation, working.rotation, modes)
-        GizmoRenderer.drawHandles(scope, handles, hoveredHandleId, draggingHandleId)
+        session.draw(scope, if (active.working != null) EntryTarget(active) else null)
     }
 
     /** Thinner bounding-box lines when the box is small/distant on screen. */
@@ -598,8 +529,10 @@ object TransformGizmoEditor {
     }
 
 
-    private fun updateLabel(entry: GizmoEntry, drag: GizmoDrag) {
-        val origin = entry.working?.translation ?: return
+    /** The value of the drag under way, next to where the dragged node is now. */
+    private fun updateLabel() {
+        val drag = session.drag ?: return
+        val origin = draggingKey?.let(entries::get)?.working?.translation ?: return
         val screen = WorldToScreenProjector.project(
             origin.x.toDouble(), origin.y.toDouble(), origin.z.toDouble(),
         ) ?: return
@@ -731,9 +664,7 @@ object TransformGizmoEditor {
             val (entryId, _) = iterator.next()
             if (entryId in seen) continue
             if (hoveredKey == entryId) hoveredKey = null
-            if (draggingKey == entryId) {
-                draggingKey = null; currentDrag = null
-            }
+            if (draggingKey == entryId) session.settle()
             if (activeKey == entryId) activeKey = null
             if (contextMenuState?.entryId == entryId) contextMenuState = null
             iterator.remove()
@@ -914,11 +845,6 @@ object TransformGizmoEditor {
     private data class GizmoEntryId(val snapshotId: UUID, val nodeId: UUID)
     private data class ContextMenuState(val entryId: GizmoEntryId, val anchor: UiRect)
     private data class OverlayLabelState(val x: Float, val y: Float, val value: Double)
-    private data class KeyboardHintState(val x: Float, val y: Float, val text: String)
-}
-
-enum class GizmoEditMode {
-    TRANSLATE, ROTATE, SCALE,
 }
 
 private fun formatLabelValue(value: Double): String {

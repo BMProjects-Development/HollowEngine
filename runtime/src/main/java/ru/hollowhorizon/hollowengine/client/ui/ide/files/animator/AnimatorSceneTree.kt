@@ -6,15 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocume
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
-import ru.hollowhorizon.hollowengine.common.models.ANY_STATE
-import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
-import ru.hollowhorizon.hollowengine.common.models.GraphPoint
-import ru.hollowhorizon.hollowengine.common.models.controller
-import ru.hollowhorizon.hollowengine.common.models.nodeAt
-import ru.hollowhorizon.hollowengine.common.models.withLayer
-import ru.hollowhorizon.hollowengine.common.models.withoutAnyState
-import ru.hollowhorizon.hollowengine.common.models.withoutLayer
-import ru.hollowhorizon.hollowengine.common.models.withoutState
+import ru.hollowhorizon.hollowengine.common.models.*
 
 private const val LayerIcon = "hollowengine:textures/gui/icons/layers.svg"
 private const val StateIcon = "hollowengine:textures/gui/icons/state.svg"
@@ -30,8 +22,8 @@ private fun stateRow(layerId: String, stateId: String) = "$StateRow$layerId/$sta
 /** The row a tree id stands for, as the selection it makes. */
 private fun selectionOf(row: String): AnimatorSelection? = when {
     row.startsWith(LayerRow) -> AnimatorSelection.Layer(row.removePrefix(LayerRow))
-    row.startsWith(StateRow) -> row.removePrefix(StateRow).split('/', limit = 2)
-        .takeIf { it.size == 2 }?.let { (layer, state) -> AnimatorSelection.State(layer, state) }
+    row.startsWith(StateRow) -> row.removePrefix(StateRow).split('/', limit = 2).takeIf { it.size == 2 }
+        ?.let { (layer, state) -> AnimatorSelection.State(layer, state) }
 
     else -> null
 }
@@ -48,12 +40,16 @@ internal fun animatorSceneTarget(
     items = buildList {
         document.animator.layers.forEach { layer ->
             val controller = document.animator.controller(layer.id)
-            val states = controller?.states?.map { it.id }.orEmpty() +
-                    listOfNotNull(ANY_STATE.takeIf { document.animator.nodeAt(layer.id, ANY_STATE) != null })
+            val states = controller?.states?.map { it.id }.orEmpty() + listOfNotNull(ANY_STATE.takeIf {
+                document.animator.nodeAt(
+                    layer.id,
+                    ANY_STATE
+                ) != null
+            })
             add(
-                UiTreeItem<Any?>(
+                UiTreeItem(
                     id = layerRow(layer.id),
-                    label = "${layer.id} · ${layer.kindName()}",
+                    label = "${layer.id} (${layer.kindName()})",
                     depth = 0,
                     payload = layer,
                     icon = LayerIcon,

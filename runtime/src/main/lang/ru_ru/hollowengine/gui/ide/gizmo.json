@@ -2,6 +2,9 @@
   "translate": "Перемещение",
   "rotate": "Поворот",
   "scale": "Масштаб",
-  "local": "локально",
-  "keys": "%s - ось. Ctrl - шаг, Ctrl+Shift - мелкий, Alt - крупный. Клик или Enter - применить. ПКМ или Esc - отмена"
+  "keys": "%s - ось. Ctrl - шаг, Ctrl+Shift - мелкий, Alt - крупный. Клик или Enter - применить. ПКМ или Esc - отмена",
+  "orientation": "Оси: %s. Нажмите, чтобы сменить",
+  "orientation.global": "глобальные",
+  "orientation.local": "локальные",
+  "orientation.view": "вида"
 }

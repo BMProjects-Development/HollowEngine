@@ -2,6 +2,9 @@
   "translate": "Move",
   "rotate": "Rotate",
   "scale": "Scale",
-  "local": "local",
-  "keys": "%s axis · Ctrl snap, Ctrl+Shift fine, Alt coarse · click or Enter applies · right click or Esc cancels"
+  "keys": "%s axis. Ctrl snap, Ctrl+Shift fine, Alt coarse. Click or Enter applies. Right click or Esc cancels",
+  "orientation": "Axes: %s. Click for the next",
+  "orientation.global": "global",
+  "orientation.local": "local",
+  "orientation.view": "view"
 }

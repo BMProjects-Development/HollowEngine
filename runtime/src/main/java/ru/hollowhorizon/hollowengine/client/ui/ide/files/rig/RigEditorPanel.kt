@@ -2,15 +2,14 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
-import ru.hollowhorizon.hollowengine.client.editor.GizmoDrag
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
@@ -20,6 +19,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
+import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.time.Duration.Companion.milliseconds
@@ -30,13 +30,6 @@ private const val PhysicsIcon = "hollowengine:textures/gui/icons/timeline/play.s
 private const val StopIcon = "hollowengine:textures/gui/icons/timeline/pause.svg"
 private const val SkeletonIcon = "hollowengine:textures/gui/icons/rig/skeleton.svg"
 private const val ColliderIcon = "hollowengine:textures/gui/icons/rig/colliders.svg"
-
-/** The modes of the collider gizmo, with the icons and names the IDE toolbar gives them for the world. */
-private val GizmoModes = listOf(
-    Triple(GizmoEditMode.TRANSLATE, "hollowengine:textures/gui/icons/gizmo_translate.svg", "hollowengine.gui.ide.gizmo.translate"),
-    Triple(GizmoEditMode.ROTATE, "hollowengine:textures/gui/icons/gizmo_rotate.svg", "hollowengine.gui.ide.gizmo.rotate"),
-    Triple(GizmoEditMode.SCALE, "hollowengine:textures/gui/icons/gizmo_scale.svg", "hollowengine.gui.ide.gizmo.scale"),
-)
 
 /**
  * The editor for a `.rig` file.
@@ -120,7 +113,12 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
 }
 
 @Composable
-private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, preview: RigPreview?, onPhysics: () -> Unit) {
+private fun Toolbar(
+    document: HollowIdeRigDocument,
+    state: RigEditorState,
+    preview: RigPreview?,
+    onPhysics: () -> Unit,
+) {
     val viewer = state.viewer
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
         AnimatorIconButton(SkeletonIcon, rigText("toggle_skeleton"), size = 12f, active = state.showSkeleton) {
@@ -129,13 +127,7 @@ private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, previ
         AnimatorIconButton(ColliderIcon, rigText("toggle_colliders"), size = 12f, active = state.showColliders) {
             state.showColliders = !state.showColliders
         }
-        if (state.partSelection != null) {
-            GizmoModes.forEach { (mode, icon, tooltip) ->
-                AnimatorIconButton(icon, tooltip.lang, size = 12f, active = mode in state.gizmoModes) {
-                    state.gizmoModes = if (mode in state.gizmoModes) state.gizmoModes - mode else state.gizmoModes + mode
-                }
-            }
-        }
+        if (state.partSelection != null) GizmoToolbarButtons()
         if (RigPreviews.isAvailable) {
             AnimatorIconButton(
                 icon = if (preview == null) PhysicsIcon else StopIcon,
@@ -200,10 +192,9 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
     var rootExpanded by mutableStateOf(true)
 
     val gizmo = RigPartGizmo()
-    var gizmoModes by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
-    var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
-    var transform by mutableStateOf<RigPartTransform?>(null)
-    internal var handleDrag: RigHandleDrag? = null
+
+    /** Turns the preview to a view picked on its axes or by the numpad. */
+    val cameraTurn = OrbitCameraTurn(viewer)
 
     /** Ticks every frame while something in the preview moves on its own, to redraw the gizmo over it. */
     var frame by mutableStateOf(0L)
@@ -221,9 +212,7 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
 
     /** Selects [bone] and [part] on it; a transform or a drag under way stays where it got to. */
     fun select(bone: String?, part: String? = null) {
-        if (transform != null || handleDrag != null) document.endGesture()
-        transform = null
-        handleDrag = null
+        gizmo.session.settle()
         selected = bone
         selectedPart = part ?: when {
             bone == null -> null
@@ -250,9 +239,8 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
         pointerY = y
     }
 
-    fun endHandleDrag() {
-        handleDrag = null
-    }
+    /** The selected part as the gizmo moves it, or null when there is none it can move. */
+    fun gizmoTarget(): GizmoTarget? = selectedFrame()?.let { RigPartTarget(document, it) }
 
     /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
     fun selectedFrame(): RigGizmoFrame? {
@@ -260,7 +248,8 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
         if (document.isLocked(selection.bone, selection.id)) return null
         if (selection.id == BONE_POSE_PART) {
             val bone = selection.bone ?: return null
-            val node = viewer.nodes.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } } ?: return null
+            val node =
+                viewer.nodes.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } } ?: return null
             return BonePoseFrame(bone, node, document.rig.bone(bone)?.pose)
         }
         if (selection.id == BONE_ORIGIN_PART) {
@@ -273,9 +262,6 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
         return gizmoFrame(selection, spec, holder)
     }
 }
-
-/** A drag on a gizmo handle: the part it moves, where it was when the drag began, and the drag. */
-internal class RigHandleDrag(val selection: RigPartSelection, val frame: RigGizmoFrame, val drag: GizmoDrag)
 
 private fun RigPreview?.toggled(viewer: ModelViewerState): RigPreview? {
     if (this != null) {

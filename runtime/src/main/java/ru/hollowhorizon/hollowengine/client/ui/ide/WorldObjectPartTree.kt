@@ -236,7 +236,7 @@ internal class PartsReader {
         is ModelAttachmentSpec -> fileName(spec.model) ?: spec.id
         is VfxBoneAttachmentSpec -> fileName(spec.effect)?.let { if (spec.ownEffect != null) "$it *" else it }
             ?: spec.id
-        else -> "${RigAttachmentTypes.of(spec).title()} · ${spec.id}"
+        else -> "${RigAttachmentTypes.of(spec).title()} (${spec.id})"
     }
 
     private fun attachmentIcon(spec: RigAttachmentSpec): String = when (spec) {

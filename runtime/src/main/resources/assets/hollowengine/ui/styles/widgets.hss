@@ -1,6 +1,12 @@
 @import "hollowengine:ui/styles/theme.hss";
 @import "hollowengine:ui/styles/buttons.hss";
 
+.view-axes-label {
+    font-size: 7px;
+    foreground: $bg-window;
+    text-shadow: none;
+}
+
 .dropdown-button {
     height: 24px;
     padding: 0px 8px;

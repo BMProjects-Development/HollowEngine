@@ -154,7 +154,7 @@ internal class MontageTimelineSession(
     }
 
     private fun addBone(bone: String) {
-        val path = listOf("${montageText("bone")} · $bone")
+        val path = listOf("${montageText("bone")} ($bone)")
         val group = timeline.group(path)
         groupKeys[group] = boneKey(bone)
         MontageBoneProperty.entries.forEach { property ->
@@ -618,7 +618,7 @@ internal class MontageTimelineSession(
         return bone to property
     }
 
-    private fun attachmentLabel(bone: String?, spec: RigAttachmentSpec) = "${bone ?: montageText("model")} · ${spec.id}"
+    private fun attachmentLabel(bone: String?, spec: RigAttachmentSpec) = "${bone ?: montageText("model")} (${spec.id})"
 
     private fun windowColor(spec: RigAttachmentSpec): Color =
         RigAttachmentTypes.of(spec)?.editorColor?.let { Color(String.format("%06X", it)) } ?: EventColor

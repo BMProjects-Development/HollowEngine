@@ -23,7 +23,7 @@ fun RecipeLayout(content: HollowUiContent) {
     Row(tags = listOf("recipe-layout"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER), content = content)
 }
 
-/** [rows] × [columns] slots; [slot] draws the one at a row and a column. */
+/** [rows] x [columns] slots; [slot] draws the one at a row and a column. */
 @Composable
 fun RecipeGrid(rows: Int, columns: Int, slot: @Composable (row: Int, column: Int) -> Unit) {
     Column(tags = listOf("recipe-grid")) {
@@ -81,23 +81,23 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
     val dropping = dragAndDrop?.hoveredTargetId == dropId && dragAndDrop.canDrop
 
     val interactive = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).dropTarget(
-            id = dropId,
-            accepts = { item ->
-                val pick = item.payload as? RecipePick
-                pick != null && !readOnly && (binding.kind == RecipeSlotKind.INGREDIENT || pick.tag == null)
-            },
-            onDrop = { item, _, _ ->
-                session.apply(binding, item.payload as RecipePick)
-                session.select(binding)
-                true
-            },
-        ).onClick { event ->
-            when {
-                event.isLeftClick() -> session.select(binding)
-                event.isRightClick() -> session.write(binding, null)
-            }
-            event.consume()
+        id = dropId,
+        accepts = { item ->
+            val pick = item.payload as? RecipePick
+            pick != null && !readOnly && (binding.kind == RecipeSlotKind.INGREDIENT || pick.tag == null)
+        },
+        onDrop = { item, _, _ ->
+            session.apply(binding, item.payload as RecipePick)
+            session.select(binding)
+            true
+        },
+    ).onClick { event ->
+        when {
+            event.isLeftClick() -> session.select(binding)
+            event.isRightClick() -> session.write(binding, null)
         }
+        event.consume()
+    }
     Box(
         id = "recipe-slot-${binding.id}",
         mode = UiBoxMode.STACK,
@@ -122,9 +122,7 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
             )
 
             unknown -> Text(
-                "?",
-                tags = listOf("recipe-slot-unknown"),
-                modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
+                "?", tags = listOf("recipe-slot-unknown"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
             )
         }
     }

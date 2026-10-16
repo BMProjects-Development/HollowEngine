@@ -5,7 +5,6 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /** What a key or a click did to a [GizmoKeyboardTransform]. */
@@ -25,9 +24,9 @@ enum class GizmoKeyResult {
 
 /**
  * A transform started from the keyboard, the way Blender does it: G, R or S begins it where the pointer
- * is, the pointer drives it, X, Y or Z holds it to an axis (the world's first, the object's own on a
- * second press, free again on a third), a click or Enter applies it and Escape or the right button puts
- * the object back. Scale is always along the object's own axes.
+ * is, the pointer drives it, X, Y or Z holds it to an axis (of the orientation the gizmo is set to first, of
+ * its [alternate][GizmoOrientation.alternate] on a second press, free again on a third), a click or Enter
+ * applies it and Escape or the right button puts the object back. Scale is always along the object's own axes.
  */
 class GizmoKeyboardTransform(
     val mode: GizmoEditMode,
@@ -40,8 +39,12 @@ class GizmoKeyboardTransform(
 ) {
     var axis: Int? = null
         private set
-    var local: Boolean = false
+
+    /** Whose axis [axis] is; null while the transform is free. */
+    var orientation: GizmoOrientation? = null
         private set
+
+    private val primary = if (mode == GizmoEditMode.SCALE) GizmoOrientation.LOCAL else GizmoSettings.orientation
 
     private lateinit var handle: GizmoHandle
     private lateinit var drag: GizmoDrag
@@ -79,30 +82,32 @@ class GizmoKeyboardTransform(
     /** What it is doing and which keys do what, for the editor to show by the pointer. */
     val hint: String
         get() {
-            val held = axis?.let { "XYZ"[it] + if (local) " " + "hollowengine.gui.ide.gizmo.local".lang else "" }
+            val held = axis?.let { index ->
+                "XYZ"[index] + " (" + "hollowengine.gui.ide.gizmo.orientation.${orientation?.name?.lowercase()}".lang + ")"
+            }
             val axes = AXIS_ACTIONS.joinToString("/") { it.shortcut ?: "-" }
             return listOfNotNull(
                 "hollowengine.gui.ide.gizmo.${mode.name.lowercase()}".lang,
                 held,
                 "hollowengine.gui.ide.gizmo.keys".lang(axes)
-            ).joinToString("  ·  ")
+            ).joinToString(", ")
         }
 
     /**
-     * Holds the transform to [index]: the world's axis, then the object's own, then free again. Starts
+     * Holds the transform to [index]: along the gizmo's orientation, then the other one, then free again. Starts
      * over from where it began, so motion along the old axis does not carry over.
      */
     private fun constrain(index: Int) {
         when {
             axis != index -> {
                 axis = index
-                local = mode == GizmoEditMode.SCALE
+                orientation = primary
             }
 
-            !local -> local = true
+            orientation == primary && mode != GizmoEditMode.SCALE -> orientation = primary.alternate
             else -> {
                 axis = null
-                local = false
+                orientation = null
             }
         }
         restart()
@@ -111,8 +116,7 @@ class GizmoKeyboardTransform(
     private fun restart() {
         val origin = start.translation.toVec3()
         val direction = axis?.let { index ->
-            val unit = UNIT_AXES[index]
-            if (local || mode == GizmoEditMode.SCALE) unit.rotateBy(start.rotation) else unit
+            geometry.axes(orientation ?: primary, start.rotation)?.toList()?.get(index)
         }?.toVec3()
         val id = when (mode) {
             GizmoEditMode.TRANSLATE -> axis?.let(TRANSLATE_IDS::get) ?: GizmoHandleId.CENTER
@@ -158,7 +162,6 @@ class GizmoKeyboardTransform(
         private const val GUIDE_REACH_PIXELS = 4000f
         private const val GUIDE_WIDTH = 1.5f
 
-        private val UNIT_AXES = listOf(Vec3f.X_AXIS, Vec3f.Y_AXIS, Vec3f.Z_AXIS)
         private val TRANSLATE_IDS = listOf(GizmoHandleId.AXIS_X, GizmoHandleId.AXIS_Y, GizmoHandleId.AXIS_Z)
         private val ROTATE_IDS = listOf(GizmoHandleId.ROTATE_X, GizmoHandleId.ROTATE_Y, GizmoHandleId.ROTATE_Z)
         private val SCALE_IDS = listOf(GizmoHandleId.SCALE_X, GizmoHandleId.SCALE_Y, GizmoHandleId.SCALE_Z)

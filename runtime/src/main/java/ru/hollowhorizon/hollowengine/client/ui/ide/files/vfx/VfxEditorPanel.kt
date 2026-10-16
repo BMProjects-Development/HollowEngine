@@ -5,16 +5,19 @@ import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
+import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
@@ -27,12 +30,10 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
-import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.time.Duration.Companion.milliseconds
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
-import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 private const val AutoSaveDelayMillis = 900L
 
@@ -128,9 +129,12 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
 
     Column(
         tags = listOf("ide-file-panel"),
-        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas)
-            .focusScope().onKeyInput { input ->
-                if (!input.repeat && TimelineKeys.handlePlayback(session.timeline, input.key, input.modifiers)) input.consume()
+        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas).focusScope()
+            .onKeyInput { input ->
+                if (!input.repeat && TimelineKeys.handlePlayback(
+                        session.timeline, input.key, input.modifiers
+                    )
+                ) input.consume()
             },
     ) {
         document.error?.let { message ->
@@ -166,11 +170,7 @@ private fun Toolbar(state: VfxEditorState) {
         AnimatorIconButton(ShapeIcon, vfxText("toggle_shape"), size = 12f, active = preview.showShape) {
             preview.showShape = !preview.showShape
         }
-        GizmoModes.forEach { (mode, icon, tooltip) ->
-            AnimatorIconButton(icon, tooltip.lang, size = 12f, active = mode in state.gizmoModes) {
-                state.gizmoModes = if (mode in state.gizmoModes) state.gizmoModes - mode else state.gizmoModes + mode
-            }
-        }
+        GizmoToolbarButtons()
     }
 }
 
@@ -215,14 +215,13 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     /** The shape handle being dragged, with node as it was when drag started. */
     var drag: VfxGizmoHandle? = null
 
-    /** The transform gizmo of the world, drawn over the preview, and what it is set to move. */
+    /** The transform gizmo of the world, drawn over the preview. */
     val transformGizmo = VfxTransformGizmo()
-    var gizmoModes by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
-    var transformDrag: VfxTransformDrag? = null
-    var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
 
-    /** A transform from the keyboard under way, and where the pointer last was: where the next one starts. */
-    var keyboard by mutableStateOf<VfxKeyboardTransform?>(null)
+    /** Turns the preview to a view picked on its axes or by the numpad. */
+    val cameraTurn = OrbitCameraTurn(preview)
+
+    /** Where the pointer last was: where a transform from the keyboard starts. */
     var pointerX = 0f
     var pointerY = 0f
 
@@ -230,10 +229,7 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     var readout by mutableStateOf<VfxGizmoReadout?>(null)
 
     override fun select(id: String?) {
-        if (keyboard != null) {
-            keyboard = null
-            endGesture()
-        }
+        transformGizmo.session.settle()
         selected = id
         playbackPick = null
         id?.let(session::touch)
@@ -260,16 +256,23 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     val gizmoKey = listOf(
         preview.yaw, preview.pitch, preview.distance, preview.targetX, preview.targetY, preview.targetZ,
         preview.viewportWidth, preview.viewportHeight, preview.time, preview.showShape, preview.revision, node,
-        state.gizmoModes, state.session.timeline.isRecording,
+        GizmoSettings.modes, GizmoSettings.orientation, state.session.timeline.isRecording,
     )
     val gizmo = remember(gizmoKey) {
         if (node == null) VfxGizmo.EMPTY else VfxGizmos.build(preview, node, runtime, preview.showShape, driven)
     }
     val transform = state.transformGizmo
-    val handles = remember(gizmoKey) {
-        if (node == null || runtime == null || preview.viewportWidth <= 1f) return@remember emptyList()
-        transform.capture(preview)
-        transform.handles(runtime.frame, state.gizmoModes, driven)
+    val session = transform.session
+    // The node where the preview has it now, made anew for every event: the session keeps the one a move began with.
+    val target: () -> GizmoTarget? = {
+        val current = selected?.let { document.effect.node(it) }
+        val placed = selected?.let { preview.instance?.node(it) }
+        if (current == null || placed == null || preview.viewportWidth <= 1f) {
+            null
+        } else {
+            transform.capture(preview)
+            VfxNodeTarget(document, state, current.id, placed.frame, placed.parent?.frame, current.transform, driven)
+        }
     }
 
     Box(
@@ -279,88 +282,80 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
         modifier = Modifier.size(100.percent, 100.percent).clip().onPlaced { rect ->
             preview.viewportWidth = rect.width
             preview.viewportHeight = rect.height
-        }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus()
-            .onKeyInput { input ->
-                if (handleTransformKeys(document, state, driven, input) || handleHistoryKeys(document, input)) input.consume()
-            }.onPress { event ->
-                state.pointerX = event.localX
-                state.pointerY = event.localY
-                if (clickDuringKeyboardTransform(document, state, event.button)) {
-                    event.consume()
-                    return@onPress
-                }
-                val left = event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
-                val handle = if (left) gizmo.handleAt(event.localX, event.localY) else null
-                val moving = if (left && handle == null && node != null && runtime != null) {
-                    transform.pick(handles, event.localX, event.localY)?.let { picked ->
-                        transform.begin(picked, runtime.frame, runtime.parent?.frame, node.transform, event.localX, event.localY)
-                    }
-                } else null
-                state.drag = handle
-                state.transformDrag = moving
-                state.readout = null
-                if (handle != null || moving != null) state.beginGesture() else preview.beginCameraDrag()
-            }.onDrag { event ->
-                val handle = state.drag
-                val moving = state.transformDrag
-                val current = selected?.let { document.effect.node(it) }
-                when {
-                    moving != null && current != null -> {
-                        transform.drag(moving, event.localX, event.localY, event.modifiers)?.let { placed ->
-                            document.edit { it.withNode(current.withCommon(transform = placed)) }
-                        }
-                        state.readout = transform.labelAt(moving)?.let { (x, y) -> VfxGizmoReadout(x, y, moving.label) }
-                    }
-
-                    handle != null && current != null -> {
-                        val fine = event.modifiers and GLFW.GLFW_MOD_SHIFT != 0
-                        val snap = event.modifiers and GLFW.GLFW_MOD_CONTROL != 0
-                        val distance = VfxGizmos.dragDistance(handle, event.dragTotalX, event.dragTotalY, fine, snap)
-                        document.edit { it.withNode(handle.apply(current, distance)) }
-                        state.readout = VfxGizmoReadout(handle.x, handle.y, handle.readout(distance))
-                    }
-
-                    event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT -> preview.pan(event.dragTotalX, event.dragTotalY)
-                    else -> preview.orbit(event.dragTotalX, event.dragTotalY)
-                }
+        }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus().onKeyInput { input ->
+            if (input.repeat) return@onKeyInput
+            val idle = !session.isBusy
+            val taken = idle && UndoKeys.handle(
+                document.history, input.key, input.modifiers
+            ) || idle && state.cameraTurn.handleKey(input.key, input.modifiers) || session.key(
+                target(), input.key, input.modifiers, state.pointerX, state.pointerY
+            )
+            if (taken) input.consume()
+        }.onPress { event ->
+            state.pointerX = event.localX
+            state.pointerY = event.localY
+            state.readout = null
+            val left = event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
+            // A shape handle wins over the transform handles; during a keyboard transform every click is the session's.
+            val handle = if (left && session.keyboard == null) gizmo.handleAt(event.localX, event.localY) else null
+            if (handle == null && session.press(target(), event.localX, event.localY, event.button)) {
                 event.consume()
-            }.onRelease {
-                if (state.drag != null || state.transformDrag != null) state.endGesture()
-                state.drag = null
-                state.transformDrag = null
-                state.readout = null
-            }.onHover { event ->
-                state.pointerX = event.localX
-                state.pointerY = event.localY
-                if (state.keyboard != null) {
-                    moveKeyboardTransform(document, state, event.modifiers)
-                    return@onHover
+                return@onPress
+            }
+            state.drag = handle
+            if (handle != null) state.beginGesture() else preview.beginCameraDrag()
+        }.onDrag { event ->
+            val handle = state.drag
+            val current = selected?.let { document.effect.node(it) }
+            when {
+                session.drag != null -> {
+                    transform.capture(preview)
+                    session.dragTo(event.localX, event.localY, event.modifiers)
+                    state.readout = session.readout()?.let { (x, y, value) -> VfxGizmoReadout(x, y, value.toFloat()) }
                 }
-                val over = transform.pick(handles, event.localX, event.localY)?.id
-                if (over != state.hoveredHandle) state.hoveredHandle = over
-            }.onScroll { event ->
-                preview.zoom(event.scrollY)
-                event.consume()
-            }.drawBehind(key = preview) {
-                preview.draw(this)
-            },
+
+                handle != null && current != null -> {
+                    val fine = event.modifiers and GLFW.GLFW_MOD_SHIFT != 0
+                    val snap = event.modifiers and GLFW.GLFW_MOD_CONTROL != 0
+                    val distance = VfxGizmos.dragDistance(handle, event.dragTotalX, event.dragTotalY, fine, snap)
+                    document.edit { it.withNode(handle.apply(current, distance)) }
+                    state.readout = VfxGizmoReadout(handle.x, handle.y, handle.readout(distance))
+                }
+
+                event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT -> preview.pan(event.dragTotalX, event.dragTotalY)
+                else -> preview.orbit(event.dragTotalX, event.dragTotalY)
+            }
+            event.consume()
+        }.onRelease {
+            if (state.drag != null) state.endGesture()
+            session.release()
+            state.drag = null
+            state.readout = null
+        }.onHover { event ->
+            state.pointerX = event.localX
+            state.pointerY = event.localY
+            transform.capture(preview)
+            if (!session.moveTo(event.localX, event.localY, event.modifiers)) {
+                session.hover(target(), event.localX, event.localY)
+            }
+        }.onScroll { event ->
+            preview.zoom(event.scrollY)
+            event.consume()
+        }.drawBehind(key = preview) {
+            preview.draw(this)
+        },
     ) {
         Box(
             modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
-                .drawBehind(key = listOf(gizmo, handles, state.drag?.id, state.hoveredHandle, state.keyboard)) {
+                .drawBehind(key = listOf(gizmoKey, state.drag?.id, session.hovered, session.drag, session.keyboard)) {
                     drawGizmo(gizmo, state.drag?.id)
-                    val keyboard = state.keyboard
-                    if (keyboard != null) keyboard.keyboard.draw(this)
-                    else transform.draw(this, handles, state.hoveredHandle, state.transformDrag)
+                    session.draw(this, target())
                 },
         )
-        state.keyboard?.let { keyboard ->
-            Text(
-                keyboard.keyboard.hint,
-                tags = listOf("vfx-gizmo-readout"),
-                modifier = Modifier.position(8.px, 32.px).inputTransparent(),
-            )
+        session.hint?.let { hint ->
+            Text(hint, tags = listOf("vfx-gizmo-readout"), modifier = Modifier.position(8.px, 32.px).inputTransparent())
         }
+        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
         state.readout?.let { readout ->
             Text(
                 formatNumber(readout.value),
@@ -370,9 +365,6 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
         }
     }
 }
-
-private fun handleHistoryKeys(document: HollowIdeVfxDocument, input: UiKeyInput): Boolean =
-    !input.repeat && UndoKeys.handle(document.history, input.key, input.modifiers)
 
 /** The number beside the handle being dragged. */
 internal class VfxGizmoReadout(val x: Float, val y: Float, val value: Float)
@@ -410,13 +402,6 @@ private fun ParticleCounter(preview: VfxPreviewState) {
             .inputTransparent(),
     )
 }
-
-/** The modes of the transform gizmo, with the icons and names the IDE toolbar gives them for the world. */
-private val GizmoModes = listOf(
-    Triple(GizmoEditMode.TRANSLATE, "hollowengine:textures/gui/icons/gizmo_translate.svg", "hollowengine.gui.ide.gizmo.translate"),
-    Triple(GizmoEditMode.ROTATE, "hollowengine:textures/gui/icons/gizmo_rotate.svg", "hollowengine.gui.ide.gizmo.rotate"),
-    Triple(GizmoEditMode.SCALE, "hollowengine:textures/gui/icons/gizmo_scale.svg", "hollowengine.gui.ide.gizmo.scale"),
-)
 
 private val HandleOutline = UiColor(0.05f, 0.05f, 0.06f, 0.9f)
 private val CounterBackground = UiColor(0.06f, 0.07f, 0.08f, 0.7f)

@@ -1,8 +1,8 @@
 {
   "title": "Частицы",
   "description": "Спрайты Minecraft с отдельной физикой UI. Загруженный мир не требуется.",
-  "smoke": "Дым · particleBackground",
-  "flame": "Пламя · drawBehind",
+  "smoke": "Дым | particleBackground",
+  "flame": "Пламя | drawBehind",
   "pause": "Приостановить частицы",
   "resume": "Продолжить частицы"
 }

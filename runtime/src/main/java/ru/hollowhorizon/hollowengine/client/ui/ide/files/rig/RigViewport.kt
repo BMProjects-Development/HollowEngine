@@ -2,20 +2,16 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import androidx.compose.runtime.Composable
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.editor.GizmoHandle
-import ru.hollowhorizon.hollowengine.client.editor.GizmoKeyResult
-import ru.hollowhorizon.hollowengine.client.editor.GizmoKeyboardTransform
+import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigPreview
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
-/**
- * The preview of the rig, and how the pointer and the keyboard edit it.
- */
+/** The preview of the rig, and how the pointer and the keyboard edit it. */
 @Composable
 internal fun RigViewport(
     document: RigEditing,
@@ -33,20 +29,21 @@ internal fun RigViewport(
                 .onKeyInput { input -> if (onKey(input) || handleKey(document, state, input)) input.consume() }
                 .onPress { event ->
                     state.pointer(event.localX, event.localY)
-                    state.swallowClick = state.transform?.let { finishTransform(document, state, it.keyboard.click(event.button)) } == true ||
-                        event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT && beginHandleDrag(document, state, event.localX, event.localY)
+                    state.swallowClick = state.gizmo.capture(viewer) && state.gizmo.session.press(
+                        state.gizmoTarget(),
+                        event.localX,
+                        event.localY,
+                        event.button
+                    )
                     if (state.swallowClick) event.consume()
-                }
-                .onRelease {
-                    if (state.handleDrag != null) document.endGesture()
-                    state.endHandleDrag()
-                }
-                .onHover { event ->
+                }.onRelease { state.gizmo.session.release() }.onHover { event ->
                     state.pointer(event.localX, event.localY)
-                    if (state.transform != null) moveTransform(document, state, event.modifiers)
-                    else state.hoveredHandle = handleAt(document, state, event.localX, event.localY)?.id
-                }
-                .onClick { event ->
+                    if (!state.gizmo.capture(viewer)) return@onHover
+                    val session = state.gizmo.session
+                    if (!session.moveTo(event.localX, event.localY, event.modifiers)) {
+                        session.hover(state.gizmoTarget(), event.localX, event.localY)
+                    }
+                }.onClick { event ->
                     if (state.swallowClick || event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onClick
                     pick(document, state, event.localX, event.localY)
                     event.consume()
@@ -55,10 +52,11 @@ internal fun RigViewport(
                 state.pointer(event.localX, event.localY)
                 val physics = preview
                 when {
-                    state.handleDrag != null -> {
-                        dragHandle(document, state, event.localX, event.localY, event.modifiers)
-                        true
-                    }
+                    state.gizmo.capture(viewer) && state.gizmo.session.dragTo(
+                        event.localX,
+                        event.localY,
+                        event.modifiers
+                    ) -> true
 
                     physics != null && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
                         physics.push(Vec3f(-event.deltaX, -event.deltaY, 0f) * PUSH_STRENGTH)
@@ -69,94 +67,36 @@ internal fun RigViewport(
                 }
             },
         )
+        val session = state.gizmo.session
         Box(
-            modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
-                .drawBehind(key = listOf(state.frame, document.rig, state.partSelection, state.gizmoModes, state.hoveredHandle)) {
-                    drawGizmo(document, state)
-                },
+            modifier = Modifier.size(100.percent, 100.percent).inputTransparent().drawBehind(
+                key = listOf(
+                    state.frame, document.rig, state.partSelection, GizmoSettings.modes, GizmoSettings.orientation,
+                    session.hovered, session.drag, session.keyboard,
+                ),
+            ) {
+                if (state.gizmo.capture(viewer)) session.draw(this, state.gizmoTarget())
+            },
         )
-        state.transform?.let { transform ->
+        session.hint?.let { hint ->
             Text(
-                transform.keyboard.hint,
+                hint,
                 tags = listOf("rig-transform-hint"),
-                modifier = Modifier.position(8.px, 32.px).inputTransparent(),
+                modifier = Modifier.position(8.px, 32.px).inputTransparent()
             )
         }
+        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
     }
 }
 
-private fun UiCanvasDrawScope.drawGizmo(document: RigEditing, state: RigEditorState) {
-    state.transform?.let { transform ->
-        transform.keyboard.draw(this)
-        return
-    }
-    val frame = state.selectedFrame() ?: return
-    if (!state.gizmo.capture(state.viewer)) return
-    state.gizmo.draw(this, state.gizmo.handles(frame, state.gizmoModes), state.hoveredHandle, state.handleDrag?.drag)
-}
-
-private fun handleAt(document: RigEditing, state: RigEditorState, x: Float, y: Float): GizmoHandle? {
-    val frame = state.selectedFrame() ?: return null
-    if (!state.gizmo.capture(state.viewer)) return null
-    return state.gizmo.pick(state.gizmo.handles(frame, state.gizmoModes), x, y)
-}
-
-private fun beginHandleDrag(document: RigEditing, state: RigEditorState, x: Float, y: Float): Boolean {
-    val selection = state.partSelection ?: return false
-    val frame = state.selectedFrame() ?: return false
-    val handle = handleAt(document, state, x, y) ?: return false
-    state.handleDrag = RigHandleDrag(selection, frame, state.gizmo.begin(handle, frame, x, y))
-    document.beginGesture()
-    return true
-}
-
-private fun dragHandle(document: RigEditing, state: RigEditorState, x: Float, y: Float, modifiers: Int) {
-    val drag = state.handleDrag ?: return
-    state.gizmo.drag(drag.drag, x, y, modifiers)?.let { values -> document.edit { drag.frame.placed(it, values) } }
-}
-
+/** Undo and redo, the numpad's views, then the gizmo's keys: a transform, a reset, the axes of one under way. */
 private fun handleKey(document: RigEditing, state: RigEditorState, input: UiKeyInput): Boolean {
     if (input.repeat) return false
-    val transform = state.transform
-    if (transform != null) {
-        val result = transform.keyboard.key(input.key, input.modifiers)
-        if (result == GizmoKeyResult.CHANGED) {
-            document.edit { transform.frame.restored(it) }
-            moveTransform(document, state, input.modifiers)
-        }
-        return finishTransform(document, state, result) || result == GizmoKeyResult.CHANGED
-    }
-
-    if (UndoKeys.handle(document.history, input.key, input.modifiers)) return true
-
-    val mode = GizmoKeyboardTransform.modeFor(input.key, input.modifiers) ?: return false
-    val selection = state.partSelection ?: return true
-    val frame = state.selectedFrame() ?: return true
-    if (mode == GizmoEditMode.ROTATE && frame.isWorldAligned) return true
-    if (!state.gizmo.capture(state.viewer)) return true
-
-    document.beginGesture()
-    state.transform = RigPartTransform(selection, frame, state.gizmo.keyboard(mode, frame, state.pointerX, state.pointerY))
-    return true
-}
-
-/** Ends the transform under way when [result] says so; true when it did. */
-private fun finishTransform(document: RigEditing, state: RigEditorState, result: GizmoKeyResult): Boolean {
-    val transform = state.transform ?: return false
-    when (result) {
-        GizmoKeyResult.CONFIRMED -> Unit
-        GizmoKeyResult.CANCELLED -> document.edit { transform.frame.restored(it) }
-        else -> return false
-    }
-    state.transform = null
-    document.endGesture()
-    return true
-}
-
-private fun moveTransform(document: RigEditing, state: RigEditorState, modifiers: Int) {
-    val transform = state.transform ?: return
-    transform.keyboard.update(state.pointerX, state.pointerY, modifiers)
-        ?.let { values -> document.edit { transform.frame.placed(it, values) } }
+    val session = state.gizmo.session
+    if (!session.isBusy && UndoKeys.handle(document.history, input.key, input.modifiers)) return true
+    if (!session.isBusy && state.cameraTurn.handleKey(input.key, input.modifiers)) return true
+    if (!state.gizmo.capture(state.viewer)) return false
+    return session.key(state.gizmoTarget(), input.key, input.modifiers, state.pointerX, state.pointerY)
 }
 
 /** An IK target under the pointer wins, then a bone; a collider is picked only where there is neither. */
@@ -178,10 +118,9 @@ private fun pick(document: RigEditing, state: RigEditorState, x: Float, y: Float
     // A click on nothing lets go of what was picked, back to the model itself.
     if (!state.showColliders || !state.gizmo.capture(viewer)) return state.select(null)
     val (start, end) = state.gizmo.ray(x, y) ?: return state.select(null)
-    val hits = previewColliders(document.rig, viewer.nodes)
-        .mapNotNull { collider -> collider.volume.clip(start, end)?.let { collider to it.distanceToSqr(start) } }
-        .sortedBy { it.second }
-        .map { it.first }
+    val hits = previewColliders(document.rig, viewer.nodes).mapNotNull { collider ->
+            collider.volume.clip(start, end)?.let { collider to it.distanceToSqr(start) }
+        }.sortedBy { it.second }.map { it.first }
     if (hits.isEmpty()) return state.select(null)
 
     // Clicking the same spot again goes through to the collider behind the selected one.

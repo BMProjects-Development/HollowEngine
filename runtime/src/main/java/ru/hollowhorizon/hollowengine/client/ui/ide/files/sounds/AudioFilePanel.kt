@@ -153,7 +153,7 @@ private class AudioFileState(path: String) {
         result.onSuccess { (blocks, seconds, format) ->
             peaks = blocks
             duration = seconds
-            info = "${format.sampleRate.toInt()} Hz · ${if (format.channels == 1) text("mono") else text("stereo")}"
+            info = "${format.sampleRate.toInt()} Hz | ${if (format.channels == 1) text("mono") else text("stereo")}"
         }.onFailure { error = text("unreadable").format(it.message ?: it.javaClass.simpleName) }
     }
 

@@ -74,7 +74,16 @@ object GizmoColors {
  * Builds the screen-space geometry for the gizmo.
  */
 class GizmoGeometry(private val projector: GizmoProjector) {
-    fun buildHandles(translation: Vec3f, rotation: QuatF, modes: Set<GizmoEditMode>): List<GizmoHandle> {
+    /**
+     * The handles of an object at [translation] turned by [rotation]. Moving and turning follow [orientation];
+     * scaling always follows the object, since a transform cannot scale across its own axes.
+     */
+    fun buildHandles(
+        translation: Vec3f,
+        rotation: QuatF,
+        modes: Set<GizmoEditMode>,
+        orientation: GizmoOrientation = GizmoSettings.orientation,
+    ): List<GizmoHandle> {
         val origin = Vec3(translation.x.toDouble(), translation.y.toDouble(), translation.z.toDouble())
         val perPixel = projector.worldPerPixel(origin)
         val originScreen = projector.project(origin) ?: return emptyList()
@@ -83,21 +92,19 @@ class GizmoGeometry(private val projector: GizmoProjector) {
         val lx = Vec3f.X_AXIS.rotateBy(rotation)
         val ly = Vec3f.Y_AXIS.rotateBy(rotation)
         val lz = Vec3f.Z_AXIS.rotateBy(rotation)
+        val (ax, ay, az) = axes(orientation, rotation) ?: return emptyList()
         val translate = GizmoEditMode.TRANSLATE in modes
         val rotate = GizmoEditMode.ROTATE in modes
         val ringRadius = if (modes.size > 1) COMBINED_RING_RADIUS_PX else RING_RADIUS_PX
 
         return buildList {
             if (translate) {
-                val wx = Vec3f.X_AXIS
-                val wy = Vec3f.Y_AXIS
-                val wz = Vec3f.Z_AXIS
-                axisArrow(GizmoHandleId.AXIS_X, origin, wx, perPixel, GizmoColors.AXIS_X)?.let(::add)
-                axisArrow(GizmoHandleId.AXIS_Y, origin, wy, perPixel, GizmoColors.AXIS_Y)?.let(::add)
-                axisArrow(GizmoHandleId.AXIS_Z, origin, wz, perPixel, GizmoColors.AXIS_Z)?.let(::add)
-                planeQuad(GizmoHandleId.PLANE_X, origin, wx, wy, wz, perPixel, GizmoColors.AXIS_X)?.let(::add)
-                planeQuad(GizmoHandleId.PLANE_Y, origin, wy, wz, wx, perPixel, GizmoColors.AXIS_Y)?.let(::add)
-                planeQuad(GizmoHandleId.PLANE_Z, origin, wz, wx, wy, perPixel, GizmoColors.AXIS_Z)?.let(::add)
+                axisArrow(GizmoHandleId.AXIS_X, origin, ax, perPixel, GizmoColors.AXIS_X)?.let(::add)
+                axisArrow(GizmoHandleId.AXIS_Y, origin, ay, perPixel, GizmoColors.AXIS_Y)?.let(::add)
+                axisArrow(GizmoHandleId.AXIS_Z, origin, az, perPixel, GizmoColors.AXIS_Z)?.let(::add)
+                planeQuad(GizmoHandleId.PLANE_X, origin, ax, ay, az, perPixel, GizmoColors.AXIS_X)?.let(::add)
+                planeQuad(GizmoHandleId.PLANE_Y, origin, ay, az, ax, perPixel, GizmoColors.AXIS_Y)?.let(::add)
+                planeQuad(GizmoHandleId.PLANE_Z, origin, az, ax, ay, perPixel, GizmoColors.AXIS_Z)?.let(::add)
                 add(
                     discHandle(
                         GizmoHandleId.CENTER, origin, originPt, CENTER_RADIUS_PX, GizmoColors.CENTER, originScreen.depth
@@ -106,13 +113,13 @@ class GizmoGeometry(private val projector: GizmoProjector) {
             }
 
             if (rotate) {
-                rotationRing(GizmoHandleId.ROTATE_X, origin, lx, ly, lz, perPixel, ringRadius, GizmoColors.AXIS_X)?.let(
+                rotationRing(GizmoHandleId.ROTATE_X, origin, ax, ay, az, perPixel, ringRadius, GizmoColors.AXIS_X)?.let(
                     ::add
                 )
-                rotationRing(GizmoHandleId.ROTATE_Y, origin, ly, lz, lx, perPixel, ringRadius, GizmoColors.AXIS_Y)?.let(
+                rotationRing(GizmoHandleId.ROTATE_Y, origin, ay, az, ax, perPixel, ringRadius, GizmoColors.AXIS_Y)?.let(
                     ::add
                 )
-                rotationRing(GizmoHandleId.ROTATE_Z, origin, lz, lx, ly, perPixel, ringRadius, GizmoColors.AXIS_Z)?.let(
+                rotationRing(GizmoHandleId.ROTATE_Z, origin, az, ax, ay, perPixel, ringRadius, GizmoColors.AXIS_Z)?.let(
                     ::add
                 )
             }
@@ -130,6 +137,24 @@ class GizmoGeometry(private val projector: GizmoProjector) {
             }
         }
     }
+
+    /** The three axes [orientation] gives an object turned by [rotation], or null while the camera is unknown. */
+    fun axes(orientation: GizmoOrientation, rotation: QuatF): Triple<Vec3f, Vec3f, Vec3f>? = when (orientation) {
+        GizmoOrientation.GLOBAL -> projector.axesFrame.let { frame ->
+            Triple(Vec3f.X_AXIS.rotateBy(frame), Vec3f.Y_AXIS.rotateBy(frame), Vec3f.Z_AXIS.rotateBy(frame))
+        }
+
+        GizmoOrientation.LOCAL -> Triple(
+            Vec3f.X_AXIS.rotateBy(rotation),
+            Vec3f.Y_AXIS.rotateBy(rotation),
+            Vec3f.Z_AXIS.rotateBy(rotation)
+        )
+
+        GizmoOrientation.VIEW -> projector.viewAxes()
+            ?.let { (right, up, back) -> Triple(right.toVec3f(), up.toVec3f(), back.toVec3f()) }
+    }
+
+    private fun Vec3.toVec3f() = Vec3f(x.toFloat(), y.toFloat(), z.toFloat())
 
     private fun axisArrow(id: GizmoHandleId, origin: Vec3, axis: Vec3f, perPixel: Float, color: UiColor): GizmoHandle? {
         val direction = worldVec(axis)

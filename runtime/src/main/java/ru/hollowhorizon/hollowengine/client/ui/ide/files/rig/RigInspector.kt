@@ -157,7 +157,7 @@ private fun AttachmentSection(
     selected: Boolean,
 ) {
     val type = RigAttachmentTypes.of(attachment)
-    val title = if (type?.namedAcrossRig == true) "${type.title()} · ${attachment.id}" else type.title()
+    val title = if (type?.namedAcrossRig == true) "${type.title()} (${attachment.id})" else type.title()
     val path = "/${bone ?: ""}/#$index"
 
     Section(if (selected) "◆ $title" else title) {

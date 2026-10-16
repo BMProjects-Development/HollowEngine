@@ -9,9 +9,9 @@ internal val CookingCategories = listOf("food", "blocks", "misc")
 
 private const val MaxCraftingIngredients = 9
 
-/** The 3×3 crafting grid, read row by row and refilled the same way. */
 internal object ShapedShape : RecipeShape {
-    override fun read(json: JsonObject) = RecipeContents(shapedCells(json)?.filterNotNull().orEmpty(), json.get("result"))
+    override fun read(json: JsonObject) =
+        RecipeContents(shapedCells(json)?.filterNotNull().orEmpty(), json.get("result"))
 
     override fun write(target: JsonObject, contents: RecipeContents, previous: JsonObject) {
         target.copyShared(previous, CraftingCategories)
@@ -26,7 +26,9 @@ internal object ShapelessShape : RecipeShape {
 
     override fun write(target: JsonObject, contents: RecipeContents, previous: JsonObject) {
         target.copyShared(previous, CraftingCategories)
-        target.add("ingredients", JsonArray().apply { contents.ingredients.take(MaxCraftingIngredients).forEach(::add) })
+        target.add(
+            "ingredients",
+            JsonArray().apply { contents.ingredients.take(MaxCraftingIngredients).forEach(::add) })
         target.put("result", contents.result)
     }
 }
@@ -69,11 +71,9 @@ internal class SmithingShape(private val hasResult: Boolean) : RecipeShape {
 
 internal val SmithingSlots = listOf("template", "base", "addition")
 
-/** The ingredients of a shapeless recipe, in order. */
 internal fun shapelessIngredients(json: JsonObject): List<JsonElement> =
     json.get("ingredients")?.takeIf { it.isJsonArray }?.asJsonArray?.toList().orEmpty()
 
-/** `group`, and `category` when the new type has a category of that name. */
 private fun JsonObject.copyShared(previous: JsonObject, categories: List<String>) {
     copy(previous, "group")
     previous.primitive("category")?.asString?.takeIf { it in categories }?.let { addProperty("category", it) }

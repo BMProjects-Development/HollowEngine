@@ -338,9 +338,4 @@ class GizmoManipulator(
         return sqrt(dx * dx + dy * dy)
     }
 
-
-    companion object {
-        /** The one the world overlay uses. */
-        val World = GizmoManipulator(WorldToScreenProjector)
-    }
 }

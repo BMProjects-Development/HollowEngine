@@ -20,12 +20,10 @@ import kotlin.test.assertTrue
 
 class MontageTests {
     private val arm = RuntimeNode(
-        NodeDefinition(index = 1, name = "arm", children = mutableListOf(), transform = TrsTransformF()),
-        parent = null
+        NodeDefinition(index = 1, name = "arm", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )
     private val leg = RuntimeNode(
-        NodeDefinition(index = 0, name = "leg", children = mutableListOf(), transform = TrsTransformF()),
-        parent = null
+        NodeDefinition(index = 0, name = "leg", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )
     private val target = PoseTarget(
         mapOf(0 to leg, 1 to arm),
@@ -44,11 +42,8 @@ class MontageTests {
 
         val pose = MontageSampler.sample(montage, 1.25f, target, setOf(0, 1))
 
-        // The walk, looped to 0.25 s and half faded out, covers half of the leg; the wave does not touch it.
         assertEquals(0.25f, pose[0]!!.translation!!.x, 1e-4f)
         assertEquals(0.5f, pose[0]!!.cover, 1e-4f)
-        // On the arm the wave, half faded in at 5 × 0.25 s, lies over that: a quarter of what is beneath,
-        // a quarter of walk and half of wave, so the montage's part is a third walk and two thirds wave.
         assertEquals(0.25f / 3f + 1.25f * 2f / 3f, pose[1]!!.translation!!.x, 1e-4f)
         assertEquals(0.75f, pose[1]!!.cover, 1e-4f)
         assertNull(MontageSampler.sample(montage, 1.75f, target, setOf(0, 1))[0])
@@ -60,10 +55,7 @@ class MontageTests {
             duration = 1f,
             clips = listOf(
                 MontageClip(
-                    "a",
-                    "walk",
-                    length = 1f,
-                    weight = listOf(VfxKey(0f, 0.5f, VfxInterpolation.LINEAR))
+                    "a", "walk", length = 1f, weight = listOf(VfxKey(0f, 0.5f, VfxInterpolation.LINEAR))
                 )
             ),
             bones = listOf(
@@ -87,10 +79,7 @@ class MontageTests {
         leg.transform.translation.set(Vec3f(10f, 0f, 0f))
 
         applyAnimationPose(
-            MontageSampler.sample(montage, 0.1f, target, setOf(0)),
-            mapOf(0 to leg),
-            LayerBlendMode.Override,
-            1f
+            MontageSampler.sample(montage, 0.1f, target, setOf(0)), mapOf(0 to leg), LayerBlendMode.Override, 1f
         )
 
         assertEquals((10f + 0.1f) / 2f, leg.transform.translation.x, 1e-4f)
@@ -122,8 +111,7 @@ class MontageTests {
                 "hand" to RigBone(
                     attachments = listOf(
                         IkChainSpec(
-                            id = "reach",
-                            weight = AnimationExpression("0.2")
+                            id = "reach", weight = AnimationExpression("0.2")
                         )
                     )
                 )
@@ -174,8 +162,9 @@ class MontageTests {
             """
         )
 
-        fun sound(time: Float) = ModelRig.EMPTY.withMontages(listOf(MontageMoment(montage, time, 1f)))
-            .rig.bone("hand")!!.attachment("hum") as SoundBoneAttachmentSpec
+        fun sound(time: Float) =
+            ModelRig.EMPTY.withMontages(listOf(MontageMoment(montage, time, 1f))).rig.bone("hand")!!
+                .attachment("hum") as SoundBoneAttachmentSpec
 
         val playing = sound(1.5f)
         assertEquals(0.5f, playing.clock!!, 1e-5f)
@@ -188,8 +177,14 @@ class MontageTests {
 
         val fields = RigFields.animatable(playing).map { it.name }
         assertTrue("playback.volume" in fields && "playback.filters.0.cutoff" in fields, "$fields")
-        assertTrue(fields.none { it.startsWith("playback.repeat") || it == "playback.fadeIn" || it == "clock" }, "$fields")
-        assertEquals(listOf("playback.pitch"), RigFields.changed(playing, playing.copy(playback = playing.playback.copy(pitch = 2f))))
+        assertTrue(
+            fields.none { it.startsWith("playback.repeat") || it == "playback.fadeIn" || it == "clock" },
+            "$fields"
+        )
+        assertEquals(
+            listOf("playback.pitch"),
+            RigFields.changed(playing, playing.copy(playback = playing.playback.copy(pitch = 2f)))
+        )
     }
 
     /** A clip that moves a bone along x by [rate] times the time it is sampled at. */
@@ -197,10 +192,7 @@ class MontageTests {
         name = name,
         nodes = listOf(0, 1).associateWith {
             AnimationData(
-                translation = Rate(duration, rate),
-                rotation = null,
-                scale = null,
-                weights = null
+                translation = Rate(duration, rate), rotation = null, scale = null, weights = null
             )
         },
         duration = duration,

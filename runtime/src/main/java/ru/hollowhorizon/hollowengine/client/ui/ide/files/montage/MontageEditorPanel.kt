@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.montage
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
@@ -11,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
@@ -44,20 +44,6 @@ private const val PauseIcon = "hollowengine:textures/gui/icons/timeline/pause.sv
 private const val SkeletonIcon = "hollowengine:textures/gui/icons/rig/skeleton.svg"
 private const val ColliderIcon = "hollowengine:textures/gui/icons/rig/colliders.svg"
 private const val KeyIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
-
-private val GizmoModes = listOf(
-    Triple(
-        GizmoEditMode.TRANSLATE,
-        "hollowengine:textures/gui/icons/gizmo_translate.svg",
-        "hollowengine.gui.ide.gizmo.translate"
-    ),
-    Triple(
-        GizmoEditMode.ROTATE,
-        "hollowengine:textures/gui/icons/gizmo_rotate.svg",
-        "hollowengine.gui.ide.gizmo.rotate"
-    ),
-    Triple(GizmoEditMode.SCALE, "hollowengine:textures/gui/icons/gizmo_scale.svg", "hollowengine.gui.ide.gizmo.scale"),
-)
 
 /**
  * The editor for a `.montage` file.
@@ -217,14 +203,7 @@ private fun Toolbar(state: MontageEditorState) {
         ) {
             rigState.showColliders = !rigState.showColliders
         }
-        if (rigState.partSelection != null) {
-            GizmoModes.forEach { (mode, icon, tooltip) ->
-                AnimatorIconButton(icon, tooltip.lang, size = 12f, active = mode in rigState.gizmoModes) {
-                    rigState.gizmoModes =
-                        if (mode in rigState.gizmoModes) rigState.gizmoModes - mode else rigState.gizmoModes + mode
-                }
-            }
-        }
+        if (rigState.partSelection != null) GizmoToolbarButtons()
     }
 }
 

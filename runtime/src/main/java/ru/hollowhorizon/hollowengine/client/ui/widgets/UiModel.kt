@@ -1,9 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
-import ru.hollowhorizon.hollowengine.client.decals.DecalGround
-import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
-import ru.hollowhorizon.hollowengine.client.decals.Decals
 import androidx.compose.runtime.*
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
@@ -15,8 +11,14 @@ import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.util.Mth
 import org.joml.Matrix4f
 import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
+import ru.hollowhorizon.hollowengine.client.decals.Decals
+import ru.hollowhorizon.hollowengine.client.editor.ModelPreviewAxes
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
@@ -27,12 +29,12 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderCont
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.*
+import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
-import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBindingSource
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneAttachment
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings
@@ -57,7 +59,7 @@ import kotlin.math.min
  * pitch / zoom / pan) and the display toggles.
  */
 @Stable
-class ModelViewerState(model: String) {
+class ModelViewerState(model: String) : OrbitCamera {
     var model: String by mutableStateOf(model)
         private set
 
@@ -66,8 +68,8 @@ class ModelViewerState(model: String) {
 
     val attachment: ModelAttachment get() = instance.attachment
 
-    var yaw by mutableStateOf(0f)
-    var pitch by mutableStateOf(0f)
+    override var yaw by mutableStateOf(0f)
+    override var pitch by mutableStateOf(0f)
     private val zoomSpring = SpringZoom(1f, min = 0.1f, max = 10f, perNotch = ModelZoomPerNotch)
     val zoom: Float get() = zoomSpring.value
     var offsetX by mutableStateOf(0f)
@@ -224,6 +226,17 @@ class ModelViewerState(model: String) {
             .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS)
     }
 
+    override fun toView(world: Vec3f): Vec3f {
+        val view = Quaternionf().rotateX(pitch * Mth.DEG_TO_RAD).rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD)
+            .transform(Vector3f(world.x, world.y, world.z))
+        return Vec3f(view.x, view.y, view.z)
+    }
+
+    override fun anglesFor(back: Vec3f): Pair<Float, Float> =
+        anglesAround(back, yawSign = -1f, yawOffset = PREVIEW_FRONT_YAW)
+
+    override val axesFrame: QuatF get() = ModelPreviewAxes
+
     /** Renders the model into [rect] using [stack]; called from a `drawGl` block on the render thread. */
     fun render(rect: UiRect, stack: PoseStack) {
         lastRect = rect
@@ -296,7 +309,8 @@ class ModelViewerState(model: String) {
             }
         }
         bufferSource.endBatch()
-        drawDecals(decals + decals.filter { draw -> draw.key?.let { decalOverlay?.invoke(it) } == true }.map(DecalDraw::asOverlay), stack)
+        drawDecals(decals + decals.filter { draw -> draw.key?.let { decalOverlay?.invoke(it) } == true }
+            .map(DecalDraw::asOverlay), stack)
         drawEffects(effects, stack)
         playSounds()
 
@@ -337,6 +351,7 @@ class ModelViewerState(model: String) {
         )
         DecalRenderer.render(decals, view)
     }
+
     private val effectFrame = VfxDrawList()
 
     /**

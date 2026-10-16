@@ -425,7 +425,7 @@ private fun AnimationControllerLayerSpec.state(stateId: String): AnimationContro
 private fun AnimationControllerStateSpec?.subtitle(): String? = when (this) {
     null -> null
     is ClipStateSpec -> animation
-    is BlendStateSpec -> motions.joinToString(" · ") { it.animation }.ifEmpty { kindName() }
+    is BlendStateSpec -> motions.joinToString(", ") { it.animation }.ifEmpty { kindName() }
     else -> kindName()
 }
 

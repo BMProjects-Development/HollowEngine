@@ -58,7 +58,7 @@ internal fun HollowIdeReadOnlyImageViewer(document: HollowIdeImageDocument) {
             }
         }
         Text(
-            "${document.width} × ${document.height} px · Ctrl+wheel to zoom · Right-drag to pan",
+            "${document.width} × ${document.height} px | Ctrl+wheel to zoom | Right-drag to pan",
             tags = listOf("image-editor-info", "read-only"),
         )
     }
