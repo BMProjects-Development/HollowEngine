@@ -289,14 +289,6 @@ internal fun UiPath.intersectedWith(mask: UiPath): UiPath {
     return area.toUiPath()
 }
 
-internal fun UiPath.unionWith(path: UiPath): UiPath {
-    if (isEmpty()) return path
-    if (path.isEmpty()) return this
-    val area = Area(toAwtPath())
-    area.add(Area(path.toAwtPath()))
-    return area.toUiPath()
-}
-
 internal fun UiPath.toAwtPath(): Path2D.Float {
     val path = Path2D.Float(Path2D.WIND_NON_ZERO)
     var current = UiPathPoint(0f, 0f)

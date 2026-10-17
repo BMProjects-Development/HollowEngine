@@ -123,14 +123,6 @@
     text-wrap: false;
 }
 
-.sounds-editor-value {
-    height: fit;
-    foreground: $text;
-    font-size: 10px;
-    align: end center;
-    text-wrap: false;
-}
-
 .sounds-editor-search,
 .sounds-editor-field {
     padding: 3px 5px;
@@ -149,4 +141,3 @@
     background: $bg-field;
     border-radius: $radius;
 }
-

@@ -197,9 +197,6 @@
 
 .insp-animated-value { size: 0px fit; }
 
-/* Written by the timeline, so it reads as keyed and does not take input. */
-.insp-animated-value.driven { opacity: 0.55; }
-
 .insp-key-toggle {
     size: 10px 10px;
     margin: 0px 0px 6px 0px;
@@ -281,8 +278,6 @@
 
 .insp-input.flat:focus { border: 1px $accent; }
 
-.insp-input.numeric { text-align: right; }
-
 .insp-number-row {
     size: 100% fit;
     gap: 6px;
@@ -334,13 +329,6 @@
     shadow: 1px 1px 3px 0px $shadow;
 }
 
-/* A field the timeline writes: read-only, and tinted like the accent so it reads as "keyed". */
-.vfx-driven {
-    background: $bg-field;
-    border: 1px alpha($accent, 0.5);
-    foreground: $text-soft;
-}
-
 .vfx-curve-dialog {
     padding: 10px;
 }
@@ -351,13 +339,6 @@
     border-radius: $radius-small;
     foreground: $text-strong;
     font-size: $font-size;
-}
-
-.vfx-detail {
-    size: 100% fit;
-    gap: 3px;
-    padding: 3px 0px 3px 6px;
-    border-left: 1px $divider;
 }
 
 .vfx-node-head {
@@ -380,12 +361,6 @@
     border-radius: $radius;
     background: $bg-window;
     clip: true;
-}
-
-.vfx-module-head {
-    size: 100% fit;
-    gap: 4px;
-    align-items: start center;
 }
 
 .insp-check-row {

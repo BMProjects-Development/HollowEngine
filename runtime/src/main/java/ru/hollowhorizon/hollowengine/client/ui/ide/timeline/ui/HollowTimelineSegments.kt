@@ -143,7 +143,6 @@ private fun Block(
             drag,
             segment,
             timelineTimeDelta(event.dragTotalX, pxPerSec),
-            event.modifiers,
             lane,
             controller,
             pxPerSec,
@@ -315,7 +314,6 @@ private fun Marker(
                     drag,
                     segment,
                     timelineTimeDelta(event.dragTotalX, pxPerSec),
-                    event.modifiers,
                     lane,
                     controller,
                     pxPerSec
@@ -344,7 +342,6 @@ private fun drag(
     drag: SegmentDrag,
     segment: TimelineSegment,
     delta: Float,
-    modifiers: Int,
     lane: SegmentLane,
     controller: TimelineController,
     pxPerSec: Float,

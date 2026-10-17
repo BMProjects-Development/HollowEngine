@@ -21,7 +21,6 @@ private const val PlayIcon = "hollowengine:textures/gui/icons/play.svg"
 private const val PauseIcon = "hollowengine:textures/gui/icons/pause.svg"
 private const val VisibleIcon = "hollowengine:textures/gui/icons/visible.svg"
 private const val InvisibleIcon = "hollowengine:textures/gui/icons/invisible.svg"
-private const val NodeIcon = "hollowengine:textures/gui/icons/file_model.svg"
 private const val RigIcon = "hollowengine:textures/gui/icons/graph.svg"
 
 private fun String.toModelId(): String = substringAfter("assets/").replaceFirst("/", ":")

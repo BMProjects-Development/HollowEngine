@@ -29,19 +29,6 @@ class BoneBounds(val min: Vec3f, val max: Vec3f) {
  * when they fit a box or a body to a bone.
  */
 object BoneGeometry {
-    /** Every bone that holds geometry, with the surrounding box, in skeleton order. */
-    fun boundsPerBone(model: ModelAttachment): Map<RuntimeNode, BoneBounds> =
-        boundsPerBone(model.nodes.flatMap { it.walk() }, model.model.boneBounds)
-
-    /**
-     * [geometry] is the local box of each node's mesh by node index. A mesh on a node that is no bone
-     * counts towards the nearest bone above it.
-     */
-    fun boundsPerBone(nodes: List<RuntimeNode>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<RuntimeNode, BoneBounds> =
-        cornersPerBone(nodes, geometry).mapValues { (_, corners) ->
-            BoneBounds.around(corners)
-        }
-
     /** The corners of every piece of geometry each bone holds, in the bone's own space: what a hull is fitted around. */
     fun cornersPerBone(model: ModelAttachment): Map<RuntimeNode, List<Vec3f>> =
         cornersPerBone(model.nodes.flatMap { it.walk() }, model.model.boneBounds)

@@ -1,8 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
 open class NodeDefinition(
@@ -26,16 +24,6 @@ open class NodeDefinition(
 
     val localMatrix get() = transform.matrixF
     val globalMatrix = MutableMat4f()
-
-    val globalRotation: QuatF
-        get() {
-            var rotation = parent?.globalRotation ?: return transform.rotation
-            transform.apply {
-                rotation = rotation.mul(this.rotation, MutableQuatF())
-            }
-            return rotation
-        }
-
 
     fun allBones(): Set<NodeDefinition> = buildSet {
         add(this@NodeDefinition)

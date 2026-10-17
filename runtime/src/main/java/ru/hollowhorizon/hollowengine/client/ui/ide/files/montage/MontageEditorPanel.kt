@@ -288,7 +288,6 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
 }
 
 /** How alike two turns are, as the cosine of half the angle between them, for them to count as the same. */
-private const val SAME_TURN = 0.99999f
 
 private const val ClipsItem = "montage-clips"
 private const val EventsItem = "montage-events"

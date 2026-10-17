@@ -825,7 +825,6 @@ class DialogueController(
         const val PLAYER_ACTOR = "player"
 
         /** Property lookups fail outside any one expression, so they report without a position. */
-        private val NO_SPAN = StorySpan(0, 0, 0)
     }
 }
 

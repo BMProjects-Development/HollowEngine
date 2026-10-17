@@ -4,70 +4,11 @@ import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.renderer.GameRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import ru.hollowhorizon.hollowengine.client.ui.style.*
 import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
-
-internal data class UiBatchedQuad(
-    val width: Float,
-    val height: Float,
-    val transform: UiMatrix4,
-    val topLeft: UiColor,
-    val bottomLeft: UiColor,
-    val bottomRight: UiColor,
-    val topRight: UiColor,
-)
-
-internal fun drawBatchedQuads(quads: List<UiBatchedQuad>) {
-    if (quads.isEmpty()) return
-    withCullStatePreserved {
-        RenderSystem.disableCull()
-        RenderSystem.enableBlend()
-        configureUiBlend()
-        RenderSystem.setShader(GameRenderer::getPositionColorShader)
-        val tessellator = Tesselator.getInstance()
-        val buffer = tessellator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR)
-        quads.forEach { quad ->
-            val corners = localCorners(quad.width, quad.height, quad.transform)
-            corners.forEachIndexed { index, corner ->
-                val color = when (index) {
-                    0 -> quad.topLeft
-                    1 -> quad.bottomLeft
-                    2 -> quad.bottomRight
-                    else -> quad.topRight
-                }
-                buffer.addVertex(corner.x, corner.y, corner.z).setColor(color.red, color.green, color.blue, color.alpha)
-            }
-        }
-        BufferUploader.drawWithShader(buffer.buildOrThrow())
-    }
-}
-
-internal fun solidQuad(width: Float, height: Float, color: UiColor, transform: UiMatrix4): UiBatchedQuad {
-    return UiBatchedQuad(width, height, transform, color, color, color, color)
-}
-
-internal fun gradientQuad(
-    width: Float,
-    height: Float,
-    angleDegrees: Float,
-    stops: List<UiGradientStop>,
-    opacity: Float,
-    transform: UiMatrix4,
-): UiBatchedQuad {
-    return UiBatchedQuad(
-        width = width,
-        height = height,
-        transform = transform,
-        topLeft = gradientColorAt(0f, 0f, width, height, angleDegrees, stops).withOpacity(opacity),
-        bottomLeft = gradientColorAt(0f, height, width, height, angleDegrees, stops).withOpacity(opacity),
-        bottomRight = gradientColorAt(width, height, width, height, angleDegrees, stops).withOpacity(opacity),
-        topRight = gradientColorAt(width, 0f, width, height, angleDegrees, stops).withOpacity(opacity),
-    )
-}
 
 internal fun UiTriangleBatch.appendSolidQuad(
     width: Float,
@@ -460,30 +401,6 @@ private fun drawSampledQuad(
             buffer.addVertex(corner.x, corner.y, corner.z)
                 .setColor(color.red, color.green, color.blue, color.alpha)
         }
-        BufferUploader.drawWithShader(buffer.buildOrThrow())
-    }
-}
-
-internal fun drawSolid(rect: UiRect, color: UiColor, transform: UiMatrix4, radius: Float = 0f) {
-    if (radius > 0f) {
-        drawLocalPaint(
-            rect.width,
-            rect.height,
-            radius,
-            color,
-            transform.translated(rect.x, rect.y),
-            UiFilterChain.Empty
-        )
-        return
-    }
-    withCullStatePreserved {
-        RenderSystem.disableCull()
-        RenderSystem.enableBlend()
-        configureUiBlend()
-        RenderSystem.setShader(GameRenderer::getPositionColorShader)
-        val tessellator = Tesselator.getInstance()
-        val buffer = tessellator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR)
-        buffer.addColoredQuad(rect.corners(transform), color)
         BufferUploader.drawWithShader(buffer.buildOrThrow())
     }
 }
@@ -958,13 +875,6 @@ private fun UiResolvedPaint.canDrawAsShapePaint(): Boolean = when (this) {
     is UiResolvedPaint.Shader,
         -> false
 }
-
-private fun UiRect.corners(transform: UiMatrix4) = arrayOf(
-    transform.transform(x, y),
-    transform.transform(x, y + height),
-    transform.transform(x + width, y + height),
-    transform.transform(x + width, y),
-)
 
 internal fun UiColor.filtered(filter: UiFilterChain): UiColor {
     val grayscale = filter.grayscaleAmount()

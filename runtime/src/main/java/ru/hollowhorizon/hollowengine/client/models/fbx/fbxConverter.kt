@@ -18,7 +18,6 @@ import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import java.io.IOException
 import kotlin.math.abs
-import ru.hollowhorizon.hollowengine.client.models.fbx.FileGlobalSettings.FrameRate as Fr
 import ru.hollowhorizon.hollowengine.client.models.fbx.TransformationComp as Tc
 import ru.hollowhorizon.hollowengine.client.models.internal.Material as InternalMaterial
 import ru.hollowhorizon.hollowengine.client.models.internal.Model as InternalModel
@@ -648,26 +647,7 @@ fun getRotationMatrix(mode: Model.RotOrder, rotation: Vec3f): Mat4f {
 
 
 fun Document.convertAnimations() {
-    val fps = globals?.timeMode ?: FrameRate._30
-    val custom = globals?.customFrameRate ?: -1f
-    val frameRate = frameRateToDouble(fps, custom.toDouble())
     animationStacks().forEach { convertAnimationStack(it) }
-}
-
-fun frameRateToDouble(fp: FrameRate, customFPSVal: Double = -1.0) = when (fp) {
-    Fr.DEFAULT -> 1.0
-    Fr._120 -> 120.0
-    Fr._100 -> 100.0
-    Fr._60 -> 60.0
-    Fr._50 -> 50.0
-    Fr._48 -> 48.0
-    Fr._30, Fr._30_DROP -> 30.0
-    Fr.NTSC_DROP_FRAME, Fr.NTSC_FULL_FRAME -> 29.9700262
-    Fr.PAL -> 25.0
-    Fr.CINEMA -> 24.0
-    Fr._1000 -> 1000.0
-    Fr.CINEMA_ND -> 23.976
-    Fr.CUSTOM -> customFPSVal
 }
 
 context(doc: Document)

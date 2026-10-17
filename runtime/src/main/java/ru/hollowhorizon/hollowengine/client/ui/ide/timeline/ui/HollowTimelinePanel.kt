@@ -20,7 +20,6 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.round
 
-private const val TimelineZoomWheelStep = 12f
 private const val TimelineScrollStep = 44f
 private const val TimelineValueZoomStep = 0.12f
 private const val TimelineValuePanStep = 0.08f
@@ -295,16 +294,6 @@ private fun handleTimelineScroll(
         }
     }
     refresh()
-}
-
-/** Zooms the time a wheel notch [notches] around the point [cursor] pixels into the viewport, which stays put. */
-private fun zoomTimeAt(controller: TimelineController, scroll: UiScrollHandle, cursor: Float, notches: Float) {
-    val oldZoom = controller.pixelsPerSecond
-    val newZoom = (oldZoom - notches * TimelineZoomWheelStep).coerceIn(TimelineMinZoom, TimelineMaxZoom)
-    if (newZoom == oldZoom) return
-    val time = (cursor + scroll.offsetX - TimelineLeftPadding) / oldZoom
-    controller.pixelsPerSecond = newZoom
-    scroll.scrollTo(x = (time * newZoom + TimelineLeftPadding - cursor).coerceAtLeast(0f))
 }
 
 /** Zooms the values of the graph [notches] around the value [localY] pixels down a graph [height] tall. */

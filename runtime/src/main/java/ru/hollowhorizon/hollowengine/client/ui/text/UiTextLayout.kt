@@ -250,57 +250,6 @@ internal object UiTextLayouter {
         return measureTextWidth(text, fontSize, fontFamily, style)
     }
 
-    fun visibleTextPrefix(
-        layout: UiTextLayout,
-        visibleCharacters: Int,
-        fontSize: Float,
-        fontFamily: String? = null,
-    ): UiTextLayout {
-        var remaining = visibleCharacters.coerceAtLeast(0)
-        val lines = layout.lines.mapNotNull { line ->
-            val fragments = mutableListOf<UiTextFragment>()
-            val lineText = StringBuilder()
-            var consumedOnLine = 0
-            fragmentLoop@ for (fragment in line.fragments) {
-                when (fragment) {
-                    is UiInlineImageRun -> fragments += fragment
-                    is UiInlineWidgetRun -> fragments += fragment
-                    is UiTextSpaceRun -> {
-                        if (remaining <= 0) break@fragmentLoop
-                        fragments += fragment
-                        lineText.append(' ')
-                        remaining -= 1
-                        consumedOnLine += 1
-                    }
-
-                    is UiTextRun -> {
-                        if (remaining <= 0) break@fragmentLoop
-                        val visible = fragment.text.take(remaining)
-                        if (visible.isEmpty()) continue@fragmentLoop
-                        val size = fragment.style.resolvedFontSize(fontSize)
-                        fragments += fragment.copy(
-                            text = visible,
-                            width = measureTextWidth(visible, size, fontFamily, fragment.style),
-                        )
-                        lineText.append(visible)
-                        remaining -= visible.length
-                        consumedOnLine += visible.length
-                        if (visible.length < fragment.text.length) break@fragmentLoop
-                    }
-                }
-            }
-            remaining -= (line.sourceLength - consumedOnLine).coerceAtLeast(0)
-            if (fragments.isEmpty()) return@mapNotNull null
-            line.copy(text = lineText.toString(), fragments = fragments)
-        }
-        val height = lines.lastOrNull()?.let { it.y + it.height } ?: 0f
-        return layout.copy(
-            lines = lines,
-            height = height,
-            maxNaturalLineWidth = lines.maxOfOrNull { it.naturalWidth } ?: layout.width,
-        )
-    }
-
     private fun measureTextWidth(text: String, fontSize: Float, fontFamily: String?, style: UiInlineStyle): Float {
         val resolvedFamily = style.fontFamily ?: fontFamily
         val cachedFontSize = fontSize.cacheValue()
@@ -967,30 +916,6 @@ internal fun UiTextLayout.visibleLineItems(
     val endExclusive = firstLineIndexStartingAfter(bottom)
     if (first >= endExclusive) return emptySequence()
     return (first until endExclusive).asSequence().map { index -> IndexedValue(index, lines[index]) }
-}
-
-internal fun UiTextLayout.verticalCaretIndex(index: Int, lineDelta: Int, fontSize: Float, fontFamily: String?): Int {
-    if (lines.isEmpty()) return 0
-    val currentLineIndex = lineIndexAtCaret(index)
-    val currentLine = lines[currentLineIndex]
-    val localOffset = (index - currentLine.sourceStart).coerceIn(0, currentLine.sourceLength)
-    val x = currentLine.xAt(localOffset, fontSize, fontFamily)
-    val targetLineIndex = (currentLineIndex + lineDelta).coerceIn(0, lines.lastIndex)
-    val targetLine = lines[targetLineIndex]
-    if (targetLineIndex == currentLineIndex) {
-        val targetOffset = if (lineDelta < 0) 0 else targetLine.sourceLength
-        return targetLine.sourceStart + targetOffset
-    }
-    var bestOffset = 0
-    var bestDistance = Float.POSITIVE_INFINITY
-    for (offset in targetLine.caretOffsets()) {
-        val distance = abs(targetLine.xAt(offset, fontSize, fontFamily) - x)
-        if (distance < bestDistance) {
-            bestDistance = distance
-            bestOffset = offset
-        }
-    }
-    return targetLine.sourceStart + bestOffset
 }
 
 private fun UiTextLayout.lineIndexAtCaret(index: Int): Int {

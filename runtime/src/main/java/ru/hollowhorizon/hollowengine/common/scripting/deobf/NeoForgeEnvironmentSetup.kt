@@ -6,8 +6,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
 import ru.hollowhorizon.hollowengine.common.utils.ModList
 import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
-import java.lang.reflect.Modifier
-import java.nio.file.Path
 import java.util.jar.JarFile
 
 object NeoForgeEnvironmentSetup : EnvironmentSetup {
@@ -85,50 +83,4 @@ object NeoForgeEnvironmentSetup : EnvironmentSetup {
 private fun loadClass(name: String): Class<*>? {
     return runCatching { Class.forName(name, false, Thread.currentThread().contextClassLoader) }.getOrNull()
         ?: runCatching { Class.forName(name, false, NeoForgeEnvironmentSetup::class.java.classLoader) }.getOrNull()
-}
-
-private fun Class<*>.callStatic(name: String): Any? {
-    val method = methods.firstOrNull { it.name == name && it.parameterCount == 0 && Modifier.isStatic(it.modifiers) }
-        ?: declaredMethods.firstOrNull { it.name == name && it.parameterCount == 0 && Modifier.isStatic(it.modifiers) }
-        ?: return null
-    return runCatching {
-        method.isAccessible = true
-        method.invoke(null)
-    }.getOrNull()
-}
-
-private fun Any.call(name: String): Any? {
-    val method = javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }
-        ?: javaClass.declaredMethods.firstOrNull { it.name == name && it.parameterCount == 0 }
-        ?: return null
-    return runCatching {
-        method.isAccessible = true
-        method.invoke(this)
-    }.getOrNull()
-}
-
-private fun Any.member(name: String): Any? {
-    call(name)?.let { return it }
-    val getter = "get${name.replaceFirstChar { it.uppercase() }}"
-    call(getter)?.let { return it }
-    val field = javaClass.fields.firstOrNull { it.name == name }
-        ?: javaClass.declaredFields.firstOrNull { it.name == name }
-        ?: return null
-    return runCatching {
-        field.isAccessible = true
-        field.get(this)
-    }.getOrNull()
-}
-
-private fun Any?.flattenToFiles(): List<File> {
-    return when (this) {
-        null -> emptyList()
-        is File -> listOf(this)
-        is Path -> listOf(toFile())
-        is String -> listOf(File(this))
-        is Array<*> -> flatMap { it.flattenToFiles() }
-        is Iterable<*> -> flatMap { it.flattenToFiles() }
-        is Map<*, *> -> values.flatMap { it.flattenToFiles() }
-        else -> emptyList()
-    }
 }

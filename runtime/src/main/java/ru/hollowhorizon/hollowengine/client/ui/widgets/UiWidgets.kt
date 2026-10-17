@@ -102,9 +102,6 @@ data class UiTextFieldStyle(
     )
 }
 
-internal fun Map<String, String>.readSliderValue(name: String, fallback: Float): Float =
-    this[name]?.toFloatOrNull() ?: fallback
-
 internal fun Map<String, String>.readBoolean(name: String, fallback: Boolean = false): Boolean =
     when (this[name]?.lowercase()) {
         "true", "yes", "1", "enabled", "checked" -> true

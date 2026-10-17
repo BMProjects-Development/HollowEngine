@@ -375,14 +375,6 @@
     text-overflow: dots;
 }
 
-.ee-asset-tree {
-    width: 100%;
-    background: $bg-panel;
-    border-radius: $radius-large;
-    border: 1px $bg-selected;
-    padding: 4px;
-}
-
 /* ---- slots ---- */
 
 .ee-slots {

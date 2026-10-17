@@ -15,31 +15,6 @@
     font-size: $font-size;
 }
 
-.animator-pill {
-    padding: 5px 3px;
-    background: $bg-selected;
-    border: 1px alpha($white, 0.1);
-    border-radius: $radius-small;
-    cursor: hand;
-    transition: background 250ms ease-out, border-color 250ms ease-out;
-}
-
-.animator-pill:hover {
-    background: $bg-pressed;
-    border-color: $text-strong;
-}
-
-.animator-pill.active {
-    background: $accent-soft;
-    border-color: alpha($white, 0.1);
-}
-
-.animator-pill-label {
-    font-size: 8px;
-    foreground: $text-strong;
-    text-wrap: false;
-}
-
 /* A state of a controller graph; the frame is the graph node's. */
 .animator-state {
     padding: 6px 8px;

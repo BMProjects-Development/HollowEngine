@@ -11,11 +11,6 @@
     padding: 3px 5px;
 }
 
-.image-editor-label {
-    height: fit;
-    text-wrap: false;
-}
-
 .image-editor-canvas-scroll {
     background: $bg-window;
     @apply $thin-scroll;
@@ -33,10 +28,6 @@
     height: fit;
     margin: 4px 0px 0px 0px;
     foreground: $caret;
-}
-
-.image-editor-setting {
-    foreground: $text-strong;
 }
 
 .image-editor-info {

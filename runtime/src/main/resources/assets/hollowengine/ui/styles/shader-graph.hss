@@ -124,16 +124,6 @@ $category-output: #CF5E54;
     text-wrap: false;
 }
 
-/* The name of a value, which a drag along changes it by. */
-.sg-scrub {
-    cursor: ew-resize;
-    transition: foreground 110ms ease-out;
-}
-
-.sg-scrub:hover {
-    foreground: $text-strong;
-}
-
 .sg-fields {
     gap: 4px;
 }

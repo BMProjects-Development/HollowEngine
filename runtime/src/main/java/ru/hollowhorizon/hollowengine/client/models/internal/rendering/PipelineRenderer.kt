@@ -302,16 +302,6 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         GL33.glEnableVertexAttribArray(location)
     }
 
-    private fun bindIntegerAsFloatAttribute(shader: ShaderInstance, name: String, buffer: VboWrapper?) {
-        val location = GL33.glGetAttribLocation(shader.id, name)
-        if (location == -1 || buffer == null) return
-
-        buffer.bind()
-        GL33.glVertexAttribPointer(location, 2, GL33.GL_INT, false, INT2_STRIDE_BYTES, 0L)
-        GL33.glEnableVertexAttribArray(location)
-        GL33.glVertexAttribDivisor(location, 1)
-    }
-
     private fun bindIntegerAttribute(
         shader: ShaderInstance,
         name: String,

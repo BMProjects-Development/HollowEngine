@@ -111,28 +111,6 @@
     text-align: center;
 }
 
-.project-filter-row {
-    size: fill fit;
-    padding: 0px 4px;
-    gap: 4px;
-    align-items: start center;
-    background: $bg-field;
-    border-radius: $radius;
-}
-
-.project-filter-icon {
-    size: 14px 14px;
-    tint: $white;
-}
-
-.project-filter {
-    grow: 1;
-    margin-top: 2px;
-    align: center center;
-    caret-color: $caret;
-    selection-color: $selection;
-}
-
 .ide-empty-title {
     foreground: $text-muted;
     height: 18px;

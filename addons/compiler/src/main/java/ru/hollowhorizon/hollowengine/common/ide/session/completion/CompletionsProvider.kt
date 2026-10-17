@@ -726,18 +726,3 @@ private sealed interface CompletionPosition {
     // Новая позиция для автодополнения пакетов (в import, package или при вводе полных путей)
     class Package(override val prefix: String?, val fqName: FqName, val onlyPackages: Boolean) : CompletionPosition
 }
-
-private val javaInternalPackages = listOf(
-    "sun.",
-    "com.sun.",
-    "apple.",
-    "com.apple.",
-    "com.microsoft.",
-    "org.jcp.xml.dsig.internal.",
-    "jdk.internal.",
-    "jdk.javadoc.internal.",
-    "jdk.jfr.internal.",
-    "jdk.tools.jlink.internal.",
-    "jdk.xml.internal.",
-    "jdk.jpackage.internal.",
-)
