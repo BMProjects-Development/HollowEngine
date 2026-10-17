@@ -4,8 +4,8 @@ import ru.hollowhorizon.hollowengine.client.utils.math.conjugate
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import kotlin.math.cos
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.sin
 
 class Vec3Step(keys: FloatArray, values: Array<Vec3f>) : SteppedInterpolator<Vec3f>(keys, values)

@@ -1,8 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.common.models.ModelMetadata
-import java.util.Collections
-import java.util.IdentityHashMap
+import java.util.*
 
 /**
  * Every material the model draws with, whether it is listed up front or only reached through a mesh.

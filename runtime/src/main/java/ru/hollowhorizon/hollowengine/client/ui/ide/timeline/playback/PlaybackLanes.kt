@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback
 
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSegment
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackLanes.Companion.MIN_SECTION
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackSection

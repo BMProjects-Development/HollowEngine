@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import androidx.compose.runtime.mutableStateOf
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.padding
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

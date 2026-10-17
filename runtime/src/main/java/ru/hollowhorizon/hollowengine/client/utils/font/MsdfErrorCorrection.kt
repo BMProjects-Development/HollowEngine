@@ -2,8 +2,6 @@ package ru.hollowhorizon.hollowengine.client.utils.font
 
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sqrt
 
 internal fun correctMsdfField(

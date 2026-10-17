@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap.enabled
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap.fps
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import kotlin.math.round
 

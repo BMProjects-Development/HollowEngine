@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.attachments.components
 
-import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
@@ -11,6 +10,7 @@ import kotlinx.serialization.encoding.encodeStructure
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.api.Registerable
 import ru.hollowhorizon.hollowengine.api.Syncable
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForQuatF
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForVec3f
 

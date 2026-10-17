@@ -4,7 +4,8 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit

@@ -5,19 +5,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackSection
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackSections
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackStep
 import ru.hollowhorizon.hollowengine.common.playback.TimelineEvent
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
-import ru.hollowhorizon.hollowengine.common.vfx.VfxKey
-import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
-import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrackCurve
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * One authored action laid out on a timeline: clips of the model it plays on, things it hangs on the

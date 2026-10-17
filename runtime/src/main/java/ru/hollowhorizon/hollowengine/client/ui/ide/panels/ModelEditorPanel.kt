@@ -4,10 +4,11 @@ import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
-import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.client.ui.inspector.CollapsibleSection
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.Readonly
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.save

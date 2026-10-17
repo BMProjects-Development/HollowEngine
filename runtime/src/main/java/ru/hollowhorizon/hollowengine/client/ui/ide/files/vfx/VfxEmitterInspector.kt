@@ -4,14 +4,7 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.Text
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
-import ru.hollowhorizon.hollowengine.common.vfx.VfxDirectionMode
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxParticleEvent
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShape
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShapeKind
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSimulationSpace
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSubEmission
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * How many particles, where they are born, what they start with and how they move. How they look is

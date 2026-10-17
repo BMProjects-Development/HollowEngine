@@ -1,13 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.attachments.binding
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import net.minecraft.client.Minecraft
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket

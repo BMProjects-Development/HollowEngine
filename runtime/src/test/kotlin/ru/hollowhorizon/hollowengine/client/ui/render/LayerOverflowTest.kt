@@ -1,15 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiRuntime
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiMeasurePolicies
-import ru.hollowhorizon.hollowengine.client.ui.clip
-import ru.hollowhorizon.hollowengine.client.ui.margin
-import ru.hollowhorizon.hollowengine.client.ui.opacity
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

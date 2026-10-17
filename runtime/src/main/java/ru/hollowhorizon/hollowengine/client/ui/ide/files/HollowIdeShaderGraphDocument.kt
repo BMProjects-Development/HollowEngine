@@ -4,7 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.client.history.*
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraph
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraphFormat
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeLibrary

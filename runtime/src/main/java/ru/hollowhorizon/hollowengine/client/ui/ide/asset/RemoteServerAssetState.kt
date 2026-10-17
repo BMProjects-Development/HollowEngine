@@ -2,7 +2,10 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.asset
 
 import androidx.compose.runtime.*
 import net.minecraft.resources.ResourceLocation
-import ru.hollowhorizon.hollowengine.common.network.*
+import ru.hollowhorizon.hollowengine.common.network.RequestServerAssetDirectoryPacket
+import ru.hollowhorizon.hollowengine.common.network.RequestServerAssetFilePacket
+import ru.hollowhorizon.hollowengine.common.network.ServerAssetDirectoryPacket
+import ru.hollowhorizon.hollowengine.common.network.ServerAssetFilePacket
 import java.io.ByteArrayOutputStream
 
 @Stable

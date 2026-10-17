@@ -2,11 +2,7 @@ package ru.hollowhorizon.hollowengine.common.vfx.modules
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.vfx.VfxAnimatableKind
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSimulationSpace
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
-import ru.hollowhorizon.hollowengine.common.vfx.constants
-import ru.hollowhorizon.hollowengine.common.vfx.sources
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * An extra velocity added while integrating, on top of the particle own.

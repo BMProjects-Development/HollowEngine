@@ -18,11 +18,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.MOVEMENT_FACTOR
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.calculateSpeedViaDeltaMovement
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.FloatExpression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.References
-import ru.hollowhorizon.hollowengine.common.utils.expressions.mathNamespace
+import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
 import kotlin.reflect.KProperty

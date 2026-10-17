@@ -1,18 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
-import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
-import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import org.joml.Matrix4f
 import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook
 import ru.hollowhorizon.hollowengine.client.vfx.VfxParticles
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxRibbonDraw.Companion.STRIDE
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxMaterialSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxMeshSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxModelSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPrimitive
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * Where the particles are looked at from.

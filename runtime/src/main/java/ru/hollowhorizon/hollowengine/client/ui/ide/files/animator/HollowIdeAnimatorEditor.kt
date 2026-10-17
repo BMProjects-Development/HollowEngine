@@ -1,31 +1,16 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.focusScope
-import ru.hollowhorizon.hollowengine.client.ui.gap
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphViewState
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
-import ru.hollowhorizon.hollowengine.client.ui.padding
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
-import ru.hollowhorizon.hollowengine.client.ui.style
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.controller
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val AutoSaveDelayMillis = 900L
 

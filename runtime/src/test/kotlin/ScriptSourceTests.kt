@@ -1,22 +1,11 @@
 import org.junit.jupiter.api.io.TempDir
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonDescriptorReader
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
-import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
-import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
-import ru.hollowhorizon.hollowengine.common.scripting.source.DirectoryScriptSource
-import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.*
 import java.io.File
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ScriptSourceTests {
     @Test

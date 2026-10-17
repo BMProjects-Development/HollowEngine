@@ -5,12 +5,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxParticleEvent
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSimulationSpace
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
 import kotlin.math.ceil
 import kotlin.math.sqrt

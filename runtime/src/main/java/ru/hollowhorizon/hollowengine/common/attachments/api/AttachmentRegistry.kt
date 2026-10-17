@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.extensions.EntityExtension
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry.DATA_NBT
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry.ROOT_NBT
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry.cacheForTransfer
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentSyncPolicy

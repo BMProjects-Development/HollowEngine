@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.sounds
 
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDefault
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
+import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import kotlin.math.max
 import net.minecraft.sounds.SoundSource as SoundCategory
 

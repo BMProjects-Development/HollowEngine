@@ -3,21 +3,8 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.staticCompositionLocalOf
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import ru.hollowhorizon.hollowengine.client.ui.Checkbox
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.cursor
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.onClick
+import kotlinx.serialization.json.*
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** Colliders on the bone whose attachment the inspector shows, by name, for [CollidersField]. */

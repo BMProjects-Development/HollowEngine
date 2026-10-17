@@ -3,8 +3,8 @@ package ru.hollowhorizon.hollowengine.api
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
-import java.nio.file.Path
 import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
+import java.nio.file.Path
 
 interface VideoApi {
     fun play(source: MediaSource, options: VideoPlaybackOptions = VideoPlaybackOptions()) = play(source.externalForm(), options)

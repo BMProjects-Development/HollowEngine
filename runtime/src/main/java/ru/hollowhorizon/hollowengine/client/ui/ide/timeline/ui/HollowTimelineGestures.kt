@@ -1,15 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.Composable
-import kotlin.math.exp
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.max
+import kotlin.math.min
 
 internal const val MinDragUnit = 3f
 

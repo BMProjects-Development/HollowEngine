@@ -12,17 +12,14 @@ import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.client.renderer.texture.SimpleTexture
 import net.minecraft.client.renderer.texture.TextureAtlas
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
 import org.joml.Matrix4f
-import org.joml.Quaternionf
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.render.render
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutResult
@@ -33,8 +30,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.popPose
 import ru.hollowhorizon.hollowengine.client.utils.pushPose
 import ru.hollowhorizon.hollowengine.client.utils.setIdentity
-import ru.hollowhorizon.hollowengine.common.entities.nameplateMode
-import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
 import ru.hollowhorizon.hollowengine.common.registry.ModShaders
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap

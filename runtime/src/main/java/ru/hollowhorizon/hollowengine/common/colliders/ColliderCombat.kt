@@ -4,6 +4,7 @@ import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.HitResult
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderCombat.resolve
 
 /**
  * Ties the damage of a melee attack or a projectile to the collider it was aimed at, for as long as the

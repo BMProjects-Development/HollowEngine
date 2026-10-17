@@ -3,7 +3,10 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.history.*
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize

@@ -2,13 +2,7 @@ package ru.hollowhorizon.hollowengine.common.vfx
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
+import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
 import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec

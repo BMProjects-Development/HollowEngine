@@ -6,13 +6,13 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.CutsceneIcon
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelinePlayheadHold
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
-import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelinePlayheadHold
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineViewMode
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSession
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneStorage
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
+import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState

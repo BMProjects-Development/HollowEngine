@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.attachments.api
 
-import java.util.Collections
-import java.util.IdentityHashMap
+import java.util.*
 
 /** An owned runtime resource whose validity follows the entity's current components. */
 interface RuntimeAttachment : AutoCloseable {

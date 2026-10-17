@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxPrimitiveGeometry.Companion.FLOATS
 import ru.hollowhorizon.hollowengine.common.vfx.VfxPrimitive
 import ru.hollowhorizon.hollowengine.common.vfx.VfxPrimitiveKind
 import kotlin.math.PI

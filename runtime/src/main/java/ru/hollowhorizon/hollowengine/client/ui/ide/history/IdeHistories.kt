@@ -8,13 +8,7 @@ import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
 import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.history.UndoOwner
-import ru.hollowhorizon.hollowengine.client.ui.ide.GameViewportId
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
-import ru.hollowhorizon.hollowengine.client.ui.ide.IdeScenes
-import ru.hollowhorizon.hollowengine.client.ui.ide.InspectorId
-import ru.hollowhorizon.hollowengine.client.ui.ide.SceneId
-import ru.hollowhorizon.hollowengine.client.ui.ide.TimelineId
+import ru.hollowhorizon.hollowengine.client.ui.ide.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSessions
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper

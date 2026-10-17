@@ -2,25 +2,18 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
-import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.elementDescriptors
-import kotlinx.serialization.descriptors.elementNames
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.descriptors.getPolymorphicDescriptors
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes

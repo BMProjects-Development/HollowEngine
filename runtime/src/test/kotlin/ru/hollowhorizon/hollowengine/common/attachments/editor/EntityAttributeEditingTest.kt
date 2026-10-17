@@ -10,11 +10,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import ru.hollowhorizon.hollowengine.bridge.attributes.MutableAttributeState
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class EntityAttributeEditingTest {
     @BeforeTest

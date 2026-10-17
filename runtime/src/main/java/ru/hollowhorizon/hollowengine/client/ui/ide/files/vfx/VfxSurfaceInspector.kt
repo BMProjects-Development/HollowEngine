@@ -3,17 +3,11 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderTarget
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPathField
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorHost
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Pill
-import ru.hollowhorizon.hollowengine.client.ui.inspector.PillFlow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
-import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.resourceExists
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.vfx.*
 
 internal val VfxModelExtensions = listOf(".glb", ".gltf", ".fbx", ".obj")

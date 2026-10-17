@@ -9,12 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExp
 import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 
 /**

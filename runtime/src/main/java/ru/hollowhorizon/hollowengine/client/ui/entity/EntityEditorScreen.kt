@@ -7,13 +7,15 @@ import net.minecraft.world.entity.LivingEntity
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.slots.SlotTooltips
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalInspectorHost
 import ru.hollowhorizon.hollowengine.client.ui.screen.HollowComposeUiScreen
 import ru.hollowhorizon.hollowengine.client.ui.style.CompiledHss
 import ru.hollowhorizon.hollowengine.client.ui.style.MinecraftHssResourceLoader
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 internal const val EntityEditorStylesheet = "hollowengine:ui/styles/entity-editor.hss"
 internal const val WidgetStylesheet = "hollowengine:ui/styles/widgets.hss"

@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.panels
 
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class UiPanelPickingTest {
     @Test

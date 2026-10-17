@@ -2,21 +2,8 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
-import ru.hollowhorizon.hollowengine.client.ui.inspector.NameRow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
-import ru.hollowhorizon.hollowengine.client.ui.inspector.TextRow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.assetCompletions
-import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackAction
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackRule

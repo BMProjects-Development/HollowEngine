@@ -7,12 +7,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.deg
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 private const val LANG = "hollowengine.gui.rig_editor.collider"
 

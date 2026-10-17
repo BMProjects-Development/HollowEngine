@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.execution
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 
 @Serializable

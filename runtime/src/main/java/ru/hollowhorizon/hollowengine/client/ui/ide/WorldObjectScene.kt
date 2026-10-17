@@ -13,7 +13,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelOrNull
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectFavorite
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
@@ -21,6 +20,7 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
+import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import java.util.*
 
 /** One loaded object as scene window lists it, read off entity on game thread. */

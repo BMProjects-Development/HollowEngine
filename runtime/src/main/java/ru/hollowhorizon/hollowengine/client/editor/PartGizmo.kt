@@ -1,25 +1,18 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigPose
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
-import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 /**
  * A part of an entity's model under the gizmo: a bone, or something placed on one.

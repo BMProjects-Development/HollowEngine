@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
 

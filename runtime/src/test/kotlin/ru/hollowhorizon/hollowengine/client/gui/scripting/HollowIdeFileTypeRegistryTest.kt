@@ -1,15 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.gui.scripting
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileType
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileTypeRegistry
-import ru.hollowhorizon.hollowengine.client.ui.ide.isProbablyText
-import ru.hollowhorizon.hollowengine.client.ui.ide.registerBuiltinFileTypes
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertSame
+import ru.hollowhorizon.hollowengine.client.ui.ide.*
+import kotlin.test.*
 
 class HollowIdeFileTypeRegistryTest {
     @Test

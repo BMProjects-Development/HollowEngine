@@ -4,7 +4,9 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec2
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
+import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
+import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory

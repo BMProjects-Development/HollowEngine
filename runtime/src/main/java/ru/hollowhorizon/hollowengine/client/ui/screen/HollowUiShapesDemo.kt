@@ -3,12 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.screen
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
-import ru.hollowhorizon.hollowengine.client.ui.shape.SvgPathShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiSvgPathDocument
-import ru.hollowhorizon.hollowengine.client.ui.shape.svgResource
-import ru.hollowhorizon.hollowengine.client.ui.shape.svgResourceDocument
+import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiGradientStop
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.style.UiRadialGradient

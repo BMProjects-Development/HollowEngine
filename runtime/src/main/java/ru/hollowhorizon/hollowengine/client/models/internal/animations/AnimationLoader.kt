@@ -1,14 +1,14 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animations
 
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.toQuatF
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import ru.hollowhorizon.hollowengine.client.models.internal.ChannelData
 import ru.hollowhorizon.hollowengine.client.models.internal.ImportedAnimation
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.*
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.toQuatF
 
 
 object AnimationLoader {

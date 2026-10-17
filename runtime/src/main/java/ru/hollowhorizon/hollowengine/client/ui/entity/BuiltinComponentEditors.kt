@@ -11,9 +11,9 @@ import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.colliders.fitEntityBox
@@ -23,7 +23,7 @@ import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.PlayerSkinPart
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import java.util.Locale
+import java.util.*
 
 /**
  * The extras the engine's own components bring to the editor.
@@ -43,7 +43,8 @@ internal object BuiltinComponentEditors {
             EntityAttributesEditor(scope)
         }
     }
-}
+
+}
 
 /** The model's animator is declared in its `.hemeta`, so the editor can jump straight to that file. */
 @Composable

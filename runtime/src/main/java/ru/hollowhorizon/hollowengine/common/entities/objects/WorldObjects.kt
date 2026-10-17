@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.common.entities.objects
 import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
-import java.util.UUID
+import java.util.*
 
 /**
  * The objects in each level, by UUID: how a child finds its parent every tick, and what the scene window

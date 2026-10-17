@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.script
 import net.minecraft.client.Minecraft
 import net.minecraft.nbt.CompoundTag
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.LocalUiFrameTimeNanos
-import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.UiExitWindow
-import ru.hollowhorizon.hollowengine.client.ui.currentUiKeyModifiers
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.render.MinecraftUiRenderer
 import ru.hollowhorizon.hollowengine.common.ui.UiContent
 import ru.hollowhorizon.hollowengine.common.ui.UiData

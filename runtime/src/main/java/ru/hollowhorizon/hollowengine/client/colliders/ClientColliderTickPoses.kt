@@ -9,13 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderHost
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseAssets
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderPoseTracks
-import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
-import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
-import ru.hollowhorizon.hollowengine.common.colliders.PosedHost
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
 /**

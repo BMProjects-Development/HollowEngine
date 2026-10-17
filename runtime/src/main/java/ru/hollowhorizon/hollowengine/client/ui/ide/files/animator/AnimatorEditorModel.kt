@@ -1,17 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationExpressionLanguage
-import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerType
-import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
-import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateType
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
-import ru.hollowhorizon.hollowengine.common.models.UnknownAnimatorLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.UnknownAnimatorStateSpec
+import ru.hollowhorizon.hollowengine.client.ui.UiColor
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
+import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.common.models.*
 
 /** What the inspector is looking at. */
 sealed interface AnimatorSelection {

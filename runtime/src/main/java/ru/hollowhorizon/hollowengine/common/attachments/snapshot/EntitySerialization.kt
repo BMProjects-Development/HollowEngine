@@ -6,8 +6,8 @@ import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.world.entity.Entity
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.ByteBufFormat

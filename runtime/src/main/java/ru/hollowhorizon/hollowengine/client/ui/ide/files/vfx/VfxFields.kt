@@ -7,19 +7,11 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
-import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.vfx.VfxExpressionLanguage
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurveInput
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.math.abs
 
 /**

@@ -1,18 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.dialogue
 
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryCompiler
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryInstruction
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StorySeverity
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.list
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.number
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.storyCatalog
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.string
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import ru.hollowhorizon.hollowengine.common.dialogue.lang.*
+import kotlin.test.*
 
 class StoryCompilerTest {
     private val catalog = storyCatalog {

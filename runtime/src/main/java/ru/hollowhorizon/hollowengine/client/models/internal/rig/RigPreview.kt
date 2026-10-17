@@ -2,11 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rig
 
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationLayer
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.LayerPose
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f

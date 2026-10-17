@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmission
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSpawn
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.asset
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,12 +11,7 @@ import net.minecraft.server.packs.resources.ResourceManager
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeFilterState
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeView
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 internal const val FolderIcon = "hollowengine:textures/gui/icons/folder.svg"

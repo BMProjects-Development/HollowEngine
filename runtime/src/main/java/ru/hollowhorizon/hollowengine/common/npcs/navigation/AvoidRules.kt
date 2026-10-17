@@ -11,6 +11,7 @@ import net.minecraft.util.Mth
 import net.minecraft.world.level.BlockGetter
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.AvoidRules.Companion.FORBIDDEN
 import kotlin.math.ceil
 import kotlin.math.max
 

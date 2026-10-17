@@ -1,7 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
-import ru.hollowhorizon.hollowengine.client.decals.DecalGround
-import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
 import com.mojang.blaze3d.pipeline.RenderTarget
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
@@ -11,6 +9,8 @@ import net.minecraft.util.Mth
 import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook

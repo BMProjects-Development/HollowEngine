@@ -1,14 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.sounds
 
 import net.minecraft.client.Minecraft
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
-import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
-import ru.hollowhorizon.hollowengine.client.vfx.VfxPlayback
-import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.common.sounds.SoundEmitterSpec
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
+import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments.register
+import ru.hollowhorizon.hollowengine.client.vfx.VfxPlayback
+import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
+import ru.hollowhorizon.hollowengine.common.sounds.SoundEmitterSpec
 
 sealed interface SoundEmitterState {
     data object Listener : SoundEmitterState

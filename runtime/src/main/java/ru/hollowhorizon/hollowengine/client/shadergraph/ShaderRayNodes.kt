@@ -1,9 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.shadergraph
 
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeCategory.RAY
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderPinType.FLOAT
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderPinType.VEC2
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderPinType.VEC3
+import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderPinType.*
 
 /**
  * Shapes that are not there, traced along the ray from the eye: what lets a graph draw a hole, a

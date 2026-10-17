@@ -1,13 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.render
 
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.HideVanillaEntityModelComponent
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderEntityEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderPlayerEvent
-import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.components.HideVanillaEntityModelComponent
 
 @ClientOnly
 object VanillaEntityModelVisibilitySystem {

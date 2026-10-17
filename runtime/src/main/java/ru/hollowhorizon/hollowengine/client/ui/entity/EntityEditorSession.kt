@@ -9,8 +9,11 @@ import kotlinx.serialization.json.JsonObject
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.UiEntityView
+import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
+import ru.hollowhorizon.hollowengine.client.ui.inspector.EditorAssetSources
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorAssetRequest
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorHost
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry

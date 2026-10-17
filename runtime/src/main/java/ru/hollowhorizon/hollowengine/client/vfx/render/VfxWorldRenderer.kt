@@ -1,11 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.vfx.render
 
-import ru.hollowhorizon.hollowengine.client.decals.DecalGround
-import ru.hollowhorizon.hollowengine.client.decals.Decals
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
 import org.joml.Matrix4f
 import org.lwjgl.opengl.GL33
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.Decals
 import ru.hollowhorizon.hollowengine.client.render.CameraSetupEvent
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings

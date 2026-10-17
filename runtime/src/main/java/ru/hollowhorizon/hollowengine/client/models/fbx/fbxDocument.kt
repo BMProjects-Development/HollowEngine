@@ -1,12 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.models.fbx
 
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.util.bool
 import ru.hollowhorizon.hollowengine.client.models.util.strncmp
 import ru.hollowhorizon.hollowengine.client.models.util.trimNUL
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
 
 class LazyObject(val id: Long, val element: Element, val doc: Document) {

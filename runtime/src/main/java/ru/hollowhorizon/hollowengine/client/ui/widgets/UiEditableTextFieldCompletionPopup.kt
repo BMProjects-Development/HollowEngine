@@ -12,8 +12,8 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiTransition
 import ru.hollowhorizon.hollowengine.client.ui.style.parseColor
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.generated.Assets
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.generated.Assets
 import kotlin.math.floor
 
 /** Completion popup placement in viewport coordinates (relative to the field's content box). */

@@ -31,9 +31,9 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.time.Duration.Companion.milliseconds
 

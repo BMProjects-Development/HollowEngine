@@ -29,9 +29,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.hasInspectableSelection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.rl

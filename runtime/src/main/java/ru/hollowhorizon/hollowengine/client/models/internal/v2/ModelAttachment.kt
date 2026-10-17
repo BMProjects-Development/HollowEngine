@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import net.minecraft.world.entity.Entity
 import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.HollowEngine
@@ -27,9 +27,9 @@ import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import java.util.*
 import kotlin.math.max
 import kotlin.math.min
-import java.util.UUID
 
 /**
  * The model at [model] or fallback; a blank path is a model with no geometry, which only carries what

@@ -1,11 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
-import ru.hollowhorizon.hollowengine.client.ui.text.Bold
-import ru.hollowhorizon.hollowengine.client.ui.text.DefaultBoldWeight
-import ru.hollowhorizon.hollowengine.client.ui.text.DefaultItalicSkew
-import ru.hollowhorizon.hollowengine.client.ui.text.Italic
-import ru.hollowhorizon.hollowengine.client.ui.text.Strikethrough
-import ru.hollowhorizon.hollowengine.client.ui.text.Underline
+import ru.hollowhorizon.hollowengine.client.ui.text.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

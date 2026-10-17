@@ -5,14 +5,10 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.ConditionalAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec

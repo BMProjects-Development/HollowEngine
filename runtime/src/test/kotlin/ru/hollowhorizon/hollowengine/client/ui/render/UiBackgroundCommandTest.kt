@@ -1,18 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.DrawShapeCommand
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiCommandRenderer
-import ru.hollowhorizon.hollowengine.client.ui.UiNode
-import ru.hollowhorizon.hollowengine.client.ui.UiRenderCommand
-import ru.hollowhorizon.hollowengine.client.ui.UiRenderPhase
-import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.shape
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape

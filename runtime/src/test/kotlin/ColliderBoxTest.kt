@@ -2,23 +2,14 @@ import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAlignment
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderBox
-import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
-import ru.hollowhorizon.hollowengine.common.colliders.fitEntityBox
-import ru.hollowhorizon.hollowengine.common.colliders.place
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
 import kotlin.math.abs
 import kotlin.math.sqrt
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ColliderBoxTest {
     /** A unit cube turned 45 degrees about Y: its corner, not its face, faces the ray. */

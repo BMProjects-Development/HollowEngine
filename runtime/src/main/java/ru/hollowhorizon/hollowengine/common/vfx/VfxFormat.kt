@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.vfx
 
-import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 
 /**
  * Reads and writes json-like `.vfx` files.

@@ -1,18 +1,7 @@
 package ru.hollowhorizon.hollowengine.cutscene
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.CurvePresets
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.FloatPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.HandleMode
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInterpolation
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyTangent
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TangentSide
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

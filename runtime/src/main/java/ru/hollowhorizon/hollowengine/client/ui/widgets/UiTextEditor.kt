@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 
 private const val HighlightedRichTextCacheSize = 24

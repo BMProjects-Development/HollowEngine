@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import com.mojang.blaze3d.pipeline.TextureTarget
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.BufferUploader
-import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.Tesselator
-import com.mojang.blaze3d.vertex.VertexFormat
-import com.mojang.blaze3d.vertex.VertexSorting
+import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GameRenderer
 import org.joml.Matrix4f

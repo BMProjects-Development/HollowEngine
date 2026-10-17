@@ -1,26 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelBounds
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueOption
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.CurvePresets
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.HandleMode
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInterpolation
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyTangent
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TangentSide
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSession
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 /** The cutscene's own fields, composed inside whichever panel the shared inspector is drawn in. */
 @Composable

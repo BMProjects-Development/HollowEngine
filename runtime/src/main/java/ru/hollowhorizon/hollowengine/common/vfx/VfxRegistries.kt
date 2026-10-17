@@ -9,12 +9,7 @@ import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxModuleSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxVelocityOverLifetimeSpec
+import ru.hollowhorizon.hollowengine.common.vfx.modules.*
 import kotlin.reflect.KClass
 
 /**

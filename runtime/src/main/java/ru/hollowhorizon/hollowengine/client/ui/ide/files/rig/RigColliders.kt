@@ -3,27 +3,18 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.common.colliders.ServerColliderAssets
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
+import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoTransformValues
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAlignment
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
-import ru.hollowhorizon.hollowengine.common.colliders.placeColliders
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 
 /** Which part is selected: the bone it hangs on, null for the model itself, and its id. */

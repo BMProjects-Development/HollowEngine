@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.common.sounds
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
+import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 

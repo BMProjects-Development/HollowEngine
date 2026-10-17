@@ -1,12 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
 
 /**

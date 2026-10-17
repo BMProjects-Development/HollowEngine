@@ -1,11 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
-import ru.hollowhorizon.hollowengine.client.ui.UiBorder
-import ru.hollowhorizon.hollowengine.client.ui.UiBorderDash
-import ru.hollowhorizon.hollowengine.client.ui.UiInsets
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.UiTransform
-import ru.hollowhorizon.hollowengine.client.ui.UiVec3
+import ru.hollowhorizon.hollowengine.client.ui.*
 
 private fun paintSlot(name: String = "paint") = slot(name, HssValueKind.PAINT)
 

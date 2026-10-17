@@ -12,12 +12,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
 import ru.hollowhorizon.hollowengine.common.attachments.components.bodyComponent
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderBox
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderVolume
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderContacts
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderModes
-import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
-import ru.hollowhorizon.hollowengine.common.colliders.SolidColliders
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler

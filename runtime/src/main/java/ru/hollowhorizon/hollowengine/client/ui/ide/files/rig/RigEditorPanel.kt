@@ -16,11 +16,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
-import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.time.Duration.Companion.milliseconds
 

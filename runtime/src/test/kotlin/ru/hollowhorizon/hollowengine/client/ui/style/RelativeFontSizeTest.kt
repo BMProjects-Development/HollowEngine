@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.SpanNode
-import ru.hollowhorizon.hollowengine.client.ui.fontScale
-import ru.hollowhorizon.hollowengine.client.ui.fontSize
+import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
 
 /**

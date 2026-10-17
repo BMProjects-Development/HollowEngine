@@ -1,13 +1,14 @@
 package ru.hollowhorizon.hollowengine.common.addons.project
 
-import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.addons.ClientResources
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonState
+import ru.hollowhorizon.hollowengine.common.addons.project.HollowProject.root
+import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
-import ru.hollowhorizon.hollowengine.HollowEngine
 import java.io.File
 
 /**

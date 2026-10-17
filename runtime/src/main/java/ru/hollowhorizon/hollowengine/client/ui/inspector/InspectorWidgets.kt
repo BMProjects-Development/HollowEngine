@@ -2,15 +2,11 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 
 import androidx.compose.runtime.Composable
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.ExpressionField
+import kotlinx.serialization.json.*
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.client.ui.Column
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.ExpressionField
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
 import ru.hollowhorizon.hollowengine.common.utils.rl

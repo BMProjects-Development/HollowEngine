@@ -1,7 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
+import ru.hollowhorizon.hollowengine.client.ui.UiEvent
+import ru.hollowhorizon.hollowengine.client.ui.UiNode
 
 data class UiKeyInput(
     val event: UiEvent,

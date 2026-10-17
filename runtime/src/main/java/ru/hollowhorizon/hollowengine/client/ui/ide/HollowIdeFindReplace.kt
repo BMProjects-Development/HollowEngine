@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*

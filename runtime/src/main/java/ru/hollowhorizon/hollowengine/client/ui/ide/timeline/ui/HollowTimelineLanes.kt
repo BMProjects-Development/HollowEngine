@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 private const val TimelineKeyframeSize = 10f
 internal const val LaneContentId = "timeline-lane-content"

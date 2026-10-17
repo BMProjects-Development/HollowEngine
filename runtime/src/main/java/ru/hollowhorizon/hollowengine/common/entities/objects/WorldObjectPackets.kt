@@ -21,24 +21,20 @@ import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
+import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
+import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.sounds.SoundArea
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
-import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
-import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+import ru.hollowhorizon.hollowengine.common.network.HollowPacket
+import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
+import ru.hollowhorizon.hollowengine.common.sounds.*
+import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
-import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
-import ru.hollowhorizon.hollowengine.common.network.HollowPacket
-import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
-import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
-import java.util.UUID
+import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import java.util.*
 
 /** What a new object starts out showing. */
 @Serializable

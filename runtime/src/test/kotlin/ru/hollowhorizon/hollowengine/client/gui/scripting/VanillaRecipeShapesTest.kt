@@ -2,11 +2,7 @@ package ru.hollowhorizon.hollowengine.client.gui.scripting
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.CookingShape
-import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.RecipeShape
-import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.ShapedShape
-import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.ShapelessShape
-import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.SmithingShape
+import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

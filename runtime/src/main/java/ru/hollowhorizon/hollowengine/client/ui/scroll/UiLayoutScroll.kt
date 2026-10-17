@@ -1,11 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.scroll
 
-import ru.hollowhorizon.hollowengine.client.ui.PopupNode
-import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
-import ru.hollowhorizon.hollowengine.client.ui.UiNode
-import ru.hollowhorizon.hollowengine.client.ui.UiScrollSpec
-import ru.hollowhorizon.hollowengine.client.ui.layout.*
-import ru.hollowhorizon.hollowengine.client.ui.scrollSpec
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutNode
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiScrollbarReserve
+import ru.hollowhorizon.hollowengine.client.ui.layout.intersect
 import ru.hollowhorizon.hollowengine.client.ui.style.ResolvedUiScrollbarStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.scrollPinned

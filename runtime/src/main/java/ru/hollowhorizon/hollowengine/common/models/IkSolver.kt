@@ -4,12 +4,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import kotlin.math.abs
-import kotlin.math.acos
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 
 /**
  * Where the joints of a chain go so its end reaches a goal. It works on positions alone, in whatever space

@@ -1,16 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
-import ru.hollowhorizon.hollowengine.client.utils.lang
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
+import ru.hollowhorizon.hollowengine.client.utils.lang
 
 @Composable
 internal fun HollowIdeProjectContextMenu(

@@ -1,7 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.BoxNode
+import ru.hollowhorizon.hollowengine.client.ui.UiNode
+import ru.hollowhorizon.hollowengine.client.ui.UiState
+import ru.hollowhorizon.hollowengine.client.ui.UiVec3
 import kotlin.test.assertEquals
 
 /** The rule index must never drop a matching rule: multi-tag, id, universal-state and descendant. */

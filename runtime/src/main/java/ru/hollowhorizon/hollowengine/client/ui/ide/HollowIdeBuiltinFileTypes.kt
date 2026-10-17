@@ -1,12 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensions
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 
 internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     modelEditor: HollowIdeFileEditor,

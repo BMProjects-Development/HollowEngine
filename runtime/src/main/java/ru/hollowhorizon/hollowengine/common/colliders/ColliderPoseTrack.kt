@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.common.colliders
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.ModelAnimator
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes

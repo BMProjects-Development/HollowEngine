@@ -1,30 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.ui.entity
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.onPlaced
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
-import ru.hollowhorizon.hollowengine.client.ui.grow
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityAttributes
 

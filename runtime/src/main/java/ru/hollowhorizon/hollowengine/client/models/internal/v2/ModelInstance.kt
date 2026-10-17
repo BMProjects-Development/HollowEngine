@@ -5,17 +5,17 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEva
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.ModelAnimator
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
-import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.api.RuntimeAttachment
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
+import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.MontageBoneProperty
 import ru.hollowhorizon.hollowengine.common.models.MontageRig
 import ru.hollowhorizon.hollowengine.common.models.withMontages
-import java.util.UUID
+import java.util.*
 
 /**
  * One model node of one entity.

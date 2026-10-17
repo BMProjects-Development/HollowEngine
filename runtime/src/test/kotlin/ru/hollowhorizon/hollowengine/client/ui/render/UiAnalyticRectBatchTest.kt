@@ -1,17 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.DrawBoxCommand
-import ru.hollowhorizon.hollowengine.client.ui.DrawShadowCommand
-import ru.hollowhorizon.hollowengine.client.ui.UiBorder
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiInsets
-import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
-import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
-import ru.hollowhorizon.hollowengine.client.ui.UiVec3
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.style.UiBackfaceVisibility
 import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
 import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit

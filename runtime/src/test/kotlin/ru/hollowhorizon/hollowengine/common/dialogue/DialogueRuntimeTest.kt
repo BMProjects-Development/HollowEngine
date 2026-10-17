@@ -5,7 +5,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlin.time.Duration.Companion.seconds
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryAnchor
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.actor
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.number
@@ -13,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /** Collects everything a dialogue shows, and answers menus with a scripted list of picks. */
 private open class RecordingPresenter(private val picks: MutableList<Int> = mutableListOf()) : DialoguePresenter {

@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.ui.hud
 
 import net.minecraft.resources.ResourceLocation
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**

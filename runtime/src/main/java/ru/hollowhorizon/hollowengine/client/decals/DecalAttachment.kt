@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.client.decals
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec

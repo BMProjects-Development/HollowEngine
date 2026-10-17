@@ -5,12 +5,8 @@ import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.models.ServerModelAnimationMetadata
 import ru.hollowhorizon.hollowengine.common.npcs.NpcAnimationRuntime
-import ru.hollowhorizon.hollowengine.common.utils.literal
-import ru.hollowhorizon.hollowengine.common.utils.mcTranslate
-import ru.hollowhorizon.hollowengine.common.utils.onClickCopy
-import ru.hollowhorizon.hollowengine.common.utils.onHoverText
-import ru.hollowhorizon.hollowengine.common.utils.plus
-import java.util.Locale
+import ru.hollowhorizon.hollowengine.common.utils.*
+import java.util.*
 
 /**
  * Lists a model's animation clips and materials as command feedback. The server reads the model

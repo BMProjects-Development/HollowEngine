@@ -9,11 +9,11 @@ import ru.hollowhorizon.hollowengine.client.ui.Row
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimationExpressionEditing
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.AttachmentAnimation
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.HolderFields
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.LocalAttachmentAnimation
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.HolderFields
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.LocalAttachmentAnimation
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.common.models.*
 

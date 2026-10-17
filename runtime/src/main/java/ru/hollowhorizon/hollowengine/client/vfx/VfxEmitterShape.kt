@@ -2,16 +2,8 @@ package ru.hollowhorizon.hollowengine.client.vfx
 
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxDirectionMode
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShape
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShapeKind
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
-import kotlin.math.tan
+import ru.hollowhorizon.hollowengine.common.vfx.*
+import kotlin.math.*
 import kotlin.random.Random
 
 /**

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import net.minecraft.client.Minecraft
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
@@ -12,7 +13,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
-import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 /** The id of the row that stands for the effect itself, above its nodes. */
 internal const val VfxRootId = "vfx-root"

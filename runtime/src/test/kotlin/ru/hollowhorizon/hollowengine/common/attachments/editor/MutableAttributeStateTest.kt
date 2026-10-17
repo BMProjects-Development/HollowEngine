@@ -7,18 +7,9 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.Bootstrap
-import net.minecraft.world.entity.ai.attributes.Attribute
-import net.minecraft.world.entity.ai.attributes.AttributeInstance
-import net.minecraft.world.entity.ai.attributes.AttributeModifier
-import net.minecraft.world.entity.ai.attributes.AttributeSupplier
-import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.entity.ai.attributes.*
 import ru.hollowhorizon.hollowengine.bridge.attributes.MutableAttributeState
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class MutableAttributeStateTest {
     @BeforeTest

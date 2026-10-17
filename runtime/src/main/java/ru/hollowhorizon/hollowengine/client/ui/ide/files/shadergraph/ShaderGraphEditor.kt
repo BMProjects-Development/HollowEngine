@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.delay
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -19,7 +20,6 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxGraphMaterials
 import kotlin.math.hypot
 import kotlin.time.Duration.Companion.milliseconds
-import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 
 internal const val ShaderGraphStylesheet = "hollowengine:ui/styles/shader-graph.hss"
 private const val AutoSaveDelayMillis = 900L

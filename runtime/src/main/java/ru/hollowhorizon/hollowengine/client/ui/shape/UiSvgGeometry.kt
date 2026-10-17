@@ -6,15 +6,7 @@ import java.awt.BasicStroke
 import java.awt.geom.Area
 import java.awt.geom.Path2D
 import java.awt.geom.PathIterator
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
-import kotlin.math.sqrt
-import kotlin.math.tan
+import kotlin.math.*
 import java.awt.Shape as AwtShape
 
 data class UiSvgPathElement(

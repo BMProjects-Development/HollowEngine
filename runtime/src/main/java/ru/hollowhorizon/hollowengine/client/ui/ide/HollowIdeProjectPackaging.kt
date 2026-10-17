@@ -14,15 +14,7 @@ import ru.hollowhorizon.hollowengine.api.ModList.ModInfo
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
-import ru.hollowhorizon.hollowengine.common.addons.project.HollowModMetadata
-import ru.hollowhorizon.hollowengine.common.addons.project.HollowProject
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectException
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectExportOptions
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectExporter
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectImportPlan
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectImporter
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectMessage
-import ru.hollowhorizon.hollowengine.common.addons.project.ProjectProperties
+import ru.hollowhorizon.hollowengine.common.addons.project.*
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil

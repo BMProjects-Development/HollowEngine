@@ -2,10 +2,11 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
 import androidx.compose.runtime.mutableStateOf
 import net.minecraft.client.Minecraft
-import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.decomposeAt
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 class CutsceneEditorSession {
     val playback = CutscenePlaybackController()

@@ -8,12 +8,8 @@ import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathStrokeLineJoin
 import ru.hollowhorizon.hollowengine.client.ui.shape.UiShapeSize
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
-import java.util.Arrays
-import kotlin.math.ceil
-import kotlin.math.abs
-import kotlin.math.floor
-import kotlin.math.max
-import kotlin.math.min
+import java.util.*
+import kotlin.math.*
 
 /**
  * Path input plus lazily produced CPU fallback tiles. The raw segment/path/candidate buffers are

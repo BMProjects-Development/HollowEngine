@@ -11,12 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownSlider
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.common.network.RequestWorldControlPacket
-import ru.hollowhorizon.hollowengine.common.network.WorldChange
-import ru.hollowhorizon.hollowengine.common.network.WorldControlState
-import ru.hollowhorizon.hollowengine.common.network.WorldControlStatePacket
-import ru.hollowhorizon.hollowengine.common.network.WorldRule
-import ru.hollowhorizon.hollowengine.common.network.WorldWeather
+import ru.hollowhorizon.hollowengine.common.network.*
 
 /** The server's answer to the World menu; the server stays the only one that changes anything. */
 internal object WorldControlClient {

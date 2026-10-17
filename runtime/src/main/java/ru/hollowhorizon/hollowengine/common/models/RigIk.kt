@@ -2,14 +2,7 @@ package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorBone
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
+import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 private const val LANG = "hollowengine.gui.rig_editor.ik"

@@ -1,23 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
 import ru.hollowhorizon.hollowengine.client.sounds.ManagedSound
 import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import ru.hollowhorizon.hollowengine.common.sounds.SoundMode

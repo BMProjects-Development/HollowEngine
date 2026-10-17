@@ -4,26 +4,10 @@ import androidx.compose.runtime.Composable
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraph
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderTarget
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.alignItems
-import ru.hollowhorizon.hollowengine.client.ui.gap
-import ru.hollowhorizon.hollowengine.client.ui.grow
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxShaderDeclarations
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCameraShakeSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPostEffectSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSamplerSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSkySpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformValue
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 @Composable
 internal fun PostEffectFields(document: VfxEditing, state: VfxInspectorState, post: VfxPostEffectSpec) {

@@ -2,18 +2,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
-import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
-import ru.hollowhorizon.hollowengine.common.models.IkEndRotation
-import ru.hollowhorizon.hollowengine.common.models.IkSolver
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ikChains
-import ru.hollowhorizon.hollowengine.common.models.ikTarget
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 import kotlin.math.sqrt
 

@@ -9,15 +9,10 @@ import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.api.Init
 import ru.hollowhorizon.hollowengine.common.entities.objects.ObjectPose
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3d
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.rotateByEulers
-import ru.hollowhorizon.hollowengine.common.utils.math.toEulers
-import ru.hollowhorizon.hollowengine.common.utils.literal
-import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
 import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntityAndSelf
+import ru.hollowhorizon.hollowengine.common.utils.literal
+import ru.hollowhorizon.hollowengine.common.utils.math.*
+import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 @Serializable

@@ -3,25 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiBoxMode
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.align
-import ru.hollowhorizon.hollowengine.client.ui.background
-import ru.hollowhorizon.hollowengine.client.ui.inputTransparent
-import ru.hollowhorizon.hollowengine.client.ui.foreground
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.layer
-import ru.hollowhorizon.hollowengine.client.ui.onClick
-import ru.hollowhorizon.hollowengine.client.ui.pinnedToViewport
-import ru.hollowhorizon.hollowengine.client.ui.position
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
-import ru.hollowhorizon.hollowengine.client.ui.textWrap
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 

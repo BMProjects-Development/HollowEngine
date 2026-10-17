@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.allMaterials
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.MaterialSources
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.utils.Color
-import java.util.IdentityHashMap
+import java.util.*
 
 class ModelInstanceMaterials(model: Model) {
     private val instancesBySource = IdentityHashMap<Material, Material>()

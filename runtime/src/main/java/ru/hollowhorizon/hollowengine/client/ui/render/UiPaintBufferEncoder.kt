@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
-import ru.hollowhorizon.hollowengine.client.ui.resolve
 import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
 import ru.hollowhorizon.hollowengine.client.ui.style.UiGradientStop
 import ru.hollowhorizon.hollowengine.client.ui.style.linearGradientRadians

@@ -1,14 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
-import ru.hollowhorizon.hollowengine.client.decals.DecalExtents
-import ru.hollowhorizon.hollowengine.client.decals.DecalGround
-import ru.hollowhorizon.hollowengine.client.decals.DecalGuidePart
-import ru.hollowhorizon.hollowengine.client.decals.DecalShapes
-import ru.hollowhorizon.hollowengine.client.decals.Decals
+import ru.hollowhorizon.hollowengine.client.decals.*
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.ui.UiColor

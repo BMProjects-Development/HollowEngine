@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityAttributes
 import ru.hollowhorizon.hollowengine.common.attachments.editor.BuiltinVirtualComponents
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityAttributes
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.test.BeforeTest
 import kotlin.test.Test

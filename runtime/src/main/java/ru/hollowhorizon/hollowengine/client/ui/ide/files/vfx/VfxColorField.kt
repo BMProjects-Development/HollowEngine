@@ -6,11 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**

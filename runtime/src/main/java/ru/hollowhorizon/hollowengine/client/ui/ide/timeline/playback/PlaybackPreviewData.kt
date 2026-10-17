@@ -1,19 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Coercions
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression

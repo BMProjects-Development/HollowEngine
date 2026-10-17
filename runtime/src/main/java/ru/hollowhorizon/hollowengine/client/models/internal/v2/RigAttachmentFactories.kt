@@ -3,16 +3,15 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
-import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.common.models.ItemSlotAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.RigItemSlot
+import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /** What one bone of the model this attachment is being built for is, and whose model it is. */

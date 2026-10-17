@@ -1,4 +1,5 @@
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
@@ -8,7 +9,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEva
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.BlendState
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
 import ru.hollowhorizon.hollowengine.common.models.BlendMotion
 import ru.hollowhorizon.hollowengine.common.models.BlendStateSpec

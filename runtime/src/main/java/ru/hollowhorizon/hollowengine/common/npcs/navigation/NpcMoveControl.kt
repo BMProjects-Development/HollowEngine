@@ -8,6 +8,7 @@ import net.minecraft.world.level.pathfinder.PathType
 import net.minecraft.world.level.pathfinder.PathfindingContext
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcMoveControl.Companion.SIDESTEP_ANGLE
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt

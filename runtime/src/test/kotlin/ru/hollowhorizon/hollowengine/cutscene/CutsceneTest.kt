@@ -1,20 +1,8 @@
 package ru.hollowhorizon.hollowengine.cutscene
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelBounds
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.FloatPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInterpolation
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TranslationPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraRig
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutscenePlaybackController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneWeather
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.TimeOfDayPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.TimeOfDayValueFormatter
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.timelineRows
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals

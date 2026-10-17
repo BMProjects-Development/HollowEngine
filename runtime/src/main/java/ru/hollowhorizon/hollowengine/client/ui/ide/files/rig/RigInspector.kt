@@ -4,28 +4,19 @@ import androidx.compose.runtime.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.ui.Column
+import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.onPlaced
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
-import ru.hollowhorizon.hollowengine.common.models.withIkTargetRenamed
-import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
-import ru.hollowhorizon.hollowengine.common.models.withAddedBoneRenamed
-import ru.hollowhorizon.hollowengine.common.models.withoutAddedBone
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
-import ru.hollowhorizon.hollowengine.common.models.RigBone
-import ru.hollowhorizon.hollowengine.common.models.RigPose
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
-import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 
 private const val BoneIcon = "hollowengine:textures/gui/icons/graph.svg"

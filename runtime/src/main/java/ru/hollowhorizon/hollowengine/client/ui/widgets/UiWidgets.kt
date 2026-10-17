@@ -1,6 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.UiBorder
+import ru.hollowhorizon.hollowengine.client.ui.UiColor
+import ru.hollowhorizon.hollowengine.client.ui.UiLength
+import ru.hollowhorizon.hollowengine.client.ui.UiSize
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
 

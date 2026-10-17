@@ -5,10 +5,10 @@ import net.minecraft.Util
 import net.minecraft.client.sounds.AudioStream
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceProvider
+import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
 import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
 import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
-import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
 

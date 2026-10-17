@@ -5,12 +5,7 @@ import net.minecraft.server.Bootstrap
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for the declaration side: what a `slots { }` block turns into.

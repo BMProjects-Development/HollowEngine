@@ -7,12 +7,15 @@ import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.*
 import ru.hollowhorizon.hollowengine.api.utils.Polymorphic
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentSyncPolicy
 import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.config.ConfigName
 import ru.hollowhorizon.hollowengine.common.events.*
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterReloadListenersEvent
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryManager

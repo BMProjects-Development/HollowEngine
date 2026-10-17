@@ -1,17 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiSyntaxHighlighter
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.common.models.*
 
 

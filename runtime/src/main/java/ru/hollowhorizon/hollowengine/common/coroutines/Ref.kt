@@ -6,7 +6,7 @@ import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityLoadedEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.await
-import java.util.UUID
+import java.util.*
 
 interface Ref<T> {
     val isLinkAlive: Boolean

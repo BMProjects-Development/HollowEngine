@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.particles
 
 import net.minecraft.client.renderer.texture.AbstractTexture
-import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
 import ru.hollowhorizon.hollowengine.client.particles.file.ParticleComponents
 import ru.hollowhorizon.hollowengine.client.utils.toTexture
+import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 class ParticleEffect(

@@ -4,16 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 
 private const val LANG = "hollowengine.gui.sound_area"
 

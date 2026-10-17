@@ -1,31 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Checkbox
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.grow
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.CollapsibleSection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Readonly
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.*
-import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 
 /** What the shared inspector shows for the selected node of an effect. */
 internal fun vfxNodeInspector(

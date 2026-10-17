@@ -22,6 +22,13 @@ import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import java.util.Optional
 import java.util.UUID
+import kotlin.collections.ArrayDeque
+import kotlin.collections.LinkedHashSet
+import kotlin.collections.List
+import kotlin.collections.filter
+import kotlin.collections.isNotEmpty
+import kotlin.collections.listOf
+import kotlin.collections.toList
 
 /**
  * A thing placed in the world: a decoration, a lamp, a lever. It has no health, AI, gravity or physics and

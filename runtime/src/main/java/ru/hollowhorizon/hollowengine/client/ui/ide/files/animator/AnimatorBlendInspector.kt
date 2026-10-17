@@ -8,9 +8,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocume
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
 import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
+import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.models.*
 import kotlin.math.roundToInt
 

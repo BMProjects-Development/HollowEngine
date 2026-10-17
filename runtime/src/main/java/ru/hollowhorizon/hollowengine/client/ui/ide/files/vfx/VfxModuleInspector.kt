@@ -1,37 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
-import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.onPlaced
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionAction
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceKind
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxModuleSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
+import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import ru.hollowhorizon.hollowengine.common.vfx.VfxSimulationSpace
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvMode
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxVelocityOverLifetimeSpec
+import ru.hollowhorizon.hollowengine.common.vfx.modules.*
 import kotlin.reflect.KClass
 
 /**

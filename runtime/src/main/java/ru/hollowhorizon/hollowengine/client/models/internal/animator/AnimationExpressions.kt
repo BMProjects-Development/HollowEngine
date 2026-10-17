@@ -3,9 +3,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.coroutines.scopeAsync
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f

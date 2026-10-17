@@ -1,19 +1,18 @@
 package ru.hollowhorizon.hollowengine.client.particles
 
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
-import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitter
-import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitterState
-
-import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
-import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
-import ru.hollowhorizon.hollowengine.client.utils.math.rotateSelfBy
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.models.bedrock.VariablesMap
+import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
+import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
+import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitter
+import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitterState
+import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
+import ru.hollowhorizon.hollowengine.client.utils.math.rotateSelfBy
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 class ParticleEmitter(
     val system: ParticleSystem,

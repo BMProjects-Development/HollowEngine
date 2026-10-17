@@ -5,12 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import ru.hollowhorizon.hollowengine.client.ui.inspector.AutoFields
-import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Pill
-import ru.hollowhorizon.hollowengine.client.ui.inspector.PillFlow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 

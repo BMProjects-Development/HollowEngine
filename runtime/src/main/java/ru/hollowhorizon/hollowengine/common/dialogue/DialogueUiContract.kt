@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.common.dialogue
 
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.data.dataKey
+import ru.hollowhorizon.hollowengine.common.dialogue.DialogueUiKeys.ChooseAction
+import ru.hollowhorizon.hollowengine.common.dialogue.DialogueUiKeys.Index
 
 /**
  * What [UiDialoguePresentation] writes into the UI session, and what the screen reads back.

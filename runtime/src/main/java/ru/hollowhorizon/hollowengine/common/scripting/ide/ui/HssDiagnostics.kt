@@ -2,8 +2,8 @@ package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
 import ru.hollowhorizon.hollowengine.client.ui.style.HssDeclaration
 import ru.hollowhorizon.hollowengine.client.ui.style.HssSchema
-import ru.hollowhorizon.hollowengine.client.ui.style.HssVariableReference
 import ru.hollowhorizon.hollowengine.client.ui.style.HssValueKind
+import ru.hollowhorizon.hollowengine.client.ui.style.HssVariableReference
 import ru.hollowhorizon.hollowengine.client.ui.toStylePatch
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Position

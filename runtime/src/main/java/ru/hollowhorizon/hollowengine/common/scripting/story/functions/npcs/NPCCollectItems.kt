@@ -10,14 +10,8 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcAction
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemRequest
 import ru.hollowhorizon.hollowengine.common.npcs.items.itemRequest
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveResult
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.UnavailableTargetPolicy
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.UnreachablePolicy
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.moveToPosition
-import java.util.Collections
-import java.util.UUID
-import java.util.WeakHashMap
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
+import java.util.*
 import kotlin.math.min
 import kotlin.time.Duration.Companion.milliseconds
 

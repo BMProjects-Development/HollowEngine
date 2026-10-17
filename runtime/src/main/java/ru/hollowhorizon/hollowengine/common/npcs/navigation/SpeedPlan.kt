@@ -1,10 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.npcs.navigation
 
-import kotlin.math.asin
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sin
-import kotlin.math.sqrt
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.SpeedPlan.SHARP_TURN_SHARE
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.SpeedPlan.smoothstep
+import kotlin.math.*
 
 /** How fast an NPC walks, as a share of its full walking speed. */
 internal object SpeedPlan {

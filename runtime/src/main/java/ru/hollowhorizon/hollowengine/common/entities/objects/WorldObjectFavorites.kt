@@ -10,7 +10,7 @@ import net.minecraft.util.datafix.DataFixTypes
 import net.minecraft.world.level.saveddata.SavedData
 import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
-import java.util.UUID
+import java.util.*
 
 /** A bookmarked object, remembered where it was last seen so it can be found while it is not loaded. */
 @Serializable

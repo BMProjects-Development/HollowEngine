@@ -5,11 +5,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.ikTargetMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.links
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
-import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
-import ru.hollowhorizon.hollowengine.common.models.IkTargetSpec
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
-import ru.hollowhorizon.hollowengine.common.models.ikChains
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.hypot
 

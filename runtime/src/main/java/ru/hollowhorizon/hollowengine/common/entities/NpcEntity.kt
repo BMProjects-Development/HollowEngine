@@ -3,11 +3,10 @@ package ru.hollowhorizon.hollowengine.common.entities
 import com.mojang.authlib.GameProfile
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.EntityType
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.PathfinderMob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
@@ -17,8 +16,6 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.GameType
 import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
-import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.snapshotOf
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionController
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcMoveControl
@@ -27,7 +24,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.maxDrop
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.utils.FakePlayer
 import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
-import java.util.UUID
+import java.util.*
 
 class NpcEntity : PathfinderMob {
     constructor(level: Level) : super(ModEntities.NPC_ENTITY, level)

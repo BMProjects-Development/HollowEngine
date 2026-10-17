@@ -1,23 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.utils.expressions
 
 import net.minecraft.util.Mth
-import kotlin.math.abs
-import kotlin.math.acos
-import kotlin.math.asin
-import kotlin.math.atan
-import kotlin.math.atan2
-import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.exp
-import kotlin.math.floor
-import kotlin.math.ln
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
-import kotlin.math.tan
+import kotlin.math.*
 import kotlin.random.Random
 
 /**

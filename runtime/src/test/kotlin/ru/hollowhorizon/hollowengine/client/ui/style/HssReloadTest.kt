@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotSame
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class HssReloadTest {
     @Test

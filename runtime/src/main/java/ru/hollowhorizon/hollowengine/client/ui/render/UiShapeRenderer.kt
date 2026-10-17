@@ -6,7 +6,6 @@ import net.minecraft.client.renderer.GameRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import ru.hollowhorizon.hollowengine.client.ui.style.*
-import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.*
 

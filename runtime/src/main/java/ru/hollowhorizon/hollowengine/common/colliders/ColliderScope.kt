@@ -3,21 +3,12 @@ package ru.hollowhorizon.hollowengine.common.colliders
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.addRigBones
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
-import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
-import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.montageKey
-import ru.hollowhorizon.hollowengine.common.models.withMontages
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
 /**

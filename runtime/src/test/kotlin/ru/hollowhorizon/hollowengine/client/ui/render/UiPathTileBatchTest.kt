@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.DrawShapeCommand
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
-import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathStrokeLineCap

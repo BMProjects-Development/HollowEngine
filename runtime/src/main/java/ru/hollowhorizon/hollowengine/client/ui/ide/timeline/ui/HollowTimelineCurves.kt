@@ -10,7 +10,6 @@ import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import kotlin.math.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 
 private const val CurveSampleStep = 3f
 private const val CurvePointSize = 9f

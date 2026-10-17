@@ -2,11 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.style
 
 import ru.hollowhorizon.hollowengine.client.ui.flattenModifiers
 import ru.hollowhorizon.hollowengine.client.ui.toStylePatch
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
+import kotlin.test.*
 
 class HssLinearGradientTest {
     @Test

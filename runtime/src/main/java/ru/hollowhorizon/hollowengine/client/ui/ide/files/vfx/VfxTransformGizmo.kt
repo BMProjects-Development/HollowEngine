@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.editor.GizmoProjector
-import ru.hollowhorizon.hollowengine.client.editor.GizmoSession
-import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
-import ru.hollowhorizon.hollowengine.client.editor.GizmoTransformValues
+import ru.hollowhorizon.hollowengine.client.editor.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.utils.math.conjugate
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy

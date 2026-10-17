@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.client.decals
 
 import com.mojang.blaze3d.platform.GlStateManager
 import org.lwjgl.opengl.GL33
+import ru.hollowhorizon.hollowengine.client.decals.DecalDepth.blocks
+import ru.hollowhorizon.hollowengine.client.decals.DecalDepth.scene
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose.Companion.mix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.utils.math.*

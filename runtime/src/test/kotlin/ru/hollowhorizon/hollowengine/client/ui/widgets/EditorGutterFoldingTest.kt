@@ -1,26 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.UiEvent
-import ru.hollowhorizon.hollowengine.client.ui.UiEventKind
-import ru.hollowhorizon.hollowengine.client.ui.style.opacity
-import ru.hollowhorizon.hollowengine.client.ui.style.fontSize
-import ru.hollowhorizon.hollowengine.client.ui.style.padding
-import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
-import ru.hollowhorizon.hollowengine.client.ui.text.UiInlineWidgetRun
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
+import ru.hollowhorizon.hollowengine.client.ui.style.fontSize
+import ru.hollowhorizon.hollowengine.client.ui.style.opacity
+import ru.hollowhorizon.hollowengine.client.ui.style.padding
+import ru.hollowhorizon.hollowengine.client.ui.text.UiInlineWidgetRun
+import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class EditorGutterFoldingTest {
     private val text = "fun outer() {\n fun inner() {\n  call()\n }\n}\nfun after() {}"

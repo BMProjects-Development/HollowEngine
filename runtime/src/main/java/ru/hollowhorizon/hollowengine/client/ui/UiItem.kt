@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.ItemStack
+import ru.hollowhorizon.hollowengine.client.ui.UiItem.Companion.Empty
 import ru.hollowhorizon.hollowengine.common.utils.areStacksEqual
 
 /**

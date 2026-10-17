@@ -1,15 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
-import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
-import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
-import ru.hollowhorizon.hollowengine.common.scripting.ide.SpanStyle
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TextLine
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
-import ru.hollowhorizon.hollowengine.common.scripting.ide.buildTextLines
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
 /**
  * IDE support for HSS. Highlighting, completion, hints and diagnostics all read the same

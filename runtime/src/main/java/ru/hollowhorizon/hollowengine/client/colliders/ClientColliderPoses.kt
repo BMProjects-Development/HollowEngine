@@ -12,14 +12,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNu
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderScope
-import ru.hollowhorizon.hollowengine.common.colliders.EntityCollider
-import ru.hollowhorizon.hollowengine.common.colliders.EntityRigs
-import ru.hollowhorizon.hollowengine.common.colliders.applyOverrides
-import ru.hollowhorizon.hollowengine.common.colliders.entityModelMatrix
-import ru.hollowhorizon.hollowengine.common.colliders.hasColliders
-import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
-import ru.hollowhorizon.hollowengine.common.colliders.placeColliders
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig

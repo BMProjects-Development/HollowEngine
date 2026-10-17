@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.data
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class NbtDataStoreTest {
     private val visits = dataKey<Int>("hollowengine:visits") { 0 }

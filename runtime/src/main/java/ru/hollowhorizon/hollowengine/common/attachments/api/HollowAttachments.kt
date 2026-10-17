@@ -1,17 +1,16 @@
 package ru.hollowhorizon.hollowengine.common.attachments.api
 
-import kotlinx.coroutines.CoroutineScope
-import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.common.coroutines.EntityScope
 import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.CoroutineScope
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
+import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.coroutines.EntityScope
 import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
 import ru.hollowhorizon.hollowengine.common.data.Sync
 import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
-import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeManager
 
 /**

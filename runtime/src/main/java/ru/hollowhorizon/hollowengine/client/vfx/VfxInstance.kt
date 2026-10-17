@@ -4,9 +4,9 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
 import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackSections
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.playback.PlaybackSections
 import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.math.abs
 import kotlin.math.ceil

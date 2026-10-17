@@ -19,9 +19,9 @@ import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlaneEnvironment
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
+import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.math.cos
 import kotlin.math.sin
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 
 /** The vertical field of view of the preview camera, in degrees. */
 internal const val VfxPreviewFieldOfView = 50f

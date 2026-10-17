@@ -4,11 +4,7 @@ import net.minecraft.SharedConstants
 import net.minecraft.server.Bootstrap
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Tests for the gesture logic both sides run.

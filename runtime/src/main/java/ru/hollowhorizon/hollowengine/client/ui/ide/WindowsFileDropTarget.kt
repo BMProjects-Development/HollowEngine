@@ -1,11 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import com.sun.jna.Callback
-import com.sun.jna.CallbackReference
-import com.sun.jna.Memory
-import com.sun.jna.Native
-import com.sun.jna.Pointer
-import com.sun.jna.Structure
+import com.sun.jna.*
 import com.sun.jna.platform.win32.Guid.GUID
 import com.sun.jna.platform.win32.Ole32
 import com.sun.jna.platform.win32.User32
@@ -16,7 +11,7 @@ import com.sun.jna.ptr.PointerByReference
 import com.sun.jna.win32.StdCallLibrary
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.io.File
-import java.util.Collections
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 

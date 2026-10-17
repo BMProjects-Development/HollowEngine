@@ -1,22 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
-import ru.hollowhorizon.hollowengine.client.ui.scrollable
-import ru.hollowhorizon.hollowengine.client.ui.style
 
 /** The one stylesheet every inspector pulls in; editors add their own chrome on top. */
 const val InspectorStylesheet = "hollowengine:ui/styles/inspector.hss"

@@ -1,13 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
-import ru.hollowhorizon.hollowengine.client.ui.style.HssDeclaration
-import ru.hollowhorizon.hollowengine.client.ui.style.HssImport
-import ru.hollowhorizon.hollowengine.client.ui.style.HssParseException
-import ru.hollowhorizon.hollowengine.client.ui.style.HssParseResult
-import ru.hollowhorizon.hollowengine.client.ui.style.HssScope
-import ru.hollowhorizon.hollowengine.client.ui.style.HssSelector
-import ru.hollowhorizon.hollowengine.client.ui.style.HssVariable
-import ru.hollowhorizon.hollowengine.client.ui.style.parseHssRecovering
+import ru.hollowhorizon.hollowengine.client.ui.style.*
 
 /**
  * One parse of the edited stylesheet, shared by highlighting, hints and diagnostics.

@@ -2,18 +2,13 @@ package ru.hollowhorizon.hollowengine.client.gui.timeline.ui
 
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.FloatPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TranslationPropertyType
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.HollowTimelineEditor
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import ru.hollowhorizon.hollowengine.client.ui.style.scale
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

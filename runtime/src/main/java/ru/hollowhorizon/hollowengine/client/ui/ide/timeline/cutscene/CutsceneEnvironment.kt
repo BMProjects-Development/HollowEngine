@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelColors
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelSampling
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelSpec
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueFormatter
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueOption
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.PropertyType
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max

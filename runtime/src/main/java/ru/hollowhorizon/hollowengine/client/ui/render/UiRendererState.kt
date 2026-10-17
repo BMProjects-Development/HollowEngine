@@ -14,7 +14,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiBackfaceVisibility
 import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
 import ru.hollowhorizon.hollowengine.client.ui.style.clip
 import ru.hollowhorizon.hollowengine.client.ui.style.scrollable
-import java.util.IdentityHashMap
+import java.util.*
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max

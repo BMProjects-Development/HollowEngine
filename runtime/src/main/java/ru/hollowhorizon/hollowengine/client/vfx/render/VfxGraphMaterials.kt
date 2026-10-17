@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.ShaderInstance
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxGraphMaterials.builds
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 

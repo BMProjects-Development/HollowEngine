@@ -1,28 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.entity
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.LocalUiViewport
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Popup
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.cursor
-import ru.hollowhorizon.hollowengine.client.ui.focusScope
-import ru.hollowhorizon.hollowengine.client.ui.input
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.maxSize
-import ru.hollowhorizon.hollowengine.client.ui.onClick
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.scrollable
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 

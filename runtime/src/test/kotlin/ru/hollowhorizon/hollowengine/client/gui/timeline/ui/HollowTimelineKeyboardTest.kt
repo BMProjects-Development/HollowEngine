@@ -3,8 +3,8 @@ package ru.hollowhorizon.hollowengine.client.gui.timeline.ui
 import androidx.compose.runtime.mutableStateOf
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.HollowTimelineEditor
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

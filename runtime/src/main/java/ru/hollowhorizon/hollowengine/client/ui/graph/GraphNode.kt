@@ -3,18 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.graph
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiEvent
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.onDrag
-import ru.hollowhorizon.hollowengine.client.ui.onPress
-import ru.hollowhorizon.hollowengine.client.ui.onRelease
-import ru.hollowhorizon.hollowengine.client.ui.position
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 
 /**
  * A press, drag or release on a node: how far the pointer has gone since the press, in graph units,

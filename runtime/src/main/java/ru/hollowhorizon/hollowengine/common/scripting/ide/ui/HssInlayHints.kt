@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
 import ru.hollowhorizon.hollowengine.client.ui.style.HssVariableReference
 import ru.hollowhorizon.hollowengine.client.ui.style.parseColor
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayContent
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayIcons
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayTags
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
 private val LocationPattern = Regex("[a-z0-9_.-]+:[a-z0-9_./-]+")
 

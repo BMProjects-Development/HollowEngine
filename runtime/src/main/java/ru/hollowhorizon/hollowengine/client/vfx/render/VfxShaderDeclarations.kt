@@ -6,12 +6,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderTarget
-import ru.hollowhorizon.hollowengine.common.vfx.VfxColorValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxRgba
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /** A uniform as a shader json declares it. */
 class VfxShaderUniform(val name: String, val type: String, val count: Int, val defaults: FloatArray) {

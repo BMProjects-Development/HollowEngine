@@ -1,11 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.sounds
 
-import net.minecraft.client.sounds.JOrbisAudioStream
 import net.minecraft.client.sounds.AudioStream
+import net.minecraft.client.sounds.JOrbisAudioStream
 import net.minecraft.server.packs.resources.ResourceProvider
+import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders.open
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
-
 import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import java.io.InputStream
 import java.net.URI

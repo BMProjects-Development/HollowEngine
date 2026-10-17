@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.utils.nbt
 
-import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -14,13 +13,11 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
-import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize

@@ -6,8 +6,8 @@ import androidx.compose.runtime.setValue
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiEvent
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil

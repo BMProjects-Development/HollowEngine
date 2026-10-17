@@ -9,7 +9,6 @@ import net.minecraft.core.Direction
 import net.minecraft.core.RegistryAccess
 import net.minecraft.core.component.DataComponentPatch
 import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.*
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
@@ -29,11 +28,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
 import ru.hollowhorizon.hollowengine.common.scripting.state.waitPersistent
 import ru.hollowhorizon.hollowengine.common.scripting.state.waitRealtime
 import ru.hollowhorizon.hollowengine.common.scripting.state.waitUntil
-import ru.hollowhorizon.hollowengine.common.utils.colored
-import ru.hollowhorizon.hollowengine.common.utils.currentServer
-import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
-import ru.hollowhorizon.hollowengine.common.utils.literal
-import ru.hollowhorizon.hollowengine.common.utils.plus
+import ru.hollowhorizon.hollowengine.common.utils.*
 import java.time.Instant
 import java.util.*
 import kotlin.time.Duration

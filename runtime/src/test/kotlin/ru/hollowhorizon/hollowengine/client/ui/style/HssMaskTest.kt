@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.style
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.flattenModifiers
 import ru.hollowhorizon.hollowengine.client.ui.toStylePatch
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * `mask: linear-gradient(...)` follows CSS closely enough that a recipe copied from the web works,

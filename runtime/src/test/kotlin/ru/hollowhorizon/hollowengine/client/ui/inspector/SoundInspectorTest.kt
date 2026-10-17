@@ -12,13 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.locale.Language
 import net.minecraft.network.chat.FormattedText
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.SpanNode
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDefault
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptSchema
@@ -26,12 +20,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.toDescriptor
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFalloff
 import ru.hollowhorizon.hollowengine.common.sounds.SoundPlayback
 import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class SoundInspectorTest {
     @Test

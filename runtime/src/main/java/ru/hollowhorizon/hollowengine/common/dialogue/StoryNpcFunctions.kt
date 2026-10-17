@@ -4,11 +4,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.actor
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.any
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.list
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.number
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.string
+import ru.hollowhorizon.hollowengine.common.dialogue.lang.*
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.Facing

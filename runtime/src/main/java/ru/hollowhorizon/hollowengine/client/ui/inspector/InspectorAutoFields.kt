@@ -2,20 +2,14 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
-import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import androidx.compose.runtime.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 

@@ -1,25 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TrackGroup
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.common.utils.Color
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.log10
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
+import kotlin.math.*
 
 internal const val TimelineRulerHeight = 18f
 

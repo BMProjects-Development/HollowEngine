@@ -6,14 +6,7 @@ import net.minecraft.world.item.ItemStack
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemRequest
-import ru.hollowhorizon.hollowengine.common.slots.contains
-import ru.hollowhorizon.hollowengine.common.slots.containsAll
-import ru.hollowhorizon.hollowengine.common.slots.count
-import ru.hollowhorizon.hollowengine.common.slots.extract
-import ru.hollowhorizon.hollowengine.common.slots.insert
-import ru.hollowhorizon.hollowengine.common.slots.insertAll
-import ru.hollowhorizon.hollowengine.common.slots.storageSlots
-import ru.hollowhorizon.hollowengine.common.slots.transferTo
+import ru.hollowhorizon.hollowengine.common.slots.*
 
 fun Player.giveItem(stack: ItemStack): ItemStack = storageSlots().insert(stack)
 

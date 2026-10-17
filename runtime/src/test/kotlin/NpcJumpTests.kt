@@ -1,12 +1,7 @@
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpBody
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpDecision
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpOutcome
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpSimulation
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.JumpSpace
-import ru.hollowhorizon.hollowengine.common.npcs.navigation.PathStraightening
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
 import kotlin.math.sqrt
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

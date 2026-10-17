@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.runtime.bootstrap
 
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
-import ru.hollowhorizon.hollowengine.common.runtime.EmptyRuntimeAnnotationIndex
-import ru.hollowhorizon.hollowengine.common.runtime.HollowRuntimeBootstrapContext
-import ru.hollowhorizon.hollowengine.common.runtime.HollowRuntimeEntrypoint
-import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationEnvironment
-import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationIndex
+import ru.hollowhorizon.hollowengine.common.runtime.*
 
 class HollowEngineRuntimeBootstrap : HollowRuntimeEntrypoint {
     private val runtimeIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {

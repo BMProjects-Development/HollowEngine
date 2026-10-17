@@ -9,6 +9,7 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderClaims.peek
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 

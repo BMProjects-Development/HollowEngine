@@ -9,16 +9,8 @@ import net.minecraft.network.chat.Component
 import net.minecraft.server.Bootstrap
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
-import ru.hollowhorizon.hollowengine.common.npcs.items.ItemMatchMode
-import ru.hollowhorizon.hollowengine.common.npcs.items.anyOf
-import ru.hollowhorizon.hollowengine.common.npcs.items.itemFilter
-import ru.hollowhorizon.hollowengine.common.npcs.items.itemRequest
-import ru.hollowhorizon.hollowengine.common.npcs.items.request
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import ru.hollowhorizon.hollowengine.common.npcs.items.*
+import kotlin.test.*
 
 class NpcInventoryTest {
     @BeforeTest

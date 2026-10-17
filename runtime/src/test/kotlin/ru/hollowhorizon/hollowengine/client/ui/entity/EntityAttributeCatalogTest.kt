@@ -4,11 +4,7 @@ import net.minecraft.SharedConstants
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.Bootstrap
 import net.minecraft.world.entity.ai.attributes.Attributes
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class EntityAttributeCatalogTest {
     @BeforeTest

@@ -3,16 +3,7 @@ package ru.hollowhorizon.hollowengine.client.vfx
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxBeamRenderer
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxCameraShake
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDecalNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMeshNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxModelNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxPlaneNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxPostEffectNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxSkyNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxTrailRenderer
+import ru.hollowhorizon.hollowengine.client.vfx.render.*
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.math.sqrt

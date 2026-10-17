@@ -4,6 +4,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
+import ru.hollowhorizon.hollowengine.common.colliders.ServerColliderPoses.HISTORY_TICKS
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent

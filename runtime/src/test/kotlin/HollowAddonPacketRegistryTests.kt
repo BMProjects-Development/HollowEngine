@@ -4,11 +4,7 @@ import kotlinx.serialization.Serializable
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
-import kotlin.test.AfterTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
+import kotlin.test.*
 
 class HollowAddonPacketRegistryTests {
     @AfterTest

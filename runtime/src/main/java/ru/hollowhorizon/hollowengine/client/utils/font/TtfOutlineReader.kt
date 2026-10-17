@@ -3,14 +3,7 @@ package ru.hollowhorizon.hollowengine.client.utils.font
 import org.lwjgl.PointerBuffer
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
-import org.lwjgl.util.freetype.FT_Face
-import org.lwjgl.util.freetype.FT_Outline_ConicToFunc
-import org.lwjgl.util.freetype.FT_Outline_CubicToFunc
-import org.lwjgl.util.freetype.FT_Outline_Funcs
-import org.lwjgl.util.freetype.FT_Outline_LineToFunc
-import org.lwjgl.util.freetype.FT_Outline_MoveToFunc
-import org.lwjgl.util.freetype.FT_Vector
-import org.lwjgl.util.freetype.FreeType
+import org.lwjgl.util.freetype.*
 import java.nio.ByteBuffer
 import kotlin.math.ceil
 import kotlin.math.sqrt

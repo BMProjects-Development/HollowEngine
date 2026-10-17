@@ -2,18 +2,18 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
+import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
-import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
 import java.io.File
 
 internal const val SoundsFileName = "sounds.json"
