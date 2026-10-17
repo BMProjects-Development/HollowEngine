@@ -20,12 +20,12 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
-import ru.hollowhorizon.hollowengine.client.ui.inspector.IntRow
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Readonly
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
 import ru.hollowhorizon.hollowengine.client.ui.inspector.TextRow
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
+import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
 import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.itemTooltip
@@ -157,7 +157,7 @@ private fun ResultInspector(session: RecipeEditorSession, binding: RecipeSlotBin
         session.write(binding, result.withId(text.trim(), keepComponents = true).json)
     }
     if (binding.counted) {
-        IntRow(recipeLang("count").lang, result.count, id = "recipe-result-count", min = 1, max = MaxCount) { count ->
+        NumberRow(recipeLang("count").lang, result.count, id = "recipe-result-count", min = 1, max = MaxCount) { count ->
             session.write(binding, result.withCount(count).json)
         }
     }

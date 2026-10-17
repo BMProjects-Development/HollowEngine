@@ -103,19 +103,19 @@ private fun PreviewSection(controller: TimelineController, refresh: () -> Unit) 
 private fun OriginSection(session: CutsceneEditorSession, refresh: () -> Unit) {
     val origin = session.playback.origin
     Section(CutsceneLang.ORIGIN.lang, id = "timeline-origin-section") {
-        FloatRow(CutsceneLang.ORIGIN_X.lang, origin.x, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_X.lang, origin.x) { next ->
             session.moveOrigin(Vec3f(next, origin.y, origin.z), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_Y.lang, origin.y, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_Y.lang, origin.y) { next ->
             session.moveOrigin(Vec3f(origin.x, next, origin.z), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_Z.lang, origin.z, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_Z.lang, origin.z) { next ->
             session.moveOrigin(Vec3f(origin.x, origin.y, next), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f, step = 1f) { next ->
+        NumberRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f, step = 1f) { next ->
             session.moveOrigin(origin.position, next, keepWorld = false)
             refresh()
         }
@@ -144,7 +144,7 @@ private fun KeyframeSection(
     val title = if (count == 1) CutsceneLang.KEYFRAME.lang else CutsceneLang.KEYFRAMES.lang(count)
     Section(title) {
         Readonly(CutsceneLang.CHANNEL.lang, channelPath(controller, curve))
-        FloatRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
+        NumberRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
             controller.nudgeSelectedKeyframes(snapTimelineTime(time) - keyframe.time)
             refresh()
         }
@@ -152,7 +152,7 @@ private fun KeyframeSection(
             val owner = controller.propertyOf(keyframe)
             val channel = owner?.curves?.indexOfFirst { it === curve } ?: -1
             val bounds = (if (channel >= 0) owner?.bounds(channel) else null) ?: ChannelBounds.Unbounded
-            FloatRow(
+            NumberRow(
                 CutsceneLang.VALUE.lang,
                 keyframe.value,
                 min = bounds.minimum ?: -Float.MAX_VALUE,
@@ -271,11 +271,11 @@ private fun TangentRow(
 ) {
     val tangent = keyframe.tangent(side)
     Row(modifier = Modifier.size(100.percent, UiLength.Fit).gap(4.px)) {
-        FloatRow(label, tangent.time) { next ->
+        NumberRow(label, tangent.time) { next ->
             applyTangent(controller, keyframe, side, KeyTangent(next, keyframe.tangent(side).value))
             refresh()
         }
-        FloatRow("", tangent.value) { next ->
+        NumberRow("", tangent.value) { next ->
             applyTangent(controller, keyframe, side, KeyTangent(keyframe.tangent(side).time, next))
             refresh()
         }
@@ -296,7 +296,7 @@ private fun applyTangent(
 @Composable
 private fun WorkAreaSection(controller: TimelineController, refresh: () -> Unit) {
     Section(CutsceneLang.WORK_AREA.lang) {
-        FloatRow(CutsceneLang.END.lang, controller.workAreaEnd, min = 0.1f, max = Float.POSITIVE_INFINITY) { time ->
+        NumberRow(CutsceneLang.END.lang, controller.workAreaEnd, min = 0.1f, max = Float.POSITIVE_INFINITY) { time ->
             controller.workAreaEnd = snapTimelineTime(time).coerceAtLeast(0.1f)
             if (controller.currentTime > controller.workAreaEnd) controller.applyCurrentTime(0f)
             refresh()

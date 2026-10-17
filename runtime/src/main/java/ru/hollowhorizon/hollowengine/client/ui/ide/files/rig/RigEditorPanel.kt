@@ -13,7 +13,6 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -21,6 +20,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -121,18 +121,18 @@ private fun Toolbar(
 ) {
     val viewer = state.viewer
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
-        AnimatorIconButton(SkeletonIcon, rigText("toggle_skeleton"), size = 12f, active = state.showSkeleton) {
+        IconButton(SkeletonIcon, rigText("toggle_skeleton"), iconSize = 12f, active = state.showSkeleton) {
             state.showSkeleton = !state.showSkeleton
         }
-        AnimatorIconButton(ColliderIcon, rigText("toggle_colliders"), size = 12f, active = state.showColliders) {
+        IconButton(ColliderIcon, rigText("toggle_colliders"), iconSize = 12f, active = state.showColliders) {
             state.showColliders = !state.showColliders
         }
         if (state.partSelection != null) GizmoToolbarButtons()
         if (RigPreviews.isAvailable) {
-            AnimatorIconButton(
+            IconButton(
                 icon = if (preview == null) PhysicsIcon else StopIcon,
                 tooltip = rigText(if (preview == null) "start_physics" else "stop_physics"),
-                size = 12f,
+                iconSize = 12f,
                 active = preview != null,
                 onClick = onPhysics,
             )
@@ -148,13 +148,7 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
     if (generators.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     var anchor by remember { mutableStateOf(UiRect.Zero) }
-    AnimatorIconButton(
-        RigGenerators.DEFAULT_ICON,
-        rigText("generate"),
-        size = 12f,
-        active = open,
-        modifier = Modifier.onPlaced { anchor = it },
-    ) { open = !open }
+    IconButton(RigGenerators.DEFAULT_ICON, rigText("generate"), iconSize = 12f, active = open, modifier = Modifier.onPlaced { anchor = it }) { open = !open }
     if (!open) return
     ContextMenu(
         id = "rig-generate-menu",

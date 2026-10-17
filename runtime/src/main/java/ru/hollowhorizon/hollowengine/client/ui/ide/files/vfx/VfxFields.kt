@@ -295,7 +295,7 @@ private fun DrivenCell(driven: VfxDrivenValue, property: VfxProperty?, channel: 
 @Composable
 private fun DrivenMark(property: VfxProperty?) {
     val focus = LocalVfxFieldFocus.current
-    InspectorIcon(KeyframeIcon, vfxText("driven_show")) { if (property != null) focus(property) }
+    InspectorIconButton(KeyframeIcon, vfxText("driven_show"), tags = listOf("insp-inline-icon")) { if (property != null) focus(property) }
 }
 
 @Composable
@@ -311,22 +311,11 @@ private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, ste
 }
 
 @Composable
-internal fun VfxNumberCellInline(value: Float, onChange: (Float) -> Unit) =
-    NumberCell(value, null, whole = false, onChange = onChange)
-
-@Composable
 private fun TextCell(text: String, property: VfxProperty?, onChange: (String) -> Unit) {
     val focus = LocalVfxFieldFocus.current
-    var draft by remember { mutableStateOf(text) }
-    var lastExternal by remember { mutableStateOf(text) }
-    if (text != lastExternal) {
-        lastExternal = text
-        draft = text
-    }
-
-    val diagnostics = remember(draft) { VfxExpressionEditing.diagnostics(draft) }
+    val diagnostics = remember(text) { VfxExpressionEditing.diagnostics(text) }
     TextField(
-        value = draft,
+        value = text,
         fontSize = 9f,
         placeholder = vfxText("expression_placeholder"),
         completionContributor = VfxExpressionEditing.completions,
@@ -335,11 +324,7 @@ private fun TextCell(text: String, property: VfxProperty?, onChange: (String) ->
         tags = listOf("insp-input", "insp-inline-input", "vfx-expression"),
         modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).onFocus { if (property != null) focus(property) }
             .then(if (diagnostics.isEmpty()) Modifier.tooltipOnHover(vfxText("expression_hint")) else Modifier),
-        onChange = { typed ->
-            draft = typed
-            lastExternal = typed
-            onChange(typed)
-        },
+        onChange = onChange,
     )
 }
 
@@ -384,7 +369,7 @@ private fun KindPicker(value: VfxValue, onChange: (VfxValue) -> Unit) {
     val kind = value.kind()
 
     Box(modifier = Modifier.onPlaced { anchor = it }) {
-        InspectorIcon(kind.icon, vfxText(kind.key)) { open = true }
+        InspectorIconButton(kind.icon, vfxText(kind.key), tags = listOf("insp-inline-icon")) { open = true }
     }
 
     if (!open) return
@@ -460,11 +445,6 @@ internal fun VfxCurvePreview(curve: VfxCurve, modifier: Modifier) {
             }
         },
     )
-}
-
-@Composable
-internal fun InspectorIcon(icon: String, tooltip: String, onClick: () -> Unit) {
-    InspectorIconButton(icon = icon, tooltip = tooltip, tags = listOf("insp-inline-icon"), onClick = onClick)
 }
 
 /** Highlighting, completion and diagnostics for the expressions of the effect dialect. */

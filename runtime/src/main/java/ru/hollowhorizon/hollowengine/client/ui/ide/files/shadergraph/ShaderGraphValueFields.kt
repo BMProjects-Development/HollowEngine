@@ -128,15 +128,7 @@ private fun ColorSwatch(id: String, values: List<Float>, actions: ShaderFieldAct
 private fun UiColor.clamped() =
     UiColor(red.coerceIn(0f, 1f), green.coerceIn(0f, 1f), blue.coerceIn(0f, 1f), alpha.coerceIn(0f, 1f))
 
-private fun step(modifiers: Int, base: Float): Float = when {
-    modifiers and GLFW.GLFW_MOD_SHIFT != 0 -> base / 10f
-    modifiers and GLFW.GLFW_MOD_CONTROL != 0 -> base * 10f
-    else -> base
-}
-
 internal fun formatValue(value: Float): String =
     if (value == value.toInt().toFloat()) value.toInt().toString() else "%.3f".format(Locale.ROOT, value).trimEnd('0')
 
 private fun rounded(value: Float): Float = (value * 1000f).roundToInt() / 1000f
-
-/** Pixels a press has to move before it counts as a drag rather than a click. */

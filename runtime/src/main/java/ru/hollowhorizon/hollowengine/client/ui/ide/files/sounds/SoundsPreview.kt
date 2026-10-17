@@ -258,12 +258,12 @@ private fun SoundCard(
             SoundsIconButton(RemoveIcon, tags = listOf("sounds-editor-sound-delete"), onClick = onDelete)
         }
 
-        SliderRow(key("volume").lang, sound.volume, 0f, 1f) { sound.volume = it; onChanged() }
-        SliderRow(key("pitch").lang, sound.pitch, 0.5f, 2f) { sound.pitch = it; onChanged() }
+        NumberRow(key("volume").lang, sound.volume, min = 0f, max = 1f, slider = true) { sound.volume = it; onChanged() }
+        NumberRow(key("pitch").lang, sound.pitch, min = 0.5f, max = 2f, slider = true) { sound.pitch = it; onChanged() }
 
         Row(modifier = Modifier.size(100.percent, 22.px).gap(6.px).alignItems(vertical = UiAlign.CENTER)) {
-            IntRow(key("weight").lang, sound.weight, min = 1) { sound.weight = it; onChanged() }
-            IntRow(key("attenuation").lang, sound.attenuationDistance, min = 0) { sound.attenuationDistance = it; onChanged() }
+            NumberRow(key("weight").lang, sound.weight, min = 1) { sound.weight = it; onChanged() }
+            NumberRow(key("attenuation").lang, sound.attenuationDistance, min = 0) { sound.attenuationDistance = it; onChanged() }
         }
 
         Row(modifier = Modifier.size(100.percent, 20.px).gap(10.px).alignItems(vertical = UiAlign.CENTER)) {

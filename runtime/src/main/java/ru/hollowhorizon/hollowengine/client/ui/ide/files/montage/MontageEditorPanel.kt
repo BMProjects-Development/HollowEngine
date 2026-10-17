@@ -16,7 +16,6 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInsertMenu
@@ -32,6 +31,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -182,30 +182,20 @@ private fun Toolbar(state: MontageEditorState) {
     val timeline = state.session.timeline
     val rigState = state.rigState
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
-        AnimatorIconButton(
+        IconButton(
             icon = if (timeline.isPlaying) PauseIcon else PlayIcon,
             tooltip = HollowKeys.PLAY.hint(montageText(if (timeline.isPlaying) "pause" else "play")),
-            size = 12f,
+            iconSize = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
-        AnimatorIconButton(PREVIEW_RESET_ICON, playbackText("preview_reset"), size = 12f) { state.preview.reset() }
-        AnimatorIconButton(KeyIcon, HollowKeys.INSERT_KEY.hint(montageText("key_picked")), size = 12f) {
+        IconButton(PREVIEW_RESET_ICON, playbackText("preview_reset"), iconSize = 12f) { state.preview.reset() }
+        IconButton(KeyIcon, HollowKeys.INSERT_KEY.hint(montageText("key_picked")), iconSize = 12f) {
             state.session.keyPicked(rigState.selected, rigState.selectedPart)
         }
-        AnimatorIconButton(
-            SkeletonIcon,
-            "hollowengine.gui.rig_editor.toggle_skeleton".lang,
-            size = 12f,
-            active = rigState.showSkeleton
-        ) {
+        IconButton(SkeletonIcon, "hollowengine.gui.rig_editor.toggle_skeleton".lang, iconSize = 12f, active = rigState.showSkeleton) {
             rigState.showSkeleton = !rigState.showSkeleton
         }
-        AnimatorIconButton(
-            ColliderIcon,
-            "hollowengine.gui.rig_editor.toggle_colliders".lang,
-            size = 12f,
-            active = rigState.showColliders
-        ) {
+        IconButton(ColliderIcon, "hollowengine.gui.rig_editor.toggle_colliders".lang, iconSize = 12f, active = rigState.showColliders) {
             rigState.showColliders = !rigState.showColliders
         }
         if (rigState.partSelection != null) GizmoToolbarButtons()

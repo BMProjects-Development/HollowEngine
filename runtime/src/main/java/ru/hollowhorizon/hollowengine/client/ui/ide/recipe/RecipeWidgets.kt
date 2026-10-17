@@ -56,7 +56,7 @@ fun RecipeEditing.ResultSlot(key: String = "result", count: Boolean = true) {
     Row(tags = listOf("recipe-result"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
         Slot(RecipeSlotBinding.key(key, RecipeSlotKind.RESULT, id = "result-$key", counted = count))
         if (count && result != null) {
-            IntRow(recipeLang("count").lang, result.count, id = "recipe-$key-count", min = 1, max = MaxCount) { next ->
+            NumberRow(recipeLang("count").lang, result.count, id = "recipe-$key-count", min = 1, max = MaxCount) { next ->
                 edit { RecipeResult.of(get(key))?.let { put(key, it.withCount(next).json) } }
             }
         }
@@ -131,7 +131,7 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
 /** A whole number under [key]; [default] is left out of the file, as vanilla does. */
 @Composable
 fun RecipeEditing.IntField(key: String, label: String, default: Int = 0, min: Int = 0, max: Int = Int.MAX_VALUE) =
-    IntRow(label.lang, int(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
+    NumberRow(label.lang, int(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
 
 @Composable
 fun RecipeEditing.FloatField(
@@ -140,7 +140,7 @@ fun RecipeEditing.FloatField(
     default: Float = 0f,
     min: Float = 0f,
     max: Float = Float.MAX_VALUE,
-) = FloatRow(label.lang, float(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
+) = NumberRow(label.lang, float(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
 
 @Composable
 fun RecipeEditing.StringField(key: String, label: String, default: String = "") =

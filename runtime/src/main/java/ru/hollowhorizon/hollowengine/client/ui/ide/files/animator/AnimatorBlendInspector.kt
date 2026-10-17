@@ -9,6 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.common.models.*
 import kotlin.math.roundToInt
 
@@ -168,13 +170,13 @@ private fun RangeRow(prefix: String, axis: String, range: BlendRange, onChange: 
         Text(axis, tags = listOf("animator-blend-range-axis"))
         Text(animatorText("blend_from"), tags = listOf("animator-blend-range-word"))
         Column(modifier = Modifier.size(0.px).grow(1f)) {
-            NumberInput("$prefix-$axis-min", range.min.toDouble(), whole = false) { value ->
+            NumberField(value = range.min.toDouble(), id = "insp-number$prefix-$axis-min", modifier = Modifier.grow(1f)) { value ->
                 if (value < range.max) onChange(range.copy(min = value.toFloat()))
             }
         }
         Text(animatorText("blend_to"), tags = listOf("animator-blend-range-word"))
         Column(modifier = Modifier.size(0.px).grow(1f)) {
-            NumberInput("$prefix-$axis-max", range.max.toDouble(), whole = false) { value ->
+            NumberField(value = range.max.toDouble(), id = "insp-number$prefix-$axis-max", modifier = Modifier.grow(1f)) { value ->
                 if (value > range.min) onChange(range.copy(max = value.toFloat()))
             }
         }
@@ -184,7 +186,7 @@ private fun RangeRow(prefix: String, axis: String, range: BlendRange, onChange: 
 @Composable
 private fun RangeField(path: String, value: Float, onChange: (Float) -> Unit) {
     Column(modifier = Modifier.size(RangeFieldWidth.px)) {
-        NumberInput(path, value.toDouble(), whole = false) { onChange(it.toFloat()) }
+        NumberField(value = value.toDouble(), id = "insp-number$path", modifier = Modifier.grow(1f)) { onChange(it.toFloat()) }
     }
 }
 
@@ -219,7 +221,7 @@ private fun MotionSection(
         }
         Row(tags = listOf("animator-blend-coordinates"), modifier = Modifier.size(100.percent)) {
             Column(modifier = Modifier.size(0.px).grow(1f)) {
-                FloatRow(
+                NumberRow(
                     animatorText(if (planar) "blend_point_x" else "blend_position"),
                     motion.x,
                     id = "$prefix-$index-x"
@@ -229,13 +231,13 @@ private fun MotionSection(
             }
             if (planar) {
                 Column(modifier = Modifier.size(0.px).grow(1f)) {
-                    FloatRow(animatorText("blend_point_y"), motion.y, id = "$prefix-$index-y") { value ->
+                    NumberRow(animatorText("blend_point_y"), motion.y, id = "$prefix-$index-y") { value ->
                         onChange(motion.copy(y = value))
                     }
                 }
             }
             Column(modifier = Modifier.size(0.px).grow(1f)) {
-                FloatRow(animatorText("speed"), motion.speed, id = "$prefix-$index-speed") { value ->
+                NumberRow(animatorText("speed"), motion.speed, id = "$prefix-$index-speed") { value ->
                     onChange(motion.copy(speed = value))
                 }
             }
@@ -460,6 +462,6 @@ private fun UiCanvasDrawScope.drawFrame(view: BlendView, probe: BlendPoint, movi
 private fun pointText(motion: BlendMotion, planar: Boolean): String =
     if (planar) "${format(motion.x)}, ${format(motion.y)}" else format(motion.x)
 
-private fun format(value: Float): String = formatNumber((value * 100f).roundToInt() / 100.0, whole = false)
+private fun format(value: Float): String = formatUiNumber((value * 100f).roundToInt() / 100.0, whole = false)
 
 private fun snap(value: Float): Float = (value * 20f).roundToInt() / 20f

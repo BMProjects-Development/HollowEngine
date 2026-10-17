@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.screen.HollowComposeUiScreen
 import ru.hollowhorizon.hollowengine.client.ui.style.CompiledHss
 import ru.hollowhorizon.hollowengine.client.ui.style.MinecraftHssResourceLoader
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
 
 internal const val EntityEditorStylesheet = "hollowengine:ui/styles/entity-editor.hss"
 internal const val WidgetStylesheet = "hollowengine:ui/styles/widgets.hss"
@@ -197,7 +198,7 @@ private fun ViewportStats(session: EntityEditorSession) {
         (entity as? LivingEntity)?.let { living ->
             StatRow(
                 EntityEditorLang.statHealth,
-                "${formatNumber(living.health.toDouble(), false)} / ${formatNumber(living.maxHealth.toDouble(), false)}",
+                "${formatUiNumber(living.health.toDouble(), false)} / ${formatUiNumber(living.maxHealth.toDouble(), false)}",
             )
         }
     }

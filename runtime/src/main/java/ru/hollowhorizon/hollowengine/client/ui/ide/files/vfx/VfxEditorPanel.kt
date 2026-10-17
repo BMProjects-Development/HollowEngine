@@ -16,7 +16,6 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInsertMenu
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
@@ -34,6 +33,7 @@ import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -159,17 +159,17 @@ private fun Toolbar(state: VfxEditorState) {
     val timeline = state.session.timeline
     val preview = state.preview
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
-        AnimatorIconButton(
+        IconButton(
             icon = if (timeline.isPlaying) PauseIcon else PlayIcon,
             tooltip = HollowKeys.PLAY.hint(vfxText(if (timeline.isPlaying) "pause" else "play")),
-            size = 12f,
+            iconSize = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
-        AnimatorIconButton(RestartIcon, playbackText("preview_reset"), size = 12f) { state.playbackPreview.reset() }
-        AnimatorIconButton(FloorIcon, vfxText("toggle_floor"), size = 12f, active = preview.showFloor) {
+        IconButton(RestartIcon, playbackText("preview_reset"), iconSize = 12f) { state.playbackPreview.reset() }
+        IconButton(FloorIcon, vfxText("toggle_floor"), iconSize = 12f, active = preview.showFloor) {
             preview.showFloor = !preview.showFloor
         }
-        AnimatorIconButton(ShapeIcon, vfxText("toggle_shape"), size = 12f, active = preview.showShape) {
+        IconButton(ShapeIcon, vfxText("toggle_shape"), iconSize = 12f, active = preview.showShape) {
             preview.showShape = !preview.showShape
         }
         GizmoToolbarButtons()

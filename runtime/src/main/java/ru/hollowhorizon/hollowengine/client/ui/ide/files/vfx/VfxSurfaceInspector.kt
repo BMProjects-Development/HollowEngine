@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.resourceExists
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.common.vfx.*
 
 internal val VfxModelExtensions = listOf(".glb", ".gltf", ".fbx", ".obj")
@@ -262,7 +263,10 @@ private fun UvRows(uv: VfxUvRect, onChange: (VfxUvRect) -> Unit) {
 private fun UvNumber(axis: String, value: Float, onChange: (Float) -> Unit) {
     Row(modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).gap(2.px).alignItems(vertical = UiAlign.CENTER)) {
         Text(axis, modifier = Modifier.fontSize(8f).foreground(MutedText))
-        VfxNumberCellInline(value) { onChange(it.coerceIn(0f, 1f)) }
+        NumberField(
+            value = value.toDouble(),
+            modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+        ) { onChange(it.toFloat().coerceIn(0f, 1f)) }
     }
 }
 

@@ -89,7 +89,7 @@ private fun MontageFields(document: HollowIdeMontageDocument, preview: PlaybackP
                 id = "montage-preview-model",
                 candidates = { host -> host.assets(ModelExtensions) },
             ) { value -> document.edit(mergeKey = "preview-model") { it.copy(previewModel = value.trim()) } }
-            FloatRow(montageText("duration"), montage.duration, min = 0.05f) { value ->
+            NumberRow(montageText("duration"), montage.duration, min = 0.05f) { value ->
                 document.edit(mergeKey = "duration") { it.copy(duration = value) }
             }
         }
@@ -151,22 +151,22 @@ private fun ClipFields(document: HollowIdeMontageDocument, state: MontageEditorS
             TextRow(montageText("animation"), clip.animation, completions = assetCompletions(names)) { value ->
                 edit { it.copy(animation = value.trim()) }
             }
-            FloatRow(montageText("start"), clip.start, min = 0f) { value -> edit { it.copy(start = value) } }
-            FloatRow(montageText("length"), clip.length, min = 0.05f) { value -> edit { it.copy(length = value) } }
-            FloatRow(montageText("from"), clip.from, min = 0f) { value -> edit { it.copy(from = value) } }
-            FloatRow(montageText("speed"), clip.speed) { value -> edit { it.copy(speed = value) } }
+            NumberRow(montageText("start"), clip.start, min = 0f) { value -> edit { it.copy(start = value) } }
+            NumberRow(montageText("length"), clip.length, min = 0.05f) { value -> edit { it.copy(length = value) } }
+            NumberRow(montageText("from"), clip.from, min = 0f) { value -> edit { it.copy(from = value) } }
+            NumberRow(montageText("speed"), clip.speed) { value -> edit { it.copy(speed = value) } }
             ToggleRow(
                 montageText("loop"),
                 clip.loop,
                 hint = montageText("loop_hint")
             ) { value -> edit { it.copy(loop = value) } }
-            FloatRow(
+            NumberRow(
                 montageText("fade_in"),
                 clip.fadeIn,
                 min = 0f,
                 help = montageText("fade_hint")
             ) { value -> edit { it.copy(fadeIn = value) } }
-            FloatRow(montageText("fade_out"), clip.fadeOut, min = 0f) { value -> edit { it.copy(fadeOut = value) } }
+            NumberRow(montageText("fade_out"), clip.fadeOut, min = 0f) { value -> edit { it.copy(fadeOut = value) } }
             KeyedField(
                 "clip-weight",
                 session.isWeightAnimated(id),
@@ -225,10 +225,10 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
         owned.windows.forEachIndexed { index, window ->
             key(index) {
                 Row(tags = listOf("insp-input-row")) {
-                    FloatRow(montageText("window_start"), window.start, id = "window-$index-start", min = 0f) { value ->
+                    NumberRow(montageText("window_start"), window.start, id = "window-$index-start", min = 0f) { value ->
                         session.editWindow(bone, attachment.id, index) { it.copy(start = value) }
                     }
-                    FloatRow(
+                    NumberRow(
                         montageText("window_end"),
                         window.end ?: duration,
                         id = "window-$index-end",

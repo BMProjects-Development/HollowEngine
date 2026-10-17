@@ -19,11 +19,12 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberInput
 import ru.hollowhorizon.hollowengine.client.ui.onPlaced
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
+import ru.hollowhorizon.hollowengine.client.ui.grow
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityAttributes
 
@@ -148,7 +149,7 @@ private fun AttributeValueRow(
             modifier = codeId?.let { Modifier.input(hoverable = true).tooltipOnHover(it) },
         )
         Box(tags = listOf("ee-attribute-value")) {
-            NumberInput(path = "/ee-attribute/$id", value = value, whole = false, onChange = onChange)
+            NumberField(value = value, id = "insp-number/ee-attribute/$id", modifier = Modifier.grow(1f), onChange = onChange)
         }
         Row(tags = listOf("ee-attribute-actions")) { actions?.invoke() }
     }

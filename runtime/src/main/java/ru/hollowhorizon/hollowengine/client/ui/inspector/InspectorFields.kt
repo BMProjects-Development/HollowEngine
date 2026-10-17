@@ -113,22 +113,22 @@ fun NameRow(label: String, value: String, id: String? = null, onCommit: (String)
     }
 }
 
+/** A whole number with its type's bounds and conversion kept at the inspector boundary. */
 @Composable
-fun IntRow(
+fun NumberRow(
     label: String,
     value: Int,
     id: String? = null,
     min: Int = Int.MIN_VALUE,
     max: Int = Int.MAX_VALUE,
     onChange: (Int) -> Unit,
-) {
-    NumberRow(label, value.toDouble(), whole = true, id = id, min = min.toDouble(), max = max.toDouble()) {
-        onChange(it.toInt())
-    }
+) = NumberRow(label, value.toDouble(), whole = true, id = id, min = min.toDouble(), max = max.toDouble()) {
+    onChange(it.toInt())
 }
 
+/** A floating-point number; [slider] uses the supplied bounds as the slider's range. */
 @Composable
-fun FloatRow(
+fun NumberRow(
     label: String,
     value: Float,
     id: String? = null,
@@ -136,20 +136,19 @@ fun FloatRow(
     max: Float = Float.MAX_VALUE,
     help: String? = null,
     step: Float? = null,
+    slider: Boolean = false,
     onChange: (Float) -> Unit,
-) {
-    NumberRow(
-        label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(), help = help,
-        step = step?.toDouble(),
-    ) { onChange(it.toFloat()) }
-}
+) = NumberRow(
+    label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(),
+    help = help, step = step?.toDouble(), slider = slider,
+) { onChange(it.toFloat()) }
 
 /** `Label:  ‹ value ›`, a number of an inspector with its label in front; [help] is the label's tooltip. */
 @Composable
 fun NumberRow(
     label: String,
     value: Double,
-    whole: Boolean,
+    whole: Boolean = false,
     id: String? = null,
     min: Double = -Double.MAX_VALUE,
     max: Double = Double.MAX_VALUE,
@@ -207,13 +206,6 @@ fun ToggleRow(
 }
 
 @Composable
-fun SliderRow(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
-    NumberRow(label, value.toDouble(), whole = false, min = min.toDouble(), max = max.toDouble(), slider = true) {
-        onChange(it.toFloat())
-    }
-}
-
-@Composable
 fun PillFlow(id: String? = null, content: HollowUiContent) {
     Layout(
         content = content,
@@ -260,18 +252,7 @@ fun InspectorButton(
 fun InspectorIconButton(
     icon: String,
     tooltip: String,
-    modifier: Modifier = Modifier,
-    active: Boolean = false,
-    tags: List<String> = emptyList(),
-    onClick: () -> Unit,
-) = InspectorIconButton(null, icon, tooltip, modifier, active, tags, onClick)
-
-/** A small icon in a row of the inspector: no fill of its own, only its color answers the pointer. */
-@Composable
-fun InspectorIconButton(
-    id: String?,
-    icon: String,
-    tooltip: String,
+    id: String? = null,
     modifier: Modifier = Modifier,
     active: Boolean = false,
     tags: List<String> = emptyList(),

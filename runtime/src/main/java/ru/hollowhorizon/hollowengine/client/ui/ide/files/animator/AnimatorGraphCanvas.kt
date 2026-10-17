@@ -37,6 +37,7 @@ import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.common.models.ANY_STATE
 import ru.hollowhorizon.hollowengine.common.models.AnimationControllerLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
@@ -157,7 +158,7 @@ internal fun AnimatorGraphCanvas(
         },
         overlay = {
             Row(modifier = Modifier.position(6.px, 6.px).gap(4.px)) {
-                AnimatorIconButton(ResetIcon, animatorText("reset_view"), size = 11f) { view.reset() }
+                IconButton(ResetIcon, animatorText("reset_view"), iconSize = 11f) { view.reset() }
             }
         },
     ) {

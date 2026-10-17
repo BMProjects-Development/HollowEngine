@@ -15,7 +15,6 @@ import kotlinx.serialization.json.*
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
-import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
@@ -392,23 +391,6 @@ private fun AutoNumberField(
 }
 
 @Composable
-internal fun NumberInput(
-    path: String,
-    value: Double,
-    whole: Boolean,
-    modifier: Modifier = Modifier,
-    onChange: (Double) -> Unit,
-) {
-    NumberField(
-        value = value,
-        id = "insp-number$path",
-        whole = whole,
-        modifier = modifier.grow(1f),
-        onChange = onChange,
-    )
-}
-
-@Composable
 private fun EnumField(
     label: String?,
     description: String?,
@@ -739,5 +721,3 @@ private fun numberJson(kind: PrimitiveKind, value: Double): JsonPrimitive = when
     PrimitiveKind.FLOAT -> JsonPrimitive(value.toFloat())
     else -> JsonPrimitive(value)
 }
-
-internal fun formatNumber(value: Double, whole: Boolean): String = formatUiNumber(value, whole)

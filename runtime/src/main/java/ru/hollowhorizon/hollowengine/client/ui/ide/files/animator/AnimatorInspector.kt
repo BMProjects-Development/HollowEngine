@@ -63,12 +63,12 @@ private fun LayerSection(
             document.edit { it.withLayerRenamed(layerId, value) }
             onRenamed(value)
         }
-        IntRow(animatorText("priority"), layer.priority) { value -> document.edit { it.withLayer(layer.withCommon(priority = value)) } }
+        NumberRow(animatorText("priority"), layer.priority) { value -> document.edit { it.withLayer(layer.withCommon(priority = value)) } }
         ExpressionField(animatorText("weight"), layer.weight.source) { value ->
             document.edit { it.withLayer(layer.withCommon(weight = AnimationExpression(value))) }
         }
-        FloatRow(animatorText("fade_in"), layer.fadeIn) { value -> document.edit { it.withLayer(layer.withCommon(fadeIn = value)) } }
-        FloatRow(animatorText("fade_out"), layer.fadeOut) { value -> document.edit { it.withLayer(layer.withCommon(fadeOut = value)) } }
+        NumberRow(animatorText("fade_in"), layer.fadeIn) { value -> document.edit { it.withLayer(layer.withCommon(fadeIn = value)) } }
+        NumberRow(animatorText("fade_out"), layer.fadeOut) { value -> document.edit { it.withLayer(layer.withCommon(fadeOut = value)) } }
         Label(animatorText("blend"))
         Pills(LayerBlendMode.entries, layer.blendMode, { it.name.lowercase() }) { mode ->
             document.edit { it.withLayer(layer.withCommon(blendMode = mode)) }
@@ -213,8 +213,8 @@ private fun TransitionSection(
         ExpressionField(animatorText("duration"), transition.duration.source) { value ->
             update { it.copy(duration = AnimationExpression(value)) }
         }
-        IntRow(animatorText("priority"), transition.priority) { value -> update { it.copy(priority = value) } }
-        FloatRow(animatorText("exit_time"), transition.exitTime ?: 0f) { value ->
+        NumberRow(animatorText("priority"), transition.priority) { value -> update { it.copy(priority = value) } }
+        NumberRow(animatorText("exit_time"), transition.exitTime ?: 0f) { value ->
             update { it.copy(exitTime = value.takeIf { time -> time > 0f }) }
         }
     }
@@ -230,4 +230,3 @@ internal fun PlayModeRow(current: AnimationPlayMode, onChange: (AnimationPlayMod
     Label(animatorText("play_mode"))
     Pills(AnimationPlayMode.entries, current, { it.name.lowercase() }, onChange)
 }
-

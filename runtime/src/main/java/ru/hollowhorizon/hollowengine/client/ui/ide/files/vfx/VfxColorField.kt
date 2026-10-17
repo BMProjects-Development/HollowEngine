@@ -3,12 +3,14 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
@@ -57,7 +59,7 @@ fun VfxColorRow(
                         event.consume()
                     },
             )
-            InspectorIcon(KeyframeIcon, vfxText("driven_show")) { focus(property) }
+            InspectorIconButton(KeyframeIcon, vfxText("driven_show"), tags = listOf("insp-inline-icon")) { focus(property) }
         }
         if (open) {
             Popup(anchorBounds = anchor, id = "vfx-color-popup", tags = listOf("vfx-popup"), onDismiss = { open = false }) {
@@ -153,16 +155,19 @@ private fun GradientEditor(value: VfxColorValue.Gradient, onChange: (VfxColorVal
                         },
                 )
                 Text(vfxText("stop_at"), modifier = Modifier.fontSize(8f).foreground(HintTint))
-                VfxNumberCellInline(stop.position) { position ->
+                NumberField(
+                    value = stop.position.toDouble(),
+                    modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+                ) { position ->
                     onChange(
                         value.copy(
                             gradient = value.gradient.withStop(
-                                index, stop.copy(position = position.coerceIn(0f, 1f))
+                                index, stop.copy(position = position.toFloat().coerceIn(0f, 1f))
                             )
                         )
                     )
                 }
-                InspectorIcon(RemoveIcon, vfxText("key_remove")) {
+                InspectorIconButton(RemoveIcon, vfxText("key_remove"), tags = listOf("insp-inline-icon")) {
                     onChange(value.copy(gradient = value.gradient.withoutStop(index)))
                 }
             }
@@ -243,7 +248,7 @@ private fun ColorKindPicker(current: String, onChange: (VfxColorValue) -> Unit) 
     var anchor by remember { mutableStateOf(UiRect.Zero) }
 
     Box(modifier = Modifier.onPlaced { anchor = it }) {
-        InspectorIcon(colorKindIcon(current), vfxText("color_$current")) { open = true }
+        InspectorIconButton(colorKindIcon(current), vfxText("color_$current"), tags = listOf("insp-inline-icon")) { open = true }
     }
     if (!open) return
 

@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.Row
 import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.inspector.FloatRow
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
@@ -17,6 +16,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.Pills
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
 import ru.hollowhorizon.hollowengine.client.ui.inspector.TextRow
 import ru.hollowhorizon.hollowengine.client.ui.inspector.assetCompletions
+import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackAction
 import ru.hollowhorizon.hollowengine.common.playback.PlaybackRule
@@ -62,7 +62,7 @@ private fun EventFields(lanes: PlaybackLanes, index: Int, hint: String, onRemove
     Column(tags = listOf("insp-body")) {
         Section(playbackText("event"), help = hint) {
             NameRow(playbackText("name"), event.name) { value -> lanes.editEvent(index) { it.copy(name = value) } }
-            FloatRow(playbackText("time"), event.time, min = 0f) { value -> lanes.editEvent(index) { it.copy(time = value) } }
+            NumberRow(playbackText("time"), event.time, min = 0f) { value -> lanes.editEvent(index) { it.copy(time = value) } }
         }
         InspectorButton(playbackText("remove_event"), tags = listOf("danger")) {
             lanes.removeEvent(index)
@@ -86,8 +86,8 @@ private fun SectionFields(
     Column(tags = listOf("insp-body")) {
         Section(playbackText("section"), help = playbackText("section_hint")) {
             NameRow(playbackText("name"), section.name.ifBlank { section.id }) { value -> edit { it.copy(name = value) } }
-            FloatRow(playbackText("start"), section.start, min = 0f) { value -> edit { it.copy(start = value) } }
-            FloatRow(playbackText("end"), section.end, min = 0f) { value -> edit { it.copy(end = value) } }
+            NumberRow(playbackText("start"), section.start, min = 0f) { value -> edit { it.copy(start = value) } }
+            NumberRow(playbackText("end"), section.end, min = 0f) { value -> edit { it.copy(end = value) } }
         }
         Rules(
             title = playbackText("before"),
