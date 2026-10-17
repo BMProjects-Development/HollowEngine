@@ -1,6 +1,13 @@
 {
   "properties": "Properties",
+  "snap": "Snap to frames",
+  "snap.fps": "Frames per second the timeline snaps to",
+  "snap.unit": "fps",
   "tracks": "Tracks",
+  "tracks.listing": "Which objects have tracks",
+  "tracks.only_selected": "Only the selected",
+  "tracks.show_all": "Show all",
+  "tracks.hide_unselected": "Hide all but the selected",
   "view.dope_sheet": "Dope sheet",
   "view.curves": "Curves",
   "view.frame_curves": "Frame curves",

@@ -46,6 +46,15 @@ object HollowEngineConfig : Config() {
     @PropertyName("transform_gizmo_orientation")
     var gizmoOrientation by property(GizmoOrientation.GLOBAL.name)
 
+    @PropertyComment("Whether the timeline snaps times to frames: keys, the playhead, blocks")
+    @PropertyName("timeline_snap")
+    var timelineSnap by property(true)
+
+    @PropertyComment("Frames per second the timeline snaps times to")
+    @PropertyName("timeline_snap_fps")
+    @PropertyRange(1.0f, 240.0f)
+    var timelineSnapFps by property(20)
+
     @PropertyComment("Whether nodes dragged in a graph land on its grid")
     @PropertyName("graph_snap_to_grid")
     var graphSnapToGrid by property(false)

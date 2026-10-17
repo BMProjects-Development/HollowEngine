@@ -62,6 +62,35 @@ class SnapshotStep<T : Any>(
     override fun merge(next: UndoStep): UndoStep? = takeIf { next is SnapshotStep<*> && next.owner === owner }
 }
 
+/** A step with what it changed besides itself attached ([UndoHistory.attach]), taken back and done again as one. */
+internal class JoinedStep(private val main: UndoStep, private val parts: List<UndoStep>) : UndoStep {
+    override val label: UndoLabel get() = main.label
+
+    override val cost: Int get() = main.cost + parts.sumOf { it.cost }
+
+    override val isEmpty: Boolean get() = main.isEmpty && parts.all { it.isEmpty }
+
+    override fun undo(): Boolean {
+        val taken = parts.asReversed().fold(false) { taken, step -> step.undo() || taken }
+        return main.undo() || taken
+    }
+
+    override fun redo(): Boolean {
+        val done = main.redo()
+        return parts.fold(done) { done, step -> step.redo() || done }
+    }
+
+    override fun merge(next: UndoStep): UndoStep? = main.merge(next)?.let { JoinedStep(it, parts) }
+
+    companion object {
+        fun join(last: UndoStep, step: UndoStep): UndoStep {
+            val joined = last as? JoinedStep ?: JoinedStep(last, emptyList())
+            val merged = joined.parts.lastOrNull()?.merge(step)
+            return JoinedStep(joined.main, if (merged != null) joined.parts.dropLast(1) + merged else joined.parts + step)
+        }
+    }
+}
+
 /** Steps taken as one, such as everything a gesture changed across several owners. */
 internal class CompositeStep(override val label: UndoLabel, private val steps: List<UndoStep>) : UndoStep {
     override val cost: Int get() = steps.sumOf { it.cost }

@@ -374,7 +374,7 @@ object HollowIdeOverlay {
         if (!isVisible()) return false
         if (isGameCaptured) return false
         pipeline.await()
-        val point = hollowIdeOverlayPoint(x, y)
+        val point = HollowIdePointerWrap.wrap(hollowIdeOverlayPoint(x, y))
         val deltaX = point.x - lastMouseX
         val deltaY = point.y - lastMouseY
         lastMouseX = point.x
@@ -398,7 +398,7 @@ object HollowIdeOverlay {
         if (nativeFileDragActive) return true
         if (!isVisible()) return false
         pipeline.await()
-        val point = hollowIdeOverlayPoint(x, y)
+        val point = HollowIdePointerWrap.wrap(hollowIdeOverlayPoint(x, y))
 
         settleGesture()
         return when (action) {

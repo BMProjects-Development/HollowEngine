@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
@@ -93,7 +94,7 @@ internal fun TimelineCurveGraph(
             }.onRelease { event ->
                 if (event.isRightClick()) {
                     if (!pan.moved) {
-                        val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd, event.modifiers)
+                        val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
                         menu = TimelineMenuState(pan.pressX, pan.pressY, null, time, locked = false)
                     }
                     pan.moved = false
@@ -227,7 +228,7 @@ private fun CurveKeyPoint(
                 val focus = controller.dragFocusKeyframe ?: return@onDrag
                 val origin = controller.dragStartTimes?.get(focus) ?: focus.time
                 val delta = timelineTimeDelta(event.dragTotalX, pxPerSec)
-                val time = snapTimelineTime(origin + delta, event.modifiers)
+                val time = snapTimelineTime(origin + delta)
                 controller.applyCurveDrag(time - origin, -event.dragTotalY / pxPerValue)
                 event.consume()
                 refresh()
@@ -428,12 +429,22 @@ private fun Modifier.panCurveOnDrag(
     pan: TimelinePanGesture,
     refresh: () -> Unit,
 ): Modifier {
+    val zoom = remember { TimelineZoomDrag() }
     return this.onPress { event ->
-        if (!event.isMiddleClick() && !event.isRightClick()) return@onPress
+        if (zoom.begin(event, controller, scroll, event.localX)) {
+            event.consume()
+            return@onPress
+        }
+        if (!isPanPress(event)) return@onPress
         pan.begin(event, scroll.offsetX, scroll.offsetY, controller.curveAxis.targetCenter)
         event.consume()
     }.onDrag { event ->
-        if (!event.isMiddleClick() && !event.isRightClick()) return@onDrag
+        if (zoom.drag(event, controller, scroll, values = true)) {
+            event.consume()
+            refresh()
+            return@onDrag
+        }
+        if (!isPanPress(event)) return@onDrag
         if (!pan.advance(event)) return@onDrag
         scroll.scrollTo(x = (pan.scrollX - event.dragTotalX).coerceAtLeast(0f))
         controller.curveAxis.snapTo(
@@ -442,8 +453,12 @@ private fun Modifier.panCurveOnDrag(
         )
         event.consume()
         refresh()
-    }
+    }.onRelease { zoom.end() }
 }
+
+/** The keymap's pan drag, or the right button, which pans the graph too and opens its menu on a click. */
+private fun isPanPress(event: UiEvent): Boolean =
+    event.isRightClick() || HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
 
 private fun keysInCurveMarquee(
     lanes: List<CurveLane>,

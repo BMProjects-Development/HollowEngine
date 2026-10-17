@@ -19,6 +19,8 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInsertMenu
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PREVIEW_RESET_ICON
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
@@ -27,14 +29,13 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.PublishTimeline
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.hasInspectableSelection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.*
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val AutoSaveDelayMillis = 900L
@@ -101,10 +102,11 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
             null
         )
         val bone = rigState.selected
-        val part = rigState.selectedPart
-        if (bone != null) session.touchBone(bone)
-        document.montage.attachments.filter { it.bone == bone }.forEach { session.touchAttachment(bone, it.spec.id) }
-        if (part != null && state.rigs.rig.holder(bone).attachment(part) != null) session.touchAttachment(bone, part)
+        if (bone == null && rigState.selectedPart == null && state.sceneLane != null) return@LaunchedEffect
+        state.sceneLane = null
+        val part = rigState.selectedPart?.takeIf { state.rigs.rig.holder(bone).attachment(it) != null }
+        val attachments = document.montage.attachments.filter { it.bone == bone }.map { it.spec.id }
+        session.select(bone, attachments + listOfNotNull(part))
     }
 
     val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
@@ -122,6 +124,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
             document.revision,
             model,
             rigState.selected,
+            state.sceneLane,
             rigState.expanded.toList(),
             rigState.rootExpanded,
             viewer.nodeVisibilityRevision
@@ -158,11 +161,14 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
             key(rigState) {
                 RigViewport(state.rigs, rigState, null) { input ->
                     val keying = !input.repeat && HollowKeys.INSERT_KEY.matches(input)
-                    if (keying) session.keyPicked(rigState.selected, rigState.selectedPart)
+                    if (keying) state.keyMenu = rigState.pointerOnSurface()
                     keying
                 }
             }
             Toolbar(state)
+            KeyInsertMenu(state.keyMenu, onPick = { parts -> session.keyPicked(rigState.selected, rigState.selectedPart, parts) }) {
+                state.keyMenu = null
+            }
             if (document.montage.previewModel.isBlank()) Text(
                 montageText("no_preview_model"),
                 modifier = Modifier.position(8.px, 32.px).fontSize(10f).foreground(AnimatorColors.Muted)
@@ -214,6 +220,12 @@ private fun Toolbar(state: MontageEditorState) {
 internal class MontageEditorState(val document: HollowIdeMontageDocument, private val path: String) {
     val title: String = path.substringAfterLast('/').substringBeforeLast('.')
 
+    /** The clips, the events or the sections, when the scene picked them in place of a bone; null otherwise. */
+    var sceneLane by mutableStateOf<String?>(null)
+
+    /** Where the insert-key menu is open, at the pointer over the preview; null while it is closed. */
+    var keyMenu by mutableStateOf<UiRect?>(null)
+
     /** What the montage hangs on its preview model, as the rig editors edit it. */
     val rigs = MontageRigEditing(document) { RigAssets.of(previewModel.takeIf(String::isNotBlank)?.rl) }
 
@@ -234,16 +246,11 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
         rigs.recording = { session.timeline.isRecording }
         rigs.animated = session::isAnimated
         rigs.onFieldKey = session::keyField
-        rigs.onBonePose = { bone, pose ->
-            session.keyBone(bone, MontageBoneProperty.POSITION, pose.position)
-            val turned = eulerRotationXyz(session.boneValue(bone, MontageBoneProperty.ROTATION))
-            if (abs(turned.dot(pose.rotation)) < SAME_TURN) session.keyBone(
-                bone,
-                MontageBoneProperty.ROTATION,
-                pose.rotation.eulerDegreesXyz()
-            )
-            session.keyBone(bone, MontageBoneProperty.SCALE, pose.scale)
-        }
+        rigs.onBoneHold = session::holdBone
+        rigs.onFieldHold = session::holdFields
+        rigs.held = session::withHeldFields
+        rigs.heldBones = session::withHeldBones
+        rigs.onBonePose = session::keyPose
     }
 
     /** The data the preview plays the montage with, in place of an entity, which its sections' rules read. */
@@ -299,7 +306,7 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
         override val blendMode: LayerBlendMode = LayerBlendMode.Override
 
         override fun sample(target: PoseTarget, context: AnimatorEvaluationContext): LayerPose {
-            val montage = document.montage
+            val montage = session.withHeldBones(document.montage)
             val time = session.timeline.currentTime.coerceIn(0f, montage.duration)
             context.montages += MontageMoment(montage, time, 1f)
             return LayerPose(MontageSampler.sample(montage, time, target, target.nodesByIndex.keys))
@@ -319,8 +326,8 @@ private const val EventsIcon = "hollowengine:textures/gui/icons/timeline/key_add
 private const val SectionsIcon = "hollowengine:textures/gui/icons/loops.svg"
 
 /**
- * The scene of the montage: the clips and the events as objects of their own above the model, which open their
- * lanes on the timeline when picked, and the model's bones with what the montage hangs on them.
+ * The scene of the montage: the clips, the events and the sections as objects of their own above the model, which
+ * are picked like bones and open their lanes on the timeline, and the model's bones with what the montage hangs on them.
  */
 private fun montageSceneTarget(state: MontageEditorState, bones: SceneTarget): SceneTarget {
     val session = state.session
@@ -332,8 +339,14 @@ private fun montageSceneTarget(state: MontageEditorState, bones: SceneTarget): S
         icon = icon,
         hasChildren = false,
         expanded = false,
-        selected = false,
+        selected = state.sceneLane == id,
     )
+
+    fun pickLane(id: String, lane: SegmentLane) {
+        state.sceneLane = id
+        state.rigState.select(null)
+        session.selectLane(lane)
+    }
     return SceneTarget(
         id = bones.id,
         items = listOf(
@@ -343,9 +356,9 @@ private fun montageSceneTarget(state: MontageEditorState, bones: SceneTarget): S
         ) + bones.items,
         onSelect = { id ->
             when (id) {
-                ClipsItem -> session.show(session.clipLane)
-                EventsItem -> session.show(session.playback.eventLane)
-                SectionsItem -> session.show(session.playback.sectionLane)
+                ClipsItem -> pickLane(id, session.clipLane)
+                EventsItem -> pickLane(id, session.playback.eventLane)
+                SectionsItem -> pickLane(id, session.playback.sectionLane)
                 else -> bones.onSelect(id)
             }
         },

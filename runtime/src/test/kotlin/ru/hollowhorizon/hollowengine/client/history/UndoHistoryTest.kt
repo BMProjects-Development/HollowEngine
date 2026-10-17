@@ -154,4 +154,44 @@ class UndoHistoryTest {
         assertEquals(2, history.position)
         assertEquals(listOf("undo c", "undo b", "undo a", "redo a", "redo b"), log)
     }
+
+    @Test
+    fun `an attached step is undone with the edit it goes with, which still merges on`() {
+        val history = history()
+        val value = Value("a")
+        val held = Value("x")
+        value.set("b", history, mergeKey = "typing")
+        history.attach(SnapshotStep(held, UndoLabel("held"), held.current, { held.current }, { held.current = it }))
+        held.current = "y"
+        value.set("c", history, mergeKey = "typing")
+        history.attach(SnapshotStep(held, UndoLabel("held"), held.current, { held.current }, { held.current = it }))
+        held.current = "z"
+
+        assertEquals(1, history.steps.size)
+        assertTrue(history.undo())
+        assertEquals("a", value.current)
+        assertEquals("x", held.current)
+        assertTrue(history.redo())
+        assertEquals("c", value.current)
+        assertEquals("z", held.current)
+    }
+
+    @Test
+    fun `steps attached inside a transaction do not split the steps they go with`() {
+        val history = history()
+        val value = Value("a")
+        val held = Value("x")
+        history.transaction {
+            listOf("b", "c").forEach { next ->
+                value.set(next, history)
+                history.attach(SnapshotStep(held, UndoLabel("held"), held.current, { held.current }, { held.current = it }))
+                held.current = next.uppercase()
+            }
+        }
+
+        assertEquals(1, history.steps.size)
+        assertTrue(history.undo())
+        assertEquals("a", value.current)
+        assertEquals("x", held.current)
+    }
 }

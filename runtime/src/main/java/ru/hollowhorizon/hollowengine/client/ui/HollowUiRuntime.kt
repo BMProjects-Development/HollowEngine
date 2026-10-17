@@ -274,6 +274,8 @@ class HollowUiRuntime(
             else -> scrolledOnly(layoutKey)?.let { previous ->
                 layoutPipeline.rescroll(root, previous, scrollState, profile)
             } ?: layoutPipeline.compute(root, width, height, scrollState, profile)
+        }.let { placed ->
+            if (scrollState.takeSettled()) layoutPipeline.rescroll(root, placed, scrollState, profile) ?: placed else placed
         }
         lastLayout = layout
         lastLayoutKey = layoutKey

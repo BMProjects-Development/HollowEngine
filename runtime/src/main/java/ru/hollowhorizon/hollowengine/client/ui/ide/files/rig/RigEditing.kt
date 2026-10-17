@@ -20,12 +20,6 @@ interface RigEditing : UndoOwner {
     /** Replaces the rig with what [change] makes of it, as a step called [label] in the history. */
     fun edit(mergeKey: String? = null, label: UndoLabel? = null, change: (ModelRig) -> ModelRig)
 
-    /**
-     * Whether the gizmo leaves [part] on [bone] alone, as an editor whose timeline animates its placement does
-     * while keys are not being recorded.
-     */
-    fun isLocked(bone: String?, part: String): Boolean = false
-
     /** Starts a gesture, such as dragging a handle, that should go back in one step. */
     fun beginGesture()
 

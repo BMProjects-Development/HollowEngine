@@ -145,7 +145,7 @@ private fun KeyframeSection(
     Section(title) {
         Readonly(CutsceneLang.CHANNEL.lang, channelPath(controller, curve))
         FloatRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
-            controller.nudgeSelectedKeyframes(snapTimelineTime(time, currentUiKeyModifiers()) - keyframe.time)
+            controller.nudgeSelectedKeyframes(snapTimelineTime(time) - keyframe.time)
             refresh()
         }
         if (curve.spec.valueOptions.isEmpty()) {
@@ -297,7 +297,7 @@ private fun applyTangent(
 private fun WorkAreaSection(controller: TimelineController, refresh: () -> Unit) {
     Section(CutsceneLang.WORK_AREA.lang) {
         FloatRow(CutsceneLang.END.lang, controller.workAreaEnd, min = 0.1f, max = Float.POSITIVE_INFINITY) { time ->
-            controller.workAreaEnd = snapTimelineTime(time, currentUiKeyModifiers()).coerceAtLeast(0.1f)
+            controller.workAreaEnd = snapTimelineTime(time).coerceAtLeast(0.1f)
             if (controller.currentTime > controller.workAreaEnd) controller.applyCurrentTime(0f)
             refresh()
         }

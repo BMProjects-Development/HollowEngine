@@ -186,9 +186,11 @@ private fun CaptureChip(capture: KeymapCapture, onEnd: () -> Unit) {
             .onKeyInput(priority = 100) { input ->
                 input.consume()
                 when {
-                    input.repeat || HollowKeyChord.isModifierKey(input.key) -> Unit
+                    input.repeat -> Unit
+                    HollowKeyChord.isModifierKey(input.key) ->
+                        if (HollowInputKind.HOLD in action.kinds) take(HollowKeyChord.key(input.key))
                     input.key == GLFW.GLFW_KEY_ESCAPE && input.modifiers == 0 -> onEnd()
-                    HollowInputKind.KEY in action.kinds -> take(HollowKeyChord.key(input.key, input.modifiers))
+                    HollowInputKind.KEY in action.kinds || HollowInputKind.HOLD in action.kinds -> take(HollowKeyChord.key(input.key, input.modifiers))
                 }
             }.onPress { event ->
                 event.consume()

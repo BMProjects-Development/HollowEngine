@@ -322,6 +322,21 @@ interface PropertyType<T> {
     fun compose(values: FloatArray): T
 }
 
+/**
+ * Which objects of an editor have rows in the track list, as the menu by the list asks: an editor whose objects
+ * the author picks in a scene provides it.
+ */
+interface TrackListing {
+    /** Whether only the objects selected in the editor have rows. */
+    var onlySelected: Boolean
+
+    /** Gives every object its rows back, with the tracks the author closed, and lists more than the selection. */
+    fun showAll()
+
+    /** Closes the rows of every object but the selected ones. */
+    fun hideUnselected()
+}
+
 class TrackGroup(name: String) {
     var nameState by mutableStateOf(name)
     var isCollapsed by mutableStateOf(false)
@@ -333,7 +348,7 @@ class TrackGroup(name: String) {
 
     /** Whether anything of this group has a row, which is what decides whether the group has one. */
     val hasListedContent: Boolean
-        get() = isListed || lanes.any { it.isListed } || properties.any { it.isListed } || children.any { it.hasListedContent }
+        get() = isListed || lanes.any { it.isShown } || properties.any { it.isListed } || children.any { it.hasListedContent }
 
     /** Rows of segments shown under the group's own row, above its properties. */
     val lanes = mutableStateListOf<SegmentLane>()

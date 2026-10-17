@@ -227,7 +227,7 @@
   "curve_open": "Click to open the curve editor",
   "curve_title": "Curve",
   "close": "Close",
-  "driven_hint": "Timeline keys set this value. Remove the keys, or turn on auto-key on the timeline, to edit it here.",
+  "driven_hint": "Timeline keys set this value. A new value shows until the playhead moves; press I to key it, or turn on auto-key to key every edit.",
   "driven_record_hint": "Auto-key is on: a new value becomes a key at the playhead.",
   "driven_show": "Show the track on the timeline",
   "curve_fade_out": "Fade out",

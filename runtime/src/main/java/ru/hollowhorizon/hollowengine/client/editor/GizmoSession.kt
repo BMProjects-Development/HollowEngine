@@ -53,6 +53,10 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
 
     private var held: GizmoTarget? = null
 
+    /** How far the pointer of a keyboard transform was moved by wrapping around the view, added back to it. */
+    private var shiftX = 0f
+    private var shiftY = 0f
+
     /** Whether a drag or a keyboard transform holds the target. */
     val isBusy: Boolean get() = drag != null || keyboard != null
 
@@ -111,8 +115,15 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
     /** The pointer moved while a keyboard transform runs; false when none does. */
     fun moveTo(x: Float, y: Float, modifiers: Int): Boolean {
         val transform = keyboard ?: return false
-        transform.update(x, y, modifiers)?.let { held?.place(it, transform.mode) }
+        transform.update(x + shiftX, y + shiftY, modifiers)?.let { held?.place(it, transform.mode) }
         return true
+    }
+
+    /** The pointer of a keyboard transform was wrapped around the view by ([dx], [dy]); it goes on from where it was. */
+    fun shiftPointer(dx: Float, dy: Float) {
+        if (keyboard == null) return
+        shiftX += dx
+        shiftY += dy
     }
 
     /**
@@ -139,6 +150,8 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
         val mode = GizmoKeyboardTransform.modeFor(key, modifiers) ?: return false
         if (!target.canEdit(mode)) return true
         held = target
+        shiftX = 0f
+        shiftY = 0f
         target.beginEdit()
         keyboard =
             GizmoKeyboardTransform(mode, target.values, x, y, projector, geometry, manipulator).also { hint = it.hint }

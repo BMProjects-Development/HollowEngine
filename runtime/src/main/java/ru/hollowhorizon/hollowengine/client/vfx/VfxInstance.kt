@@ -247,10 +247,19 @@ class VfxInstance(
         return true
     }
 
+    /**
+     * What an editor holds over the tracks, by node and property: an edit shown until the playhead moves, written
+     * over what the timeline says. Null where nothing is held.
+     */
+    var held: (nodeId: String, property: VfxProperty) -> FloatArray? = { _, _ -> null }
+
+    /** Places the nodes again where they are now, for an editor that changed what it holds. */
+    fun repose() = pose()
+
     /** Places every node for the current time: the authored transform, then the timeline over it. */
     private fun pose() {
         nodes.forEach { it.reset() }
-        if (!timeline.isEmpty) timeline.apply(timelineTime)
+        if (!timeline.isEmpty) timeline.apply(timelineTime, held)
         nodes.forEach { it.place(root) }
         allNodes.forEach { it.fillContext() }
     }
@@ -395,9 +404,9 @@ class VfxTimelinePlayer(private val spec: VfxTimelineSpec, nodes: List<VfxNodeRu
         tracks = spec.tracks.mapNotNull { track -> prepare(track, byId) }
     }
 
-    /** Writes the tracks at [time] of the timeline onto their nodes. */
-    fun apply(time: Float) {
-        tracks.forEach { track -> apply(track, time) }
+    /** Writes the tracks at [time] of the timeline onto their nodes, with what [held] has over them. */
+    fun apply(time: Float, held: (String, VfxProperty) -> FloatArray? = { _, _ -> null }) {
+        tracks.forEach { track -> apply(track, time, held(track.node.spec.id, track.property)) }
     }
 
     private fun prepare(track: VfxTrack, byId: Map<String, VfxNodeRuntime>): PreparedTrack? {
@@ -415,7 +424,7 @@ class VfxTimelinePlayer(private val spec: VfxTimelineSpec, nodes: List<VfxNodeRu
         return PreparedTrack(node, track.property, channels, property.read(), curves, drive)
     }
 
-    private fun apply(track: PreparedTrack, time: Float) {
+    private fun apply(track: PreparedTrack, time: Float, held: FloatArray?) {
         for (channel in 0 until track.channels) {
             values[channel] = track.defaults.getOrElse(channel) { 0f }
         }
@@ -434,6 +443,7 @@ class VfxTimelinePlayer(private val spec: VfxTimelineSpec, nodes: List<VfxNodeRu
         track.curves.forEach { (channel, curve) ->
             values[channel] = curve.valueAt(time, values[channel])
         }
+        held?.let { for (channel in 0 until track.channels) values[channel] = it.getOrElse(channel) { values[channel] } }
 
         when (track.property) {
             VfxProperty.ENABLED -> track.node.enabled = values[0] >= 0.5f

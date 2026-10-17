@@ -205,6 +205,12 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
     var pointerY = 0f
         private set
 
+    /** Where the preview is on the surface, for a menu opened at the pointer. */
+    internal var viewportBounds = UiRect.Zero
+
+    /** The pointer as a point on the surface, which a popup anchors to. */
+    fun pointerOnSurface(): UiRect = UiRect(viewportBounds.x + pointerX, viewportBounds.y + pointerY, 0f, 0f)
+
     /** Set by a press the gizmo took, so the click that follows does not change the selection. */
     internal var swallowClick = false
 
@@ -245,7 +251,6 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
     /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
     fun selectedFrame(): RigGizmoFrame? {
         val selection = partSelection ?: return null
-        if (document.isLocked(selection.bone, selection.id)) return null
         if (selection.id == BONE_POSE_PART) {
             val bone = selection.bone ?: return null
             val node =

@@ -53,6 +53,12 @@ class SegmentLane(
     /** Whether the lane has a row in the track list; the owner decides, and the author can close it. */
     var isListed by mutableStateOf(true)
 
+    /** Whether the track list's filter leaves the lane out for now, whatever [isListed] says. */
+    var isFiltered by mutableStateOf(false)
+
+    /** Whether the lane has a row: listed, and not left out by the filter. */
+    val isShown: Boolean get() = isListed && !isFiltered
+
     /** Whether a segment is being dragged across rows, which gives the lane a free row to drop it on. */
     var isRearranging by mutableStateOf(false)
 

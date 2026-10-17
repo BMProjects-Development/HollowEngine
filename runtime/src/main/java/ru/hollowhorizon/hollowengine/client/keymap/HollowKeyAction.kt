@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.keymap
 
+import net.minecraft.client.Minecraft
+import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -34,6 +36,18 @@ class HollowKeyAction(
     fun matchesMouse(button: Int, modifiers: Int): Boolean = bindings.any { it.matchesMouse(button, modifiers) }
 
     fun matchesWheel(modifiers: Int): Boolean = bindings.any { it.matchesWheel(modifiers) }
+
+    /** Whether a key or button bound to it is down right now, for an action that is held rather than pressed. */
+    fun isHeld(): Boolean {
+        val window = Minecraft.getInstance().window.window
+        return bindings.any { chord ->
+            when (val input = chord.input) {
+                is HollowInput.Key -> GLFW.glfwGetKey(window, input.code) == GLFW.GLFW_PRESS
+                is HollowInput.Mouse -> GLFW.glfwGetMouseButton(window, input.button) == GLFW.GLFW_PRESS
+                HollowInput.Wheel -> false
+            }
+        }
+    }
 
     /** The first chord as shown in menus and tooltips, or null when nothing is bound. */
     val shortcut: String? get() = bindings.firstOrNull()?.displayText

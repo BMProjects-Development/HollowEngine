@@ -1,11 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSegment
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
@@ -350,7 +350,7 @@ private fun drag(
     pxPerSec: Float,
     row: Int? = null,
 ) {
-    val magnets = if (modifiers and GLFW.GLFW_MOD_CONTROL != 0) emptyList()
+    val magnets = if (TimelineSnap.isFree) emptyList()
     else lane.segments.filter { it !== segment }.flatMap { listOf(it.start, it.end) } + controller.currentTime + 0f
     val reach = MagnetPixels / pxPerSec
     fun stick(time: Float): Float? = magnets.minByOrNull { abs(it - time) }?.takeIf { abs(it - time) <= reach }
@@ -358,7 +358,7 @@ private fun drag(
     val end = drag.start + drag.length
     when (drag.grip) {
         SegmentGrip.MOVE -> {
-            var start = snapTimelineTime(drag.start + delta, modifiers)
+            var start = snapTimelineTime(drag.start + delta)
             val byStart = stick(start)
             val byEnd = stick(start + segment.length)
             start = when {
@@ -380,7 +380,7 @@ private fun drag(
 
         SegmentGrip.START -> {
             val left = if (lane.exclusive) lane.gap(segment).first else 0f
-            val wanted = snapTimelineTime(drag.start + delta, modifiers).let { stick(it) ?: it }
+            val wanted = snapTimelineTime(drag.start + delta).let { stick(it) ?: it }
             val start = wanted.coerceIn(left, end - MinLength)
             segment.start = start
             segment.length = end - start
@@ -389,7 +389,7 @@ private fun drag(
 
         SegmentGrip.END -> {
             val right = if (lane.exclusive) lane.gap(segment).second else Float.MAX_VALUE
-            val wanted = snapTimelineTime(end + delta, modifiers).let { stick(it) ?: it }
+            val wanted = snapTimelineTime(end + delta).let { stick(it) ?: it }
             segment.length = (wanted.coerceAtMost(right) - drag.start).coerceAtLeast(MinLength)
             segment.fadeOut = drag.fadeOut.coerceAtMost(segment.length - segment.fadeIn)
         }

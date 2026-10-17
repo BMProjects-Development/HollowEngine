@@ -17,6 +17,15 @@ internal fun hollowIdeOverlayPoint(x: Float, y: Float): HollowIdeOverlayPoint {
     )
 }
 
+/** Where the window's cursor is for [x], [y] in the IDE's coordinates: [hollowIdeOverlayPoint] taken back. */
+internal fun hollowIdeCursorPoint(x: Float, y: Float): HollowIdeOverlayPoint {
+    val window = Minecraft.getInstance().window
+    return HollowIdeOverlayPoint(
+        x = x * window.screenWidth / HollowIdeScale.scaledWidth(),
+        y = y * window.screenHeight / HollowIdeScale.scaledHeight(),
+    )
+}
+
 /**
  * Turns a pointer in the pixels of the target the world was drawn into.
  */

@@ -11,6 +11,13 @@ import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 object TimelineKeys {
     private const val NUDGE_SMALL = 0.05f
     private const val NUDGE_LARGE = 0.25f
+    private const val FRAMES_FAR = 10
+
+    /** One frame while times snap to frames, otherwise a twentieth of a second. */
+    private val nudge: Float get() = TimelineSnap.frame ?: NUDGE_SMALL
+
+    /** Ten frames while times snap to frames, otherwise a quarter of a second. */
+    private val nudgeFar: Float get() = TimelineSnap.frame?.let { it * FRAMES_FAR } ?: NUDGE_LARGE
 
     /** What each action does to the timeline; false when it had nothing to act on, so the key goes on. */
     private val commands: List<Pair<HollowKeyAction, (TimelineController) -> Boolean>> = listOf(
@@ -32,10 +39,10 @@ object TimelineKeys {
         HollowKeys.COPY to { it.copySelectedKeyframes().let { true } },
         HollowKeys.CUT to { it.cutSelectedKeyframes().let { true } },
         HollowKeys.PASTE to { it.pasteKeyframes().let { true } },
-        HollowKeys.NUDGE_LEFT to { moveSelectionOrPlayhead(it, -NUDGE_SMALL) },
-        HollowKeys.NUDGE_RIGHT to { moveSelectionOrPlayhead(it, NUDGE_SMALL) },
-        HollowKeys.NUDGE_LEFT_FAR to { moveSelectionOrPlayhead(it, -NUDGE_LARGE) },
-        HollowKeys.NUDGE_RIGHT_FAR to { moveSelectionOrPlayhead(it, NUDGE_LARGE) },
+        HollowKeys.NUDGE_LEFT to { moveSelectionOrPlayhead(it, -nudge) },
+        HollowKeys.NUDGE_RIGHT to { moveSelectionOrPlayhead(it, nudge) },
+        HollowKeys.NUDGE_LEFT_FAR to { moveSelectionOrPlayhead(it, -nudgeFar) },
+        HollowKeys.NUDGE_RIGHT_FAR to { moveSelectionOrPlayhead(it, nudgeFar) },
         HollowKeys.TO_START to { it.applyCurrentTime(0f).let { true } },
     )
 

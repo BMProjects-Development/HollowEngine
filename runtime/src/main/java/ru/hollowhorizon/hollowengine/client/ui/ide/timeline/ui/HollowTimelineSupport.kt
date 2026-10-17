@@ -1,12 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineSnap
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TrackGroup
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
@@ -20,7 +20,6 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.round
 
 internal const val TimelineRulerHeight = 18f
 
@@ -95,7 +94,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
     var y = TimelineRulerHeight
 
     fun appendLane(lane: SegmentLane, depth: Int, locked: Boolean, visible: Boolean) {
-        if (curveEditorOnly || !lane.isListed) return
+        if (curveEditorOnly || !lane.isShown) return
         val height = lane.rowCount * TimelineSegmentRowHeight
         rows += TimelineRow(
             id = "timeline-lane-${System.identityHashCode(lane)}",
@@ -200,17 +199,10 @@ internal fun timelineContentWidth(
     return max(TimelineMinContentWidth, max(max(endWidth, keyWidth), viewportWidth))
 }
 
-internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float, modifiers: Int = 0): Float =
-    snapTimelineTime((localX - TimelineLeftPadding) / pixelsPerSecond, modifiers).coerceIn(0f, workAreaEnd)
+internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float): Float =
+    snapTimelineTime((localX - TimelineLeftPadding) / pixelsPerSecond).coerceIn(0f, workAreaEnd)
 
-internal fun snapTimelineTime(time: Float, modifiers: Int): Float {
-    val step = when {
-        modifiers and GLFW.GLFW_MOD_ALT != 0 -> 1f
-        modifiers and GLFW.GLFW_MOD_SHIFT != 0 -> 0.5f
-        else -> return time
-    }
-    return round(time / step) * step
-}
+internal fun snapTimelineTime(time: Float): Float = TimelineSnap.snap(time)
 
 internal fun timelineTimeDelta(deltaX: Float, pixelsPerSecond: Float): Float {
     return deltaX / pixelsPerSecond.coerceAtLeast(1f)
@@ -309,16 +301,16 @@ private const val PlayheadMagnetPixels = 6f
 
 /**
  * [time] moved onto the nearest key of a listed track, or edge of a segment, within a few pixels, so a key can be
- * changed in place by recording over it; Ctrl lets the playhead go anywhere.
+ * changed in place by recording over it; the free-move key lets the playhead go anywhere.
  */
-internal fun TimelineController.snapPlayhead(time: Float, pxPerSec: Float, modifiers: Int): Float {
-    if (modifiers and GLFW.GLFW_MOD_CONTROL != 0) return time
+internal fun TimelineController.snapPlayhead(time: Float, pxPerSec: Float): Float {
+    if (TimelineSnap.isFree) return time
     val reach = PlayheadMagnetPixels / pxPerSec
     val keys = allProperties().filter { it.isListed }.flatMap { property -> property.curves.flatMap { curve -> curve.keyframes.map { it.time } } }
-    val lanes = lanes.filter { it.isListed } + groups.flatMap(::listedLanes)
+    val lanes = lanes.filter { it.isShown } + groups.flatMap(::listedLanes)
     val edges = lanes.flatMap { lane -> lane.segments.flatMap { listOf(it.start, it.end) } }
     return (keys + edges).minByOrNull { abs(it - time) }?.takeIf { abs(it - time) <= reach } ?: time
 }
 
 private fun listedLanes(group: TrackGroup): List<SegmentLane> =
-    group.lanes.filter { it.isListed } + group.children.flatMap(::listedLanes)
+    group.lanes.filter { it.isShown } + group.children.flatMap(::listedLanes)

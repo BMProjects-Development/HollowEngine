@@ -73,6 +73,13 @@ object HollowKeys {
     val NUDGE_RIGHT = action("timeline.nudge_right", TIMELINE, key(GLFW.GLFW_KEY_RIGHT))
     val NUDGE_LEFT_FAR = action("timeline.nudge_left_far", TIMELINE, key(GLFW.GLFW_KEY_LEFT, SHIFT))
     val NUDGE_RIGHT_FAR = action("timeline.nudge_right_far", TIMELINE, key(GLFW.GLFW_KEY_RIGHT, SHIFT))
+    val WHEEL_ZOOM_TIME = wheel("timeline.wheel_zoom_time", TIMELINE, HollowKeyChord.wheel())
+    val WHEEL_ALONG_TIME = wheel("timeline.wheel_along_time", TIMELINE, HollowKeyChord.wheel(CONTROL))
+    val WHEEL_SCROLL = wheel("timeline.wheel_scroll", TIMELINE, HollowKeyChord.wheel(SHIFT))
+    val WHEEL_ZOOM_VALUES = wheel("timeline.wheel_zoom_values", TIMELINE, HollowKeyChord.wheel(ALT))
+    val DRAG_PAN = drag("timeline.drag_pan", TIMELINE, HollowKeyChord.mouse(GLFW.GLFW_MOUSE_BUTTON_MIDDLE))
+    val DRAG_ZOOM = drag("timeline.drag_zoom", TIMELINE, HollowKeyChord.mouse(GLFW.GLFW_MOUSE_BUTTON_MIDDLE, CONTROL))
+    val FREE_MOVE = hold("timeline.free_move", TIMELINE, key(GLFW.GLFW_KEY_LEFT_ALT), key(GLFW.GLFW_KEY_RIGHT_ALT))
 
     // 3D views
     val GRAB = action("viewport.grab", VIEWPORT, key(GLFW.GLFW_KEY_G))
@@ -109,6 +116,18 @@ object HollowKeys {
 
     private fun action(id: String, context: HollowKeyContext, vararg defaults: HollowKeyChord) =
         HollowKeymap.register(HollowKeyAction(id, context, defaults.toList()))
+
+    /** An action the wheel does, with the modifiers held for it. */
+    private fun wheel(id: String, context: HollowKeyContext, vararg defaults: HollowKeyChord) =
+        HollowKeymap.register(HollowKeyAction(id, context, defaults.toList(), kinds = setOf(HollowInputKind.WHEEL)))
+
+    /** An action a mouse button does by dragging, with the modifiers held for it. */
+    private fun drag(id: String, context: HollowKeyContext, vararg defaults: HollowKeyChord) =
+        HollowKeymap.register(HollowKeyAction(id, context, defaults.toList(), kinds = setOf(HollowInputKind.MOUSE)))
+
+    /** An action that works while its key is held down, such as moving freely through a drag. */
+    private fun hold(id: String, context: HollowKeyContext, vararg defaults: HollowKeyChord) =
+        HollowKeymap.register(HollowKeyAction(id, context, defaults.toList(), kinds = setOf(HollowInputKind.HOLD)))
 
     private fun action(id: String, context: HollowKeyContext, default: HollowKeyChord, label: () -> String) =
         HollowKeymap.register(HollowKeyAction(id, context, listOf(default), labelText = label))

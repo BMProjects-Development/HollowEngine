@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoPointerWrap
 import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
@@ -17,6 +18,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInsertMenu
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
@@ -110,7 +112,7 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
 
     PublishScene(
         source = "vfx-${file.path}",
-        key = listOf(document.revision, state.selected, state.expanded.toList(), state.rootExpanded),
+        key = listOf(document.revision, state.selected, state.selectedLane, state.expanded.toList(), state.rootExpanded),
     ) {
         vfxSceneTarget(document, state, file.path.substringAfterLast('/').substringBeforeLast('.'))
     }
@@ -187,6 +189,7 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
 
     init {
         document.onEdit = session::recordEdit
+        preview.held = session::held
         session.playback.onPick = { pick -> playbackPick = pick }
         playbackPreview.onReset = {
             preview.data = playbackPreview.values
@@ -212,6 +215,9 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     val expanded = mutableStateListOf<String>()
     var rootExpanded by mutableStateOf(true)
 
+    /** The events or the sections, when the scene picked them in place of a node; null otherwise. */
+    var selectedLane by mutableStateOf<String?>(null)
+
     /** The shape handle being dragged, with node as it was when drag started. */
     var drag: VfxGizmoHandle? = null
 
@@ -220,6 +226,12 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
 
     /** Turns the preview to a view picked on its axes or by the numpad. */
     val cameraTurn = OrbitCameraTurn(preview)
+
+    /** Where the preview is on the surface, for a menu opened at the pointer. */
+    var viewportBounds = UiRect.Zero
+
+    /** Where the insert-key menu is open, at the pointer; null while it is closed. */
+    var keyMenu by mutableStateOf<UiRect?>(null)
 
     /** Where the pointer last was: where a transform from the keyboard starts. */
     var pointerX = 0f
@@ -231,8 +243,9 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     override fun select(id: String?) {
         transformGizmo.session.settle()
         selected = id
+        selectedLane = null
         playbackPick = null
-        id?.let(session::touch)
+        session.select(id)
         session.timeline.clearSelection()
     }
 
@@ -263,6 +276,7 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     }
     val transform = state.transformGizmo
     val session = transform.session
+    GizmoPointerWrap(session, state.viewportBounds, state.pointerX, state.pointerY)
     // The node where the preview has it now, made anew for every event: the session keeps the one a move began with.
     val target: () -> GizmoTarget? = {
         val current = selected?.let { document.effect.node(it) }
@@ -271,7 +285,7 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
             null
         } else {
             transform.capture(preview)
-            VfxNodeTarget(document, state, current.id, placed.frame, placed.parent?.frame, current.transform, driven)
+            VfxNodeTarget(document, state, current.id, placed.frame, placed.parent?.frame, current.transform)
         }
     }
 
@@ -282,8 +296,15 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
         modifier = Modifier.size(100.percent, 100.percent).clip().onPlaced { rect ->
             preview.viewportWidth = rect.width
             preview.viewportHeight = rect.height
+            state.viewportBounds = rect
         }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus().onKeyInput { input ->
             if (input.repeat) return@onKeyInput
+            if (selected != null && !session.isBusy && HollowKeys.INSERT_KEY.matches(input)) {
+                val bounds = state.viewportBounds
+                state.keyMenu = UiRect(bounds.x + state.pointerX, bounds.y + state.pointerY, 0f, 0f)
+                input.consume()
+                return@onKeyInput
+            }
             val idle = !session.isBusy
             val taken = idle && UndoKeys.handle(
                 document.history, input.key, input.modifiers
@@ -356,6 +377,9 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
             Text(hint, tags = listOf("vfx-gizmo-readout"), modifier = Modifier.position(8.px, 32.px).inputTransparent())
         }
         ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
+        KeyInsertMenu(state.keyMenu, onPick = { parts -> selected?.let { state.session.insertKeys(it, parts) } }) {
+            state.keyMenu = null
+        }
         state.readout?.let { readout ->
             Text(
                 formatNumber(readout.value),

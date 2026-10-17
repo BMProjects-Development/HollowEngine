@@ -16,7 +16,6 @@
   "bone.search": "Find a bone",
   "close": "Close",
   "animate": "Animate on the timeline: the field takes a key where the playhead is",
-  "locked_by_timeline": "The timeline writes this field; turn on recording keys on the timeline to change it",
   "stop_animating": "Stop animating: the keys go and the field takes its own value again",
   "empty_list": "Empty",
   "not_set": "Not set",

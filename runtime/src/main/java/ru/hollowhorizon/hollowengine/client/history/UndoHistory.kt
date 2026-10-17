@@ -57,6 +57,20 @@ class UndoHistory(
         push(step)
     }
 
+    /**
+     * Makes [step] a part of the newest step, as something an edit changed besides itself, so one undo takes both
+     * back; the newest step still merges with the next edit. Inside a transaction it joins that instead.
+     */
+    fun attach(step: UndoStep) {
+        transaction?.let {
+            it.attached += step
+            return
+        }
+        val current = state
+        val last = current.steps.lastOrNull()?.takeIf { current.position == current.steps.size } ?: return push(step)
+        state = current.copy(steps = current.steps.dropLast(1) + JoinedStep.join(last, step))
+    }
+
     /** Starts a step that everything recorded until the matching [commit] belongs to. Transactions nest. */
     fun begin(label: UndoLabel? = null) {
         val open = transaction
@@ -164,17 +178,25 @@ class UndoHistory(
         var depth = 1
         val steps = ArrayList<UndoStep>()
 
+        /** What [attach] added: folded apart, so it does not split the steps it goes with. */
+        val attached = ArrayList<UndoStep>()
+
         fun build(): UndoStep? {
-            val folded = ArrayList<UndoStep>()
-            for (step in steps) {
-                val merged = folded.lastOrNull()?.merge(step)
-                if (merged != null) folded[folded.lastIndex] = merged else folded += step
-            }
+            val folded = fold(steps) + fold(attached)
             return when (folded.size) {
                 0 -> null
                 1 if label == null -> folded.single()
                 else -> CompositeStep(label ?: folded.first().label, folded)
             }
+        }
+
+        private fun fold(steps: List<UndoStep>): List<UndoStep> {
+            val folded = ArrayList<UndoStep>()
+            for (step in steps) {
+                val merged = folded.lastOrNull()?.merge(step)
+                if (merged != null) folded[folded.lastIndex] = merged else folded += step
+            }
+            return folded
         }
     }
 

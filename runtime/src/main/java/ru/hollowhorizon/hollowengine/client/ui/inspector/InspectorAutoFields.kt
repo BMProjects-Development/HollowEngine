@@ -74,7 +74,8 @@ internal fun AutoFields(
 
 /**
  * The fields of what an inspector shows that a timeline can animate. A field it animates shows the timeline's
- * value and its key button is lit; while keys are recorded an edit of it keys it there, otherwise it is locked.
+ * value and its key button is lit; while keys are recorded an edit of it keys it there, otherwise the edit holds
+ * until the playhead moves.
  */
 interface AnimatedFields {
     /** Null when [name] cannot be animated; otherwise whether it is. */
@@ -83,9 +84,6 @@ interface AnimatedFields {
     /** Starts animating [name], keyed where the timeline is, or stops and lets the authored value back. */
     fun toggle(name: String)
 
-    /** Whether [name] takes no edits now: it is animated and keys are not being recorded. */
-    fun isLocked(name: String): Boolean = false
-
     /** The same, for what lies inside the field [name], named by their paths under it. */
     fun nested(name: String): AnimatedFields = PrefixedAnimatedFields(this, "$name.")
 }
@@ -93,7 +91,6 @@ interface AnimatedFields {
 private class PrefixedAnimatedFields(private val parent: AnimatedFields, private val prefix: String) : AnimatedFields {
     override fun isAnimated(name: String): Boolean? = parent.isAnimated(prefix + name)
     override fun toggle(name: String) = parent.toggle(prefix + name)
-    override fun isLocked(name: String): Boolean = parent.isLocked(prefix + name)
     override fun nested(name: String): AnimatedFields = PrefixedAnimatedFields(parent, "$prefix$name.")
 }
 
@@ -103,31 +100,19 @@ val LocalAnimatedFields = compositionLocalOf<AnimatedFields?> { null }
 @Composable
 private fun AnimatedField(animated: AnimatedFields?, name: String, editor: @Composable () -> Unit) {
     val state = animated?.isAnimated(name) ?: return editor()
-    KeyedField(name, state, locked = animated.isLocked(name), onToggle = { animated.toggle(name) }, editor = editor)
+    KeyedField(name, state, onToggle = { animated.toggle(name) }, editor = editor)
 }
 
-/**
- * A field with a key button beside it, lit while a timeline animates the field. A [locked] field shows its
- * value and takes no input, as one the timeline writes while keys are not being recorded.
- */
+/** A field with a key button beside it, lit while a timeline animates the field. */
 @Composable
-fun KeyedField(id: String, animated: Boolean, locked: Boolean, onToggle: () -> Unit, editor: @Composable () -> Unit) {
+fun KeyedField(id: String, animated: Boolean, onToggle: () -> Unit, editor: @Composable () -> Unit) {
     Row(tags = listOf("insp-animated-field")) {
         Box(
             mode = UiBoxMode.STACK,
-            tags = if (locked) listOf("insp-animated-value", "driven") else listOf("insp-animated-value"),
+            tags = listOf("insp-animated-value"),
             modifier = Modifier.grow(1f),
         ) {
             Column(modifier = Modifier.size(100.percent)) { editor() }
-            // The fields under it would still take clicks and keys, so a cover takes them while it is locked.
-            if (locked) Box(
-                id = "locked-$id",
-                modifier = Modifier.size(100.percent, 100.percent)
-                    .input(hoverable = true, clickable = true, draggable = true)
-                    .tooltipOnHover(InspectorLang.lockedByTimeline)
-                    .onPress { it.consume() }
-                    .onClick { it.consume() },
-            )
         }
         Image(
             KeyIcon,

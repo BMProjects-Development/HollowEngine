@@ -40,16 +40,16 @@ val LocalVfxDriven = staticCompositionLocalOf<(VfxProperty) -> VfxDrivenValue?> 
 class VfxDrivenValue(
     val values: FloatArray,
     private val channels: Set<Int>,
-    private val record: ((Map<Int, Float>) -> Unit)? = null,
+    /** Whether a write becomes keys at the playhead; otherwise it is held there until the playhead moves. */
+    val recording: Boolean,
+    private val write: (Map<Int, Float>) -> Unit,
 ) {
-    val recording: Boolean get() = record != null
-
     fun drives(channel: Int): Boolean = channel in channels
 
     fun value(channel: Int): Float = values.getOrElse(channel) { 0f }
 
     fun write(changes: Map<Int, Float>) {
-        if (changes.isNotEmpty()) record?.invoke(changes)
+        if (changes.isNotEmpty()) write.invoke(changes)
     }
 }
 
@@ -281,21 +281,13 @@ private fun axisColor(axis: String): UiColor = when (axis) {
     else -> UiColor(0.45f, 0.62f, 0.95f, 1f)
 }
 
-/** What a keyed channel holds at the playhead: read-only, unless the timeline records, when a typed value becomes a key. */
+/**
+ * What a keyed channel holds at the playhead. A typed value becomes a key while the timeline records, and is held
+ * there until the playhead moves otherwise.
+ */
 @Composable
 private fun DrivenCell(driven: VfxDrivenValue, property: VfxProperty?, channel: Int) {
-    val value = driven.value(channel)
-    if (driven.recording) {
-        NumberCell(value, property, whole = false) { driven.write(mapOf(channel to it)) }
-        return
-    }
-    Box(
-        tags = listOf("insp-input", "insp-inline-input", "vfx-driven"),
-        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).input(hoverable = true).cursor(UiCursorShape.NOT_ALLOWED)
-            .tooltipOnHover(vfxText("driven_hint")),
-    ) {
-        Text(formatNumber(value), modifier = Modifier.fontSize(9f).textWrap(false))
-    }
+    NumberCell(driven.value(channel), property, whole = false) { driven.write(mapOf(channel to it)) }
 }
 
 @Composable

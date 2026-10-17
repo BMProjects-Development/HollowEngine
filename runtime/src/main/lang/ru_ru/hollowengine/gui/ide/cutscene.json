@@ -1,6 +1,13 @@
 {
   "properties": "Свойства",
+  "snap": "Привязка к кадрам",
+  "snap.fps": "Сколько кадров в секунду у привязки",
+  "snap.unit": "к/с",
   "tracks": "Дорожки",
+  "tracks.listing": "Какие объекты видны на дорожках",
+  "tracks.only_selected": "Только выделенные",
+  "tracks.show_all": "Показать все",
+  "tracks.hide_unselected": "Скрыть все, кроме выделенных",
   "view.dope_sheet": "Ключи",
   "view.curves": "Кривые",
   "view.frame_curves": "Показать все кривые",

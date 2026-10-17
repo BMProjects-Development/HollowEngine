@@ -19,8 +19,11 @@ sealed interface HollowInput {
     }
 }
 
-/** The kinds of [HollowInput] an action takes; whether it is pressed, held or turned is the action's own business. */
-enum class HollowInputKind { KEY, MOUSE, WHEEL }
+/**
+ * The kinds of [HollowInput] an action takes; whether it is pressed, held or turned is the action's own business.
+ * [HOLD] is a key kept down while something else happens, such as a drag: a modifier key alone is one.
+ */
+enum class HollowInputKind { KEY, MOUSE, WHEEL, HOLD }
 
 /**
  * An input with the modifiers held for it. Super counts as Ctrl and the lock keys do not count, so a chord reads the

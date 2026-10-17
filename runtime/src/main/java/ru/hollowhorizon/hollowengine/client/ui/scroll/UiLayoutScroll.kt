@@ -30,7 +30,9 @@ internal fun applyScrollRanges(
             x = if (spec.horizontal) overflowOf(bounds.x + bounds.width, viewport.x + viewport.width) else 0f,
             y = if (spec.vertical) overflowOf(bounds.y + bounds.height, viewport.y + viewport.height) else 0f,
         )
-        entry.setValue(layout.copy(scrollOffset = scrollState.clamp(spec.state, range), scrollRange = range))
+        val placed = scrollState.clamp(spec.state, range)
+        scrollState.settleRequest(spec.state, range)
+        entry.setValue(layout.copy(scrollOffset = placed, scrollRange = range))
     }
 }
 

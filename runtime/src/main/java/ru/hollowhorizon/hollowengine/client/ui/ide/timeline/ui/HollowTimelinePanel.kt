@@ -3,8 +3,10 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 import androidx.compose.runtime.*
 import kotlinx.coroutines.isActive
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.CutsceneIcon
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelinePlayheadHold
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
@@ -22,8 +24,8 @@ private const val TimelineZoomWheelStep = 12f
 private const val TimelineScrollStep = 44f
 private const val TimelineValueZoomStep = 0.12f
 private const val TimelineValuePanStep = 0.08f
-private const val TimelineMinValueSpan = 0.001f
-private const val TimelineMaxValueSpan = 100_000f
+internal const val TimelineMinValueSpan = 0.001f
+internal const val TimelineMaxValueSpan = 100_000f
 
 internal val LocalTimelineRevision = staticCompositionLocalOf { 0 }
 
@@ -102,6 +104,8 @@ fun HollowTimelineEditor(
 ) {
     val bump = refresh
     val scroll = rememberScrollState()
+    val zoomGlide = remember(controller) { TimelineZoomGlide() }
+    val playheadHold = remember(controller) { TimelinePlayheadHold() }
     val headerScroll = rememberScrollState()
     val isCurveView = controller.viewMode == TimelineViewMode.CURVES
     val rows = timelineRows(controller, curveEditorOnly = isCurveView)
@@ -133,8 +137,18 @@ fun HollowTimelineEditor(
     }
     if (focusContentX != null) autoPanToContentX(scroll, laneViewport, focusContentX)
 
+    LaunchedEffect(controller) {
+        while (isActive) {
+            withFrameNanos { now ->
+                zoomGlide.advance(now, controller, scroll)
+                playheadHold.advance(controller, now)
+            }
+        }
+    }
+
     LaunchedEffect(controller.frameTimeRequests) {
         if (controller.frameTimeRequests == 0 || laneViewport.width <= 0f) return@LaunchedEffect
+        zoomGlide.stop()
         val usable = laneViewport.width - TimelineLeftPadding - TimelineFrameMargin
         controller.pixelsPerSecond = (usable / controller.workAreaEnd.coerceAtLeast(0.1f))
             .coerceIn(TimelineMinZoom, TimelineMaxZoom)
@@ -149,7 +163,10 @@ fun HollowTimelineEditor(
             .style(TimelineStylesheet)
             .focusScope()
             .onKeyInput { input ->
-                if (keyboardActive && !input.repeat && onKeyInput(input.key, input.modifiers)) input.consume()
+                if (keyboardActive && !input.repeat && onKeyInput(input.key, input.modifiers)) {
+                    input.consume()
+                    playheadHold.press(controller, input.key, input.modifiers)
+                }
             },
     ) {
         TimelineToolbar(controller, onCapture, onSave, onLoad, bump, features)
@@ -192,7 +209,7 @@ fun HollowTimelineEditor(
                         .clip()
                         .scrollable(state = scroll, vertical = !isCurveView)
                         .onPlaced { laneViewport = it }
-                        .onScroll { event -> handleTimelineScroll(event, controller, scroll, laneViewport, bump) },
+                        .onScroll { event -> handleTimelineScroll(event, controller, scroll, zoomGlide, laneViewport, bump) },
                 ) {
                     if (isCurveView) {
                         TimelineCurveGraph(
@@ -246,14 +263,15 @@ private fun HeaderSplitter(controller: TimelineController, refresh: () -> Unit) 
 }
 
 /**
- * Wheel handling for the lane viewport, the way lists scroll everywhere else: the wheel goes down the
- * tracks (in the graph, down the values), Shift+wheel goes along the time, Ctrl+wheel zooms the time
- * around the pointer and, in the graph, Alt+wheel zooms the values.
+ * Wheel handling for the lane viewport, by the keymap: as in Blender, the wheel zooms the time about the middle,
+ * Ctrl+wheel goes along the time, Shift+wheel goes down the tracks (in the graph, along the values) and Alt+wheel
+ * zooms the values of the graph. A wheel turned sideways always goes along the time.
  */
 private fun handleTimelineScroll(
     event: UiEvent,
     controller: TimelineController,
     scroll: UiScrollHandle,
+    zoom: TimelineZoomGlide,
     viewport: UiRect,
     refresh: () -> Unit,
 ) {
@@ -261,44 +279,40 @@ private fun handleTimelineScroll(
     val modifiers = currentUiKeyModifiers()
     val down = -event.rawScrollY
     val sideways = -event.rawScrollX
-    if (down == 0f && sideways == 0f) return
-
-    if (modifiers and GLFW.GLFW_MOD_CONTROL != 0) {
-        val oldZoom = controller.pixelsPerSecond
-        val newZoom = (oldZoom - (down + sideways) * TimelineZoomWheelStep).coerceIn(TimelineMinZoom, TimelineMaxZoom)
-        if (newZoom == oldZoom) return
-        val cursorInViewport = event.x - viewport.x
-        val time = (cursorInViewport + scroll.offsetX - TimelineLeftPadding) / oldZoom
-        controller.pixelsPerSecond = newZoom
-        scroll.scrollTo(x = (time * newZoom + TimelineLeftPadding - cursorInViewport).coerceAtLeast(0f))
-        refresh()
-        return
-    }
-
-    val shift = modifiers and GLFW.GLFW_MOD_SHIFT != 0
-    val alongTime = if (shift) down + sideways else sideways
-    if (alongTime != 0f) scroll.animateScrollBy(deltaX = alongTime * TimelineScrollStep)
-    if (shift || down == 0f) {
-        refresh()
-        return
-    }
-
-    if (controller.viewMode == TimelineViewMode.CURVES && viewport.height > 0f) {
-        val axis = controller.curveAxis
-        if (modifiers and GLFW.GLFW_MOD_ALT != 0) {
-            val height = viewport.height
-            val localY = event.y - viewport.y
-            val cursorValue = curveYToValue(localY, controller.curveValueCenter, controller.curveValueSpan, height)
-            val span = (axis.targetSpan * (1f + down * TimelineValueZoomStep))
-                .coerceIn(TimelineMinValueSpan, TimelineMaxValueSpan)
-            axis.glideTo(cursorValue + (localY - height * 0.5f) / height * span, span)
-        } else {
-            axis.glideTo(axis.targetCenter - down * axis.targetSpan * TimelineValuePanStep, axis.targetSpan)
+    if (sideways != 0f) scroll.animateScrollBy(deltaX = sideways * TimelineScrollStep)
+    if (down != 0f) {
+        val curves = controller.viewMode == TimelineViewMode.CURVES && viewport.height > 0f
+        when {
+            HollowKeys.WHEEL_ZOOM_TIME.matchesWheel(modifiers) -> zoom.zoomBy(controller, scroll, viewport.width, down)
+            HollowKeys.WHEEL_ALONG_TIME.matchesWheel(modifiers) -> scroll.animateScrollBy(deltaX = down * TimelineScrollStep)
+            HollowKeys.WHEEL_ZOOM_VALUES.matchesWheel(modifiers) -> if (curves) zoomValuesAt(controller, event.y - viewport.y, viewport.height, down)
+            HollowKeys.WHEEL_SCROLL.matchesWheel(modifiers) -> if (curves) {
+                val axis = controller.curveAxis
+                axis.glideTo(axis.targetCenter - down * axis.targetSpan * TimelineValuePanStep, axis.targetSpan)
+            } else {
+                scroll.animateScrollBy(deltaY = down * TimelineScrollStep)
+            }
         }
-    } else {
-        scroll.animateScrollBy(deltaY = down * TimelineScrollStep)
     }
     refresh()
+}
+
+/** Zooms the time a wheel notch [notches] around the point [cursor] pixels into the viewport, which stays put. */
+private fun zoomTimeAt(controller: TimelineController, scroll: UiScrollHandle, cursor: Float, notches: Float) {
+    val oldZoom = controller.pixelsPerSecond
+    val newZoom = (oldZoom - notches * TimelineZoomWheelStep).coerceIn(TimelineMinZoom, TimelineMaxZoom)
+    if (newZoom == oldZoom) return
+    val time = (cursor + scroll.offsetX - TimelineLeftPadding) / oldZoom
+    controller.pixelsPerSecond = newZoom
+    scroll.scrollTo(x = (time * newZoom + TimelineLeftPadding - cursor).coerceAtLeast(0f))
+}
+
+/** Zooms the values of the graph [notches] around the value [localY] pixels down a graph [height] tall. */
+private fun zoomValuesAt(controller: TimelineController, localY: Float, height: Float, notches: Float) {
+    val axis = controller.curveAxis
+    val cursorValue = curveYToValue(localY, controller.curveValueCenter, controller.curveValueSpan, height)
+    val span = (axis.targetSpan * (1f + notches * TimelineValueZoomStep)).coerceIn(TimelineMinValueSpan, TimelineMaxValueSpan)
+    axis.glideTo(cursorValue + (localY - height * 0.5f) / height * span, span)
 }
 
 /** The wheel over the track list: down the tracks, or with Shift along long names. */
@@ -331,13 +345,13 @@ private fun TimeRuler(
                 onScrubbingChange(true)
                 controller.clearSelection()
                 controller.applyCurrentTime(
-                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers), pxPerSec, event.modifiers)
+                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd), pxPerSec)
                 )
                 refresh()
             }
             .onDrag { event ->
                 controller.applyCurrentTime(
-                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd, event.modifiers), pxPerSec, event.modifiers)
+                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd), pxPerSec)
                 )
                 event.consume()
                 refresh()
@@ -424,7 +438,7 @@ private fun WorkAreaHandle(controller: TimelineController, pxPerSec: Float, refr
                 val raw = (dragStartEnd + timelineTimeDelta(event.dragTotalX, pxPerSec))
                     .coerceAtLeast(maxKeyTime)
                     .coerceAtLeast(0.1f)
-                val next = snapTimelineTime(raw, event.modifiers)
+                val next = snapTimelineTime(raw)
                     .coerceAtLeast(maxKeyTime)
                     .coerceAtLeast(0.1f)
                 controller.workAreaEnd = if (event.modifiers == 0) round(next * 100f) / 100f else next

@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigPreview
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoPointerWrap
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
@@ -26,6 +27,7 @@ internal fun RigViewport(
             id = "rig-viewport",
             tags = listOf("ide-file-viewport"),
             modifier = Modifier.size(100.percent, 100.percent).clip().input(hoverable = true, clickable = true).focus()
+                .onPlaced { state.viewportBounds = it }
                 .onKeyInput { input -> if (onKey(input) || handleKey(document, state, input)) input.consume() }
                 .onPress { event ->
                     state.pointer(event.localX, event.localY)
@@ -68,6 +70,7 @@ internal fun RigViewport(
             },
         )
         val session = state.gizmo.session
+        GizmoPointerWrap(session, state.viewportBounds, state.pointerX, state.pointerY)
         Box(
             modifier = Modifier.size(100.percent, 100.percent).inputTransparent().drawBehind(
                 key = listOf(

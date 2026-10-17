@@ -44,16 +44,14 @@ fun VfxColorRow(
         Row(modifier = Modifier.size(100.percent).gap(3.px).alignItems(vertical = UiAlign.CENTER)) {
             VfxFieldLabel(label, hint)
             Box(
-                tags = if (recording) emptyList() else listOf("vfx-driven"),
                 modifier = Modifier.size(0.px, CurveCellHeight.px).grow(1f).onPlaced { anchor = it }
-                    .input(hoverable = true, clickable = recording)
-                    .cursor(if (recording) UiCursorShape.HAND else UiCursorShape.NOT_ALLOWED)
+                    .input(hoverable = true, clickable = true)
+                    .cursor(UiCursorShape.HAND)
                     .tooltipOnHover(vfxText(if (recording) "driven_record_hint" else "driven_hint"))
                     .drawBehind(key = shown) {
                         drawChecker(size.width, size.height)
                         drawRect(UiPaint.Color(shown.toUi()), radius = 3f)
                     }.onClick { event ->
-                        if (!recording) return@onClick
                         open = !open
                         focus(property)
                         event.consume()
@@ -61,7 +59,7 @@ fun VfxColorRow(
             )
             InspectorIcon(KeyframeIcon, vfxText("driven_show")) { focus(property) }
         }
-        if (open && recording) {
+        if (open) {
             Popup(anchorBounds = anchor, id = "vfx-color-popup", tags = listOf("vfx-popup"), onDismiss = { open = false }) {
                 ColorPicker(
                     value = shown.toUi(),

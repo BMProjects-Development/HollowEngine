@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
 
@@ -28,6 +29,8 @@ internal object TimelineIcons {
     const val PREV_KEY = ROOT + "prev_key.svg"
     const val NEXT_KEY = ROOT + "next_key.svg"
     const val ZOOM_IN = ROOT + "zoom_in.svg"
+    const val SNAP = ROOT + "snap.svg"
+    const val FILTER = ROOT + "filter.svg"
     const val ZOOM_OUT = ROOT + "zoom_out.svg"
     const val MORE = ROOT + "more.svg"
     const val DOPE_SHEET = ROOT + "dope_sheet.svg"
@@ -74,6 +77,8 @@ internal fun TimelineToolbar(
     features: TimelineFeatures = TimelineFeatures.CUTSCENE,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    var snapOpen by remember { mutableStateOf(false) }
+    var snapAnchor by remember { mutableStateOf(UiRect.Zero) }
     var menuAnchor by remember { mutableStateOf(UiRect.Zero) }
 
     val parked = LocalDockPanelTitle.current
@@ -181,6 +186,10 @@ internal fun TimelineToolbar(
             controller.requestFrameTime()
             refresh()
         }
+        TimelineButton(TimelineIcons.SNAP, "timeline-snap", snapTooltip(), active = TimelineSnap.enabled) {
+            TimelineSnap.enabled = !TimelineSnap.enabled
+        }
+        SnapFpsField()
         TimelineButton(TimelineIcons.ZOOM_OUT, "timeline-zoom-out", CutsceneLang.ZOOM_OUT.lang) {
             zoomAroundCenter(controller, 1f / TimelineZoomButtonFactor)
             refresh()
@@ -206,7 +215,7 @@ internal fun TimelineToolbar(
                     CutsceneLang.DELETE_SELECTED.lang,
                     icon = TimelineIcons.DELETE,
                     enabled = controller.selectedKeyframes.isNotEmpty(),
-                    shortcut = "Del",
+                    shortcut = HollowKeys.DELETE.shortcut,
                 ) {
                     controller.deleteSelectedKeyframes(); refresh()
                 },
@@ -214,7 +223,7 @@ internal fun TimelineToolbar(
                     CutsceneLang.SMOOTH_SELECTED.lang,
                     icon = TimelineIcons.SMOOTH,
                     enabled = controller.canEditSelectedCurves,
-                    shortcut = "S",
+                    shortcut = HollowKeys.SMOOTH_KEYS.shortcut,
                 ) {
                     controller.smoothSelectedKeyframes(); refresh()
                 },
@@ -240,6 +249,23 @@ internal fun TimelineToolbar(
             ),
         )
     }
+}
+
+private fun snapTooltip(): String = HollowKeys.FREE_MOVE.hint(CutsceneLang.SNAP.lang)
+
+/** How many frames a second the timeline snaps to, typed in. */
+@Composable
+private fun SnapFpsField() {
+    TextField(
+        value = TimelineSnap.fps.toString(),
+        id = "timeline-snap-fps",
+        fontSize = 9f,
+        filter = UiTextInputFilter.INTEGER,
+        tags = listOfNotNull("timeline-time", "timeline-snap-fps", "off".takeUnless { TimelineSnap.enabled }),
+        modifier = Modifier.tooltipOnHover(CutsceneLang.SNAP_FPS.lang),
+        onChange = { typed -> typed.toIntOrNull()?.takeIf { it > 0 }?.let { TimelineSnap.fps = it } },
+    )
+    Text(CutsceneLang.SNAP_UNIT.lang, tags = listOf("timeline-duration"))
 }
 
 /** Where the playhead is, as a field: typing a time jumps there. */
@@ -306,6 +332,9 @@ internal fun TimelineHeaders(
                 tags = listOf("timeline-corner-label"),
                 modifier = Modifier.align(vertical = UiAlign.CENTER),
             )
+            controller.listing?.let { listing ->
+                TrackListingButton(listing, Modifier.align(horizontal = UiAlign.END, vertical = UiAlign.CENTER))
+            }
         }
         val overflows = labelWidth > width + 1f
         Box(
@@ -341,6 +370,36 @@ internal fun TimelineHeaders(
             onExpandedChange = { if (!it) menu = null },
         )
     }
+}
+
+/** The menu by the track list's title: which objects have rows. */
+@Composable
+private fun TrackListingButton(listing: TrackListing, modifier: Modifier) {
+    var open by remember { mutableStateOf(false) }
+    var anchor by remember { mutableStateOf(UiRect.Zero) }
+    Box(modifier = modifier.onPlaced { anchor = it }) {
+        TimelineButton(
+            TimelineIcons.FILTER,
+            "timeline-track-listing",
+            CutsceneLang.TRACKS_LISTING.lang,
+            active = listing.onlySelected,
+            tags = listOf("timeline-corner-button"),
+        ) { open = !open }
+    }
+    if (open) ContextMenu(
+        id = "timeline-track-listing-menu",
+        anchorBounds = anchor,
+        onExpandedChange = { if (!it) open = false },
+        items = listOf(
+            UiDropdownItem(
+                CutsceneLang.TRACKS_ONLY_SELECTED.lang,
+                checked = listing.onlySelected,
+                mark = UiDropdownMark.CHECKBOX,
+            ) { listing.onlySelected = !listing.onlySelected },
+            UiDropdownItem(CutsceneLang.TRACKS_SHOW_ALL.lang, separatorBefore = true, onClick = listing::showAll),
+            UiDropdownItem(CutsceneLang.TRACKS_HIDE_UNSELECTED.lang, onClick = listing::hideUnselected),
+        ),
+    )
 }
 
 /** Room at the end of a track row, so the list's scrollbar does not sit on the row's buttons. */

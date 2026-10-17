@@ -87,6 +87,9 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     var onHideGroup: ((TrackGroup) -> Unit)? = null
     var onHideLane: ((SegmentLane) -> Unit)? = null
 
+    /** What the menu by the track list does; without it there is no menu. */
+    var listing: TrackListing? = null
+
     fun group(path: List<String>): TrackGroup {
         require(path.isNotEmpty()) { "Timeline group path must not be empty" }
         var currentGroups: MutableList<TrackGroup> = groups
@@ -357,11 +360,17 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
         }
     }
 
-    fun addKeyframes(property: AnimProperty<*>, time: Float): List<Keyframe> {
+    /**
+     * Keys every channel of [property] at [time]: with [values] when given, as what the edited thing shows there,
+     * otherwise with what the curves already hold.
+     */
+    fun addKeyframes(property: AnimProperty<*>, time: Float, values: FloatArray? = null): List<Keyframe> {
         if (isLocked(property)) return emptyList()
         return edited(TimelineEdits.ADD_KEY) {
             property.curves.mapIndexed { channel, curve ->
-                setKey(curve, time, curve.valueAt(time, defaultChannel(property, channel)), selectKey = false)
+                val current = curve.valueAt(time, defaultChannel(property, channel))
+                val value = values?.getOrNull(channel)?.let { curve.spec.unwrap(it, current) } ?: current
+                setKey(curve, time, value, selectKey = false)
             }.also { select(it, additive = false) }
         }
     }

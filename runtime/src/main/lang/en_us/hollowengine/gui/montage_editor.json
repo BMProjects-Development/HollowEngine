@@ -2,7 +2,7 @@
   "add_clip": "Add clip",
   "add_window": "Hang it once more here",
   "bone": "Bone",
-  "bone_keys_hint": "Moves the bone over what the clips do with it. It is edited while keys are recorded: a field or the gizmo then keys it at the playhead. The key button takes the keys of that part away.",
+  "bone_keys_hint": "Moves the bone over what the clips do with it. An edit from a field or the gizmo shows until the playhead moves; I keys it, and with auto-key every edit is keyed. The key button takes the keys of that part away.",
   "bone_position": "Position",
   "bone_rotation": "Rotation",
   "bone_scale": "Scale",

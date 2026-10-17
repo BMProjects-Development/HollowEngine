@@ -107,21 +107,19 @@ private fun BoneFields(state: MontageEditorState, bone: String) {
     session.timeline.currentTime
     Column(tags = listOf("insp-body")) {
         Section(montageText("section_bone_keys"), help = montageText("bone_keys_hint")) {
-            val locked = !session.timeline.isRecording
             PoseParts.forEach { property ->
                 key(property) {
                     val animated = session.isBoneAnimated(bone, property)
                     KeyedField(
                         "bone-${property.name}",
                         animated,
-                        locked = locked,
                         onToggle = { session.toggleBone(bone, property) }) {
                         Vec3Row(
                             montageText("bone_${property.name.lowercase()}"),
                             session.boneValue(bone, property),
                             "bone-$bone-${property.name}"
                         ) { value ->
-                            session.keyBone(bone, property, value)
+                            session.editBone(bone, property, value)
                         }
                     }
                 }
@@ -129,15 +127,11 @@ private fun BoneFields(state: MontageEditorState, bone: String) {
             KeyedField(
                 "bone-visible",
                 session.isBoneAnimated(bone, MontageBoneProperty.VISIBLE),
-                locked = locked,
                 onToggle = {
                     session.toggleBone(bone, MontageBoneProperty.VISIBLE)
                 }) {
                 ToggleRow(montageText("bone_visible"), session.isBoneShown(bone)) { shown ->
-                    session.keyBoneShown(
-                        bone,
-                        shown
-                    )
+                    session.editBoneShown(bone, shown)
                 }
             }
         }
@@ -175,7 +169,6 @@ private fun ClipFields(document: HollowIdeMontageDocument, state: MontageEditorS
             KeyedField(
                 "clip-weight",
                 session.isWeightAnimated(id),
-                locked = false,
                 onToggle = { session.toggleWeight(id) }) {
                 FieldLabel(
                     montageText("weight") + ": " + montageText(if (session.isWeightAnimated(id)) "weight_keyed" else "weight_full"),
@@ -213,9 +206,6 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
                 if (name in names) state.session.isAnimated(bone, attachment.id, name) else null
 
             override fun toggle(name: String) = state.session.toggle(bone, attachment.id, name)
-
-            override fun isLocked(name: String): Boolean =
-                !state.session.timeline.isRecording && state.session.isAnimated(bone, attachment.id, name)
         }
     }
 

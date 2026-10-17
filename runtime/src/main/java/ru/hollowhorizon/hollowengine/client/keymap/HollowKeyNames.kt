@@ -50,6 +50,14 @@ internal object HollowKeyNames {
         GLFW.GLFW_KEY_KP_ENTER to "NumpadEnter",
         GLFW.GLFW_KEY_KP_EQUAL to "NumpadEqual",
         GLFW.GLFW_KEY_MENU to "Menu",
+        GLFW.GLFW_KEY_LEFT_SHIFT to "LeftShift",
+        GLFW.GLFW_KEY_RIGHT_SHIFT to "RightShift",
+        GLFW.GLFW_KEY_LEFT_CONTROL to "LeftCtrl",
+        GLFW.GLFW_KEY_RIGHT_CONTROL to "RightCtrl",
+        GLFW.GLFW_KEY_LEFT_ALT to "LeftAlt",
+        GLFW.GLFW_KEY_RIGHT_ALT to "RightAlt",
+        GLFW.GLFW_KEY_LEFT_SUPER to "LeftSuper",
+        GLFW.GLFW_KEY_RIGHT_SUPER to "RightSuper",
     )
 
     private val Arrows = mapOf("Up" to "↑", "Down" to "↓", "Left" to "←", "Right" to "→")

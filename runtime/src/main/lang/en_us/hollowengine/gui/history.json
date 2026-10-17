@@ -8,6 +8,7 @@
   "world": "World",
   "timeline": "Timeline",
   "edit": "Edit",
+  "held_edit": "Edit at the playhead",
   "typing": "Typing",
   "stroke": "Brush stroke",
   "world.move": "Move object",

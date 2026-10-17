@@ -55,6 +55,10 @@
 
 .timeline-time:focus { border: 1px $accent; }
 
+.timeline-time.timeline-snap-fps { size: 30px fit; }
+
+.timeline-time.timeline-snap-fps.off { foreground: $text-faint; }
+
 .timeline-duration {
     margin: 0px 4px 0px 3px;
     foreground: $text-faint;
@@ -78,6 +82,16 @@
     margin: 0px 0px 0px 8px;
     foreground: $text-faint;
     font-size: $font-size-small;
+}
+
+/* The ruler is lower than a toolbar, so the button by the title is smaller than the others. */
+.icon-button.timeline-corner-button {
+    padding: 2px;
+    margin: 0px 4px 0px 0px;
+}
+
+.icon-button.timeline-corner-button .button-icon {
+    size: 12px 12px;
 }
 
 .timeline-row {

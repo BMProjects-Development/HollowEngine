@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -67,7 +68,7 @@ internal fun TimelineLanes(
         override fun onRelease(event: UiEvent, row: TimelineRow) {
             if (event.isRightClick()) {
                 if (!pan.moved) {
-                    val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd, event.modifiers)
+                    val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
                     menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
                 }
                 pan.moved = false
@@ -83,7 +84,7 @@ internal fun TimelineLanes(
 
     Box(
         id = LaneContentId,
-        modifier = Modifier.size(contentWidth.px, contentHeight.coerceAtLeast(1f).px).panOnDrag(scroll, refresh),
+        modifier = Modifier.size(contentWidth.px, contentHeight.coerceAtLeast(1f).px).panOnDrag(controller, scroll, refresh),
     ) {
         rows.forEach { row ->
             key(row.id) {
@@ -147,22 +148,38 @@ internal class TimelineMenuState(
     val segment: TimelineSegment? = null,
 )
 
+/** The keymap's drags over the lanes: the pan drag moves the view, the zoom drag zooms the time. */
 @Composable
-internal fun Modifier.panOnDrag(scroll: UiScrollHandle, refresh: () -> Unit): Modifier {
+internal fun Modifier.panOnDrag(controller: TimelineController, scroll: UiScrollHandle, refresh: () -> Unit): Modifier {
     val start = remember { FloatArray(2) }
+    val panning = remember { booleanArrayOf(false) }
+    val zoom = remember { TimelineZoomDrag() }
     return this.onPress { event ->
-        if (!event.isMiddleClick()) return@onPress
+        if (zoom.begin(event, controller, scroll, event.localX)) {
+            event.consume()
+            return@onPress
+        }
+        panning[0] = HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
+        if (!panning[0]) return@onPress
         start[0] = scroll.offsetX
         start[1] = scroll.offsetY
         event.consume()
     }.onDrag { event ->
-        if (!event.isMiddleClick()) return@onDrag
+        if (zoom.drag(event, controller, scroll, values = false)) {
+            event.consume()
+            refresh()
+            return@onDrag
+        }
+        if (!panning[0]) return@onDrag
         scroll.scrollTo(
             x = (start[0] - event.dragTotalX).coerceAtLeast(0f),
             y = (start[1] - event.dragTotalY).coerceAtLeast(0f),
         )
         event.consume()
         refresh()
+    }.onRelease {
+        zoom.end()
+        panning[0] = false
     }
 }
 
@@ -271,7 +288,7 @@ private fun TimelineKeyframe(
                 val focus = controller.dragFocusKeyframe ?: return@onDrag
                 val origin = controller.dragStartTimes?.get(focus) ?: focus.time
                 val delta = timelineTimeDelta(event.dragTotalX, pxPerSec)
-                controller.applyKeyframeDrag(snapTimelineTime(origin + delta, event.modifiers) - origin)
+                controller.applyKeyframeDrag(snapTimelineTime(origin + delta) - origin)
                 event.consume()
                 refresh()
             }.onRelease {

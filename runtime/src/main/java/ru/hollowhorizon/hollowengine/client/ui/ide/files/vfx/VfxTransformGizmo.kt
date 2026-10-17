@@ -42,8 +42,8 @@ internal class VfxTransformGizmo {
 
 /**
  * A node of the effect as the gizmo moves it, placed where [frame] has it now inside [parent]. Each move writes only the
- * part of the placement it changed, in the parent's space. A part the timeline drives cannot be moved unless the
- * timeline records: then a move becomes a key.
+ * part of the placement it changed, in the parent's space; on a part the timeline drives it becomes a key while the
+ * timeline records, and is held until the playhead moves otherwise.
  */
 internal class VfxNodeTarget(
     private val document: HollowIdeVfxDocument,
@@ -52,13 +52,10 @@ internal class VfxNodeTarget(
     frame: VfxFrame,
     parent: VfxFrame?,
     private val start: VfxTransform,
-    private val driven: (VfxProperty) -> VfxDrivenValue?,
 ) : GizmoTarget {
     private val parent = parent?.let { VfxFrame().set(it) } ?: VfxFrame()
 
     override val values = GizmoTransformValues(frame.position.copy(), frame.rotation.copy(), start.scale)
-
-    override fun canEdit(mode: GizmoEditMode): Boolean = driven(mode.property)?.recording != false
 
     override fun place(values: GizmoTransformValues, mode: GizmoEditMode) = write(
         when (mode) {
@@ -68,7 +65,11 @@ internal class VfxNodeTarget(
         },
     )
 
-    override fun restore() = write(start)
+    /** Back where it was; what a keyed part held during the transform goes, so the track shows it again. */
+    override fun restore() {
+        write(start)
+        state.session.release(nodeId, Placement)
+    }
 
     override val canReset: Boolean get() = true
 
@@ -104,6 +105,8 @@ internal class VfxNodeTarget(
 
     private fun QuatF.copy(): QuatF = QuatF(x, y, z, w)
 }
+
+private val Placement = listOf(VfxProperty.POSITION, VfxProperty.ROTATION, VfxProperty.SCALE)
 
 internal val GizmoEditMode.property: VfxProperty
     get() = when (this) {

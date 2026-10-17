@@ -21,6 +21,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 import kotlin.math.cos
 import kotlin.math.sin
+import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 
 /** The vertical field of view of the preview camera, in degrees. */
 internal const val VfxPreviewFieldOfView = 50f
@@ -73,6 +74,14 @@ class VfxPreviewState(initialDistance: Float = 4.5f) : OrbitCamera {
     var instance: VfxInstance? = null
         private set
 
+    /** What the editor holds over the timeline; see [VfxInstance.held]. */
+    var held: (String, VfxProperty) -> FloatArray? = { _, _ -> null }
+
+    /** Places the effect again, after what is held changed. */
+    fun repose() {
+        instance?.repose()
+    }
+
     private var builtFor: VfxEffect? = null
     private var lastFrameNanos = 0L
 
@@ -91,6 +100,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) : OrbitCamera {
 
         val at = timelineTime
         instance = VfxInstance(effect, asset, VfxPlaneEnvironment(0.0), seed = PREVIEW_SEED).also {
+            it.held = { node, property -> held(node, property) }
             it.useData(data)
             it.update(0f)
         }

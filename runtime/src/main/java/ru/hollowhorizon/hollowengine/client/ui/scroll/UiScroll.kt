@@ -60,6 +60,29 @@ class UiScrollState {
         return next
     }
 
+    /** Whether a [settleRequest] moved an offset since the last [takeSettled], so the layout has to place it again. */
+    private var settled = false
+
+    /**
+     * Puts the offset a `scrollTo` asked for into [range], the travel just measured; null when there was no request.
+     */
+    internal fun settleRequest(handle: UiScrollHandle, range: UiScrollOffset): UiScrollOffset? {
+        val x = handle.requestedX
+        val y = handle.requestedY
+        if (x == null && y == null) return null
+        handle.requestedX = null
+        handle.requestedY = null
+        val next = handle.clampedTo(range, x ?: handle.offsetX, y ?: handle.offsetY)
+        handle.target = next
+        if (handle.applyOffset(next)) {
+            revision++
+            settled = true
+        }
+        return next
+    }
+
+    internal fun takeSettled(): Boolean = settled.also { settled = false }
+
     /** Records a container's freshly measured travel and re-clamps its offset into it. */
     fun clamp(handle: UiScrollHandle, range: UiScrollOffset): UiScrollOffset {
         handle.range = range
@@ -76,6 +99,10 @@ class UiScrollState {
         val iterator = animating.iterator()
         while (iterator.hasNext()) {
             val handle = iterator.next()
+            if (!handle.animating) {
+                iterator.remove()
+                continue
+            }
             val progress = ((nowMillis - handle.animationStartedAt).toFloat() / durationMillis).coerceIn(0f, 1f)
             val eased = 1f - (1f - progress) * (1f - progress)
             val start = handle.animationStart
@@ -94,8 +121,14 @@ class UiScrollState {
 
     /** Drains the requests a composable queued on [handle] through `scrollTo`/`animateScrollBy`. */
     internal fun applyPendingRequests(handle: UiScrollHandle) {
+        if (handle.jumped) {
+            handle.jumped = false
+            revision++
+        }
         if (handle.pendingX != null || handle.pendingY != null) {
             setImmediate(handle, handle.pendingX, handle.pendingY)
+            handle.requestedX = handle.pendingX
+            handle.requestedY = handle.pendingY
             handle.pendingX = null
             handle.pendingY = null
         }
