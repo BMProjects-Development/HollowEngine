@@ -1,31 +1,22 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TrackGroup
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.common.utils.Color
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.log10
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.round
+import kotlin.math.*
 
 internal const val TimelineRulerHeight = 18f
 
 internal const val TimelineGroupRowHeight = 17f
 internal const val TimelinePropertyRowHeight = 16f
 internal const val TimelineChannelRowHeight = 14f
+
+/** The height of one row of segments within a lane; overlapping segments add rows. */
+internal const val TimelineSegmentRowHeight = 18f
 internal const val TimelineLeftPadding = 40f
 internal const val CurveValueGutter = 40f
 internal const val TimelineMinContentWidth = 600f
@@ -58,6 +49,7 @@ internal enum class TimelineRowKind {
     GROUP,
     PROPERTY,
     CHANNEL,
+    SEGMENTS,
 }
 
 internal data class TimelineRow(
@@ -70,12 +62,14 @@ internal data class TimelineRow(
     val group: TrackGroup? = null,
     val property: AnimProperty<*>? = null,
     val curve: ChannelCurve? = null,
+    val lane: SegmentLane? = null,
     val locked: Boolean = false,
     val visible: Boolean = true,
     val color: Color? = null,
 ) {
     val curves: List<ChannelCurve>
         get() = when {
+            lane != null -> emptyList()
             curve != null -> listOf(curve)
             property != null -> property.curves
             group != null -> group.allProperties().flatMap { it.curves }
@@ -86,6 +80,25 @@ internal data class TimelineRow(
 internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boolean = false): List<TimelineRow> {
     val rows = mutableListOf<TimelineRow>()
     var y = TimelineRulerHeight
+
+    fun appendLane(lane: SegmentLane, depth: Int, locked: Boolean, visible: Boolean) {
+        if (curveEditorOnly || !lane.isShown) return
+        val height = lane.rowCount * TimelineSegmentRowHeight
+        rows += TimelineRow(
+            id = "timeline-lane-${System.identityHashCode(lane)}",
+            label = lane.nameState,
+            depth = depth,
+            y = y,
+            height = height,
+            kind = TimelineRowKind.SEGMENTS,
+            lane = lane,
+            locked = locked,
+            visible = visible,
+        )
+        y += height
+    }
+
+    controller.lanes.forEach { appendLane(it, 0, locked = false, visible = true) }
 
     fun appendGroup(group: TrackGroup, depth: Int, parentLocked: Boolean, parentVisible: Boolean) {
         if (!group.hasListedContent) return
@@ -108,6 +121,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
         y += TimelineGroupRowHeight
         if (group.isCollapsed) return
 
+        group.lanes.forEach { appendLane(it, depth + 1, locked, visible) }
         group.children.forEach { appendGroup(it, depth + 1, locked, visible) }
         group.properties.forEach { property ->
             if (!property.isListed) return@forEach
@@ -173,17 +187,10 @@ internal fun timelineContentWidth(
     return max(TimelineMinContentWidth, max(max(endWidth, keyWidth), viewportWidth))
 }
 
-internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float, modifiers: Int = 0): Float =
-    snapTimelineTime((localX - TimelineLeftPadding) / pixelsPerSecond, modifiers).coerceIn(0f, workAreaEnd)
+internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float): Float =
+    snapTimelineTime((localX - TimelineLeftPadding) / pixelsPerSecond).coerceIn(0f, workAreaEnd)
 
-internal fun snapTimelineTime(time: Float, modifiers: Int): Float {
-    val step = when {
-        modifiers and GLFW.GLFW_MOD_ALT != 0 -> 1f
-        modifiers and GLFW.GLFW_MOD_SHIFT != 0 -> 0.5f
-        else -> return time
-    }
-    return round(time / step) * step
-}
+internal fun snapTimelineTime(time: Float): Float = TimelineSnap.snap(time)
 
 internal fun timelineTimeDelta(deltaX: Float, pixelsPerSecond: Float): Float {
     return deltaX / pixelsPerSecond.coerceAtLeast(1f)
@@ -261,7 +268,6 @@ internal fun UiColor.withAlpha(multiplier: Float) =
 internal object TimelineColors {
     val Background = UiColor(0.110f, 0.118f, 0.133f, 1f)
     val Panel = UiColor(0.110f, 0.118f, 0.133f, 1f)
-    val PanelAlt = UiColor(0.169f, 0.180f, 0.208f, 1f)
     val Row = UiColor(0.118f, 0.125f, 0.141f, 1f)
     val Group = UiColor(0.129f, 0.137f, 0.157f, 1f)
     val Muted = UiColor(0.561f, 0.608f, 0.678f, 1f)
@@ -269,7 +275,6 @@ internal object TimelineColors {
     val Accent = UiColor(0.431f, 0.608f, 0.863f, 1f)
     val Blue = UiColor(0.682f, 0.722f, 0.792f, 1f)
     val Border = UiColor(0.149f, 0.157f, 0.180f, 1f)
-    val Danger = UiColor(0.76f, 0.23f, 0.23f, 1f)
     val Recording = UiColor(0.878f, 0.478f, 0.478f, 1f)
     val Grid = UiColor(0.176f, 0.188f, 0.216f, 1f)
     val Handle = UiColor(0.72f, 0.74f, 0.8f, 1f)
@@ -278,3 +283,22 @@ internal object TimelineColors {
 /** The playhead turns red while auto-keying is on, so it is clear that edits land on it as keys. */
 internal val TimelineController.playheadColor: UiColor
     get() = if (isRecording) TimelineColors.Recording else TimelineColors.Accent
+
+/** How close, in pixels, the playhead comes to a key or the edge of a segment before it sticks there. */
+private const val PlayheadMagnetPixels = 6f
+
+/**
+ * [time] moved onto the nearest key of a listed track, or edge of a segment, within a few pixels, so a key can be
+ * changed in place by recording over it; the free-move key lets the playhead go anywhere.
+ */
+internal fun TimelineController.snapPlayhead(time: Float, pxPerSec: Float): Float {
+    if (TimelineSnap.isFree) return time
+    val reach = PlayheadMagnetPixels / pxPerSec
+    val keys = allProperties().filter { it.isListed }.flatMap { property -> property.curves.flatMap { curve -> curve.keyframes.map { it.time } } }
+    val lanes = lanes.filter { it.isShown } + groups.flatMap(::listedLanes)
+    val edges = lanes.flatMap { lane -> lane.segments.flatMap { listOf(it.start, it.end) } }
+    return (keys + edges).minByOrNull { abs(it - time) }?.takeIf { abs(it - time) <= reach } ?: time
+}
+
+private fun listedLanes(group: TrackGroup): List<SegmentLane> =
+    group.lanes.filter { it.isShown } + group.children.flatMap(::listedLanes)

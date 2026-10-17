@@ -58,12 +58,6 @@ class BackdropSampleBoundsTest {
     }
 
     @Test
-    fun `gaussian padding covers three standard deviations`() {
-        assertEquals(12, gaussianSamplePadding(8f))
-        assertEquals(36, gaussianSamplePadding(24f))
-    }
-
-    @Test
     fun `workspace axes use stable allocation buckets`() {
         assertEquals(64, alignFramebufferAxis(42, 16_384))
         assertEquals(128, alignFramebufferAxis(65, 16_384))

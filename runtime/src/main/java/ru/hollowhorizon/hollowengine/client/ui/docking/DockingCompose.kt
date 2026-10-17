@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -241,7 +242,13 @@ private fun FloatingDockWindowView(
             }) {
         Column(modifier = Modifier.size(100.percent, 100.percent)) {
             FloatingHeader(window, state, headerContent, if (window.stack.items.size > 1) null else tabBarActions)
-            if (window.stack.items.size > 1) DockTabBar(window.stack, state, tabContent, tabBarActions, allowUndock = false)
+            if (window.stack.items.size > 1) DockTabBar(
+                window.stack,
+                state,
+                tabContent,
+                tabBarActions,
+                allowUndock = false
+            )
             Box(
                 id = "${window.id}-content",
                 tags = listOf(DockTags.Content),
@@ -326,8 +333,7 @@ private fun DockTabBar(
             },
             id = "${stack.id}-tabs",
             tags = listOf(DockTags.TabBar),
-            modifier = Modifier.size(0.px, DockTabBarHeight.px).grow(1f).clip()
-                .scrollable(
+            modifier = Modifier.size(0.px, DockTabBarHeight.px).grow(1f).clip().scrollable(
                     vertical = false,
                     horizontal = true,
                     hasVerticalScrollbar = false,
@@ -390,8 +396,7 @@ private fun DockTab(
             .buildTabInputModifier(stackId, item, state, allowUndock, scrollOffsetX) { event ->
                 if (item.pinnable) menuAt = UiRect(event.x, event.y, 0f, 0f)
                 else state.onTabContextMenu?.invoke(item, event)
-            }
-    ) {
+            }) {
         Row(
             modifier = Modifier.size(UiLength.Auto, (DockTabHeight - DockTabIndicatorHeight).px)
                 .alignItems(vertical = UiAlign.CENTER),
@@ -425,7 +430,7 @@ private fun tabMenuItems(item: DockItem, state: DockingState): List<UiDropdownIt
     }
 }
 
-/** Why a tab sits away from the place the tab bar laid out for it. */
+/** Why tab sits away from place, that tab bar laid out for it. */
 internal enum class DockTabOffset {
     /** It is under the pointer, being dragged along the bar. */
     DRAG,
@@ -434,14 +439,7 @@ internal enum class DockTabOffset {
     SWAP,
 }
 
-/**
- * Offsets a tab from where the tab bar laid it out.
- *
- * How the offset settles belongs to the stylesheet: `.dock-tab` transitions `translate`, so
- * a swapped tab slides into its new place, and `.dock-tab:dragging` turns that transition
- * off so the dragged tab tracks the pointer exactly. The swap keeps its own first frame
- * untransitioned as well — the tab has to appear back where it was before it can slide.
- */
+/** Offsets a tab from where the tab bar laid it out. */
 internal fun Modifier.tabTransform(offset: Float?, kind: DockTabOffset): Modifier {
     if (offset == null) return this
     val dragging = kind == DockTabOffset.DRAG
@@ -570,17 +568,13 @@ private fun TabContentWrapper(item: DockItem, tabContent: DockHeaderContent) {
 @Composable
 private fun CloseButton(item: DockItem, state: DockingState) {
     if (!item.closable) return
-    Box(
+    IconButton(
+        DockCloseIcon,
+        tooltip = null,
         id = "dock-close-${item.id}",
         tags = listOf(DockTags.CloseButton),
-        mode = UiBoxMode.STACK,
-        modifier = Modifier.size(DockTabCloseSize.px, DockTabCloseSize.px).input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND).onClick { event ->
-                state.close(item.id)
-                event.consume()
-            }) {
-        Image(DockCloseIcon, tags = listOf(DockTags.CloseIcon), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
+        modifier = Modifier.size(DockTabCloseSize.px, DockTabCloseSize.px),
+    ) { state.close(item.id) }
 }
 
 @Composable
@@ -597,8 +591,7 @@ private fun DefaultDockHeaderContent(item: DockItem) {
 @Composable
 private fun DockItemLabel(item: DockItem) {
     Row(
-        modifier = Modifier.size(UiLength.Auto, 100.percent)
-            .align(UiAlign.START, UiAlign.CENTER)
+        modifier = Modifier.size(UiLength.Auto, 100.percent).align(UiAlign.START, UiAlign.CENTER)
             .alignItems(vertical = UiAlign.CENTER),
     ) {
         item.icon?.let { icon -> Image(icon, tags = listOf(DockTags.TabIcon)) }
@@ -649,7 +642,6 @@ object DockTags {
     const val ContentBody = "dock-content-body"
     const val ResizeHandle = "dock-resize-handle"
     const val CloseButton = "dock-close-button"
-    const val CloseIcon = "dock-close-icon"
     const val TabIndicator = "dock-tab-indicator"
     const val PinnedIsland = "dock-pinned-island"
     const val DropOverlay = "dock-drop-overlay"

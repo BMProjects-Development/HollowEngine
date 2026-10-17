@@ -100,6 +100,16 @@ internal object HollowIdeToolWindows {
         minWidth = 160f,
         minHeight = 90f,
     )
+    val History = HollowIdeToolWindow(
+        id = HistoryId,
+        titleKey = "hollowengine.gui.history.title",
+        icon = "hollowengine:textures/gui/icons/history.svg",
+        placement = DockPlacement.RIGHT,
+        anchors = listOf(HollowIdePanelAnchor.EDITORS, HollowIdePanelAnchor.PROJECT),
+        minWidth = 160f,
+        minHeight = 120f,
+        titleInToolbar = true,
+    )
     val UiProfiler = HollowIdeToolWindow(
         id = UiProfilerId,
         titleKey = "hollowengine.gui.ide.tools.ui_profiler",
@@ -111,14 +121,14 @@ internal object HollowIdeToolWindows {
     )
 
     val menu: List<HollowIdeToolWindow?> = listOf(
-        Project, Scene, Inspector, AssetManager, Console,
+        Project, Scene, Inspector, AssetManager, Console, History,
         null,
         Timeline, GameViewport,
     )
 
     /** Every window the editor knows how to open, for turning a remembered id back into one. */
     val all: List<HollowIdeToolWindow> = listOf(
-        Project, Scene, AssetManager, Console, Timeline, Inspector, GameViewport, UiProfiler,
+        Project, Scene, AssetManager, Console, Timeline, Inspector, GameViewport, History, UiProfiler,
     )
 
     fun byId(id: String): HollowIdeToolWindow? = all.firstOrNull { it.id == id }

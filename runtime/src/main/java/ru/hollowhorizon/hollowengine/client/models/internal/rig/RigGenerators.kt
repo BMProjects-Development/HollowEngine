@@ -17,10 +17,22 @@ fun interface RigGenerator {
 object RigGenerators {
     val point = ExtensionPoints.create<Entry>("hollowengine:rig/generators".rl)
 
-    class Entry(val id: String, val titleKey: String, val generator: RigGenerator)
+    /** One way to fill in a rig: what the editor's menu calls it, the icon beside it, and the generator itself. */
+    class Entry(val id: String, val titleKey: String, val icon: String, val generator: RigGenerator)
 
-    fun register(id: String, titleKey: String, generator: RigGenerator): ExtensionHandle =
-        point.register(id.rl, Entry(id, titleKey, generator))
+    const val DEFAULT_ICON = "hollowengine:textures/gui/icons/rig/generate.svg"
+
+    init {
+        register(
+            ColliderRigGenerator.ID,
+            "hollowengine.gui.rig_editor.generate_colliders",
+            ColliderRigGenerator,
+            icon = "hollowengine:textures/gui/icons/rig/colliders.svg",
+        )
+    }
+
+    fun register(id: String, titleKey: String, generator: RigGenerator, icon: String = DEFAULT_ICON): ExtensionHandle =
+        point.register(id.rl, Entry(id, titleKey, icon, generator))
 
     val all: List<Entry> get() = point.extensions
 }

@@ -1,21 +1,8 @@
 package ru.hollowhorizon.hollowengine.cutscene
 
 import org.junit.jupiter.api.Test
-import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelBounds
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.FloatPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInterpolation
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TranslationPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraRig
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutscenePlaybackController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneWeather
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.TimeOfDayPropertyType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.TimeOfDayValueFormatter
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.snapTimelineTime
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.timelineRows
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
@@ -25,13 +12,11 @@ import kotlin.test.assertTrue
 class CutsceneTest {
 
     @Test
-    fun `timeline snapping follows drag modifiers`() {
-        assertEquals(1f, snapTimelineTime(1.24f, GLFW.GLFW_MOD_ALT))
-        assertEquals(2f, snapTimelineTime(1.76f, GLFW.GLFW_MOD_ALT))
-        assertEquals(1f, snapTimelineTime(1.24f, GLFW.GLFW_MOD_SHIFT))
-        assertEquals(1.5f, snapTimelineTime(1.26f, GLFW.GLFW_MOD_SHIFT))
-        assertEquals(1.24f, snapTimelineTime(1.24f, GLFW.GLFW_MOD_CONTROL))
-        assertEquals(1.24f, snapTimelineTime(1.24f, 0))
+    fun `timeline times snap to the nearest whole frame`() {
+        assertEquals(1f, TimelineSnap.snap(1.02f, 20))
+        assertEquals(1.05f, TimelineSnap.snap(1.04f, 20))
+        assertEquals(0.5f, TimelineSnap.snap(0.51f, 24))
+        assertEquals(1.24f, TimelineSnap.snap(1.24f, 0))
     }
 
     @Test

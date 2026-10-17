@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphGroupColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val GraphIcon = "hollowengine:textures/gui/icons/files/shader.svg"
@@ -124,10 +125,9 @@ private fun ValueRow(document: HollowIdeShaderGraphDocument, node: ShaderGraphNo
     Label(pin.name)
     Row(tags = listOf("insp-input-row")) {
         repeat(width) { component ->
-            NumberInput(
-                path = "sg-value-${node.id}-${pin.name}-$component",
+            NumberField(
                 value = values.getOrElse(component) { values.last() }.toDouble(),
-                whole = false,
+                id = "insp-numbersg-value-${node.id}-${pin.name}-$component",
                 modifier = Modifier.size(0.px).grow(1f),
             ) { typed ->
                 val next = (0 until width).map { values.getOrElse(it) { values.last() } }.toMutableList()
@@ -208,10 +208,9 @@ private fun PropertyFields(document: HollowIdeShaderGraphDocument, index: Int, p
         Row(tags = listOf("insp-input-row")) {
             repeat(property.type.width) { component ->
                 val values = property.default.ifEmpty { listOf(0f) }
-                NumberInput(
-                    path = "sg-property-$index-$component",
+                NumberField(
                     value = values.getOrElse(component) { values.last() }.toDouble(),
-                    whole = false,
+                    id = "insp-numbersg-property-$index-$component",
                     modifier = Modifier.size(0.px).grow(1f),
                 ) { typed ->
                     val next =

@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.utils
 
 import com.mojang.blaze3d.systems.RenderSystem
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import net.minecraft.ChatFormatting
 import net.minecraft.Util
 import net.minecraft.core.HolderLookup
@@ -142,18 +141,6 @@ fun MutableComponent.onHoverEntity(entity: Entity) = this.withStyle {
 }
 
 fun openUrl(url: String) = Util.getPlatform().openUri(url)
-
-/**
- * Memoizes a function, caching its results to improve performance.
- *
- * @return A memoized version of the function.
- */
-fun <A, B> ((A) -> B).memoize(): (A) -> B {
-    val cache: MutableMap<A, B> = Object2ObjectOpenHashMap()
-    return {
-        cache.getOrPut(it) { this(it) }
-    }
-}
 
 /**
  * Saves an ItemStack to a CompoundTag.

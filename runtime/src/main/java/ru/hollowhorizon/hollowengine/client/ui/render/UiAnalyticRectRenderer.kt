@@ -2,13 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.render
 
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.resources.ResourceLocation
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL13
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GL31
-import org.lwjgl.opengl.GL33
+import org.lwjgl.opengl.*
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.text.GlyphEdgeSoftness
 import java.nio.FloatBuffer
@@ -49,8 +43,8 @@ internal class UiAnalyticRectRenderer : UiSdfRenderer(
         val missing = fontAtlasLocations.indexOfFirst { it < 0 }
         if (missing >= 0) {
             HollowEngine.LOGGER.error(
-                "rect_sdf.fsh declares fewer glyph atlases than UiAnalyticRectBatch.MaxGlyphPages " +
-                        "({}): no uniform FontAtlas{}", UiAnalyticRectBatch.MaxGlyphPages, missing,
+                "rect_sdf.fsh declares fewer glyph atlases than UiAnalyticRectBatch.MaxGlyphPages " + "({}): no uniform FontAtlas{}",
+                UiAnalyticRectBatch.MaxGlyphPages, missing,
             )
         }
         val previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM)
@@ -62,7 +56,6 @@ internal class UiAnalyticRectRenderer : UiSdfRenderer(
         GL20.glUseProgram(previousProgram)
     }
 
-    /** Per-instance attributes: the 4×4 row-major transform (locations 0-3) + local bounds (4). */
     override fun setupVertexAttributes() {
         val stride = UiAnalyticRectBatch.InstanceStride * Float.SIZE_BYTES
         for (location in 0..4) {

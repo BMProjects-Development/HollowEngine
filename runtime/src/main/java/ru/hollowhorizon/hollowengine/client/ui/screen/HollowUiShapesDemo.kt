@@ -3,12 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.screen
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
-import ru.hollowhorizon.hollowengine.client.ui.shape.SvgPathShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiSvgPathDocument
-import ru.hollowhorizon.hollowengine.client.ui.shape.svgResource
-import ru.hollowhorizon.hollowengine.client.ui.shape.svgResourceDocument
+import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiGradientStop
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.style.UiRadialGradient
@@ -79,7 +74,7 @@ internal fun shapesDemo() {
                 .size(188.px, 126.px)
                 .clip(bevel)
                 .background(
-                    32f, listOf(
+                    122f, listOf(
                         UiGradientStop(0f, UiColor(0.36f, 0.58f, 0.95f, 1f)),
                         UiGradientStop(1f, UiColor(0.18f, 0.8f, 0.64f, 1f)),
                     )
@@ -120,7 +115,7 @@ internal fun shapesDemo() {
                 .drawBehind {
                     drawRect(
                         paint = UiPaint.LinearGradient(
-                            35f,
+                            125f,
                             listOf(
                                 UiGradientStop(0f, UiColor(0.22f, 0.72f, 0.92f, 0.96f)),
                                 UiGradientStop(1f, UiColor(0.42f, 0.22f, 0.72f, 0.96f)),
@@ -180,7 +175,7 @@ internal fun shapesDemo() {
                 .size(188.px, 126.px)
                 .clip(svgHexagon)
                 .background(
-                    45f, listOf(
+                    135f, listOf(
                         UiGradientStop(0f, UiColor(0.92f, 0.58f, 0.36f, 1f)),
                         UiGradientStop(1f, UiColor(0.26f, 0.84f, 0.75f, 1f)),
                     )
@@ -262,7 +257,7 @@ internal fun shapesDemo() {
             x = 230,
             y = 464,
             fill = UiPaint.LinearGradient(
-                130f,
+                220f,
                 listOf(
                     UiGradientStop(0f, UiColor(0.82f, 0.94f, 1f, 0.96f)),
                     UiGradientStop(1f, UiColor(0.34f, 0.78f, 0.74f, 0.92f)),

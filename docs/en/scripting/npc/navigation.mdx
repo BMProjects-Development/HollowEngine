@@ -1,0 +1,99 @@
+---
+title: Navigation
+order: 5
+---
+
+<center><h1>Navigation</h1></center>
+
+*How an NPC finds its way and walks it, and how to tune that for one NPC or one move.*
+
+Every engine NPC finds and walks its paths the same way, whatever moves it: a script's [`move`](/docs/hollowengine/scripting/npc/movement), a goal such as attacking, or the patrol component. The **Navigation** component tunes this for one NPC. Without it the NPC goes by the defaults shown below, and a script can change them for a single move.
+
+---
+
+## The Navigation component
+
+Open the NPC's components with the NPC wand and add **Navigation** (`hollowengine:entity/navigation`). Its settings come in four groups. The component lives on the server only: clients see the NPC move and need nothing of it.
+
+### Path
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| Straighten the path | on | Walks the found path in straight lines wherever nothing is in the way, instead of block by block. A straight line never cuts across doors, hazards, jumps or anything the NPC avoids. |
+| Drop off ledges | on | Steps off ledges higher than a block, as high as the fall damage below allows, instead of looking for a way down. Water at the bottom takes a fall from any height. |
+| Fall damage | `0` | The fall damage, in half-hearts, the NPC accepts for a shorter way. `0` falls only as far as is safe: 3 blocks for a regular NPC. |
+
+### Jumps
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| Over gaps | on | Jumps over gaps onto ground as high as the ground it takes off from. |
+| Over gaps, up | on | Jumps over gaps onto ground a block higher. |
+| Over gaps, down | on | Jumps over gaps onto ground one or two blocks lower. |
+| Widest gap | `2` | In blocks. |
+| Jump cost | `3` | How many blocks of walking a jump is worth: the NPC jumps when going around is longer by more than this. It also counts for jumping up a block. |
+| Run-up | `1.5` | How much faster than its own speed the NPC runs up to a jump over a gap. |
+
+### Movement
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| Acceleration | `0.3` | Seconds from standing to full speed. |
+| Deceleration | `0.5` | Seconds from full speed to a stop. The NPC brakes this early for the end of its path, for sharp turns and before a jump. |
+| Speed on straights | `1.1` | How much faster the NPC walks on a long straight stretch. `1` never speeds up. |
+| Straight length | `8` | In blocks: how long the straight stretch ahead has to be. The extra speed fades out over the last half of it. |
+| Step back | `2` | In blocks: the longest walk to a point behind the NPC it takes backward instead of turning round. `0` always turns. It does not step back up or down a block. |
+| Backward speed | `0.6` | The NPC's speed walking backward, as a share of walking forward. |
+| Sideways speed | `0.8` | The NPC's speed walking sideways, as a share of walking forward. |
+
+### Avoiding
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| Swim | on | Swims through deep water. Without it, water deeper than a block is a wall to the NPC; one that stands in it already gets out to the nearest shore. |
+| Water cost | `8` | How many blocks of walking a block of water is worth, so a swimming NPC still takes a bridge. |
+| Make way | on | Steps out of the way of others in its path; see [Meeting others](#meeting-others). |
+| Blocks | empty | Blocks the NPC walks around, each with a cost. |
+
+An entry of **Blocks** is a block id such as `minecraft:farmland`, or a block tag such as `#minecraft:flowers`, and a cost: how many blocks of walking stepping onto or into such a block is worth. A negative cost means never. Both the floor the NPC stands on and the blocks its body is in count, so farmland, carpets and crops all work; a block that matches several entries costs the most of them.
+
+An NPC that already stands on a block it may never step on, or in water it does not swim in, is not stuck there: it walks out of it the shortest way and does not come back.
+
+---
+
+## Changing the settings for one move
+
+`MoveOptions(navigation = ...)` changes the settings for that move only. It is given the NPC's own settings, or the defaults when it has no component, and returns the ones to use:
+
+```kotlin
+npc.move(
+    pos(40, 64, 12),
+    MoveOptions(navigation = { copy(jumps = jumps.copy(maxGap = 3, runUp = 2f)) }),
+)
+```
+
+Zones to keep out of are set from scripts as well, for one move or for good: see [Keeping out of zones](/docs/hollowengine/scripting/npc/movement#keeping-out-of-zones).
+
+---
+
+## Meeting others
+
+With **Make way** on, an NPC walking its path keeps out of the way of NPCs, players and mobs, all but those with an empty body: those standing in its path, coming toward it or crossing it. It works out where it will pass closest to each of them, and if that is too close, steps aside on the side the other is not, keeping right when they meet head on. Two NPCs walking into each other both step aside to their right and pass each other. The path stays as it was: once the other is past, the NPC walks back onto it. It does not step around whoever stands where its path ends, as the player it walks up to.
+
+Where a wall or a ledge leaves no room to pass, as in a gap between two pillars, one of the two gives way: the NPC that still has room steps aside where it is and waits until the other is by, while the one already in the narrow part goes on. Two that both have room settle it between themselves, and a player or a mob, which never gives way, is waited for. The NPC waits five seconds at most and then goes on. In a corridor one block wide, where neither has room, NPCs still push past each other.
+
+Unlike [colliders](#colliders-and-blocking-bodies), these bodies take no part in the path search: they move, and a path planned around where they stood would be wrong a tick later.
+
+---
+
+## Colliders and blocking bodies
+
+All mobs, not only NPCs, plan their paths around [solid colliders](/docs/hollowengine/scripting/colliders) and around the boxes of blocking bodies, the way they plan around blocks: a mob no longer walks into a 3×3 machine standing on what looks like empty floor. When such a collider moves into or out of the way of a mob walking a path, the mob plans the path again, as after a block change.
+
+The top of a collider is not yet ground a path goes over, so a low solid collider, such as a rug, is walked around rather than stepped onto.
+
+---
+
+## Animations
+
+The standard player model plays its walk and run clips as fast as keeps its feet planted on the ground, walking backward plays the walk backward, and a sideways step plays the walk. For a model of your own, drive the clip speed in its [animator](/docs/hollowengine/scripting/animator-editor) the same way: `movement_animation_speed` is the entity's speed in blocks a second, negative when it walks backward, so divide it by how fast a planted foot of your clip moves over the ground, and use `local_side_speed`, its sideways speed in blocks a tick, for a clip that steps sideways.

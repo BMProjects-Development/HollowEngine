@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
@@ -55,8 +56,8 @@ internal fun nodeItems(
         add(UiDropdownItem(graphText("show_preview"), mark = UiDropdownMark.CHECKBOX, checked = shown) { onPreview(!shown) })
     }
     if (kind.master == null) {
-        add(UiDropdownItem(graphText("duplicate"), shortcut = "Ctrl+D", separatorBefore = isNotEmpty(), onClick = onDuplicate))
-        add(UiDropdownItem(graphText("delete_node"), shortcut = "Del", onClick = onDelete))
+        add(UiDropdownItem(graphText("duplicate"), shortcut = HollowKeys.DUPLICATE.shortcut, separatorBefore = isNotEmpty(), onClick = onDuplicate))
+        add(UiDropdownItem(graphText("delete_node"), shortcut = HollowKeys.DELETE.shortcut, onClick = onDelete))
     }
     organize.forEachIndexed { index, item -> add(if (index == 0) item.copy(separatorBefore = true) else item) }
 }
@@ -73,9 +74,9 @@ internal fun organizeItems(
     onLeave: () -> Unit,
     arrange: UiDropdownItem?,
 ): List<UiDropdownItem> = listOfNotNull(
-    UiDropdownItem(graphText("group_nodes"), icon = GroupIcon, shortcut = "Ctrl+G", onClick = onGroup).takeIf { canGroup },
+    UiDropdownItem(graphText("group_nodes"), icon = GroupIcon, shortcut = HollowKeys.GROUP.shortcut, onClick = onGroup).takeIf { canGroup },
     UiDropdownItem(graphText("leave_group"), onClick = onLeave).takeIf { grouped },
-    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = "Ctrl+Shift+G", onClick = onUngroup).takeIf { grouped },
+    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut, onClick = onUngroup).takeIf { grouped },
     arrange,
 )
 
@@ -88,7 +89,7 @@ internal fun groupItems(
     arrange: UiDropdownItem?,
 ): List<UiDropdownItem> = listOfNotNull(
     UiDropdownItem(graphText(if (group.collapsed) "expand_group" else "collapse_group"), onClick = onToggle),
-    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = "Ctrl+Shift+G", onClick = onUngroup),
+    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut, onClick = onUngroup),
     arrange,
     UiDropdownItem(graphText("delete_group_nodes"), separatorBefore = true, onClick = onDelete),
 )

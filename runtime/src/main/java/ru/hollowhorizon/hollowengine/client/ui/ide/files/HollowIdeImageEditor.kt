@@ -4,13 +4,15 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCheckboxVariant
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.checkerboard
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.ceil
@@ -58,8 +60,11 @@ internal fun HollowIdeImageEditor(
 
     fun applyHistory(redo: Boolean) {
         finishStroke()
-        val changed = if (redo) document.redo() else document.undo()
-        if (!changed) return
+        if (redo) document.history.redo() else document.history.undo()
+    }
+
+    val historyPosition = document.history.position
+    LaunchedEffect(document, historyPosition) {
         file.updateDirty(document.isModified)
         uploadRevision++
     }
@@ -163,21 +168,7 @@ internal fun HollowIdeImageEditor(
         tags = listOf("image-editor-root"),
         modifier = Modifier.style(InspectorStylesheet).style("hollowengine:ui/styles/image-editor.hss")
             .size(100.percent, 100.percent)
-            .focusScope()
-            .onKeyInput { input ->
-                if (!input.command || input.repeat) return@onKeyInput
-                when (input.key) {
-                    GLFW.GLFW_KEY_Z -> {
-                        applyHistory(redo = input.shift)
-                        input.consume()
-                    }
-
-                    GLFW.GLFW_KEY_Y -> {
-                        applyHistory(redo = true)
-                        input.consume()
-                    }
-                }
-            },
+            .focusScope(),
     ) {
         Box(
             tags = listOf("image-editor-canvas-scroll"),
@@ -249,18 +240,16 @@ internal fun HollowIdeImageEditor(
             }
 
             if (tool != ImageTool.EYEDROPPER) {
-                Text(
-                    "hollowengine.gui.image_editor.size".lang.format(brushRadius * 2 + 1),
-                    tags = listOf("image-editor-label"),
-                )
-                Slider(
-                    value = brushRadius.toFloat(),
-                    min = 0f,
-                    max = MaxBrushRadius.toFloat(),
-                    step = 1f,
-                    onValueChange = { brushRadius = it.toInt() },
-                    modifier = Modifier.size(100.percent, 16.px),
-                )
+                NumberField(
+                    value = brushRadius.toDouble(),
+                    id = "image-editor-brush",
+                    label = "hollowengine.gui.image_editor.size".lang,
+                    whole = true,
+                    min = 0.0,
+                    max = MaxBrushRadius.toDouble(),
+                    slider = true,
+                    format = { (it.toInt() * 2 + 1).toString() },
+                ) { brushRadius = it.toInt() }
             }
 
             SectionTitle("hollowengine.gui.image_editor.history".lang)
@@ -268,7 +257,7 @@ internal fun HollowIdeImageEditor(
                 ToolButton(
                     "hollowengine.gui.image_editor.undo".lang,
                     selected = false,
-                    enabled = document.canUndo,
+                    enabled = document.history.canUndo,
                     modifier = HistoryButtonModifier,
                 ) {
                     applyHistory(redo = false)
@@ -276,7 +265,7 @@ internal fun HollowIdeImageEditor(
                 ToolButton(
                     "hollowengine.gui.image_editor.redo".lang,
                     selected = false,
-                    enabled = document.canRedo,
+                    enabled = document.history.canRedo,
                     modifier = HistoryButtonModifier,
                 ) {
                     applyHistory(redo = true)
@@ -338,23 +327,7 @@ private fun ToolButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-) {
-    val enabledState by rememberUpdatedState(enabled)
-    val tags = buildList {
-        add("image-editor-tool")
-        if (selected) add("selected")
-        if (!enabledState) add("disabled")
-    }
-    Box(
-        tags = tags,
-        modifier = modifier.cursor(if (enabledState) UiCursorShape.HAND else UiCursorShape.DEFAULT).onClick { event ->
-            if (enabledState && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-            event.consume()
-        },
-    ) {
-        Text(label, tags = listOf("image-editor-tool-label"))
-    }
-}
+) = Button(label, active = selected, enabled = enabled, tags = listOf("image-editor-tool"), modifier = modifier, onClick = onClick)
 
 @Composable
 private fun RecentColor(color: UiColor, onClick: () -> Unit) {

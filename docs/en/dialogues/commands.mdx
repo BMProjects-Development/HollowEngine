@@ -39,7 +39,7 @@ Arguments may be positional or named. Durations accept bare milliseconds and the
 
 | Command | Arguments | Behaviour |
 | --- | --- | --- |
-| `@walk-to` | `who position-or-character [speed=...] [distance=...] [timeout=15s]` | Moves an NPC and waits for arrival. `timeout=0` waits without a limit. |
+| `@walk-to` | `who position-or-character [speed=...] [distance=...] [timeout=15s] [facing=...]` | Moves an NPC and waits for arrival. `timeout=0` waits without a limit. A list of positions, `[[x, y, z], [x, y, z]]`, is walked through in turn without stopping at any but the last. `facing=` names a character or a position to keep facing on the way: the NPC walks sideways or backward. |
 | `@stop-walking` | `who` | Stops NPC navigation. |
 | `@look-at` | `who position [time=1500ms]` or `who character` | Looks at a position for a duration, or follows a character. |
 | `@stop-looking` | `who` | Clears the NPC look target. |
@@ -51,6 +51,8 @@ Arguments may be positional or named. Durations accept bare milliseconds and the
 
 ```story
 @walk-to Guard [100, 64, 120] speed=1.2 distance=2 timeout=10s
+@walk-to Guard [[100, 64, 120], [110, 64, 120], [110, 64, 135]]
+@walk-to Guard [96, 64, 120] facing=player
 @look-at Guard player
 @play-once Guard hello fade=250ms
 ```

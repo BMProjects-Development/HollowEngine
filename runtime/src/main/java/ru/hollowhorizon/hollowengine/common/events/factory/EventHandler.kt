@@ -3,14 +3,7 @@ package ru.hollowhorizon.hollowengine.common.events.factory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.suspendCancellableCoroutine
-import ru.hollowhorizon.hollowengine.common.events.Cancellable
-import ru.hollowhorizon.hollowengine.common.events.ClientEvent
-import ru.hollowhorizon.hollowengine.common.events.Event
-import ru.hollowhorizon.hollowengine.common.events.EventListener
-import ru.hollowhorizon.hollowengine.common.events.LogicalSide
-import ru.hollowhorizon.hollowengine.common.events.ServerEvent
-import ru.hollowhorizon.hollowengine.common.events.StartupEvent
-import ru.hollowhorizon.hollowengine.common.events.eventListenerOf
+import ru.hollowhorizon.hollowengine.common.events.*
 import java.lang.reflect.ParameterizedType
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
@@ -26,6 +19,9 @@ open class EventHandler<T : Event> {
     private val eventType: Class<*>? by lazy {
         (javaClass.genericSuperclass as? ParameterizedType)?.actualTypeArguments?.firstOrNull() as? Class<*>
     }
+
+    /** Whether anything listens, for events that are costly to work out before they can be posted. */
+    val hasListeners: Boolean get() = subscriptions.isNotEmpty()
 
     fun register(priority: Int = 0, listener: (T) -> Unit): (T) -> Unit {
         add(Subscription(eventListenerOf(priority, listener), side = null, job = null))

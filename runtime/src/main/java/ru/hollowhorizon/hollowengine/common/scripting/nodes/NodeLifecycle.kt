@@ -1,23 +1,27 @@
 package ru.hollowhorizon.hollowengine.common.scripting.nodes
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.*
 
-/** Serializes replacement of a node with completion of its old scope, including `onStop`. */
-internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
-    private val stopping = ConcurrentHashMap<String, Job>()
-    private val pending = ConcurrentHashMap<String, Job>()
+/**
+ * Game-thread-owned replacement of a node after its old scope, including `onStop`, completes.
+ * [changed] fires on the game thread whenever a node starts or finishes stopping or waiting. It may run
+ * inside `cancel`, so it must only schedule work.
+ */
+internal class NodeLifecycle(
+    private val changed: () -> Unit = {},
+    private val scope: () -> CoroutineScope,
+) {
+    private val stopping = mutableMapOf<String, Job>()
+    private val pending = mutableMapOf<String, Job>()
 
-    fun pendingPaths(): Set<String> = pending.keys.toSet()
+    fun pendingPaths(): Set<String> = pending.activePaths()
+    fun stoppingPaths(): Set<String> = stopping.activePaths()
 
-    fun isPending(path: String): Boolean = pending.containsKey(path)
+    fun isPending(path: String): Boolean = pending[path]?.isCompleted == false
+    fun isStopping(path: String): Boolean = stopping[path]?.isCompleted == false
 
     fun cancelStart(path: String) {
+        removeCompleted()
         pending.remove(path)?.cancel()
     }
 
@@ -25,7 +29,7 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
         cancelStart(path)
         if (!job.isCompleted) {
             stopping[path] = job
-            job.invokeOnCompletion { stopping.remove(path, job) }
+            job.notifyOnCompletion()
         }
         job.cancel()
     }
@@ -48,7 +52,23 @@ internal class NodeLifecycle(private val scope: () -> CoroutineScope) {
             start()
         }
         pending[path] = next
-        next.invokeOnCompletion { pending.remove(path, next) }
+        next.notifyOnCompletion()
         next.start()
+        changed()
+    }
+
+    /** A node's last child may finish on a worker thread; the notification still belongs to the game thread. */
+    private fun Job.notifyOnCompletion() {
+        invokeOnCompletion { scope().launch { changed() } }
+    }
+
+    private fun MutableMap<String, Job>.activePaths(): Set<String> {
+        removeCompleted()
+        return keys.toSet()
+    }
+
+    private fun removeCompleted() {
+        stopping.entries.removeAll { it.value.isCompleted }
+        pending.entries.removeAll { it.value.isCompleted }
     }
 }

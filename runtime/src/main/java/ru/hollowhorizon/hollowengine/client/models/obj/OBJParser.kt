@@ -1,9 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.models.obj
 
 import net.minecraft.resources.ResourceLocation
-import ru.hollowhorizon.hollowengine.client.models.internal.ModelSpace
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.ModelSpace
 import ru.hollowhorizon.hollowengine.client.models.internal.Scene
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
 import ru.hollowhorizon.hollowengine.client.utils.stream

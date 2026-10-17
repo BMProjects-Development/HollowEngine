@@ -4,11 +4,7 @@ import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
-import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkKeyframes
-import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkPeriodMillis
-import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
-import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
-import ru.hollowhorizon.hollowengine.client.ui.style.opacity
+import ru.hollowhorizon.hollowengine.client.ui.style.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

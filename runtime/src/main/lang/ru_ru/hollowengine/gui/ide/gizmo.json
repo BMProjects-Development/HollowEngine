@@ -1,5 +1,9 @@
 {
   "translate": "Перемещение",
   "rotate": "Поворот",
-  "scale": "Масштаб"
+  "scale": "Масштаб",
+  "orientation": "Оси: %s. Нажмите, чтобы сменить",
+  "orientation.global": "глобальные",
+  "orientation.local": "локальные",
+  "orientation.view": "вида"
 }

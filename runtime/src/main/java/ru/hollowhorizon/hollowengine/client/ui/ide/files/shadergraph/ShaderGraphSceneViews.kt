@@ -3,18 +3,9 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderDiagnostic
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraph
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraphTypes
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeLibrary
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeTypes
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderType
+import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphGroupColors
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphGroupHeader
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphGroupToggle
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNode
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphViewState
+import ru.hollowhorizon.hollowengine.client.ui.graph.*
 
 /**
  * Everything on the canvas of a graph, back to front: the title bars of open groups, the nodes, the

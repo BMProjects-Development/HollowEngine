@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiGradientStop
 import kotlin.math.floor
@@ -55,7 +51,7 @@ fun ColorPicker(
         ) {
             Box(
                 modifier = Modifier.size(100.percent, 100.percent).background(
-                    0f,
+                    90f,
                     listOf(
                         UiGradientStop(0f, UiColor.White),
                         UiGradientStop(1f, UiColor(1f, 1f, 1f, 0f)),
@@ -64,7 +60,7 @@ fun ColorPicker(
             )
             Box(
                 modifier = Modifier.size(100.percent, 100.percent).background(
-                    90f,
+                    180f,
                     listOf(
                         UiGradientStop(0f, UiColor(0f, 0f, 0f, 0f)),
                         UiGradientStop(1f, UiColor.Black),
@@ -88,7 +84,7 @@ fun ColorPicker(
             mode = UiBoxMode.STACK,
             tags = listOf("color-picker-hue"),
             modifier = Modifier.size(100.percent, 14.px)
-                .background(0f, HueStops)
+                .background(90f, HueStops)
                 .border(1.px, PickerBorderColor, 3f)
                 .borderRadius(3f),
         ) {
@@ -128,7 +124,7 @@ fun ColorPicker(
                     val opaque = hsv.toUiColor().copy(alpha = 1f)
                     Box(
                         modifier = Modifier.size(100.percent, 100.percent).background(
-                            0f,
+                            90f,
                             listOf(
                                 UiGradientStop(0f, opaque.copy(alpha = 0f)),
                                 UiGradientStop(1f, opaque),

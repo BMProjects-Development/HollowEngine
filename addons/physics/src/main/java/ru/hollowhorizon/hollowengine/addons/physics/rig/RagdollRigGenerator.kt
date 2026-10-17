@@ -1,25 +1,36 @@
 package ru.hollowhorizon.hollowengine.addons.physics.rig
 
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.BoneBounds
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.BoneGeometry
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.ColliderRigGenerator
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigGenerator
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.boneAncestor
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import kotlin.math.sqrt
 
 /**
- * Turns a model into a ragdoll to start from: a body around whatever geometry each bone actually holds,
- * and a joint to the bone above it.
+ * Turns a model into a ragdoll to start from: a body on every bone whose geometry has some bulk, made of the bone's
+ * colliders, and a joint holding it to the body it hangs from. A bone without a collider gets one fitted around its
+ * geometry, the same one "colliders from geometry" would give it. A bone that already has a body keeps it, and its
+ * joint, as they are.
  */
 object RagdollRigGenerator : RigGenerator {
     const val ID = "hollowengine:physics/ragdoll_from_geometry"
 
     private const val BODY_ID = "body"
     private const val JOINT_ID = "joint"
+
+    /** Geometry thinner than this on any side is a lid, a brow or a decal, which rides on the bone above it. */
+    private const val MIN_THICKNESS = 0.05f
 
     override fun generate(model: ModelAttachment, current: ModelRig): ModelRig =
         generate(model.nodes.flatMap { it.walk() }, model.model.boneBounds, current)
@@ -29,146 +40,73 @@ object RagdollRigGenerator : RigGenerator {
         geometry: Map<Int, Pair<Vec3f, Vec3f>>,
         current: ModelRig,
     ): ModelRig {
-        if (nodes.isEmpty() || geometry.isEmpty()) return current
-
-        val bindGlobals = bindGlobalsOf(nodes)
-        val bones = boneNodes(nodes)
-        val boxes = geometryPerBone(nodes, bones, geometry, bindGlobals)
-        if (boxes.isEmpty()) return current
-
-        val worthSimulating = boxes.filterValues { it.isWorthSimulating }
+        val corners = BoneGeometry.cornersPerBone(nodes, geometry)
+        val bodies = corners.mapValues { (_, points) -> BoneBounds.around(points) }.filterValues { it.thinnestSide >= MIN_THICKNESS }
+        if (bodies.isEmpty()) return current
+        val parents = jointParents(bodies, BoneGeometry.bindGlobalsOf(nodes))
+        val takenNames = current.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
 
         var rig = current
-        worthSimulating.forEach { (bone, box) ->
-            val existing = rig.bone(bone.name) ?: RigBone.EMPTY
-            val parent = bone.boneAncestor(worthSimulating.keys)
-            val body = RigidBodyAttachmentSpec(id = BODY_ID, shape = box.toShape())
-
-            rig = rig.withBone(bone.name, existing.withAttachment(body).withJointTo(parent))
+        bodies.keys.forEach { bone ->
+            var holder = rig.bone(bone.name) ?: RigBone.EMPTY
+            // A body already on the bone was set up by hand, its joint and limits with it, and is left as it is.
+            if (holder.attachments.any { it is RigidBodyAttachmentSpec }) return@forEach
+            if (holder.attachments.none { it is ColliderAttachmentSpec }) {
+                val name = ColliderRigGenerator.freeName(bone.name, takenNames).also(takenNames::add)
+                ColliderRigGenerator.fit(name, corners.getValue(bone))?.let { holder = holder.withAttachment(it) }
+            }
+            holder = holder.withAttachment(RigidBodyAttachmentSpec(id = BODY_ID))
+            parents[bone]?.let { parent -> holder = holder.withAttachment(JointAttachmentSpec(id = JOINT_ID, parent = parent.name)) }
+            rig = rig.withBone(bone.name, holder)
         }
         return rig
     }
 
-    private fun RigBone.withJointTo(parent: RuntimeNode?): RigBone = if (parent == null) withoutAttachment(JOINT_ID)
-    else withAttachment(JointAttachmentSpec(id = JOINT_ID, parent = parent.name))
 
-    private fun boneNodes(nodes: List<RuntimeNode>): Set<RuntimeNode> {
-        val joints = nodes.mapNotNull { it.definition.skin }.flatMap { it.jointsIds }.toSet()
-        if (joints.isNotEmpty()) return nodes.filterTo(LinkedHashSet()) { it.definition.index in joints }
-
-        return nodes.filterTo(LinkedHashSet()) { it.definition.mesh == null && it.children.isNotEmpty() }
-    }
-
-    private fun geometryPerBone(
-        nodes: List<RuntimeNode>,
-        bones: Set<RuntimeNode>,
-        geometry: Map<Int, Pair<Vec3f, Vec3f>>,
-        bindGlobals: Map<Int, Mat4f>,
-    ): Map<RuntimeNode, Bounds> {
-        val boxes = LinkedHashMap<RuntimeNode, Bounds>()
-        val corner = MutableVec3f()
-        val inBone = MutableVec3f()
-
-        nodes.forEach { node ->
-            val (min, max) = geometry[node.definition.index] ?: return@forEach
-            val bone = if (node in bones) node else node.boneAncestor(bones) ?: return@forEach
-            val toBone = intoBoneSpace(node, bone, bindGlobals) ?: return@forEach
-            val box = boxes.getOrPut(bone) { Bounds() }
-
-            repeat(CORNERS) { index ->
-                corner.set(
-                    if (index and 1 == 0) min.x else max.x,
-                    if (index and 2 == 0) min.y else max.y,
-                    if (index and 4 == 0) min.z else max.z,
-                )
-                toBone.transform(corner, 1f, inBone)
-                box.add(inBone)
-            }
+    private fun jointParents(bodies: Map<RuntimeNode, BoneBounds>, globals: Map<Int, Mat4f>): Map<RuntimeNode, RuntimeNode> {
+        val parents = HashMap<RuntimeNode, RuntimeNode>()
+        val tops = ArrayList<RuntimeNode>()
+        bodies.keys.forEach { bone ->
+            val above = bone.boneAncestor(bodies.keys)
+            if (above == null) tops += bone else parents[bone] = above
         }
-        return boxes
-    }
 
-    private fun intoBoneSpace(node: RuntimeNode, bone: RuntimeNode, bindGlobals: Map<Int, Mat4f>): Mat4f? {
-        if (node === bone) return IDENTITY
-
-        val nodeGlobal = bindGlobals[node.definition.index] ?: return null
-        val boneGlobal = bindGlobals[bone.definition.index] ?: return null
-        val inverse = MutableMat4f().set(boneGlobal)
-        if (!inverse.invert()) return null
-        return inverse.mul(nodeGlobal, MutableMat4f())
-    }
-
-    private fun bindGlobalsOf(nodes: List<RuntimeNode>): Map<Int, Mat4f> {
-        val globals = HashMap<Int, Mat4f>(nodes.size)
-        nodes.forEach { node ->
-            val local = node.definition.baseTransform.matrixF
-            val parent = (node.parent as? RuntimeNode)?.let { globals[it.definition.index] }
-            globals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: local
+        val main = tops.maxBy { bodies.getValue(it).volume }
+        val joined = HashSet(bodies.keys.filter { it.isUnder(main) })
+        val waiting = tops.filterTo(ArrayList()) { it !== main }
+        while (waiting.isNotEmpty()) {
+            val (top, nearest) = waiting.flatMap { top ->
+                val pivot = globals[top.definition.index]?.origin() ?: return@flatMap emptyList()
+                joined.map { body -> Triple(top, body, distance(pivot, body, bodies.getValue(body), globals)) }
+            }.minByOrNull { it.third } ?: break
+            parents[top] = nearest
+            waiting.remove(top)
+            joined += bodies.keys.filter { it.isUnder(top) }
         }
-        return globals
+        return parents
     }
 
-    private val IDENTITY: Mat4f = MutableMat4f().setIdentity()
-    private const val CORNERS = 8
-}
-
-/** The nearest bone at or above this node. */
-private fun RuntimeNode.boneAncestor(bones: Set<RuntimeNode>): RuntimeNode? {
-    var current = parent as? RuntimeNode
-    while (current != null) {
-        if (current in bones) return current
-        current = current.parent as? RuntimeNode
-    }
-    return null
-}
-
-/** A box being measured, in some bone's space. */
-private class Bounds {
-    private val min = MutableVec3f(Float.POSITIVE_INFINITY)
-    private val max = MutableVec3f(Float.NEGATIVE_INFINITY)
-
-    fun add(point: Vec3f) {
-        min.x = minOf(min.x, point.x)
-        min.y = minOf(min.y, point.y)
-        min.z = minOf(min.z, point.z)
-        max.x = maxOf(max.x, point.x)
-        max.y = maxOf(max.y, point.y)
-        max.z = maxOf(max.z, point.z)
+    /** How far [point], in model space, is from the geometry of [bone]. */
+    private fun distance(point: Vec3f, bone: RuntimeNode, box: BoneBounds, globals: Map<Int, Mat4f>): Float {
+        val inverse = MutableMat4f().set(globals[bone.definition.index] ?: return Float.MAX_VALUE)
+        if (!inverse.invert()) return Float.MAX_VALUE
+        val local = inverse.transform(point, 1f, MutableVec3f())
+        val x = maxOf(box.min.x - local.x, 0f, local.x - box.max.x)
+        val y = maxOf(box.min.y - local.y, 0f, local.y - box.max.y)
+        val z = maxOf(box.min.z - local.z, 0f, local.z - box.max.z)
+        return sqrt(x * x + y * y + z * z)
     }
 
-    val isWorthSimulating: Boolean
-        get() = maxOf(max.x - min.x, max.y - min.y, max.z - min.z) >= MIN_BODY_SIZE
+    private val BoneBounds.volume: Float get() = size.x * size.y * size.z
 
-    fun toShape(): RigidBodyShape {
-        val centre = RigVector((min.x + max.x) / 2f, (min.y + max.y) / 2f, (min.z + max.z) / 2f)
-        val half = MutableVec3f(
-            ((max.x - min.x) / 2f).coerceAtLeast(MIN_HALF_EXTENT),
-            ((max.y - min.y) / 2f).coerceAtLeast(MIN_HALF_EXTENT),
-            ((max.z - min.z) / 2f).coerceAtLeast(MIN_HALF_EXTENT),
-        )
+    private fun Mat4f.origin(): Vec3f = Vec3f(transform(Vec3f.ZERO, 1f, MutableVec3f()))
 
-        val longest = listOf(half.x, half.y, half.z).max()
-        val others = listOf(half.x, half.y, half.z).sorted().take(2)
-        val slender = longest > others.max() * CAPSULE_RATIO
-        if (!slender) return RigidBodyShape.Box(RigVector(half.x, half.y, half.z), centre)
-
-        val radius = ((others[0] + others[1]) / 2f).coerceAtLeast(MIN_HALF_EXTENT)
-        val rotation = when (longest) {
-            half.x -> RigVector(z = -90f)
-            half.z -> RigVector(x = 90f)
-            else -> RigVector.ZERO
+    private fun RuntimeNode.isUnder(ancestor: RuntimeNode): Boolean {
+        var current: RuntimeNode? = this
+        while (current != null) {
+            if (current === ancestor) return true
+            current = current.parent as? RuntimeNode
         }
-        return RigidBodyShape.Capsule(
-            radius = radius,
-            length = (longest * 2f).coerceAtLeast(radius * 2f + MIN_HALF_EXTENT),
-            offset = centre,
-            rotation = rotation,
-        )
-    }
-
-    private companion object {
-        const val MIN_HALF_EXTENT = 0.02f
-        const val MIN_BODY_SIZE = 0.04f
-        const val CAPSULE_RATIO = 1.8f
+        return false
     }
 }

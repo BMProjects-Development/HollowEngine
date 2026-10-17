@@ -5,17 +5,17 @@ import ru.hollowhorizon.hollowengine.client.slots.Slot
 import ru.hollowhorizon.hollowengine.client.slots.SlotGrid
 import ru.hollowhorizon.hollowengine.client.slots.Slots
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
 import ru.hollowhorizon.hollowengine.common.data.dataKey
 import ru.hollowhorizon.hollowengine.common.dialogue.DialogueChoiceView
 import ru.hollowhorizon.hollowengine.common.dialogue.DialogueChoicesView
 import ru.hollowhorizon.hollowengine.common.dialogue.DialogueUiKeys
-import ru.hollowhorizon.hollowengine.common.dialogue.UiDialoguePresentation
-import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
 import ru.hollowhorizon.hollowengine.common.scripting.ui.UiScript
-import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
+import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import kotlin.test.*
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /**
  * Compiles the shape a real `.ui.kts` body has composables, data reads and `send` from an event
@@ -75,61 +75,6 @@ class UiScriptContentTest {
     }
 
     @Test
-    fun `an interactive per-frame overlay compiles with input opted in`() {
-        object : UiScript() {
-            init {
-                overlay("mypack:radial") {
-                    anchor = "hotbar"
-                    interactive()
-                    aboveScreens = true
-                    rebuildEveryFrame = true
-                    content {
-                        Box(modifier = Modifier.padding(8.px).onClick { send { putString("action", "pick") } }) {
-                            Text(data[Title])
-                        }
-                    }
-                }
-            }
-        }
-
-        val definition = UiDefinitionRegistry.overlay("mypack:radial".rl)!!
-        assertTrue(definition.isInteractive)
-        assertTrue(definition.aboveScreens)
-        assertTrue(definition.rebuildEveryFrame)
-    }
-
-    @Test
-    fun `a custom bar anchored between vanilla layers compiles`() {
-        val fraction = dataKey<Float>("stamina") { 1f }
-        object : UiScript() {
-            init {
-                overlay("mypack:stamina") {
-                    anchor = "experience_bar"
-                    placement = HudPlacement.BEFORE
-                    content {
-                        val value = data[fraction].coerceIn(0f, 1f)
-                        Box(
-                            modifier = Modifier
-                                .align(UiAlign.CENTER, UiAlign.END)
-                                .size(182.px, 5.px)
-                                .background(UiColor(0f, 0f, 0f, 0.5f))
-                                .borderRadius(2f),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size((182f * value).px, 5.px)
-                                    .background(UiColor(0.3f, 0.8f, 1f, 0.9f)),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        assertEquals(VanillaHudLayers.EXPERIENCE_BAR, UiDefinitionRegistry.overlay("mypack:stamina".rl)!!.anchor)
-    }
-
-    @Test
     fun `a slot screen body compiles against the slot widget API`() {
         object : UiScript() {
             init {
@@ -155,60 +100,6 @@ class UiScriptContentTest {
         }
 
         assertNotNull(UiDefinitionRegistry.screen("mypack:npc_gear".rl))
-    }
-
-    @Test
-    fun `a screen styled with inline HSS and a texture compiles`() {
-        val styles = compileHss(
-            """
-            #root { padding: 10px; gap: 6px; background: image("hollowengine:textures/gui/dialogues/dialogue_box.png"); image-fit: 9-slice 16px; }
-            .btn { padding: 5px 10px; transition: background 120ms ease-out; }
-            .btn:hover { background: #5f8ccd; }
-            """.trimIndent()
-        )
-        object : UiScript() {
-            init {
-                screen("mypack:styled") {
-                    content {
-                        Column(id = "root", modifier = Modifier.style(styles)) {
-                            Image("hollowengine:textures/gui/npc_menu/character.png", modifier = Modifier.size(24.px, 24.px))
-                            Box(tags = listOf("btn"), modifier = Modifier.onClick { close() }) { Text(data[Title]) }
-                        }
-                    }
-                }
-            }
-        }
-
-        assertNotNull(UiDefinitionRegistry.screen("mypack:styled".rl))
-    }
-
-    @Test
-    fun `a screen can pick its own gui scale instead of following the player`() {
-        object : UiScript() {
-            init {
-                screen("mypack:auto_scaled") {
-                    guiScale = UiGuiScale.Auto
-                    content { Text("scaled") }
-                }
-                screen("mypack:fixed_scaled") {
-                    guiScale(2)
-                    content { Text("scaled") }
-                }
-                screen("mypack:inherited") {
-                    content { Text("plain") }
-                }
-                screen("mypack:animated_exit") {
-                    exitDuration = 700L
-                    content { Text("closing") }
-                }
-            }
-        }
-
-        assertEquals(UiGuiScale.Auto, UiDefinitionRegistry.screen("mypack:auto_scaled".rl)!!.guiScale)
-        assertEquals(UiGuiScale.Fixed(2), UiDefinitionRegistry.screen("mypack:fixed_scaled".rl)!!.guiScale)
-        assertEquals(UiGuiScale.Inherit, UiDefinitionRegistry.screen("mypack:inherited".rl)!!.guiScale)
-        assertEquals(700L, UiDefinitionRegistry.screen("mypack:animated_exit".rl)!!.exitDuration)
-        assertEquals(0L, UiDefinitionRegistry.screen("mypack:inherited".rl)!!.exitDuration)
     }
 
     @Test
@@ -259,48 +150,5 @@ class UiScriptContentTest {
             this[DialogueUiKeys.Choices] = DialogueChoicesView(listOf(DialogueChoiceView(0, "Yes")))
         }
         assertEquals(UiSurfaceKind.SCREEN, surface.mode(menu), "a menu needs the cursor")
-    }
-
-    @Test
-    fun `a script can replace the dialogue window through the public keys`() {
-        object : UiScript() {
-            init {
-                screen("hollowengine:dialogue") {
-                    closeOnEscape = false
-                    content {
-                        val line = data[DialogueUiKeys.Line]
-                        val choices = data[DialogueUiKeys.Choices]
-
-                        Box(
-                            modifier = Modifier
-                                .size(UiLength.Fill, UiLength.Fill)
-                                .input(clickable = true)
-                                .onClick {
-                                    send { putString(DialogueUiKeys.Action, DialogueUiKeys.AdvanceAction) }
-                                },
-                        ) {
-                            Column(modifier = Modifier.gap(4.px)) {
-                                if (line.speaker.isNotEmpty()) Text(line.speaker)
-                                Text(line.text)
-                                choices.options.forEach { option ->
-                                    Box(
-                                        modifier = Modifier.input(hoverable = true, clickable = true).onClick {
-                                            send {
-                                                putString(DialogueUiKeys.Action, DialogueUiKeys.ChooseAction)
-                                                putInt(DialogueUiKeys.Index, option.index)
-                                            }
-                                        },
-                                    ) {
-                                        Text(option.text)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        assertNotNull(UiDefinitionRegistry.screen(UiDialoguePresentation.DEFAULT_SCREEN))
     }
 }

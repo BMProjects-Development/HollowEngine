@@ -8,9 +8,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
-import ru.hollowhorizon.hollowengine.client.models.bedrock.FloatExpr
-import ru.hollowhorizon.hollowengine.client.models.bedrock.FloatVec3Expr
-import ru.hollowhorizon.hollowengine.client.models.bedrock.parseBedrockExpression
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ListOrSingle
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TreeMap
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val ProfilerLang = "hollowengine.gui.ide.tools.profiler"
@@ -39,13 +40,4 @@ internal fun HollowIdeUiProfilerPanel(profiler: UiProfiler) {
 }
 
 @Composable
-private fun ProfilerButton(label: String, action: () -> Unit) {
-    Text(
-        label,
-        tags = listOf("ui-profiler-button"),
-        modifier = Modifier.input(clickable = true, hoverable = true).onClick { event ->
-            action()
-            event.consume()
-        },
-    )
-}
+private fun ProfilerButton(label: String, action: () -> Unit) = Button(label, onClick = action)

@@ -3,13 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.render
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
-import org.lwjgl.opengl.GL
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL13
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GL31
+import org.lwjgl.opengl.*
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import ru.hollowhorizon.hollowengine.HollowEngine

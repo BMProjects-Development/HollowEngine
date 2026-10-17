@@ -5,15 +5,7 @@ import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.*
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionAction
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceKind
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxModuleSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvMode
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxVelocityOverLifetimeSpec
+import ru.hollowhorizon.hollowengine.common.vfx.modules.*
 import kotlin.math.floor
 import kotlin.math.sqrt
 

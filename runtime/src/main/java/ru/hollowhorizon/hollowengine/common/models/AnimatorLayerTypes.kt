@@ -59,6 +59,14 @@ object AnimatorLayerTypes {
                 titleKey = "hollowengine.gui.animator_editor.kind_procedural",
             )
         )
+        register(
+            AnimatorLayerType(
+                id = "hollowengine:animator/montage",
+                specClass = MontageLayerSpec::class,
+                serializer = MontageLayerSpec.serializer(),
+                titleKey = "hollowengine.gui.animator_editor.kind_montage",
+            )
+        )
     }
 
     fun register(type: AnimatorLayerType<*>): ExtensionHandle = point.register(type.key, type)

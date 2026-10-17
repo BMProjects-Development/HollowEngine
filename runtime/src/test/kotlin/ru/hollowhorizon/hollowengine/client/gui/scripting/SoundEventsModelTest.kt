@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.client.gui.scripting
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.SoundEntry
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.SoundEntryType
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.SoundEventsModel
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class SoundEventsModelTest {
     @Test

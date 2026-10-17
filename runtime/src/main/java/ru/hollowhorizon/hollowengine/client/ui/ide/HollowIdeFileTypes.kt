@@ -145,9 +145,6 @@ class HollowIdeFileTypeRegistry {
         }
         return null
     }
-
-    @Synchronized
-    fun registeredTypes(): List<HollowIdeFileType> = entries.map(Entry::type)
 }
 
 private val EmptyFileContent = ByteArray(0)

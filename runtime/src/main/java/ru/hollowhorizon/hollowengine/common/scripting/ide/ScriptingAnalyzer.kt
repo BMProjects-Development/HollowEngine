@@ -25,6 +25,24 @@ interface ScriptingAnalyzer {
     fun format(name: String, text: String): String? = null
 
     fun definition(name: String, text: String, offset: Int): DefinitionLocation? = null
+    fun structure(name: String, text: String): EditorStructure = EditorStructure()
+
+    /**
+     * Where the navigable gutter marker at [offset] leads. Resolved only on click: the targets may
+     * live in library sources or need decompiling, which is too slow for every analysis pass.
+     */
+    fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> = emptyList()
+
+    /**
+     * Text of a read-only document this language produces on demand, such as a decompiled class, so a
+     * tab restored from the saved layout can be filled again. Null when [path] is not such a document.
+     */
+    fun documentText(path: String): String? = null
+
+    /**
+     * Alt+Enter actions at the caret, such as import suggestions.
+     */
+    fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>

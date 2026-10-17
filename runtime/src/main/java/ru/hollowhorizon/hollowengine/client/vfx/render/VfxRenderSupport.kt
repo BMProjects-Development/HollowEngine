@@ -15,6 +15,7 @@ import net.minecraft.server.packs.resources.ResourceProvider
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxShaders.surface
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.VfxMaterialSpec
 

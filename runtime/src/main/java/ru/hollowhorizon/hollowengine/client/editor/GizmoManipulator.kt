@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import net.minecraft.world.phys.Vec3
+import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
-import net.minecraft.world.phys.Vec3
-import org.lwjgl.glfw.GLFW
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.round
@@ -16,6 +16,51 @@ data class GizmoTransformValues(
     val rotation: QuatF,
     val scale: Vec3f,
 )
+
+/**
+ * How far a drag snaps, by the keys held: Ctrl snaps to the step, Shift with it to the fine step and Alt
+ * to the coarse one. Shift also slows the drag down, snapping or not.
+ */
+enum class GizmoStep {
+    FINE,
+    NORMAL,
+    COARSE;
+
+    companion object {
+        fun of(modifiers: Int): GizmoStep? = when {
+            modifiers and GLFW.GLFW_MOD_ALT != 0 -> COARSE
+            modifiers and GLFW.GLFW_MOD_CONTROL == 0 -> null
+            modifiers and GLFW.GLFW_MOD_SHIFT != 0 -> FINE
+            else -> NORMAL
+        }
+    }
+}
+
+/**
+ * The steps of each [GizmoStep], fine to coarse: [translation] in blocks, [rotation] in degrees and
+ * [scale] as a factor of the size the drag started at.
+ */
+class GizmoSnapping(
+    private val translation: DoubleArray,
+    private val rotation: DoubleArray,
+    private val scale: DoubleArray,
+) {
+    fun translation(step: GizmoStep): Double = translation[step.ordinal]
+    fun rotation(step: GizmoStep): Double = rotation[step.ordinal]
+    fun scale(step: GizmoStep): Double = scale[step.ordinal]
+
+    companion object {
+        /** Blocks in the world. */
+        val WORLD = GizmoSnapping(doubleArrayOf(0.1, 1.0, 4.0), doubleArrayOf(1.0, 5.0, 45.0), doubleArrayOf(0.01, 0.1, 0.5))
+
+        /** Pixels of a model: a sixteenth of a block, a quarter of one for the coarse step. */
+        val MODEL = GizmoSnapping(
+            doubleArrayOf(1.0 / 64.0, 1.0 / 16.0, 0.25),
+            doubleArrayOf(1.0, 15.0, 45.0),
+            doubleArrayOf(0.01, 0.1, 0.5),
+        )
+    }
+}
 
 /**
  * A single in-progress drag. Created by [GizmoManipulator.begin] on grab and advanced by
@@ -48,7 +93,10 @@ class GizmoDrag internal constructor(
 /**
  * Screen-to-world manipulation math for the gizmo.
  */
-class GizmoManipulator(private val projector: GizmoProjector) {
+class GizmoManipulator(
+    private val projector: GizmoProjector,
+    private val snapping: GizmoSnapping = GizmoSnapping.WORLD,
+) {
     fun begin(handle: GizmoHandle, values: GizmoTransformValues, pointerX: Float, pointerY: Float): GizmoDrag {
         val axis = handle.worldAxis?.normalize()
         val drag = GizmoDrag(handle.id, handle.worldOrigin, axis, values)
@@ -102,10 +150,8 @@ class GizmoManipulator(private val projector: GizmoProjector) {
 
             GizmoHandleId.SCALE_UNIFORM -> {
                 val originScreen = projector.project(handle.worldOrigin)
-                if (originScreen != null) {
-                    drag.referenceDistance = distance(originScreen.x, originScreen.y, pointerX, pointerY)
-                    drag.valid = drag.referenceDistance > 1e-3f
-                }
+                drag.referenceDistance = distance(originScreen.x, originScreen.y, pointerX, pointerY)
+                drag.valid = drag.referenceDistance > 1e-3f
             }
         }
         return drag
@@ -119,32 +165,31 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         modifiers: Int,
     ): GizmoTransformValues? {
         if (!drag.valid) return null
-        val fine = modifiers and GLFW.GLFW_MOD_SHIFT != 0
-        val snap = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-        val speed = if (fine) 0.1 else 1.0
+        val step = GizmoStep.of(modifiers)
+        val speed = if (modifiers and GLFW.GLFW_MOD_SHIFT != 0) 0.1 else 1.0
 
         return when (drag.handleId) {
             GizmoHandleId.AXIS_X, GizmoHandleId.AXIS_Y, GizmoHandleId.AXIS_Z ->
-                updateAxis(drag, pointerX, pointerY, speed, snap, fine)
+                updateAxis(drag, pointerX, pointerY, speed, step)
 
             GizmoHandleId.PLANE_X, GizmoHandleId.PLANE_Y, GizmoHandleId.PLANE_Z ->
-                updatePlane(drag, pointerX, pointerY, speed, snap, fine)
+                updatePlane(drag, pointerX, pointerY, speed, step)
 
             GizmoHandleId.ROTATE_X, GizmoHandleId.ROTATE_Y, GizmoHandleId.ROTATE_Z ->
-                updateRotate(drag, pointerX, pointerY, speed, snap, fine)
+                updateRotate(drag, pointerX, pointerY, speed, step)
 
             GizmoHandleId.SCALE_X, GizmoHandleId.SCALE_Y, GizmoHandleId.SCALE_Z ->
-                updateScaleAxis(drag, pointerX, pointerY, speed, snap, fine)
+                updateScaleAxis(drag, pointerX, pointerY, speed, step)
 
             GizmoHandleId.CENTER ->
-                updateViewPlane(drag, pointerX, pointerY, speed, snap, fine)
+                updateViewPlane(drag, pointerX, pointerY, speed, step)
 
             GizmoHandleId.SCALE_UNIFORM ->
-                updateScale(drag, pointerX, pointerY, speed, snap, fine)
+                updateScale(drag, pointerX, pointerY, speed, step)
         }
     }
 
-    private fun updateViewPlane(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
+    private fun updateViewPlane(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
         val normal = drag.planeNormal ?: return null
         val reference = drag.referenceHit ?: return null
         val ray = projector.screenRay(x, y) ?: return null
@@ -152,8 +197,8 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         var dx = (hit.x - reference.x) * speed
         var dy = (hit.y - reference.y) * speed
         var dz = (hit.z - reference.z) * speed
-        if (snap) {
-            val tick = translationTick(fine)
+        if (step != null) {
+            val tick = snapping.translation(step)
             dx = round(dx / tick) * tick
             dy = round(dy / tick) * tick
             dz = round(dz / tick) * tick
@@ -162,18 +207,18 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         return drag.start.copy(translation = drag.start.translation + Vec3f(dx.toFloat(), dy.toFloat(), dz.toFloat()))
     }
 
-    private fun updateAxis(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
+    private fun updateAxis(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
         val axis = drag.axis ?: return null
         val ray = projector.screenRay(x, y) ?: return null
         val t = closestParamOnAxis(ray, drag.origin, axis) ?: return null
         var delta = (t - drag.referenceParam) * speed
-        if (snap) delta = round(delta / translationTick(fine)) * translationTick(fine)
+        if (step != null) delta = round(delta / snapping.translation(step)) * snapping.translation(step)
         drag.labelValue = delta
         val offset = Vec3f((axis.x * delta).toFloat(), (axis.y * delta).toFloat(), (axis.z * delta).toFloat())
         return drag.start.copy(translation = drag.start.translation + offset)
     }
 
-    private fun updatePlane(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
+    private fun updatePlane(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
         val axis = drag.axis ?: return null
         val reference = drag.referenceHit ?: return null
         val ray = projector.screenRay(x, y) ?: return null
@@ -181,8 +226,8 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         var dx = (hit.x - reference.x) * speed
         var dy = (hit.y - reference.y) * speed
         var dz = (hit.z - reference.z) * speed
-        if (snap) {
-            val tick = translationTick(fine)
+        if (step != null) {
+            val tick = snapping.translation(step)
             dx = round(dx / tick) * tick
             dy = round(dy / tick) * tick
             dz = round(dz / tick) * tick
@@ -192,13 +237,13 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         return drag.start.copy(translation = drag.start.translation + offset)
     }
 
-    private fun updateRotate(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
+    private fun updateRotate(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
         val axis = drag.axis ?: return null
         val ray = projector.screenRay(x, y) ?: return null
         val angle = anglePlane(ray, drag.origin, axis) ?: return null
         drag.currentAngle = drag.referenceAngle + shortestAngle(angle - drag.referenceAngle)
         var deltaDeg = Math.toDegrees(shortestAngle(angle - drag.referenceAngle)) * speed
-        if (snap) deltaDeg = round(deltaDeg / rotationTick(fine)) * rotationTick(fine)
+        if (step != null) deltaDeg = round(deltaDeg / snapping.rotation(step)) * snapping.rotation(step)
         drag.labelValue = deltaDeg
         val axisF = Vec3f(axis.x.toFloat(), axis.y.toFloat(), axis.z.toFloat())
         val delta = QuatF(deltaDeg.toFloat().deg, axisF)
@@ -206,13 +251,13 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         return drag.start.copy(rotation = rotation)
     }
 
-    private fun updateScale(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
-        val originScreen = projector.project(drag.origin) ?: return null
+    private fun updateScale(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
+        val originScreen = projector.project(drag.origin)
         val current = distance(originScreen.x, originScreen.y, x, y)
         if (drag.referenceDistance <= 1e-3f) return null
         var factor = (current / drag.referenceDistance).toDouble()
         factor = 1.0 + (factor - 1.0) * speed
-        if (snap) factor = (round(factor / scaleTick(fine)) * scaleTick(fine)).coerceAtLeast(scaleTick(fine))
+        if (step != null) factor = (round(factor / snapping.scale(step)) * snapping.scale(step)).coerceAtLeast(snapping.scale(step))
         factor = factor.coerceIn(0.01, 100.0)
         drag.labelValue = factor
         val scale = Vec3f(
@@ -223,14 +268,14 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         return drag.start.copy(scale = scale)
     }
 
-    private fun updateScaleAxis(drag: GizmoDrag, x: Float, y: Float, speed: Double, snap: Boolean, fine: Boolean): GizmoTransformValues? {
+    private fun updateScaleAxis(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
         val axis = drag.axis ?: return null
         if (abs(drag.referenceParam) < 1e-4) return null
         val ray = projector.screenRay(x, y) ?: return null
         val t = closestParamOnAxis(ray, drag.origin, axis) ?: return null
         var factor = t / drag.referenceParam
         factor = 1.0 + (factor - 1.0) * speed
-        if (snap) factor = round(factor / scaleTick(fine)) * scaleTick(fine)
+        if (step != null) factor = round(factor / snapping.scale(step)) * snapping.scale(step)
         factor = factor.coerceIn(0.01, 100.0)
         drag.labelValue = factor
         val s = drag.start.scale
@@ -291,12 +336,4 @@ class GizmoManipulator(private val projector: GizmoProjector) {
         return sqrt(dx * dx + dy * dy)
     }
 
-    private fun translationTick(fine: Boolean) = if (fine) 0.1 else 1.0
-    private fun rotationTick(fine: Boolean) = if (fine) 1.0 else 5.0
-    private fun scaleTick(fine: Boolean) = if (fine) 0.01 else 0.1
-
-    companion object {
-        /** The one the world overlay uses. */
-        val World = GizmoManipulator(WorldToScreenProjector)
-    }
 }

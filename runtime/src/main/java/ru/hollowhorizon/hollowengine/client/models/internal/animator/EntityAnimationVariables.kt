@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
-import net.minecraft.client.Minecraft
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
@@ -10,10 +9,15 @@ import kotlin.math.abs
 
 /**
  * Fills [context] with what an animation expression can read this frame.
+ *
+ * [gameTicks] is the level clock; without an entity, as in a preview, the caller says which clock it runs on.
  */
-fun fillAnimationVariables(context: AnimatorEvaluationContext, entity: Entity?, partialTick: Float) {
-    val gameTicks = entity?.level()?.gameTime ?: Minecraft.getInstance().level?.gameTime ?: 0L
-
+fun fillAnimationVariables(
+    context: AnimatorEvaluationContext,
+    entity: Entity?,
+    partialTick: Float,
+    gameTicks: Long = entity?.level()?.gameTime ?: 0L,
+) {
     context.temporaries.clear()
     context.entity = entity
     context.partialTick = partialTick
@@ -57,3 +61,13 @@ internal fun signedLocomotionSpeed(horizontalSpeed: Float, localForwardSpeed: Fl
     else horizontalSpeed
 
 private const val LOCAL_MOVEMENT_EPSILON = 0.001f
+
+/**
+ * The conditions of an entity's montage sections, asked of the entity as it is at [partialTick]; what they read
+ * is gathered the first time one is asked, as most playback asks none.
+ */
+class EntityConditions(private val entity: Entity, private val partialTick: Float = 1f) : (String) -> Boolean {
+    private val context by lazy { AnimatorEvaluationContext().also { fillAnimationVariables(it, entity, partialTick) } }
+
+    override fun invoke(source: String): Boolean = AnimatorExpressionEvaluator.condition(source, context)
+}

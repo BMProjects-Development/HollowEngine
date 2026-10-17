@@ -74,6 +74,9 @@ class Keyframe(
     fun copy(time: Float = this.time) = Keyframe(time, value, interpolation, handleMode, incoming, outgoing)
 }
 
+/** A handle of a key picked in the graph on its own. */
+data class HandlePick(val keyframe: Keyframe, val side: TangentSide)
+
 /** Which of the two keyframe handles is being modified. */
 enum class TangentSide {
     INCOMING, OUTGOING,
@@ -292,7 +295,7 @@ class AnimProperty<T>(
         val values = FloatArray(size)
         type.decompose(defaultValue, values)
         for (channel in 0 until size) {
-            val curve = curves.getOrNull(channel) ?: continue
+            val curve = curves.getOrNull(channel)?.takeIf { it.isVisible } ?: continue
             val base = values[channel]
             val sampled = curve.valueAt(time, base)
             values[channel] = type.bounds(channel).clamp(
@@ -322,6 +325,21 @@ interface PropertyType<T> {
     fun compose(values: FloatArray): T
 }
 
+/**
+ * Which objects of an editor have rows in the track list, as the menu by the list asks: an editor whose objects
+ * the author picks in a scene provides it.
+ */
+interface TrackListing {
+    /** Whether only the objects selected in the editor have rows. */
+    var onlySelected: Boolean
+
+    /** Gives every object its rows back, with the tracks the author closed, and lists more than the selection. */
+    fun showAll()
+
+    /** Closes the rows of every object but the selected ones. */
+    fun hideUnselected()
+}
+
 class TrackGroup(name: String) {
     var nameState by mutableStateOf(name)
     var isCollapsed by mutableStateOf(false)
@@ -333,7 +351,10 @@ class TrackGroup(name: String) {
 
     /** Whether anything of this group has a row, which is what decides whether the group has one. */
     val hasListedContent: Boolean
-        get() = isListed || properties.any { it.isListed } || children.any { it.hasListedContent }
+        get() = isListed || lanes.any { it.isShown } || properties.any { it.isListed } || children.any { it.hasListedContent }
+
+    /** Rows of segments shown under the group's own row, above its properties. */
+    val lanes = mutableStateListOf<SegmentLane>()
 
     val children = mutableStateListOf<TrackGroup>()
     val properties = mutableStateListOf<AnimProperty<*>>()

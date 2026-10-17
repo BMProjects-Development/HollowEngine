@@ -2,21 +2,12 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import ru.hollowhorizon.hollowengine.client.ui.BaseUiNode
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.scrollable
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextFonts
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class CodeInsightPopupLayoutTest {
     @Test

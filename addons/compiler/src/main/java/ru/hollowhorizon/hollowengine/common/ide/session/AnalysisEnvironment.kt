@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.ide.session
 
+import com.intellij.codeInsight.JavaExpressionTypeNullabilityPatcher
 import com.intellij.core.CoreApplicationEnvironment
 import com.intellij.ide.highlighter.JavaClassFileType
 import com.intellij.lang.LanguageExtensionPoint
@@ -10,7 +11,9 @@ import com.intellij.openapi.extensions.DefaultPluginDescriptor
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.Key
 import com.intellij.psi.ClassFileViewProviderFactory
 import com.intellij.psi.FileTypeFileViewProviders
 import com.intellij.psi.compiled.ClassFileDecompilers
@@ -44,6 +47,8 @@ import org.jetbrains.kotlin.analysis.api.standalone.base.modification.KotlinStan
 import org.jetbrains.kotlin.analysis.api.standalone.base.permissions.KotlinStandaloneAnalysisPermissionOptions
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.FirStandaloneServiceRegistrar
 import org.jetbrains.kotlin.analysis.api.standalone.base.projectStructure.StandaloneProjectFactory
+import org.jetbrains.kotlin.analysis.decompiled.light.classes.ClsJavaStubByVirtualFileCache
+import org.jetbrains.kotlin.analysis.decompiled.light.classes.origin.KotlinDeclarationInCompiledFileSearcher
 import org.jetbrains.kotlin.analysis.decompiler.konan.KlibMetaFileType
 import org.jetbrains.kotlin.analysis.decompiler.konan.KotlinKlibMetadataDecompiler
 import org.jetbrains.kotlin.analysis.decompiler.psi.KotlinBuiltInDecompiler
@@ -59,10 +64,12 @@ import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinitionProvider
 import org.jetbrains.kotlin.serialization.deserialization.METADATA_FILE_EXTENSION
 import org.jetbrains.kotlin.serialization.deserialization.builtins.BuiltInSerializerProtocol
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.index.JavaClassNameIndex
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJarLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJdkLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
+import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
 import java.nio.file.Path
 import java.util.*
 import kotlin.io.path.absolutePathString
@@ -87,6 +94,7 @@ class AnalysisEnvironment(
     val kotlinCoreProjectEnvironment: KotlinCoreProjectEnvironment
     val project: MockProject
     val analyzer: ScriptingAnalyzerImpl
+    val javaAnalyzer: ScriptingAnalyzer
 
     init {
         // Установка временной директории для Idea
@@ -119,12 +127,17 @@ class AnalysisEnvironment(
         registerProjectServices(builtins, libraries, projectStructureProvider)
 
         // Создание структуры проекта
+        val navigation = LibraryNavigation(project, libraries.flatMap { it.binaryRoots })
+        val analysisLock = Any()
         analyzer = ScriptingAnalyzerImpl(
             kotlinCoreProjectEnvironment,
             libraries,
             builtins,
-            projectStructureProvider
+            projectStructureProvider,
+            navigation,
+            analysisLock,
         )
+        javaAnalyzer = JavaLanguageAnalyzer(project, projectStructureProvider, navigation, analysisLock)
 
         // Настройка провайдера скриптов
         setupScriptDefinitions()
@@ -209,8 +222,19 @@ class AnalysisEnvironment(
 
     private fun registerApplicationServices() {
         KotlinCoreEnvironment.underApplicationLock {
+            registerJavaAnalysisRegistryKeys()
             val applicationEnvironment = kotlinCoreProjectEnvironment.environment
             val application = applicationEnvironment.application
+
+            application.registerApplicationServiceIfMissing(
+                KotlinDeclarationInCompiledFileSearcher::class.java,
+                KotlinDeclarationInCompiledFileSearcher(),
+            )
+
+            registerApplicationExtensionPoint(
+                JavaExpressionTypeNullabilityPatcher.EP_NAME.name,
+                JavaExpressionTypeNullabilityPatcher::class.java.name,
+            )
 
             registerApplicationExtensionPoint(
                 "com.intellij.syntax.elementTypeConverter",
@@ -273,9 +297,17 @@ class AnalysisEnvironment(
         }
     }
 
-    private fun registerDecompilers() {
+    /**
+     * Decompilers belong to the application, which every analysis and compilation project shares.
+     * Registering them per project would stack duplicates, and removing them with a project makes
+     * IntelliJ post decompiler-change notifications that may outlive the application.
+     */
+    private fun registerDecompilers() = KotlinCoreEnvironment.underApplicationLock {
         val applicationEnvironment = kotlinCoreProjectEnvironment.environment
-        val applicationDisposable = kotlinCoreProjectEnvironment.environment.parentDisposable
+        val application = applicationEnvironment.application
+        if (application.getUserData(DecompilersRegistered) == true) return@underApplicationLock
+        application.putUserData(DecompilersRegistered, true)
+        val registrationDisposable = applicationEnvironment.parentDisposable
 
         applicationEnvironment.registerFileType(
             KotlinBuiltInFileType,
@@ -288,28 +320,28 @@ class AnalysisEnvironment(
             FileTypeFileViewProviders.INSTANCE.addExplicitExtension(
                 fileType,
                 ClassFileViewProviderFactory(),
-                applicationDisposable,
+                registrationDisposable,
             )
 
             BinaryFileStubBuilders.INSTANCE.addExplicitExtension(
                 fileType,
                 ClassFileStubBuilder(),
-                applicationDisposable
+                registrationDisposable
             )
             BinaryFileTypeDecompilers.getInstance()
-                .addExplicitExtension(fileType, ClassFileDecompiler(), applicationDisposable)
+                .addExplicitExtension(fileType, ClassFileDecompiler(), registrationDisposable)
         }
 
         ClassFileDecompilers.getInstance().EP_NAME.point.apply {
-            registerExtension(KotlinClassFileDecompiler(), LoadingOrder.FIRST, applicationDisposable)
-            registerExtension(KotlinBuiltInDecompiler(), LoadingOrder.FIRST, applicationDisposable)
+            registerExtension(KotlinClassFileDecompiler(), LoadingOrder.FIRST, registrationDisposable)
+            registerExtension(KotlinBuiltInDecompiler(), LoadingOrder.FIRST, registrationDisposable)
             registerExtension(
                 KotlinKlibMetadataDecompiler(),
                 LoadingOrder.FIRST,
-                applicationDisposable,
+                registrationDisposable,
             )
 
-            registerExtension(ClsDecompilerImpl(), LoadingOrder.FIRST, applicationDisposable)
+            registerExtension(ClsDecompilerImpl(), LoadingOrder.FIRST, registrationDisposable)
         }
     }
 
@@ -385,6 +417,7 @@ class AnalysisEnvironment(
                     kotlinCoreProjectEnvironment,
                     builtins,
                     jdkClasses + classpath,
+                    projectStructureProvider,
                 ).also { declarationProviderFactory ->
                     registerService(JavaClassNameIndex::class.java, declarationProviderFactory.javaClassNameIndex)
                 }
@@ -483,6 +516,7 @@ class AnalysisEnvironment(
     }
 
     private fun MockProject.registerFirAnalysisServices() {
+        registerServiceIfMissing(ClsJavaStubByVirtualFileCache::class.java, ClsJavaStubByVirtualFileCache())
         registerServiceIfMissing(
             "org.jetbrains.kotlin.resolve.jvm.KotlinJavaPsiFacade",
             "org.jetbrains.kotlin.analysis.api.impl.base.java.KaBaseKotlinJavaPsiFacade",
@@ -623,14 +657,23 @@ class AnalysisEnvironment(
     }
 
     fun dispose() {
+        if (Disposer.isDisposed(projectDisposable)) return
         scriptConfigurationsProvider?.close()
-        Disposer.dispose(projectDisposable)
+        val application = kotlinCoreProjectEnvironment.environment.application
+        if (application.isDispatchThread) {
+            application.invokeLater { Disposer.dispose(projectDisposable) }
+        } else {
+            application.invokeAndWait({}, ModalityState.any())
+            Disposer.dispose(projectDisposable)
+        }
     }
 
     fun warmUpClassIndex() {
         JavaClassNameIndex.getInstance(project).warmUp()
     }
 }
+
+private val DecompilersRegistered = Key.create<Boolean>("hollowengine.decompilers")
 
 private fun SourceCode.matchesExtension(extension: String): Boolean {
     return sequenceOf(locationId, name)

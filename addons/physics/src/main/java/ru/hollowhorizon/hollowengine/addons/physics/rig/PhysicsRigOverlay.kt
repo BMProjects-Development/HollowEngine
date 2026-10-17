@@ -1,7 +1,5 @@
 package ru.hollowhorizon.hollowengine.addons.physics.rig
 
-import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollShape
-import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.shape
 import ru.hollowhorizon.hollowengine.addons.physics.rotated
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigOverlay
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
@@ -14,7 +12,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
- * Bodies and joints attached to the rig drawn in the positions, they currently occupy on the model.
+ * Joints, that rig holds and its bodies together with, where they are on the model now.
  */
 object PhysicsRigOverlay : RigOverlay {
     const val ID = "hollowengine:physics/bodies"
@@ -29,10 +27,7 @@ object PhysicsRigOverlay : RigOverlay {
         val rotation = MutableQuatF()
 
         bodies.forEach { node ->
-            val body = requireNotNull(node.rigidBody()).spec
             node.globalMatrix.decompose(position, rotation, null)
-            val colour = if (node.name == selected) SELECTED_COLOR else BODY_COLOR
-            lines.shape(RagdollShape.of(body.shape), Vec3f(position), QuatF(rotation), colour)
 
             node.joint()?.spec?.let { joint ->
                 val parent = byName[joint.parent] ?: node.bodyAncestor(bodies.toSet()) ?: return@let
@@ -75,8 +70,6 @@ object PhysicsRigOverlay : RigOverlay {
         return null
     }
 
-    private val BODY_COLOR = 0xCC4DFF99.toInt()
-    private val SELECTED_COLOR = 0xFFEB9433.toInt()
     private val JOINT_COLOR = 0xCCFF66CC.toInt()
 
     private val AXES = listOf(Vec3f.X_AXIS, Vec3f.Y_AXIS, Vec3f.Z_AXIS)

@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
@@ -29,6 +30,16 @@ public class EntityRenderDispatcherMixin {
     @Inject(method = "onResourceManagerReload", at = @At("TAIL"))
     private void onResourceManagerReload(ResourceManager resourceManager, CallbackInfo ci, @Local EntityRendererProvider.Context context) {
         BootstrapRuntimeManager.bridge().onAddEntityRendererLayers(renderers, playerRenderers, context);
+    }
+
+    @WrapOperation(
+        method = "render",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;renderHitbox(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/world/entity/Entity;FFFF)V")
+    )
+    private void hollowengine$renderHitbox(PoseStack poseStack, VertexConsumer lines, Entity entity, float partialTick,
+                                           float red, float green, float blue, Operation<Void> original) {
+        if (BootstrapRuntimeManager.bridge().renderColliderHitbox(entity, partialTick, poseStack, lines)) return;
+        original.call(poseStack, lines, entity, partialTick, red, green, blue);
     }
 
     @WrapOperation(

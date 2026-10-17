@@ -7,19 +7,11 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.vfx.VfxExpressionLanguage
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurveInput
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.math.abs
 
 /**
@@ -40,16 +32,16 @@ val LocalVfxDriven = staticCompositionLocalOf<(VfxProperty) -> VfxDrivenValue?> 
 class VfxDrivenValue(
     val values: FloatArray,
     private val channels: Set<Int>,
-    private val record: ((Map<Int, Float>) -> Unit)? = null,
+    /** Whether a write becomes keys at the playhead; otherwise it is held there until the playhead moves. */
+    val recording: Boolean,
+    private val write: (Map<Int, Float>) -> Unit,
 ) {
-    val recording: Boolean get() = record != null
-
     fun drives(channel: Int): Boolean = channel in channels
 
     fun value(channel: Int): Float = values.getOrElse(channel) { 0f }
 
     fun write(changes: Map<Int, Float>) {
-        if (changes.isNotEmpty()) record?.invoke(changes)
+        if (changes.isNotEmpty()) write.invoke(changes)
     }
 }
 
@@ -212,14 +204,15 @@ fun VfxFloat3Row(
     value: Vec3f,
     property: VfxProperty? = null,
     hint: String? = null,
+    step: Double? = null,
     onChange: (Vec3f) -> Unit,
 ) {
     val driven = property?.let { LocalVfxDriven.current(it) }
     Row(modifier = Modifier.size(100.percent).gap(3.px).alignItems(vertical = UiAlign.CENTER)) {
         VfxFieldLabel(label, hint, VectorLabelWidth)
-        AxisNumber("X", value.x, property, driven, 0) { onChange(Vec3f(it, value.y, value.z)) }
-        AxisNumber("Y", value.y, property, driven, 1) { onChange(Vec3f(value.x, it, value.z)) }
-        AxisNumber("Z", value.z, property, driven, 2) { onChange(Vec3f(value.x, value.y, it)) }
+        AxisNumber("X", value.x, property, driven, 0, step) { onChange(Vec3f(it, value.y, value.z)) }
+        AxisNumber("Y", value.y, property, driven, 1, step) { onChange(Vec3f(value.x, it, value.z)) }
+        AxisNumber("Z", value.z, property, driven, 2, step) { onChange(Vec3f(value.x, value.y, it)) }
         if (driven != null) DrivenMark(property)
     }
 }
@@ -263,6 +256,7 @@ private fun AxisNumber(
     property: VfxProperty?,
     driven: VfxDrivenValue?,
     channel: Int,
+    step: Double? = null,
     onChange: (Float) -> Unit,
 ) {
     Row(modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).gap(2.px).alignItems(vertical = UiAlign.CENTER)) {
@@ -270,7 +264,7 @@ private fun AxisNumber(
         if (driven != null && driven.drives(channel)) {
             DrivenCell(driven, property, channel)
         } else {
-            NumberCell(value, property, whole = false, onChange = onChange)
+            NumberCell(value, property, whole = false, step = step, onChange = onChange)
         }
     }
 }
@@ -281,72 +275,39 @@ private fun axisColor(axis: String): UiColor = when (axis) {
     else -> UiColor(0.45f, 0.62f, 0.95f, 1f)
 }
 
-/** What a keyed channel holds at the playhead: read-only, unless the timeline records, when a typed value becomes a key. */
+/**
+ * What a keyed channel holds at the playhead. A typed value becomes a key while the timeline records, and is held
+ * there until the playhead moves otherwise.
+ */
 @Composable
 private fun DrivenCell(driven: VfxDrivenValue, property: VfxProperty?, channel: Int) {
-    val value = driven.value(channel)
-    if (driven.recording) {
-        NumberCell(value, property, whole = false) { driven.write(mapOf(channel to it)) }
-        return
-    }
-    Box(
-        tags = listOf("insp-input", "insp-inline-input", "vfx-driven"),
-        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).input(hoverable = true).cursor(UiCursorShape.NOT_ALLOWED)
-            .tooltipOnHover(vfxText("driven_hint")),
-    ) {
-        Text(formatNumber(value), modifier = Modifier.fontSize(9f).textWrap(false))
-    }
+    NumberCell(driven.value(channel), property, whole = false) { driven.write(mapOf(channel to it)) }
 }
 
 @Composable
 private fun DrivenMark(property: VfxProperty?) {
     val focus = LocalVfxFieldFocus.current
-    InspectorIcon(KeyframeIcon, vfxText("driven_show")) { if (property != null) focus(property) }
+    InspectorIconButton(KeyframeIcon, vfxText("driven_show"), tags = listOf("insp-inline-icon")) { if (property != null) focus(property) }
 }
 
 @Composable
-private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, onChange: (Float) -> Unit) {
+private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, step: Double? = null, onChange: (Float) -> Unit) {
     val focus = LocalVfxFieldFocus.current
-    var draft by remember { mutableStateOf(formatNumber(value)) }
-    var lastExternal by remember { mutableStateOf(value) }
-    if (value != lastExternal) {
-        lastExternal = value
-        if (draft.toFloatOrNull() != value) draft = formatNumber(value)
-    }
-
-    TextField(
-        value = draft,
-        fontSize = 9f,
-        filter = if (whole) UiTextInputFilter.INTEGER else UiTextInputFilter.DECIMAL,
-        tags = listOf("insp-input", "insp-inline-input", "numeric"),
-        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).onFocus { if (property != null) focus(property) },
-        onChange = { text ->
-            draft = text
-            text.toFloatOrNull()?.let { number ->
-                lastExternal = number
-                onChange(number)
-            }
-        },
-    )
+    NumberField(
+        value = value.toDouble(),
+        whole = whole,
+        step = step,
+        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+        onGestureStart = { if (property != null) focus(property) },
+    ) { onChange(it.toFloat()) }
 }
-
-@Composable
-internal fun VfxNumberCellInline(value: Float, onChange: (Float) -> Unit) =
-    NumberCell(value, null, whole = false, onChange = onChange)
 
 @Composable
 private fun TextCell(text: String, property: VfxProperty?, onChange: (String) -> Unit) {
     val focus = LocalVfxFieldFocus.current
-    var draft by remember { mutableStateOf(text) }
-    var lastExternal by remember { mutableStateOf(text) }
-    if (text != lastExternal) {
-        lastExternal = text
-        draft = text
-    }
-
-    val diagnostics = remember(draft) { VfxExpressionEditing.diagnostics(draft) }
+    val diagnostics = remember(text) { VfxExpressionEditing.diagnostics(text) }
     TextField(
-        value = draft,
+        value = text,
         fontSize = 9f,
         placeholder = vfxText("expression_placeholder"),
         completionContributor = VfxExpressionEditing.completions,
@@ -355,11 +316,7 @@ private fun TextCell(text: String, property: VfxProperty?, onChange: (String) ->
         tags = listOf("insp-input", "insp-inline-input", "vfx-expression"),
         modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).onFocus { if (property != null) focus(property) }
             .then(if (diagnostics.isEmpty()) Modifier.tooltipOnHover(vfxText("expression_hint")) else Modifier),
-        onChange = { typed ->
-            draft = typed
-            lastExternal = typed
-            onChange(typed)
-        },
+        onChange = onChange,
     )
 }
 
@@ -404,7 +361,7 @@ private fun KindPicker(value: VfxValue, onChange: (VfxValue) -> Unit) {
     val kind = value.kind()
 
     Box(modifier = Modifier.onPlaced { anchor = it }) {
-        InspectorIcon(kind.icon, vfxText(kind.key)) { open = true }
+        InspectorIconButton(kind.icon, vfxText(kind.key), tags = listOf("insp-inline-icon")) { open = true }
     }
 
     if (!open) return
@@ -480,11 +437,6 @@ internal fun VfxCurvePreview(curve: VfxCurve, modifier: Modifier) {
             }
         },
     )
-}
-
-@Composable
-internal fun InspectorIcon(icon: String, tooltip: String, onClick: () -> Unit) {
-    InspectorIconButton(icon = icon, tooltip = tooltip, tags = listOf("insp-inline-icon"), onClick = onClick)
 }
 
 /** Highlighting, completion and diagnostics for the expressions of the effect dialect. */

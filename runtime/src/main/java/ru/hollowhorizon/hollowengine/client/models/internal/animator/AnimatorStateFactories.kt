@@ -2,9 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
-import ru.hollowhorizon.hollowengine.common.models.ClipStateSpec
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /**
@@ -47,6 +45,8 @@ object AnimatorStateFactories {
 
     init {
         register("hollowengine:animator/state/clip") { ClipState(it as ClipStateSpec) }
+        register("hollowengine:animator/state/blend") { BlendState(it as BlendStateSpec) }
+        register("hollowengine:animator/state/montage") { MontageState(it as MontageStateSpec) }
     }
 
     fun register(typeId: String, factory: AnimatorStateFactory): ExtensionHandle = point.register(typeId.rl, factory)

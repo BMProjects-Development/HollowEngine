@@ -1,12 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 
-import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeLibrary
-import ru.hollowhorizon.hollowengine.client.shadergraph.freeNodeId
-import ru.hollowhorizon.hollowengine.client.shadergraph.withGroup
-import ru.hollowhorizon.hollowengine.client.shadergraph.withMembership
-import ru.hollowhorizon.hollowengine.client.shadergraph.withNodesAt
-import ru.hollowhorizon.hollowengine.client.shadergraph.withReroute
-import ru.hollowhorizon.hollowengine.client.shadergraph.withoutGroup
+import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphArrange
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
 import ru.hollowhorizon.hollowengine.client.ui.graph.graphArrangeItem

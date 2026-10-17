@@ -6,6 +6,7 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "ArgumentTypeInfosMixin",
+    "AttributeMapMixin",
     "ListTagAccessor",
     "RecipeManagerAccessor",
     "registry.HolderReferenceAccessor",
@@ -16,6 +17,7 @@
   ],
   "client": [
     "client.CameraInvoker",
+    "client.ClientAttributeSyncMixin",
     "client.LevelRendererInvoker",
     "client.ShaderInstanceAccessor"
   ],

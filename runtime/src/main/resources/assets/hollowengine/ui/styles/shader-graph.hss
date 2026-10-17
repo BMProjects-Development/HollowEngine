@@ -12,7 +12,7 @@ $node-radius: 8px;
 $node-field-radius: 5px;
 
 /* The outline of a title bar: lighter than its color along the top and the sides, darker along the bottom.
-   Gradient angles run from the right turning clockwise, so 90deg is downwards. */
+   CSS gradient angles run from the top clockwise, so to bottom is 180deg. */
 $head-light: alpha(#FFFFFF, 0.14);
 $head-dark: alpha(#000000, 0.28);
 
@@ -48,7 +48,7 @@ $category-output: #CF5E54;
     padding: 0px 10px;
     gap: 5px;
     background: $category-math;
-    border: 1px linear-gradient(90deg, $head-light 0%, $head-light 96.875%, $head-dark 96.875%, $head-dark 100%);
+    border: 1px linear-gradient(to bottom, $head-light 0%, $head-light 96.875%, $head-dark 96.875%, $head-dark 100%);
     border-radius: $node-radius;
 }
 
@@ -122,16 +122,6 @@ $category-output: #CF5E54;
     font-size: 9px;
     foreground: $text-faint;
     text-wrap: false;
-}
-
-/* The name of a value, which a drag along changes it by. */
-.sg-scrub {
-    cursor: ew-resize;
-    transition: foreground 110ms ease-out;
-}
-
-.sg-scrub:hover {
-    foreground: $text-strong;
 }
 
 .sg-fields {
@@ -233,12 +223,12 @@ $category-output: #CF5E54;
     border-radius: 2px;
 }
 
-/* A number: dragged sideways it changes, clicked it is typed into. */
-.sg-number {
-    cursor: ew-resize;
-    text-wrap: false;
-    text-overflow: dots;
-}
+/* A number of a node keeps the node's field look; its parts bring their own room. */
+.number-field.sg-field { padding: 0px; }
+
+.number-field.sg-field .number-field-frame { size: 100% 100%; }
+
+.number-field.sg-field.editing { padding: 1px 4px; }
 
 .sg-swatch {
     border: 1px alpha(#FFFFFF, 0.28);

@@ -26,9 +26,7 @@ interface Modifier {
 
 /**
  * A modifier that contributes style property values. Application is declarative and
- * order-independent per property (last write wins), so `padding` and `margin` keep
- * their box-model meaning regardless of modifier order — unlike Compose's chained
- * modifier semantics.
+ * order-independent per property (last write wins).
  */
 interface UiModifierPatchNode : Modifier {
     fun applyPatch(style: UiStylePatch)
@@ -294,6 +292,7 @@ fun Modifier.position(x: UiLength, y: UiLength, z: Float = 0f) = prop(UiProps.Po
 
 fun Modifier.background(color: UiColor) = prop(UiProps.Background, UiPaint.Color(color))
 
+/** Linear gradient with CSS angles: 0° up, 90° right, 180° down, 270° left. */
 fun Modifier.background(angleDegrees: Float, stops: List<UiGradientStop>) =
     prop(UiProps.Background, UiPaint.LinearGradient(angleDegrees, stops))
 
@@ -337,6 +336,7 @@ fun Modifier.border(width: UiLength, color: UiColor, radius: Float = 0f) =
 fun Modifier.border(width: UiLength, paint: UiPaint, radius: Float = 0f) =
     prop(UiProps.BorderWidth, UiInsets.all(width)).prop(UiProps.BorderPaint, paint).prop(UiProps.BorderRadius, radius)
 
+/** Linear border gradient using the same CSS angles as [background]. */
 fun Modifier.border(width: UiLength, angleDegrees: Float, stops: List<UiGradientStop>, radius: Float = 0f) =
     border(width, UiPaint.LinearGradient(angleDegrees, stops), radius)
 
@@ -429,14 +429,14 @@ fun Modifier.input(
 /**
  * Makes a node focusable within its enclosing [focusScope] (by click or Tab). While focused it
  * receives key/char events. Each scope holds its own focus independently, so several `focus` nodes
- * (e.g. a text field and a popup's list) can be active at once — multi-focus.
+ * (e.g. a text field and a popup's list) can be active at once.
  */
 fun Modifier.focus() = prop(UiProps.Focusable, true).input(clickable = true)
 
 /**
- * A focus scope (the root, popups, dock windows): always key/char-active while composed, and owns
+ * A focus scope (root, popups, dock windows): always key/char-active while composed, and owns
  * the focus among its [focus] descendants. Key/char input reaches every open scope at once and is
- * routed from there to that scope's focused child; the scope itself also reacts to keys directly
+ * routed from there to that scope's focused child; scope itself also reacts to keys directly
  * (e.g. Escape), even with no focused child.
  */
 fun Modifier.focusScope() = prop(UiProps.FocusScope, true)

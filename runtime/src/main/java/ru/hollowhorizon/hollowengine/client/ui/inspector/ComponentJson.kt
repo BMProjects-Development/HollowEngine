@@ -4,18 +4,20 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.elementDescriptors
-import kotlinx.serialization.descriptors.elementNames
+import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
+import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
+import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
+import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
+import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
 import kotlin.reflect.KClass
 
 /**
@@ -25,11 +27,33 @@ import kotlin.reflect.KClass
  * tree, and a changed tree is decoded back into a component.
  */
 internal object ComponentJson {
-    val format = Json {
-        encodeDefaults = true
-        ignoreUnknownKeys = true
-        explicitNulls = true
-    }
+    @Volatile
+    private var cached: Json? = null
+
+    @Volatile
+    private var cachedRevision = -1
+
+    val format: Json
+        get() {
+            val revision = TagModuleRevision.current
+            cached?.takeIf { cachedRevision == revision }?.let { return it }
+            return Json {
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+                explicitNulls = true
+                allowSpecialFloatingPointValues = true
+                serializersModule = SerializersModule {
+                    RigAttachmentTypes.registerInto(this)
+                    ColliderShapeTypes.registerInto(this)
+                    VfxNodeTypes.registerInto(this)
+                    VfxModuleTypes.registerInto(this)
+                    SoundFilterTypes.registerInto(this)
+                }
+            }.also {
+                cached = it
+                cachedRevision = revision
+            }
+        }
 
     @Suppress("UNCHECKED_CAST")
     fun serializerOf(type: KClass<*>): KSerializer<Component>? =
@@ -59,7 +83,7 @@ internal object ComponentJson {
         decode(serializer, JsonObject(emptyMap()))
             ?: decode(serializer, defaultJson(serializer.descriptor))
 
-    /** A value of the shape [descriptor] describes, with every leaf at its zero. */
+    /** A minimal value of this shape; optional members keep their constructor defaults on decode. */
     fun defaultJson(descriptor: SerialDescriptor): JsonElement {
         if (descriptor.isNullable) return JsonNull
         return when (descriptor.kind) {
@@ -68,10 +92,10 @@ internal object ComponentJson {
             PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> JsonPrimitive(0)
             PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> JsonPrimitive(0.0)
             SerialKind.ENUM -> JsonPrimitive(descriptor.elementNames.firstOrNull().orEmpty())
-            StructureKind.LIST -> JsonArray(emptyList())
+            StructureKind.LIST -> JsonArray(List(VectorDescriptors.components(descriptor) ?: 0) { defaultJson(descriptor.getElementDescriptor(0)) })
             StructureKind.MAP -> JsonObject(emptyMap())
             StructureKind.CLASS, StructureKind.OBJECT -> JsonObject(
-                (0 until descriptor.elementsCount).associate { index ->
+                (0 until descriptor.elementsCount).filterNot(descriptor::isElementOptional).associate { index ->
                     descriptor.getElementName(index) to defaultJson(descriptor.getElementDescriptor(index))
                 },
             )
@@ -83,12 +107,17 @@ internal object ComponentJson {
         }
     }
 
+    fun initialValue(descriptor: SerialDescriptor, json: String?): JsonElement =
+        json?.let(format::parseToJsonElement) ?: defaultJson(descriptor)
+
     private fun defaultJsonOfSubclass(descriptor: SerialDescriptor): JsonObject {
         val body = defaultJson(descriptor) as? JsonObject ?: JsonObject(emptyMap())
         return JsonObject(body + (format.configuration.classDiscriminator to JsonPrimitive(descriptor.serialName)))
     }
 
+    /** The kinds a polymorphic field can hold: those of a sealed class, or those registered for an open one. */
     fun subclassDescriptors(descriptor: SerialDescriptor): List<SerialDescriptor> {
+        if (descriptor.kind == PolymorphicKind.OPEN) return format.serializersModule.getPolymorphicDescriptors(descriptor)
         if (descriptor.elementsCount < 2) return emptyList()
         return descriptor.getElementDescriptor(1).elementDescriptors.toList()
     }

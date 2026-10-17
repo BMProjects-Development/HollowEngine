@@ -71,7 +71,7 @@ This lets you restore any data the node needs after a restart. You can register 
 
 ### `persisted(name) { default }`
 
-When you only need a value to survive a restart, you do not have to write the `onSave`/`onLoad` pair by hand — there is a delegate for it:
+When you only need a value to survive a restart, you do not have to write the `onSave`/`onLoad` pair by hand, you can use delegate:
 
 ```kotlin
 var radius by persisted("radius") { 3 }
@@ -84,7 +84,7 @@ onUpdate(every = 20.ticks) {
 
 This is the same mechanism as `onSave`/`onLoad`, just written shorter. The value stays private to this node: another node, even one attached to the same entity, cannot see it. For data other scripts should reach, use [`entity.data`](/docs/hollowengine/scripting/npc/data).
 
-The default block is evaluated lazily — only when the property is read and nothing was loaded from the save. An expensive default therefore costs nothing on a node restored from a world.
+The default block is evaluated lazily, only when the property is read and nothing was loaded from the save. An expensive default therefore costs nothing on a node restored from a world.
 
 Reading the default does not by itself write anything; only assigning does. That way changing the default in your script keeps taking effect on worlds that already exist.
 
@@ -228,6 +228,10 @@ onDie {
     println("The guard has fallen")
 }
 ```
+
+### Colliders
+
+`onColliderHit`, `onColliderInteract`, `onColliderEnter`, `onCollideTick` and `onColliderExit` react to hits, clicks and touches on the [colliders](/docs/hollowengine/scripting/colliders#in-a-node-script) of the attached entity's model.
 
 A small NPC example combining several handlers:
 

@@ -1,12 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
-import ru.hollowhorizon.hollowengine.common.utils.math.*
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.BatchingRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.MeshRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.PipelineRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.GeometryUtils
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
+import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.max
 import kotlin.math.min
 

@@ -4,8 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
-import java.util.IdentityHashMap
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 
 data class UiProfileTiming(

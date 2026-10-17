@@ -1,66 +1,103 @@
 ---
 title: Звуки
-order: 11
+order: 12
 ---
 
-<center><h1>Звуки</h1></center>
+# Звуки
 
-*Проигрывание звуков в мире и отдельным игрокам.*
+Файлы и события `sounds.json` используют один API воспроизведения. Ядро поддерживает потоковый OGG Vorbis и RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, моно/стерео, включая extensible WAV. Остальные кодеки и звуковые дорожки видеоконтейнеров предоставляет [аддон Media](/docs/hollowengine/addons/media).
 
 ![Редактор звуков](/hollowengine/pictures/sounds/editor.webp)
 
----
+## Источники
 
-## `playSound(sound, position, volume, pitch)` – звук в мире
+- `minecraft:entity.villager.yes` - событие из `sounds.json`. Точки в его имени сохраняются.
+- `demo:dialogue/hello.ogg` или `demo:sounds/dialogue/hello.ogg` - файл `assets/demo/sounds/dialogue/hello.ogg`.
+- `resource:demo:music.custom` - звуковой ресурс с явно указанным расширением.
+- `event:demo:voice.mp3` - явно заданное событие, даже если его имя похоже на файл.
+- `file:voices/hello.wav` - локальный файл относительно `hollowengine`; абсолютные пути тоже поддерживаются.
+- `https://example.org/music.mp3` - URL. Для медиаадресов без расширения нужен анализ контейнера из Media.
 
-Проигрывает звук в указанной позиции мира для всех игроков поблизости. Параметры: `sound` (обязательный), `position` (обязательный), `volume` (по умолч. `1.0`), `pitch` (по умолч. `1.0`).
+Для явной типизации используются `SoundSource.Event(id)`, `MediaSource.Resource(id)`, `MediaSource.File(path)`, `MediaSource.Url(uri)`. Типизированный ресурс содержит полный путь внутри namespace: например `demo:sounds/dialogue/hello.ogg`. Физический медиаисточник также принимается `VideoApi`.
 
-```kotlin
-playSound(
-    sound = "minecraft:entity.creeper.primed",
-    position = pos(10.0, 64.0, 10.0),
-    volume = 1.0,
-    pitch = 1.0
-)
+Все звуковые ресурсы движка находятся в `sounds/`. Перенесите файлы из прежних `assets/<namespace>/audio/` в `sounds/`; старые имена `namespace:audio/...` в сценариях преобразуются в новый путь. Отдельные старые OpenAL-плееры и кеш декодированных Wave удалены.
 
-// С параметрами по умолчанию
-playSound("minecraft:entity.creeper.primed", pos(10.0, 64.0, 10.0))
-```
-
----
-
-## `playSound(player, sound, volume, pitch)` – звук игроку
-
-Перегрузка для проигрывания звука конкретному игроку:
+## Простое воспроизведение
 
 ```kotlin
-playSound(player = player, sound = "minecraft:entity.experience_orb.pickup", volume = 1.0, pitch = 1.0)
+player.playSound("minecraft:entity.villager.yes")
+player.playSound("demo:dialogue/hello.ogg")
 ```
 
----
-
-## `player.playSound(sound, volume, pitch)` – альтернативный вызов
-
-Метод на `Player` (см. [Игрок](/docs/hollowengine/scripting/player)):
+Обычный вызов воспроизводит звук относительно слушателя. `Player.playSound` адресуется одному игроку, `Level.playSound` - всем игрокам уровня. Оба возвращают строковый id воспроизведения. Команда текста диалога `@play-sound` использует тот же API.
 
 ```kotlin
-player.playSound("minecraft:entity.experience_orb.pickup", 1.0, 1.0)
+val voice = player.playSound("demo:dialogue/hello.wav") {
+    volume = 0.8f
+    pitch = 1.1f
+    fadeIn = 0.1f
+    fadeOut = 0.3f
+}
+player.stopSound(voice) // использует настроенный fadeOut
 ```
 
----
-
-## Пример: зона со звуком
+## Циклы, затухание и управление
 
 ```kotlin
-val pos = pos(100.0, 64.0, 100.0)
-say("Go to the marked area!")
+import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+import net.minecraft.sounds.SoundSource as SoundCategory
 
-val who = player.waitZone(position = pos, radius = 3.0, leave = false)
-playSound(
-    sound = "minecraft:block.note_block.chime",
-    position = pos,
-    volume = 1.0,
-    pitch = 1.0
-)
-say("You entered the zone!")
+val engine = level.playSound("demo:machines/engine.wav") {
+    repeat = SoundRepeat.Forever
+    fadeIn = 1f
+    fadeOut = 2f
+    category = SoundCategory.BLOCKS
+    range = 32f
+    follow(machineEntity)
+}
+
+player.updateSound(engine, volume = 0.4f, pitch = 0.9f)
+level.stopSound(engine, fadeOut = 0.5f)
 ```
+
+По умолчанию используется `SoundRepeat.Once`. `SoundRepeat.Count(3)` или `cycles(3)` означает три воспроизведения всего, включая первое. `SoundRepeat.Forever` работает до остановки или удаления владельца. Пустые потоки завершаются даже в бесконечном режиме. Каждый цикл заново открывает декодер, не сохраняя декодированный файл целиком. Событие выбирает файл с учётом весов один раз на воспроизведение и повторяет выбранный файл.
+
+Длительности переходов задаются в секундах. Fade-in и естественный fade-out применяются к PCM-сэмплам. По умолчанию они охватывают всё воспроизведение: первый и последний цикл. `fadeEachCycle = true` применяет оба перехода к каждому циклу. Бесконечный звук использует `fadeOut` при остановке. Естественное затухание хранит опережающий буфер пропорционально заданной длительности, не требуя всего декодированного файла. Затухание при явной остановке идёт по игровому времени и учитывает паузы.
+
+Повторный запуск того же id с тем же источником и огибающей меняет громкость, pitch и привязку без перезапуска. Изменение источника или огибающей создаёт новое воспроизведение. `playLoop(id, location) { ... }` и `stopLoop(id)` сохранены как совместимые вызовы этого же механизма. `stopSound(id, 0f)` останавливает сразу. Громкость категорий/master Minecraft, пауза, перезагрузка ресурсов и выключение звука применяются и к этим голосам.
+
+## Подвижные источники
+
+`at(Vec3(...))` задаёт неподвижную точку в мире, `follow(entity, offset)` следует за сущностью. Также доступны привязки к ригу и эффекту:
+
+```kotlin
+player.playSound("demo:machines/engine.ogg") {
+    repeat = SoundRepeat.Forever
+    attach(machineEntity, "engine_sound")
+}
+
+player.playSound("demo:effects/electric.wav") {
+    followEffect(effectHandle)
+}
+```
+
+В редакторе рига добавьте к кости attachment типа «Звук». Его id уникален в пределах рига. `autoPlay` запускает звук при первой подготовке модели мира; предпросмотры не воспроизводят звуки мира. При отключённом автозапуске сценарий обращается к привязке через `attach(entity, attachmentId)`. Положение отслеживает анимированную кость каждый кадр, в том числе у моделей вне поля зрения камеры. Перестройка/удаление рига освобождает привязки. Для смещения создайте собственную кость и прикрепите звук к ней; отдельные смещение, поворот и масштаб у звукового вложения отсутствуют.
+
+Вложенные привязки задаются путями вроде `hand/tool/engine_sound`. Если у сущности несколько узлов моделей с одинаковым путём привязки, передайте `modelNodeId = nodeUuid.toString()` в `attach`: неоднозначные имена отклоняются. Ожидающая привязка к ригу/эффекту ждёт `timeoutSeconds`: по умолчанию 5 игровых секунд, 0 - без ограничения. Удаление владельца останавливает звук. Временная недоступность сохраняет последнюю корректную позицию. Переключение между режимами слушателя и мира создаёт новый нативный голос с начала; перемещение внутри мира сохраняет текущий голос.
+
+Клиентские системы используют `ClientSounds.play(source, settings, emitter)` и `SoundEmitter`, возвращающий `SoundEmitterState`. `SoundAttachments.register(id)` предоставляет привязку с явным обновлением положения; её нужно закрывать вместе с владельцем. `SoundEmitterSpec.Attachment(id)` адресует её из сценариев/пакетов. Управлять воспроизведением нужно на клиентском потоке. `ManagedSound` предоставляет остановку/затухание, громкость, pitch, смену источника положения и ошибки декодирования. Сетевые сценарные вызовы управляют звуком по возвращённому id.
+
+## `sounds.json`
+
+Обычные имена OGG без расширения остаются совместимыми с Minecraft. Другие форматы сохраняют расширение:
+
+```json
+{
+  "greeting": {
+    "subtitle": "demo.greeting",
+    "sounds": [{ "name": "demo:dialogue/hello.wav", "stream": true }]
+  }
+}
+```
+
+После этого можно воспроизвести `demo:greeting` или непосредственно `demo:dialogue/hello.wav`. Редактор звуков подсказывает OGG без расширения, сохраняя расширения WAV/Media. Сохраняются веса событий, субтитры, громкость/pitch файлов и дистанция затухания. Параметр `range` воспроизведения переопределяет дистанцию события, когда указан.

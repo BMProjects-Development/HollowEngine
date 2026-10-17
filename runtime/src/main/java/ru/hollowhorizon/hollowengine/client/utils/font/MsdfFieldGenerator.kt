@@ -1,8 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.utils.font
 
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sqrt
 
 /** Scratch results of one edge's distance query, avoiding an allocation per pixel per edge. */

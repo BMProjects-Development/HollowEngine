@@ -1,12 +1,5 @@
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.models.internal.Material
-import ru.hollowhorizon.hollowengine.client.models.internal.Mesh
-import ru.hollowhorizon.hollowengine.client.models.internal.Model
-import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
-import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
-import ru.hollowhorizon.hollowengine.client.models.internal.Scene
-import ru.hollowhorizon.hollowengine.client.models.internal.allMaterials
-import ru.hollowhorizon.hollowengine.client.models.internal.renameMaterials
+import ru.hollowhorizon.hollowengine.client.models.internal.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstanceMaterials
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelMetadata

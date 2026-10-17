@@ -1,0 +1,7 @@
+{
+  "source": "Sound event or media file",
+  "auto_play": "Play automatically",
+  "playback": "Playback",
+  "areas": "Areas",
+  "areas.hint": "The space the sound fills: inside any area it is all around, outside it comes from the nearest one and fades from its edge. Without areas it comes from the attachment's point."
+}

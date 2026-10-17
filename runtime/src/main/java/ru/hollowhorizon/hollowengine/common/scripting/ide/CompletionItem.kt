@@ -79,10 +79,6 @@ class KeywordItemBuilder {
         closeness = completionItem.closeness
     }
 
-    fun withSpace() {
-        textToInsert += " "
-    }
-
     fun build() = CompletionItem.Keyword(textToShow, textToInsert, name, moveCaret, wordChars, closeness)
 }
 
@@ -139,15 +135,6 @@ class DeclarationCompletionItemBuilder {
 fun declarationCompletionItem(block: DeclarationCompletionItemBuilder.() -> Unit): CompletionItem.Declaration {
     val builder = DeclarationCompletionItemBuilder().apply(block)
     return builder.build()
-}
-
-fun keywordCompletionItem(keyword: String, block: KeywordItemBuilder.() -> Unit = {}): CompletionItem.Keyword {
-    return keywordCompletionItem {
-        textToShow = keyword
-        textToInsert = keyword
-        name = keyword
-        apply(block)
-    }
 }
 
 fun keywordCompletionItem(block: KeywordItemBuilder.() -> Unit = {}): CompletionItem.Keyword {

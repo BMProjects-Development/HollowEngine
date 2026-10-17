@@ -3,9 +3,12 @@ package ru.hollowhorizon.hollowengine.addons.physics.rig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorBone
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidgets
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -22,65 +25,6 @@ data class RigVector(val x: Float = 0f, val y: Float = 0f, val z: Float = 0f) {
 
         fun of(vector: Vec3f) = RigVector(vector.x, vector.y, vector.z)
     }
-}
-
-/**
- * Shape of a body, in the space of bone it hangs on.
- */
-@Serializable
-sealed class RigidBodyShape {
-    /** Where the middle of shape sits, relative to bone's origin. */
-    abstract val offset: RigVector
-
-    /** How the shape is turned in the bone's space, in degrees. */
-    abstract val rotation: RigVector
-
-    @Serializable
-    @SerialName("capsule")
-    data class Capsule(
-        @EditorName("$LANG.capsule.radius")
-        @EditorDescription("$LANG.capsule.radius.hint")
-        val radius: Float = 0.08f,
-        @EditorName("$LANG.capsule.length")
-        @EditorDescription("$LANG.capsule.length.hint")
-        val length: Float = 0.3f,
-        @EditorName("$LANG.shape.offset")
-        @EditorDescription("$LANG.shape.offset.hint")
-        override val offset: RigVector = RigVector.ZERO,
-        @EditorName("$LANG.shape.rotation")
-        @EditorDescription("$LANG.capsule.rotation.hint")
-        override val rotation: RigVector = RigVector.ZERO,
-    ) : RigidBodyShape()
-
-    @Serializable
-    @SerialName("box")
-    data class Box(
-        @EditorName("$LANG.box.half_extents")
-        @EditorDescription("$LANG.box.half_extents.hint")
-        val halfExtents: RigVector = RigVector(
-            0.1f,
-            0.1f,
-            0.1f
-        ),
-        @EditorName("$LANG.shape.offset")
-        @EditorDescription("$LANG.shape.offset.hint")
-        override val offset: RigVector = RigVector.ZERO,
-        @EditorName("$LANG.shape.rotation")
-        @EditorDescription("$LANG.shape.rotation.hint")
-        override val rotation: RigVector = RigVector.ZERO,
-    ) : RigidBodyShape()
-
-    @Serializable
-    @SerialName("sphere")
-    data class Sphere(
-        @EditorName("$LANG.sphere.radius")
-        @EditorDescription("$LANG.sphere.radius.hint")
-        val radius: Float = 0.1f,
-        @EditorName("$LANG.shape.offset")
-        @EditorDescription("$LANG.shape.offset.hint")
-        override val offset: RigVector = RigVector.ZERO,
-        @EditorHidden override val rotation: RigVector = RigVector.ZERO,
-    ) : RigidBodyShape()
 }
 
 /**
@@ -112,9 +56,10 @@ data class BodyCollision(
 data class RigidBodyAttachmentSpec(
     @EditorHidden override val id: String = "body",
 
-    @EditorName("$LANG.body.shape")
-    @EditorDescription("$LANG.body.shape.hint")
-    val shape: RigidBodyShape = RigidBodyShape.Capsule(),
+    @EditorWidget(EditorWidgets.COLLIDERS)
+    @EditorName("$LANG.body.colliders")
+    @EditorDescription("$LANG.body.colliders.hint")
+    val colliders: List<String> = emptyList(),
     @EditorName("$LANG.body.density")
     @EditorDescription("$LANG.body.density.hint")
     val density: Float = 1050f,
@@ -126,10 +71,9 @@ data class RigidBodyAttachmentSpec(
     val angularDamping: Float = 0.15f,
     @EditorName("$LANG.body.gravity")
     @EditorDescription("$LANG.body.gravity.hint")
-    val gravityFactor: Float = 1f, @EditorName("$LANG.body.friction")
-
-    @EditorDescription("$LANG.body.friction.hint"
-    )
+    val gravityFactor: Float = 1f,
+    @EditorName("$LANG.body.friction")
+    @EditorDescription("$LANG.body.friction.hint")
     val friction: Float = 0.6f,
     @EditorName("$LANG.body.restitution")
     @EditorDescription("$LANG.body.restitution.hint")
@@ -138,6 +82,10 @@ data class RigidBodyAttachmentSpec(
     val collision: BodyCollision = BodyCollision(),
 ) : RigAttachmentSpec() {
     override fun withId(id: String) = copy(id = id)
+
+    /** The colliders of [bone] this body is made of: those it names, or every one when it names none. */
+    fun partsOn(bone: List<RigAttachmentSpec>): List<ColliderAttachmentSpec> =
+        bone.filterIsInstance<ColliderAttachmentSpec>().filter { colliders.isEmpty() || it.id in colliders }
 
     companion object {
         const val TYPE_ID = "hollowengine:physics/rigid_body"

@@ -3,8 +3,14 @@ package ru.hollowhorizon.hollowengine.common.ide.session.definition
 import org.benf.cfr.reader.api.CfrDriver
 import org.benf.cfr.reader.api.OutputSinkFactory
 import org.benf.cfr.reader.api.SinkReturns
+import org.benf.cfr.reader.util.output.IllegalIdentifierReplacement
 
 internal object CfrSourceDecompiler {
+    /** Match identifiers with CFR's own renaming, including Kotlin's value class mangling. */
+    @Synchronized
+    fun sourceIdentifier(name: String): String = IllegalIdentifierReplacement.getInstance().getLegalIdentifierFor(name)
+
+    @Synchronized
     fun decompile(classFile: String): String? {
         val output = StringBuilder()
         val sinkFactory = object : OutputSinkFactory {
@@ -36,6 +42,7 @@ internal object CfrSourceDecompiler {
                     "silent" to "true",
                     "comments" to "false",
                     "hideutf" to "false",
+                    "renameillegalidents" to "true",
                 )
             )
             .withOutputSink(sinkFactory)

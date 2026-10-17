@@ -1,9 +1,5 @@
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Casts
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
-import ru.hollowhorizon.hollowengine.common.utils.expressions.ExprType
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.References
+import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import kotlin.math.max
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

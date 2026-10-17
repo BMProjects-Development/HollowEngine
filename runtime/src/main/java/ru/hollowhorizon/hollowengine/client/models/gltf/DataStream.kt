@@ -39,8 +39,4 @@ class DataStream(val data: Uint8Buffer, val byteOffset: Int = 0) {
         for (i in 0 until len) buf[i] = data[index++]
         return buf
     }
-
-    fun skipBytes(nBytes: Int) {
-        index += nBytes
-    }
 }

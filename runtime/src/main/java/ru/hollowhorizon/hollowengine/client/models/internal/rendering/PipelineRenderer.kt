@@ -1,23 +1,23 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.rendering
 
 import com.mojang.blaze3d.systems.RenderSystem
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.ShaderInstance
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.lwjgl.BufferUtils
-import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.client.models.internal.*
+import ru.hollowhorizon.hollowengine.client.models.internal.INSTANCED_SHADER
+import ru.hollowhorizon.hollowengine.client.models.internal.Material
+import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
+import ru.hollowhorizon.hollowengine.client.models.internal.packedLight
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.toFloatBuffer
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.utils.areShadersEnabled
 import ru.hollowhorizon.hollowengine.client.utils.instancingEntityInfo
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.client.utils.toTexture
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.cbrt
@@ -300,16 +300,6 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         buffer.bind()
         GL33.glVertexAttribPointer(location, size, type, false, stride, offset)
         GL33.glEnableVertexAttribArray(location)
-    }
-
-    private fun bindIntegerAsFloatAttribute(shader: ShaderInstance, name: String, buffer: VboWrapper?) {
-        val location = GL33.glGetAttribLocation(shader.id, name)
-        if (location == -1 || buffer == null) return
-
-        buffer.bind()
-        GL33.glVertexAttribPointer(location, 2, GL33.GL_INT, false, INT2_STRIDE_BYTES, 0L)
-        GL33.glEnableVertexAttribArray(location)
-        GL33.glVertexAttribDivisor(location, 1)
     }
 
     private fun bindIntegerAttribute(

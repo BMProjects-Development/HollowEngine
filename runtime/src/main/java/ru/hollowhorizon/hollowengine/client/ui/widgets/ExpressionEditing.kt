@@ -1,12 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Diagnostics
-import ru.hollowhorizon.hollowengine.common.utils.expressions.ExprType
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Lexer
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Severity
-import ru.hollowhorizon.hollowengine.common.utils.expressions.TokenType
+import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 
 /**
  * What a text field needs to edit an expression of one dialect: colors for its tokens, the names it

@@ -221,11 +221,10 @@ private fun parseLinearGradient(value: String): UiPaint.LinearGradient? {
     if (!cleaned.startsWith("linear-gradient(")) return null
     val args = functionArgs(cleaned, "linear-gradient")
     val first = args.firstOrNull()?.trim().orEmpty()
-    val firstIsAngle = first.endsWith("deg") || first.toFloatOrNull() != null
-    val angle = if (firstIsAngle) parseScalar(first) else 180f
-    val colorArgs = if (firstIsAngle) args.drop(1) else args
+    val angle = parseGradientAngle(first)
+    val colorArgs = if (angle != null) args.drop(1) else args
     require(colorArgs.size >= 2) { "linear-gradient requires at least two colors" }
-    return UiPaint.LinearGradient(angle, parseGradientStops(colorArgs))
+    return UiPaint.LinearGradient(angle ?: 180f, parseGradientStops(colorArgs))
 }
 
 private fun parseRadialGradient(value: String): UiPaint.RadialGradient? {
@@ -401,8 +400,8 @@ private fun parseGradientAngle(part: String): Float? {
             else -> throw IllegalArgumentException("Unknown gradient direction '$part'")
         }
     }
-    if (text.endsWith("deg")) return text.removeSuffix("deg").trim().toFloatOrNull()
-    return null
+    if (text.endsWith("deg")) return text.removeSuffix("deg").trim().toFloat()
+    return text.toFloatOrNull()
 }
 
 private fun spreadMissingStops(positions: Array<Float?>) {

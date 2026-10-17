@@ -1,0 +1,11 @@
+{
+  "panel": "Panel",
+  "panel.hint": "The id of a panel declared in a .ui.kts script with panel(\"mypack:terminal\") { }. Its content reads the data of the entity it hangs on and sends what players do to onPanelEvent of that entity's node scripts.",
+  "offset": "Offset",
+  "rotation": "Rotation",
+  "scale": "Scale",
+  "width": "Width (in blocks)",
+  "interactive": "Clickable",
+  "reach": "Reach (in blocks)",
+  "emissive": "Glows"
+}

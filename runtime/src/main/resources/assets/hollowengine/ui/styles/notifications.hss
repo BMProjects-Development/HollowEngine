@@ -5,6 +5,7 @@
  */
 
 @import "hollowengine:ui/styles/theme.hss";
+@import "hollowengine:ui/styles/buttons.hss";
 
 
 .notif-stack {
@@ -27,11 +28,11 @@
     shadow: 0px 6px 16px 0px $shadow;
 }
 
-.notif.success { border: 1px linear-gradient(135deg, #9BF763, #3D5A24); }
-.notif.error { border: 1px linear-gradient(135deg, #FF759F, #6E2020); }
-.notif.warning { border: 1px linear-gradient(135deg, #F7C363, #6B4520); }
-.notif.info { border: 1px linear-gradient(135deg, #4C86E0, #12203F); }
-.notif.progress { border: 1px linear-gradient(135deg, #4C86E0, #12203F); }
+.notif.success { border: 1px linear-gradient(225deg, #9BF763, #3D5A24); }
+.notif.error { border: 1px linear-gradient(225deg, #FF759F, #6E2020); }
+.notif.warning { border: 1px linear-gradient(225deg, #F7C363, #6B4520); }
+.notif.info { border: 1px linear-gradient(225deg, #4C86E0, #12203F); }
+.notif.progress { border: 1px linear-gradient(225deg, #4C86E0, #12203F); }
 
 .notif-head {
     size: 100% fit;
@@ -50,37 +51,16 @@
 }
 
 .notif-action {
-    size: fit fit;
-    min-height: 18px;
-    padding: 2px 8px;
-    background: $bg-hover;
-    border-radius: $radius;
-    hoverable: true;
-    clickable: true;
-    transition: background 120ms ease-out;
-}
-
-.notif-action:hover { background: $bg-pressed; }
-
-.notif-action-label {
-    align: center center;
-    size: fit fit;
-    foreground: $text-strong;
-    wrap: false;
+    height: 18px;
+    padding: 0px 8px;
 }
 
 .notif-close {
     size: 16px 16px;
-    padding: 4px;
-    background: transparent;
-    border-radius: $radius;
-    tint: $text-faint;
-    transition: tint 120ms ease-out, background 120ms ease-out;
 }
 
-.notif-close:hover {
-    background: $bg-hover;
-    tint: $text-strong;
+.notif-close .button-icon {
+    size: 8px 8px;
 }
 
 .notif-track {
@@ -91,10 +71,10 @@
 }
 
 .notif-fill {
-    background: linear-gradient(90deg, #4C86E0, #9BC2FF);
+    background: linear-gradient(to bottom, #4C86E0, #9BC2FF);
     border-radius: 2px;
 }
 
-.notif.success .notif-fill { background: linear-gradient(90deg, #70A832, #9BF763); }
-.notif.error .notif-fill { background: linear-gradient(90deg, #F54747, #FF759F); }
-.notif.warning .notif-fill { background: linear-gradient(90deg, #A86D32, #F7C363); }
+.notif.success .notif-fill { background: linear-gradient(to bottom, #70A832, #9BF763); }
+.notif.error .notif-fill { background: linear-gradient(to bottom, #F54747, #FF759F); }
+.notif.warning .notif-fill { background: linear-gradient(to bottom, #A86D32, #F7C363); }

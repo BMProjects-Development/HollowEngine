@@ -11,16 +11,16 @@ object GeometryUtils {
         val getIndex = { i: Int -> indices?.get(i) ?: i }
         val loops = indices?.size ?: count
 
-        val p1 = MutableVec3f();
-        val p2 = MutableVec3f();
+        val p1 = MutableVec3f()
+        val p2 = MutableVec3f()
         val p3 = MutableVec3f()
-        val e1 = MutableVec3f();
-        val e2 = MutableVec3f();
+        val e1 = MutableVec3f()
+        val e2 = MutableVec3f()
         val nrm = MutableVec3f()
 
         for (i in 0 until loops step 3) {
-            val i1 = getIndex(i);
-            val i2 = getIndex(i + 1);
+            val i1 = getIndex(i)
+            val i2 = getIndex(i + 1)
             val i3 = getIndex(i + 2)
             if (i1 >= count || i2 >= count || i3 >= count) continue
 

@@ -1,18 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensions
 
 internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     modelEditor: HollowIdeFileEditor,
     imageEditor: HollowIdeFileEditor,
     videoEditor: HollowIdeFileEditor,
+    audioEditor: HollowIdeFileEditor,
     animatorEditor: HollowIdeFileEditor,
     rigEditor: HollowIdeFileEditor,
     vfxEditor: HollowIdeFileEditor,
+    montageEditor: HollowIdeFileEditor,
     shaderGraphEditor: HollowIdeFileEditor,
     textEditor: HollowIdeFileEditor,
 ) {
@@ -32,6 +31,15 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
             priority = 280,
             loader = { _, bytes -> HollowIdeVfxDocument(bytes) },
             editor = vfxEditor,
+        ),
+    )
+    register(
+        HollowIdeFileType.extensions(
+            id = "montage",
+            extensions = listOf(".montage"),
+            priority = 275,
+            loader = { _, bytes -> HollowIdeMontageDocument(bytes) },
+            editor = montageEditor,
         ),
     )
     register(
@@ -70,6 +78,16 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
             requiresContent = false,
             loader = { _, _ -> HollowIdeReadOnlyDocument },
             editor = videoEditor,
+        ),
+    )
+    register(
+        HollowIdeFileType.extensions(
+            id = "audio",
+            extensions = AudioFileExtensions,
+            priority = 140,
+            requiresContent = false,
+            loader = { _, _ -> HollowIdeReadOnlyDocument },
+            editor = audioEditor,
         ),
     )
     register(

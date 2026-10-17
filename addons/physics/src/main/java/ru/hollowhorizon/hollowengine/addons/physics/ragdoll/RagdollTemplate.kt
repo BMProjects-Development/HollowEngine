@@ -6,6 +6,7 @@ import com.github.stephengold.joltjni.enumerate.EConstraintSpace
 import com.github.stephengold.joltjni.enumerate.EMotionType
 import com.github.stephengold.joltjni.enumerate.ESwingType
 import ru.hollowhorizon.hollowengine.addons.physics.*
+import ru.hollowhorizon.hollowengine.addons.physics.collider.JoltColliderShapes
 import ru.hollowhorizon.hollowengine.addons.physics.rig.AxisLimit
 import ru.hollowhorizon.hollowengine.addons.physics.rig.JointLimits
 import ru.hollowhorizon.hollowengine.addons.physics.world.PhysicsWorld
@@ -37,9 +38,11 @@ class RagdollTemplate private constructor(
             settings.resizeParts(plan.bones.size)
 
             val parts = settings.parts
+            val shapes = plan.bones.map(::shapeOf)
+            val centers = shapes.map { shape -> shape.centerOfMass.let { Vec3f(it.x, it.y, it.z) } }
             plan.bones.forEachIndexed { index, bone ->
                 val part = parts[index]
-                part.setShapeSettings(shapeOf(bone))
+                part.setShape(shapes[index])
                 part.setPosition(bone.bindPosition.toJoltPosition())
                 part.setRotation(bone.bindRotation.toJolt())
                 part.setMotionType(EMotionType.Dynamic)
@@ -51,7 +54,7 @@ class RagdollTemplate private constructor(
                 part.setRestitution(spec.restitution)
                 part.setAllowSleeping(true)
 
-                if (bone.parent >= 0) part.setToParent(jointTo(plan.bones[bone.parent], bone))
+                if (bone.parent >= 0) part.setToParent(jointTo(plan.bones[bone.parent], bone, centers[bone.parent], centers[index]))
             }
 
             val collisions = collisionFilter(plan)
@@ -77,34 +80,27 @@ class RagdollTemplate private constructor(
             return filter.toRef()
         }
 
-        private fun shapeOf(bone: RagdollBone): RotatedTranslatedShapeSettings {
-            val shape = when (val authored = bone.shape) {
-                is RagdollShape.Capsule -> {
-                    val halfHeight = (authored.length * 0.5f - authored.radius).coerceAtLeast(MIN_HALF_HEIGHT)
-                    CapsuleShapeSettings(halfHeight, authored.radius)
-                }
-
-                is RagdollShape.Box -> BoxShapeSettings(authored.halfExtents.toJolt())
-                is RagdollShape.Sphere -> SphereShapeSettings(authored.radius)
+        /** The body of [bone]: each of its pieces where it sits on the bone, built as one shape. */
+        private fun shapeOf(bone: RagdollBone): ShapeRefC {
+            val density = bone.density.coerceAtLeast(MIN_DENSITY)
+            val placed = bone.shape.parts.map { part ->
+                Triple(part.center.toJolt(), part.rotation.toJolt(), JoltColliderShapes.settings(part.shape, part.halfExtents, density))
             }
-            // A body of no density has no mass, and Jolt divides by it.
-            shape.setDensity(bone.density.coerceAtLeast(MIN_DENSITY))
-
-            return RotatedTranslatedShapeSettings(
-                bone.shape.center.toJolt(),
-                bone.shape.rotation.toJolt(),
-                shape,
-            )
+            val settings = placed.singleOrNull()?.let { (center, rotation, shape) -> RotatedTranslatedShapeSettings(center, rotation, shape) }
+                ?: StaticCompoundShapeSettings().apply { placed.forEach { (center, rotation, shape) -> addShape(center, rotation, shape) } }
+            val result = settings.create()
+            check(!result.hasError()) { "Could not build the body of ${bone.name}: ${result.error}" }
+            return result.get()
         }
 
         /**
          * Constraint holding [bone] to [parent].
          */
-        private fun jointTo(parent: RagdollBone, bone: RagdollBone): TwoBodyConstraintSettings {
+        private fun jointTo(parent: RagdollBone, bone: RagdollBone, parentCenter: Vec3f, boneCenter: Vec3f): TwoBodyConstraintSettings {
             val pivot = bone.bindPosition + bone.pivot.rotated(bone.bindRotation)
             val offset = pivot.subtract(parent.bindPosition, MutableVec3f())
-            val inParent = offset.rotatedInverse(parent.bindRotation).subtract(parent.centreOfMass, MutableVec3f())
-            val onBone = bone.pivot - bone.centreOfMass
+            val inParent = offset.rotatedInverse(parent.bindRotation).subtract(parentCenter, MutableVec3f())
+            val onBone = bone.pivot - boneCenter
 
             val limits = bone.limits
             val hingeAxis = limits.hingeAxis
@@ -141,8 +137,8 @@ class RagdollTemplate private constructor(
 
             settings.setTwistMinAngle(limits.axes[along].min.coerceIn(-MAX_ANGLE, 0f).toRadians())
             settings.setTwistMaxAngle(limits.axes[along].max.coerceIn(0f, MAX_ANGLE).toRadians())
-            settings.setPlaneHalfConeAngle(limits.axes[(along + 1) % AXES].reach.coerceIn(0f, MAX_ANGLE).toRadians())
-            settings.setNormalHalfConeAngle(limits.axes[(along + 2) % AXES].reach.coerceIn(0f, MAX_ANGLE).toRadians())
+            settings.setPlaneHalfConeAngle(limits.axes[(along + 2) % AXES].reach.coerceIn(0f, MAX_ANGLE).toRadians())
+            settings.setNormalHalfConeAngle(limits.axes[(along + 1) % AXES].reach.coerceIn(0f, MAX_ANGLE).toRadians())
             return settings
         }
 
@@ -211,7 +207,6 @@ class RagdollTemplate private constructor(
 
         private fun Float.toRadians(): Float = (this * Math.PI / 180.0).toFloat()
 
-        private const val MIN_HALF_HEIGHT = 0.01f
         private const val AXES = 3
         private const val MIN_DENSITY = 1f
         private const val MAX_ANGLE = 179f

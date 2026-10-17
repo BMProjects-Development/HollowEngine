@@ -14,16 +14,4 @@ object HollowCoreLoader : Config() {
     @PropertyName("opengl_version")
     @PropertyComment("OpenGL version for Kool (3.3 or 4.5)")
     var openGlVersion by property("3.3")
-
-    @JvmStatic
-    fun canAttachRenderdoc(): Boolean {
-        if (!enableRenderDoc) return false
-
-        // TODO: fix on neoforge
-        //? if fabric {
-        return true
-        //?} else {
-        /*return !FMLConfig.getBoolConfigValue(FMLConfig.ConfigValue.EARLY_WINDOW_CONTROL)
-        *///?}
-    }
 }

@@ -4,7 +4,6 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import java.util.*

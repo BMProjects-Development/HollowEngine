@@ -12,7 +12,7 @@ import kotlin.math.abs
  */
 internal object RagdollCollisions {
     fun excludedPairs(bones: List<RagdollBone>): List<Pair<Int, Int>> {
-        val boxes = bones.map(::boxOf)
+        val boxes = bones.map(::boxesOf)
         val pairs = ArrayList<Pair<Int, Int>>()
 
         bones.indices.forEach { first ->
@@ -23,7 +23,7 @@ internal object RagdollCollisions {
         return pairs
     }
 
-    private fun excluded(bones: List<RagdollBone>, boxes: List<Box>, first: Int, second: Int): Boolean {
+    private fun excluded(bones: List<RagdollBone>, boxes: List<List<Box>>, first: Int, second: Int): Boolean {
         val one = bones[first]
         val other = bones[second]
         if (one.parent == second || other.parent == first) return true
@@ -32,23 +32,19 @@ internal object RagdollCollisions {
         if (settings.any { !it.withRig }) return true
         if (other.name in one.collision.ignores || one.name in other.collision.ignores) return true
 
-        return settings.none { it.pushesOut } && overlap(boxes[first], boxes[second])
+        return settings.none { it.pushesOut } && boxes[first].any { one -> boxes[second].any { overlap(one, it) } }
     }
 
     fun softBodies(bones: List<RagdollBone>): Map<Int, Float> =
         bones.withIndex().filterNot { (_, bone) -> bone.collision.isSolid }
             .associate { (index, bone) -> index to bone.collision.push.coerceIn(0f, 1f) }
 
-    fun boxOf(bone: RagdollBone): Box {
-        val rotation = MutableQuatF(bone.bindRotation).mul(bone.shape.rotation).norm()
-        return Box(
-            centre = bone.bindPosition + bone.shape.center.rotated(bone.bindRotation),
-            rotation = QuatF(rotation),
-            half = when (val shape = bone.shape) {
-                is RagdollShape.Box -> shape.halfExtents
-                is RagdollShape.Sphere -> Vec3f(shape.radius, shape.radius, shape.radius)
-                is RagdollShape.Capsule -> Vec3f(shape.radius, shape.length * 0.5f, shape.radius)
-            },
+    /** The box of every piece of [bone]'s body in the bind pose; each holds whatever shape fills it. */
+    fun boxesOf(bone: RagdollBone): List<Box> = bone.shape.parts.map { part ->
+        Box(
+            centre = bone.bindPosition + part.center.rotated(bone.bindRotation),
+            rotation = QuatF(MutableQuatF(bone.bindRotation).mul(part.rotation).norm()),
+            half = part.halfExtents,
         )
     }
 

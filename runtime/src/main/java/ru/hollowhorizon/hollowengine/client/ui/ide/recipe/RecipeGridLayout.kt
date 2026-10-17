@@ -9,7 +9,6 @@ internal const val GridSize = 3
 /** Keys a new ingredient of a shaped recipe gets, in order; ones the file already uses are kept. */
 private const val Symbols = "#XIABCDEFGHJKLMNOPQRSTUVWYZ0123456789"
 
-/** The 3×3 grid a shaped recipe fills, row by row; null when its pattern does not fit one. */
 internal fun shapedCells(json: JsonObject): List<JsonElement?>? {
     val pattern = json.get("pattern")?.takeIf { it.isJsonArray }?.asJsonArray?.strings().orEmpty()
     if (pattern.size > GridSize || pattern.any { it.length > GridSize }) return null

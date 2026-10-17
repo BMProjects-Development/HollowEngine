@@ -12,6 +12,7 @@ object UiDefinitionRegistry {
     private val screens = ConcurrentHashMap<ResourceLocation, UiScreenDefinition>()
     private val overlays = ConcurrentHashMap<ResourceLocation, UiOverlayDefinition>()
     private val surfaces = ConcurrentHashMap<ResourceLocation, UiSurfaceDefinition>()
+    private val panels = ConcurrentHashMap<ResourceLocation, UiPanelDefinition>()
 
     /** Replaced screen class name -> the scripted screen that replaces it. */
     private val overrides = ConcurrentHashMap<String, OverrideEntry>()
@@ -50,6 +51,12 @@ object UiDefinitionRegistry {
 
     fun surface(id: ResourceLocation): UiSurfaceDefinition? = surfaces[id]
 
+    fun register(definition: UiPanelDefinition) {
+        panels[definition.id] = definition
+    }
+
+    fun panel(id: ResourceLocation): UiPanelDefinition? = panels[id]
+
     fun screenOverride(type: Class<*>): UiScreenDefinition? {
         if (overrides.isEmpty()) return null
         var current: Class<*>? = type
@@ -67,6 +74,7 @@ object UiDefinitionRegistry {
         screens.clear()
         overlays.clear()
         surfaces.clear()
+        panels.clear()
         overrides.clear()
     }
 }

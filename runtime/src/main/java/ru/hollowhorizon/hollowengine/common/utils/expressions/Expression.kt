@@ -84,8 +84,6 @@ class Expression<C> internal constructor(
         return Baked(source, diagnostics.all, ast, ir)
     }
 
-    fun bakeAll(sources: Iterable<String>): Map<String, Baked<C>> = sources.associateWith(::bake)
-
     fun compile(sources: Iterable<String>): CompiledUnit<C> {
         val baked = sources.distinct().map(::bake)
         val compiled = ExpressionCompiler.compile(baked.map { it.ir })

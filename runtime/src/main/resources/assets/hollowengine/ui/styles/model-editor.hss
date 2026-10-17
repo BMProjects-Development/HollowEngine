@@ -109,31 +109,11 @@
 
 .model-play {
     size: 26px 26px;
-    align-items: center center;
-    background: $bg-selected;
     border-radius: $radius-large;
-    border: 1px $border;
-    hoverable: true;
-    clickable: true;
-    transition: background 140ms ease-out, border 140ms ease-out;
 }
 
-.model-play:hover {
-    background: $bg-pressed;
-}
-
-.model-play.active {
-    background: $accent-soft;
-    border: 1px $accent;
-}
-
-.model-play-icon {
+.model-play .button-icon {
     size: 14px 14px;
-    tint: $text;
-}
-
-.model-play.active .model-play-icon {
-    tint: $bg-panel;
 }
 
 .model-progress-track {

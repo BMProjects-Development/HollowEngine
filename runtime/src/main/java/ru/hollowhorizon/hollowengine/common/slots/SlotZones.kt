@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.slots
 
 import net.minecraft.world.item.ItemStack
-import kotlin.math.min
 
 /**
  * Rules for one slot. Every field is optional: what is left unset keeps the zone's answer.

@@ -1,4 +1,79 @@
 @import "hollowengine:ui/styles/theme.hss";
+@import "hollowengine:ui/styles/buttons.hss";
+
+.number-field {
+    size: 100% fit;
+    background: $bg-field;
+    border-radius: $radius-small;
+    border: 1px $divider;
+    foreground: $text;
+    font-size: $font-size;
+    caret-color: $caret;
+    selection-color: $selection;
+    text-shadow: none;
+    transition: border 110ms ease-out;
+}
+
+.number-field:hover { border: 1px $border; }
+
+.number-field.editing {
+    min-height: 18px;
+    padding: 1px 4px;
+}
+
+.number-field-frame { size: 100% 16px; }
+
+.number-field.editing:focus { border: 1px $accent; }
+
+.number-field-fill {
+    background: $accent-fill;
+    border-radius: $radius-small;
+}
+
+.number-field-body {
+    gap: 4px;
+    padding: 0px 3px;
+    align-items: start center;
+}
+
+.number-field-label {
+    size: 0px fit;
+    grow: 1;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+}
+
+.number-field-value {
+    foreground: $text;
+    font-size: $font-size;
+    text-align: center;
+}
+
+.number-field.labeled .number-field-value { text-align: right; }
+
+.number-field-arrow {
+    size: 9px 100%;
+    align-items: center center;
+    background: $bg-field;
+    border-radius: $radius-small;
+    opacity: 0;
+    transition: opacity 110ms ease-out;
+}
+
+.number-field:hover .number-field-arrow { opacity: 1; }
+
+.number-field-arrow-icon {
+    size: 6px 6px;
+    tint: $text-faint;
+}
+
+.number-field-arrow:hover .number-field-arrow-icon { tint: $text-strong; }
+
+.view-axes-label {
+    font-size: 7px;
+    foreground: $bg-window;
+    text-shadow: none;
+}
 
 .dropdown-button {
     height: 24px;
@@ -135,7 +210,7 @@
     border-radius: $radius;
 }
 
-.tree-filter-icon, .tree-filter-close {
+.tree-filter-icon, .tree-filter-close .button-icon {
     size: 12px 12px;
     tint: $text-soft;
 }
@@ -147,10 +222,6 @@
     selection-color: $selection;
 }
 
-.tree-filter-close:hover {
-    tint: $white;
-}
-
 .tree-item {
     padding-right: 6px;
     background: transparent;
@@ -160,6 +231,11 @@
         background 200ms ease-out,
         foreground 200ms ease-out;
     animations: tree-row-in 110ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* A row of a long tree comes into view as it is scrolled to, not as it appears. */
+.tree-item.virtual {
+    animations: none;
 }
 
 @keyframes tree-row-in {
@@ -184,6 +260,10 @@
 
 .tree-item.drop-rejected {
     background: alpha($danger, 0.35);
+}
+
+.tree-indent-space {
+    size: 16px 100%;
 }
 
 .tree-indent {
@@ -257,6 +337,39 @@
 
 .editable-text-field-gutter {
     background: $bg-field;
+    cursor: default;
+}
+
+.gutter-marker {
+    border-radius: 3px;
+    cursor: default;
+}
+
+.gutter-action { cursor: hand; }
+.fold-marker { opacity: 0; transition: opacity 140ms ease-in-out; }
+.editable-text-field-gutter:hover .fold-marker { opacity: 1; }
+
+.gutter-marker:hover {
+    background: $bg-hover;
+}
+
+.fold-placeholder {
+    foreground: $text-muted;
+    background: $bg-panel;
+    border-radius: 3px;
+}
+
+.editable-text-field-inlay.fold-placeholder {
+    padding: 0px 2px;
+    margin: 0px;
+    gap: 0px;
+    align-items: center center;
+}
+
+.fold-placeholder .editable-text-field-inlay-text {
+    font-size: 100%;
+    padding: 0px;
+    foreground: $text-muted;
 }
 
 .editable-text-field-inlay {
@@ -309,7 +422,7 @@
     max-width: 320px;
     padding: 3px 5px;
     background: alpha(#100010, 0.94);
-    border: 1px linear-gradient(180deg, alpha(#5000FF, 0.5), alpha(#28007F, 0.5));
+    border: 1px linear-gradient(to left, alpha(#5000FF, 0.5), alpha(#28007F, 0.5));
     border-radius: $radius-small;
 }
 
@@ -322,37 +435,6 @@
 .ui-item-tooltip-line {
     size: fit fit;
     foreground: #FFFFFF;
-    text-wrap: false;
-}
-
-.ide-quick-fix-popup {
-    padding: 3px;
-    gap: 1px;
-    background: $bg-raised;
-    border: 1px $border;
-    border-radius: $radius-large;
-    shadow: 0px 6px 16px 0px $shadow;
-}
-
-.ide-quick-fix-row {
-    width: 100%;
-    height: fit;
-    min-height: 18px;
-    padding: 2px 8px;
-    border-radius: $radius;
-    foreground: $text-strong;
-    text-wrap: false;
-}
-
-.ide-quick-fix-row.selected {
-    background: alpha($accent, 0.24);
-}
-
-.ide-quick-fix-row:hover {
-    background: alpha($accent, 0.18);
-}
-
-.ide-quick-fix-label {
     text-wrap: false;
 }
 

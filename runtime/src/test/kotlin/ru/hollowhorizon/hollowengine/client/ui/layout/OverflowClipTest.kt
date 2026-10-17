@@ -1,17 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.layout
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiMeasurePolicies
-import ru.hollowhorizon.hollowengine.client.ui.border
-import ru.hollowhorizon.hollowengine.client.ui.clip
-import ru.hollowhorizon.hollowengine.client.ui.padding
-import ru.hollowhorizon.hollowengine.client.ui.px
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
-import ru.hollowhorizon.hollowengine.client.ui.scrollModifier
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 import kotlin.test.assertEquals
 

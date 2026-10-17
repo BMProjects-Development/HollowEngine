@@ -4,17 +4,14 @@ import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.renderer.GameRenderer
+import net.minecraft.client.renderer.ShaderInstance
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.UiInsets
 import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
 import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathPoint
-import net.minecraft.client.renderer.ShaderInstance
-import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
-import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterEffect
-import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
-import ru.hollowhorizon.hollowengine.client.ui.style.UiImageUv
+import ru.hollowhorizon.hollowengine.client.ui.style.*
 import ru.hollowhorizon.hollowengine.common.registry.ModShaders
 import kotlin.math.abs
 import kotlin.math.cos
@@ -340,9 +337,9 @@ internal object UiTextureEffects {
         val stops = mask.stops
             .sortedBy { it.position }
             .take(UiFilterEffect.LinearMask.MAX_STOPS)
-        val radians = Math.toRadians(mask.angle.toDouble())
+        val radians = linearGradientRadians(mask.angle)
         shader.getUniform("GradientCount")?.set(stops.size.toFloat())
-        shader.getUniform("GradientDirection")?.set(sin(radians).toFloat(), -cos(radians).toFloat())
+        shader.getUniform("GradientDirection")?.set(cos(radians).toFloat(), sin(radians).toFloat())
         shader.getUniform("GradientStops")?.set(
             stops.getOrNull(0)?.position ?: 0f,
             stops.getOrNull(1)?.position ?: 1f,

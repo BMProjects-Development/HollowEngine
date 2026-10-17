@@ -50,7 +50,4 @@ interface Buffer {
 
     fun clear()
 
-    fun checkCapacity(requiredSize: Int) = check(requiredSize <= remaining) {
-        RuntimeException("Insufficient remaining size. Requested: $requiredSize, remaining: $remaining")
-    }
 }

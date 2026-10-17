@@ -40,7 +40,7 @@ class SeatEntity(entityType: EntityType<SeatEntity>, pLevel: Level) : LivingEnti
 
     override fun getMainArm(): HumanoidArm = HumanoidArm.RIGHT
 
-    override fun getAddEntityPacket(entity: ServerEntity): Packet<ClientGamePacketListener?>? {
+    override fun getAddEntityPacket(entity: ServerEntity): Packet<ClientGamePacketListener?> {
         return ClientboundAddEntityPacket(this, entity)
     }
 

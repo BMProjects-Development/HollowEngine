@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.render
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -30,7 +31,8 @@ object SkeletonLayout {
     private fun boneNodes(attachment: ModelAttachment): Set<Int>? {
         val all = attachment.nodes.flatMap { it.walk() }
         val joints = all.mapNotNull { it.definition.skin }.flatMap { it.jointsIds }.toSet()
-        if (joints.isNotEmpty()) return joints
+        val added = attachment.rig.addedBones.keys
+        if (joints.isNotEmpty()) return joints + all.filter { it.name in added }.map { it.definition.index }
 
         val withoutGeometry = all.filter { it.definition.mesh == null }.mapTo(HashSet()) { it.definition.index }
         return withoutGeometry.ifEmpty { null }

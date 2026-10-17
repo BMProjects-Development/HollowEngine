@@ -152,14 +152,13 @@ object VfxGizmos {
             return keyed?.value(channel) ?: value.constantOr(fallback)
         }
 
-        /** A keyed channel only takes a drag while the timeline records it as a key. */
-        private fun editable(property: VfxProperty, channel: Int, value: VfxValue): Boolean =
-            value is VfxValue.Const && driven(property)?.let { it.drives(channel) && !it.recording } != true
+        /** A handle sets a constant; a keyed channel takes the drag as a key or holds it, as the timeline records or not. */
+        private fun editable(value: VfxValue): Boolean = value is VfxValue.Const
 
         fun shape(shape: VfxShape) {
             val radius = current(VfxProperty.SHAPE_RADIUS, 0, shape.radius, 0.5f)
             val thickness = current(VfxProperty.SHAPE_THICKNESS, 0, shape.thickness, 1f)
-            val radiusEditable = editable(VfxProperty.SHAPE_RADIUS, 0, shape.radius)
+            val radiusEditable = editable(shape.radius)
 
             fun radiusHandle() {
                 if (!radiusEditable) return
@@ -212,7 +211,7 @@ object VfxGizmos {
                     ShapeFaint,
                 )
             }
-            if (editable(VfxProperty.SHAPE_RADIUS, 0, shape.radius)) {
+            if (editable(shape.radius)) {
                 handle(
                     "radius", Vector3f(radius, 0f, 0f), Vector3f(1f, 0f, 0f), HandleColor,
                     readout = { (radius + it).coerceAtLeast(0f) },
@@ -220,7 +219,7 @@ object VfxGizmos {
                     node.withShape { it.copy(radius = VfxValue.Const((radius + delta).coerceAtLeast(0f))) }
                 }
             }
-            if (editable(VfxProperty.SHAPE_ANGLE, 0, shape.angle)) {
+            if (editable(shape.angle)) {
                 fun degreesFor(delta: Float): Float {
                     val spread = ((top + delta - radius) / CONE_PREVIEW_HEIGHT).coerceAtLeast(0f)
                     return Math.toDegrees(atan(spread).toDouble()).toFloat().coerceIn(0f, 89f)
@@ -245,7 +244,7 @@ object VfxGizmos {
             polyline(corners.subList(4, 8), ShapeColor, closed = true)
             for (index in 0 until 4) segment(corners[index], corners[index + 4], ShapeColor)
 
-            if (editable(VfxProperty.SHAPE_EXTENTS, 0, extents.x)) {
+            if (editable(extents.x)) {
                 handle(
                     "extent-x",
                     Vector3f(x, 0f, 0f),
@@ -255,7 +254,7 @@ object VfxGizmos {
                     node.withShape { it.copy(extents = it.extents.copy(x = VfxValue.Const((x + delta).coerceAtLeast(0f)))) }
                 }
             }
-            if (editable(VfxProperty.SHAPE_EXTENTS, 1, extents.y)) {
+            if (editable(extents.y)) {
                 handle(
                     "extent-y",
                     Vector3f(0f, y, 0f),
@@ -265,7 +264,7 @@ object VfxGizmos {
                     node.withShape { it.copy(extents = it.extents.copy(y = VfxValue.Const((y + delta).coerceAtLeast(0f)))) }
                 }
             }
-            if (editable(VfxProperty.SHAPE_EXTENTS, 2, extents.z)) {
+            if (editable(extents.z)) {
                 handle(
                     "extent-z",
                     Vector3f(0f, 0f, z),
@@ -288,7 +287,7 @@ object VfxGizmos {
 
             val length = end.length()
             val editable = (0..2).all { channel ->
-                editable(VfxProperty.SHAPE_EXTENTS, channel, listOf(extents.x, extents.y, extents.z)[channel])
+                editable(listOf(extents.x, extents.y, extents.z)[channel])
             }
             if (!editable || length <= 1.0e-4f) return
 

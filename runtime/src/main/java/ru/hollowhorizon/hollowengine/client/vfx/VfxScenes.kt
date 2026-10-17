@@ -80,7 +80,7 @@ class VfxScene(private val environment: VfxEnvironment) {
 
         val playback = VfxPlayback(handle, instance, entity)
         playback.moveTo(position)
-        if (!data.isEmpty()) playback.applyData(data)
+        if (!data.isEmpty) playback.applyData(data)
 
         playbacks.removeAll { it.handle == handle }
         playbacks += playback
@@ -155,6 +155,10 @@ object VfxScenes {
 
     fun stop(handle: Int, immediate: Boolean) {
         scene?.of(handle)?.stop(immediate)
+    }
+
+    fun jump(handle: Int, event: String) {
+        scene?.of(handle)?.instance?.jumpTo(event)
     }
 
     fun move(handle: Int, position: Vec3) {

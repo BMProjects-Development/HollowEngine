@@ -1,0 +1,9 @@
+{
+  "play": "Play",
+  "pause": "Pause",
+  "stop": "Stop",
+  "loop": "Loop",
+  "mono": "mono",
+  "stereo": "stereo",
+  "unreadable": "The file could not be read: %s"
+}

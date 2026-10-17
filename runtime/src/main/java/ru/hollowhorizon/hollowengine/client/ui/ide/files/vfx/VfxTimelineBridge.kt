@@ -1,7 +1,14 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackLanes
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -14,8 +21,9 @@ import kotlin.math.abs
 class VfxTimelineSession(
     private val document: HollowIdeVfxDocument,
     private val preview: VfxPreviewState,
-) {
-    val timeline = TimelineController()
+) : TrackListing {
+    /** Records into the file's history, so Ctrl+Z walks back through effect and tracks in the order they were edited. */
+    val timeline = TimelineController(document.history)
 
     /** Properties the author asked for, as `node|property`. */
     private val pinned = LinkedHashSet<String>()
@@ -26,6 +34,50 @@ class VfxTimelineSession(
     /** Nodes that were selected at some point, so their group row stays. */
     private val touched = LinkedHashSet<String>()
 
+    /** The node selected in the editor now, or the lane picked in its scene in place of one. */
+    private var selection: String? = null
+    private var selectedLane: SegmentLane? = null
+    private var onlySelectedState by mutableStateOf(false)
+
+    override var onlySelected: Boolean
+        get() = onlySelectedState
+        set(value) {
+            onlySelectedState = value
+            applyListing()
+        }
+
+    /*
+     * Values of keyed properties the author changed without recording keys, as `node|property`: the preview shows
+     * them over the tracks until the playhead moves or the timeline plays, as in any animation editor.
+     */
+    private val heldValues = mutableStateMapOf<String, FloatArray>()
+    private var heldAt by mutableStateOf(Float.NaN)
+
+    private val holding: Boolean get() = !timeline.isPlaying && abs(timeline.currentTime - heldAt) <= HoldEpsilon
+
+    private val heldEdits = HeldEdits(
+        document.history,
+        read = { heldValues.mapValues { it.value.toList() } },
+        write = { held ->
+            heldValues.clear()
+            held.forEach { (id, values) -> heldValues[id] = values.toFloatArray() }
+            preview.repose()
+        },
+        isCurrent = { holding },
+    )
+
+    /** The events and sections of the effect's timeline, on lanes of their own. */
+    internal val playback = PlaybackLanes(
+        read = { document.effect.timeline.let { PlaybackParts(it.events, it.sections) } },
+        duration = { document.effect.timeline.duration },
+        edit = { label, mergeKey, change ->
+            document.edit(mergeKey = mergeKey, label = UndoLabel(label)) { effect ->
+                val parts = change(PlaybackParts(effect.timeline.events, effect.timeline.sections))
+                effect.copy(timeline = effect.timeline.copy(events = parts.events, sections = parts.sections))
+            }
+        },
+    )
+
     private var suppressCommit = false
     private var builtFor: Int = -1
     private var signature: List<Any> = emptyList()
@@ -35,15 +87,23 @@ class VfxTimelineSession(
             commit()
             applyListing()
         }
-        timeline.onTimeChanged = { preview.requestSeek(timeline.currentTime) }
+        timeline.onTimeChanged = {
+            heldEdits.forget()
+            heldValues.clear()
+            preview.requestSeek(timeline.currentTime)
+        }
         timeline.onHideProperty = { property -> hide(property.id) }
         timeline.onHideGroup = { group -> hideNode(group) }
+        timeline.onHideLane = { lane -> lane.isListed = false }
+        timeline.lanes += playback.lanes
+        playback.refresh()
     }
 
     /** Rebuilds the tracks when the node tree, or the properties it offers, changed under the timeline. */
     fun sync() {
         if (builtFor == document.revision) return
         builtFor = document.revision
+        playback.refresh()
 
         val next = signatureOf()
         if (next == signature && timeline.groups.isNotEmpty()) return
@@ -83,12 +143,11 @@ class VfxTimelineSession(
     }
 
     /**
-     * While auto-keying, turns an edit of the effect into keys at the playhead: every channel of an
-     * animatable property the edit changed, and that does not already hold that value there. The edit
-     * itself stays, since the value it changed is only what the track falls back to.
+     * Turns an edit of the effect into the timeline. While auto-keying, every channel of an animatable property the
+     * edit changed, and that does not already hold that value there, is keyed at the playhead; otherwise a property
+     * with keys holds the edit until the playhead moves.
      */
     fun recordEdit(before: VfxEffect, after: VfxEffect) {
-        if (!timeline.isRecording) return
         val time = timeline.currentTime
         after.walk().forEach { node ->
             val old = before.node(node.id)?.takeIf { it != node } ?: return@forEach
@@ -99,10 +158,21 @@ class VfxTimelineSession(
                 val shown = FloatArray(property.curves.size) { channel ->
                     property.curves[channel].valueAt(time, was.getOrElse(channel) { 0f })
                 }
+                if (!timeline.isRecording) {
+                    if (property.isKeyed()) holdChanges(
+                        node.id,
+                        animatable.property,
+                        now.indices.filter { now[it] != was.getOrNull(it) }.associateWith { now[it] },
+                        shown,
+                        withEdit = true
+                    )
+                    return@animatable
+                }
                 val changed = property.curves.indices.filter { channel ->
                     val value = now.getOrNull(channel) ?: return@filter false
                     value != was.getOrNull(channel) && abs(value - shown[channel]) > RecordEpsilon
                 }
+                heldValues.remove(property.id)
                 if (changed.isEmpty()) return@animatable
                 focus(node.id, animatable.property)
                 timeline.recordKeys(property, changed.associateWith { now[it] }, shown)
@@ -117,18 +187,102 @@ class VfxTimelineSession(
     fun record(nodeId: String, property: VfxProperty, changes: Map<Int, Float>, previous: FloatArray) {
         if (!timeline.isRecording) return
         val track = propertyOf(nodeId, property) ?: return
+        heldValues.remove(track.id)
         focus(nodeId, property)
         timeline.recordKeys(track, changes, previous)
     }
+
+    /** What is held for [property] of [nodeId] at the playhead, or null. */
+    fun held(nodeId: String, property: VfxProperty): FloatArray? =
+        if (holding) heldValues[propertyId(nodeId, property)] else null
+
+    /**
+     * Holds [changes] (channel to value) of [property] of [nodeId] over the track until the playhead moves; [shown] is
+     * what the property shows now, which the channels the edit left alone keep. [withEdit] when an edit of the file
+     * comes with it, which one undo then takes back along with the hold.
+     */
+    fun holdChanges(
+        nodeId: String,
+        property: VfxProperty,
+        changes: Map<Int, Float>,
+        shown: FloatArray,
+        withEdit: Boolean = false,
+    ) {
+        if (changes.isEmpty()) return
+        if (!holding) heldValues.clear()
+        heldAt = timeline.currentTime
+        val id = propertyId(nodeId, property)
+        val values = (heldValues[id] ?: shown).copyOf()
+        changes.forEach { (channel, value) -> if (channel in values.indices) values[channel] = value }
+        val hold = { heldValues[id] = values }
+        if (withEdit) heldEdits.attach(hold) else heldEdits.record(hold)
+        preview.repose()
+    }
+
+    /** Lets go of what is held for [properties] of [nodeId], so the tracks show again. */
+    fun release(nodeId: String, properties: Collection<VfxProperty>) {
+        if (properties.none { heldValues.remove(propertyId(nodeId, it)) != null }) return
+        preview.repose()
+    }
+
+    /**
+     * Keys [parts] of [nodeId] at the playhead with what the preview shows, held edits included: one part of its
+     * placement, or the placement and every property that already has keys.
+     */
+    fun insertKeys(nodeId: String, parts: KeyParts) {
+        val node = document.effect.node(nodeId) ?: return
+        val runtime = preview.instance?.node(nodeId)
+        val placement = when (parts) {
+            KeyParts.LOCATION -> listOf(VfxProperty.POSITION)
+            KeyParts.ROTATION -> listOf(VfxProperty.ROTATION)
+            KeyParts.SCALE -> listOf(VfxProperty.SCALE)
+            KeyParts.ALL -> listOf(VfxProperty.POSITION, VfxProperty.ROTATION, VfxProperty.SCALE)
+        }
+        val keyed = if (parts != KeyParts.ALL) emptyList()
+        else VfxAnimatables.forNode(node).map { it.property }.filter { propertyOf(nodeId, it).isKeyed() }
+        val properties = (placement + keyed).distinct()
+            .mapNotNull { property -> propertyOf(nodeId, property)?.let { property to it } }
+        if (properties.isEmpty()) return
+        timeline.beginHistoryTransaction(TimelineEdits.ADD_KEY)
+        properties.forEach { (property, track) ->
+            focus(nodeId, property)
+            timeline.addKeyframes(track, timeline.currentTime, runtime?.let { currentValues(it, property) })
+        }
+        timeline.commitHistoryTransaction()
+    }
+
+    private fun AnimProperty<*>?.isKeyed(): Boolean = this?.curves?.any { it.keyframes.isNotEmpty() } == true
 
     private fun propertyOf(nodeId: String, property: VfxProperty): AnimProperty<*>? {
         val id = propertyId(nodeId, property)
         return timeline.allProperties().firstOrNull { it.id == id }
     }
 
-    /** Keeps the row of [nodeId] once it has been selected. */
-    fun touch(nodeId: String) {
-        if (touched.add(nodeId)) applyListing()
+    /** Opens the rows of [nodeId], the node selected in the editor now, and keeps them once it was; null for none. */
+    fun select(nodeId: String?) {
+        selection = nodeId
+        selectedLane = null
+        if (nodeId?.let(touched::add) == true || onlySelectedState) applyListing()
+    }
+
+    /** Opens [lane], picked in the scene in place of a node, as what is selected now. */
+    fun selectLane(lane: SegmentLane) {
+        selection = null
+        selectedLane = lane
+        lane.isListed = true
+        applyListing()
+    }
+
+    override fun showAll() {
+        hidden.clear()
+        timeline.lanes.forEach { it.isListed = true }
+        onlySelected = false
+    }
+
+    override fun hideUnselected() {
+        timeline.groups.filter { group -> group.properties.firstOrNull()?.let(::nodeOf) != selection }.forEach(::close)
+        timeline.lanes.filter { it !== selectedLane }.forEach { it.isListed = false }
+        applyListing()
     }
 
     private fun hide(id: String) {
@@ -138,6 +292,12 @@ class VfxTimelineSession(
     }
 
     private fun hideNode(group: TrackGroup) {
+        close(group)
+        applyListing()
+    }
+
+    /** Takes the rows of the node of [group] off the list, keys and all, until the author selects it again. */
+    private fun close(group: TrackGroup) {
         val properties = group.allProperties()
         val node = properties.firstOrNull()?.let(::nodeOf) ?: return
         touched -= node
@@ -145,22 +305,23 @@ class VfxTimelineSession(
             pinned -= property.id
             hidden += property.id
         }
-        applyListing()
     }
 
     /** Decides which rows track list shows. */
     fun applyListing() {
         timeline.groups.forEach { group -> applyListing(group) }
+        timeline.lanes.forEach { lane -> lane.isFiltered = onlySelectedState && lane !== selectedLane }
     }
 
     private fun applyListing(group: TrackGroup) {
         group.children.forEach(::applyListing)
+        val node = group.properties.firstOrNull()?.let(::nodeOf)
+        val shown = !onlySelectedState || node == selection
         group.properties.forEach { property ->
             val keyed = property.curves.any { it.keyframes.isNotEmpty() }
-            property.isListed = property.id !in hidden && (keyed || property.id in pinned)
+            property.isListed = shown && property.id !in hidden && (keyed || property.id in pinned)
         }
-        val node = group.properties.firstOrNull()?.let(::nodeOf)
-        group.isListed = node != null && node in touched
+        group.isListed = shown && node != null && node in touched
     }
 
     /** Writes whatever the editor holds back into the file. */
@@ -177,15 +338,11 @@ class VfxTimelineSession(
             if (curves.isEmpty()) null else VfxTrack(node, animatable, curves)
         }
 
-        val spec = VfxTimelineSpec(
-            duration = timeline.workAreaEnd,
-            loop = document.effect.timeline.loop,
-            tracks = tracks,
-        )
+        val spec = document.effect.timeline.copy(duration = timeline.workAreaEnd, tracks = tracks)
         if (spec == document.effect.timeline) return
 
         suppressCommit = true
-        document.edit(history = false) { it.copy(timeline = spec) }
+        document.edit(recorded = false) { it.copy(timeline = spec) }
         builtFor = document.revision
         suppressCommit = false
     }
@@ -198,7 +355,7 @@ class VfxTimelineSession(
     private fun buildProperty(node: VfxNodeSpec, animatable: VfxAnimatable): AnimProperty<*> {
         val id = propertyId(node.id, animatable.property)
         val title = animatable.titleKey.lang
-        val name = animatable.ownerTitleKey?.let { "${it.lang} · $title" } ?: title
+        val name = animatable.ownerTitleKey?.let { "${it.lang} | $title" } ?: title
         val defaults = animatable.read()
 
         return when (animatable.kind) {
@@ -240,7 +397,7 @@ class VfxTimelineSession(
 }
 
 /** On or off, held between keys; the editor draws it as a step curve and never interpolates it. */
-private object TogglePropertyType : PropertyType<Float> {
+internal object TogglePropertyType : PropertyType<Float> {
     override val id = "vfx_toggle"
 
     override val channels = listOf(
@@ -313,3 +470,6 @@ internal fun Keyframe.toStored(curve: ChannelCurve): VfxKey {
 
 /** How far apart an edited value and what the track already holds must be to be worth a key. */
 private const val RecordEpsilon = 1.0e-5f
+
+/** How far the playhead may sit from where an edit was held for it to still show. */
+private const val HoldEpsilon = 1.0e-4f

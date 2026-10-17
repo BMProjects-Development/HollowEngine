@@ -1,15 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import ru.hollowhorizon.hollowengine.client.utils.lang
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
+import ru.hollowhorizon.hollowengine.client.utils.lang
 
 @Composable
 internal fun HollowIdeProjectContextMenu(
@@ -52,12 +49,12 @@ internal fun HollowIdeProjectContextMenu(
         if (menu.canCreateSoundEvents) {
             ProjectMenuItem("New Sound Events", "", IconHelper.forFile("sounds.ogg").toString(), closeScripts) { onCreateSoundEvents(menu.path) }
         }
-        ProjectMenuItem("Rename", "F2", ProjectMenuIcons.RENAME, closeScripts) { onRename(menu.path) }
-        ProjectMenuItem("Copy", "Ctrl+C", ProjectMenuIcons.COPY, closeScripts) { onCopy(menu.path) }
-        ProjectMenuItem("Cut", "Ctrl+X", ProjectMenuIcons.CUT, closeScripts) { onCut(menu.path) }
-        ProjectMenuItem("Paste", "Ctrl+V", ProjectMenuIcons.PASTE, closeScripts) { onPaste(menu.path) }
+        ProjectMenuItem("Rename", HollowKeys.RENAME.shortcut.orEmpty(), ProjectMenuIcons.RENAME, closeScripts) { onRename(menu.path) }
+        ProjectMenuItem("Copy", HollowKeys.COPY.shortcut.orEmpty(), ProjectMenuIcons.COPY, closeScripts) { onCopy(menu.path) }
+        ProjectMenuItem("Cut", HollowKeys.CUT.shortcut.orEmpty(), ProjectMenuIcons.CUT, closeScripts) { onCut(menu.path) }
+        ProjectMenuItem("Paste", HollowKeys.PASTE.shortcut.orEmpty(), ProjectMenuIcons.PASTE, closeScripts) { onPaste(menu.path) }
         ProjectMenuItem("Show in Explorer", "", ProjectMenuIcons.REVEAL, closeScripts) { onShowInExplorer(menu.path) }
-        ProjectMenuItem("Delete", "Del", ProjectMenuIcons.DELETE, closeScripts) { onDelete(menu.path) }
+        ProjectMenuItem("Delete", HollowKeys.DELETE.shortcut.orEmpty(), ProjectMenuIcons.DELETE, closeScripts) { onDelete(menu.path) }
         contributedActions(menu).forEach { action ->
             ProjectMenuItem(action.label, "", action.icon, closeScripts) {
                 onDismiss()

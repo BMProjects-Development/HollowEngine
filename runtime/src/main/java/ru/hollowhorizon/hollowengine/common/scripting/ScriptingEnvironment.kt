@@ -16,7 +16,11 @@ interface ScriptingEnvironment {
     val classpath: List<File>
     val mappings: Mappings
 
+    /** Kotlin scripts and sources. */
     val analyzer: ScriptingAnalyzer
+    /** Java sources. Attached library sources and decompiled classes, resolved against same classpath. */
+    val javaAnalyzer: ScriptingAnalyzer
+
     val compiler: ScriptingCompiler
 
     fun close()

@@ -8,14 +8,16 @@ import kotlin.test.assertTrue
 
 /**
  * The field's geometry model (pinned MonoCraft MSDF font: 6.667px/glyph, 10.898px line height).
- * Caret/click/scroll all read from this one measurement, so an offset maps to a boundary and a
- * boundary maps back — even at the bottom of a large document (the caret-jump regression) and
- * through virtualization.
  */
 class EditableFieldLayoutTest {
     private val fontSize = 10f
-    private fun layout(text: String, wrap: Boolean = false, viewportWidth: Float = 0f) =
-        computeEditableFieldLayout(text, fontSize, fontFamily = TestFontFamily, wrap = wrap, viewportWidth = viewportWidth)
+    private fun layout(text: String, wrap: Boolean = false, viewportWidth: Float = 0f) = computeEditableFieldLayout(
+        text,
+        fontSize,
+        fontFamily = TestFontFamily,
+        wrap = wrap,
+        viewportWidth = viewportWidth
+    )
 
     @Test
     fun `non-wrapped lines stack at a uniform height and size to the widest line`() {
@@ -88,8 +90,7 @@ class EditableFieldLayoutTest {
         assertEquals(EditableFieldCaretHit(1, UiInlayCaretAffinity.BEFORE), withInlay.caretHitAt(leftQuarter, visual.y))
         assertEquals(EditableFieldCaretHit(1, UiInlayCaretAffinity.AFTER), withInlay.caretHitAt(rightQuarter, visual.y))
         assertTrue(
-            withInlay.caretAt(1, UiInlayCaretAffinity.BEFORE).x <
-                    withInlay.caretAt(1, UiInlayCaretAffinity.AFTER).x,
+            withInlay.caretAt(1, UiInlayCaretAffinity.BEFORE).x < withInlay.caretAt(1, UiInlayCaretAffinity.AFTER).x,
         )
     }
 

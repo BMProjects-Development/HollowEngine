@@ -250,57 +250,6 @@ internal object UiTextLayouter {
         return measureTextWidth(text, fontSize, fontFamily, style)
     }
 
-    fun visibleTextPrefix(
-        layout: UiTextLayout,
-        visibleCharacters: Int,
-        fontSize: Float,
-        fontFamily: String? = null,
-    ): UiTextLayout {
-        var remaining = visibleCharacters.coerceAtLeast(0)
-        val lines = layout.lines.mapNotNull { line ->
-            val fragments = mutableListOf<UiTextFragment>()
-            val lineText = StringBuilder()
-            var consumedOnLine = 0
-            fragmentLoop@ for (fragment in line.fragments) {
-                when (fragment) {
-                    is UiInlineImageRun -> fragments += fragment
-                    is UiInlineWidgetRun -> fragments += fragment
-                    is UiTextSpaceRun -> {
-                        if (remaining <= 0) break@fragmentLoop
-                        fragments += fragment
-                        lineText.append(' ')
-                        remaining -= 1
-                        consumedOnLine += 1
-                    }
-
-                    is UiTextRun -> {
-                        if (remaining <= 0) break@fragmentLoop
-                        val visible = fragment.text.take(remaining)
-                        if (visible.isEmpty()) continue@fragmentLoop
-                        val size = fragment.style.resolvedFontSize(fontSize)
-                        fragments += fragment.copy(
-                            text = visible,
-                            width = measureTextWidth(visible, size, fontFamily, fragment.style),
-                        )
-                        lineText.append(visible)
-                        remaining -= visible.length
-                        consumedOnLine += visible.length
-                        if (visible.length < fragment.text.length) break@fragmentLoop
-                    }
-                }
-            }
-            remaining -= (line.sourceLength - consumedOnLine).coerceAtLeast(0)
-            if (fragments.isEmpty()) return@mapNotNull null
-            line.copy(text = lineText.toString(), fragments = fragments)
-        }
-        val height = lines.lastOrNull()?.let { it.y + it.height } ?: 0f
-        return layout.copy(
-            lines = lines,
-            height = height,
-            maxNaturalLineWidth = lines.maxOfOrNull { it.naturalWidth } ?: layout.width,
-        )
-    }
-
     private fun measureTextWidth(text: String, fontSize: Float, fontFamily: String?, style: UiInlineStyle): Float {
         val resolvedFamily = style.fontFamily ?: fontFamily
         val cachedFontSize = fontSize.cacheValue()
@@ -608,6 +557,7 @@ internal object UiTextLayouter {
             var measuredTextHeight = 0f
             var baseline = 0f
             var gaps = 0
+            var widgetSourceCorrection = 0
             for (unit in units) {
                 measuredWidth += unit.width.toDouble()
                 measuredLineHeight = maxOf(measuredLineHeight, unit.height)
@@ -629,7 +579,11 @@ internal object UiTextLayouter {
                     }
 
                     is InlineUnit.Widget -> {
-                        if (unit.sourceLength > 0) textBuilder.append(unit.widget.alt.ifBlank { "\uFFFC" })
+                        if (unit.sourceLength > 0) {
+                            val label = unit.widget.alt.ifBlank { "\uFFFC" }
+                            textBuilder.append(label)
+                            widgetSourceCorrection += unit.sourceLength - label.length
+                        }
                         if (unit.widget.align == UiInlineAlign.BASELINE) baseline = maxOf(baseline, unit.height)
                     }
                 }
@@ -638,7 +592,7 @@ internal object UiTextLayouter {
             width = measuredWidth.toFloat()
             naturalWidth = width
             justifyGapCount = gaps
-            sourceLength = text.length + trailingSourceCharacters
+            sourceLength = text.length + trailingSourceCharacters + widgetSourceCorrection
             val textHeight = measuredTextHeight.takeIf { it > 0f }
                 ?: UiTextFonts.resolve(null).lineHeight(baseFontSize)
             val lineHeight = maxOf(measuredLineHeight, textHeight)
@@ -832,7 +786,7 @@ fun UiTextLayout.caretIndexAt(x: Float, y: Float, fontSize: Float, fontFamily: S
     }
     var bestOffset = 0
     var bestDistance = Float.POSITIVE_INFINITY
-    for (offset in 0..line.sourceLength) {
+    for (offset in line.caretOffsets()) {
         val distance = abs(line.xAt(offset, fontSize, fontFamily) - x)
         if (distance < bestDistance) {
             bestDistance = distance
@@ -964,30 +918,6 @@ internal fun UiTextLayout.visibleLineItems(
     return (first until endExclusive).asSequence().map { index -> IndexedValue(index, lines[index]) }
 }
 
-internal fun UiTextLayout.verticalCaretIndex(index: Int, lineDelta: Int, fontSize: Float, fontFamily: String?): Int {
-    if (lines.isEmpty()) return 0
-    val currentLineIndex = lineIndexAtCaret(index)
-    val currentLine = lines[currentLineIndex]
-    val localOffset = (index - currentLine.sourceStart).coerceIn(0, currentLine.sourceLength)
-    val x = currentLine.xAt(localOffset, fontSize, fontFamily)
-    val targetLineIndex = (currentLineIndex + lineDelta).coerceIn(0, lines.lastIndex)
-    val targetLine = lines[targetLineIndex]
-    if (targetLineIndex == currentLineIndex) {
-        val targetOffset = if (lineDelta < 0) 0 else targetLine.sourceLength
-        return targetLine.sourceStart + targetOffset
-    }
-    var bestOffset = 0
-    var bestDistance = Float.POSITIVE_INFINITY
-    for (offset in 0..targetLine.sourceLength) {
-        val distance = abs(targetLine.xAt(offset, fontSize, fontFamily) - x)
-        if (distance < bestDistance) {
-            bestDistance = distance
-            bestOffset = offset
-        }
-    }
-    return targetLine.sourceStart + bestOffset
-}
-
 private fun UiTextLayout.lineIndexAtCaret(index: Int): Int {
     if (lines.isEmpty()) return 0
     val target = index.coerceAtLeast(0)
@@ -1054,7 +984,7 @@ private fun UiTextLayout.firstLineIndexStartingAfterSource(offset: Int): Int {
 }
 
 private fun UiTextLine.xAt(offset: Int, fontSize: Float, fontFamily: String?): Float {
-    val textOffset = offset.coerceIn(0, text.length)
+    val textOffset = offset.coerceIn(0, sourceLength)
     if (fragments.isEmpty()) return x + UiTextLayouter.measureTextWidth(text.take(textOffset), fontSize, fontFamily)
 
     var remaining = textOffset
@@ -1100,4 +1030,27 @@ private fun UiTextLine.xAt(offset: Int, fontSize: Float, fontFamily: String?): F
         }
     }
     return x + cursor
+}
+
+/** A replacement widget has only boundary carets, regardless of how much source it represents. */
+private fun UiTextLine.caretOffsets(): Sequence<Int> = sequence {
+    yield(0)
+    if (fragments.isEmpty()) {
+        yieldAll(1..sourceLength)
+        return@sequence
+    }
+    var offset = 0
+    for (fragment in fragments) {
+        val length = when (fragment) {
+            is UiTextRun -> fragment.text.length
+            is UiTextSpaceRun -> 1
+            is UiInlineImageRun -> fragment.image.alt.ifBlank { "\uFFFC" }.length
+            is UiInlineWidgetRun -> fragment.widget.sourceLength
+        }
+        if (fragment is UiInlineWidgetRun) {
+            if (length > 0) yield(offset + length)
+        } else yieldAll(offset + 1..offset + length)
+        offset += length
+    }
+    if (offset < sourceLength) yield(sourceLength)
 }

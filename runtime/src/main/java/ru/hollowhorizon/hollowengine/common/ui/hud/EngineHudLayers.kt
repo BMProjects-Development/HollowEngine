@@ -4,6 +4,7 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderArmEvent
+import ru.hollowhorizon.hollowengine.common.ui.hud.EngineHudLayers.HAND
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /**
@@ -33,6 +34,6 @@ object EngineHudLayers {
 object EngineHudLayerRendering {
     @SubscribeEvent
     fun onRenderArm(event: RenderArmEvent) {
-        if (HudLayerRegistry.isHidden(EngineHudLayers.HAND)) event.isCanceled = true
+        if (HudLayerRegistry.isHidden(HAND)) event.isCanceled = true
     }
 }

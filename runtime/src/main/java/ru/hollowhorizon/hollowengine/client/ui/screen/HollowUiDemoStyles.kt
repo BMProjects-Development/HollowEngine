@@ -555,7 +555,7 @@ internal val DemoStyles = compileHss(
     .free-stage {
         size: 100% 100%;
         min-size: 0px 0px;
-        background: linear-gradient(135deg, rgba(12, 16, 23, 0.94), rgba(18, 44, 54, 0.9), rgba(38, 42, 64, 0.88));
+        background: linear-gradient(225deg, rgba(12, 16, 23, 0.94), rgba(18, 44, 54, 0.9), rgba(38, 42, 64, 0.88));
         border-radius: 10px;
         scrollable: true;
     }
@@ -715,7 +715,7 @@ internal val DemoStyles = compileHss(
         size: 100% 100%;
         min-size: 0px 0px;
         scrollable: true;
-        background: linear-gradient(135deg, rgba(12, 18, 28, 0.98), rgba(28, 34, 48, 0.94), rgba(18, 42, 48, 0.92));
+        background: linear-gradient(225deg, rgba(12, 18, 28, 0.98), rgba(28, 34, 48, 0.94), rgba(18, 42, 48, 0.92));
         border-radius: 10px;
     }
 
@@ -738,13 +738,13 @@ internal val DemoStyles = compileHss(
     }
 
     .gradient-card {
-        background: linear-gradient(135deg, rgba(70, 132, 218, 0.96), rgba(142, 83, 184, 0.94), rgba(34, 172, 148, 0.9));
+        background: linear-gradient(225deg, rgba(70, 132, 218, 0.96), rgba(142, 83, 184, 0.94), rgba(34, 172, 148, 0.9));
         shadow: 0px 22px 40px -6px rgba(8, 18, 34, 0.72);
     }
 
     .grayscale-card {
         filter: grayscale(1);
-        background: linear-gradient(145deg, rgba(86, 112, 152, 0.94), rgba(42, 52, 72, 0.96));
+        background: linear-gradient(235deg, rgba(86, 112, 152, 0.94), rgba(42, 52, 72, 0.96));
         border: 2px rgba(218, 230, 246, 0.5);
         hoverable: true;
     }
@@ -771,18 +771,18 @@ internal val DemoStyles = compileHss(
     }
 
     .flip-front {
-        background: linear-gradient(135deg, rgba(58, 102, 156, 0.97), rgba(36, 48, 74, 0.97));
+        background: linear-gradient(225deg, rgba(58, 102, 156, 0.97), rgba(36, 48, 74, 0.97));
     }
 
     .flip-back {
-        background: linear-gradient(135deg, rgba(38, 154, 130, 0.96), rgba(38, 62, 78, 0.98));
+        background: linear-gradient(225deg, rgba(38, 154, 130, 0.96), rgba(38, 62, 78, 0.98));
         border: 2px rgba(174, 255, 228, 0.44);
     }
 
     .paper-card {
         hoverable: true;
         perspective: 720px;
-        background: linear-gradient(180deg, rgba(242, 235, 212, 0.96), rgba(206, 218, 230, 0.94));
+        background: linear-gradient(to left, rgba(242, 235, 212, 0.96), rgba(206, 218, 230, 0.94));
         foreground: rgba(22, 28, 36, 0.98);
         border: 2px rgba(255, 255, 255, 0.62);
     }
@@ -829,7 +829,7 @@ internal val DemoStyles = compileHss(
         scale: 0.9;
         opacity: 0.55;
         filter: blur(8px);
-        background: linear-gradient(135deg, rgba(236, 126, 168, 0.92), rgba(126, 154, 246, 0.92));
+        background: linear-gradient(225deg, rgba(236, 126, 168, 0.92), rgba(126, 154, 246, 0.92));
         foreground: rgba(246, 248, 255, 0.96);
         shadow: 24px 24px 34px -8px rgba(12, 12, 28, 0.68);
         transition:
@@ -858,7 +858,7 @@ internal val DemoStyles = compileHss(
         size: 100% 100%;
         min-size: 0px 0px;
         scrollable: true;
-        background: linear-gradient(135deg, rgba(12, 16, 24, 0.98), rgba(26, 34, 46, 0.94), rgba(22, 50, 54, 0.92));
+        background: linear-gradient(225deg, rgba(12, 16, 24, 0.98), rgba(26, 34, 46, 0.94), rgba(22, 50, 54, 0.92));
         border-radius: 10px;
     }
 
@@ -895,7 +895,7 @@ internal val DemoStyles = compileHss(
     }
 
     .shape-clip-stripe-b {
-        background: linear-gradient(90deg, rgba(255, 230, 128, 0.72), rgba(255, 122, 154, 0.52));
+        background: linear-gradient(to bottom, rgba(255, 230, 128, 0.72), rgba(255, 122, 154, 0.52));
     }
 
     .shape-clip-stripe-c {
@@ -904,7 +904,7 @@ internal val DemoStyles = compileHss(
 
     .svg-file-hexagon {
         shape: svg("hollowengine:ui/shapes/hexagon.svg");
-        shape-fill: linear-gradient(135deg, rgba(255, 206, 94, 0.88), rgba(92, 204, 190, 0.86), rgba(58, 86, 156, 0.92));
+        shape-fill: linear-gradient(225deg, rgba(255, 206, 94, 0.88), rgba(92, 204, 190, 0.86), rgba(58, 86, 156, 0.92));
         shape-stroke: rgba(242, 250, 255, 0.82);
         shape-stroke-width: 2px;
     }

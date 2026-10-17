@@ -5,12 +5,16 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.world.entity.LivingEntity
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.slots.SlotTooltips
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalInspectorHost
 import ru.hollowhorizon.hollowengine.client.ui.screen.HollowComposeUiScreen
 import ru.hollowhorizon.hollowengine.client.ui.style.CompiledHss
 import ru.hollowhorizon.hollowengine.client.ui.style.MinecraftHssResourceLoader
+import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 internal const val EntityEditorStylesheet = "hollowengine:ui/styles/entity-editor.hss"
@@ -58,8 +62,7 @@ internal class EntityEditorScreen(
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
-        val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-        if (control && keyCode == GLFW.GLFW_KEY_F) {
+        if (HollowKeys.FIND.matches(keyCode, modifiers)) {
             session.searchOpen = true
             Minecraft.getInstance().execute { focusInput(EntityEditorSearchInput) }
             return true
@@ -197,7 +200,7 @@ private fun ViewportStats(session: EntityEditorSession) {
         (entity as? LivingEntity)?.let { living ->
             StatRow(
                 EntityEditorLang.statHealth,
-                "${formatNumber(living.health.toDouble(), false)} / ${formatNumber(living.maxHealth.toDouble(), false)}",
+                "${formatUiNumber(living.health.toDouble(), false)} / ${formatUiNumber(living.maxHealth.toDouble(), false)}",
             )
         }
     }

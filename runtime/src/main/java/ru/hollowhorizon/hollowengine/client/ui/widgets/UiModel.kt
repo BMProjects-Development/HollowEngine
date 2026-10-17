@@ -9,9 +9,16 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.renderer.texture.OverlayTexture
 import net.minecraft.util.Mth
+import org.joml.Matrix4f
 import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
+import ru.hollowhorizon.hollowengine.client.decals.Decals
+import ru.hollowhorizon.hollowengine.client.editor.ModelPreviewAxes
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
@@ -22,10 +29,19 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderCont
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.*
+import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import ru.hollowhorizon.hollowengine.client.vfx.VfxBindingSource
+import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneAttachment
+import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxFrameRenderer
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxView
+import ru.hollowhorizon.hollowengine.client.vfx.render.ofCamera
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
@@ -43,7 +59,7 @@ import kotlin.math.min
  * pitch / zoom / pan) and the display toggles.
  */
 @Stable
-class ModelViewerState(model: String) {
+class ModelViewerState(model: String) : OrbitCamera {
     var model: String by mutableStateOf(model)
         private set
 
@@ -52,8 +68,8 @@ class ModelViewerState(model: String) {
 
     val attachment: ModelAttachment get() = instance.attachment
 
-    var yaw by mutableStateOf(0f)
-    var pitch by mutableStateOf(0f)
+    override var yaw by mutableStateOf(0f)
+    override var pitch by mutableStateOf(0f)
     private val zoomSpring = SpringZoom(1f, min = 0.1f, max = 10f, perNotch = ModelZoomPerNotch)
     val zoom: Float get() = zoomSpring.value
     var offsetX by mutableStateOf(0f)
@@ -75,6 +91,11 @@ class ModelViewerState(model: String) {
     var nodeVisibilityRevision by mutableStateOf(0)
         private set
 
+    /** Lines drawn among the model rather than over it, which it hides where it is in front: a floor. */
+    var debugBackdrop: ((DebugLines.Batch) -> Unit)? = null
+
+    /** Solid shapes drawn over the model, under [debugDraw]'s lines. */
+    var debugFill: ((DebugShapes.Batch) -> Unit)? = null
     var debugDraw: ((DebugLines.Batch) -> Unit)? = null
     private var lastRect = UiRect.Zero
 
@@ -118,9 +139,8 @@ class ModelViewerState(model: String) {
             val animation = currentAnimation ?: return 0f
             if (animation.duration <= 0f) return 0f
             return ((instance.animator.layerTime(previewLayerId(animation.name)) ?: 0f) / animation.duration).coerceIn(
-                    0f,
-                    1f
-                )
+                0f, 1f
+            )
         }
 
     fun isPlaying(index: Int): Boolean = index in playing
@@ -169,11 +189,11 @@ class ModelViewerState(model: String) {
         val tail = MutableVec3f()
 
         return SkeletonLayout.of(attachment).mapNotNull { bone ->
-                matrix.transform(bone.head, 1f, head)
-                matrix.transform(bone.tail, 1f, tail)
-                val distance = distanceToSegment(x, y, head, tail)
-                if (distance <= radius) bone.node to distance else null
-            }.sortedBy { it.second }.map { it.first }
+            matrix.transform(bone.head, 1f, head)
+            matrix.transform(bone.tail, 1f, tail)
+            val distance = distanceToSegment(x, y, head, tail)
+            if (distance <= radius) bone.node to distance else null
+        }.sortedBy { it.second }.map { it.first }
     }
 
     private fun distanceToSegment(x: Float, y: Float, head: Vec3f, tail: Vec3f): Float {
@@ -186,13 +206,36 @@ class ModelViewerState(model: String) {
         return hypot(head.x + dx * along - x, head.y + dy * along - y)
     }
 
+    /** The size of the panel the preview was last drawn into. */
+    val panelWidth: Float get() = lastRect.width
+    val panelHeight: Float get() = lastRect.height
+
+    /** How many panel pixels one unit of the model spans; the preview has no perspective. */
+    val pixelsPerUnit: Float get() = min(lastRect.width, lastRect.height) * zoom
+
+    /** Model space to panel pixels, y down, z toward the viewer: [project] as a matrix. */
+    fun panelMatrix(): Matrix4f =
+        Matrix4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
+            .scale(pixelsPerUnit, -pixelsPerUnit, pixelsPerUnit).rotateX(pitch * Mth.DEG_TO_RAD)
+            .rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD)
+
     private fun viewMatrix(): Mat4f {
-        val baseSize = min(lastRect.width, lastRect.height)
-        val scale = baseSize * zoom
+        val scale = pixelsPerUnit
         return MutableMat4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
             .scale(Vec3f(scale, -scale, scale)).rotate(pitch.deg, Vec3f.X_AXIS)
             .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS)
     }
+
+    override fun toView(world: Vec3f): Vec3f {
+        val view = Quaternionf().rotateX(pitch * Mth.DEG_TO_RAD).rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD)
+            .transform(Vector3f(world.x, world.y, world.z))
+        return Vec3f(view.x, view.y, view.z)
+    }
+
+    override fun anglesFor(back: Vec3f): Pair<Float, Float> =
+        anglesAround(back, yawSign = -1f, yawOffset = PREVIEW_FRONT_YAW)
+
+    override val axesFrame: QuatF get() = ModelPreviewAxes
 
     /** Renders the model into [rect] using [stack]; called from a `drawGl` block on the render thread. */
     fun render(rect: UiRect, stack: PoseStack) {
@@ -216,7 +259,9 @@ class ModelViewerState(model: String) {
 
         configurePreviewAnimator(animations)
 
-        fillAnimationVariables(animationContext, null, TickHandler.partialTick)
+        fillAnimationVariables(
+            animationContext, null, TickHandler.partialTick, Minecraft.getInstance().level?.gameTime ?: 0L,
+        )
         animationContext.time = TickHandler.gameTime
         animations.indices.forEach { index ->
             animationContext.variables[animationWeightVariables[index]] = animationWeights[animations[index].name] ?: 0f
@@ -254,6 +299,20 @@ class ModelViewerState(model: String) {
             RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
         )
         bufferSource.endBatch()
+        val effects = ArrayList<VfxBindingSource>()
+        val decals = ArrayList<DecalDraw>()
+        Decals.capturing(decals) {
+            VfxBoneBindings.capturing(effects) {
+                attachment.pipeline.render(
+                    RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
+                )
+            }
+        }
+        bufferSource.endBatch()
+        drawDecals(decals + decals.filter { draw -> draw.key?.let { decalOverlay?.invoke(it) } == true }
+            .map(DecalDraw::asOverlay), stack)
+        drawEffects(effects, stack)
+        playSounds()
 
         if (showWireframe) {
             GL33.glPolygonMode(GL33.GL_FRONT_AND_BACK, GL33.GL_FILL)
@@ -264,9 +323,94 @@ class ModelViewerState(model: String) {
             OpenGLUtils.renderBoundingBox(stack, minCorner, maxCorner, Color.WHITE.withAlpha(0.75f))
         }
 
+        debugBackdrop?.let { draw ->
+            draw(DebugLines.batch(bufferSource, stack, DebugLines.PANEL_DEPTH))
+            bufferSource.endBatch(DebugLines.PANEL_DEPTH)
+        }
+        debugFill?.let { fill ->
+            fill(DebugShapes.batch(bufferSource, stack))
+            bufferSource.endBatch(DebugShapes.PANEL)
+        }
         debugDraw?.let { draw ->
             draw(DebugLines.batch(bufferSource, stack, DebugLines.PANEL))
             bufferSource.endBatch(DebugLines.PANEL)
+        }
+    }
+
+    /** Which decals the preview also shows where they land, by the `bone/id` key of their attachment; none when null. */
+    var decalOverlay: ((String) -> Boolean)? = null
+
+    /** Draws the decals hung on the model, over the model itself, in the space the panel draws it in; the floor is at its feet. */
+    private fun drawDecals(decals: List<DecalDraw>, stack: PoseStack) {
+        if (decals.isEmpty()) return
+        val view = VfxView.ofCamera(
+            Matrix4f(RenderSystem.getModelViewMatrix()),
+            Matrix4f(RenderSystem.getProjectionMatrix()),
+            TickHandler.gameTime / TICKS_PER_SECOND,
+            DecalGround.floor(Matrix4f(stack.last().pose()).invert()),
+        )
+        DecalRenderer.render(decals, view)
+    }
+
+    private val effectFrame = VfxDrawList()
+
+    /**
+     * The seconds the effects on the model play by, as a timeline's playhead, so they stand still while it does
+     * and start over when it goes back; null plays them on the clock of the frames.
+     */
+    var effectClock: (() -> Float)? = null
+
+    /**
+     * Whether the effect [id] on [bone] makes particles [seconds] into [effectClock], for playing it through again
+     * after the clock goes back; null takes whether it makes them now as true for the whole way.
+     */
+    var effectEmitting: ((bone: String, id: String, seconds: Float) -> Boolean)? = null
+
+    /** Whether the sounds hung on the model play in the preview, as a montage editor plays them along its timeline. */
+    var playsSounds = false
+
+    /** Keeps the sounds hung on the model playing, around the listener, for as long as the preview is drawn. */
+    private fun playSounds() {
+        if (!playsSounds) return
+        val holders = attachment.nodes.flatMap { it.walk() } + listOfNotNull(attachment.modelRoot)
+        holders.forEach { node -> node.attachments.forEach { (it as? SoundBoneAttachment)?.updatePreview() } }
+    }
+
+    /**
+     * Draws the effects the model's bones carry over the model. They play in the model's own space, in blocks
+     * as in the world, and are seen through the same matrices that put the model into the panel.
+     */
+    private fun drawEffects(sources: List<VfxBindingSource>, stack: PoseStack) {
+        if (sources.isEmpty()) return
+        val drawn = Matrix4f(stack.last().pose())
+        val toModel = Matrix4f(drawn).invert()
+        effectFrame.clear()
+        sources.forEach { source ->
+            val effect = source as? VfxBoneAttachment ?: return@forEach
+            val seconds = effectClock?.invoke()
+            val binding = if (seconds == null) effect.updateIn(toModel) else effect.seekIn(toModel, seconds) { at ->
+                effectEmitting?.invoke(effect.bone, effect.spec.id, at) ?: effect.spec.emitting
+            }
+            binding ?: return@forEach
+            binding.instance.collect(effectFrame, binding.placement)
+        }
+        if (effectFrame.isEmpty) return
+
+        val modelView = RenderSystem.getModelViewStack()
+        modelView.pushMatrix()
+        modelView.mul(drawn)
+        RenderSystem.applyModelViewMatrix()
+        try {
+            val view = VfxView.ofCamera(
+                Matrix4f(modelView),
+                Matrix4f(RenderSystem.getProjectionMatrix()),
+                TickHandler.gameTime / TICKS_PER_SECOND,
+                DecalGround.floor(),
+            )
+            VfxFrameRenderer.renderInPanel(effectFrame, view)
+        } finally {
+            modelView.popMatrix()
+            RenderSystem.applyModelViewMatrix()
         }
     }
 
@@ -303,6 +447,7 @@ class ModelViewerState(model: String) {
 
     companion object {
         private const val PREVIEW_FRONT_YAW = 180f
+        private const val TICKS_PER_SECOND = 20f
     }
 }
 
@@ -338,24 +483,24 @@ fun Model(
         id = id,
         tags = tags,
         modifier = Modifier.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).onDrag { event ->
-                if (onDrag?.invoke(event) == true) {
-                    event.consume()
-                } else if (event.button == 1) {
-                    val scale = state.zoom.coerceAtLeast(0.0001f)
-                    state.offsetX += event.deltaX / scale
-                    state.offsetY += event.deltaY / scale
-                } else {
-                    state.yaw = (state.yaw + event.deltaX / 3f) % 360f
-                    state.pitch = (state.pitch + event.deltaY / 3f).coerceIn(-90f, 90f)
-                }
+            if (onDrag?.invoke(event) == true) {
                 event.consume()
-            }.onScroll { event ->
-                state.zoomBy(event.scrollY)
-                event.consume()
-            }.drawBehind(key = state) {
-                if (state.showGrid) drawGrid(state)
-                drawGl { state.render(rect, poseStack) }
-            }.then(modifier ?: Modifier),
+            } else if (event.button == 1) {
+                val scale = state.zoom.coerceAtLeast(0.0001f)
+                state.offsetX += event.deltaX / scale
+                state.offsetY += event.deltaY / scale
+            } else {
+                state.yaw = (state.yaw + event.deltaX / 3f) % 360f
+                state.pitch = (state.pitch + event.deltaY / 3f).coerceIn(-90f, 90f)
+            }
+            event.consume()
+        }.onScroll { event ->
+            state.zoomBy(event.scrollY)
+            event.consume()
+        }.drawBehind(key = state) {
+            if (state.showGrid) drawGrid(state)
+            drawGl { state.render(rect, poseStack) }
+        }.then(modifier ?: Modifier),
     )
 }
 

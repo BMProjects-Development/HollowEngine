@@ -4,13 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL13
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GL40
-import org.lwjgl.opengl.GL43
+import org.lwjgl.opengl.*
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.nio.FloatBuffer
 import java.nio.IntBuffer

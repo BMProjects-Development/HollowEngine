@@ -1,22 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.*
 import kotlinx.coroutines.isActive
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.UiBoxMode
-import ru.hollowhorizon.hollowengine.client.ui.grow
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.CutsceneIcon
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
@@ -24,11 +10,6 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEdi
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.scrollable
-import ru.hollowhorizon.hollowengine.client.ui.size
-import ru.hollowhorizon.hollowengine.client.ui.style
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /**

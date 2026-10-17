@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.nodes
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.HollowEngine
@@ -33,13 +29,27 @@ class NodeManager(val server: MinecraftServer) {
      */
     private val dormant = mutableMapOf<String, CompoundTag>()
 
-    private val lifecycle = NodeLifecycle { server.runtimeContext.scope }
+    private val lifecycle = NodeLifecycle(::notifyExecutionChanged) { server.runtimeContext.scope }
+    private val executionListeners = ArrayList<() -> Unit>()
+
+    /** [listener] runs whenever a node starts, stops or finishes stopping; it must only schedule work. */
+    internal fun onExecutionChanged(listener: () -> Unit) {
+        executionListeners += listener
+    }
+
+    private fun notifyExecutionChanged() {
+        executionListeners.forEach { it() }
+    }
 
     fun serialize(tag: CompoundTag) {
         dormant.forEach { (name, nodeTag) -> tag.put(name, nodeTag) }
         nodes.forEach { (name, entry) ->
-            runCatching { tag.put(name, entry.persist(server)) }
-                .onFailure { HollowEngine.LOGGER.error("Error while saving node '$name'", it) }
+            runCatching {
+                tag.put(
+                    name,
+                    entry.persist(server)
+                )
+            }.onFailure { HollowEngine.LOGGER.error("Error while saving node '$name'", it) }
         }
     }
 
@@ -53,8 +63,7 @@ class NodeManager(val server: MinecraftServer) {
                     return@runCatching
                 }
                 val extras = nodeTag.getCompound("extras")
-                val context = (nodeTag.get("states") as? CompoundTag)
-                    ?.let { StateContext.deserialize(it) }
+                val context = (nodeTag.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) }
                 server.addNode(key, extras, context)
             }.onFailure {
                 HollowEngine.LOGGER.error("Error while deserializing node '$key'", it)
@@ -66,6 +75,7 @@ class NodeManager(val server: MinecraftServer) {
         dormant.remove(script.path)
         nodes[script.path] = RunningNode(script, executor, context)
         context?.let { executor.start(it) }
+        notifyExecutionChanged()
     }
 
     fun removeNode(path: String) {
@@ -73,6 +83,7 @@ class NodeManager(val server: MinecraftServer) {
         dormant.remove(canonicalPath)
         lifecycle.cancelStart(canonicalPath)
         nodes.remove(canonicalPath)?.let { stop(canonicalPath, it) }
+        notifyExecutionChanged()
     }
 
     /**
@@ -95,23 +106,35 @@ class NodeManager(val server: MinecraftServer) {
         paths().forEach(::removeNode)
     }
 
-    fun contains(path: String): Boolean = canonicalNodePath(path).let { nodes.containsKey(it) || lifecycle.isPending(it) }
+    fun contains(path: String): Boolean =
+        canonicalNodePath(path).let { nodes.containsKey(it) || lifecycle.isPending(it) }
+
+    internal fun isStopping(path: String): Boolean = lifecycle.isStopping(canonicalNodePath(path))
+    internal fun isStarting(path: String): Boolean = lifecycle.isPending(canonicalNodePath(path))
 
     fun paths(): Set<String> = nodes.keys + lifecycle.pendingPaths()
+    internal fun executionPaths(): Set<String> = paths() + lifecycle.stoppingPaths()
 
     internal fun reloadChanged(plan: NodeReloadPlan) {
         val waiting = dormant.filterKeys { it !in nodes && !lifecycle.isPending(it) }
         nodes.toMap().forEach { (path, node) ->
-            val compiled = plan.replacement(path, node.script.binding.fingerprint, expectedReceivers = 1) ?: return@forEach
-            val saved = runCatching { node.persist(server) }
-                .onFailure { HollowEngine.LOGGER.error("Error while restarting server node '$path'", it) }
-                .getOrNull() ?: return@forEach
+            val compiled =
+                plan.replacement(path, node.script.binding.fingerprint, expectedReceivers = 1) ?: return@forEach
+            val saved = runCatching { node.persist(server) }.onFailure {
+                    HollowEngine.LOGGER.error(
+                        "Error while restarting server node '$path'",
+                        it
+                    )
+                }.getOrNull() ?: return@forEach
             dormant[path] = saved
             stop(path, node)
             lifecycle.start(path) {
-                val latest = runCatching { node.persist(server) }
-                    .onFailure { HollowEngine.LOGGER.error("Error while saving stopped node '$path'", it) }
-                    .getOrDefault(saved)
+                val latest = runCatching { node.persist(server) }.onFailure {
+                        HollowEngine.LOGGER.error(
+                            "Error while saving stopped node '$path'",
+                            it
+                        )
+                    }.getOrDefault(saved)
                 nodes.remove(path, node)
                 startSaved(path, latest, compiled)
             }
@@ -134,19 +157,19 @@ class NodeManager(val server: MinecraftServer) {
     internal fun suspendNamespace(namespace: String) {
         lifecycle.pendingPaths().filter { ScriptRegistry.parse(it).namespace == namespace }
             .forEach(lifecycle::cancelStart)
-        nodes.filterKeys { path -> ScriptRegistry.parse(path).namespace == namespace }
-            .forEach { (path, entry) ->
-                runCatching { dormant[path] = entry.persist(server) }
-                    .onFailure { HollowEngine.LOGGER.error("Error while suspending node '$path'", it) }
+        nodes.filterKeys { path -> ScriptRegistry.parse(path).namespace == namespace }.forEach { (path, entry) ->
+                runCatching {
+                    dormant[path] = entry.persist(server)
+                }.onFailure { HollowEngine.LOGGER.error("Error while suspending node '$path'", it) }
                 nodes.remove(path)
                 stop(path, entry)
             }
+        notifyExecutionChanged()
     }
 
     /** Starts the nodes of [namespace] again from the state they were suspended with. */
     internal fun resumeNamespace(namespace: String) {
-        dormant.filterKeys { path -> ScriptRegistry.parse(path).namespace == namespace }
-            .forEach { (path, nodeTag) ->
+        dormant.filterKeys { path -> ScriptRegistry.parse(path).namespace == namespace }.forEach { (path, nodeTag) ->
                 if (path in nodes || lifecycle.isPending(path)) return@forEach
                 dormant.remove(path)
                 runCatching {
@@ -156,8 +179,7 @@ class NodeManager(val server: MinecraftServer) {
             }
     }
 
-    private fun isAvailable(path: String): Boolean =
-        ScriptRegistry.source(ScriptRegistry.parse(path).namespace) != null
+    private fun isAvailable(path: String): Boolean = ScriptRegistry.source(ScriptRegistry.parse(path).namespace) != null
 }
 
 internal class RunningNode(
@@ -206,15 +228,7 @@ internal fun buildNode(
         constructorArgs(canonicalPath, binding)
         implicitReceivers(*receivers.toTypedArray())
     }
-    val evaluated = if (compiled == null) {
-        ScriptLoader.executeCompiled<NodeScript>(id, validate, configure)
-    } else {
-        runCatching {
-            validate(compiled)
-            compiled.execute<NodeScript>(configure).getOrThrow()
-        }
-    }
-    val script = evaluated.onFailure {
+    val script = ScriptLoader.executeCompiled<NodeScript>(id, validate, compiled, configure).onFailure {
         HollowEngine.LOGGER.error("Error while loading $canonicalPath", it)
         nodeScope.cancel()
     }.getOrNull() ?: return null
@@ -250,17 +264,14 @@ private fun receiverMismatch(expected: Int, host: NodeHost, receivers: List<Any>
 
     val wantsMore = expected > given
     val hint = when {
-        wantsMore && host is NodeHost.Server ->
-            "it declares @file:Attach, so attach it to an entity instead of starting it as a server node"
+        wantsMore && host is NodeHost.Server -> "it declares @file:Attach, so attach it to an entity instead of starting it as a server node"
 
-        !wantsMore && host is NodeHost.OfEntity ->
-            "it has no @file:Attach, so start it as a server node instead of attaching it to an entity"
+        !wantsMore && host is NodeHost.OfEntity -> "it has no @file:Attach, so start it as a server node instead of attaching it to an entity"
 
         wantsMore -> "it expects more implicit receivers than this host provides"
         else -> "it expects fewer implicit receivers than this host provides"
     }
-    return "Cannot run node script as ${host.describe()}: $hint " +
-            "(script expects $expected implicit receivers, this host supplies $given)"
+    return "Cannot run node script as ${host.describe()}: $hint " + "(script expects $expected implicit receivers, this host supplies $given)"
 }
 
 private fun NodeHost.describe(): String = when (this) {
@@ -277,7 +288,12 @@ fun canonicalNodePath(path: String): String = ScriptRegistry.display(ScriptRegis
 fun MinecraftServer.addNode(path: String, tag: CompoundTag? = null, context: StateContext? = null) =
     addNode(path, tag, context, null)
 
-internal fun MinecraftServer.addNode(path: String, tag: CompoundTag?, context: StateContext?, compiled: CompiledScript?) {
+internal fun MinecraftServer.addNode(
+    path: String,
+    tag: CompoundTag?,
+    context: StateContext?,
+    compiled: CompiledScript?,
+) {
     val saved = CompoundTag().apply {
         tag?.let { put("extras", it.copy()) }
         context?.let { put("states", it.serialize().copy()) }

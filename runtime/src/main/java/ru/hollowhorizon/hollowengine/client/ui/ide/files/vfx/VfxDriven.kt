@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeRuntime
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
@@ -9,7 +8,7 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
  * What the timeline holds for the properties of [nodeId], as the preview plays it.
  */
 internal fun vfxDrivenLookup(
-    document: HollowIdeVfxDocument,
+    document: VfxEditing,
     state: VfxEditorState,
     nodeId: String,
 ): (VfxProperty) -> VfxDrivenValue? = lookup@{ property ->
@@ -22,14 +21,14 @@ internal fun vfxDrivenLookup(
     preview.revision
     val values = currentValues(preview.instance?.node(nodeId), property)
     val session = state.session
-    val record = if (!session.timeline.isRecording) null else { changes: Map<Int, Float> ->
-        session.record(nodeId, property, changes, values)
+    val recording = session.timeline.isRecording
+    VfxDrivenValue(values, channels, recording) { changes ->
+        if (recording) session.record(nodeId, property, changes, values) else session.holdChanges(nodeId, property, changes, values)
     }
-    VfxDrivenValue(values, channels, record)
 }
 
 /** The values the running node has for [property] this frame. */
-private fun currentValues(node: VfxNodeRuntime?, property: VfxProperty): FloatArray {
+internal fun currentValues(node: VfxNodeRuntime?, property: VfxProperty): FloatArray {
     if (node == null) return FloatArray(4)
     return when (property) {
         VfxProperty.POSITION -> node.transform.position.asArray()

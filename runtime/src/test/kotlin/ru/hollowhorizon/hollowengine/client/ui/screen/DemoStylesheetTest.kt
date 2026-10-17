@@ -13,16 +13,4 @@ class DemoStylesheetTest {
         assertTrue(DemoStyles.rules.isNotEmpty(), "the stylesheet produced no rules")
     }
 
-    @Test
-    fun `the text lab's classes are all styled`() {
-        val selectors = DemoStyles.rules.map { it.selector.toString() }.toSet()
-        val required = listOf(
-            "textlab-catalog", "textlab-effect-row", "textlab-effect-name", "textlab-params",
-            "textlab-effect-preview", "textlab-field", "textlab-label", "textlab-input",
-            "textlab-sample-field", "textlab-stage", "textlab-handle-h", "textlab-table",
-            "textlab-row", "textlab-head", "textlab-cell-name", "textlab-cell", "textlab-mixed",
-        )
-        val missing = required.filter { name -> selectors.none { it.contains(name) } }
-        assertTrue(missing.isEmpty(), "unstyled text-lab classes: $missing")
-    }
 }

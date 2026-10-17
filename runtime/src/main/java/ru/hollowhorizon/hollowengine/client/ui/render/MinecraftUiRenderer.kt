@@ -12,17 +12,14 @@ import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.client.renderer.texture.SimpleTexture
 import net.minecraft.client.renderer.texture.TextureAtlas
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
 import org.joml.Matrix4f
-import org.joml.Quaternionf
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.render.render
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutResult
@@ -33,8 +30,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.popPose
 import ru.hollowhorizon.hollowengine.client.utils.pushPose
 import ru.hollowhorizon.hollowengine.client.utils.setIdentity
-import ru.hollowhorizon.hollowengine.common.entities.nameplateMode
-import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
 import ru.hollowhorizon.hollowengine.common.registry.ModShaders
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -1291,6 +1286,7 @@ class MinecraftUiRenderer {
         val transform = effective(command.transform)
         if (isBackfaceHidden(command.rect.width, command.rect.height, transform, command.backfaceVisibility)) return
         command.shadows.forEach { shadow ->
+            if (shadow.inset) return@forEach
             drawProjectedShadow(
                 command.rect.width,
                 command.rect.height,
@@ -1393,9 +1389,11 @@ class MinecraftUiRenderer {
     private fun appendAnalyticRectShadows(command: DrawShadowCommand): Boolean {
         if (!analyticRectRenderer.isAvailable) return false
         for (shadow in command.shadows) {
-            val transform = effective(
-                UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform
-            )
+            val transform = if (shadow.inset) {
+                effective(command.transform)
+            } else {
+                effective(UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform)
+            }
             if (isBackfaceHidden(
                     command.rect.width,
                     command.rect.height,
@@ -1403,7 +1401,7 @@ class MinecraftUiRenderer {
                     command.backfaceVisibility,
                 )
             ) continue
-            val padding = abs(shadow.spread) + shadow.blur.coerceAtLeast(0f) * 3f + 1f
+            val padding = if (shadow.inset) 0f else abs(shadow.spread) + shadow.blur.coerceAtLeast(0f) * 3f + 1f
             computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
             flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
             analyticRectBatch.appendShadow(command, shadow, transform, phaseShaderClip())

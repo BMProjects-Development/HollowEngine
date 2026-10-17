@@ -1,14 +1,18 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import com.mojang.blaze3d.systems.RenderSystem
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
@@ -16,26 +20,32 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import java.util.*
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The model at [model] or fallback.
+ * The model at [model] or fallback; a blank path is a model with no geometry, which only carries what
+ * hangs on the model itself.
  */
-fun ModelAttachment(model: String): ModelAttachment {
+fun ModelAttachment(model: String, parent: Attachment? = null): ModelAttachment {
+    if (model.isBlank()) return ModelAttachment(MutableStateFlow(Model.EMPTY), parent)
     val location = ResourceLocation.tryParse(model) ?: run {
         HollowEngine.LOGGER.warn("Model path '{}' is not a valid resource location, using the fallback", model)
         ModelLoader.FALLBACK_MODEL
     }
-    return ModelAttachment(location)
+    return ModelAttachment(location, parent)
 }
 
-fun ModelAttachment(location: ResourceLocation): ModelAttachment {
-    return ModelAttachment(HollowModelManager.getOrCreate(location), null, location = location)
+fun ModelAttachment(location: ResourceLocation, parent: Attachment? = null): ModelAttachment {
+    return ModelAttachment(HollowModelManager.getOrCreate(location), parent, location = location)
 }
 
 /**
@@ -47,8 +57,28 @@ class ModelAttachment(
     var entity: LivingEntity? = null,
     val location: ResourceLocation? = null,
 ) : Attachment(parent) {
+    var instanceId: String = UUID.randomUUID().toString()
+
+    /** The entity that carries this model, living or not, for what hangs on it and talks to it, as a panel does. */
+    var carrier: Entity? = null
+    val soundScope: String
+        get() {
+            val lineage = generateSequence<Attachment>(this) { it.parent }.toList()
+            val root = lineage.filterIsInstance<ModelAttachment>().last()
+            val nested = lineage.filterIsInstance<NestedModelAttachment>().asReversed().flatMap {
+                listOf((it.parent as RuntimeNode).name, it.spec.id)
+            }
+            return (listOf(root.instanceId) + nested).joinToString("/")
+        }
     private var builtFor: Model? = null
     private var runtimeNodes: List<RuntimeNode> = emptyList()
+
+    /**
+     * Holds what hangs on the model itself rather than on a bone. It is not one of the model's nodes, so
+     * no animation or name lookup ever reaches it.
+     */
+    var modelRoot: RuntimeNode? = null
+        private set
     private var nodesByIndex: Map<Int, RuntimeNode> = emptyMap()
     private var runtimeMaterials = ModelInstanceMaterials(Model.EMPTY)
     private var renderPipeline: ListRenderPipeline? = null
@@ -77,13 +107,69 @@ class ModelAttachment(
             authoredRig = value
             if (currentRig == value) return
 
+            val sameStructure = currentRig.structure() == value.structure()
             currentRig = value
-            builtFor?.let(::rebuild)
+            if (sameStructure) {
+                respecAttachments()
+                placeAddedBones()
+                dress()
+                target = null
+            } else {
+                builtFor?.let(::rebuild)
+            }
         }
+
+    /**
+     * Moves the bones the rig adds to where it now puts them. Their place is their own rest pose, so it is set
+     * there and the next pose starts from it, without building the model again.
+     */
+    private fun placeAddedBones() {
+        val added = currentRig.addedBones
+        if (added.isEmpty()) return
+        runtimeNodes.forEach { root ->
+            root.walk().forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
+        }
+    }
+
+    /** Asks the conditions of the attachments that have one; see [ConditionalAttachment]. */
+    fun evaluateConditions(context: AnimatorEvaluationContext) {
+        if (conditionsOf !== currentRig) {
+            conditionsOf = currentRig
+            hasConditions = currentRig.allAttachments().any { (_, spec) ->
+                (spec as? ConditionalAttachmentSpec)?.activeWhile?.source?.isNotBlank() == true
+            }
+        }
+        if (!hasConditions) return
+        runtimeNodes.forEach { root ->
+            root.walk().forEach { node -> node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
+        }
+        modelRoot?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
+    }
+
+    /** Whether any attachment of [conditionsOf] works only while a condition holds, so a frame asks nothing otherwise. */
+    private var hasConditions = false
+    private var conditionsOf: ModelRig? = null
+
+    /** Hands the running attachments their specs again, after a change that left the rig's structure as it was. */
+    private fun respecAttachments() {
+        val holders = runtimeNodes.flatMap { it.walk() }.map { it.name to it } + listOfNotNull(modelRoot?.let { null to it })
+        holders.forEach { (bone, node) ->
+            node.attachments.filterIsInstance<RespecAttachment>().forEach { running ->
+                currentRig.holder(bone).attachment(running.spec.id)?.let(running::respec)
+            }
+        }
+    }
 
     private var currentRig: ModelRig = RigAssets.of(location)
 
     private var authoredRig: ModelRig? = null
+
+    /** What the entity dresses this model in, under what the rig says about each material. */
+    private var dressedBy: Map<String, MaterialSource> = emptyMap()
+
+    /** Whether any effect hangs on this model, here or on a model nested in it; effects reach past any box. */
+    var carriesEffects: Boolean = false
+        private set
 
     val triangles get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.positionsCount / 3 } ?: 0 }
     val shapekeys get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.morphTargets.size } ?: 0 }
@@ -112,13 +198,24 @@ class ModelAttachment(
     fun endPose() {
         updateGlobalMatrix()
         runtimeNodes.forEach(RuntimeNode::updateHierarchyMatrices)
+        modelRoot?.updateHierarchyMatrices()
         cachedBounds = null
+    }
+
+    /** Drops the draw commands, which something hung on this model changed under; they are collected again on the next draw. */
+    fun invalidatePipeline() {
+        renderPipeline = null
     }
 
     /**
      * Dresses this instance's materials, by the names the model gave them.
      */
-    fun applyMaterials(overrides: Map<String, MaterialSource>) = runtimeMaterials.apply(overrides)
+    fun applyMaterials(overrides: Map<String, MaterialSource>) {
+        dressedBy = overrides
+        dress()
+    }
+
+    private fun dress() = runtimeMaterials.apply(dressedBy + currentRig.materials)
 
 
     /** What a pose is written into: this instance's nodes and the clips of its model. */
@@ -126,6 +223,7 @@ class ModelAttachment(
         nodesByIndex = nodesByIndex,
         animations = model.animationsByName,
         aliases = rig.boneByAlias,
+        rig = rig,
     ).also { target = it }
 
     /**
@@ -136,18 +234,42 @@ class ModelAttachment(
     }
 
     private fun rebuild(model: Model) {
+        runtimeNodes.forEach(RuntimeNode::close)
+        modelRoot?.close()
         builtFor = model
         currentRig = authoredRig ?: RigAssets.of(location)
         runtimeMaterials = ModelInstanceMaterials(model)
-        runtimeNodes = model.scenes.getOrNull(model.scene)?.nodes?.map {
-            RuntimeNode(it, this, runtimeMaterials::resolve)
-        } ?: emptyList()
+        runtimeNodes = addRigBones(
+            model.scenes.getOrNull(model.scene)?.nodes?.map { RuntimeNode(it, this, runtimeMaterials::resolve) } ?: emptyList(),
+            currentRig,
+            this,
+        )
         nodesByIndex = runtimeNodes.byIndex()
         nodesByIndex.values.forEach(::customizeNode)
+        modelRoot = RuntimeNode(NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF()), this).also { root ->
+            val context = RigAttachmentContext(root, { entity }, this) { carrier }
+            currentRig.attachments.forEach { spec -> RigAttachmentFactories.create(spec, context)?.let(root.attachments::add) }
+        }
+        carriesEffects = currentRig.carriesEffects()
+        dress()
         renderPipeline = null
         target = null
         cachedBounds = null
         modelChangeListeners.forEach { it() }
+    }
+
+    override fun close() {
+        runtimeNodes.forEach(RuntimeNode::close)
+        modelRoot?.close()
+        runtimeNodes = emptyList()
+        modelRoot = null
+        renderPipeline = null
+        nodesByIndex = emptyMap()
+    }
+
+    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
+        runtimeNodes.forEach { it.updateWorldPose(modelToWorld, entity) }
+        modelRoot?.updateWorldPose(modelToWorld, entity)
     }
 
     /**
@@ -163,17 +285,29 @@ class ModelAttachment(
             return
         }
 
-        val context = RigAttachmentContext(node) { entity }
+        val context = RigAttachmentContext(node, { entity }, this) { carrier }
         bone.attachments.forEach { spec ->
             RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
         }
         if (bone.hidden) node.isVisible = false
+        bone.material?.let { name ->
+            node.attachments.replaceAll { mesh ->
+                if (mesh is MeshAttachment) MeshAttachment(mesh.primitive, node, runtimeMaterials.named(name, mesh.material)) else mesh
+            }
+        }
     }
 
 
     override fun collectCommands(pipeline: RenderPipeline) {
         super.collectCommands(pipeline)
         runtimeNodes.forEach { it.collectCommands(pipeline) }
+        modelRoot?.collectCommands(pipeline)
+    }
+
+    companion object {
+        /** The name of the node that holds what hangs on the model itself. */
+        const val MODEL_ROOT = "#model"
+        private const val MODEL_ROOT_INDEX = -2
     }
 
     fun child(name: String): RuntimeNode {

@@ -2,13 +2,7 @@ package ru.hollowhorizon.hollowengine.cutscene
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneMigrations
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutscenePlaybackController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.LegacyCutsceneData
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.LegacyKeyData
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.LegacyKeyframeSnapshot
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.LegacyNodeData
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.LegacyTrackData
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

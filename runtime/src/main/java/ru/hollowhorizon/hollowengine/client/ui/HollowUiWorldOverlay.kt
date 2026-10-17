@@ -34,8 +34,6 @@ class HollowUiWorldOverlay(
         surface.setContent { content() }
     }
 
-    fun hasFocusedInput(): Boolean = surface.runtime.isAnyFocused
-
     fun isMouseOver(x: Float, y: Float): Boolean {
         val (lx, ly) = logicalPoint(x, y)
         return surface.runtime.lastFrame?.hitsVisible(lx, ly) ?: false
@@ -89,8 +87,6 @@ class HollowUiWorldOverlay(
         pipeline.await()
         return surface.runtime.charTyped(codePoint.toChar(), modifiers)
     }
-
-    fun advanceFrameTime(nowNanos: Long) = surface.advanceFrameTime(nowNanos)
 
     fun render() {
         if (!contentSet) return

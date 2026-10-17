@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap
 import com.mojang.blaze3d.audio.SoundBuffer
 import com.mojang.blaze3d.platform.Window
 import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.datafixers.util.Either
 import net.minecraft.Util
 import net.minecraft.client.Camera
@@ -17,16 +18,16 @@ import net.minecraft.client.model.geom.builders.LayerDefinition
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.particle.ParticleEngine
 import net.minecraft.client.player.AbstractClientPlayer
-import net.minecraft.client.resources.PlayerSkin
-import net.minecraft.client.player.KeyboardInput
 import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.LevelRenderer
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.client.renderer.culling.Frustum
 import net.minecraft.client.renderer.entity.EntityRenderer
 import net.minecraft.client.renderer.entity.EntityRendererProvider
+import net.minecraft.client.resources.PlayerSkin
+import net.minecraft.client.resources.sounds.SoundInstance
 import net.minecraft.client.sounds.AudioStream
-import net.minecraft.client.sounds.LoopingAudioStream
+import net.minecraft.client.sounds.ChannelAccess
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.NonNullList
@@ -52,8 +53,8 @@ import net.minecraft.world.item.crafting.RecipeManager
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.SkullBlock
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.*
+import net.minecraft.world.phys.shapes.VoxelShape
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.ConsoleAppender
 import ru.hollowhorizon.hollowengine.LOGGER
@@ -62,34 +63,46 @@ import ru.hollowhorizon.hollowengine.api.ModList
 import ru.hollowhorizon.hollowengine.api.extensions.FakePlayerFactory
 import ru.hollowhorizon.hollowengine.api.extensions.ItemStackHelper
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.EventBridge
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.PathObstacles
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimeBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
-import ru.hollowhorizon.hollowengine.client.audio.streams.ExtendedSoundConverter
-import ru.hollowhorizon.hollowengine.client.audio.streams.Mp3StreamingAudioStream
-import ru.hollowhorizon.hollowengine.client.audio.streams.WavAudioStream
+import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
+import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
+import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
 import ru.hollowhorizon.hollowengine.client.editor.TransformGizmoEditor
+import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
+import ru.hollowhorizon.hollowengine.client.editor.WorldObjectContextMenu
 import ru.hollowhorizon.hollowengine.client.input.ClientKeyWaitManager
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.MaterialSources
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.render.CameraFovEvent
 import ru.hollowhorizon.hollowengine.client.render.CameraSetupEvent
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
+import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
+import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments
+import ru.hollowhorizon.hollowengine.client.sounds.SoundResourceConverter
+import ru.hollowhorizon.hollowengine.client.sounds.SoundStreams
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeGameViewport
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlayPoint
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCameraSystem
-import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost
-import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
-import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
 import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationOverlay
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxWorldRenderer
-import ru.hollowhorizon.hollowengine.common.ui.hud.HudLayerRegistry
-import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
+import ru.hollowhorizon.hollowengine.client.ui.panels.UiPanels
+import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost
 import ru.hollowhorizon.hollowengine.client.utils.HollowCoreLoader
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxWorldRenderer
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonRuntimeEnvironment
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArms
+import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArmsComponent
+import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.compat.util.recipeManagerProtected
 import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
+import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
 import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewPotionEvent
 import ru.hollowhorizon.hollowengine.common.events.brew.BrewedPlayerPotionEvent
@@ -109,29 +122,25 @@ import ru.hollowhorizon.hollowengine.common.events.registry.RegisterTagsEvent
 import ru.hollowhorizon.hollowengine.common.events.server.ServerChatEvent
 import ru.hollowhorizon.hollowengine.common.events.server.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
-import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.components.MaterialsComponent
-import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArms
-import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArmsComponent
-import ru.hollowhorizon.hollowengine.client.models.internal.manager.MaterialSources
 import ru.hollowhorizon.hollowengine.common.registry.CommonRegistryHelper
 import ru.hollowhorizon.hollowengine.common.registry.CommonRegistryProvider
-import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScripts
-import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScriptReload
 import ru.hollowhorizon.hollowengine.common.runtime.EmptyRuntimeAnnotationIndex
 import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationEnvironment
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScriptReload
+import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScripts
+import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
+import ru.hollowhorizon.hollowengine.common.ui.hud.HudLayerRegistry
 import ru.hollowhorizon.hollowengine.common.utils.*
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 import ru.hollowhorizon.hollowengine.network.CommonNetworkManager
 import ru.hollowhorizon.hollowengine.runtime.bootstrap.ClassGraphRuntimeAnnotationIndex
-import java.io.IOException
-import java.io.InputStream
-import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionException
+import java.util.concurrent.Executor
+import java.util.function.Predicate
+import java.util.function.Supplier
+import net.minecraft.sounds.SoundSource as SoundCategory
 
 class RuntimeBridgeEntrypoint : RuntimeBridge {
     init {
@@ -165,7 +174,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onPlayerInteractEntity(player: Player, hand: InteractionHand, target: Entity): Boolean {
-        val event = PlayerInteractEvent.EntityInteract(player, hand, target)
+        val collider = ColliderClaims.peek(player, target)?.takeIf { it.spec.modes.interact }?.hit
+        val event = PlayerInteractEvent.EntityInteract(player, hand, target, collider)
         PlayerInteractEvent.EntityInteract.post(event)
         return event.isCanceled
     }
@@ -241,6 +251,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onPlayerRespawn(original: ServerPlayer, returnFromEnd: Boolean) {
         PlayerEvent.Respawn.post(PlayerEvent.Respawn(original, returnFromEnd))
+    }
+
+    override fun onPlayerPermissionsChanged(player: ServerPlayer) {
+        PlayerEvent.PermissionsChanged.post(PlayerEvent.PermissionsChanged(player))
     }
 
     override fun onServerChat(player: ServerPlayer, content: Component): RuntimeBridge.ChatResult {
@@ -391,7 +405,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientInteractEntity(player: Player, hand: InteractionHand, target: Entity): Boolean {
-        val event = PlayerInteractEvent.EntityInteract(player, hand, target)
+        val collider = ClientColliderHooks.interacted(target)
+        val event = PlayerInteractEvent.EntityInteract(player, hand, target, collider)
         PlayerInteractEvent.EntityInteract.post(event)
         return event.isCanceled
     }
@@ -410,10 +425,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         LOGGER.info(
             "Production: {}, Can attach renderdoc: {}, Platform: {}",
             isProduction,
-            HollowCoreLoader.canAttachRenderdoc(),
+            HollowCoreLoader.enableRenderDoc,
             Util.getPlatform().name
         )
-        if (!HollowCoreLoader.canAttachRenderdoc() || Util.getPlatform() != Util.OS.WINDOWS) {
+        if (!HollowCoreLoader.enableRenderDoc || Util.getPlatform() != Util.OS.WINDOWS) {
             return
         }
 
@@ -421,7 +436,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         val name = System.mapLibraryName("renderdoc")
         var detected = false
         for (folder in path.split(";")) {
-            if (java.nio.file.Files.exists(java.nio.file.Path.of("$folder/$name"))) {
+            if (java.nio.file.Files.exists(Path.of("$folder/$name"))) {
                 detected = true
                 break
             }
@@ -430,7 +445,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         LOGGER.info("Is detected renderdoc: {}", detected)
 
         if (!detected) {
-            val renderDoc = java.nio.file.Path.of("C:/Program Files/RenderDoc/renderdoc.dll")
+            val renderDoc = Path.of("C:/Program Files/RenderDoc/renderdoc.dll")
             if (java.nio.file.Files.exists(renderDoc)) {
                 try {
                     LOGGER.info("Trying load system renderdoc")
@@ -456,49 +471,31 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         resourceManager: ResourceProvider,
         cache: Map<ResourceLocation, CompletableFuture<SoundBuffer>>,
     ): CompletableFuture<SoundBuffer>? {
-        val path = soundId.path
-        if (!path.endsWith(".mp3") && !path.endsWith(".wav")) return null
-
-        @Suppress("UNCHECKED_CAST") val mutableCache =
-            cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>
-        return mutableCache.computeIfAbsent(soundId) { resourceLocation ->
-            CompletableFuture.supplyAsync({
-                try {
-                    resourceManager.open(resourceLocation).use { inputStream ->
-                        loadSoundBuffer(path, inputStream)
-                    }
-                } catch (ioException: IOException) {
-                    throw CompletionException(ioException)
-                }
-            }, Util.backgroundExecutor())
-        }
+        if (!SoundStreams.handles(soundId)) return null
+        @Suppress("UNCHECKED_CAST")
+        return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>)
+            .computeIfAbsent(soundId) { SoundStreams.complete(it, resourceManager)!! }
     }
 
     override fun onLoadStreamSound(
         soundId: ResourceLocation,
         resourceManager: ResourceProvider,
         isWrapper: Boolean,
-    ): CompletableFuture<AudioStream>? {
-        val path = soundId.path
-        if (!path.endsWith(".mp3") && !path.endsWith(".wav")) return null
+    ): CompletableFuture<AudioStream>? = SoundStreams.stream(soundId, resourceManager, isWrapper)
 
-        return CompletableFuture.supplyAsync({
-            try {
-                val inputStream = resourceManager.open(soundId)
-                if (path.endsWith(".wav")) {
-                    if (isWrapper) LoopingAudioStream(::WavAudioStream, inputStream) else WavAudioStream(inputStream)
-                } else {
-                    if (isWrapper) LoopingAudioStream(
-                        ::Mp3StreamingAudioStream, inputStream
-                    ) else Mp3StreamingAudioStream(inputStream)
-                }
-            } catch (ioException: IOException) {
-                throw CompletionException(ioException)
-            }
-        }, Util.backgroundExecutor())
-    }
+    override fun createSoundConverter(): FileToIdConverter = SoundResourceConverter
 
-    override fun createSoundConverter(): FileToIdConverter = ExtendedSoundConverter
+    override fun onSoundEngineTick(paused: Boolean) = ClientSounds.tick(paused)
+
+    override fun onSoundEngineReset() = ClientSounds.clear()
+
+    override fun onSoundEnginePaused(paused: Boolean) = ClientSounds.enginePaused(paused)
+
+    override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>, executor: Executor) =
+        ClientSounds.frame(channels, executor)
+
+    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) =
+        ClientSounds.stopMatching(id, category)
 
     override fun getOpenGlVersionOverride(): String = HollowCoreLoader.openGlVersion
 
@@ -601,6 +598,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onLevelClosed(level: Level) {
+        if (level.isClientSide) {
+            ClientSounds.clear()
+            SoundAttachments.clear()
+        }
+        LevelEvent.Unload.post(LevelEvent.Unload(level))
         AttachmentRegistry.close(level)
     }
 
@@ -617,6 +619,75 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         EntityEvent.Hurt.post(event)
         return event.isCanceled
     }
+
+    override fun onLivingEntityHurt(entity: LivingEntity, damageSource: DamageSource, amount: Float): Float {
+        val event = EntityEvent.Hurt(entity, damageSource, amount)
+        EntityEvent.Hurt.post(event)
+        return if (event.isCanceled) Float.NaN else event.amount
+    }
+
+    override fun bodyPushable(entity: Entity, vanilla: Boolean): Boolean = EntityBodies.isPushable(entity, vanilla)
+
+    override fun bodyPushesOthers(entity: Entity): Boolean = EntityBodies.pushesOthers(entity)
+
+    override fun bodySolid(entity: Entity, vanilla: Boolean): Boolean = EntityBodies.isSolid(entity, vanilla)
+
+    override fun bodyDimensions(entity: Entity, vanilla: EntityDimensions): EntityDimensions =
+        EntityBodies.dimensions(entity, vanilla)
+
+    override fun collideWithColliders(entity: Entity, movement: Vec3, move: Supplier<Vec3>): Vec3 {
+        val moved = SolidColliders.during(entity, movement, move)
+        if (entity.noPhysics || !ColliderContacts.isSimulatedHere(entity)) return moved
+        val kept = SolidColliders.keepOutOfBlocks(entity, moved)
+        EntityBodies.afterMove(entity, movement, kept)
+        return kept
+    }
+
+    override fun collideShapesWithColliders(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 =
+        SolidColliders.collide(movement, box, shapes, vanilla)
+
+    override fun stepHeightsWithColliders(box: AABB, limit: Float, vanilla: FloatArray): FloatArray =
+        SolidColliders.stepHeights(box, limit, vanilla)
+
+    override fun onLivingEntityTickStart(entity: LivingEntity) = ColliderContacts.resolve(entity)
+
+    override fun isSupportedByColliders(entity: Entity): Boolean = SolidColliders.supports(entity)
+
+    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
+
+    override fun overlapsSolidColliders(entity: Entity, box: AABB): Boolean = SolidColliders.overlaps(entity, box)
+
+    override fun pathObstacles(mob: Mob): PathObstacles? = ColliderPathObstacles.of(mob)
+
+    override fun resolveColliderDamage(entity: Entity, damageSource: DamageSource): DamageSource =
+        ColliderCombat.resolve(entity, damageSource)
+
+    override fun hasColliderTargets(entity: Entity, projectile: Boolean): Boolean =
+        EntityColliders.hasTargets(entity, colliderModes(projectile))
+
+    override fun pickColliders(
+        level: Level, source: Entity?, start: Vec3, end: Vec3, search: AABB,
+        predicate: Predicate<Entity>, maxDistanceSquared: Double, vanilla: EntityHitResult?, projectile: Boolean,
+    ): EntityHitResult? =
+        EntityColliders.pick(level, source, start, end, search, predicate, maxDistanceSquared, vanilla, colliderModes(projectile))
+
+    override fun onPlayerAttack(player: Player, target: Entity, attack: Runnable) =
+        ColliderCombat.attack(player, target, attack)
+
+    override fun onProjectileHit(projectile: Entity, result: HitResult, hit: Runnable) =
+        ColliderCombat.projectileHit(projectile, result, hit)
+
+    override fun colliderReachBounds(player: Player, target: Entity, vanilla: AABB): AABB =
+        ColliderClaims.reachBounds(player, target, vanilla)
+
+    override fun onClientTargetEntity(target: Entity, result: HitResult?) = ClientColliderHooks.claim(result, target)
+
+    override fun renderColliderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean =
+        ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
+
+    /** Projectiles land only on colliders that take hits; the crosshair also stops at the clickable ones. */
+    private fun colliderModes(projectile: Boolean): (ColliderModes) -> Boolean =
+        if (projectile) ColliderModes::hit else ColliderModes::isTarget
 
     override fun onEntityChangedDimension(entity: Entity, resultEntity: Entity?, fromLevel: Level, toLevel: Level) {
         if (resultEntity != null) {
@@ -689,6 +760,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         return event.isVisible
     }
 
+    override fun entityNameplateAttachment(entity: Entity, vanilla: Vec3?): Vec3? =
+        vanilla?.let { ClientColliderPoses.nameplateAttachment(entity, it) }
+
     override fun onCameraSetup(
         gameRenderer: GameRenderer,
         camera: Camera,
@@ -747,12 +821,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         return !IrisHelper.isShadowRendering()
     }
 
-    override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, java.util.function.Supplier<LayerDefinition>>) {
+    override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, Supplier<LayerDefinition>>) {
         val eventDefinitions = HashMap<ModelLayerLocation, () -> LayerDefinition>()
         val event = RegisterEntityLayersDefinitions(eventDefinitions)
         RegisterEntityLayersDefinitions.post(event)
         eventDefinitions.forEach { (location, definition) ->
-            definitions[location] = java.util.function.Supplier { definition() }
+            definitions[location] = Supplier { definition() }
         }
     }
 
@@ -859,7 +933,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onKeyboardKey(windowPointer: Long, key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
         ClientKeyWaitManager.handleKey(key, action)
         if (HollowIdeOverlay.handleKey(key, scanCode, action, modifiers)) return true
+        if (WorldObjectContextMenu.handleKey(key, scanCode, action, modifiers)) return true
         if (TransformGizmoEditor.handleKey(key, scanCode, action, modifiers)) return true
+        if (UiPanels.handleKey(key, scanCode, action, modifiers)) return true
         if (UiScriptHudHost.handleKey(key, scanCode, action, modifiers)) return true
         return false
     }
@@ -867,6 +943,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onKeyboardChar(windowPointer: Long, codePoint: Int, modifiers: Int): Boolean {
         if (HollowIdeOverlay.handleChar(codePoint, modifiers)) return true
         if (TransformGizmoEditor.handleChar(codePoint, modifiers)) return true
+        if (UiPanels.handleChar(codePoint, modifiers)) return true
         if (UiScriptHudHost.handleChar(codePoint, modifiers)) return true
         return false
     }
@@ -890,7 +967,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         var isGizmoBlocking = false
         if (world != null) {
             WorldInspector.handleMouseMove(world.x, world.y)
-            isGizmoInputCaptured = TransformGizmoEditor.handleMouseMove(world.x, world.y)
+            isGizmoInputCaptured = WorldObjectContextMenu.handleMouseMove(world.x, world.y)
+            isGizmoInputCaptured = isGizmoInputCaptured || TransformGizmoEditor.handleMouseMove(world.x, world.y)
             val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
             isScriptOverlayCaptured = UiScriptHudHost.handleMouseMove(guiX, guiY)
             isGizmoBlocking = TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
@@ -934,9 +1012,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseButton(x, y, button, action)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
+        return WorldObjectContextMenu.handleMouseButton(world.x, world.y, button, action) ||
+                TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
                 WorldInspector.pickAt(world.x, world.y, button, action) ||
                 UiScriptHudHost.handleMouseButton(guiX, guiY, button, action) ||
+                minecraft.screen == null && UiPanels.handleMouseButton(button, action) ||
                 TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
@@ -955,6 +1035,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
         return TransformGizmoEditor.handleMouseScroll(world.x, world.y, xOffset, yOffset) ||
                 UiScriptHudHost.handleMouseScroll(guiX, guiY, xOffset, yOffset) ||
+                minecraft.screen == null && UiPanels.handleMouseScroll(xOffset, yOffset) ||
                 TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
@@ -1035,20 +1116,6 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     private fun isClassPresent(name: String): Boolean {
         val classPath = name.replace('.', '/') + ".class"
         return javaClass.classLoader.getResource(classPath) != null
-    }
-
-    private fun loadSoundBuffer(path: String, inputStream: InputStream): SoundBuffer {
-        return if (path.endsWith(".wav")) {
-            WavAudioStream(inputStream).use { stream ->
-                val byteBuffer: ByteBuffer = stream.readAll()
-                SoundBuffer(byteBuffer, stream.format)
-            }
-        } else {
-            Mp3StreamingAudioStream(inputStream).use { stream ->
-                val byteBuffer: ByteBuffer = stream.readAll()
-                SoundBuffer(byteBuffer, stream.format)
-            }
-        }
     }
 
     private fun RuntimeBridge.RenderLevelStage.toRenderStage(): RenderStage = when (this) {

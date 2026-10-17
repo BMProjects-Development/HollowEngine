@@ -1,26 +1,14 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Checkbox
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.grow
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.CollapsibleSection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Readonly
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.*
@@ -44,15 +32,16 @@ internal fun vfxNodeInspector(
             LocalVfxFieldFocus provides { property -> state.focusProperty(nodeId, property) },
             LocalVfxDriven provides vfxDrivenLookup(document, state, nodeId),
         ) {
-            NodeFields(document, state, live)
+            VfxNodeFields(document, state, live)
         }
     }
 }
 
-internal fun HollowIdeVfxDocument.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}") { it.withNode(node) }
+internal fun VfxEditing.replace(node: VfxNodeSpec) = edit(mergeKey = "node:${node.id}", label = UndoLabel("${UndoLabel.LANG}.vfx.node", node.id)) { it.withNode(node) }
 
+/** Everything the inspector shows for [node], wherever the effect it belongs to lives. */
 @Composable
-private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, node: VfxNodeSpec) {
+internal fun VfxNodeFields(document: VfxEditing, state: VfxInspectorState, node: VfxNodeSpec) {
     NodeHead(document, node)
 
     Folding(state, "transform", vfxText("section_transform"), VfxIcons.TRANSFORM) {
@@ -60,7 +49,7 @@ private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, no
         VfxFloat3Row(vfxText("position"), transform.position, VfxProperty.POSITION) {
             document.replace(node.withCommon(transform = transform.copy(position = it)))
         }
-        VfxFloat3Row(vfxText("rotation"), transform.rotation, VfxProperty.ROTATION) {
+        VfxFloat3Row(vfxText("rotation"), transform.rotation, VfxProperty.ROTATION, step = 1.0) {
             document.replace(node.withCommon(transform = transform.copy(rotation = it)))
         }
         VfxFloat3Row(vfxText("scale"), transform.scale, VfxProperty.SCALE) {
@@ -82,6 +71,8 @@ private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, no
         is VfxPostEffectSpec -> PostEffectFields(document, state, node)
         is VfxSkySpec -> SkyFields(document, state, node)
         is VfxCameraShakeSpec -> CameraShakeFields(document, state, node)
+        is VfxSoundSpec -> SoundFields(document, state, node)
+        is VfxDecalSpec -> DecalFields(document, state, node)
         else -> Unit
     }
 }
@@ -91,7 +82,7 @@ private fun NodeFields(document: HollowIdeVfxDocument, state: VfxEditorState, no
  * whether it draws on particles or once, which depends on where it sits in the tree.
  */
 @Composable
-private fun NodeHead(document: HollowIdeVfxDocument, node: VfxNodeSpec) {
+private fun NodeHead(document: VfxEditing, node: VfxNodeSpec) {
     var draft by remember(node.id, node.name) { mutableStateOf(node.name) }
     Row(tags = listOf("vfx-node-head")) {
         Checkbox(
@@ -130,7 +121,7 @@ private fun NodeHead(document: HollowIdeVfxDocument, node: VfxNodeSpec) {
  * turn, so it only offers the color.
  */
 @Composable
-private fun ParticleFields(document: HollowIdeVfxDocument, state: VfxEditorState, node: VfxParticleRendererSpec) {
+private fun ParticleFields(document: VfxEditing, state: VfxInspectorState, node: VfxParticleRendererSpec) {
     val look = node.particle
     fun update(next: VfxAppearance) = document.replace(node.withParticle(next))
 
@@ -156,7 +147,7 @@ private fun ParticleFields(document: HollowIdeVfxDocument, state: VfxEditorState
  */
 @Composable
 internal fun Folding(
-    state: VfxEditorState,
+    state: VfxInspectorState,
     key: String,
     title: String,
     icon: String,
@@ -192,6 +183,7 @@ internal fun vfxEffectInspector(document: HollowIdeVfxDocument, state: VfxEditor
                 document.edit { it.copy(timeline = it.timeline.copy(loop = loop)) }
             }
         }
+        PreviewDataSection(state.playbackPreview)
         Folding(state, "stats", vfxText("section_stats"), VfxIcons.STATS) {
             Readonly(vfxText("nodes"), effect.walk().size.toString())
             Readonly(vfxText("expressions"), effect.expressions().size.toString())
@@ -228,6 +220,8 @@ internal object VfxIcons {
     const val POST = ROOT + "post.svg"
     const val SKY = ROOT + "sky.svg"
     const val SHAKE = ROOT + "shake.svg"
+    const val SOUND = ROOT + "node_sound.svg"
+    const val DECAL = ROOT + "node_decal.svg"
     const val TIMELINE = ROOT + "timeline.svg"
     const val STATS = ROOT + "stats.svg"
     const val ADD = ROOT + "add.svg"

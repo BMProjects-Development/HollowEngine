@@ -5,7 +5,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlin.time.Duration.Companion.seconds
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryAnchor
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.actor
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.number
@@ -13,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /** Collects everything a dialogue shows, and answers menus with a scripted list of picks. */
 private open class RecordingPresenter(private val picks: MutableList<Int> = mutableListOf()) : DialoguePresenter {
@@ -418,11 +418,11 @@ class DialogueRuntimeTest {
         val presenter = RecordingPresenter()
         val controller = controller(
             """
-            @set вещи = ["меч", "щит"]
-            @set вещи = вещи + "зелье"
-            Всего {вещи.size}: первое — {вещи[0]}, последнее — {вещи[2]}.
-            @if вещи.size > 2
-                Виталик: Тяжеловато несёшь.
+            @set items = ["sword", "shield"]
+            @set items = items + "potion"
+            {items.size} Items: first - {items[0]}, last - {items[2]}.
+            @if items.size > 2
+                Vitalik: That weights...
             """.trimIndent(),
             presenter,
         )
@@ -430,7 +430,7 @@ class DialogueRuntimeTest {
         controller.startHeadless()
 
         assertEquals(
-            listOf("Всего 3: первое — меч, последнее — зелье.", "Виталик: Тяжеловато несёшь."),
+            listOf("3 Items: first - sword, last - potion.", "Vitalik: That weights..."),
             presenter.lines,
         )
     }

@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.models.gltf
 
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.HollowEngine.MODID
 import ru.hollowhorizon.hollowengine.client.models.internal.*
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationLoader
@@ -11,7 +10,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
 import ru.hollowhorizon.hollowengine.client.utils.exists
 import ru.hollowhorizon.hollowengine.common.models.ModelResourceIO
 import ru.hollowhorizon.hollowengine.common.utils.math.*
-import ru.hollowhorizon.hollowengine.common.utils.rl
 
 
 object GltfModelLoader : ModelLoader {

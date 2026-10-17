@@ -3,14 +3,19 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 /** A titled group of rows. [boxed] draws the group as a card instead of a ruled heading. */
 @Composable
-fun Section(title: String, id: String? = null, boxed: Boolean = false, content: HollowUiContent) {
+fun Section(title: String, id: String? = null, boxed: Boolean = false, help: String? = null, content: HollowUiContent) {
     Column(id = id, tags = if (boxed) listOf("insp-section", "boxed") else listOf("insp-section")) {
         if (title.isNotEmpty()) {
-            Text(title, tags = listOf("insp-section-title"))
+            if (help == null) Text(title, tags = listOf("insp-section-title"))
+            else Row(tags = listOf("insp-field-head")) {
+                Text(title, tags = listOf("insp-section-title"), modifier = Modifier.grow(1f))
+                FieldHelp(help)
+            }
             if (!boxed) Box(tags = listOf("insp-section-rule"))
         }
         Column(tags = listOf("insp-section-body"), content = content)
@@ -75,10 +80,11 @@ fun TextRow(
     highlighter: UiSyntaxHighlighter? = null,
     diagnostics: List<UiTextDiagnostic> = emptyList(),
     trailing: HollowUiContent? = null,
+    help: String? = null,
     onChange: (String) -> Unit,
 ) {
     Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
+        if (label.isNotEmpty()) FieldLabel(label, help)
         Row(tags = listOf("insp-input-row")) {
             TextField(
                 value = value,
@@ -107,51 +113,70 @@ fun NameRow(label: String, value: String, id: String? = null, onCommit: (String)
     }
 }
 
+/** A whole number with its type's bounds and conversion kept at the inspector boundary. */
 @Composable
-fun IntRow(
+fun NumberRow(
     label: String,
     value: Int,
     id: String? = null,
     min: Int = Int.MIN_VALUE,
     max: Int = Int.MAX_VALUE,
     onChange: (Int) -> Unit,
-) {
-    NumberRow(label, value.toDouble(), whole = true, id = id, min = min.toDouble(), max = max.toDouble()) {
-        onChange(it.toInt())
-    }
+) = NumberRow(label, value.toDouble(), whole = true, id = id, min = min.toDouble(), max = max.toDouble()) {
+    onChange(it.toInt())
 }
 
+/** A floating-point number; [slider] uses the supplied bounds as the slider's range. */
 @Composable
-fun FloatRow(
+fun NumberRow(
     label: String,
     value: Float,
     id: String? = null,
     min: Float = -Float.MAX_VALUE,
     max: Float = Float.MAX_VALUE,
+    help: String? = null,
+    step: Float? = null,
+    slider: Boolean = false,
     onChange: (Float) -> Unit,
-) {
-    NumberRow(label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble()) {
-        onChange(it.toFloat())
-    }
-}
+) = NumberRow(
+    label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(),
+    help = help, step = step?.toDouble(), slider = slider,
+) { onChange(it.toFloat()) }
 
+/** `Label:  ‹ value ›`, a number of an inspector with its label in front; [help] is the label's tooltip. */
 @Composable
 fun NumberRow(
     label: String,
     value: Double,
-    whole: Boolean,
+    whole: Boolean = false,
     id: String? = null,
     min: Double = -Double.MAX_VALUE,
     max: Double = Double.MAX_VALUE,
+    help: String? = null,
+    slider: Boolean = false,
+    step: Double? = null,
+    onGestureEnd: () -> Unit = {},
     onChange: (Double) -> Unit,
 ) {
-    Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
-        NumberInput(
-            path = id ?: "-$label",
+    Row(tags = listOf("insp-number-row")) {
+        if (label.isNotEmpty()) Text(
+            label,
+            tags = if (help != null) listOf("insp-number-label", "hinted") else listOf("insp-number-label"),
+            modifier = Modifier.textWrap(false).textOverflow(UiTextOverflow.DOTS)
+                .then(if (help != null) Modifier.tooltipOnHover(help) else Modifier),
+        )
+        NumberField(
             value = value,
+            id = "insp-number${id ?: "-$label"}",
             whole = whole,
-        ) { typed -> onChange(typed.coerceIn(min, max)) }
+            min = min,
+            max = max,
+            slider = slider,
+            step = step,
+            modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+            onGestureEnd = onGestureEnd,
+            onChange = onChange,
+        )
     }
 }
 
@@ -176,23 +201,6 @@ fun ToggleRow(
         } else {
             Checkbox(checked = checked, tags = listOf("insp-checkbox"), onCheckedChange = onChange)
             Text(label, tags = listOf("insp-check-label"))
-        }
-    }
-}
-
-@Composable
-fun SliderRow(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
-    Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
-        Row(tags = listOf("insp-input-row")) {
-            Slider(
-                value = value,
-                min = min,
-                max = max,
-                tags = listOf("insp-slider"),
-                onValueChange = onChange,
-            )
-            Text(formatNumber(value.toDouble(), whole = false), tags = listOf("insp-slider-value"))
         }
     }
 }
@@ -238,38 +246,26 @@ fun InspectorButton(
     modifier: Modifier = Modifier,
     tags: List<String> = emptyList(),
     onClick: () -> Unit,
-) {
-    Row(
-        tags = listOf("insp-button") + tags,
-        modifier = modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        icon?.let { Image(it, tags = listOf("insp-button-icon")) }
-        Text(label, tags = listOf("insp-button-label"))
-    }
-}
+) = Button(label, icon = icon, tags = listOf("insp-button") + tags, modifier = modifier, onClick = onClick)
 
 @Composable
 fun InspectorIconButton(
     icon: String,
     tooltip: String,
+    id: String? = null,
     modifier: Modifier = Modifier,
     active: Boolean = false,
     tags: List<String> = emptyList(),
     onClick: () -> Unit,
-) {
-    Image(
-        icon,
-        tags = listOf("insp-icon-button") + tags + if (active) listOf("active") else emptyList(),
-        modifier = modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).tooltipOnHover(tooltip)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    )
-}
+) = IconButton(
+    icon,
+    tooltip,
+    id = id,
+    active = active,
+    tags = listOf("inline", "insp-icon-button") + tags,
+    modifier = modifier,
+    onClick = onClick,
+)
 
 @Composable
 fun DisclosureArrow(expanded: Boolean) {

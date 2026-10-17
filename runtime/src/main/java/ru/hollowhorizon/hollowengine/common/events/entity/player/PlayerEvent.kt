@@ -20,6 +20,11 @@ open class PlayerEvent(val player: Player) : Event {
         companion object : EventHandler<Leave>()
     }
 
+    /** The server has sent [player] its permission level: on join, op and deop. */
+    class PermissionsChanged(player: Player) : PlayerEvent(player) {
+        companion object : EventHandler<PermissionsChanged>()
+    }
+
     class ChangeDimension(player: Player, val from: ServerLevel, val to: ServerLevel) : PlayerEvent(player) {
         companion object : EventHandler<ChangeDimension>()
     }

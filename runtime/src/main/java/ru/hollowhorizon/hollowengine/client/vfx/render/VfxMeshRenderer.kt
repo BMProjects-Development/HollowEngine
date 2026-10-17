@@ -11,6 +11,7 @@ import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMeshRenderer.render
 import ru.hollowhorizon.hollowengine.common.registry.ModShaders
 import ru.hollowhorizon.hollowengine.common.vfx.VfxLighting
 import ru.hollowhorizon.hollowengine.common.vfx.VfxPrimitive

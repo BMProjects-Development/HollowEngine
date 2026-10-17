@@ -4,8 +4,8 @@ import ru.hollowhorizon.hollowengine.common.dialogue.DialogueController
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryEngine
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryFunctionRegistry
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryString
-import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.*
+import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast

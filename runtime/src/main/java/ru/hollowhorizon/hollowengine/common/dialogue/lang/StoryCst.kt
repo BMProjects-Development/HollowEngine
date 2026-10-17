@@ -132,7 +132,6 @@ sealed interface StoryLineKind {
 
 /** Text with variable expressions, inline commands, etc. */
 data class TextTemplate(val parts: List<TextPart>, val span: StorySpan) {
-    /** The literal text with all dynamic parts dropped — useful for logs and matching. */
     fun literalText(): String = parts.filterIsInstance<TextPart.Literal>().joinToString("") { it.text }
 }
 

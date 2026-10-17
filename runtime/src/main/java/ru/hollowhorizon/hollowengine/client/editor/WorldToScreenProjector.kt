@@ -5,6 +5,9 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector4f
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeScale
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.deg
 import kotlin.math.tan
 
 private const val NEAR_PLANE_EPSILON = 0.05f
@@ -24,6 +27,12 @@ data class WorldRay(
     val origin: Vec3,
     val direction: Vec3,
 )
+
+/**
+ * How the model previews name the axes. As the model stands in the world, facing +Z, which is half a turn around Y
+ * from how its file keeps it. Only what is shown turns; the values written stay in the file's own space.
+ */
+val ModelPreviewAxes: QuatF = QuatF.rotation(180f.deg, Vec3f.Y_AXIS)
 
 /**
  * Projects points of one camera into the logical pixels of the surface it is shown on, and back into
@@ -65,13 +74,16 @@ open class GizmoProjector {
         logicalHeight = height.coerceAtLeast(1f)
     }
 
+    /** How this view names the world's axes: the global arrows point along these, turned from the plain X, Y and Z. */
+    var axesFrame: QuatF = QuatF.IDENTITY
+
     val width: Float get() = logicalWidth
     val height: Float get() = logicalHeight
     val cameraPosition: Vec3 get() = Vec3(camX, camY, camZ)
 
     fun screenCenter(): Pair<Float, Float> = logicalWidth * 0.5f to logicalHeight * 0.5f
 
-    fun project(world: Vec3): ScreenPoint? = project(world.x, world.y, world.z)
+    fun project(world: Vec3): ScreenPoint = project(world.x, world.y, world.z)
 
     fun project(worldX: Double, worldY: Double, worldZ: Double): ScreenPoint {
         scratch.set((worldX - camX).toFloat(), (worldY - camY).toFloat(), (worldZ - camZ).toFloat(), 1f)
@@ -110,7 +122,19 @@ open class GizmoProjector {
         )
     }
 
-    fun worldPerPixel(world: Vec3): Float {
+    /**
+     * The camera's axes in the world: to the right of the view, up it, and toward the viewer. Read off the near plane,
+     * so a projection with no perspective, or a mirrored one, gives them the same as any other.
+     */
+    fun viewAxes(): Triple<Vec3, Vec3, Vec3>? {
+        val center = unproject(0f, 0f, -1f) ?: return null
+        val right = unproject(1f, 0f, -1f)?.subtract(center)?.normalize() ?: return null
+        val up = unproject(0f, 1f, -1f)?.subtract(center)?.normalize() ?: return null
+        if (right.lengthSqr() < 0.5 || up.lengthSqr() < 0.5) return null
+        return Triple(right, up, right.cross(up).normalize())
+    }
+
+    open fun worldPerPixel(world: Vec3): Float {
         if (logicalHeight <= 0f) return 0.05f
         val distance = world.distanceTo(cameraPosition).toFloat()
         val worldHeightAtDepth = 2f * tan(fovYRadians * 0.5f) * distance

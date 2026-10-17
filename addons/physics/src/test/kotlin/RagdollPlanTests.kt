@@ -1,25 +1,26 @@
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollStateSpec
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPlan
-import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollShape
-import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachment
+import ru.hollowhorizon.hollowengine.addons.physics.collider.SphereColliderShape
 import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachmentSpec
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigVector
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachment
 import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyShape
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.Skin
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 /**
  * Which nodes of model rag-doll takes over.
@@ -93,17 +94,19 @@ class RagdollPlanTests {
         val hips = NodeDefinition(index = 1, name = "hips", children = mutableListOf(helper), transform = up(0.5f))
         listOf(chest to helper, helper to hips).forEach { (child, parent) -> child.parent = parent }
 
-        val target = PoseTarget(listOf(RuntimeNode(hips, parent = null)).byIndex(), emptyMap())
-        target.rig("hips", body(RigidBodyShape.Box(halfExtents = RigVector(0.2f, 0.1f, 0.1f))))
-        target.rig("chest", body(RigidBodyShape.Sphere(radius = 0.15f)), JointAttachmentSpec(parent = "hips"))
+        val target = rigged(
+            hips,
+            "hips" to body("hips", Vec3f(0.4f, 0.2f, 0.2f)),
+            "chest" to body("chest", Vec3f(0.3f, 0.3f, 0.3f), SphereColliderShape, JointAttachmentSpec(parent = "hips")),
+        )
 
         val plan = requireNotNull(RagdollPlan.build(target, RagdollStateSpec(), target.everyBone()))
 
         assertEquals(listOf("hips", "chest"), plan.bones.map { it.name })
         assertEquals(-1, plan.bones[0].parent)
         assertEquals(0, plan.bones[1].parent, "The chest hangs off the hips, not off the helper bone")
-        assertIs<RagdollShape.Box>(plan.bones[0].shape)
-        assertIs<RagdollShape.Sphere>(plan.bones[1].shape)
+        assertEquals(BoxShapeSpec, plan.bones[0].shape.parts.single().shape, "A body is made of the collider on its bone")
+        assertEquals(SphereColliderShape, plan.bones[1].shape.parts.single().shape)
     }
 
     @Test
@@ -112,9 +115,7 @@ class RagdollPlanTests {
         val arm = NodeDefinition(index = 1, name = "arm", children = mutableListOf(hand), transform = up(0.4f))
         hand.parent = arm
 
-        val target = PoseTarget(listOf(RuntimeNode(arm, parent = null)).byIndex(), emptyMap())
-        target.rig("arm", body(RigidBodyShape.Capsule()))
-        target.rig("hand", body(RigidBodyShape.Capsule()))
+        val target = rigged(arm, "arm" to body("arm", Vec3f(0.1f, 0.4f, 0.1f)), "hand" to body("hand", Vec3f(0.1f, 0.2f, 0.1f)))
 
         val plan = requireNotNull(RagdollPlan.build(target, RagdollStateSpec(), target.everyBone()))
 
@@ -122,11 +123,44 @@ class RagdollPlanTests {
         assertEquals(0, plan.bones[1].parent)
     }
 
-    private fun body(shape: RigidBodyShape) = RigidBodyAttachmentSpec(shape = shape)
+    @Test
+    fun `a body takes the colliders it names, and is no body without one`() {
+        val hand = NodeDefinition(index = 2, name = "hand", children = mutableListOf(), transform = up(0.4f))
+        val arm = NodeDefinition(index = 1, name = "arm", children = mutableListOf(hand), transform = up(0.4f))
+        hand.parent = arm
 
-    private fun PoseTarget.rig(bone: String, body: RigidBodyAttachmentSpec, joint: JointAttachmentSpec? = null) {
-        val node = requireNotNull(node(bone)) { "No bone '$bone'" }
-        node.attachments += RigidBodyAttachment(body, node)
-        joint?.let { node.attachments += JointAttachment(it, node) }
+        val armBone = RigBone(
+            attachments = listOf(
+                ColliderAttachmentSpec(id = "sleeve", size = Vec3f(0.1f, 0.4f, 0.1f)),
+                ColliderAttachmentSpec(id = "shield", size = Vec3f(0.6f, 0.6f, 0.05f)),
+                RigidBodyAttachmentSpec(colliders = listOf("sleeve")),
+            ),
+        )
+        val bareHand = RigBone(attachments = listOf(RigidBodyAttachmentSpec()))
+        val target = rigged(arm, "arm" to armBone, "hand" to bareHand)
+
+        val plan = requireNotNull(RagdollPlan.build(target, RagdollStateSpec(), target.everyBone()))
+
+        assertEquals(listOf("arm"), plan.bones.map { it.name }, "A body with nothing to be made of is left out")
+        assertEquals(0.2f, plan.bones.single().shape.parts.single().halfExtents.y, "Only the sleeve: the shield is not named")
     }
+
+    @Test
+    fun `bodies with nothing to be made of are not swapped for guessed capsules`() {
+        val hand = NodeDefinition(index = 2, name = "hand", children = mutableListOf(), transform = up(0.4f))
+        val arm = NodeDefinition(index = 1, name = "arm", children = mutableListOf(hand), transform = up(0.4f))
+        hand.parent = arm
+
+        val bare = RigBone(attachments = listOf(RigidBodyAttachmentSpec()))
+        val target = rigged(arm, "arm" to bare, "hand" to bare)
+
+        assertNull(RagdollPlan.build(target, RagdollStateSpec(), target.everyBone()), "The rig says what the bodies are, even when it says too little")
+    }
+
+    /** A collider of [size] and the body made of it, on one bone. */
+    private fun body(collider: String, size: Vec3f, shape: ColliderShapeSpec = BoxShapeSpec, joint: JointAttachmentSpec? = null) =
+        RigBone(attachments = listOfNotNull(ColliderAttachmentSpec(id = collider, size = size, shape = shape), RigidBodyAttachmentSpec(), joint))
+
+    private fun rigged(root: NodeDefinition, vararg bones: Pair<String, RigBone>) =
+        PoseTarget(listOf(RuntimeNode(root, parent = null)).byIndex(), emptyMap(), rig = ModelRig(bones = mapOf(*bones)))
 }

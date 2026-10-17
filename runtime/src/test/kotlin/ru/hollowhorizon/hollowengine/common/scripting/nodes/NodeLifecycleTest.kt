@@ -1,17 +1,10 @@
 package ru.hollowhorizon.hollowengine.common.scripting.nodes
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,6 +12,52 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NodeLifecycleTest {
+    @Test
+    fun `cleanup can finish on a worker while replacement still starts on the owner thread`() = runTest {
+        val owner = Thread.currentThread()
+        val node = Job()
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val replacement = CompletableDeferred<Thread>()
+        val starts = mutableListOf<Thread>()
+        CoroutineScope(Dispatchers.Default + node).launch {
+            try {
+                started.countDown()
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) { release.await() }
+            }
+        }
+        val changes = mutableListOf<Thread>()
+        val lifecycle = NodeLifecycle({ changes += Thread.currentThread() }) { this }
+        try {
+            assertTrue(started.await(10, TimeUnit.SECONDS))
+            lifecycle.stop("node", node)
+            lifecycle.start("node") {
+                starts += Thread.currentThread()
+                replacement.complete(Thread.currentThread())
+            }
+            val requested = changes.size
+            runCurrent()
+            assertTrue(lifecycle.isStopping("node"))
+            assertTrue(starts.isEmpty())
+            release.countDown()
+            val replacementThread = withContext(Dispatchers.Default) {
+                withTimeout(10_000) { replacement.await() }
+            }
+            assertEquals(owner, replacementThread)
+            assertEquals(listOf(owner), starts)
+            assertTrue(lifecycle.stoppingPaths().isEmpty())
+            assertTrue(lifecycle.pendingPaths().isEmpty())
+            runCurrent()
+            assertEquals(requested + 2, changes.size, "Both the stop and the queued start announce their completion")
+            assertTrue(changes.all { it === owner }, "Announcements stay on the owner thread")
+        } finally {
+            release.countDown()
+            node.cancel()
+        }
+    }
+
     @Test
     fun `replacement waits for cleanup and onStop completion`() = runTest {
         val events = mutableListOf<String>()

@@ -5,14 +5,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.item.ItemStack
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemRequest
-import ru.hollowhorizon.hollowengine.common.slots.SimpleSlotSource
-import ru.hollowhorizon.hollowengine.common.slots.clearAll
-import ru.hollowhorizon.hollowengine.common.slots.contains
-import ru.hollowhorizon.hollowengine.common.slots.containsAll
-import ru.hollowhorizon.hollowengine.common.slots.count
-import ru.hollowhorizon.hollowengine.common.slots.extract
-import ru.hollowhorizon.hollowengine.common.slots.insert
-import ru.hollowhorizon.hollowengine.common.slots.insertAll
+import ru.hollowhorizon.hollowengine.common.slots.*
 
 /**
  * An NPC's carried items.

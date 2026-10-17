@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.docking
 
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class DockingStateTest {
     @Test

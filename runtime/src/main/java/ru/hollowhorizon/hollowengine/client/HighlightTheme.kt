@@ -13,7 +13,6 @@ object HighlightTheme {
     val VALUE_ARGUMENT_NAME = Color("57AAF7")
     val NAME_REFERENCE = Color("BCBEC4")
     val NUMERIC_LITERAL = Color("2AACB8")
-    val ERROR_ELEMENT = Color("F75464")
     val PARAMETER = Color("A9B7C6")
     val TOP_LEVEL = Color("F2F4F2")
 

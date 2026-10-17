@@ -20,7 +20,7 @@ data class GltfMaterial(
     val occlusionTexture: GltfTexture.Info? = null,
     val emissiveTexture: GltfTexture.Info? = null,
     val emissiveFactor: List<Float>? = null,
-    val alphaMode: String = ALPHA_MODE_OPAQUE,
+    val alphaMode: String = "OPAQUE",
     val alphaCutoff: Float = 0.5f,
     val doubleSided: Boolean = false,
 ) {
@@ -78,10 +78,4 @@ data class GltfMaterial(
         val roughnessFactor: Float = 1f,
         val metallicRoughnessTexture: GltfTexture.Info? = null,
     )
-
-    companion object {
-        const val ALPHA_MODE_BLEND = "BLEND"
-        const val ALPHA_MODE_MASK = "MASK"
-        const val ALPHA_MODE_OPAQUE = "OPAQUE"
-    }
 }

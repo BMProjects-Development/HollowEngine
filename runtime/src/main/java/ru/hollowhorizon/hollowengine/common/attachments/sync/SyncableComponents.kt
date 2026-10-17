@@ -3,10 +3,10 @@ package ru.hollowhorizon.hollowengine.common.attachments.sync
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import net.minecraft.server.level.ServerPlayer
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
-import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 
 @SubscribeEvent
 fun onClone(event: PlayerEvent.Clone) {

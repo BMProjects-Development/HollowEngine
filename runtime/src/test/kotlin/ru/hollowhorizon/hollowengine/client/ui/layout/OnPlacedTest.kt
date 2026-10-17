@@ -2,9 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.layout
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class OnPlacedTest {
     @Test

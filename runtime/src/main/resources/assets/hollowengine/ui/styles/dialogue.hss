@@ -1,22 +1,10 @@
-/*
- * The dialogue window. Everything the player sees is decided here: the composable side only says
- * which pieces exist, so re-skinning the dialogue means editing this file and nothing else.
- *
- * A `.ui.kts` script that declares `screen("hollowengine:dialogue")` replaces the whole screen; a
- * resource pack that overrides this file re-skins the built-in one.
- *
- * The closing animations are what `DialogueScreenUi.EXIT_DURATION_MILLIS` reserves time for — the
- * screen is taken away when that runs out, so lengthening one of them means raising it too.
- */
-
-/* ------------------------------------------------------------------ the screen */
+/* Example dialogue window */
 
 #dialogue-root {
     size: fill fill;
     align-items: center center;
 }
 
-/* A dim plus a light blur: enough to push the world back without hiding it. */
 #dialogue-dim {
     size: fill fill;
     align: center center;
@@ -40,12 +28,6 @@
     to   { opacity: 0; }
 }
 
-/* ------------------------------------------------------------------ the text window */
-
-/*
- * One animation, overshooting easing and all: the engine clamps `opacity` while it interpolates, so
- * a springy curve can carry the transform past its target without the alpha following it there.
- */
 #dialogue-box {
     size: fit fit;
     width: 62%;
@@ -78,11 +60,6 @@
     to   { opacity: 0; translate: 0 18 0; rotate: 12 0 0; }
 }
 
-/*
- * The name plate rides on the top edge of the window, the way the old dialogue box had it. It hangs
- * outside the window's box on a negative margin — the layer the window composites through reserves
- * room for that overhang (see `layerOverflows`), so the plate is not cut off while it animates.
- */
 #dialogue-name {
     size: fit fit;
     min-height: 18px;
@@ -126,20 +103,10 @@
     text-wrap: true;
 }
 
-/*
- * The part that has not been typed yet still takes part in the layout, only invisibly. That is what
- * keeps a word from hopping to the next line the moment its last letter arrives.
- */
 .dialogue-text-pending {
     opacity: 0;
 }
 
-/*
- * The mirrored cursor at the right edge, telling the reader the line is over.
- *
- * It is always in the tree and merely invisible: mounting it only when the line finishes would
- * change the box's height and make the window twitch between lines.
- */
 #dialogue-continue {
     size: 11px 12px;
     align: end end;
@@ -159,13 +126,6 @@
     100% { opacity: 0.35; translate: 0 0 0; }
 }
 
-/* ------------------------------------------------------------------ the menu */
-
-/*
- * The scroll area is bounded to the middle of the screen. Its mask fades whatever leaves that band
- * instead of cutting it off, and the scrollbar is gone entirely — the wheel and dragging the list
- * are the way around it.
- */
 #choice-viewport {
     size: fit fit;
     width: 300px;
@@ -178,7 +138,6 @@
     mask: linear-gradient(to bottom, transparent, white 26%, white 74%, transparent);
 }
 
-/* Padded from the code, by half a viewport, so the first and last option can reach dead center. */
 #choice-list {
     size: fill fit;
     align-items: center start;
@@ -203,7 +162,6 @@
     to   { opacity: 1; translate: 0 0 0; }
 }
 
-/* Options come in one after another rather than all at once. */
 .choice-0 { animation-delay: 0ms; }
 .choice-1 { animation-delay: 70ms; }
 .choice-2 { animation-delay: 140ms; }
@@ -231,14 +189,12 @@
     text-wrap: false;
 }
 
-/* Both flanks close in on the button when the option is pointed at, hence the mirrored offsets. */
 .choice-desc {
     size: 32px 24px;
     image-fit: contain;
     transitions: translate 110ms ease-out;
 }
 
-/* Hidden until the option is pointed at, then it slides in from the right. */
 .choice-cursor {
     size: 22px 24px;
     image-fit: contain;
@@ -254,10 +210,6 @@
 .choice:hover .choice-cursor { opacity: 1; translate: -6 0 0; }
 .choice:hover .choice-text { color: #ffffff; }
 
-/*
- * Multiplayer: after this player has voted the options they did not pick lose their color and stop
- * reacting, so it reads as "no longer yours to decide" rather than as a dead button.
- */
 .choice:disabled {
     filter: grayscale(1);
     opacity: 0.55;
@@ -265,7 +217,6 @@
 
 .choice:selected .choice-text { color: #ffffff; }
 
-/* The vote is in: the losers shrink away first, the winner a beat later so it is clear what won. */
 .choice:lost {
     animations: choice-lost 260ms ease-in both;
 }

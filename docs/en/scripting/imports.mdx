@@ -139,7 +139,7 @@ fun sayLine(text: String) {
 }
 ```
 
-In that case, all scripts that import `common/dialogue.kts` will access the same instance and the shared `dialogueHistory`. This is useful for services that share state during gameplay—for example, a dialogue system that is read from `.reload.kts` and modified within `.node.kts`.
+In that case, all scripts that import `common/dialogue.kts` will access the same instance and the shared `dialogueHistory`. This is useful for services that share state during gameplay. For example, a dialogue system that is read from `.reload.kts` or `.mixin.kts` and modified within `.node.kts`.
 
 `SharedScript` is imported by default, meaning a separate `import ...` statement is not required for it. The annotation must be placed at the beginning of the file, before the regular imports.
 

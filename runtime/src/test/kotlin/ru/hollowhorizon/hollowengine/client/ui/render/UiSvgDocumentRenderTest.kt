@@ -1,28 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.DrawShapeCommand
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiCommandRenderer
-import ru.hollowhorizon.hollowengine.client.ui.UiMeasurePolicies
-import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
-import ru.hollowhorizon.hollowengine.client.ui.drawBehind
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
-import ru.hollowhorizon.hollowengine.client.ui.px
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
-import ru.hollowhorizon.hollowengine.client.ui.shape.SvgFileParser
-import ru.hollowhorizon.hollowengine.client.ui.shape.SvgPathShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathCommand
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiShapeSize
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiSvgFilterEffect
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiSvgPathDocument
-import ru.hollowhorizon.hollowengine.client.ui.shape.toAwtPath
-import java.awt.geom.Area
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
+import java.awt.geom.Area
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -96,7 +81,7 @@ class UiSvgDocumentRenderTest {
         val gradient = assertIs<UiPaint.LinearGradient>(document.elements.first().paint)
 
         // The icon's own axis runs down and to the left, so the angle has to as well.
-        assertTrue(gradient.angleDegrees > 90f && gradient.angleDegrees < 180f, "angle ${gradient.angleDegrees}")
+        assertTrue(gradient.angleDegrees > 180f && gradient.angleDegrees < 270f, "angle ${gradient.angleDegrees}")
         assertEquals(0f, gradient.stops.first().offset)
         assertEquals(1f, gradient.stops.last().offset)
         assertTrue(gradient.stops.zipWithNext().all { (a, b) -> a.offset <= b.offset }, "stops out of order")

@@ -2,22 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.graph
 
 import androidx.compose.runtime.Composable
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.alignItems
-import ru.hollowhorizon.hollowengine.client.ui.background
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.onPress
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 
 /** The colors a group can be, by the name a graph file keeps; the first one is the default. */
 object GraphGroupColors {

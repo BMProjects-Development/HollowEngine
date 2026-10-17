@@ -1,4 +1,8 @@
 {
+  "completion.player_position": "позиция игрока",
+  "completion.held_item": "предмет в руке",
+  "fix.import_declaration": "Импортировать %s",
+  "fix.remove_unused_variable": "Удалить неиспользуемую переменную",
   "color_moved": "Цвет сместился, отредактируйте его вручную",
   "fix.remove_import": "Удалить импорт",
   "fix.remove_unused_imports": "Удалить все неиспользуемые импорты (%s)",
@@ -14,7 +18,7 @@
   "status.resource_not_found": "Не удалось найти «%s»",
   "status.unsupported_action": "Это действие не поддерживается",
   "status.unsupported_definition": "Не удалось открыть определение в %s",
-  "completion.navigate": "— выбор,",
+  "completion.navigate": "для выбора,",
   "completion.or": "или",
-  "completion.insert": "— вставка"
+  "completion.insert": "для навигации"
 }

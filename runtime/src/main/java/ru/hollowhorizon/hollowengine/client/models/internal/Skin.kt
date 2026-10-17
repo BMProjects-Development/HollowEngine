@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 
 class Skin(
     val jointsIds: List<Int>,

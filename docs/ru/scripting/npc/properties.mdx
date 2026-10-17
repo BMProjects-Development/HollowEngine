@@ -1,6 +1,6 @@
 ---
 title: Свойства сущностей
-order: 9
+order: 10
 ---
 
 <center><h1>Свойства NPC и сущностей</h1></center>
@@ -37,7 +37,6 @@ val alive = npc.isAlive
 
 | Свойство | Тип | Чтение | Запись |
 |----------|-----|--------|--------|
-| `npc.hitboxMode` | `HitboxMode` | Текущий режим хитбокса. | Назначает `HitboxComponent` и синхронизирует снапшот. |
 | `npc.pickupDistance` | зависит от `pickupReach` | Радиус подбора предметов. | Только чтение. |
 | `npc.fakePlayer` | `ServerPlayer` | Fake player, используемый для действий вроде ломания блока. | Только чтение. |
 | `npc.goals` | `GoalSelector` | Goal selector NPC. | Менять через API goal selector. |
@@ -46,10 +45,8 @@ val alive = npc.isAlive
 | `npc.actions` | `NpcActionController` | Прямой доступ к каналам действий NPC, см. [Действия и параллельность](/docs/hollowengine/scripting/npc/actions). | Только чтение ссылки, менять через её функции. |
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 
 npc.setNameplate("Merchant", NameplateMode.SHOW)
-npc.hitboxMode = HitboxMode.EMPTY
 ```
 
 ---
@@ -94,10 +91,9 @@ val target = npc.target
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 
 npc.set(Model("my_mod:models/entity/guide.gltf"))
-npc.set(HitboxComponent(HitboxMode.BLOCKING))
+npc.set(BodyComponent(mode = BodyMode.BLOCKING))
 npc.set(StandardPlayerAnimatorPreset.create())
 ```
 

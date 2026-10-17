@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.dialogue.StoryCameraSystem
@@ -8,6 +7,7 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderItemInHandEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderOverlayEvent
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 @ClientOnly
 object CutsceneCameraSystem {
@@ -32,9 +32,6 @@ object CutsceneCameraSystem {
      */
     val currentPose: CameraPose?
         get() = heldPose ?: controller?.currentPose ?: StoryCameraSystem.currentPose
-
-    /** Whether anything is holding the camera: a held pose, a cutscene or a story. */
-    val isOverriding: Boolean get() = currentPose != null
 
     fun play(data: CutsceneData, loop: Boolean = false, anchor: CutsceneAnchor = CutsceneAnchor.WHERE_RECORDED) {
         val playback = CutscenePlaybackController().also {

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.source
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.HollowEngineBuild
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonClassLoader
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry.parse
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList

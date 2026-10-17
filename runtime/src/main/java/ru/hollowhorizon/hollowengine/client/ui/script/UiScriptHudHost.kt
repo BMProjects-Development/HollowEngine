@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost.dropFinishedExits
 import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
 import ru.hollowhorizon.hollowengine.common.ui.UiData
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry

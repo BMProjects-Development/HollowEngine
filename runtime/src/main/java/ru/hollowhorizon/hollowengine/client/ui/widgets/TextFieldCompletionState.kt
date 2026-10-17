@@ -39,16 +39,45 @@ class TextFieldCompletionState(
     private var lastRevision = Long.MIN_VALUE
     private var lastPrefix: String? = null
     private var selectionPinned = false
+    private var intentionMode = false
+    private var diagnosticFixes: List<UiTextCompletion> = emptyList()
+
+    /**
+     * Opens Alt+Enter menu. The [fixes] of diagnostics under the caret, then actions, that
+     * [contributor] answers for an intentions request, both in their given order.
+     */
+    fun openIntentions(fixes: List<UiTextQuickFix>): Boolean {
+        if (state.readOnly) return false
+        close()
+        intentionMode = true
+        diagnosticFixes = fixes.map { it.toCompletion() }
+        anchor = state.caret
+        lastText = state.text
+        refreshIntentions()
+        return true
+    }
+
+    private fun refreshIntentions() {
+        val requested = contributor?.complete(UiCompletionContext(state.text, state.caret, intentions = true)).orEmpty()
+        val found = (diagnosticFixes + requested).distinctBy { it.label to it.edits }
+        if (found == items) return
+        val selected = items.getOrNull(selectedIndex)
+        items = found
+        opened = found.isNotEmpty()
+        selectedIndex = selected?.let { previous -> found.indexOfFirst { it.sameCandidate(previous) } }
+            ?.takeIf { it >= 0 } ?: 0
+    }
 
     /** Opens (or re-queries) the popup at the current caret. */
     fun open(): Boolean {
         if (state.readOnly) return false
         val contributor = contributor ?: return false
+        if (intentionMode) close()
         val text = state.text
         val caret = state.caret
         lastText = text
         val replacement = completionWordRange(text, caret)
-        val prefix = text.substring(replacement.first.coerceAtMost(text.length), replacement.last.coerceAtMost(text.length))
+        val prefix = text.substring(replacement.first, caret.coerceIn(0, text.length))
         val found = rankAgainst(contributor.complete(UiCompletionContext(text, caret)), prefix)
         val line = completionLineRange(text, caret)
         val keepSelection = opened && prefix == lastPrefix
@@ -98,6 +127,8 @@ class TextFieldCompletionState(
         selectedIndex = 0
         lastPrefix = null
         selectionPinned = false
+        intentionMode = false
+        diagnosticFixes = emptyList()
         return hadState
     }
 
@@ -122,6 +153,11 @@ class TextFieldCompletionState(
     fun accept(index: Int = selectedIndex): Boolean {
         if (state.readOnly) return false
         val item = items.getOrNull(index) ?: return false
+        if (item.edits.isNotEmpty()) {
+            val changed = state.applyTextEdits(item.edits)
+            close()
+            return changed
+        }
         val insertText = item.insertText.ifEmpty { item.label }
 
         val text = state.text
@@ -148,6 +184,7 @@ class TextFieldCompletionState(
      * open/pending popup re-queries the contributor at the new caret.
      */
     fun onCharTyped(char: Char) {
+        if (intentionMode) close()
         val contributorTrigger = contributor?.triggerCharacters?.contains(char) == true
         if (char.isCompletionTrigger() || contributorTrigger || opened || autoOpenPending) open()
         else lastText = state.text
@@ -158,6 +195,13 @@ class TextFieldCompletionState(
      * line, retries a pending auto-open, and re-queries when the analysis [revision] advances.
      */
     fun onFrame(revision: Long = 0L) {
+        if (intentionMode) {
+            if (state.text != lastText || state.caret != anchor) close()
+            else if (revision != lastRevision) refreshIntentions()
+            lastText = state.text
+            lastRevision = revision
+            return
+        }
         if (!opened && !autoOpenPending) {
             lastText = state.text
             lastRevision = revision

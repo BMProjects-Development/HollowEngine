@@ -1,61 +1,16 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.alignItems
-import ru.hollowhorizon.hollowengine.client.ui.gap
-import ru.hollowhorizon.hollowengine.client.ui.graph.ARROW_SIZE
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphCanvas
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphCurves
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphEdge
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphLinkPreview
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphMiniMapItem
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNode
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPreferences
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
-import ru.hollowhorizon.hollowengine.client.ui.graph.GraphViewState
-import ru.hollowhorizon.hollowengine.client.ui.graph.graphViewItems
-import ru.hollowhorizon.hollowengine.client.ui.grow
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
-import ru.hollowhorizon.hollowengine.client.ui.input
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.onClick
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.position
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.common.models.ANY_STATE
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerTransitionSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
-import ru.hollowhorizon.hollowengine.common.models.Animator
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
-import ru.hollowhorizon.hollowengine.common.models.ClipStateSpec
-import ru.hollowhorizon.hollowengine.common.models.GraphPoint
-import ru.hollowhorizon.hollowengine.common.models.nodeAt
-import ru.hollowhorizon.hollowengine.common.models.nodeLayout
-import ru.hollowhorizon.hollowengine.common.models.withAnyStateAt
-import ru.hollowhorizon.hollowengine.common.models.withEntryState
-import ru.hollowhorizon.hollowengine.common.models.withNodeAt
-import ru.hollowhorizon.hollowengine.common.models.withState
-import ru.hollowhorizon.hollowengine.common.models.withStateAsAnyState
-import ru.hollowhorizon.hollowengine.common.models.withTransition
-import ru.hollowhorizon.hollowengine.common.models.withoutAnyState
-import ru.hollowhorizon.hollowengine.common.models.withoutState
-import ru.hollowhorizon.hollowengine.common.models.withoutTransitionAt
+import ru.hollowhorizon.hollowengine.common.models.*
 
 internal const val AnimatorCanvasId = "animator-canvas"
 private const val NodeHeight = 46f
@@ -66,8 +21,6 @@ private const val PlayIcon = "hollowengine:textures/gui/icons/play.svg"
 private const val StateIcon = "hollowengine:textures/gui/icons/state.svg"
 private const val AnyStateIcon = "hollowengine:textures/gui/icons/any_state.svg"
 private const val ResetIcon = "hollowengine:textures/gui/icons/reload.svg"
-internal const val MaximizeIcon = "hollowengine:textures/gui/icons/maximize.svg"
-internal const val MinimizeIcon = "hollowengine:textures/gui/icons/minimize.svg"
 
 /** Where a right click landed: on a state, on a transition, or on the empty canvas. */
 private sealed interface CanvasMenuTarget {
@@ -149,13 +102,13 @@ internal fun AnimatorGraphCanvas(
             menu = CanvasMenu(target, pointer.screenX, pointer.screenY, GraphPoint(pointer.graphX, pointer.graphY))
         },
         onKey = { input ->
-            handleKey(document, layerId, controller, selection, onSelect, input.key, input.control) {
+            handleKey(document, layerId, controller, selection, onSelect, input.key, input.modifiers) {
                 GraphPoint(view.toGraphX(canvas.width / 2f), view.toGraphY(canvas.height / 2f))
             }
         },
         overlay = {
             Row(modifier = Modifier.position(6.px, 6.px).gap(4.px)) {
-                AnimatorIconButton(ResetIcon, animatorText("reset_view"), size = 11f) { view.reset() }
+                IconButton(ResetIcon, animatorText("reset_view"), iconSize = 11f) { view.reset() }
             }
         },
     ) {
@@ -204,7 +157,7 @@ internal fun AnimatorGraphCanvas(
                     if (link != null) {
                         link = link?.copy(canvasX = gesture.canvasX, canvasY = gesture.canvasY)
                     } else {
-                        document.edit {
+                        document.edit(mergeKey = "move:$layerId/$stateId") {
                             it.withNodeAt(
                                 layerId,
                                 stateId,
@@ -225,7 +178,11 @@ internal fun AnimatorGraphCanvas(
                 StateNodeContent(
                     stateId = stateId,
                     subtitle = state.subtitle(),
-                    playMode = (state as? ClipStateSpec)?.playMode,
+                    playMode = when (state) {
+                        is ClipStateSpec -> state.playMode
+                        is BlendStateSpec -> state.playMode
+                        else -> null
+                    },
                     isEntry = controller.entryState == stateId,
                 )
             }
@@ -287,11 +244,11 @@ private fun handleKey(
     selection: AnimatorSelection,
     onSelect: (AnimatorSelection) -> Unit,
     key: Int,
-    control: Boolean,
+    modifiers: Int,
     middle: () -> GraphPoint,
 ): Boolean {
     when {
-        key == GLFW.GLFW_KEY_DELETE -> {
+        HollowKeys.DELETE.matches(key, modifiers) -> {
             when (selection) {
                 is AnimatorSelection.State -> document.edit {
                     if (selection.stateId == ANY_STATE) it.withoutAnyState(layerId) else it.withoutState(layerId, selection.stateId)
@@ -305,12 +262,12 @@ private fun handleKey(
 
         key == GLFW.GLFW_KEY_ESCAPE -> onSelect(AnimatorSelection.None)
 
-        key == GLFW.GLFW_KEY_E -> {
+        HollowKeys.ENTRY_STATE.matches(key, modifiers) -> {
             val target = selection as? AnimatorSelection.State ?: return false
             document.edit { it.withEntryState(layerId, target.stateId) }
         }
 
-        key == GLFW.GLFW_KEY_INSERT || control && key == GLFW.GLFW_KEY_N -> {
+        HollowKeys.ADD_NODE.matches(key, modifiers) -> {
             val id = freeStateId(controller)
             document.edit { it.withState(layerId, ClipStateSpec(id = id, animation = id), at = middle()) }
             onSelect(AnimatorSelection.State(layerId, id))
@@ -419,6 +376,7 @@ private fun AnimationControllerLayerSpec.state(stateId: String): AnimationContro
 private fun AnimationControllerStateSpec?.subtitle(): String? = when (this) {
     null -> null
     is ClipStateSpec -> animation
+    is BlendStateSpec -> motions.joinToString(", ") { it.animation }.ifEmpty { kindName() }
     else -> kindName()
 }
 

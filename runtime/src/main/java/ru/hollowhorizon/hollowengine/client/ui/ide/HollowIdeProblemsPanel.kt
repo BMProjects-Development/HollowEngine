@@ -5,6 +5,7 @@ import androidx.compose.runtime.key
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnosticSeverity
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
@@ -134,26 +135,12 @@ private fun ProblemsEmpty(message: String) {
 }
 
 @Composable
-private fun CopyButton(id: String, tooltip: String, text: () -> String) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOf("problem-copy"),
-        modifier = Modifier.input(clickable = true, hoverable = true)
-            .cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                Minecraft.getInstance().keyboardHandler.clipboard = text()
-                event.consume()
-            }
-            .tooltipOnHover(tooltip),
-    ) {
-        Image(
-            Assets.Hollowengine.Textures.Gui.Icons.COPY.toString(),
-            tags = listOf("problem-copy-icon"),
-            modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER),
-        )
-    }
-}
+private fun CopyButton(id: String, tooltip: String, text: () -> String) = IconButton(
+    Assets.Hollowengine.Textures.Gui.Icons.COPY.toString(),
+    tooltip,
+    id = id,
+    tags = listOf("problem-copy"),
+) { Minecraft.getInstance().keyboardHandler.clipboard = text() }
 
 private val UiTextDiagnosticSeverity.icon: String
     get() = when (this) {

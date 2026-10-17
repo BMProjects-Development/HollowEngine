@@ -1,8 +1,8 @@
 {
   "title": "Particles",
   "description": "Minecraft sprites with independent UI physics. No loaded world is needed.",
-  "smoke": "Smoke · particleBackground",
-  "flame": "Flame · drawBehind",
+  "smoke": "Smoke | particleBackground",
+  "flame": "Flame | drawBehind",
   "pause": "Pause particles",
   "resume": "Resume particles"
 }

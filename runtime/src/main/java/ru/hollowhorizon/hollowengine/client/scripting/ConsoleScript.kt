@@ -1,17 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.scripting
 
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.client.server.IntegratedServer
 import org.apache.logging.log4j.LogManager
+import ru.hollowhorizon.hollowengine.client.scripting.ConsoleScripts.run
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide

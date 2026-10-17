@@ -28,10 +28,12 @@ class ModelAnimator {
         this.animations = animations
         model?.layers?.let(AnimatorExpressionEvaluator::prepare)
         animations?.clips?.let(AnimatorExpressionEvaluator::prepare)
+        animations?.montages?.let(AnimatorExpressionEvaluator::prepare)
 
         val specs = LinkedHashMap<String, AnimatorLayerSpec>()
         model?.layers?.forEach { specs[it.id] = it }
         animations?.clips?.forEach { specs[it.id] = it }
+        animations?.montages?.forEach { specs[it.id] = it }
         val rebuilt = LinkedHashMap<String, SpecLayer>(specs.size)
         specs.values.forEach { spec ->
             val existing = specLayers[spec.id]?.takeIf { it.reconfigure(spec) }
@@ -63,6 +65,7 @@ class ModelAnimator {
 
     fun applyTo(target: PoseTarget, context: AnimatorEvaluationContext) {
         context.deltaTime = deltaSeconds(context.time)
+        context.montages.clear()
         if (isEmpty) return
 
         val layers = (specLayers.values + clientLayers.values).sortedBy { it.priority }

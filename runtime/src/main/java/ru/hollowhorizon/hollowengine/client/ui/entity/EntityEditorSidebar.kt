@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptEditorInfo
 import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptEditorJson
 import ru.hollowhorizon.hollowengine.common.attachments.editor.toDescriptor
@@ -163,7 +164,8 @@ private fun ComponentCard(session: EntityEditorSession, entry: ComponentEntry, q
             Image(icon, tags = listOf("ee-card-icon"))
             Text(name, tags = listOf("ee-card-title"), modifier = Modifier.grow(1f))
             if (entry.virtual) {
-                Text(EntityEditorLang.virtual, tags = listOf("ee-badge"))
+                Text(EntityEditorLang.virtual, id = "ee-badge-${entry.id}", tags = listOf("ee-badge"),
+                    modifier = Modifier.input(hoverable = true).tooltipOnHover(EntityEditorLang.virtualHint))
             } else {
                 InspectorIconButton(
                     EntityEditorIcons.REMOVE,
@@ -179,7 +181,6 @@ private fun ComponentCard(session: EntityEditorSession, entry: ComponentEntry, q
         if (!open) return@Column
 
         ComponentLabels.componentDescription(descriptor)?.let { Text(it, tags = listOf("insp-hint")) }
-        if (entry.virtual) Text(EntityEditorLang.virtualHint, tags = listOf("insp-hint"))
 
         val extras = ComponentEditors.of(entry.id)
         val scope = remember(entry.id, document) { ComponentEditorScope(entry, document, apply) }

@@ -1,66 +1,103 @@
 ---
 title: Sounds
-order: 11
+order: 12
 ---
 
-<center><h1>Sounds</h1></center>
+# Sounds
 
-*Play sounds to the world and individual players.*
+Files and `sounds.json` events use the same playback API. Core supports streaming OGG Vorbis and RIFF WAV (PCM 8/16/24/32 and IEEE float 32/64, mono or stereo, including extensible WAV). Other codecs and audio tracks in video containers are provided by the [Media addon](/docs/hollowengine/addons/media).
 
 ![Sound editor](/hollowengine/pictures/sounds/editor.webp)
 
----
+## Sources
 
-## `playSound(sound, position, volume, pitch)` – sound in the world
+- `minecraft:entity.villager.yes`: an event, resolved through `sounds.json`. Dots in event ids are preserved.
+- `demo:dialogue/hello.ogg` or `demo:sounds/dialogue/hello.ogg`: one file in `assets/demo/sounds/dialogue/hello.ogg`.
+- `resource:demo:music.custom`: a sound resource with an explicitly chosen file extension.
+- `event:demo:voice.mp3`: an explicit event, even when its id resembles a filename.
+- `file:voices/hello.wav`: a local file relative to `hollowengine`; absolute paths are also accepted.
+- `https://example.org/music.mp3`: a URL. Extensionless media URLs require Media's container probing.
 
-Plays the sound at the specified world position for all nearby players. Parameters: `sound` (required), `position` (required), `volume` (default `1.0`), `pitch` (default `1.0`).
+For explicit typing use `SoundSource.Event(id)` or `MediaSource.Resource(id)`, `MediaSource.File(path)`, `MediaSource.Url(uri)`. A typed resource id includes its full path inside the namespace, e.g. `demo:sounds/dialogue/hello.ogg`. Physical media sources are also accepted by `VideoApi`.
 
-```kotlin
-playSound(
-    sound = "minecraft:entity.creeper.primed",
-    position = pos(10.0, 64.0, 10.0),
-    volume = 1.0,
-    pitch = 1.0
-)
+All engine sound assets live under `sounds/`. Move files from old `assets/<namespace>/audio/` directories to `sounds/`; old `namespace:audio/...` script names normalize to the new path. The old standalone OpenAL players and decoded wave cache have been removed.
 
-// With default settings
-playSound("minecraft:entity.creeper.primed", pos(10.0, 64.0, 10.0))
-```
-
----
-
-## `playSound(player, sound, volume, pitch)` – Sound to the player
-
-Overload for playing sound to a specific player:
+## Simple playback
 
 ```kotlin
-playSound(player = player, sound = "minecraft:entity.experience_orb.pickup", volume = 1.0, pitch = 1.0)
+player.playSound("minecraft:entity.villager.yes")
+player.playSound("demo:dialogue/hello.ogg")
 ```
 
----
-
-## `player.playSound(sound, volume, pitch)` – alternate call
-
-Method on `Player` (see [Player](/docs/hollowengine/scripting/player)):
+A bare call is listener-relative. `Player.playSound` targets one player; `Level.playSound` targets every player in that level. Both return a string playback id. Dialogue `@play-sound` uses this same API.
 
 ```kotlin
-player.playSound("minecraft:entity.experience_orb.pickup", 1.0, 1.0)
+val voice = player.playSound("demo:dialogue/hello.wav") {
+    volume = 0.8f
+    pitch = 1.1f
+    fadeIn = 0.1f
+    fadeOut = 0.3f
+}
+player.stopSound(voice) // uses the configured fadeOut
 ```
 
----
-
-## Example: Zone with sound
+## Loops, fades and control
 
 ```kotlin
-val pos = pos(100.0, 64.0, 100.0)
-say("Go to the marked area!")
+import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+import net.minecraft.sounds.SoundSource as SoundCategory
 
-val who = player.waitZone(position = pos, radius = 3.0, leave = false)
-playSound(
-    sound = "minecraft:block.note_block.chime",
-    position = pos,
-    volume = 1.0,
-    pitch = 1.0
-)
-say("You entered the zone!")
+val engine = level.playSound("demo:machines/engine.wav") {
+    repeat = SoundRepeat.Forever
+    fadeIn = 1f
+    fadeOut = 2f
+    category = SoundCategory.BLOCKS
+    range = 32f
+    follow(machineEntity)
+}
+
+player.updateSound(engine, volume = 0.4f, pitch = 0.9f)
+level.stopSound(engine, fadeOut = 0.5f)
 ```
+
+`SoundRepeat.Once` is the default. `SoundRepeat.Count(3)` or `cycles(3)` means three total plays, including the first. `SoundRepeat.Forever` runs until stopped or its owner is removed. Empty streams terminate even in infinite mode. Each cycle reopens the decoder rather than storing a whole decoded file. An event chooses its weighted file once for that playback, and repeats that selected file.
+
+Fade durations are in seconds. Fade-in and natural fade-out are applied to PCM samples. By default they wrap the whole playback: the first and last cycle. Set `fadeEachCycle = true` to apply both on every cycle. Infinite playback uses `fadeOut` when stopped. Natural fade-out keeps a lookahead proportional to its configured duration; it does not require the entire decoded file. Explicit stop fades follow game time and honor pauses.
+
+Same-id playback with the same source and envelope retunes gain, pitch and emitter in place. Changing the source or envelope starts a new playback. `playLoop(id, location) { ... }` and `stopLoop(id)` remain compatibility helpers over this same owner. `stopSound(id, 0f)` stops immediately. Minecraft's master/category volume, pause, resource reload and sound shutdown apply to these voices.
+
+## Moving emitters
+
+Use `at(Vec3(...))` for a fixed world position, `follow(entity, offset)` for an entity, or a rig/effect binding:
+
+```kotlin
+player.playSound("demo:machines/engine.ogg") {
+    repeat = SoundRepeat.Forever
+    attach(machineEntity, "engine_sound")
+}
+
+player.playSound("demo:effects/electric.wav") {
+    followEffect(effectHandle)
+}
+```
+
+Add a Sound attachment to a bone in the rig editor. Its id is unique across that rig. `autoPlay` starts it when the world model is first prepared; previews do not play world audio. Otherwise scripts may address it with `attach(entity, attachmentId)`. Positions follow the animated bone every frame, including models outside the camera frustum. Rebuilding/removing a rig releases its sound bindings. To offset a sound, create a custom bone and attach the sound to it; sound attachments have no separate offset, rotation, or scale.
+
+Nested attachments use paths such as `hand/tool/engine_sound`. If an entity has several model nodes containing the same attachment path, pass `modelNodeId = nodeUuid.toString()` to `attach`; ambiguous names are rejected. A pending rig/effect binding waits up to `timeoutSeconds` (default 5 game seconds; 0 means no timeout). Missing or removed owners stop the sound. Temporary unavailability retains the last valid position. Changing between listener and world space creates a new native voice from the beginning; moving within world space keeps the existing voice.
+
+Client systems use `ClientSounds.play(source, settings, emitter)` and a `SoundEmitter` returning `SoundEmitterState`. `SoundAttachments.register(id)` provides a push binding that must be closed with its owner; `SoundEmitterSpec.Attachment(id)` addresses it from scripts/packets. Playback control belongs on the client thread. `ManagedSound` exposes stop/fade, gain, pitch, emitter changes and decoding failures. Packet-backed script calls control sounds by their returned id.
+
+## `sounds.json`
+
+Vanilla extensionless OGG names remain unchanged. Other formats retain their extension:
+
+```json
+{
+  "greeting": {
+    "subtitle": "demo.greeting",
+    "sounds": [{ "name": "demo:dialogue/hello.wav", "stream": true }]
+  }
+}
+```
+
+Then play `demo:greeting`, or play `demo:dialogue/hello.wav` directly. The sounds editor suggests OGG without its extension and retains WAV/Media extensions. Event weights, subtitles, file gain/pitch, and attenuation distance remain available. A playback's `range` overrides the event's attenuation distance when supplied.

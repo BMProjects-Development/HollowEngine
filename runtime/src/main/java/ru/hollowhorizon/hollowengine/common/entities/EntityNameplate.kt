@@ -5,7 +5,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
 import ru.hollowhorizon.hollowengine.common.attachments.components.nameplateComponent
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.snapshotOf
 import ru.hollowhorizon.hollowengine.common.utils.literal
 
 fun Entity.setNameplate(text: String, mode: NameplateMode = NameplateMode.SHOW) {

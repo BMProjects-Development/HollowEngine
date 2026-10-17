@@ -10,7 +10,10 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPo
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 import kotlin.test.Test
@@ -25,10 +28,15 @@ class RagdollFromRigTests {
 
     private fun offset(x: Float = 0f, y: Float = 0f) = TrsTransformF().apply { translate(Vec3f(x, y, 0f)) }
 
-    private fun RuntimeNode.rig(shape: RigidBodyShape, parent: String? = null) {
-        attachments += RigidBodyAttachment(RigidBodyAttachmentSpec(shape = shape), this)
-        parent?.let { attachments += JointAttachment(JointAttachmentSpec(parent = it), this) }
-    }
+    /** A box collider of [size] around [center] on a bone, the body made of it, and a joint to [parent]. */
+    private fun body(collider: String, size: Vec3f, center: Vec3f = Vec3f.ZERO, parent: String? = null, joint: JointAttachmentSpec? = null) =
+        RigBone(
+            attachments = listOfNotNull(
+                ColliderAttachmentSpec(id = collider, offset = center, size = size),
+                RigidBodyAttachmentSpec(),
+                joint ?: parent?.let { JointAttachmentSpec(parent = it) },
+            ),
+        )
 
     private fun playerLikeModel(): PoseTarget {
         val eyes = (0 until 4).map { index ->
@@ -46,17 +54,13 @@ class RagdollFromRigTests {
         eyes.forEach { it.parent = head }
         head.parent = body
 
-        val target = PoseTarget(listOf(RuntimeNode(body, parent = null)).byIndex(), emptyMap())
-        requireNotNull(target.node("body")).rig(RigidBodyShape.Box(RigVector(0.25f, 0.375f, 0.125f)))
-        requireNotNull(target.node("head")).rig(
-            RigidBodyShape.Box(
-                RigVector(0.26f, 0.26f, 0.26f), RigVector(y = 0.25f)
-            ), "body"
+        val rig = ModelRig(
+            bones = mapOf(
+                "body" to body("body", Vec3f(0.5f, 0.75f, 0.25f)),
+                "head" to body("head", Vec3f(0.52f, 0.52f, 0.52f), center = Vec3f(0f, 0.25f, 0f), parent = "body"),
+            ) + eyes.associate { eye -> eye.name!! to body(eye.name!!, Vec3f(0.06f, 0.04f, 0.02f), parent = "head") },
         )
-        eyes.forEach { eye ->
-            requireNotNull(target.node(eye.name!!)).rig(RigidBodyShape.Box(RigVector(0.03f, 0.02f, 0.01f)), "head")
-        }
-        return target
+        return PoseTarget(listOf(RuntimeNode(body, parent = null)).byIndex(), emptyMap(), rig = rig)
     }
 
     @Test
@@ -115,21 +119,14 @@ class RagdollFromRigTests {
             NodeDefinition(index = 1, name = "thigh", children = mutableListOf(shin), transform = offset(y = 1f))
         shin.parent = thigh
 
-        val target = PoseTarget(listOf(RuntimeNode(thigh, parent = null)).byIndex(), emptyMap())
-        requireNotNull(target.node("thigh")).rig(RigidBodyShape.Capsule(radius = 0.06f, length = 0.4f))
-        requireNotNull(target.node("shin")).let { node ->
-            node.attachments += RigidBodyAttachment(
-                RigidBodyAttachmentSpec(shape = RigidBodyShape.Capsule(radius = 0.06f, length = 0.4f)),
-                node,
-            )
-            node.attachments += JointAttachment(
-                JointAttachmentSpec(
-                    parent = "thigh",
-                    limits = JointLimits.hinge(min = -120f, max = 0f),
-                ),
-                node,
-            )
-        }
+        val leg = Vec3f(0.12f, 0.4f, 0.12f)
+        val rig = ModelRig(
+            bones = mapOf(
+                "thigh" to body("thigh", leg),
+                "shin" to body("shin", leg, joint = JointAttachmentSpec(parent = "thigh", limits = JointLimits.hinge(min = -120f, max = 0f))),
+            ),
+        )
+        val target = PoseTarget(listOf(RuntimeNode(thigh, parent = null)).byIndex(), emptyMap(), rig = rig)
 
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
         val system = PhysicsWorld.createSystem()

@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui
 
 import net.minecraft.client.Minecraft
-import org.joml.Matrix4f
 import net.minecraft.world.entity.Entity
+import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.ui.UiLength.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import kotlin.math.*
@@ -299,7 +299,7 @@ sealed interface UiLength {
 }
 
 /** Content-sized axes ([UiLength.Auto] and [UiLength.Fit]) whose size is driven by their content. */
-val UiLength.isContentSized: Boolean get() = this is UiLength.Auto || this is UiLength.Fit
+val UiLength.isContentSized: Boolean get() = this is Auto || this is Fit
 
 operator fun UiLength.plus(other: UiLength): UiLength = Addition(this, other)
 operator fun UiLength.minus(other: UiLength): UiLength = Substraction(this, other)

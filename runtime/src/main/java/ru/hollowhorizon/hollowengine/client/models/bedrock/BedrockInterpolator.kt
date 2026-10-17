@@ -1,8 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.models.bedrock
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
-import ru.hollowhorizon.hollowengine.common.utils.math.*
-import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.common.utils.math.Easing
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TreeMap
 
 class BedrockInterpolator<T>(

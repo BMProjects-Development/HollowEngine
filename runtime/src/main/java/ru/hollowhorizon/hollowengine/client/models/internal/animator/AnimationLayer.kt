@@ -1,26 +1,19 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator as evaluator
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
-import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.BoneMask
-import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
-import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
-import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.ProceduralLayerSpec
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator as evaluator
 
 class PoseTarget(
     val nodesByIndex: Map<Int, RuntimeNode>,
     val animations: Map<String, AnimationClip>,
-    /**
-     * Bone name by another name it answers to, from the model's rig.
-     */
     val aliases: Map<String, String> = emptyMap(),
+    val rig: ModelRig = ModelRig.EMPTY,
 ) {
     private val masks = HashMap<BoneMask, Set<Int>>()
 

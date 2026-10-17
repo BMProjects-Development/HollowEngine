@@ -7,11 +7,12 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
-import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
+import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.ServerModelAnimationMetadata
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
@@ -135,7 +136,8 @@ object NpcAnimationRuntime {
         AttachmentRegistry.entitySnapshots(level).forEach { (entity, snapshot) ->
             val animations = snapshot.components.filterIsInstance<AnimationsComponent>().firstOrNull() ?: return@forEach
             val updated = animations.copy(
-                clips = animations.clips.filterNot { clip -> clip.removeAtGameTime?.let { it <= now } == true }
+                clips = animations.clips.filterNot { clip -> clip.removeAtGameTime?.let { it <= now } == true },
+                montages = animations.montages.filterNot { montage -> montage.removeAtGameTime?.let { it <= now } == true },
             )
             if (updated == animations) return@forEach
 

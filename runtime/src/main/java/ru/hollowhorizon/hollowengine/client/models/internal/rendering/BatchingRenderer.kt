@@ -3,7 +3,9 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rendering
 import com.mojang.blaze3d.vertex.VertexConsumer
 import org.joml.Matrix3f
 import org.joml.Matrix4f
-import ru.hollowhorizon.hollowengine.client.models.internal.*
+import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
+import ru.hollowhorizon.hollowengine.client.models.internal.batchingRenderType
+import ru.hollowhorizon.hollowengine.client.models.internal.packedLight
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.utils.*
 import ru.hollowhorizon.hollowengine.common.utils.Color

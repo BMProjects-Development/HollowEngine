@@ -5,13 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.px
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
-import ru.hollowhorizon.hollowengine.client.ui.scrollModifier
-import ru.hollowhorizon.hollowengine.client.ui.size
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

@@ -3,15 +3,7 @@ package ru.hollowhorizon.hollowengine.client.vfx
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxBeamRenderer
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxCameraShake
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxDrawList
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMeshNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxModelNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxPlaneNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxPostEffectNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxSkyNode
-import ru.hollowhorizon.hollowengine.client.vfx.render.VfxTrailRenderer
+import ru.hollowhorizon.hollowengine.client.vfx.render.*
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.math.sqrt
@@ -135,6 +127,12 @@ interface VfxNodeBehavior {
 
     /** Adds what the node draws; [placement] maps effect space to the space of the view. */
     fun collect(into: VfxDrawList, placement: Matrix4f) = Unit
+
+    /**
+     * The effect is drawn this frame, held or not: for what a node does once a frame besides drawing, as a sound
+     * keeping time with it. It may come more than once a frame, from several passes.
+     */
+    fun frame() = Unit
 }
 
 /** Makes the behavior of one node. Returning null leaves the node as a plain frame. */
@@ -160,6 +158,8 @@ object VfxNodeRuntimes {
         register("hollowengine:vfx/post_effect") { VfxPostEffectNode(it.spec as VfxPostEffectSpec, it) }
         register("hollowengine:vfx/sky") { VfxSkyNode(it.spec as VfxSkySpec, it) }
         register("hollowengine:vfx/camera_shake") { VfxCameraShake(it.spec as VfxCameraShakeSpec, it) }
+        register("hollowengine:vfx/sound") { VfxSoundNode(it.spec as VfxSoundSpec, it) }
+        register("hollowengine:vfx/decal") { VfxDecalNode(it.spec as VfxDecalSpec, it) }
     }
 
     fun register(typeId: String, factory: VfxNodeFactory): ExtensionHandle = point.register(typeId.rl, factory)

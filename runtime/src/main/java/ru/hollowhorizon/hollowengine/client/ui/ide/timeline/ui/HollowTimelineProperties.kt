@@ -1,23 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelBounds
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelCurve
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueOption
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.CurvePresets
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.HandleMode
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInterpolation
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyTangent
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TangentSide
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSession
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -102,19 +89,19 @@ private fun PreviewSection(controller: TimelineController, refresh: () -> Unit) 
 private fun OriginSection(session: CutsceneEditorSession, refresh: () -> Unit) {
     val origin = session.playback.origin
     Section(CutsceneLang.ORIGIN.lang, id = "timeline-origin-section") {
-        FloatRow(CutsceneLang.ORIGIN_X.lang, origin.x, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_X.lang, origin.x) { next ->
             session.moveOrigin(Vec3f(next, origin.y, origin.z), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_Y.lang, origin.y, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_Y.lang, origin.y) { next ->
             session.moveOrigin(Vec3f(origin.x, next, origin.z), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_Z.lang, origin.z, min = -Float.MAX_VALUE, max = Float.MAX_VALUE) { next ->
+        NumberRow(CutsceneLang.ORIGIN_Z.lang, origin.z) { next ->
             session.moveOrigin(Vec3f(origin.x, origin.y, next), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f) { next ->
+        NumberRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f, step = 1f) { next ->
             session.moveOrigin(origin.position, next, keepWorld = false)
             refresh()
         }
@@ -143,15 +130,15 @@ private fun KeyframeSection(
     val title = if (count == 1) CutsceneLang.KEYFRAME.lang else CutsceneLang.KEYFRAMES.lang(count)
     Section(title) {
         Readonly(CutsceneLang.CHANNEL.lang, channelPath(controller, curve))
-        FloatRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
-            controller.nudgeSelectedKeyframes(snapTimelineTime(time, currentUiKeyModifiers()) - keyframe.time)
+        NumberRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
+            controller.nudgeSelectedKeyframes(snapTimelineTime(time) - keyframe.time)
             refresh()
         }
         if (curve.spec.valueOptions.isEmpty()) {
             val owner = controller.propertyOf(keyframe)
             val channel = owner?.curves?.indexOfFirst { it === curve } ?: -1
             val bounds = (if (channel >= 0) owner?.bounds(channel) else null) ?: ChannelBounds.Unbounded
-            FloatRow(
+            NumberRow(
                 CutsceneLang.VALUE.lang,
                 keyframe.value,
                 min = bounds.minimum ?: -Float.MAX_VALUE,
@@ -270,11 +257,11 @@ private fun TangentRow(
 ) {
     val tangent = keyframe.tangent(side)
     Row(modifier = Modifier.size(100.percent, UiLength.Fit).gap(4.px)) {
-        FloatRow(label, tangent.time) { next ->
+        NumberRow(label, tangent.time) { next ->
             applyTangent(controller, keyframe, side, KeyTangent(next, keyframe.tangent(side).value))
             refresh()
         }
-        FloatRow("", tangent.value) { next ->
+        NumberRow("", tangent.value) { next ->
             applyTangent(controller, keyframe, side, KeyTangent(keyframe.tangent(side).time, next))
             refresh()
         }
@@ -287,7 +274,7 @@ private fun applyTangent(
     side: TangentSide,
     tangent: KeyTangent,
 ) {
-    controller.edit("Edit keyframe handle") {
+    controller.edit(TimelineEdits.EDIT_HANDLES) {
         controller.setTangent(keyframe, side, tangent, keyframe.handleMode, timeScale = 1f, valueScale = 1f)
     }
 }
@@ -295,8 +282,8 @@ private fun applyTangent(
 @Composable
 private fun WorkAreaSection(controller: TimelineController, refresh: () -> Unit) {
     Section(CutsceneLang.WORK_AREA.lang) {
-        FloatRow(CutsceneLang.END.lang, controller.workAreaEnd, min = 0.1f, max = Float.POSITIVE_INFINITY) { time ->
-            controller.workAreaEnd = snapTimelineTime(time, currentUiKeyModifiers()).coerceAtLeast(0.1f)
+        NumberRow(CutsceneLang.END.lang, controller.workAreaEnd, min = 0.1f, max = Float.POSITIVE_INFINITY) { time ->
+            controller.workAreaEnd = snapTimelineTime(time).coerceAtLeast(0.1f)
             if (controller.currentTime > controller.workAreaEnd) controller.applyCurrentTime(0f)
             refresh()
         }

@@ -1,41 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.Box
-import ru.hollowhorizon.hollowengine.client.ui.Checkbox
-import ru.hollowhorizon.hollowengine.client.ui.Column
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiContent
-import ru.hollowhorizon.hollowengine.client.ui.Image
-import ru.hollowhorizon.hollowengine.client.ui.LocalUiViewport
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Popup
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.TextField
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiBoxMode
-import ru.hollowhorizon.hollowengine.client.ui.UiCursorShape
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.UiPopupAlignment
-import ru.hollowhorizon.hollowengine.client.ui.align
-import ru.hollowhorizon.hollowengine.client.ui.alignItems
-import ru.hollowhorizon.hollowengine.client.ui.cursor
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.maxSize
-import ru.hollowhorizon.hollowengine.client.ui.onClick
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.scrollable
-import ru.hollowhorizon.hollowengine.client.ui.size
-import ru.hollowhorizon.hollowengine.client.ui.textWrap
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiButtonKind
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
@@ -48,31 +18,15 @@ private const val ExportIcon = "hollowengine:textures/gui/icons/export.svg"
 /** What can be done with the project as a whole, at the right end of the project tree's tab bar. */
 @Composable
 internal fun HollowIdeProjectActions(packaging: HollowIdeProjectPackaging) {
-    Row(
-        tags = listOf("project-actions"),
-        modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
-    ) {
-        ToolbarButton("project-settings-button", SettingsIcon, "$LANG.settings".lang, packaging::openSettings)
-        ToolbarButton("project-import-button", ImportIcon, "$LANG.import".lang, packaging::startImport)
-        ToolbarButton("project-export-button", ExportIcon, "$LANG.export".lang, packaging::openExport)
-    }
-}
-
-@Composable
-private fun ToolbarButton(id: String, icon: String, tooltip: String, onClick: () -> Unit) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOf("project-action"),
-        modifier = Modifier.input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND)
-            .tooltipOnHover(tooltip)
-            .onClick { event ->
-                onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("project-action-icon"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
+    PanelActions {
+        PanelActionButton(
+            "project-settings-button",
+            SettingsIcon,
+            "$LANG.settings".lang,
+            onClick = packaging::openSettings
+        )
+        PanelActionButton("project-import-button", ImportIcon, "$LANG.import".lang, onClick = packaging::startImport)
+        PanelActionButton("project-export-button", ExportIcon, "$LANG.export".lang, onClick = packaging::openExport)
     }
 }
 
@@ -101,13 +55,23 @@ private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSe
             Field("$LANG.field.description".lang, form.description, "project-settings-description") {
                 form.description = it
             }
-            Field("$LANG.field.authors".lang, form.authors, "project-settings-authors", "$LANG.field.authors.hint".lang) {
+            Field(
+                "$LANG.field.authors".lang,
+                form.authors,
+                "project-settings-authors",
+                "$LANG.field.authors.hint".lang
+            ) {
                 form.authors = it
             }
             Field("$LANG.field.license".lang, form.license, "project-settings-license", "All Rights Reserved") {
                 form.license = it
             }
-            Field("$LANG.field.icon".lang, form.icon, "project-settings-icon", "$LANG.field.icon.hint".lang) { form.icon = it }
+            Field(
+                "$LANG.field.icon".lang,
+                form.icon,
+                "project-settings-icon",
+                "$LANG.field.icon.hint".lang
+            ) { form.icon = it }
             if (form.dependencyChoices.isNotEmpty()) {
                 Text("$LANG.field.dependencies".lang, tags = listOf("project-dialog-label"))
                 CheckboxList("project-settings-dependencies") {
@@ -185,8 +149,7 @@ private fun CheckboxList(id: String, content: HollowUiContent) {
     Column(
         id = id,
         tags = listOf("project-dialog-dependencies"),
-        modifier = Modifier.size(100.percent, UiLength.Fit)
-            .maxSize(height = CheckboxListHeight.px)
+        modifier = Modifier.size(100.percent, UiLength.Fit).maxSize(height = CheckboxListHeight.px)
             .scrollable(horizontal = false, hasHorizontalScrollbar = false),
         content = content,
     )
@@ -215,7 +178,12 @@ private fun ExportDialog(packaging: HollowIdeProjectPackaging, form: ProjectExpo
             Paragraph("$LANG.export.done_message".lang(result.absolutePath))
             Actions {
                 DialogButton("project-export-show", "$LANG.show_in_explorer".lang, onClick = packaging::showExported)
-                DialogButton("project-export-close", "$LANG.close".lang, primary = true, onClick = packaging::cancelExport)
+                DialogButton(
+                    "project-export-close",
+                    "$LANG.close".lang,
+                    primary = true,
+                    onClick = packaging::cancelExport
+                )
             }
         } else {
             val properties = packaging.properties
@@ -279,12 +247,28 @@ private fun ImportDialog(packaging: HollowIdeProjectPackaging, form: ProjectImpo
         if (plan == null) {
             Errors(form.errors)
             Actions {
-                DialogButton("project-import-close", "$LANG.close".lang, primary = true, onClick = packaging::cancelImport)
+                DialogButton(
+                    "project-import-close",
+                    "$LANG.close".lang,
+                    primary = true,
+                    onClick = packaging::cancelImport
+                )
             }
         } else {
-            Paragraph("$LANG.import.question".lang(plan.properties.displayName, plan.properties.version, form.file.name))
+            Paragraph(
+                "$LANG.import.question".lang(
+                    plan.properties.displayName,
+                    plan.properties.version,
+                    form.file.name
+                )
+            )
             Paragraph("$LANG.import.warning".lang, "project-dialog-warning")
-            plan.conflictingAddon?.let { addon -> Paragraph("$LANG.import.conflict".lang(addon), "project-dialog-warning") }
+            plan.conflictingAddon?.let { addon ->
+                Paragraph(
+                    "$LANG.import.conflict".lang(addon),
+                    "project-dialog-warning"
+                )
+            }
             Errors(form.errors)
             Actions {
                 DialogButton(
@@ -374,19 +358,11 @@ private fun DialogButton(
     primary: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit,
-) {
-    Box(
-        id = id,
-        mode = UiBoxMode.STACK,
-        tags = listOfNotNull("project-dialog-button", if (primary) "primary" else "secondary", "disabled".takeUnless { enabled }),
-        modifier = Modifier.size(UiLength.Fit, 24.px)
-            .input(hoverable = true, clickable = true)
-            .cursor(if (enabled) UiCursorShape.HAND else UiCursorShape.DEFAULT)
-            .onClick { event ->
-                if (enabled) onClick()
-                event.consume()
-            },
-    ) {
-        Text(label, modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER))
-    }
-}
+) = Button(
+    label,
+    id = id,
+    kind = if (primary) UiButtonKind.PRIMARY else UiButtonKind.NORMAL,
+    enabled = enabled,
+    tags = listOf("project-dialog-button"),
+    onClick = onClick,
+)

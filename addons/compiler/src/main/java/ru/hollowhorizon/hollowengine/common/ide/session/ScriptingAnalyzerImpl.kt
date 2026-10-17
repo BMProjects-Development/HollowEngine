@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiManager
 import com.intellij.psi.impl.PsiFileEx
 import com.intellij.psi.impl.PsiManagerEx
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
@@ -13,30 +14,39 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.intentionActions
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.syntaxDiagnostics
 import ru.hollowhorizon.hollowengine.common.ide.session.format.formatKotlinCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.highlightCode
 import ru.hollowhorizon.hollowengine.common.ide.session.highlight.occurrencesCode
 import ru.hollowhorizon.hollowengine.common.ide.session.insight.findHoverInfo
 import ru.hollowhorizon.hollowengine.common.ide.session.insight.findSignatureHelp
+import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaKotlinSourceModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaScriptModule
-import ru.hollowhorizon.hollowengine.common.scripting.ide.*
+import ru.hollowhorizon.hollowengine.common.ide.session.structure.editorStructure
+import ru.hollowhorizon.hollowengine.common.ide.session.structure.kotlinGutterTargets
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import java.io.File
 import java.io.IOException
-import java.util.IdentityHashMap
+import java.util.*
 
-class ScriptingAnalyzerImpl(
+/** [lock] is shared with the Java analyzer: both build PSI in the same project. */
+class ScriptingAnalyzerImpl internal constructor(
     val kotlinCoreProjectEnvironment: KotlinCoreProjectEnvironment,
     val libraries: List<KaRekotLibraryModule>,
     val builtins: Builtins,
     val projectStructureProvider: ProjectStructureProviderImpl,
+    internal val navigation: LibraryNavigation,
+    private val lock: Any,
 ) : ScriptingAnalyzer {
     val project: Project
         get() = kotlinCoreProjectEnvironment.project
@@ -63,6 +73,9 @@ class ScriptingAnalyzerImpl(
     private data class ImportResolution(val files: List<KtFile>, val diagnostics: List<Diagnostic>)
 
     private val importDiagnostics = IdentityHashMap<KtFile, List<Diagnostic>>()
+    private val librarySources = LinkedHashSet<KtFile>()
+    private val sourceDependencies by lazy { libraries + builtins.kaModule }
+    private val classpath by lazy { libraries.filterNot { it.isSdk } }
 
     private fun getOrCreateFile(name: String, original: String): KtFile {
         val text = original.withUnixLineSeparators()
@@ -105,6 +118,18 @@ class ScriptingAnalyzerImpl(
 
         val file = factory.createFile(name, text)
         files[name] = file
+        if (!file.isScript()) {
+            if (SourceDocumentPath.parse(name) != null) {
+                librarySources += file
+                updateLibrarySourcesModule()
+            } else {
+                projectStructureProvider.setModule(
+                    file,
+                    KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
+                )
+            }
+            return file
+        }
         activeFiles += name
         val imports = try {
             resolveImports(file, files, activeFiles)
@@ -113,16 +138,23 @@ class ScriptingAnalyzerImpl(
         }
         importDiagnostics[file] = imports.diagnostics
 
-        projectStructureProvider.setModule(
-            file, KaScriptModule(
-                file, project, buildList {
-                    addAll(libraries)
-                    addAll(importedModules(imports.files))
-                    add(builtins.kaModule)
-                }.distinct()
-            )
-        )
+        val dependencies = buildList {
+            addAll(libraries)
+            addAll(importedModules(imports.files))
+            add(builtins.kaModule)
+        }.distinct()
+        projectStructureProvider.setModule(file, KaScriptModule(file, project, dependencies))
         return file
+    }
+
+    /**
+     * Opened library sources share one module, rebuilt whenever the set changes, so each sees the
+     * declarations of the others even where the classpath has no binary for them.
+     */
+    private fun updateLibrarySourcesModule() {
+        if (librarySources.isEmpty()) return
+        val module = KaKotlinSourceModule(project, librarySources.toList(), sourceDependencies, classpath)
+        librarySources.forEach { projectStructureProvider.setModule(it, module) }
     }
 
     /**
@@ -231,6 +263,7 @@ class ScriptingAnalyzerImpl(
     internal fun cleanupFile(file: KtFile) {
         importDiagnostics.remove(file)
         projectStructureProvider.removeModule(file)
+        if (librarySources.remove(file)) updateLibrarySourcesModule()
         (file as? PsiFileEx)?.markInvalidated()
         removeFromPsiManager(file)
     }
@@ -253,68 +286,62 @@ class ScriptingAnalyzerImpl(
         }
     }
 
-    @Synchronized
-    override fun highlight(
-        name: String,
-        text: String,
-        offset: Int,
-    ): List<TextLine> {
-        val file = getOrCreateFile(name, text)
-        return highlightCode(file, offset)
+    override fun highlight(name: String, text: String, offset: Int): List<TextLine> = synchronized(lock) {
+        highlightCode(getOrCreateFile(name, text), offset)
     }
 
-    @Synchronized
-    override fun occurrences(name: String, text: String, offset: Int): List<OccurrenceRange> {
-        val file = getOrCreateFile(name, text)
-        return occurrencesCode(file, offset)
+    override fun occurrences(name: String, text: String, offset: Int): List<OccurrenceRange> = synchronized(lock) {
+        occurrencesCode(getOrCreateFile(name, text), offset)
     }
 
     override val canFormat: Boolean get() = true
 
-    @Synchronized
-    override fun format(name: String, text: String): String? {
+    override fun format(name: String, text: String): String? = synchronized(lock) {
         val file = getOrCreateFile(name, text)
-        return formatKotlinCode(file).takeIf { it != file.text }
+        formatKotlinCode(file).takeIf { it != file.text }
     }
 
-    @Synchronized
-    override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) {
+    override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
+        createCompletions(getOrCreateFile(name, text), offset, sink)
+    }
+
+    override fun definition(name: String, text: String, offset: Int): DefinitionLocation? = synchronized(lock) {
+        findDefinition(getOrCreateFile(name, text), offset)
+    }
+
+    override fun structure(name: String, text: String): EditorStructure = synchronized(lock) {
+        editorStructure(getOrCreateFile(name, text))
+    }
+
+    override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> =
+        synchronized(lock) {
+            kotlinGutterTargets(getOrCreateFile(name, text), offset)
+        }
+
+    override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
+        findSignatureHelp(getOrCreateFile(name, text), offset)
+    }
+
+    override fun hover(name: String, text: String, offset: Int): HoverInfo? = synchronized(lock) {
+        findHoverInfo(getOrCreateFile(name, text), offset)
+    }
+
+    override fun diagnostic(name: String, text: String): List<Diagnostic> = synchronized(lock) {
         val file = getOrCreateFile(name, text)
-        createCompletions(file, offset, sink)
+        if (SourceDocumentPath.parse(name) != null) syntaxDiagnostics(file)
+        else collectImportDiagnostics(name, file) + diagnosticCode(file)
     }
 
-    @Synchronized
-    override fun definition(name: String, text: String, offset: Int): DefinitionLocation? {
-        val file = getOrCreateFile(name, text)
-        return findDefinition(file, offset)
+    override fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = synchronized(lock) {
+        intentionActions(getOrCreateFile(name, text), offset)
     }
 
-    @Synchronized
-    override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? {
-        val file = getOrCreateFile(name, text)
-        return findSignatureHelp(file, offset)
+    override fun searchSymbols(query: String, limit: Int): List<SymbolMatch> = synchronized(lock) {
+        searchSymbols(getOrCreateFile(SymbolLookupScript, ""), query, limit)
     }
 
-    @Synchronized
-    override fun hover(name: String, text: String, offset: Int): HoverInfo? {
-        val file = getOrCreateFile(name, text)
-        return findHoverInfo(file, offset)
-    }
-
-    @Synchronized
-    override fun diagnostic(name: String, text: String): List<Diagnostic> {
-        val file = getOrCreateFile(name, text)
-        return collectImportDiagnostics(name, file) + diagnosticCode(file)
-    }
-
-    @Synchronized
-    override fun searchSymbols(query: String, limit: Int): List<SymbolMatch> {
-        return searchSymbols(getOrCreateFile(SymbolLookupScript, ""), query, limit)
-    }
-
-    @Synchronized
-    override fun symbolSource(qualifiedName: String): DefinitionLocation? {
-        return symbolSource(getOrCreateFile(SymbolLookupScript, ""), qualifiedName)
+    override fun symbolSource(qualifiedName: String): DefinitionLocation? = synchronized(lock) {
+        symbolSource(getOrCreateFile(SymbolLookupScript, ""), qualifiedName)
     }
 
     private companion object {
@@ -324,7 +351,7 @@ class ScriptingAnalyzerImpl(
 }
 
 private fun removeFromPsiManager(file: KtFile) {
-    val psiManager = com.intellij.psi.PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
+    val psiManager = PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
     val fileManager = psiManager.fileManager
     fileManager.setViewProvider(file.virtualFile, null)
 }

@@ -204,7 +204,7 @@ open class QuatF(open val x: Float, open val y: Float, open val z: Float, open v
      */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is Vec4f) return false
+        if (other !is QuatF) return false
         return x == other.x && y == other.y && z == other.z && w == other.w
     }
 
@@ -586,7 +586,7 @@ open class QuatD(open val x: Double, open val y: Double, open val z: Double, ope
      */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is Vec4d) return false
+        if (other !is QuatD) return false
         return x == other.x && y == other.y && z == other.z && w == other.w
     }
 

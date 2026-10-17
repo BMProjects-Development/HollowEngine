@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -12,7 +13,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.abs
 
 private const val TimelineKeyframeSize = 10f
-private const val LaneContentId = "timeline-lane-content"
+internal const val LaneContentId = "timeline-lane-content"
 
 @Composable
 internal fun TimelineLanes(
@@ -66,8 +67,8 @@ internal fun TimelineLanes(
         override fun onRelease(event: UiEvent, row: TimelineRow) {
             if (event.isRightClick()) {
                 if (!pan.moved) {
-                    val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd, event.modifiers)
-                    menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked)
+                    val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
+                    menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
                 }
                 pan.moved = false
                 refresh()
@@ -82,7 +83,7 @@ internal fun TimelineLanes(
 
     Box(
         id = LaneContentId,
-        modifier = Modifier.size(contentWidth.px, contentHeight.coerceAtLeast(1f).px).panOnDrag(scroll, refresh),
+        modifier = Modifier.size(contentWidth.px, contentHeight.coerceAtLeast(1f).px).panOnDrag(controller, scroll, refresh),
     ) {
         rows.forEach { row ->
             key(row.id) {
@@ -93,7 +94,12 @@ internal fun TimelineLanes(
                     contentWidth,
                     visibleTimes,
                     canvas,
-                    refresh
+                    refresh,
+                    onSegmentMenu = { event, segment ->
+                        // Where on the segment it was clicked, which is where "split here" splits it.
+                        val time = timelineTimeAt(event.contentX(), pxPerSec, controller.workAreaEnd)
+                        menu = TimelineMenuState(event.x, event.y, null, time, row.locked, row.lane, segment)
+                    },
                 ) { event, curve, time ->
                     menu = TimelineMenuState(event.x, event.y, curve, time, row.locked)
                 }
@@ -136,24 +142,43 @@ internal class TimelineMenuState(
     val curve: ChannelCurve?,
     val time: Float,
     val locked: Boolean,
+    /** The lane of segments the menu was opened on, whose owner says what it offers. */
+    val lane: SegmentLane? = null,
+    val segment: TimelineSegment? = null,
 )
 
+/** The keymap's drags over the lanes: the pan drag moves the view, the zoom drag zooms the time. */
 @Composable
-internal fun Modifier.panOnDrag(scroll: UiScrollHandle, refresh: () -> Unit): Modifier {
+internal fun Modifier.panOnDrag(controller: TimelineController, scroll: UiScrollHandle, refresh: () -> Unit): Modifier {
     val start = remember { FloatArray(2) }
+    val panning = remember { booleanArrayOf(false) }
+    val zoom = remember { TimelineZoomDrag() }
     return this.onPress { event ->
-        if (!event.isMiddleClick()) return@onPress
+        if (zoom.begin(event, controller, scroll, event.localX)) {
+            event.consume()
+            return@onPress
+        }
+        panning[0] = HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
+        if (!panning[0]) return@onPress
         start[0] = scroll.offsetX
         start[1] = scroll.offsetY
         event.consume()
     }.onDrag { event ->
-        if (!event.isMiddleClick()) return@onDrag
+        if (zoom.drag(event, controller, scroll, values = false)) {
+            event.consume()
+            refresh()
+            return@onDrag
+        }
+        if (!panning[0]) return@onDrag
         scroll.scrollTo(
             x = (start[0] - event.dragTotalX).coerceAtLeast(0f),
             y = (start[1] - event.dragTotalY).coerceAtLeast(0f),
         )
         event.consume()
         refresh()
+    }.onRelease {
+        zoom.end()
+        panning[0] = false
     }
 }
 
@@ -166,11 +191,13 @@ private fun TimelineLane(
     visibleTimes: ClosedFloatingPointRange<Float>,
     canvas: LaneCanvas,
     refresh: () -> Unit,
+    onSegmentMenu: (UiEvent, TimelineSegment) -> Unit,
     onContextMenu: (UiEvent, ChannelCurve?, Float) -> Unit,
 ) {
     val top = row.y - TimelineRulerHeight
     val background = when {
         row.kind == TimelineRowKind.GROUP -> TimelineColors.Group
+        row.kind == TimelineRowKind.SEGMENTS -> TimelineColors.Row
         row.locked -> UiColor(0.08f, 0.08f, 0.09f, 1f)
         !row.visible -> UiColor(0.09f, 0.09f, 0.1f, 1f)
         row.kind == TimelineRowKind.CHANNEL -> TimelineColors.Row
@@ -186,6 +213,11 @@ private fun TimelineLane(
             modifier = Modifier.position(0.px, (row.height - 1f).px).size(contentWidth.px, 1.px)
                 .background(TimelineColors.Border).inputTransparent(),
         )
+        val lane = row.lane
+        if (lane != null) {
+            SegmentLaneContent(row, lane, controller, pxPerSec, refresh, onSegmentMenu)
+            return@Box
+        }
         val curve = row.curve ?: return@Box
 
         val keys = visibleKeys(row, visibleTimes.start, visibleTimes.endInclusive)
@@ -255,7 +287,7 @@ private fun TimelineKeyframe(
                 val focus = controller.dragFocusKeyframe ?: return@onDrag
                 val origin = controller.dragStartTimes?.get(focus) ?: focus.time
                 val delta = timelineTimeDelta(event.dragTotalX, pxPerSec)
-                controller.applyKeyframeDrag(snapTimelineTime(origin + delta, event.modifiers) - origin)
+                controller.applyKeyframeDrag(snapTimelineTime(origin + delta) - origin)
                 event.consume()
                 refresh()
             }.onRelease {
@@ -374,6 +406,8 @@ internal fun TimelineContextMenu(
     val hasCurveSelection = controller.canEditSelectedCurves
 
     val items = when {
+        state.lane != null -> if (state.locked) emptyList() else state.lane.menu?.invoke(state.time, state.segment).orEmpty()
+
         showPresets && presetCategory != null -> CurvePresets.of(presetCategory!!).map { preset ->
             UiDropdownItem(preset.name) {
                 controller.applyPreset(preset)
@@ -389,7 +423,7 @@ internal fun TimelineContextMenu(
             val curve = state.curve
             if (curve != null && !state.locked) {
                 add(UiDropdownItem(CutsceneLang.ADD_KEYFRAME.lang, icon = PulseIcon) {
-                    controller.edit("Add keyframe") {
+                    controller.edit(TimelineEdits.ADD_KEY) {
                         controller.setKey(curve, state.time, curve.valueAt(state.time, 0f))
                     }
                     refresh()

@@ -59,7 +59,7 @@
   "export.done": "Экспортировано: %s",
   "export.done_message": "Аддон сохранён в %s. Положите его в mods или hollowengine/addons любой игры.",
 
-  "import.not_addon": "%s — не аддон HollowEngine.",
+  "import.not_addon": "%s не является аддоном HollowEngine.",
   "import.has_classes": "В %s есть скомпилированные классы из Gradle-сборки. Импортировать можно только проекты из скриптов и ресурсов.",
   "import.no_sources": "%s экспортирован без исходников (у %s их нет), поэтому редактировать его нельзя.",
   "import.unsafe_path": "В %s есть файлы, которые окажутся за пределами папки проекта.",

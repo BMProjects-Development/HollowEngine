@@ -3,22 +3,10 @@ package ru.hollowhorizon.hollowengine.client.vfx.render
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.client.vfx.VfxColorSampler
-import ru.hollowhorizon.hollowengine.client.vfx.VfxEmitter
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeBehavior
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeRuntime
-import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook
-import ru.hollowhorizon.hollowengine.client.vfx.VfxParticles
-import ru.hollowhorizon.hollowengine.client.vfx.VfxSamplers
+import ru.hollowhorizon.hollowengine.client.vfx.*
 import ru.hollowhorizon.hollowengine.common.utils.MutableColor
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxAppearance
-import ru.hollowhorizon.hollowengine.common.vfx.VfxColorValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxMeshSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxModelSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSurfaceSpec
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * What every renderer node shares: the particles it draws, the look it gives them, and its tint.

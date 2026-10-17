@@ -78,8 +78,34 @@ Useful editor shortcuts:
 | `Ctrl + R`         | Find and replace                                                          |
 | `F3`, `Shift + F3` | Next or previous match                                                    |
 | `F4`               | Go to definition                                                          |
+| `Alt + Enter`      | Show intention actions: imports and fixes on the current line              |
+| `Ctrl + Space`     | Open completion, including inside an existing identifier                   |
 | `Ctrl + Alt + L`   | Format the focused file                                                   |
 | `Ctrl + N`         | Search across the project; selected editor text becomes the initial query |
+
+### Library sources
+
+Place library and mod source archives (`*-sources.jar`, or `.zip`) in `hollowengine/sources`. Subdirectories are supported, and archives can be added or replaced while the game runs. Navigation reads attached sources before using the decompiler and matches the declaration's owner and parameter types. Java files support PSI-based navigation, hover information, reference highlighting, and syntax diagnostics when the compiler addon is installed.
+
+### Custom completion
+
+`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. It is posted once per caret position. Its `path`, `text`, and `caret` identify the request; `items` starts with the engine's context snippets and accepts additional `UiTextCompletion` entries. The language service's own results are computed in the background and shown next to them. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
+import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
+
+@SubscribeEvent
+fun complete(event: IdeCompletionEvent) {
+    if (!event.path.endsWith(".kts")) return
+    event.items += UiTextCompletion(
+        label = "example",
+        insertText = "println(\"example\")",
+        filterText = "example",
+    )
+}
+```
 
 ## File editors
 
@@ -93,7 +119,7 @@ Some file types open in a dedicated editor instead of the text editor:
 | `.rig` | Bone aliases, attachments, and the physical skeleton. See [Rig Editor](/docs/hollowengine/scripting/rig-editor). |
 | `.gltf`, `.glb`, `.fbx`, `.geo.json` | Model viewer. |
 | `.png`, `.jpg`, `.jpeg` | Image viewer. |
-| `.mp4` | Video player (needs the [video addon](/docs/hollowengine/addons/video)). |
+| `.mp4` | Video player (needs the [Media addon](/docs/hollowengine/addons/media)). |
 
 Some JSON resources, such as `sounds.json` and recipes, also offer **Text**, **Split**, and **Preview** buttons in the tab bar. The text is always the source of truth: the preview edits it, so undo and autosave work as usual, and a file that cannot be parsed stays in the text editor without being overwritten.
 

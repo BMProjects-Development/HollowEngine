@@ -9,6 +9,8 @@ import net.minecraft.util.Mth
 import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.client.decals.DecalGround
+import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook
@@ -29,13 +31,14 @@ object VfxFrameRenderer {
     }
 
     /**
-     * Everything drawn with the effect shaders: the sky, then meshes, ribbons and planes, then the glow
+     * Everything drawn with the effect shaders: the sky, then decals, meshes, ribbons and planes, then the glow
      * of whatever glows, over all of them.
      */
     fun renderSurfaces(list: VfxDrawList, view: VfxView, target: RenderTarget) {
         if (list.readsScene) VfxSceneTextures.capture(target)
 
         VfxSkyRenderer.render(list.skies, view)
+        DecalRenderer.render(list.decals, view)
         VfxMeshRenderer.render(list.meshes, view)
         VfxRibbonRenderer.render(list.ribbons, view)
         VfxQuadRenderer.render(list.quads, view)
@@ -46,6 +49,18 @@ object VfxFrameRenderer {
             VfxQuadRenderer.renderGlow(view)
             VfxGlow.finish(target)
         }
+    }
+
+    /**
+     * Draws [list] into a panel of the editor, over what is there: a model preview. The sky and what reads the
+     * scene or glows are left out, as the panel has no scene of its own to read or bloom.
+     */
+    fun renderInPanel(list: VfxDrawList, view: VfxView) {
+        renderModels(list.models)
+        DecalRenderer.render(list.decals, view)
+        VfxMeshRenderer.render(list.meshes, view)
+        VfxRibbonRenderer.render(list.ribbons, view)
+        VfxQuadRenderer.render(list.quads, view)
     }
 
     fun renderModels(draws: List<VfxModelDraw>) {
@@ -112,7 +127,12 @@ object VfxFrameRenderer {
 /**
  * The view of the game camera, whose space is camera-relative world space.
  */
-fun VfxView.Companion.ofCamera(modelView: Matrix4f, projection: Matrix4f, time: Float): VfxView {
+fun VfxView.Companion.ofCamera(
+    modelView: Matrix4f,
+    projection: Matrix4f,
+    time: Float,
+    decalGround: DecalGround? = null,
+): VfxView {
     val screenToWorld = Matrix4f(projection).mul(modelView).invert()
     val center = screenToWorld.transformProject(Vector3f(0f, 0f, 0.5f))
     return VfxView(
@@ -122,5 +142,6 @@ fun VfxView.Companion.ofCamera(modelView: Matrix4f, projection: Matrix4f, time: 
         up = screenToWorld.transformProject(Vector3f(0f, 1f, 0.5f)).sub(center).normalize(),
         eye = Vector3f(),
         time = time,
+        decalGround = decalGround,
     )
 }

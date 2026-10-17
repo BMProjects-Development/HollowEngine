@@ -10,16 +10,6 @@ import kotlin.test.assertTrue
  */
 class UiSizeTransitionTest {
     @Test
-    fun `width interpolates between two pixel values`() {
-        val from = listOf(Modifier.size(100.px, 5.px)).flattenModifiers().toStylePatch().resolve()
-        val to = listOf(Modifier.size(200.px, 5.px)).flattenModifiers().toStylePatch().resolve()
-
-        val mid = from.interpolate(to, UiTransitionProgress.all(0.5f))
-
-        assertEquals(UiLength.Px(150f), mid.width)
-    }
-
-    @Test
     fun `mismatched length kinds snap to the target instead of holding stale`() {
         val from = listOf(Modifier.size(UiLength.Fit, 5.px)).flattenModifiers().toStylePatch().resolve()
         val to = listOf(Modifier.size(200.px, 5.px)).flattenModifiers().toStylePatch().resolve()

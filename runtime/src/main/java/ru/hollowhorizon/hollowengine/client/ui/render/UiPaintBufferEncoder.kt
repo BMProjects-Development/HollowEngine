@@ -1,9 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import ru.hollowhorizon.hollowengine.client.ui.UiResolvedPaint
-import ru.hollowhorizon.hollowengine.client.ui.resolve
 import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
 import ru.hollowhorizon.hollowengine.client.ui.style.UiGradientStop
+import ru.hollowhorizon.hollowengine.client.ui.style.linearGradientRadians
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
@@ -31,7 +31,7 @@ internal class UiPaintBufferEncoder(
             is UiResolvedPaint.LinearGradient -> {
                 val stopStart = stops.size / StopStride
                 appendStops(paint.stops, filter)
-                val radians = paint.angleDegrees * Math.PI.toFloat() / 180f
+                val radians = linearGradientRadians(paint.angleDegrees)
                 paints.add(
                     PaintLinearGradient,
                     stopStart.toFloat(),
@@ -39,7 +39,7 @@ internal class UiPaintBufferEncoder(
                     opacity,
                 )
                 paints.add(0f, 0f, 0f, 0f)
-                paints.add(width, height, cos(radians), sin(radians))
+                paints.add(width, height, cos(radians).toFloat(), sin(radians).toFloat())
                 paints.add(0f, 0f, 0f, 0f)
             }
             is UiResolvedPaint.RadialGradient -> {

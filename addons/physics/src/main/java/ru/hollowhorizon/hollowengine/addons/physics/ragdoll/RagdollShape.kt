@@ -1,38 +1,55 @@
 package ru.hollowhorizon.hollowengine.addons.physics.ragdoll
 
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigVector
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyShape
+import ru.hollowhorizon.hollowengine.addons.physics.collider.CapsuleColliderShape
 import ru.hollowhorizon.hollowengine.addons.physics.rotated
 import ru.hollowhorizon.hollowengine.addons.physics.rotationFromYTo
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.deg
 
 /**
- * The shape of one simulated bone, in the bone's own space.
+ * One piece of a body: a collider's shape filling its box, the box placed in the bone's own space.
  */
-sealed interface RagdollShape {
+class RagdollPart(
+    val shape: ColliderShapeSpec,
+    val center: Vec3f,
+    val rotation: QuatF,
+    val halfExtents: Vec3f,
+) {
+    /** How much room the piece's box takes, which is what pieces are weighed against each other by. */
+    val volume: Float get() = halfExtents.x * halfExtents.y * halfExtents.z * 8f
+
+    companion object {
+        /** The piece a collider is: its shape in its box, wherever the collider puts that box on the bone. */
+        fun of(collider: ColliderAttachmentSpec) = RagdollPart(
+            shape = collider.shape,
+            center = collider.offset,
+            rotation = collider.orientation,
+            halfExtents = Vec3f(collider.size.x / 2f, collider.size.y / 2f, collider.size.z / 2f).atLeast(RagdollShape.MIN_EXTENT),
+        )
+    }
+}
+
+/**
+ * The shape of one simulated bone, in the bone's own space: the colliders its rig hangs on the bone, or, for a
+ * model with no rig, a capsule along the bone.
+ */
+class RagdollShape(val parts: List<RagdollPart>) {
+    init {
+        require(parts.isNotEmpty()) { "A body needs at least one piece" }
+    }
+
+    /** The largest piece, which says which way the body runs. */
+    val main: RagdollPart get() = parts.maxBy { it.volume }
+
+    /** The middle of the body, its pieces weighed by size. Jolt works out the true center of mass when it builds it. */
     val center: Vec3f
-    val rotation: QuatF
-
-    class Capsule(
-        val radius: Float,
-        val length: Float,
-        override val center: Vec3f,
-        override val rotation: QuatF,
-    ) : RagdollShape
-
-    class Box(
-        val halfExtents: Vec3f,
-        override val center: Vec3f,
-        override val rotation: QuatF,
-    ) : RagdollShape
-
-    class Sphere(
-        val radius: Float,
-        override val center: Vec3f,
-        override val rotation: QuatF,
-    ) : RagdollShape
+        get() {
+            val total = parts.sumOf { it.volume.toDouble() }.toFloat()
+            if (total <= 0f) return main.center
+            return parts.fold(Vec3f.ZERO) { sum, part -> sum + part.center * (part.volume / total) }
+        }
 
     companion object {
         /**
@@ -43,40 +60,33 @@ sealed interface RagdollShape {
         const val MIN_EXTENT = 0.01f
 
         /** Capsule extending from site of attachment to the bone along [axis]. */
-        fun alongBone(axis: Vec3f, length: Float, radius: Float): Capsule {
+        fun alongBone(axis: Vec3f, length: Float, radius: Float): RagdollShape {
             val safeRadius = radius.coerceAtLeast(MIN_EXTENT)
             val safeLength = length.coerceAtLeast(safeRadius * 2f + MIN_EXTENT)
-            return Capsule(
-                radius = safeRadius,
-                length = safeLength,
-                center = axis * (safeLength * 0.5f),
-                rotation = rotationFromYTo(axis),
+            return RagdollShape(
+                listOf(
+                    RagdollPart(
+                        shape = CapsuleColliderShape(),
+                        center = axis * (safeLength * 0.5f),
+                        rotation = rotationFromYTo(axis),
+                        halfExtents = Vec3f(safeRadius, safeLength * 0.5f, safeRadius),
+                    )
+                )
             )
         }
-
-        fun of(shape: RigidBodyShape): RagdollShape {
-            val centre = shape.offset.toVec3f()
-            val rotation = shape.rotation.toRotation()
-            return when (shape) {
-                is RigidBodyShape.Capsule -> {
-                    val radius = shape.radius.coerceAtLeast(MIN_EXTENT)
-                    Capsule(radius, shape.length.coerceAtLeast(radius * 2f + MIN_EXTENT), centre, rotation)
-                }
-
-                is RigidBodyShape.Box -> Box(shape.halfExtents.toVec3f().atLeast(MIN_EXTENT), centre, rotation)
-                is RigidBodyShape.Sphere -> Sphere(shape.radius.coerceAtLeast(MIN_EXTENT), centre, rotation)
-            }
-        }
-
-        private fun Vec3f.atLeast(minimum: Float) = Vec3f(
-            x.coerceAtLeast(minimum),
-            y.coerceAtLeast(minimum),
-            z.coerceAtLeast(minimum),
-        )
     }
 }
 
-val RagdollShape.axis: Vec3f get() = Vec3f.Y_AXIS.rotated(rotation)
+/** The way the body runs: the longest side of its largest piece, which is what it twists around. */
+val RagdollShape.axis: Vec3f
+    get() {
+        val half = main.halfExtents
+        val longest = when (maxOf(half.x, half.y, half.z)) {
+            half.y -> Vec3f.Y_AXIS
+            half.x -> Vec3f.X_AXIS
+            else -> Vec3f.Z_AXIS
+        }
+        return longest.rotated(main.rotation)
+    }
 
-internal fun RigVector.toRotation(): QuatF =
-    QuatF(z.deg, Vec3f.Z_AXIS) * QuatF(y.deg, Vec3f.Y_AXIS) * QuatF(x.deg, Vec3f.X_AXIS)
+private fun Vec3f.atLeast(minimum: Float) = Vec3f(x.coerceAtLeast(minimum), y.coerceAtLeast(minimum), z.coerceAtLeast(minimum))

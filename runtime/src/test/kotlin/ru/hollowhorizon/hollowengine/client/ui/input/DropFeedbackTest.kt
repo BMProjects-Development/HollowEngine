@@ -4,11 +4,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiDragAndDropState
 import ru.hollowhorizon.hollowengine.client.ui.UiDragItem
 import ru.hollowhorizon.hollowengine.client.ui.UiDropTarget
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class DropFeedbackTest {
     @Test

@@ -1,12 +1,7 @@
 package ru.hollowhorizon.hollowengine.common
 
 import com.intellij.openapi.diagnostic.Logger
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonContext
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEntrypoint
@@ -28,8 +23,8 @@ import ru.hollowhorizon.hollowengine.logW
 import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
-import java.util.jar.JarFile
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.jar.JarFile
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.ScriptingHostConfiguration
 import kotlin.script.experimental.host.configurationDependencies
@@ -134,8 +129,7 @@ class ScriptingEnvironmentImpl(
     }
     val scriptDefinitions = scriptTypes.sortedByDescending { it.extension.length }.map { provider ->
         ScriptDefinition.FromConfigurations(
-            scriptHostConfig,
-            HollowScriptConfiguration(classpath) {
+            scriptHostConfig, HollowScriptConfiguration(classpath) {
                 baseClass.replaceOnlyDefault(KotlinType(provider.baseClass))
                 fileExtension.replaceOnlyDefault(provider.extension)
                 defaultImports(provider.defaultImports)
@@ -144,8 +138,7 @@ class ScriptingEnvironmentImpl(
                     clientSideImplicitReceivers(receivers.map { KotlinType(it) })
                 }
                 if (provider.shared) isSharedScript(true)
-            },
-            ScriptEvaluationConfiguration()
+            }, ScriptEvaluationConfiguration()
         )
     }
     private val analysisEnvironment = CompletableFuture<AnalysisEnvironment>()
@@ -154,6 +147,8 @@ class ScriptingEnvironmentImpl(
 
     override val analyzer
         get() = analysisEnvironment().analyzer
+    override val javaAnalyzer
+        get() = analysisEnvironment().javaAnalyzer
     override val compiler = ScriptingCompilerImpl(this)
 
     internal fun warmUpAnalysis(scope: CoroutineScope): Job = scope.launch(

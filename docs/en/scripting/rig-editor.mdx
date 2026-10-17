@@ -5,7 +5,7 @@ order: 10
 
 <center><h1>Rig Editor</h1></center>
 
-*The visual editor for `.rig` files: bone aliases, hidden parts, and the physical skeleton a ragdoll is built from.*
+*The visual editor for `.rig` files: bone aliases, hidden parts, colliders, and the physical skeleton a ragdoll is built from.*
 
 ---
 
@@ -43,6 +43,7 @@ Down the left edge of the model view:
 |--------|--------------|
 | Skeleton | draws the clickable bones over the model |
 | Colliders | draws the rig's bodies in the pose the model stands in |
+| Fit colliders | gives every bone that holds geometry a [collider](/docs/hollowengine/scripting/colliders) sized to it |
 | Simulation | drops the rig and simulates it right in the editor |
 | Generate rig | builds bodies and joints from the model's geometry |
 
@@ -60,7 +61,9 @@ While the simulation runs, dragging with the mouse shoves the bodies about inste
 
 **visible / hidden** - a hidden bone is not drawn, and neither is anything under it. For helper bones and for parts of a model that only exist as a base for something else.
 
-Everything else is an **attachment**: something hung on the bone that some part of the engine knows what to do with. **+ Attach** lists what is available; which kinds there are depends on which addons are loaded.
+Everything else is an **attachment**: something hung on the bone that some part of the engine knows what to do with. **+ Attach** lists what is available; which kinds there are depends on which addons are loaded. A [collider](/docs/hollowengine/scripting/colliders), a box that takes hits, works as a button or blocks the way, is always there.
+
+**The whole model** at the top of the bone list holds what hangs on no bone and lives in the model's own space.
 
 ![A bone](/hollowengine/pictures/rig_editor/bone.webp)
 

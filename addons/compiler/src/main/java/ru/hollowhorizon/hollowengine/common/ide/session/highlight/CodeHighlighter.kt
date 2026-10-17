@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.ide.session.highlight
 
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.tree.IElementType
@@ -11,6 +12,7 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.annotations.KaAnnotation
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.idea.references.mainReference
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
@@ -194,7 +196,7 @@ private fun LineBuilder.SpanBuilder.renderPsiElement(
         italic = false
         colorOverride = null
 
-        if (KtTokens.COMMENTS.contains(elementType)) {
+        if (KtTokens.COMMENTS.contains(elementType) || psi.parentsWithSelf.any { it is PsiComment || it is KDoc }) {
             appendCommentSpans(text)
             return
         }

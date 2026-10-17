@@ -1,15 +1,16 @@
 package ru.hollowhorizon.hollowengine.common.attachments.api
 
-import kotlinx.coroutines.CoroutineScope
-import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.common.coroutines.EntityScope
 import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.CoroutineScope
 import net.minecraft.nbt.CompoundTag
-import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
-import ru.hollowhorizon.hollowengine.common.data.Sync
+import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.coroutines.EntityScope
+import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
+import ru.hollowhorizon.hollowengine.common.data.Sync
+import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeManager
 
 /**
@@ -49,6 +50,12 @@ class HollowAttachments internal constructor(entity: MCEntity) {
      * worth keeping while it exists. Never saved, never synced, gone when the entity is removed.
      */
     val runtime: RuntimeAttachments get() = runtimeState ?: RuntimeAttachments().also { runtimeState = it }
+
+    internal fun closeRuntime() {
+        val previous = runtimeState
+        runtimeState = null
+        previous?.close()
+    }
 
     /** The node scripts attached to this entity, or null when none were ever attached. */
     val nodesOrNull: EntityNodeManager? get() = nodeManager
@@ -90,7 +97,12 @@ class HollowAttachments internal constructor(entity: MCEntity) {
     var lastSyncedOwnerData: CompoundTag = CompoundTag()
 
     init {
-        components.onChange = { EntityStateSync.markDirty(entity) }
+        components.onChange = {
+            runtimeState?.pruneInvalid()
+            EntityStateSync.markDirty(entity)
+            EntityBodies.onComponentsChanged(entity)
+            (entity as? WorldObjectEntity)?.onComponentsChanged()
+        }
     }
 
     /**

@@ -27,17 +27,21 @@ class RagdollState(private var spec: RagdollStateSpec) : AnimationState {
     private var planTarget: PoseTarget? = null
     private var planAllowed: Set<Int>? = null
     private var template: RagdollTemplate? = null
-    private var attached: PhysicsWorld? = null
+    private var attached: Pair<PhysicsWorld, RagdollKey>? = null
+    private var running: RagdollInstance? = null
+    private var follows: Int? = null
     private val warnings = HashSet<String>()
 
     /** Pose, that controller assumed when it started moving towards this spot. */
     private var seed: AnimationPose = AnimationPose()
+    private var seeded = false
 
     private val animated = HashMap<Int, MutableMat4f>()
     private val simulated = HashMap<Int, MutableMat4f>()
 
     override fun enter(from: AnimationPose?) {
         seed = from ?: AnimationPose()
+        seeded = false
         release()
     }
 
@@ -60,25 +64,72 @@ class RagdollState(private var spec: RagdollStateSpec) : AnimationState {
         allowed: Set<Int>,
         context: AnimatorEvaluationContext,
     ): AnimationPose? {
-        if (!JoltNatives.isAvailable) return null
-
         val entity = context.entity ?: return null
         val placement = placementOf(context) ?: return null
-        val world = PhysicsWorlds.of(entity.level()) ?: return null
         val plan = planFor(target, allowed) ?: return null
-
-        val instance = world.ragdoll(this) {
+        if (!seeded) {
             RagdollPose.globals(plan.order, seed, animated)
+            seeded = true
+        }
+
+        val client = entity.level().isClientSide
+        return when (spec.simulation) {
+            RagdollSimulation.SERVER if client -> replicated(entity, placement, plan, target)
+            RagdollSimulation.CLIENT if !client -> null
+            else -> simulated(entity, placement, plan, target, context)
+        }
+    }
+
+    /** Runs the bodies here: on the server for everyone, or on a client for itself alone. */
+    private fun simulated(
+        entity: Entity,
+        placement: ModelPlacement,
+        plan: RagdollPlan,
+        target: PoseTarget,
+        context: AnimatorEvaluationContext,
+    ): AnimationPose? {
+        if (!JoltNatives.isAvailable) return null
+        val level = entity.level()
+        val world = PhysicsWorlds.of(level) ?: return null
+        val key = RagdollKey(entity.id, spec.id)
+
+        val instance = world.ragdoll(key) {
             val template = template ?: RagdollTemplate.build(plan, spec).also { template = it }
             RagdollInstance.create(world, template, spec)?.also {
                 it.start(placement, animated, velocityOf(entity))
-                attached = world
                 HollowEngine.LOGGER.debug("Ragdoll '{}' woke up with {} bodies", spec.id, plan.bones.size)
             }
         } ?: return warnOnce("Jolt would not build the ragdoll for state '${spec.id}'")
+        attached = world to key
+        val fresh = instance !== running
+        running = instance
 
-        world.stepOnce(TickHandler.renderFrame, context.deltaTime)
-        instance.readInto(placement, simulated)
+        var placed = placement
+        if (level.isClientSide) {
+            world.stepOnce(TickHandler.renderFrame, context.deltaTime)
+        } else {
+            if (!fresh) RagdollReplication.impulseOf(entity)?.let { instance.nudge(it * spec.inheritVelocity) }
+            world.stepOnce(level.gameTime, SECONDS_PER_TICK)
+            RagdollReplication.publish(entity, instance, fresh)
+            val moved = RagdollReplication.anchor(entity, instance)
+            placed = placement.moved(moved.x, moved.y, moved.z)
+        }
+
+        instance.readInto(placed, simulated)
+        return RagdollPose.write(plan, target, simulated, animated)
+    }
+
+    /** Follows the bodies the server sends, holding the pose it entered with until the first of them arrives. */
+    private fun replicated(
+        entity: Entity,
+        placement: ModelPlacement,
+        plan: RagdollPlan,
+        target: PoseTarget,
+    ): AnimationPose {
+        follows = entity.id
+        val bodies = RagdollReplicas.poseAt(entity.id, RagdollReplicas.clientNow())
+            ?: return RagdollPose.write(plan, target, animated, animated)
+        bodies.readInto(placement, simulated)
         return RagdollPose.write(plan, target, simulated, animated)
     }
 
@@ -91,6 +142,7 @@ class RagdollState(private var spec: RagdollStateSpec) : AnimationState {
         release()
         animated.clear()
         simulated.clear()
+        seeded = false
         plan = RagdollPlan.build(target, spec, allowed)
         plan?.let { HollowEngine.LOGGER.debug("Ragdoll state '{}' simulates {} bones", spec.id, it.bones.size) }
             ?: warnOnce("Ragdoll state '${spec.id}' has no bones to simulate")
@@ -121,12 +173,22 @@ class RagdollState(private var spec: RagdollStateSpec) : AnimationState {
     }
 
     private fun release() {
-        attached?.forget(this)
+        attached?.let { (world, key) -> world.forget(key) }
         attached = null
+        running = null
+        follows?.let(RagdollReplicas::forget)
+        follows = null
     }
+
+    /**
+     * Which ragdoll of a world this is. An entity's model can be posed by more than one animator on a client, the
+     * drawn one and the one its colliders move by, and those share one ragdoll rather than each running its own.
+     */
+    private data class RagdollKey(val entityId: Int, val stateId: String)
 
     private companion object {
         const val TICKS_PER_SECOND = 20f
+        const val SECONDS_PER_TICK = 1f / TICKS_PER_SECOND
         const val SCALE_TOLERANCE = 0.05f
     }
 }

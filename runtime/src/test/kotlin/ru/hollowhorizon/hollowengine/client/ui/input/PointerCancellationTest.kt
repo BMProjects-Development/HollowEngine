@@ -1,16 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.input
 
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.HollowUiRuntime
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.focus
-import ru.hollowhorizon.hollowengine.client.ui.focusScope
-import ru.hollowhorizon.hollowengine.client.ui.input
-import ru.hollowhorizon.hollowengine.client.ui.onClick
-import ru.hollowhorizon.hollowengine.client.ui.onDrag
-import ru.hollowhorizon.hollowengine.client.ui.onRelease
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
+import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -2,22 +2,22 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
-import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeRigDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
-import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val AutoSaveDelayMillis = 900L
@@ -26,7 +26,6 @@ private const val PhysicsIcon = "hollowengine:textures/gui/icons/timeline/play.s
 private const val StopIcon = "hollowengine:textures/gui/icons/timeline/pause.svg"
 private const val SkeletonIcon = "hollowengine:textures/gui/icons/rig/skeleton.svg"
 private const val ColliderIcon = "hollowengine:textures/gui/icons/rig/colliders.svg"
-private const val GenerateIcon = "hollowengine:textures/gui/icons/reload.svg"
 
 /**
  * The editor for a `.rig` file.
@@ -37,7 +36,7 @@ private const val GenerateIcon = "hollowengine:textures/gui/icons/reload.svg"
 @Composable
 internal fun RigEditorPanel(file: HollowIdeOpenFile) {
     val document = file.document as HollowIdeRigDocument
-    val state = remember(document) { document.editorState { RigEditorState(file.path.toModelId()) } }
+    val state = remember(document) { document.editorState { RigEditorState(document, file.path.toModelId()) } }
     val viewer = state.viewer
     val model by viewer.modelFlow.collectAsState()
     var preview by remember(document) { mutableStateOf<RigPreview?>(null) }
@@ -47,11 +46,11 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         file.updateDirty(document.isModified)
         if (!document.isModified) return@LaunchedEffect
         delay(AutoSaveDelayMillis.milliseconds)
-        if (document.isModified) file.save()
+        if (document.isModified && file.save()) publishRig(state.viewer.model, document.rig)
     }
 
-    LaunchedEffect(preview) {
-        while (true) withFrameNanos { }
+    LaunchedEffect(preview, state.partSelection) {
+        while (preview != null || state.partSelection != null) withFrameNanos { state.frame++ }
     }
 
     DisposableEffect(document) {
@@ -61,9 +60,22 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         }
     }
 
+    viewer.debugFill = { shapes ->
+        if (state.showSkeleton) {
+            val colors = boneColors(document.rig, viewer.nodes)
+            DebugSkeletonRenderer.fill(viewer.attachment, shapes, state.selected, colors::get)
+        }
+    }
+    viewer.debugBackdrop = { lines -> lines.floor() }
+    viewer.decalOverlay = { key -> state.partSelection.picksDecal(key) }
     viewer.debugDraw = { lines ->
-        if (state.showSkeleton) DebugSkeletonRenderer.draw(viewer.attachment, lines, state.selected)
+        if (state.showSkeleton) {
+            lines.ikOverlay(document.rig, viewer.nodes, state.partSelection)
+        }
         if (state.showColliders) {
+            lines.colliders(previewColliders(document.rig, viewer.nodes), state.partSelection)
+            lines.soundAreas(document.rig, viewer.nodes, state.partSelection)
+            lines.decalShapes(document.rig, viewer.nodes, state.partSelection)
             RigOverlays.all.forEach { it.draw(viewer.attachment, lines, state.selected) }
             preview?.draw(lines)
         }
@@ -71,8 +83,8 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
 
     val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
 
-    PublishInspector(source = "rig-${file.path}", key = state.selected to bones) {
-        state.selected?.let { bone -> rigInspectorTarget(document, bone, bones) }
+    PublishInspector(source = "rig-${file.path}", key = Triple(state.selected, state.selectedPart, bones)) {
+        rigInspectorTarget(document, state, bones)
     }
 
     PublishScene(
@@ -90,62 +102,160 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         modifier = Modifier.style(AnimatorStylesheet).focusScope(),
     ) {
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
-            RigViewport(
-                viewer = viewer,
-                preview = preview,
-                onPick = { candidates ->
-                    val index = candidates.indexOfFirst { it.name == state.selected }
-                    val next = (index + 1) % candidates.size.coerceAtLeast(1)
-                    state.selected = candidates.getOrNull(next)?.name
-                },
-            )
+            RigViewport(document, state, preview)
             Toolbar(document, state, preview) { preview = preview.toggled(viewer) }
         }
     }
 }
 
 @Composable
-private fun Toolbar(document: HollowIdeRigDocument, state: RigEditorState, preview: RigPreview?, onPhysics: () -> Unit) {
+private fun Toolbar(
+    document: HollowIdeRigDocument,
+    state: RigEditorState,
+    preview: RigPreview?,
+    onPhysics: () -> Unit,
+) {
     val viewer = state.viewer
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
-        AnimatorIconButton(SkeletonIcon, rigText("toggle_skeleton"), size = 12f, active = state.showSkeleton) {
+        IconButton(SkeletonIcon, rigText("toggle_skeleton"), iconSize = 12f, active = state.showSkeleton) {
             state.showSkeleton = !state.showSkeleton
         }
-        if (RigOverlays.all.isNotEmpty()) {
-            AnimatorIconButton(ColliderIcon, rigText("toggle_colliders"), size = 12f, active = state.showColliders) {
-                state.showColliders = !state.showColliders
-            }
+        IconButton(ColliderIcon, rigText("toggle_colliders"), iconSize = 12f, active = state.showColliders) {
+            state.showColliders = !state.showColliders
         }
+        if (state.partSelection != null) GizmoToolbarButtons()
         if (RigPreviews.isAvailable) {
-            AnimatorIconButton(
+            IconButton(
                 icon = if (preview == null) PhysicsIcon else StopIcon,
                 tooltip = rigText(if (preview == null) "start_physics" else "stop_physics"),
-                size = 12f,
+                iconSize = 12f,
                 active = preview != null,
                 onClick = onPhysics,
             )
         }
-        RigGenerators.all.forEach { entry ->
-            AnimatorIconButton(GenerateIcon, entry.titleKey.lang, size = 12f) {
-                viewer.attachment.ensureReady()
-                document.edit { entry.generator.generate(viewer.attachment, it) }
-            }
-        }
+        GenerateButton(document, viewer)
     }
+}
+
+/** One button for every way to fill in the rig, each named with its own icon in the menu it opens. */
+@Composable
+private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerState) {
+    val generators = RigGenerators.all
+    if (generators.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    var anchor by remember { mutableStateOf(UiRect.Zero) }
+    IconButton(RigGenerators.DEFAULT_ICON, rigText("generate"), iconSize = 12f, active = open, modifier = Modifier.onPlaced { anchor = it }) { open = !open }
+    if (!open) return
+    ContextMenu(
+        id = "rig-generate-menu",
+        anchorBounds = anchor,
+        items = generators.map { entry ->
+            UiDropdownItem(entry.titleKey.lang, entry.icon) {
+                viewer.attachment.ensureReady()
+                document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(viewer.attachment, it) }
+            }
+        },
+        onExpandedChange = { if (!it) open = false },
+    )
 }
 
 /**
  * What the editor is looking at, as opposed to what it is editing.
  */
-internal class RigEditorState(modelId: String) {
-    val viewer = ModelViewerState(modelId)
+internal class RigEditorState(private val document: RigEditing, modelId: String) {
+    // The floor drawn in the preview is the reference, so the flat grid behind the model goes.
+    val viewer = ModelViewerState(modelId).apply { showGrid = false }
+
+    /** The selected bone, or null for the model itself. */
     var selected by mutableStateOf<String?>(null)
+        private set
+
+    /** The selected part on [selected], if any: a collider, a target or anything else the gizmo moves. */
+    var selectedPart by mutableStateOf<String?>(null)
+        private set
+
     var showSkeleton by mutableStateOf(true)
     var showColliders by mutableStateOf(true)
 
     /** Which bones are open in the scene window, kept here so they survive switching files. */
     val expanded = mutableStateListOf<String>()
     var rootExpanded by mutableStateOf(true)
+
+    val gizmo = RigPartGizmo()
+
+    /** Turns the preview to a view picked on its axes or by the numpad. */
+    val cameraTurn = OrbitCameraTurn(viewer)
+
+    /** Ticks every frame while something in the preview moves on its own, to redraw the gizmo over it. */
+    var frame by mutableStateOf(0L)
+
+    /** Where the pointer last was over the preview: where a transform from the keyboard starts. */
+    var pointerX = 0f
+        private set
+    var pointerY = 0f
+        private set
+
+    /** Where the preview is on the surface, for a menu opened at the pointer. */
+    internal var viewportBounds = UiRect.Zero
+
+    /** The pointer as a point on the surface, which a popup anchors to. */
+    fun pointerOnSurface(): UiRect = UiRect(viewportBounds.x + pointerX, viewportBounds.y + pointerY, 0f, 0f)
+
+    /** Set by a press the gizmo took, so the click that follows does not change the selection. */
+    internal var swallowClick = false
+
+    val partSelection: RigPartSelection? get() = selectedPart?.let { RigPartSelection(selected, it) }
+
+    /** Selects [bone] and [part] on it; a transform or a drag under way stays where it got to. */
+    fun select(bone: String?, part: String? = null) {
+        gizmo.session.settle()
+        selected = bone
+        selectedPart = part ?: when {
+            bone == null -> null
+            document.rig.bone(bone)?.origin != null -> BONE_ORIGIN_PART
+            else -> BONE_POSE_PART
+        }
+        bone?.let(::reveal)
+    }
+
+    /** Opens the bones above [bone] in the scene window, so a bone picked in the preview shows there too. */
+    private fun reveal(bone: String) {
+        val path = viewer.nodes.firstNotNullOfOrNull { root -> pathTo(root, bone) } ?: return
+        rootExpanded = true
+        path.dropLast(1).forEach { name -> if (name !in expanded) expanded += name }
+    }
+
+    private fun pathTo(node: RuntimeNode, bone: String): List<String>? {
+        if (node.name == bone) return listOf(node.name)
+        return node.children.firstNotNullOfOrNull { child -> pathTo(child, bone) }?.let { listOf(node.name) + it }
+    }
+
+    fun pointer(x: Float, y: Float) {
+        pointerX = x
+        pointerY = y
+    }
+
+    /** The selected part as the gizmo moves it, or null when there is none it can move. */
+    fun gizmoTarget(): GizmoTarget? = selectedFrame()?.let { RigPartTarget(document, it) }
+
+    /** The selected part where it is now in the preview, or null when none is selected, it is gone or has no gizmo. */
+    fun selectedFrame(): RigGizmoFrame? {
+        val selection = partSelection ?: return null
+        if (selection.id == BONE_POSE_PART) {
+            val bone = selection.bone ?: return null
+            val node =
+                viewer.nodes.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } } ?: return null
+            return BonePoseFrame(bone, node, document.rig.bone(bone)?.pose)
+        }
+        if (selection.id == BONE_ORIGIN_PART) {
+            val bone = selection.bone ?: return null
+            val origin = document.rig.bone(bone)?.origin ?: return null
+            return BoneOriginFrame(bone, origin, holderMatrix(viewer.nodes, origin.parent) ?: return null)
+        }
+        val spec = document.rig.holder(selection.bone).attachment(selection.id) ?: return null
+        val holder = holderMatrix(viewer.nodes, selection.bone) ?: return null
+        return gizmoFrame(selection, spec, holder)
+    }
 }
 
 private fun RigPreview?.toggled(viewer: ModelViewerState): RigPreview? {
@@ -159,31 +269,6 @@ private fun RigPreview?.toggled(viewer: ModelViewerState): RigPreview? {
     viewer.instance.animator.add(RigPreviewLayer(started))
     return started
 }
-
-@Composable
-private fun RigViewport(viewer: ModelViewerState, preview: RigPreview?, onPick: (List<RuntimeNode>) -> Unit) {
-    Model(
-        state = viewer,
-        id = "rig-viewport",
-        tags = listOf("ide-file-viewport"),
-        modifier = Modifier.size(100.percent, 100.percent).clip().input(hoverable = true, clickable = true)
-            .onClick { event ->
-                if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onClick
-                onPick(viewer.bonesAt(event.localX, event.localY))
-                event.consume()
-            },
-        onDrag = { event ->
-            val physics = preview
-            if (physics == null || event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) false
-            else {
-                physics.push(Vec3f(-event.deltaX, -event.deltaY, 0f) * PUSH_STRENGTH)
-                true
-            }
-        },
-    )
-}
-
-private const val PUSH_STRENGTH = 0.05f
 
 internal fun rigText(name: String): String = "hollowengine.gui.rig_editor.$name".lang
 

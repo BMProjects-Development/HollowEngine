@@ -12,11 +12,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.pla
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.stopCutscene
 import ru.hollowhorizon.hollowengine.common.ui.hud.EngineHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
-import ru.hollowhorizon.hollowengine.common.ui.net.hideHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.hiddenHudLayers
+import ru.hollowhorizon.hollowengine.common.ui.net.hideHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.showAllHudLayers
-import java.util.Collections
-import java.util.WeakHashMap
+import java.util.*
 import kotlin.time.Duration.Companion.milliseconds
 
 /**

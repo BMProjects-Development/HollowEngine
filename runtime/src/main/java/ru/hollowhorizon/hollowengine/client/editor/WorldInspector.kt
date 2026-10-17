@@ -6,17 +6,19 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.entity.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeWorldPoint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalInspectorHost
-import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
-import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityEditorSnapshot
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStageEvent
@@ -72,7 +74,7 @@ object WorldInspector {
         val player = minecraft.player ?: return emptyList()
         val level = minecraft.level ?: return emptyList()
         return level.getEntities(player, player.boundingBox.inflate(EditorReach)) {
-            it.isPickable && it != player && it.id !in gizmoOwned
+            (it.isPickable || it is WorldObjectEntity) && it != player && it.id !in gizmoOwned
         }
     }
 
@@ -85,15 +87,30 @@ object WorldInspector {
         Minecraft.getInstance().screen != null && HollowIdeOverlay.holdsPointer()
 
     fun pickAt(physX: Float, physY: Float, button: Int, action: Int): Boolean {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || action != GLFW.GLFW_PRESS) return false
+        if (action != GLFW.GLFW_PRESS) return false
         if (!EditorMode.isActive()) return false
         if (HollowIdeOverlay.holdsPointer()) return false
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) return openObjectMenu(physX, physY)
+        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false
 
         val entity = hovered ?: run {
             close()
             return false
         }
         EntityEditorClient.request(entity, EntityEditorClient.Destination.INSPECTOR)
+        return true
+    }
+
+    /**
+     * A right click on a world object, with the pointer free, selects it and opens its menu. With the
+     * crosshair the right click stays the game's.
+     */
+    private fun openObjectMenu(physX: Float, physY: Float): Boolean {
+        if (Minecraft.getInstance().screen == null) return false
+        val target = hovered as? WorldObjectEntity ?: return false
+        select(target.id)
+        val point = hollowIdeWorldPoint(physX, physY)
+        WorldObjectContextMenu.open(target, point.x, point.y)
         return true
     }
 
@@ -104,6 +121,7 @@ object WorldInspector {
             current.accept(state)
             current
         } else {
+            WorldObjectParts.clear()
             EntityEditorSession(state).also { session = it }
         }
         InspectorSelection.publish(Source, entityInspectorTarget(shown))
@@ -116,6 +134,14 @@ object WorldInspector {
     }
 
     fun holds(entityId: Int): Boolean = session?.entityId == entityId
+
+    /** Puts the entity being edited back into the inspector, which something else took over meanwhile. */
+    fun reveal() {
+        session?.let { InspectorSelection.publish(Source, entityInspectorTarget(it)) }
+    }
+
+    /** The entity in the inspector; a snapshot read, so composition that shows it follows the selection. */
+    val selectedEntityId: Int? get() = session?.entityId
 
     internal val inspectorSession: EntityEditorSession? get() = session
 
@@ -171,17 +197,17 @@ object WorldInspector {
     }
 
     private fun outline(scope: UiCanvasDrawScope, entity: Entity, color: UiColor) {
-        val bounds = entity.boundingBox.inflate(PickSlack)
-        for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) {
-            if (edge.size < 2) continue
-            val shape = GenericShape {
-                edge.forEachIndexed { index, point ->
-                    if (index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
-                }
-            }
-            scope.drawShape(shape, UiPaint.Color(color), UiDrawStyle.Stroke(1.2f))
-        }
+        val bounds = outlineBounds(entity)
+        for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) GizmoRenderer.strokeLine(scope, edge, color, 1.2f)
     }
+
+    /** A world object is outlined by the same box the gizmo draws; any other entity, by its own box with some slack. */
+    private fun outlineBounds(entity: Entity): AABB =
+        (entity as? WorldObjectEntity)?.let { WorldObjectEditing.bounds(it, TickHandler.partialTick) }
+            ?: entity.boundingBox.inflate(PickSlack)
+
+    private fun pickBounds(entity: Entity): AABB =
+        if (entity is WorldObjectEntity) outlineBounds(entity).inflate(PickSlack) else outlineBounds(entity)
 
     private fun entityAt(physX: Float, physY: Float): Entity? {
         val minecraft = Minecraft.getInstance()
@@ -190,10 +216,13 @@ object WorldInspector {
         val (origin, end) = pickRay(player, physX, physY) ?: return null
         val searched = AABB(origin, end).inflate(1.0)
 
+        val objects = WorldObjects.all(level).filter { it.distanceToSqr(player) <= EditorReach * EditorReach }
+        val candidates = LinkedHashSet<Entity>(level.getEntities(player, searched) { it != player }).apply { addAll(objects) }
+
         var best: Entity? = null
         var bestDistance = Double.MAX_VALUE
-        level.getEntities(player, searched) { it != player }.forEach { candidate ->
-            val hit = candidate.boundingBox.inflate(PickSlack).clip(origin, end).orElse(null) ?: return@forEach
+        candidates.forEach { candidate ->
+            val hit = pickBounds(candidate).clip(origin, end).orElse(null) ?: return@forEach
             val distance = origin.distanceToSqr(hit)
             if (distance < bestDistance) {
                 bestDistance = distance

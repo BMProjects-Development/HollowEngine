@@ -72,7 +72,7 @@ entity.play("cheer", playMode = AnimationPlayMode.Loop, fadeIn = 0.1, fadeOut = 
 
 ## Writing your own animator
 
-An animator is an asset, not something a script builds: a stack of layers with a state machine, procedural bones, masks and blend weights. You put one together in the [animator editor](/docs/hollowengine/scripting/animator-editor) — create a `.animator` next to your model and name it in the model's `.hemeta`:
+An animator is an asset, not something a script builds: a stack of layers with a state machine, procedural bones, masks and blend weights. You put one together in the [animator editor](/docs/hollowengine/scripting/animator-editor). Create a `.animator` next to your model and name it in the model's `.hemeta`:
 
 ```toml
 animation-controller = "project:models/entity/guide.animator"
@@ -91,5 +91,5 @@ animation-controller = "hollowengine:standard_player"
 Take `StandardPlayerAnimatorPreset` as the worked example: it builds a locomotion state machine and a procedural look layer, which is very close to what most humanoid models want. Register your own under your own id, before models load.
 
 :::advice
-If your entity only needs to play a clip in response to an event, use `play(...)` from a script — an animator of your own is not needed for that.
+If your entity only needs to play a clip in response to an event, use `play(...)` from a script. Your own animator is not needed for that.
 :::

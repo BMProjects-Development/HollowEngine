@@ -18,7 +18,7 @@ internal object HollowAddonProbe {
             .filter(::isAddonJar).sortedBy(File::getName)
 
     /** Only jars accepted by the active mod loader can contribute a mod-bound addon. */
-    fun listEmbeddedModJars(): List<Pair<String, File>> = ModList.getMods().mapNotNull { mod ->
+    fun listEmbeddedModJars(): List<Pair<String, File>> = ModList.mods.mapNotNull { mod ->
         val file = runCatching { ModList.getFile(mod.id()) }.getOrNull() ?: return@mapNotNull null
         if (!file.isFile || !file.extension.equals("jar", ignoreCase = true)) return@mapNotNull null
         val containsDescriptor = runCatching {

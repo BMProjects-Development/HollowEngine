@@ -375,11 +375,6 @@ class DockingState {
         return setSplitFraction(split.id, splitFraction)
     }
 
-    fun resizeSplitByFraction(splitId: String, deltaFraction: Float): Boolean {
-        val split = root?.findNode(splitId) as? DockNode.Split ?: return false
-        return setSplitFraction(splitId, split.fraction + deltaFraction)
-    }
-
     fun dragTabInBar(
         stackId: String,
         itemId: String,

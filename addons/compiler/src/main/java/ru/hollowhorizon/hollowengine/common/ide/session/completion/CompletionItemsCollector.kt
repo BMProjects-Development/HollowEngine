@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.analysis.api.symbols.name
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtDeclaration
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItem
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItemTag
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionCloseness
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DeclarationCompletionItemBuilder
@@ -29,6 +30,7 @@ internal class CompletionItemsCollector(
     val nameFilter: (Name) -> Boolean,
     val symbolFilter: SymbolFilter,
     private val sink: CompletionSink = CompletionSink { true },
+    private val insertCallSyntax: Boolean = true,
 ) {
     fun interface SymbolFilter {
         context(_: KaSession) fun accepts(symbol: KaDeclarationSymbol): Boolean
@@ -124,7 +126,7 @@ internal class CompletionItemsCollector(
     @Suppress("FunctionName")
     private fun _add(symbol: KaDeclarationSymbol?, modify: (DeclarationCompletionItemBuilder.() -> Unit)?) {
         if (!acceptsSymbol(symbol)) return
-        val item = factory.createCompletionItem(symbol, this@CompletionItemsCollector.closeness) ?: return
+        val item = factory.createCompletionItem(symbol, this@CompletionItemsCollector.closeness)?.withCallSyntax() ?: return
         symbols += symbol
         add(item.applying(modify))
     }
@@ -134,7 +136,7 @@ internal class CompletionItemsCollector(
     private fun _add(signature: KaCallableSignature<*>?, modify: (DeclarationCompletionItemBuilder.() -> Unit)?) {
         if (!acceptsSymbol(signature?.symbol)) return
 
-        val item = factory.createCompletionItem(signature, this@CompletionItemsCollector.closeness) ?: return
+        val item = factory.createCompletionItem(signature, this@CompletionItemsCollector.closeness)?.withCallSyntax() ?: return
         symbols += signature.symbol
         add(item.applying(modify))
     }
@@ -148,6 +150,9 @@ internal class CompletionItemsCollector(
             modify()
         }
     }
+
+    private fun CompletionItem.Declaration.withCallSyntax(): CompletionItem.Declaration =
+        if (!insertCallSyntax && tag == CompletionItemTag.FUNCTION) copy(insert = name, moveCaret = 0) else this
 
     context(_: KaSession)
     private fun acceptsSymbol(symbol: KaDeclarationSymbol?): Boolean {

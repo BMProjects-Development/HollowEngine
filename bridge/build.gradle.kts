@@ -67,5 +67,5 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.named<Jar>("jar") {
-    archiveClassifier.set("")
+    archiveClassifier.set("dev")
 }

@@ -1,5 +1,4 @@
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
 import ru.hollowhorizon.hollowengine.common.utils.expressions.References
 import kotlin.test.assertEquals

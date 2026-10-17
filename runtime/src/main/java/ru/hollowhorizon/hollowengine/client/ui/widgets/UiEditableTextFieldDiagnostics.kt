@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.shape.UiPath
 import ru.hollowhorizon.hollowengine.client.ui.shape.UiShapeSize
 import ru.hollowhorizon.hollowengine.client.ui.shape.path
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextFonts
+import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 import ru.hollowhorizon.hollowengine.client.ui.text.caretPosition
 import kotlin.math.ceil

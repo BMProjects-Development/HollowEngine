@@ -1,11 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.scroll
 
-import ru.hollowhorizon.hollowengine.client.ui.PopupNode
-import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
-import ru.hollowhorizon.hollowengine.client.ui.UiNode
-import ru.hollowhorizon.hollowengine.client.ui.UiScrollSpec
-import ru.hollowhorizon.hollowengine.client.ui.layout.*
-import ru.hollowhorizon.hollowengine.client.ui.scrollSpec
+import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutNode
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiScrollbarReserve
+import ru.hollowhorizon.hollowengine.client.ui.layout.intersect
 import ru.hollowhorizon.hollowengine.client.ui.style.ResolvedUiScrollbarStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.scrollPinned
@@ -30,7 +29,9 @@ internal fun applyScrollRanges(
             x = if (spec.horizontal) overflowOf(bounds.x + bounds.width, viewport.x + viewport.width) else 0f,
             y = if (spec.vertical) overflowOf(bounds.y + bounds.height, viewport.y + viewport.height) else 0f,
         )
-        entry.setValue(layout.copy(scrollOffset = scrollState.clamp(spec.state, range), scrollRange = range))
+        val placed = scrollState.clamp(spec.state, range)
+        scrollState.settleRequest(spec.state, range)
+        entry.setValue(layout.copy(scrollOffset = placed, scrollRange = range))
     }
 }
 

@@ -5,10 +5,19 @@ internal object CutsceneLang {
 
     const val PROPERTIES = ROOT + "properties"
     const val TRACKS = ROOT + "tracks"
+    const val TRACKS_LISTING = ROOT + "tracks.listing"
+    const val TRACKS_ONLY_SELECTED = ROOT + "tracks.only_selected"
+    const val TRACKS_SHOW_ALL = ROOT + "tracks.show_all"
+    const val TRACKS_HIDE_UNSELECTED = ROOT + "tracks.hide_unselected"
+
+    const val SNAP = ROOT + "snap"
+    const val SNAP_UNIT = ROOT + "snap.unit"
+    const val SNAP_FPS = ROOT + "snap.fps"
 
     const val VIEW_DOPE_SHEET = ROOT + "view.dope_sheet"
     const val VIEW_CURVES = ROOT + "view.curves"
     const val FRAME_CURVES = ROOT + "view.frame_curves"
+    const val CURVE_HANDLES = ROOT + "view.curve_handles"
     const val FRAME_TIME = ROOT + "view.frame_time"
 
     const val CAPTURE_KEYFRAME = ROOT + "action.capture"

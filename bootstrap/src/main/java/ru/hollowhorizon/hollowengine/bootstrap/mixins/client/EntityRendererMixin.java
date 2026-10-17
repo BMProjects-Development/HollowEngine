@@ -10,7 +10,9 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityAttachment;
+import net.minecraft.world.entity.EntityAttachments;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -37,6 +39,12 @@ public class EntityRendererMixin {
 
         var bounds = BootstrapRuntimeManager.bridge().extendEntityCullingBounds(entity, vanillaBounds);
         return original.call(frustum, bounds);
+    }
+
+    @WrapOperation(method = "renderNameTag", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/EntityAttachments;getNullable(Lnet/minecraft/world/entity/EntityAttachment;IF)Lnet/minecraft/world/phys/Vec3;"))
+    private <T extends Entity> Vec3 nameplateOverColliders(EntityAttachments attachments, EntityAttachment attachment, int index, float yRot,
+                                                           Operation<Vec3> original, @Local(argsOnly = true) T entity) {
+        return BootstrapRuntimeManager.bridge().entityNameplateAttachment(entity, original.call(attachments, attachment, index, yRot));
     }
 
     @Inject(method = "renderNameTag", at = @At("HEAD"), cancellable = true)

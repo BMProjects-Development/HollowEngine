@@ -3,12 +3,12 @@ package ru.hollowhorizon.hollowengine.client.ui.entity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import net.minecraft.nbt.CompoundTag
+import ru.hollowhorizon.hollowengine.client.slots.ClientSlots
 import ru.hollowhorizon.hollowengine.client.slots.PlayerInventory
 import ru.hollowhorizon.hollowengine.client.slots.SlotGrid
 import ru.hollowhorizon.hollowengine.client.slots.Slots
-import ru.hollowhorizon.hollowengine.client.slots.ClientSlots
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityEditorSlots
 import ru.hollowhorizon.hollowengine.common.ui.UiData
 import ru.hollowhorizon.hollowengine.common.ui.UiScope

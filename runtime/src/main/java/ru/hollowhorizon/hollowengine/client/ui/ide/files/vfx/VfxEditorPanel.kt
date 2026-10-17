@@ -5,15 +5,25 @@ import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
-import ru.hollowhorizon.hollowengine.client.editor.GizmoHandleId
+import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
+import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoPointerWrap
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorColors
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimatorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.KeyInsertMenu
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPick
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.PublishTimeline
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.hasInspectableSelection
@@ -21,8 +31,9 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
-import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
+import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCameraTurn
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -68,11 +79,12 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
             withFrameNanos { frameNanos ->
                 state.preview.advanceCamera(frameNanos)
                 val rebuilt = state.preview.sync(document.effect, file.path)
+                state.playbackPreview.values.let { if (state.preview.data !== it) state.preview.data = it }
                 val sought = state.preview.applyPendingSeek()
                 val delta = state.preview.deltaSinceLastFrame(frameNanos)
                 if (session.timeline.isPlaying && delta > 0f) state.preview.advanceBy(delta)
                 if (rebuilt || session.timeline.isPlaying && !sought) {
-                    session.timeline.followPlayhead(state.preview.time)
+                    session.timeline.followPlayhead(state.preview.timelineTime)
                 }
             }
         }
@@ -81,9 +93,18 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
     val selected = state.selected?.takeIf { document.effect.node(it) != null }
 
     val timelineHasSelection = session.timeline.hasInspectableSelection()
-    PublishInspector(source = "vfx-${file.path}", key = selected to timelineHasSelection) {
+    val playbackPick = state.playbackPick
+    PublishInspector(source = "vfx-${file.path}", key = listOf(selected, timelineHasSelection, playbackPick)) {
         when {
             timelineHasSelection -> null
+            playbackPick != null -> playbackInspectorTarget(
+                lanes = session.playback,
+                pick = playbackPick,
+                conditions = VfxExpressionEditing,
+                eventHint = vfxText("event_hint"),
+                onRemoved = { state.playbackPick = null },
+            )
+
             selected != null -> vfxNodeInspector(document, state, selected)
             else -> vfxEffectInspector(document, state)
         }
@@ -91,7 +112,7 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
 
     PublishScene(
         source = "vfx-${file.path}",
-        key = listOf(document.revision, state.selected, state.expanded.toList(), state.rootExpanded),
+        key = listOf(document.revision, state.selected, state.selectedLane, state.expanded.toList(), state.rootExpanded),
     ) {
         vfxSceneTarget(document, state, file.path.substringAfterLast('/').substringBeforeLast('.'))
     }
@@ -110,8 +131,13 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
 
     Column(
         tags = listOf("ide-file-panel"),
-        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas)
-            .focusScope(),
+        modifier = Modifier.style(AnimatorStylesheet).background(AnimatorColors.Canvas).focusScope()
+            .onKeyInput { input ->
+                if (!input.repeat && TimelineKeys.handlePlayback(
+                        session.timeline, input.key, input.modifiers
+                    )
+                ) input.consume()
+            },
     ) {
         document.error?.let { message ->
             Text(
@@ -133,83 +159,98 @@ private fun Toolbar(state: VfxEditorState) {
     val timeline = state.session.timeline
     val preview = state.preview
     Row(tags = listOf("viewport-toolbar"), modifier = Modifier.position(8.px, 8.px)) {
-        AnimatorIconButton(
+        IconButton(
             icon = if (timeline.isPlaying) PauseIcon else PlayIcon,
-            tooltip = vfxText(if (timeline.isPlaying) "pause" else "play"),
-            size = 12f,
+            tooltip = HollowKeys.PLAY.hint(vfxText(if (timeline.isPlaying) "pause" else "play")),
+            iconSize = 12f,
             active = timeline.isPlaying,
         ) { timeline.isPlaying = !timeline.isPlaying }
-        AnimatorIconButton(RestartIcon, vfxText("restart"), size = 12f) {
-            preview.restart()
-            timeline.followPlayhead(0f)
-        }
-        AnimatorIconButton(FloorIcon, vfxText("toggle_floor"), size = 12f, active = preview.showFloor) {
+        IconButton(RestartIcon, playbackText("preview_reset"), iconSize = 12f) { state.playbackPreview.reset() }
+        IconButton(FloorIcon, vfxText("toggle_floor"), iconSize = 12f, active = preview.showFloor) {
             preview.showFloor = !preview.showFloor
         }
-        AnimatorIconButton(ShapeIcon, vfxText("toggle_shape"), size = 12f, active = preview.showShape) {
+        IconButton(ShapeIcon, vfxText("toggle_shape"), iconSize = 12f, active = preview.showShape) {
             preview.showShape = !preview.showShape
         }
-        GizmoModes.forEach { (mode, icon, tooltip) ->
-            AnimatorIconButton(icon, tooltip.lang, size = 12f, active = mode in state.gizmoModes) {
-                state.gizmoModes = if (mode in state.gizmoModes) state.gizmoModes - mode else state.gizmoModes + mode
-            }
-        }
+        GizmoToolbarButtons()
     }
 }
 
 /** What editor is looking at, as opposed to what it is editing. */
-internal class VfxEditorState(private val document: HollowIdeVfxDocument) {
+internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxInspectorState(), VfxNodeSelection {
     val preview = VfxPreviewState()
     val session = VfxTimelineSession(document, preview).also { it.timeline.isPlaying = true }
 
+    /** The data the preview plays the effect with, in place of a handle's. */
+    val playbackPreview = PlaybackPreview()
+
+    /** The event or section picked on the timeline, which the inspector shows instead of the node. */
+    var playbackPick by mutableStateOf<PlaybackPick?>(null)
+
     init {
         document.onEdit = session::recordEdit
+        preview.held = session::held
+        session.playback.onPick = { pick -> playbackPick = pick }
+        playbackPreview.onReset = {
+            preview.data = playbackPreview.values
+            preview.restart()
+            session.timeline.followPlayhead(0f)
+        }
     }
 
-    /** A drag in the viewport: one step back in the file, and one in the timeline for the keys it records. */
+    /** A drag in the viewport: one step back in the file, the keys it records included. */
     fun beginGesture() {
         document.beginGesture()
-        session.timeline.beginHistoryTransaction("Record keys")
+        session.timeline.beginHistoryTransaction(TimelineEdits.RECORD_KEYS)
     }
 
+    /** The timeline's keys go in while the file's step is still open, so both go back together. */
     fun endGesture() {
-        document.endGesture()
         session.timeline.commitHistoryTransaction()
+        document.endGesture()
     }
 
-    var selected by mutableStateOf<String?>(null)
+    override var selected by mutableStateOf<String?>(null)
         private set
     val expanded = mutableStateListOf<String>()
     var rootExpanded by mutableStateOf(true)
 
-    /** Which inspector sections are open, kept here so they survive switching between nodes. */
-    private val sections = mutableStateMapOf<String, Boolean>()
-
-    /** The material of the selected surface on its own, in the material section of the inspector. */
-    val materialPreview = materialPreviewState()
+    /** The events or the sections, when the scene picked them in place of a node; null otherwise. */
+    var selectedLane by mutableStateOf<String?>(null)
 
     /** The shape handle being dragged, with node as it was when drag started. */
     var drag: VfxGizmoHandle? = null
 
-    /** The transform gizmo of the world, drawn over the preview, and what it is set to move. */
+    /** The transform gizmo of the world, drawn over the preview. */
     val transformGizmo = VfxTransformGizmo()
-    var gizmoModes by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
-    var transformDrag: VfxTransformDrag? = null
-    var hoveredHandle by mutableStateOf<GizmoHandleId?>(null)
+
+    /** Turns the preview to a view picked on its axes or by the numpad. */
+    val cameraTurn = OrbitCameraTurn(preview)
+
+    /** Where the preview is on the surface, for a menu opened at the pointer. */
+    var viewportBounds = UiRect.Zero
+
+    /** Where the insert-key menu is open, at the pointer; null while it is closed. */
+    var keyMenu by mutableStateOf<UiRect?>(null)
+
+    /** Where the pointer last was: where a transform from the keyboard starts. */
+    var pointerX = 0f
+    var pointerY = 0f
 
     /** What dragged handle is set to right now, drawn beside it. */
     var readout by mutableStateOf<VfxGizmoReadout?>(null)
 
-    fun isSectionOpen(key: String): Boolean = sections[key] ?: false
-
-    fun toggleSection(key: String) {
-        sections[key] = !isSectionOpen(key)
+    override fun select(id: String?) {
+        transformGizmo.session.settle()
+        selected = id
+        selectedLane = null
+        playbackPick = null
+        session.select(id)
+        session.timeline.clearSelection()
     }
 
-    fun select(id: String?) {
-        selected = id
-        id?.let(session::touch)
-        session.timeline.clearSelection()
+    override fun reveal(parent: String?) {
+        if (parent == null) rootExpanded = true else if (parent !in expanded) expanded.add(parent)
     }
 
     fun focusProperty(nodeId: String, property: VfxProperty) = session.focus(nodeId, property)
@@ -228,16 +269,24 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     val gizmoKey = listOf(
         preview.yaw, preview.pitch, preview.distance, preview.targetX, preview.targetY, preview.targetZ,
         preview.viewportWidth, preview.viewportHeight, preview.time, preview.showShape, preview.revision, node,
-        state.gizmoModes, state.session.timeline.isRecording,
+        GizmoSettings.modes, GizmoSettings.orientation, state.session.timeline.isRecording,
     )
     val gizmo = remember(gizmoKey) {
         if (node == null) VfxGizmo.EMPTY else VfxGizmos.build(preview, node, runtime, preview.showShape, driven)
     }
     val transform = state.transformGizmo
-    val handles = remember(gizmoKey) {
-        if (node == null || runtime == null || preview.viewportWidth <= 1f) return@remember emptyList()
-        transform.capture(preview)
-        transform.handles(runtime.frame, state.gizmoModes, driven)
+    val session = transform.session
+    GizmoPointerWrap(session, state.viewportBounds, state.pointerX, state.pointerY)
+    // The node where the preview has it now, made anew for every event: the session keeps the one a move began with.
+    val target: () -> GizmoTarget? = {
+        val current = selected?.let { document.effect.node(it) }
+        val placed = selected?.let { preview.instance?.node(it) }
+        if (current == null || placed == null || preview.viewportWidth <= 1f) {
+            null
+        } else {
+            transform.capture(preview)
+            VfxNodeTarget(document, state, current.id, placed.frame, placed.parent?.frame, current.transform)
+        }
     }
 
     Box(
@@ -247,65 +296,87 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
         modifier = Modifier.size(100.percent, 100.percent).clip().onPlaced { rect ->
             preview.viewportWidth = rect.width
             preview.viewportHeight = rect.height
-        }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus()
-            .onKeyInput { input -> if (handleHistoryKeys(document, input)) input.consume() }.onPress { event ->
-                val left = event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
-                val handle = if (left) gizmo.handleAt(event.localX, event.localY) else null
-                val moving = if (left && handle == null && node != null && runtime != null) {
-                    transform.pick(handles, event.localX, event.localY)?.let { picked ->
-                        transform.begin(picked, runtime.frame, runtime.parent?.frame, node.transform, event.localX, event.localY)
-                    }
-                } else null
-                state.drag = handle
-                state.transformDrag = moving
-                state.readout = null
-                if (handle != null || moving != null) state.beginGesture() else preview.beginCameraDrag()
-            }.onDrag { event ->
-                val handle = state.drag
-                val moving = state.transformDrag
-                val current = selected?.let { document.effect.node(it) }
-                when {
-                    moving != null && current != null -> {
-                        transform.drag(moving, event.localX, event.localY, event.modifiers)?.let { placed ->
-                            document.edit { it.withNode(current.withCommon(transform = placed)) }
-                        }
-                        state.readout = transform.labelAt(moving)?.let { (x, y) -> VfxGizmoReadout(x, y, moving.label) }
-                    }
-
-                    handle != null && current != null -> {
-                        val fine = event.modifiers and GLFW.GLFW_MOD_SHIFT != 0
-                        val snap = event.modifiers and GLFW.GLFW_MOD_CONTROL != 0
-                        val distance = VfxGizmos.dragDistance(handle, event.dragTotalX, event.dragTotalY, fine, snap)
-                        document.edit { it.withNode(handle.apply(current, distance)) }
-                        state.readout = VfxGizmoReadout(handle.x, handle.y, handle.readout(distance))
-                    }
-
-                    event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT -> preview.pan(event.dragTotalX, event.dragTotalY)
-                    else -> preview.orbit(event.dragTotalX, event.dragTotalY)
+            state.viewportBounds = rect
+        }.input(hoverable = true, draggable = true).cursor(UiCursorShape.HAND).focus().onKeyInput { input ->
+            if (input.repeat) return@onKeyInput
+            if (selected != null && !session.isBusy && HollowKeys.INSERT_KEY.matches(input)) {
+                val bounds = state.viewportBounds
+                state.keyMenu = UiRect(bounds.x + state.pointerX, bounds.y + state.pointerY, 0f, 0f)
+                input.consume()
+                return@onKeyInput
+            }
+            val idle = !session.isBusy
+            val taken = idle && UndoKeys.handle(
+                document.history, input.key, input.modifiers
+            ) || idle && state.cameraTurn.handleKey(input.key, input.modifiers) || session.key(
+                target(), input.key, input.modifiers, state.pointerX, state.pointerY
+            )
+            if (taken) input.consume()
+        }.onPress { event ->
+            state.pointerX = event.localX
+            state.pointerY = event.localY
+            state.readout = null
+            val left = event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
+            // A shape handle wins over the transform handles; during a keyboard transform every click is the session's.
+            val handle = if (left && session.keyboard == null) gizmo.handleAt(event.localX, event.localY) else null
+            if (handle == null && session.press(target(), event.localX, event.localY, event.button)) {
+                event.consume()
+                return@onPress
+            }
+            state.drag = handle
+            if (handle != null) state.beginGesture() else preview.beginCameraDrag()
+        }.onDrag { event ->
+            val handle = state.drag
+            val current = selected?.let { document.effect.node(it) }
+            when {
+                session.drag != null -> {
+                    transform.capture(preview)
+                    session.dragTo(event.localX, event.localY, event.modifiers)
+                    state.readout = session.readout()?.let { (x, y, value) -> VfxGizmoReadout(x, y, value.toFloat()) }
                 }
-                event.consume()
-            }.onRelease {
-                if (state.drag != null || state.transformDrag != null) state.endGesture()
-                state.drag = null
-                state.transformDrag = null
-                state.readout = null
-            }.onHover { event ->
-                val over = transform.pick(handles, event.localX, event.localY)?.id
-                if (over != state.hoveredHandle) state.hoveredHandle = over
-            }.onScroll { event ->
-                preview.zoom(event.scrollY)
-                event.consume()
-            }.drawBehind(key = preview) {
-                preview.draw(this)
-            },
+
+                handle != null && current != null -> {
+                    val fine = event.modifiers and GLFW.GLFW_MOD_SHIFT != 0
+                    val snap = event.modifiers and GLFW.GLFW_MOD_CONTROL != 0
+                    val distance = VfxGizmos.dragDistance(handle, event.dragTotalX, event.dragTotalY, fine, snap)
+                    document.edit { it.withNode(handle.apply(current, distance)) }
+                    state.readout = VfxGizmoReadout(handle.x, handle.y, handle.readout(distance))
+                }
+
+                event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT -> preview.pan(event.dragTotalX, event.dragTotalY)
+                else -> preview.orbit(event.dragTotalX, event.dragTotalY)
+            }
+            event.consume()
+        }.onRelease {
+            if (state.drag != null) state.endGesture()
+            session.release()
+            state.drag = null
+            state.readout = null
+        }.onHover { event ->
+            state.pointerX = event.localX
+            state.pointerY = event.localY
+            transform.capture(preview)
+            if (!session.moveTo(event.localX, event.localY, event.modifiers)) {
+                session.hover(target(), event.localX, event.localY)
+            }
+        }.onScroll { event ->
+            preview.zoom(event.scrollY)
+            event.consume()
+        }.drawBehind(key = preview) {
+            preview.draw(this)
+        },
     ) {
         Box(
             modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
-                .drawBehind(key = listOf(gizmo, handles, state.drag?.id, state.hoveredHandle)) {
+                .drawBehind(key = listOf(gizmoKey, state.drag?.id, session.hovered, session.drag, session.keyboard)) {
                     drawGizmo(gizmo, state.drag?.id)
-                    transform.draw(this, handles, state.hoveredHandle, state.transformDrag)
+                    session.draw(this, target())
                 },
         )
+        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
+        KeyInsertMenu(state.keyMenu, onPick = { parts -> selected?.let { state.session.insertKeys(it, parts) } }) {
+            state.keyMenu = null
+        }
         state.readout?.let { readout ->
             Text(
                 formatNumber(readout.value),
@@ -313,16 +384,6 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
                 modifier = Modifier.position((readout.x + 10f).px, (readout.y - 20f).px).inputTransparent(),
             )
         }
-    }
-}
-
-private fun handleHistoryKeys(document: HollowIdeVfxDocument, input: UiKeyInput): Boolean {
-    if (input.repeat || !input.control) return false
-    return when (input.key) {
-        GLFW.GLFW_KEY_Z if input.shift -> document.redo()
-        GLFW.GLFW_KEY_Z -> document.undo()
-        GLFW.GLFW_KEY_Y -> document.redo()
-        else -> false
     }
 }
 
@@ -362,13 +423,6 @@ private fun ParticleCounter(preview: VfxPreviewState) {
             .inputTransparent(),
     )
 }
-
-/** The modes of the transform gizmo, with the icons and names the IDE toolbar gives them for the world. */
-private val GizmoModes = listOf(
-    Triple(GizmoEditMode.TRANSLATE, "hollowengine:textures/gui/icons/gizmo_translate.svg", "hollowengine.gui.ide.gizmo.translate"),
-    Triple(GizmoEditMode.ROTATE, "hollowengine:textures/gui/icons/gizmo_rotate.svg", "hollowengine.gui.ide.gizmo.rotate"),
-    Triple(GizmoEditMode.SCALE, "hollowengine:textures/gui/icons/gizmo_scale.svg", "hollowengine.gui.ide.gizmo.scale"),
-)
 
 private val HandleOutline = UiColor(0.05f, 0.05f, 0.06f, 0.9f)
 private val CounterBackground = UiColor(0.06f, 0.07f, 0.08f, 0.7f)

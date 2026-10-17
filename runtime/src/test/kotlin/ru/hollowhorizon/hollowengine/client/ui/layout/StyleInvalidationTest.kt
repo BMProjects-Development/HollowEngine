@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.layout
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.*
+import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 import ru.hollowhorizon.hollowengine.client.ui.text.Bold
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame

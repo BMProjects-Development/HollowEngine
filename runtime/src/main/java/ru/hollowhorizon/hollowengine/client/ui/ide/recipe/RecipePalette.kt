@@ -203,6 +203,7 @@ private fun PaletteCell(session: RecipeEditorSession, entry: PaletteEntry) {
                 UiDragItem(payload = entry.pick, label = entry.name)
             }.onRelease { event ->
                 if (!dragged[0] && event.isLeftClick()) session.pick(entry.pick, add = event.isShiftDown())
+                event.consume()
             }
     InlineWidget(
         id = "recipe-palette-${entry.key}",

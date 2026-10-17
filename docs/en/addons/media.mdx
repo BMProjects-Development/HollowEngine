@@ -1,0 +1,88 @@
+---
+title: Media addon
+order: 8
+---
+
+<center><h1>Media addon</h1></center>
+
+*Play videos and streams in the game.*
+
+The Media addon (id `hollowengine-media`) decodes video and audio with FFmpeg. It offers a fullscreen player, a `Video` widget for UI scripts, and a command.
+
+:::advice
+FFmpeg is a native library, so this addon is loaded at game start. After installing or updating it, restart Minecraft. Natives are bundled for Windows, Linux (x64 and ARM64), and macOS (Intel and Apple Silicon).
+:::
+
+## Sources
+
+A source is either:
+
+- a **pack resource**, addressed as `resource:namespace:videos/intro.mp4`;
+- a **local file**. A relative path is resolved from the `hollowengine` folder; an absolute path is used as it is;
+- a **URL** of any scheme that FFmpeg understands, such as `https://`.
+
+Decoding runs off the render thread, and the addon keeps only a few frames queued.
+
+## The command
+
+```text
+/he video "<source>" <player>
+```
+
+This opens the fullscreen player for the chosen player. The source must be quoted:
+
+```text
+/he video "videos/intro.mp4" @a
+/he video "https://example.com/stream.m3u8" @p
+```
+
+## In UI scripts
+
+The `Video` composable plays inline in a screen. See [UI scripts](/docs/hollowengine/scripting/ui):
+
+```kotlin
+Video(
+    source = "videos/intro.mp4",
+    controls = true,
+    autoPlay = true,
+    volume = 0.8f,
+    onEnded = { /* close the screen, continue the story... */ },
+)
+```
+
+| Parameter | Meaning |
+| --- | --- |
+| `source` | File path or URL. |
+| `controls` | Show a control bar with play or pause, time, a seek bar, and volume on hover. |
+| `autoPlay` | Start immediately. |
+| `volume` | `0` to `1`. |
+| `startSeconds` | Position to start at. |
+| `fit` | How the frame fits its box: `CONTAIN` by default. |
+| `onEnded` | Called when playback finishes. |
+
+The player belongs to the composable and is released when it leaves the composition. Without the addon, the widget shows a "no Media addon" placeholder instead.
+
+## From an addon or a Kotlin script
+
+Other code reaches the addon through `VideoApi.find()`, which returns `null` when it is not installed:
+
+```kotlin
+val video = VideoApi.find() ?: return
+
+video.play("videos/intro.mp4")                 // fullscreen, closes at the end
+val player = video.createPlayer("videos/loop.mp4")   // no UI: draw player.texture yourself
+player?.pause()
+player?.seek(12.5)
+player?.close()
+```
+
+`VideoPlaybackOptions` sets `closeOnEnd`, `volume`, `startSeconds`, `autoPlay`, and the frame and audio queue sizes. A `VideoPlayer` exposes `texture`, `videoWidth`, `videoHeight`, `durationSeconds`, `positionSeconds`, `playing`, `ended`, and `error`, and can be controlled with `play()`, `pause()`, `seek(seconds)`, and `setVolume(volume)`.
+
+
+## Audio tracks
+
+The addon publishes an FFmpeg decoder to the engine's shared sound system. Use `player.playSound`, `level.playSound`, or `ClientSounds.play` for MP3, FLAC, AAC/M4A, Opus, and audio tracks inside MP4, WebM, MKV, and other FFmpeg containers. A video track is not required when requesting sound. OGG Vorbis and PCM/float WAV work without the addon. See [Sounds](/docs/hollowengine/scripting/sounds).
+
+`MediaSource.Resource`, `MediaSource.File`, and `MediaSource.Url` describe the same physical source for both sound and video. `VideoApi` also accepts a typed `MediaSource`. Pack resources are read through custom FFmpeg IO; they are not extracted to temporary files. Seeking a compressed pack resource may require reopening and reading its compressed bytes.
+
+The former `hollowengine-video` addon is now `hollowengine-media`; install the new jar instead of keeping both versions. The `/he video` command, `Video` widget, and `VideoApi` remain available. The video player retains its presentation clock and frame queues; audio-only playback uses Minecraft's sound engine and its category volumes.

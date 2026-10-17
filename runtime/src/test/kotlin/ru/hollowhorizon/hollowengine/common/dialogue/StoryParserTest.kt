@@ -1,18 +1,13 @@
 package ru.hollowhorizon.hollowengine.common.dialogue
 
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryExpression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryLineKind
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryParser
 import ru.hollowhorizon.hollowengine.common.dialogue.lang.TextPart
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import ru.hollowhorizon.hollowengine.common.scripting.ide.story.StoryScriptingAnalyzer
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
+import kotlin.test.*
 
 class StoryParserTest {
     @Test
