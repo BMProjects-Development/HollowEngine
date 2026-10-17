@@ -61,7 +61,7 @@ internal class HollowIdeProjectPackaging(
     fun openSettings() {
         properties = HollowProject.properties()
         val installed = HollowAddonManager.statuses.map { it.descriptor.id }.distinct().sorted()
-        settings = ProjectSettingsForm(properties, installed, ModList.getMods())
+        settings = ProjectSettingsForm(properties, installed, ModList.mods)
     }
 
     fun saveSettings() {

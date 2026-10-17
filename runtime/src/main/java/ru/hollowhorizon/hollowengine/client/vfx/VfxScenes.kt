@@ -80,7 +80,7 @@ class VfxScene(private val environment: VfxEnvironment) {
 
         val playback = VfxPlayback(handle, instance, entity)
         playback.moveTo(position)
-        if (!data.isEmpty()) playback.applyData(data)
+        if (!data.isEmpty) playback.applyData(data)
 
         playbacks.removeAll { it.handle == handle }
         playbacks += playback

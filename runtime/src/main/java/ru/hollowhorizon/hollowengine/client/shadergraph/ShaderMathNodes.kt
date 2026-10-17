@@ -91,7 +91,7 @@ internal object ShaderMathNodes {
         option("type", "auto", "float", "vec2", "vec3", "vec4")
         pins { node ->
             ShaderExpression.parse(node.options["expression"] ?: DEFAULT_EXPRESSION).variables.map { name ->
-                ShaderPinSpec(name, ShaderPinType.ANY, listOf(0f), ShaderInput.forExpression(name))
+                ShaderPinSpec(name, ANY, listOf(0f), ShaderInput.forExpression(name))
             }
         }
         check { node ->

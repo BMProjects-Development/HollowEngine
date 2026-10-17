@@ -437,10 +437,10 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         LOGGER.info(
             "Production: {}, Can attach renderdoc: {}, Platform: {}",
             isProduction,
-            HollowCoreLoader.canAttachRenderdoc(),
+            HollowCoreLoader.enableRenderDoc,
             Util.getPlatform().name
         )
-        if (!HollowCoreLoader.canAttachRenderdoc() || Util.getPlatform() != Util.OS.WINDOWS) {
+        if (!HollowCoreLoader.enableRenderDoc || Util.getPlatform() != Util.OS.WINDOWS) {
             return
         }
 
@@ -448,7 +448,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         val name = System.mapLibraryName("renderdoc")
         var detected = false
         for (folder in path.split(";")) {
-            if (java.nio.file.Files.exists(java.nio.file.Path.of("$folder/$name"))) {
+            if (java.nio.file.Files.exists(Path.of("$folder/$name"))) {
                 detected = true
                 break
             }
@@ -457,7 +457,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         LOGGER.info("Is detected renderdoc: {}", detected)
 
         if (!detected) {
-            val renderDoc = java.nio.file.Path.of("C:/Program Files/RenderDoc/renderdoc.dll")
+            val renderDoc = Path.of("C:/Program Files/RenderDoc/renderdoc.dll")
             if (java.nio.file.Files.exists(renderDoc)) {
                 try {
                     LOGGER.info("Trying load system renderdoc")
@@ -833,12 +833,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         return !IrisHelper.isShadowRendering()
     }
 
-    override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, java.util.function.Supplier<LayerDefinition>>) {
+    override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, Supplier<LayerDefinition>>) {
         val eventDefinitions = HashMap<ModelLayerLocation, () -> LayerDefinition>()
         val event = RegisterEntityLayersDefinitions(eventDefinitions)
         RegisterEntityLayersDefinitions.post(event)
         eventDefinitions.forEach { (location, definition) ->
-            definitions[location] = java.util.function.Supplier { definition() }
+            definitions[location] = Supplier { definition() }
         }
     }
 

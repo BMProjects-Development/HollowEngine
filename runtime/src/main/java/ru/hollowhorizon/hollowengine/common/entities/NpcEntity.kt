@@ -103,14 +103,14 @@ class NpcEntity : PathfinderMob {
     }
 
     override fun tickDeath() {
-        ++this.deathTime;
+        ++this.deathTime
 
         val c0 = this.deathTime >= this.maxDeathTime
         val c1 = !this.level().isClientSide()
         val c2 = !this.isRemoved
         if (c0 && c1 && c2) {
-            this.level().broadcastEntityEvent(this, 60);
-            this.remove(RemovalReason.KILLED);
+            this.level().broadcastEntityEvent(this, 60)
+            this.remove(RemovalReason.KILLED)
         }
     }
 
@@ -142,7 +142,7 @@ class NpcEntity : PathfinderMob {
         private const val INVENTORY_KEY = "NpcInventory"
 
         fun createAttributes(): AttributeSupplier.Builder {
-            return LivingEntity.createLivingAttributes()
+            return createLivingAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.23)
                 .add(Attributes.ARMOR, 0.0)

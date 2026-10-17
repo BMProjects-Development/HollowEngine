@@ -17,7 +17,7 @@ class LazyObject(val id: Long, val element: Element, val doc: Document) {
     enum class Flags { NULL, BEING_CONSTRUCTED, FAILED_TO_CONSTRUCT }
 
     infix fun Int.wo(other: Flags) = and(other.ordinal.inv())
-    infix fun Int.or(f: LazyObject.Flags) = or(f.ordinal)
+    infix fun Int.or(f: Flags) = or(f.ordinal)
 
     fun <T> get(dieOnError: Boolean = false) = get(dieOnError) as? T
 

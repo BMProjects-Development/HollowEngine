@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.client.models.fbx;
+package ru.hollowhorizon.hollowengine.client.models.fbx
 
 object Util {
     fun addOffset(prefix: String, text: String, offset: Int) =

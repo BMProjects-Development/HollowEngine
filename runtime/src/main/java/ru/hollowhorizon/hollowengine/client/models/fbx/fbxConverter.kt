@@ -33,9 +33,9 @@ enum class TransformationComp {
     /** note: this returns the REAL fbx property names  */
     val nameProperty
         get() = when (this) {
-            Tc.Translation -> "Lcl Translation"
-            Tc.Rotation -> "Lcl Rotation"
-            Tc.Scaling -> "Lcl Scaling"
+            Translation -> "Lcl Translation"
+            Rotation -> "Lcl Rotation"
+            Scaling -> "Lcl Scaling"
             else -> toString()
         }
 
@@ -301,7 +301,7 @@ fun Document.getSkinForModel(model: Model): ru.hollowhorizon.hollowengine.client
     val skinConnections = getConnectionsBySourceSequenced(model.id, "Deformer")
 
     for (conn in skinConnections) {
-        val skinObj = conn.destinationObject as? ru.hollowhorizon.hollowengine.client.models.fbx.Skin
+        val skinObj = conn.destinationObject as? Skin
         if (skinObj != null) {
             return convertSkin(skinObj)
         }
@@ -309,9 +309,9 @@ fun Document.getSkinForModel(model: Model): ru.hollowhorizon.hollowengine.client
     return null
 }
 
-fun convertSkin(fbxSkin: ru.hollowhorizon.hollowengine.client.models.fbx.Skin): ru.hollowhorizon.hollowengine.client.models.internal.Skin {
+fun convertSkin(fbxSkin: Skin): ru.hollowhorizon.hollowengine.client.models.internal.Skin {
     val jointsIds = mutableListOf<Int>()
-    val inverseBindMatrices = mutableListOf<ru.hollowhorizon.hollowengine.common.utils.math.Mat4f>()
+    val inverseBindMatrices = mutableListOf<Mat4f>()
 
     for (cluster in fbxSkin.clusters) {
         cluster.node?.let { model ->
@@ -324,7 +324,7 @@ fun convertSkin(fbxSkin: ru.hollowhorizon.hollowengine.client.models.fbx.Skin): 
         }
     }
 
-    return ru.hollowhorizon.hollowengine.client.models.internal.Skin(
+    return Skin(
         jointsIds,
         inverseBindMatrices.toTypedArray()
     )
@@ -648,13 +648,13 @@ fun getRotationMatrix(mode: Model.RotOrder, rotation: Vec3f): Mat4f {
 
 
 fun Document.convertAnimations() {
-    val fps = globals?.timeMode ?: FileGlobalSettings.FrameRate._30
+    val fps = globals?.timeMode ?: FrameRate._30
     val custom = globals?.customFrameRate ?: -1f
     val frameRate = frameRateToDouble(fps, custom.toDouble())
     animationStacks().forEach { convertAnimationStack(it) }
 }
 
-fun frameRateToDouble(fp: FileGlobalSettings.FrameRate, customFPSVal: Double = -1.0) = when (fp) {
+fun frameRateToDouble(fp: FrameRate, customFPSVal: Double = -1.0) = when (fp) {
     Fr.DEFAULT -> 1.0
     Fr._120 -> 120.0
     Fr._100 -> 100.0
