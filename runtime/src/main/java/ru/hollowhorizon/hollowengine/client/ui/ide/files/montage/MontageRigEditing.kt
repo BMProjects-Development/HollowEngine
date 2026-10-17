@@ -6,6 +6,42 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.models.*
 
 /**
+ * What the rig editing of a montage needs from its timeline: where the playhead is and what the keys say there, and
+ * where an edit goes, into keys while the timeline records or held over the tracks until the playhead moves.
+ */
+internal interface MontageRigTimeline {
+    /** Where the playhead is, which the fields are shown at. */
+    val time: Float
+
+    /** Whether edits of what the timeline can animate go in as keys at the playhead. */
+    val isRecording: Boolean
+
+    /** Where the montage has [bone] at the playhead, as a rig pose, what is held there included. */
+    fun bonePose(bone: String): RigPose
+
+    /** Whether [field] of [id] on [bone] has keys, so the timeline writes it at the playhead. */
+    fun isAnimated(bone: String?, id: String, field: String): Boolean
+
+    /** Keys [pose] of [bone] at the playhead. */
+    fun keyPose(bone: String, pose: RigPose)
+
+    /** Holds [pose] of [bone] at the playhead. */
+    fun holdBone(bone: String, pose: RigPose)
+
+    /** Keys [field] of [id] on [bone] at the playhead, with what the keys there said before the edit. */
+    fun keyField(bone: String?, id: String, field: String, value: FloatArray, shown: FloatArray)
+
+    /** Holds [names] of the attachment [spec] on [bone] at the playhead, at the values [spec] has. */
+    fun holdFields(bone: String?, spec: RigAttachmentSpec, names: Collection<String>)
+
+    /** [rig] with the fields held at the playhead written over its tracks. */
+    fun withHeldFields(rig: ModelRig): ModelRig
+
+    /** [montage] with the bones held at the playhead written over their tracks. */
+    fun withHeldBones(montage: Montage): Montage
+}
+
+/**
  * What a montage hangs on its preview model, edited as a rig, so the scene, the inspector and the gizmo of the
  * rig editor work on it unchanged.
  */
@@ -13,38 +49,8 @@ internal class MontageRigEditing(
     private val document: HollowIdeMontageDocument,
     private val modelRig: () -> ModelRig,
 ) : RigEditing {
-    /**
-     * Where the montage moves a bone at the playhead, as a rig pose, so the bone gizmo starts from it; null for a
-     * bone the montage does not move.
-     */
-    var bonePose: (String) -> RigPose? = { null }
-
-    /** Told when an edit moves a bone, as the bone gizmo does: the montage keys the bone there. */
-    var onBonePose: ((String, RigPose) -> Unit)? = null
-
-    /** Where the playhead is, which the fields are shown at. */
-    var time: () -> Float = { 0f }
-
-    /** Whether the timeline records keys: edits of what it can animate go in as keys at the playhead. */
-    var recording: () -> Boolean = { false }
-
-    /** Whether [field] of [id] on [bone] has keys, so the timeline writes it at the playhead. */
-    var animated: (bone: String?, id: String, field: String) -> Boolean = { _, _, _ -> false }
-
-    /** Told when an edit moves a bone while keys are not recorded: the pose is held until the playhead moves. */
-    var onBoneHold: ((String, RigPose) -> Unit)? = null
-
-    /** Told when an edit changes fields the timeline writes while keys are not recorded: they are held the same way. */
-    var onFieldHold: ((bone: String?, spec: RigAttachmentSpec, fields: List<String>) -> Unit)? = null
-
-    /** The rig with what is held at the playhead written over the tracks. */
-    var held: (ModelRig) -> ModelRig = { it }
-
-    /** The montage with the bones held at the playhead written over their tracks. */
-    var heldBones: (Montage) -> Montage = { it }
-
-    /** Told to key [field] of [id] on [bone] at the playhead, with what it showed before the edit. */
-    var onFieldKey: ((bone: String?, id: String, field: String, value: FloatArray, shown: FloatArray) -> Unit)? = null
+    /** The timeline of the montage, which binds itself here as it is made. */
+    lateinit var timeline: MontageRigTimeline
 
     override val rig: ModelRig get() = shown(authored())
 
@@ -58,7 +64,7 @@ internal class MontageRigEditing(
         after.bones.forEach { (name, bone) ->
             if (bone.pose == before.bone(name)?.pose) return@forEach
             val pose = bone.pose ?: RigPose.IDENTITY
-            if (recording()) onBonePose?.invoke(name, pose) else onBoneHold?.invoke(name, pose)
+            if (timeline.isRecording) timeline.keyPose(name, pose) else timeline.holdBone(name, pose)
         }
         val resolved = resolve(authored, before, after, keyed(authored))
         document.edit(mergeKey, label = label) { montage -> montage.withAttachments(base, resolved) }
@@ -67,10 +73,10 @@ internal class MontageRigEditing(
     private fun authored(): ModelRig = modelRig().overlay(document.montage.ownRig())
 
     /** [authored] as it shows at the playhead, with what is held there over it. */
-    private fun shown(authored: ModelRig): ModelRig = held(keyed(authored))
+    private fun shown(authored: ModelRig): ModelRig = timeline.withHeldFields(keyed(authored))
 
     /** [authored] as the keys have it at the playhead, without what is held over them. */
-    private fun keyed(authored: ModelRig): ModelRig = posed(authored.withTracks(document.montage.tracks, time()))
+    private fun keyed(authored: ModelRig): ModelRig = posed(authored.withTracks(document.montage.tracks, timeline.time))
 
     /**
      * [after] as it is authored. While keys are recorded, what an edit changed in a field the timeline can animate
@@ -83,13 +89,13 @@ internal class MontageRigEditing(
             val own = authored.holder(bone).attachment(spec.id) ?: return@fold rig
             val changed = if (spec == shown) emptyList() else RigFields.changed(shown, spec)
             val animatable = RigFields.animatable(shown).mapTo(HashSet()) { it.name }
-            val timed = changed.filter { it in animatable && (recording() || animated(bone, spec.id, it)) }
-            if (recording()) timed.forEach { field ->
+            val timed = changed.filter { it in animatable && (timeline.isRecording || timeline.isAnimated(bone, spec.id, it)) }
+            if (timeline.isRecording) timed.forEach { field ->
                 val value = RigFields.read(spec, field) ?: return@forEach
                 val was = RigFields.read(keyed.holder(bone).attachment(spec.id) ?: shown, field) ?: return@forEach
-                onFieldKey?.invoke(bone, spec.id, field, value, was)
+                timeline.keyField(bone, spec.id, field, value, was)
             } else if (timed.isNotEmpty()) {
-                onFieldHold?.invoke(bone, spec, timed)
+                timeline.holdFields(bone, spec, timed)
             }
             val result = RigFields.copy(spec, own, changed - timed.toSet()) ?: own
             rig.withHolder(bone, rig.holder(bone).withAttachment(result))
@@ -97,9 +103,8 @@ internal class MontageRigEditing(
 
     /** [rig] with the bones the montage moves posed where it has them now. */
     private fun posed(rig: ModelRig): ModelRig =
-        heldBones(document.montage).bones.map { it.bone }.distinct().fold(rig) { posed, bone ->
-            val pose = bonePose(bone) ?: return@fold posed
-            posed.withBone(bone, (posed.bone(bone) ?: RigBone.EMPTY).copy(pose = pose))
+        timeline.withHeldBones(document.montage).bones.map { it.bone }.distinct().fold(rig) { posed, bone ->
+            posed.withBone(bone, (posed.bone(bone) ?: RigBone.EMPTY).copy(pose = timeline.bonePose(bone)))
         }
 
     override fun beginGesture() = document.beginGesture()

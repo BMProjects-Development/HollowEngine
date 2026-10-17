@@ -33,7 +33,7 @@ internal sealed interface MontagePick {
 internal class MontageTimelineSession(
     private val document: HollowIdeMontageDocument,
     private val rigs: MontageRigEditing,
-) : TrackListing {
+) : TrackListing, MontageRigTimeline {
     val timeline = TimelineController(document.history)
 
     /** The clips of the preview model, by name, with how long each is. */
@@ -116,7 +116,12 @@ internal class MontageTimelineSession(
 
     private val montage: Montage get() = document.montage
 
+    override val time: Float get() = timeline.currentTime
+
+    override val isRecording: Boolean get() = timeline.isRecording
+
     init {
+        rigs.timeline = this
         timeline.onChanged = {
             commit()
             applyListing()
@@ -307,7 +312,7 @@ internal class MontageTimelineSession(
     }
 
     /** Whether [field] of the attachment [id] on [bone] has keys. */
-    fun isAnimated(bone: String?, id: String, field: String): Boolean = propertyOf(fieldId(bone, id, field)).isKeyed()
+    override fun isAnimated(bone: String?, id: String, field: String): Boolean = propertyOf(fieldId(bone, id, field)).isKeyed()
 
     /**
      * Starts animating [field], with a key at the playhead holding what it is now, so it is written by the
@@ -316,7 +321,7 @@ internal class MontageTimelineSession(
     fun toggle(bone: String?, id: String, field: String) = toggle(fieldId(bone, id, field))
 
     /** Keys [value] for [field] at the playhead, in the channels it changes; [shown] is what it held before. */
-    fun keyField(bone: String?, id: String, field: String, value: FloatArray, shown: FloatArray) {
+    override fun keyField(bone: String?, id: String, field: String, value: FloatArray, shown: FloatArray) {
         if (!timeline.isRecording) return
         touchAttachment(bone, id)
         val track = propertyOf(fieldId(bone, id, field)) ?: return
@@ -358,13 +363,15 @@ internal class MontageTimelineSession(
         @Suppress("UNCHECKED_CAST") return (track as AnimProperty<Vec3f>).valueAt(timeline.currentTime)
     }
 
+    override fun bonePose(bone: String): RigPose = RigPose(
+        boneValue(bone, MontageBoneProperty.POSITION),
+        eulerRotationXyz(boneValue(bone, MontageBoneProperty.ROTATION)),
+        boneValue(bone, MontageBoneProperty.SCALE),
+    )
+
     /** An edit of [property] of [bone]: keyed while the timeline records, held until the playhead moves otherwise. */
     fun editBone(bone: String, property: MontageBoneProperty, value: Vec3f) {
-        val pose = RigPose(
-            boneValue(bone, MontageBoneProperty.POSITION),
-            eulerRotationXyz(boneValue(bone, MontageBoneProperty.ROTATION)),
-            boneValue(bone, MontageBoneProperty.SCALE),
-        )
+        val pose = bonePose(bone)
         val edited = when (property) {
             MontageBoneProperty.POSITION -> pose.copy(position = value)
             MontageBoneProperty.ROTATION -> pose.copy(rotation = eulerRotationXyz(value))
@@ -378,7 +385,7 @@ internal class MontageTimelineSession(
      * Keys [pose] of [bone] at the playhead in the parts it differs from the keys there, what was held of the bone
      * included, and lets go of the hold, so the keys show.
      */
-    fun keyPose(bone: String, pose: RigPose) {
+    override fun keyPose(bone: String, pose: RigPose) {
         keyBone(bone, MontageBoneProperty.POSITION, pose.position)
         val turned = eulerRotationXyz(keyedValue(bone, MontageBoneProperty.ROTATION))
         if (abs(turned.dot(pose.rotation)) < SAME_TURN) {
@@ -397,14 +404,14 @@ internal class MontageTimelineSession(
     }
 
     /** Holds [pose] of [bone] at the playhead, as the bone gizmo does while keys are not recorded. */
-    fun holdBone(bone: String, pose: RigPose) {
+    override fun holdBone(bone: String, pose: RigPose) {
         touchBone(bone)
         beginHold()
         heldEdits.record { heldBones[bone] = pose }
     }
 
     /** Holds [names] of the attachment [spec] on [bone] at the values [spec] has, over what the tracks write. */
-    fun holdFields(bone: String?, spec: RigAttachmentSpec, names: Collection<String>) {
+    override fun holdFields(bone: String?, spec: RigAttachmentSpec, names: Collection<String>) {
         touchAttachment(bone, spec.id)
         beginHold()
         val key = bone to spec.id
@@ -412,7 +419,7 @@ internal class MontageTimelineSession(
     }
 
     /** [rig] with the attachment fields held at the playhead written over it. */
-    fun withHeldFields(rig: ModelRig): ModelRig {
+    override fun withHeldFields(rig: ModelRig): ModelRig {
         if (!holding) return rig
         return heldFields.entries.fold(rig) { held, (key, value) ->
             val (bone, id) = key
@@ -423,7 +430,7 @@ internal class MontageTimelineSession(
     }
 
     /** [montage] with the bones held at the playhead in place of what their tracks say there, as the preview plays it. */
-    fun withHeldBones(montage: Montage): Montage {
+    override fun withHeldBones(montage: Montage): Montage {
         if (!holding || heldBones.isEmpty() && heldVisibility.isEmpty()) return montage
         val held = heldBones.flatMap { (bone, pose) ->
             listOf(

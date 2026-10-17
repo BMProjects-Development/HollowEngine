@@ -34,7 +34,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.models.*
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -235,22 +234,6 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
             this.pick = pick
             if (pick is MontagePick.Attachment) rigState.select(pick.bone, pick.id)
         }
-        rigs.bonePose = { bone ->
-            RigPose(
-                session.boneValue(bone, MontageBoneProperty.POSITION),
-                eulerRotationXyz(session.boneValue(bone, MontageBoneProperty.ROTATION)),
-                session.boneValue(bone, MontageBoneProperty.SCALE),
-            )
-        }
-        rigs.time = { session.timeline.currentTime }
-        rigs.recording = { session.timeline.isRecording }
-        rigs.animated = session::isAnimated
-        rigs.onFieldKey = session::keyField
-        rigs.onBoneHold = session::holdBone
-        rigs.onFieldHold = session::holdFields
-        rigs.held = session::withHeldFields
-        rigs.heldBones = session::withHeldBones
-        rigs.onBonePose = session::keyPose
     }
 
     /** The data the preview plays the montage with, in place of an entity, which its sections' rules read. */
