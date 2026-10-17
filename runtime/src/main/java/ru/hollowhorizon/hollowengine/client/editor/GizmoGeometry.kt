@@ -58,8 +58,6 @@ object GizmoColors {
     val BOUNDS_HOVER = UiColor(0.40f, 0.90f, 1f, 0.85f)
     val BOUNDS_ACTIVE = UiColor(1f, 0.80f, 0.25f, 0.95f)
 
-    val LIGHT = UiColor(0.82f, 0.84f, 0.88f, 0.92f)
-
     fun highlighted(base: UiColor): UiColor = UiColor(
         (base.red + 0.28f).coerceAtMost(1f),
         (base.green + 0.28f).coerceAtMost(1f),

@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
-import kotlinx.serialization.json.Json
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
@@ -20,12 +19,6 @@ object CutsceneStorage {
     private const val VERSION_KEY = "version"
     private const val NAME_KEY = "name"
     private const val DATA_KEY = "data"
-
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
 
     private val root: File
         get() = DirectoryManager.HOLLOW_ENGINE.resolve(ROOT_READABLE_PATH).toFile().apply {

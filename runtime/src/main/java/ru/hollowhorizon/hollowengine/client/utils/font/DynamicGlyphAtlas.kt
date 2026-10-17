@@ -25,9 +25,6 @@ internal class DynamicGlyphAtlas(
     /** Bumped on every hit, so eviction can tell a glyph in use from one seen once. */
     private var clock = 0L
 
-    val residentCount: Int get() = resident.size
-    val pendingCount: Int get() = requested.size + inFlight.size
-
     /**
      * Bumped whenever a cell changes hands. Anything caching where a glyph sits has to notice:
      * the cell an evicted glyph used is about to hold a different picture.
@@ -53,9 +50,6 @@ internal class DynamicGlyphAtlas(
 
     private fun wanted(codepoint: Int): Boolean =
         codepoint !in resident && codepoint !in inFlight && codepoint !in rejected
-
-    /** Whether [codepoint] is on the page right now, without counting it as used. */
-    fun isResident(codepoint: Int): Boolean = codepoint in resident
 
     fun takeRequests(limit: Int = Int.MAX_VALUE): List<Int> {
         if (requested.isEmpty()) return emptyList()

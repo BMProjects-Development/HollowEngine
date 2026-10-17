@@ -34,39 +34,6 @@ object OpenGLUtils {
         bufferbuilder.vertex(matrix, to.x.toFloat(), to.y.toFloat() - 0.1f, to.z.toFloat()).color(r, g, b, a)
     }
 
-    fun renderGrid(stack: PoseStack, color: Color, size: Int = 10, step: Float = 1f) {
-        RenderSystem.enableBlend()
-        RenderSystem.defaultBlendFunc()
-        RenderSystem.setShader(GameRenderer::getPositionColorShader)
-        RenderSystem.lineWidth(1.0f)
-
-        val tessellator = Tesselator.getInstance()
-        val buffer = tessellator.begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR)
-
-
-        val matrix = stack.last().pose()
-
-        for (i in -size..size) {
-            val pos = i * step
-
-            val (r, g, b, a) = if (i == 0) color.withAlpha(0.75f) else color.withAlpha(0.5f)
-
-            buffer.vertex(matrix, -size * step, 0f, pos)
-                .color(r, g, b, a)
-            buffer.vertex(matrix, size * step, 0f, pos)
-                .color(r, g, b, a)
-
-            buffer.vertex(matrix, pos, 0f, -size * step)
-                .color(r, g, b, a)
-            buffer.vertex(matrix, pos, 0f, size * step)
-                .color(r, g, b, a)
-        }
-
-        BufferUploader.drawWithShader(buffer.buildOrThrow())
-
-        RenderSystem.disableBlend()
-    }
-
     fun renderBoundingBox(stack: PoseStack, min: Vec3f, max: Vec3f, color: Color) {
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()

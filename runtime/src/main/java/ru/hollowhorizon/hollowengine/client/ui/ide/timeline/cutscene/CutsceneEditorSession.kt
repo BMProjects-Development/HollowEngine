@@ -5,7 +5,6 @@ import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.decomposeAt
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 class CutsceneEditorSession {
@@ -123,8 +122,6 @@ class CutsceneEditorSession {
         timeline.clearHistory()
         updatePreviewState()
     }
-
-    fun channelValues(property: AnimProperty<*>): List<Float> = property.decomposeAt(timeline.currentTime).toList()
 }
 
 

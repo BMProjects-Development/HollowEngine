@@ -95,7 +95,6 @@ data class HollowUiFrame(
 
     fun nodeByIdentifier(identifier: String): UiNode? = nodesByIdentifier[identifier]
 
-    fun nodeByKey(key: String): UiNode? = nodeByIdentifier(key)
 }
 
 internal fun UiLayoutNode.inputContains(x: Float, y: Float): Boolean {

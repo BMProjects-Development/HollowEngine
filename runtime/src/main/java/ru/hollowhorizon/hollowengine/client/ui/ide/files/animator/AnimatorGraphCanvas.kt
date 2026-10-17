@@ -21,8 +21,6 @@ private const val PlayIcon = "hollowengine:textures/gui/icons/play.svg"
 private const val StateIcon = "hollowengine:textures/gui/icons/state.svg"
 private const val AnyStateIcon = "hollowengine:textures/gui/icons/any_state.svg"
 private const val ResetIcon = "hollowengine:textures/gui/icons/reload.svg"
-internal const val MaximizeIcon = "hollowengine:textures/gui/icons/maximize.svg"
-internal const val MinimizeIcon = "hollowengine:textures/gui/icons/minimize.svg"
 
 /** Where a right click landed: on a state, on a transition, or on the empty canvas. */
 private sealed interface CanvasMenuTarget {

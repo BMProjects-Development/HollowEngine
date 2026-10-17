@@ -10,9 +10,6 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 import kotlinx.serialization.serializer
 import net.minecraft.network.FriendlyByteBuf
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
-import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModule
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -37,16 +34,7 @@ open class ByteBufFormat(private val context: SerializersModule = EmptySerialize
             }
         }
 
-    companion object Default : ByteBufFormat() {
-        fun serializeEntity(snapshot: EntitySnapshot, buf: FriendlyByteBuf = FriendlyByteBuf(Unpooled.buffer())): FriendlyByteBuf =
-            EntitySerialization.serializeToByteBuf(snapshot, buf)
-
-        fun serializeEntity(entity: MCEntity, buf: FriendlyByteBuf = FriendlyByteBuf(Unpooled.buffer())): FriendlyByteBuf =
-            EntitySerialization.serializeEntityToByteBuf(entity, buf)
-
-        fun deserializeEntity(buf: FriendlyByteBuf): EntitySnapshot = EntitySerialization.deserializeFromByteBuf(buf)
-        fun deserializeInto(target: MCEntity, buf: FriendlyByteBuf): EntitySnapshot = EntitySerialization.deserializeInto(target, buf)
-    }
+    companion object Default : ByteBufFormat()
 
     fun <T> serialize(
         serializer: SerializationStrategy<T>,

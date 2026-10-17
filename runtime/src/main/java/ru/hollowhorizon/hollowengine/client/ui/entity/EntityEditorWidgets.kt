@@ -17,7 +17,6 @@ internal object EntityEditorIcons {
     const val SEARCH = "hollowengine:textures/gui/icons/search.svg"
     const val RELOAD = "hollowengine:textures/gui/icons/reload.svg"
     const val ZOOM_RESET = "hollowengine:textures/gui/icons/zoom_out.svg"
-    const val FOLDER = "hollowengine:textures/gui/icons/folder.svg"
     const val SCRIPT = "hollowengine:textures/gui/icons/file_kts.svg"
     const val COMPONENT = "hollowengine:textures/gui/icons/box.svg"
     const val CLOSE = "hollowengine:textures/gui/icons/cross.svg"

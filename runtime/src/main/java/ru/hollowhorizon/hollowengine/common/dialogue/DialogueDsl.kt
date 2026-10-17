@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
  *
  * ```kotlin
  * val controller = DialogueController("project:stories/example.story") {
- *     presentation = ChatPresentation()
  *     functions.function<String, Float>("play-video", ["name", "volume"]) { name, volume -> … }
  * }
  * ```

@@ -22,7 +22,6 @@ annotation class EditorDescription(val description: String)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 annotation class EditorIcon(val icon: String)
 
-// TODO:
 /** Groups a component under a heading in the "add component" list. */
 @SerialInfo
 @Target(AnnotationTarget.CLASS)

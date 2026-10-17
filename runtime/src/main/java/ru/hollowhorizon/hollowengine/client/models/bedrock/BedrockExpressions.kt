@@ -12,7 +12,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.animal.FlyingAnimal
-import net.minecraft.world.level.block.entity.BlockEntity
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
@@ -66,13 +65,6 @@ interface Query {
                 get() = GLFW.glfwGetTime().toFloat()
         }
     }
-}
-
-class BlockEntityQuery(val blockEntity: BlockEntity) : Query {
-    private val startTime = anim_time
-
-    override val anim_time: Float get() = TickHandler.gameTime
-    override val life_time: Float get() = anim_time - startTime
 }
 
 class LivingEntityQuery(val entity: LivingEntity) : Query {

@@ -6,7 +6,6 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.core.RegistryAccess
 import net.minecraft.resources.ResourceLocation
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ModelInstancingBackend
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.VanillaInstancingBackend
 import ru.hollowhorizon.hollowengine.common.utils.HollowJavaUtils
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
@@ -20,9 +19,6 @@ enum class Axis(val x: Float, val y: Float, val z: Float) {
     Y(0f, 1f, 0f),
     Z(0f, 0f, 1f);
 }
-
-var instancingBackendProvider: () -> ModelInstancingBackend = { VanillaInstancingBackend }
-var instancingEntityInfoProvider: () -> InstancingEntityInfo = { InstancingEntityInfo() }
 
 val shouldOverrideShaders: () -> Boolean = { IrisHelper.shouldOverrideShaders() }
 
@@ -43,8 +39,8 @@ val clientRegistryAccess: RegistryAccess?
 fun ResourceLocation.exists(): Boolean {
     return try {
         mc.resourceManager.getResource(this).isPresent
-    } catch (e: Exception) {
-        true
+    } catch (_: Exception) {
+        false
     }
 }
 

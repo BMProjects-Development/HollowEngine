@@ -33,9 +33,6 @@ object CutsceneCameraSystem {
     val currentPose: CameraPose?
         get() = heldPose ?: controller?.currentPose ?: StoryCameraSystem.currentPose
 
-    /** Whether anything is holding the camera: a held pose, a cutscene or a story. */
-    val isOverriding: Boolean get() = currentPose != null
-
     fun play(data: CutsceneData, loop: Boolean = false, anchor: CutsceneAnchor = CutsceneAnchor.WHERE_RECORDED) {
         val playback = CutscenePlaybackController().also {
             it.setupTracks(data, loop, anchor)

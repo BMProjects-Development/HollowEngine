@@ -436,8 +436,6 @@ class LayeredTexture(id: Long, element: Element, doc: Document, name: String) : 
         }
     }
 
-    val textureCount get() = textures.size
-
     enum class BlendMode { Translucent, Additive, Modulate, Modulate2, Over, Normal, Dissolve, Darken, ColorBurn,
         LinearBurn, DarkerColor, Lighten, Screen, ColorDodge, LinearDodge, LighterColor, SoftLight, HardLight,
         VividLight, LinearLight, PinLight, HardMix, Difference, Exclusion, Subtract, Divide, Hue, Saturation, Color,
@@ -687,7 +685,6 @@ class AnimationCurveNode(id: Long, element: Element, name: String, val doc: Docu
 
     val targetAsModel get() = target as? Model
 
-    val targetAsNodeAttribute get() = target as? NodeAttribute
 }
 
 /** Represents a FBX animation layer (i.e. a list of node animations) */

@@ -21,8 +21,6 @@ enum class CutsceneWeather(val value: Float, val labelKey: String) {
 }
 
 object EnvironmentRig {
-    const val WORLD_ID = "world"
-    const val ENVIRONMENT_ID = "world.environment"
     const val TIME_OF_DAY_ID = "world.environment.time_of_day"
     const val WEATHER_ID = "world.environment.weather"
 

@@ -34,6 +34,6 @@ object EngineHudLayers {
 object EngineHudLayerRendering {
     @SubscribeEvent
     fun onRenderArm(event: RenderArmEvent) {
-        if (HudLayerRegistry.isHidden(EngineHudLayers.HAND)) event.isCanceled = true
+        if (HudLayerRegistry.isHidden(HAND)) event.isCanceled = true
     }
 }

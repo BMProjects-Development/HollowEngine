@@ -44,9 +44,4 @@ object JsonFormat: Format<JsonElement> {
         return json.decodeFromStream(stream)
     }
 
-    fun encodeToStream(element: JsonElement, stream: java.io.OutputStream) {
-        stream.writer().use {
-            it.write(encodeToString(element))
-        }
-    }
 }

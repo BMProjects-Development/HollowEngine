@@ -1,11 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.utils
 
-import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
-import net.minecraft.client.player.LocalPlayer
-import net.minecraft.world.item.Item.TooltipContext
-import net.minecraft.world.item.ItemStack
-import net.minecraft.world.item.TooltipFlag
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.joml.Matrix4fStack
@@ -14,8 +9,6 @@ import org.joml.Vector3f
 fun Matrix4fStack.pushPose() = pushMatrix()
 fun Matrix4fStack.popPose() = popMatrix()
 fun Matrix4fStack.setIdentity() = set(identity())
-
-fun ItemStack.getTooltipLines(player: LocalPlayer?, flags: TooltipFlag) = getTooltipLines(TooltipContext.of(player?.level()), player, flags)
 
 fun VertexConsumer.vertex(pose: Matrix4f, x: Float, y: Float, z: Float) = addVertex(pose, x, y, z)
 fun VertexConsumer.uv(x: Float, y: Float) = this.setUv( x, y)
@@ -27,6 +20,3 @@ fun VertexConsumer.color(r: Float, g: Float, b: Float, a: Float) = setColor(r, g
 fun VertexConsumer.color(value: Int) = setColor(value)
 
 
-fun PoseStack.mulPoseMatrix(matrix: Matrix4f) {
-    last().pose().mul(matrix)
-}

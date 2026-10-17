@@ -28,19 +28,12 @@ data class GltfAnimation(
     ) {
         @Transient
         var nodeRef: GltfNode? = null
-
-        companion object {
-            const val PATH_TRANSLATION = "translation"
-            const val PATH_ROTATION = "rotation"
-            const val PATH_SCALE = "scale"
-            const val PATH_WEIGHTS = "weights"
-        }
     }
 
     @Serializable
     data class Sampler(
         val input: Int,
-        val interpolation: String = INTERPOLATION_LINEAR,
+        val interpolation: String = "LINEAR",
         val output: Int,
     ) {
         @Transient
@@ -48,11 +41,5 @@ data class GltfAnimation(
 
         @Transient
         lateinit var outputAccessorRef: GltfAccessor
-
-        companion object {
-            const val INTERPOLATION_LINEAR = "LINEAR"
-            const val INTERPOLATION_STEP = "STEP"
-            const val INTERPOLATION_CUBICSPLINE = "CUBICSPLINE"
-        }
     }
 }

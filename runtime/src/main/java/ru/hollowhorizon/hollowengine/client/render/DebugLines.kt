@@ -71,25 +71,6 @@ object DebugLines {
             vertex(end, normal, color)
         }
 
-        fun capsule(start: Vec3f, end: Vec3f, radius: Float, color: Int) {
-            val along = end - start
-            val axis = if (along.length() < EPSILON) Vec3f.Y_AXIS else along.normed()
-            val right = perpendicular(axis, Vec3f.Y_AXIS)
-            val forward = axis.cross(right, MutableVec3f()).norm()
-
-            ring(start, axis, radius, color)
-            ring(end, axis, radius, color)
-
-            listOf(right, forward, right * -1f, forward * -1f).forEach { side ->
-                line(start + side * radius, end + side * radius, color)
-            }
-
-            halfCircle(start, axis * -1f, right, radius, color)
-            halfCircle(start, axis * -1f, forward, radius, color)
-            halfCircle(end, axis, right, radius, color)
-            halfCircle(end, axis, forward, radius, color)
-        }
-
         fun box(center: Vec3f, x: Vec3f, y: Vec3f, z: Vec3f, color: Int) {
             val corners = List(CORNERS) { index ->
                 center + x * index.sign(X_BIT) + y * index.sign(Y_BIT) + z * index.sign(Z_BIT)

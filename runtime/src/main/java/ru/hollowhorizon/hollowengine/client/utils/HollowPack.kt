@@ -28,17 +28,6 @@ object HollowPack : PackResources {
     }
 
     private fun ofText(text: String) = IoSupplier<InputStream> { ByteArrayInputStream(text.toByteArray()) }
-    fun generatePostShader(location: ResourceLocation) {
-        addCustomJSON(
-            "${location.namespace}:shaders/post/${location.path}.json".rl,
-            "{\"targets\": [\"swap\"],\"passes\": [{\"name\": \"$location\",\"intarget\": \"minecraft:main\",\"outtarget\": \"swap\",\"uniforms\": []},{\"name\": \"$location\",\"intarget\": \"swap\",\"outtarget\": \"minecraft:main\",\"uniforms\": []}]}"
-        )
-
-        addCustomJSON(
-            "${location.namespace}:shaders/program/${location.path}.json".rl,
-            "{\"blend\":{\"func\":\"add\",\"srcrgb\":\"one\",\"dstrgb\":\"zero\"},\"vertex\":\"sobel\",\"fragment\":\"$location\",\"attributes\":[\"Position\"],\"samplers\":[{\"name\":\"DiffuseSampler\"}],\"uniforms\":[{\"name\":\"ProjMat\",\"type\":\"matrix4x4\",\"count\":16,\"values\":[1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0]},{\"name\":\"InSize\",\"type\":\"float\",\"count\":2,\"values\":[1.0,1.0]},{\"name\":\"OutSize\",\"type\":\"float\",\"count\":2,\"values\":[1.0,1.0]},{\"name\":\"Time\",\"type\":\"float\",\"count\":1,\"values\":[0.0]}]}"
-        )
-    }
 
     fun addItemModel(location: ResourceLocation, type: AutoModelType) = addCustomItemModel(
         location,
@@ -46,11 +35,6 @@ object HollowPack : PackResources {
             "{\"parent\":\"${type.modelId()}\",\"textures\":{\"layer0\":\"" + location.namespace + ":item/" + location.path + "\"}}"
         else type.modelId()
     )
-
-    fun addParticleModel(location: ResourceLocation) {
-        val particle = "${location.namespace}:particles/${location.path}.json".rl
-        addCustomJSON(particle, "{\"textures\":[\"$location\"]}")
-    }
 
     fun addBlockModel(location: ResourceLocation, type: AutoModelType) {
         when (type.blockStateId()) {
@@ -74,10 +58,6 @@ object HollowPack : PackResources {
             location,
             "{\"parent\":\"${type.modelId()}\",\"textures\":{\"all\":\"" + location.namespace + ":block/" + location.path + "\"}}"
         )
-    }
-
-    fun addSoundJson(modid: String, sound: JsonObject) {
-        addCustomJSON("$modid:sounds.json".rl, sound.toString())
     }
 
     fun addCustomJSON(modelPath: ResourceLocation, content: String) {
