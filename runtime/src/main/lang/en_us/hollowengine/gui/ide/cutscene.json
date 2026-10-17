@@ -11,6 +11,7 @@
   "view.dope_sheet": "Dope sheet",
   "view.curves": "Curves",
   "view.frame_curves": "Frame curves",
+  "view.curve_handles": "Handles of every key",
   "action.capture": "Capture keyframe",
   "action.record": "Auto-key: edits in the inspector and with the gizmo become keys at the playhead",
   "action.add_keyframe": "Add keyframe here",

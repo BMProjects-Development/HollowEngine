@@ -60,10 +60,6 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
     /** Whether a drag or a keyboard transform holds the target. */
     val isBusy: Boolean get() = drag != null || keyboard != null
 
-    /** What the keyboard transform does and which keys do what; null while there is none. */
-    var hint by mutableStateOf<String?>(null)
-        private set
-
     fun handles(target: GizmoTarget?): List<GizmoHandle> {
         if (target == null) return emptyList()
         val modes = GizmoSettings.modes.filterTo(HashSet(), target::canEdit)
@@ -136,7 +132,6 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
             if (result == GizmoKeyResult.CHANGED) {
                 held?.restore()
                 moveTo(x, y, modifiers)
-                hint = transform.hint
             }
             return finish(result) || result == GizmoKeyResult.CHANGED
         }
@@ -153,8 +148,7 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
         shiftX = 0f
         shiftY = 0f
         target.beginEdit()
-        keyboard =
-            GizmoKeyboardTransform(mode, target.values, x, y, projector, geometry, manipulator).also { hint = it.hint }
+        keyboard = GizmoKeyboardTransform(mode, target.values, x, y, projector, geometry, manipulator)
         return true
     }
 
@@ -206,7 +200,6 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
             else -> return false
         }
         keyboard = null
-        hint = null
         held?.endEdit()
         held = null
         return true

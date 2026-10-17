@@ -24,6 +24,8 @@
   "timeline.duplicate_keys": "Duplicate keyframes",
   "timeline.paste_keys": "Paste keyframes",
   "timeline.nudge_keys": "Nudge keyframes",
+  "timeline.rotate_keys": "Rotate keys",
+  "timeline.scale_keys": "Scale keys",
   "timeline.smooth_keys": "Smooth keyframes",
   "timeline.edit_value": "Edit keyframe value",
   "timeline.edit_handles": "Edit keyframe handles",

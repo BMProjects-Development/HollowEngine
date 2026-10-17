@@ -104,6 +104,7 @@ fun HollowTimelineEditor(
     val bump = refresh
     val scroll = rememberScrollState()
     val zoomGlide = remember(controller) { TimelineZoomGlide() }
+    val curveTransforms = remember(controller) { CurveTransformHost() }
     val playheadHold = remember(controller) { TimelinePlayheadHold() }
     val headerScroll = rememberScrollState()
     val isCurveView = controller.viewMode == TimelineViewMode.CURVES
@@ -162,6 +163,11 @@ fun HollowTimelineEditor(
             .style(TimelineStylesheet)
             .focusScope()
             .onKeyInput { input ->
+                if (keyboardActive && !input.repeat && curveTransforms.key(controller, input.key, input.modifiers)) {
+                    input.consume()
+                    bump()
+                    return@onKeyInput
+                }
                 if (keyboardActive && !input.repeat && onKeyInput(input.key, input.modifiers)) {
                     input.consume()
                     playheadHold.press(controller, input.key, input.modifiers)
@@ -220,6 +226,7 @@ fun HollowTimelineEditor(
                             scrollX = scroll.offsetX,
                             visibleTimes = visibleTimes,
                             scroll = scroll,
+                            transforms = curveTransforms,
                             refresh = bump,
                         )
                     } else {

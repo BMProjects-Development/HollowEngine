@@ -373,9 +373,6 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
                     session.draw(this, target())
                 },
         )
-        session.hint?.let { hint ->
-            Text(hint, tags = listOf("vfx-gizmo-readout"), modifier = Modifier.position(8.px, 32.px).inputTransparent())
-        }
         ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
         KeyInsertMenu(state.keyMenu, onPick = { parts -> selected?.let { state.session.insertKeys(it, parts) } }) {
             state.keyMenu = null

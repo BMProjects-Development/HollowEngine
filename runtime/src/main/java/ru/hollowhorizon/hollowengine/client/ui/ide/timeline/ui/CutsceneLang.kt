@@ -17,6 +17,7 @@ internal object CutsceneLang {
     const val VIEW_DOPE_SHEET = ROOT + "view.dope_sheet"
     const val VIEW_CURVES = ROOT + "view.curves"
     const val FRAME_CURVES = ROOT + "view.frame_curves"
+    const val CURVE_HANDLES = ROOT + "view.curve_handles"
     const val FRAME_TIME = ROOT + "view.frame_time"
 
     const val CAPTURE_KEYFRAME = ROOT + "action.capture"

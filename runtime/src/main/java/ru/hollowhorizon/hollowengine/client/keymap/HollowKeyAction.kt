@@ -39,7 +39,7 @@ class HollowKeyAction(
 
     /** Whether a key or button bound to it is down right now, for an action that is held rather than pressed. */
     fun isHeld(): Boolean {
-        val window = Minecraft.getInstance().window.window
+        val window = Minecraft.getInstance()?.window?.window ?: return false
         return bindings.any { chord ->
             when (val input = chord.input) {
                 is HollowInput.Key -> GLFW.glfwGetKey(window, input.code) == GLFW.GLFW_PRESS

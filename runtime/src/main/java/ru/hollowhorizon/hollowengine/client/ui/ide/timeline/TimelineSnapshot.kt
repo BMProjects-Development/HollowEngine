@@ -12,6 +12,15 @@ internal data class KeyframeState(
 ) {
     fun toKeyframe() = Keyframe(time, value, interpolation, handleMode, incoming, outgoing)
 
+    fun applyTo(keyframe: Keyframe) {
+        keyframe.time = time
+        keyframe.value = value
+        keyframe.interpolation = interpolation
+        keyframe.handleMode = handleMode
+        keyframe.incoming = incoming
+        keyframe.outgoing = outgoing
+    }
+
     companion object {
         fun of(keyframe: Keyframe) = KeyframeState(
             time = keyframe.time,
@@ -71,6 +80,8 @@ object TimelineEdits {
     val DUPLICATE_KEYS = label("duplicate_keys")
     val PASTE_KEYS = label("paste_keys")
     val NUDGE_KEYS = label("nudge_keys")
+    val ROTATE_KEYS = label("rotate_keys")
+    val SCALE_KEYS = label("scale_keys")
     val SMOOTH_KEYS = label("smooth_keys")
     val EDIT_VALUE = label("edit_value")
     val EDIT_HANDLES = label("edit_handles")

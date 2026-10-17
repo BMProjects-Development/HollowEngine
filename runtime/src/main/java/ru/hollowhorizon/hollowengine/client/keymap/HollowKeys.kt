@@ -68,7 +68,7 @@ object HollowKeys {
     val TOGGLE_CURVES = action("timeline.toggle_curves", TIMELINE, key(GLFW.GLFW_KEY_TAB, CONTROL))
     val NEXT_KEY = action("timeline.next_key", TIMELINE, key(GLFW.GLFW_KEY_UP))
     val PREVIOUS_KEY = action("timeline.previous_key", TIMELINE, key(GLFW.GLFW_KEY_DOWN))
-    val SMOOTH_KEYS = action("timeline.smooth_keys", TIMELINE, key(GLFW.GLFW_KEY_S))
+    val SMOOTH_KEYS = action("timeline.smooth_keys", TIMELINE)
     val NUDGE_LEFT = action("timeline.nudge_left", TIMELINE, key(GLFW.GLFW_KEY_LEFT))
     val NUDGE_RIGHT = action("timeline.nudge_right", TIMELINE, key(GLFW.GLFW_KEY_RIGHT))
     val NUDGE_LEFT_FAR = action("timeline.nudge_left_far", TIMELINE, key(GLFW.GLFW_KEY_LEFT, SHIFT))

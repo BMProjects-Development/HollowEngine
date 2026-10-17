@@ -221,8 +221,50 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     fun isSelected(keyframe: Keyframe): Boolean = selectedKeyframes.any { it === keyframe }
 
+    /**
+     * Bumped whenever keys change. Keys keep their numbers in plain fields, so what draws from them reads this to
+     * draw again, whoever changed them: an edit here, an undo, a transform.
+     */
+    var keysRevision by mutableStateOf(0)
+        private set
+
+    /** Tells whoever draws or keeps the keys that they changed. */
+    fun notifyKeysChanged() {
+        keysRevision++
+        onChanged?.invoke()
+    }
+
+    /** Handles picked in the graph on their own, which G, R and S turn and stretch about their keys. */
+    val selectedHandles = mutableStateListOf<HandlePick>()
+
+    fun isSelected(keyframe: Keyframe, side: TangentSide): Boolean =
+        selectedHandles.any { it.keyframe === keyframe && it.side == side }
+
+    /** Whether the graph shows the handles of [keyframe]: it is picked, or one of its handles is. */
+    fun showsHandles(keyframe: Keyframe): Boolean = isSelected(keyframe) || selectedHandles.any { it.keyframe === keyframe }
+
+    /** Adds [picks] to the handles picked alone. */
+    fun selectHandles(picks: List<HandlePick>) {
+        picks.forEach { pick -> if (!isSelected(pick.keyframe, pick.side)) selectedHandles += pick }
+    }
+
+    /** Picks the [side] handle of [keyframe] alone, or adds it to what is picked, or takes it off. */
+    fun selectHandle(keyframe: Keyframe, side: TangentSide, additive: Boolean) {
+        if (additive) {
+            if (isSelected(keyframe, side)) selectedHandles.removeAll { it.keyframe === keyframe && it.side == side }
+            else selectedHandles += HandlePick(keyframe, side)
+            return
+        }
+        selectSegment(null, null)
+        selectedKeyframes.clear()
+        selectedHandles.clear()
+        selectedHandles += HandlePick(keyframe, side)
+        isWorkAreaSelected = false
+    }
+
     fun clearSelection() {
         selectedKeyframes.clear()
+        selectedHandles.clear()
         isWorkAreaSelected = false
         selectSegment(null, null)
     }
@@ -252,7 +294,10 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     fun select(keys: List<Keyframe>, additive: Boolean) {
         if (keys.isNotEmpty()) selectSegment(null, null)
-        if (!additive) selectedKeyframes.clear()
+        if (!additive) {
+            selectedKeyframes.clear()
+            selectedHandles.clear()
+        }
         keys.forEach { key -> if (!isSelected(key)) selectedKeyframes.add(key) }
         isWorkAreaSelected = false
     }
@@ -300,7 +345,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     fun edit(label: UndoLabel, block: () -> Unit) {
         val before = createSnapshot().takeIf { transactionStart == null }
         block()
-        onChanged?.invoke()
+        notifyKeysChanged()
         if (before != null) recordSince(before, label)
     }
 
@@ -446,7 +491,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
         }
     }
 
-    private fun boundsOf(curve: ChannelCurve?): ChannelBounds {
+    internal fun boundsOf(curve: ChannelCurve?): ChannelBounds {
         curve ?: return ChannelBounds.Unbounded
         val property = propertyOf(curve) ?: return ChannelBounds.Unbounded
         val channel = property.curves.indexOfFirst { it === curve }.takeIf { it >= 0 }
@@ -518,7 +563,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
         if (withValues) dragStartValues = clones.values.associateWith { it.value }
         dragFocusKeyframe = clones[driver] ?: clones.values.first()
         dragDriver = driver
-        onChanged?.invoke()
+        notifyKeysChanged()
         return true
     }
 
@@ -529,7 +574,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     fun applyKeyframeDrag(deltaSeconds: Float) {
         val starts = dragStartTimes ?: return
-        if (moveKeyframesFromStarts(starts, deltaSeconds)) onChanged?.invoke()
+        if (moveKeyframesFromStarts(starts, deltaSeconds)) notifyKeysChanged()
     }
 
     fun applyCurveDrag(deltaSeconds: Float, deltaValue: Float) {
@@ -542,7 +587,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
                 changed = true
             }
         }
-        if (changed) onChanged?.invoke()
+        if (changed) notifyKeysChanged()
     }
 
     fun endKeyframeDrag() {
@@ -631,7 +676,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
         keyframe.setTangent(side, clamped)
 
         if (mode == HandleMode.FREE) {
-            onChanged?.invoke()
+            notifyKeysChanged()
             return
         }
         val partnerSide = if (side == TangentSide.OUTGOING) TangentSide.INCOMING else TangentSide.OUTGOING
@@ -646,7 +691,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
             keyframe.setTangent(partnerSide, partner)
             curve.useSpline(keyframe, partnerSide)
         }
-        onChanged?.invoke()
+        notifyKeysChanged()
     }
 
     fun smoothSelectedKeyframes() {
@@ -727,7 +772,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     private fun restoreFromHistory(snapshot: TimelineSnapshot) {
         restoreSnapshot(snapshot)
-        onChanged?.invoke()
+        notifyKeysChanged()
         onTimeChanged?.invoke()
     }
 
@@ -750,13 +795,20 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
         snapshot.properties.forEach { propertySnapshot ->
             propertySnapshot.state.applyTo(propertySnapshot.property)
             propertySnapshot.curves.forEachIndexed { index, curve ->
-                curve.keyframes.clear()
-                propertySnapshot.keys.getOrNull(index)
-                    ?.let { keys -> curve.keyframes.addAll(keys.map { it.toKeyframe() }) }
+                val keys = propertySnapshot.keys.getOrNull(index).orEmpty()
+                if (curve.keyframes.size == keys.size) {
+                    curve.keyframes.forEachIndexed { key, keyframe -> keys[key].applyTo(keyframe) }
+                } else {
+                    curve.keyframes.clear()
+                    curve.keyframes.addAll(keys.map { it.toKeyframe() })
+                }
             }
             propertySnapshot.property.restoreState(propertySnapshot.type, propertySnapshot.curves)
         }
-        selectedKeyframes.clear()
+        val liveKeys = allCurves().flatMap { it.keyframes }
+        selectedKeyframes.retainAll { key -> liveKeys.any { it === key } }
+        selectedHandles.retainAll { pick -> liveKeys.any { it === pick.keyframe } }
+        keysRevision++
         val liveCurves = allCurves()
         focusedCurves.retainAll { curve -> liveCurves.any { it === curve } }
         currentTime = snapshot.currentTime

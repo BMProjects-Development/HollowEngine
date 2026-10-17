@@ -34,6 +34,7 @@ internal object TimelineIcons {
     const val MORE = ROOT + "more.svg"
     const val DOPE_SHEET = ROOT + "dope_sheet.svg"
     const val CURVES = ROOT + "curves.svg"
+    const val HANDLES = ROOT + "handles.svg"
     const val FRAME = ROOT + "frame.svg"
     const val CAPTURE = ROOT + "capture.svg"
     const val RECORD = ROOT + "record.svg"
@@ -149,6 +150,15 @@ internal fun TimelineToolbar(
             active = controller.viewMode == TimelineViewMode.CURVES,
         ) {
             controller.enterCurveView()
+            refresh()
+        }
+        if (controller.viewMode == TimelineViewMode.CURVES) TimelineButton(
+            TimelineIcons.HANDLES,
+            "timeline-curve-handles",
+            CutsceneLang.CURVE_HANDLES.lang,
+            active = CurveHandleDisplay.all,
+        ) {
+            CurveHandleDisplay.all = !CurveHandleDisplay.all
             refresh()
         }
 

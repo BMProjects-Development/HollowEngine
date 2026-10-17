@@ -11,6 +11,7 @@
   "view.dope_sheet": "Ключи",
   "view.curves": "Кривые",
   "view.frame_curves": "Показать все кривые",
+  "view.curve_handles": "Ручки всех ключей",
   "action.capture": "Записать ключ",
   "action.record": "Автозапись: правки в инспекторе и гизмо ставят ключи под курсором времени",
   "action.add_keyframe": "Добавить ключ здесь",

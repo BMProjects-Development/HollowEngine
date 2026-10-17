@@ -81,13 +81,6 @@ internal fun RigViewport(
                 if (state.gizmo.capture(viewer)) session.draw(this, state.gizmoTarget())
             },
         )
-        session.hint?.let { hint ->
-            Text(
-                hint,
-                tags = listOf("rig-transform-hint"),
-                modifier = Modifier.position(8.px, 32.px).inputTransparent()
-            )
-        }
         ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
     }
 }

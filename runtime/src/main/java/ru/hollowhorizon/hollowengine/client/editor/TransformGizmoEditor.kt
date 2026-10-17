@@ -77,7 +77,6 @@ object TransformGizmoEditor {
     private var labelState by mutableStateOf<OverlayLabelState?>(null)
 
     /** Where the hint of a transform from the keyboard is shown: where the pointer was when it began. */
-    private var keyboardHintAt by mutableStateOf<Pair<Float, Float>?>(null)
     private var contextMenuState by mutableStateOf<ContextMenuState?>(null)
 
     private var enabledValue by mutableStateOf(false)
@@ -264,11 +263,7 @@ object TransformGizmoEditor {
         if (idle && pointerOverIde()) return false
         val (x, y) = pointerLogical(lastPhysX, lastPhysY)
         val taken = session.key(activeTarget(), key, modifiers, x, y)
-        keyboardHintAt = when {
-            session.keyboard == null -> null
-            idle -> (x to y).also { contextMenuState = null }
-            else -> keyboardHintAt
-        }
+        if (idle && session.keyboard != null) contextMenuState = null
         return taken
     }
 
@@ -417,7 +412,6 @@ object TransformGizmoEditor {
 
     private fun cancelInteraction() {
         session.cancel()
-        keyboardHintAt = null
         hoveredKey = null
         activeKey = null
         labelState = null
@@ -441,16 +435,6 @@ object TransformGizmoEditor {
                                 offset = UiVec3(0f, 2f), blur = 7f, spread = 0f, color = UiColor(0f, 0f, 0f, 0.55f)
                             )
                         ).foreground(UiColor(0.94f, 0.96f, 1f)),
-                )
-            }
-
-            val hint = session.hint
-            val hintAt = keyboardHintAt
-            if (hint != null && hintAt != null) {
-                Text(
-                    hint,
-                    modifier = Modifier.position((hintAt.first + 16f).px, (hintAt.second + 16f).px).padding(6.px, 3.px)
-                        .background(UiColor(0.08f, 0.10f, 0.14f, 0.9f)).foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
 

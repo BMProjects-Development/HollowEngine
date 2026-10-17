@@ -7,14 +7,6 @@
     border-radius: $radius;
 }
 
-.rig-transform-hint {
-    padding: 2px 6px;
-    background: alpha($bg-window, 0.86);
-    border-radius: $radius-small;
-    foreground: $text-strong;
-    font-size: $font-size;
-}
-
 /* A state of a controller graph; the frame is the graph node's. */
 .animator-state {
     padding: 6px 8px;

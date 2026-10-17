@@ -50,6 +50,10 @@ object HollowEngineConfig : Config() {
     @PropertyName("timeline_snap")
     var timelineSnap by property(true)
 
+    @PropertyComment("Whether the curve graph shows the handles of every key, not only of the picked ones")
+    @PropertyName("timeline_curve_handles")
+    var timelineCurveHandles by property(true)
+
     @PropertyComment("Frames per second the timeline snaps times to")
     @PropertyName("timeline_snap_fps")
     @PropertyRange(1.0f, 240.0f)

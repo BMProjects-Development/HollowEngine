@@ -74,6 +74,9 @@ class Keyframe(
     fun copy(time: Float = this.time) = Keyframe(time, value, interpolation, handleMode, incoming, outgoing)
 }
 
+/** A handle of a key picked in the graph on its own. */
+data class HandlePick(val keyframe: Keyframe, val side: TangentSide)
+
 /** Which of the two keyframe handles is being modified. */
 enum class TangentSide {
     INCOMING, OUTGOING,

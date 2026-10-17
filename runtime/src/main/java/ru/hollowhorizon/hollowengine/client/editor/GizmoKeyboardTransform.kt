@@ -4,7 +4,6 @@ import net.minecraft.world.phys.Vec3
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
-import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /** What a key or a click did to a [GizmoKeyboardTransform]. */
@@ -78,20 +77,6 @@ class GizmoKeyboardTransform(
         GizmoRenderer.drawRotationSector(scope, geometry, projector, drag)
         GizmoRenderer.drawHandles(scope, listOf(handle), null, null)
     }
-
-    /** What it is doing and which keys do what, for the editor to show by the pointer. */
-    val hint: String
-        get() {
-            val held = axis?.let { index ->
-                "XYZ"[index] + " (" + "hollowengine.gui.ide.gizmo.orientation.${orientation?.name?.lowercase()}".lang + ")"
-            }
-            val axes = AXIS_ACTIONS.joinToString("/") { it.shortcut ?: "-" }
-            return listOfNotNull(
-                "hollowengine.gui.ide.gizmo.${mode.name.lowercase()}".lang,
-                held,
-                "hollowengine.gui.ide.gizmo.keys".lang(axes)
-            ).joinToString(", ")
-        }
 
     /**
      * Holds the transform to [index]: along the gizmo's orientation, then the other one, then free again. Starts
