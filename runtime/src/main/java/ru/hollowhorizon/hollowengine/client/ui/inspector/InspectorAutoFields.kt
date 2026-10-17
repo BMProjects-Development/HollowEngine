@@ -2,6 +2,7 @@
 
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -14,12 +15,10 @@ import kotlinx.serialization.json.*
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
+import ru.hollowhorizon.hollowengine.client.ui.widgets.formatUiNumber
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 /**
  * The generic component editor. One composable per serial kind, recursing the way the descriptor does.
@@ -215,7 +214,7 @@ internal fun ValueEditor(
 
         PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG,
         PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE,
-            -> NumberField(label, description, kind as PrimitiveKind, hints, value, path, onChange)
+            -> AutoNumberField(label, description, kind as PrimitiveKind, hints, value, path, onChange)
 
         SerialKind.ENUM -> EnumField(label, description, descriptor, value, path, hints.enumKey, onChange)
 
@@ -353,7 +352,7 @@ internal fun sanitizeAssetPath(text: String): String = buildString {
 }
 
 @Composable
-private fun NumberField(
+private fun AutoNumberField(
     label: String?,
     description: String?,
     kind: PrimitiveKind,
@@ -366,39 +365,28 @@ private fun NumberField(
     val whole =
         kind == PrimitiveKind.BYTE || kind == PrimitiveKind.SHORT || kind == PrimitiveKind.INT || kind == PrimitiveKind.LONG
     val range = hints.range
+    val pace = remember(path) { SliderPace() }
+    val pending = remember(path) { arrayOfNulls<Double>(1) }
+    fun send(next: Double) = onChange(numberJson(kind, next))
 
-    Column(tags = listOf("insp-field")) {
-        FieldLabel(label, description)
-        if (range != null && range.slider && range.min.isFinite() && range.max.isFinite()) {
-            val pace = remember(path) { SliderPace() }
-            var shown by remember(path) { mutableStateOf<Float?>(null) }
-            Row(tags = listOf("insp-input-row")) {
-                Slider(
-                    value = number.toFloat(),
-                    min = range.min.toFloat(),
-                    max = range.max.toFloat(),
-                    step = if (whole) 1f else 0f,
-                    onValueChange = {
-                        shown = it
-                        if (pace.due()) onChange(numberJson(kind, it.toDouble()))
-                    },
-                    onValueCommit = {
-                        shown = null
-                        onChange(numberJson(kind, it.toDouble()))
-                    },
-                    modifier = Modifier.grow(1f),
-                    tags = listOf("insp-slider"),
-                )
-                Text(formatNumber(shown?.toDouble() ?: number, whole), tags = listOf("insp-slider-value"))
-            }
-        } else {
-            NumberInput(path, number, whole) { next ->
-                val clamped = if (range == null) next else next.coerceIn(
-                    range.min,
-                    range.max,
-                )
-                onChange(numberJson(kind, clamped))
-            }
+    NumberRow(
+        label = label.orEmpty(),
+        value = number,
+        whole = whole,
+        id = path,
+        min = range?.min ?: Double.NEGATIVE_INFINITY,
+        max = range?.max ?: Double.POSITIVE_INFINITY,
+        slider = range?.slider == true,
+        help = description,
+        onGestureEnd = {
+            pending[0]?.let(::send)
+            pending[0] = null
+        },
+    ) { next ->
+        pending[0] = next
+        if (pace.due()) {
+            send(next)
+            pending[0] = null
         }
     }
 }
@@ -411,24 +399,12 @@ internal fun NumberInput(
     modifier: Modifier = Modifier,
     onChange: (Double) -> Unit,
 ) {
-    var draft by remember(path) { mutableStateOf(formatNumber(value, whole)) }
-    var lastExternal by remember(path) { mutableStateOf(value) }
-    if (value != lastExternal) {
-        lastExternal = value
-        if (draft.toDoubleOrNull() != value) draft = formatNumber(value, whole)
-    }
-
-    TextField(
-        value = draft,
+    NumberField(
+        value = value,
         id = "insp-number$path",
-        filter = if (whole) UiTextInputFilter.INTEGER else UiTextInputFilter.DECIMAL,
-        fontSize = 9f,
-        onChange = { text ->
-            draft = text
-            text.toDoubleOrNull()?.let(onChange)
-        },
-        tags = listOf("insp-input"),
+        whole = whole,
         modifier = modifier.grow(1f),
+        onChange = onChange,
     )
 }
 
@@ -497,19 +473,32 @@ private fun ListVectorField(
     VectorRow(label, description, path, components)
 }
 
-/** Three numbers on one row, the way a vector field of a component is shown. */
+/** Three numbers on one row, the way a vector field of a component is shown; [step] for angles is a degree. */
 @Composable
-internal fun Vec3Row(label: String, value: Vec3f, path: String, description: String? = null, onChange: (Vec3f) -> Unit) {
+internal fun Vec3Row(
+    label: String,
+    value: Vec3f,
+    path: String,
+    description: String? = null,
+    step: Double? = null,
+    onChange: (Vec3f) -> Unit,
+) {
     val numbers = floatArrayOf(value.x, value.y, value.z)
     VectorRow(label, description, path, numbers.indices.map { index ->
-        VectorComponent(VectorAxes[index], PrimitiveKind.FLOAT, numbers[index].toDouble()) { next ->
+        VectorComponent(VectorAxes[index], PrimitiveKind.FLOAT, numbers[index].toDouble(), step) { next ->
             val changed = numbers.copyOf().also { it[index] = next.toFloat() }
             onChange(Vec3f(changed[0], changed[1], changed[2]))
         }
     })
 }
 
-private class VectorComponent(val name: String, val kind: PrimitiveKind, val value: Double, val onChange: (Double) -> Unit)
+private class VectorComponent(
+    val name: String,
+    val kind: PrimitiveKind,
+    val value: Double,
+    val step: Double? = null,
+    val onChange: (Double) -> Unit,
+)
 
 private val VectorAxes = listOf("x", "y", "z", "w")
 
@@ -519,11 +508,15 @@ private fun VectorRow(label: String?, description: String?, path: String, compon
         FieldLabel(label, description)
         Row(tags = listOf("insp-vector")) {
             components.forEach { component ->
-                val whole = component.kind == PrimitiveKind.INT || component.kind == PrimitiveKind.LONG
-                Row(tags = listOf("insp-vector-cell")) {
-                    Text(component.name, tags = listOf("insp-vector-label"))
-                    NumberInput("$path/${component.name}", component.value, whole, onChange = component.onChange)
-                }
+                NumberField(
+                    value = component.value,
+                    id = "insp-number$path/${component.name}",
+                    label = component.name,
+                    whole = component.kind == PrimitiveKind.INT || component.kind == PrimitiveKind.LONG,
+                    step = component.step,
+                    modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+                    onChange = component.onChange,
+                )
             }
         }
     }
@@ -747,11 +740,4 @@ private fun numberJson(kind: PrimitiveKind, value: Double): JsonPrimitive = when
     else -> JsonPrimitive(value)
 }
 
-internal fun formatNumber(value: Double, whole: Boolean): String {
-    if (whole) return value.toLong().toString()
-    if (!value.isFinite()) return value.toString()
-    val rounded = BigDecimal(value).setScale(DecimalPlaces, RoundingMode.HALF_UP).stripTrailingZeros()
-    return rounded.toPlainString()
-}
-
-private const val DecimalPlaces = 4
+internal fun formatNumber(value: Double, whole: Boolean): String = formatUiNumber(value, whole)

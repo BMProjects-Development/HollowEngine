@@ -1,6 +1,74 @@
 @import "hollowengine:ui/styles/theme.hss";
 @import "hollowengine:ui/styles/buttons.hss";
 
+.number-field {
+    size: 100% fit;
+    background: $bg-field;
+    border-radius: $radius-small;
+    border: 1px $divider;
+    foreground: $text;
+    font-size: $font-size;
+    caret-color: $caret;
+    selection-color: $selection;
+    text-shadow: none;
+    transition: border 110ms ease-out;
+}
+
+.number-field:hover { border: 1px $border; }
+
+.number-field.editing {
+    min-height: 18px;
+    padding: 1px 4px;
+}
+
+.number-field-frame { size: 100% 16px; }
+
+.number-field.editing:focus { border: 1px $accent; }
+
+.number-field-fill {
+    background: $accent-fill;
+    border-radius: $radius-small;
+}
+
+.number-field-body {
+    gap: 4px;
+    padding: 0px 3px;
+    align-items: start center;
+}
+
+.number-field-label {
+    size: 0px fit;
+    grow: 1;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+}
+
+.number-field-value {
+    foreground: $text;
+    font-size: $font-size;
+    text-align: center;
+}
+
+.number-field.labeled .number-field-value { text-align: right; }
+
+.number-field-arrow {
+    size: 9px 100%;
+    align-items: center center;
+    background: $bg-field;
+    border-radius: $radius-small;
+    opacity: 0;
+    transition: opacity 110ms ease-out;
+}
+
+.number-field:hover .number-field-arrow { opacity: 1; }
+
+.number-field-arrow-icon {
+    size: 6px 6px;
+    tint: $text-faint;
+}
+
+.number-field-arrow:hover .number-field-arrow-icon { tint: $text-strong; }
+
 .view-axes-label {
     font-size: 7px;
     foreground: $bg-window;

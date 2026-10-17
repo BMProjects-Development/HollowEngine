@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.inspector
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 /** A titled group of rows. [boxed] draws the group as a card instead of a ruled heading. */
@@ -134,13 +135,16 @@ fun FloatRow(
     min: Float = -Float.MAX_VALUE,
     max: Float = Float.MAX_VALUE,
     help: String? = null,
+    step: Float? = null,
     onChange: (Float) -> Unit,
 ) {
-    NumberRow(label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(), help = help) {
-        onChange(it.toFloat())
-    }
+    NumberRow(
+        label, value.toDouble(), whole = false, id = id, min = min.toDouble(), max = max.toDouble(), help = help,
+        step = step?.toDouble(),
+    ) { onChange(it.toFloat()) }
 }
 
+/** `Label:  ‹ value ›`, a number of an inspector with its label in front; [help] is the label's tooltip. */
 @Composable
 fun NumberRow(
     label: String,
@@ -150,15 +154,30 @@ fun NumberRow(
     min: Double = -Double.MAX_VALUE,
     max: Double = Double.MAX_VALUE,
     help: String? = null,
+    slider: Boolean = false,
+    step: Double? = null,
+    onGestureEnd: () -> Unit = {},
     onChange: (Double) -> Unit,
 ) {
-    Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) FieldLabel(label, help)
-        NumberInput(
-            path = id ?: "-$label",
+    Row(tags = listOf("insp-number-row")) {
+        if (label.isNotEmpty()) Text(
+            label,
+            tags = if (help != null) listOf("insp-number-label", "hinted") else listOf("insp-number-label"),
+            modifier = Modifier.textWrap(false).textOverflow(UiTextOverflow.DOTS)
+                .then(if (help != null) Modifier.tooltipOnHover(help) else Modifier),
+        )
+        NumberField(
             value = value,
+            id = "insp-number${id ?: "-$label"}",
             whole = whole,
-        ) { typed -> onChange(typed.coerceIn(min, max)) }
+            min = min,
+            max = max,
+            slider = slider,
+            step = step,
+            modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+            onGestureEnd = onGestureEnd,
+            onChange = onChange,
+        )
     }
 }
 
@@ -189,18 +208,8 @@ fun ToggleRow(
 
 @Composable
 fun SliderRow(label: String, value: Float, min: Float, max: Float, onChange: (Float) -> Unit) {
-    Column(tags = listOf("insp-field")) {
-        if (label.isNotEmpty()) Label(label)
-        Row(tags = listOf("insp-input-row")) {
-            Slider(
-                value = value,
-                min = min,
-                max = max,
-                tags = listOf("insp-slider"),
-                onValueChange = onChange,
-            )
-            Text(formatNumber(value.toDouble(), whole = false), tags = listOf("insp-slider-value"))
-        }
+    NumberRow(label, value.toDouble(), whole = false, min = min.toDouble(), max = max.toDouble(), slider = true) {
+        onChange(it.toFloat())
     }
 }
 

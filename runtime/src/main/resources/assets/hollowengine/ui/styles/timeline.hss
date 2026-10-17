@@ -55,9 +55,9 @@
 
 .timeline-time:focus { border: 1px $accent; }
 
-.timeline-time.timeline-snap-fps { size: 30px fit; }
+.number-field.timeline-snap-fps { size: 44px fit; }
 
-.timeline-time.timeline-snap-fps.off { foreground: $text-faint; }
+.number-field.timeline-snap-fps.off .number-field-value { foreground: $text-faint; }
 
 .timeline-duration {
     margin: 0px 4px 0px 3px;

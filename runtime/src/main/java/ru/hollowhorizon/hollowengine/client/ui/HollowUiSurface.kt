@@ -36,6 +36,9 @@ class HollowUiSurface(
     private var viewport by mutableStateOf(UiRect.Zero)
     private val overlayManager = OverlayManager()
 
+    /** How the host keeps the pointer inside a region; set before [setContent], null for a host that cannot. */
+    var pointerWrap: UiPointerWrap? = null
+
     fun setContent(content: HollowUiContent): BoxNode {
         hasContent = true
         return composition.setContent {
@@ -45,6 +48,7 @@ class HollowUiSurface(
                 LocalOverlayManager provides overlayManager,
                 LocalUiViewport provides viewport,
                 LocalUiFocusRequester provides UiFocusRequester(runtime::requestFocus),
+                LocalUiPointerWrap provides pointerWrap,
             ) {
                 content()
                 OverlayHost()

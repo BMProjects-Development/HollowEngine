@@ -581,6 +581,7 @@ object HollowIdeOverlay {
         model.onFileRemoved = ::forgetFile
         contributions.start()
         restoreLayout()
+        surface.pointerWrap = HollowIdePointerWrap
         surface.setContent { Content() }
         TagModuleRevision.observe(::rereadFilesSoon)
     }

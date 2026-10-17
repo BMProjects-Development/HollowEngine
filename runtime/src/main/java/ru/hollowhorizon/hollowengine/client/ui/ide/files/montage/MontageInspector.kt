@@ -117,7 +117,8 @@ private fun BoneFields(state: MontageEditorState, bone: String) {
                         Vec3Row(
                             montageText("bone_${property.name.lowercase()}"),
                             session.boneValue(bone, property),
-                            "bone-$bone-${property.name}"
+                            "bone-$bone-${property.name}",
+                            step = if (property == MontageBoneProperty.ROTATION) 1.0 else null,
                         ) { value ->
                             session.editBone(bone, property, value)
                         }

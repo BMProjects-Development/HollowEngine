@@ -63,7 +63,7 @@ internal fun VfxNodeFields(document: VfxEditing, state: VfxInspectorState, node:
         VfxFloat3Row(vfxText("position"), transform.position, VfxProperty.POSITION) {
             document.replace(node.withCommon(transform = transform.copy(position = it)))
         }
-        VfxFloat3Row(vfxText("rotation"), transform.rotation, VfxProperty.ROTATION) {
+        VfxFloat3Row(vfxText("rotation"), transform.rotation, VfxProperty.ROTATION, step = 1.0) {
             document.replace(node.withCommon(transform = transform.copy(rotation = it)))
         }
         VfxFloat3Row(vfxText("scale"), transform.scale, VfxProperty.SCALE) {

@@ -115,7 +115,7 @@ private fun OriginSection(session: CutsceneEditorSession, refresh: () -> Unit) {
             session.moveOrigin(Vec3f(origin.x, origin.y, next), origin.yaw, keepWorld = false)
             refresh()
         }
-        FloatRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f) { next ->
+        FloatRow(CutsceneLang.ORIGIN_YAW.lang, origin.yaw, min = -360f, max = 360f, step = 1f) { next ->
             session.moveOrigin(origin.position, next, keepWorld = false)
             refresh()
         }

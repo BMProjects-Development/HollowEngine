@@ -122,7 +122,9 @@ private fun AddedBoneFields(document: RigEditing, bone: String, origin: RigBoneO
         }
         Readonly(rigText("bone_parent"), origin.parent ?: rigText("model"))
         Vec3Row(rigText("pose_position"), origin.offset, "$path/offset") { write(origin.copy(offset = it)) }
-        Vec3Row(rigText("pose_rotation"), origin.rotation, "$path/rotation") { write(origin.copy(rotation = it)) }
+        Vec3Row(rigText("pose_rotation"), origin.rotation, "$path/rotation", step = DegreeStep) {
+            write(origin.copy(rotation = it))
+        }
         InspectorButton(rigText("remove_bone"), tags = listOf("danger")) {
             document.edit { it.withoutAddedBone(bone) }
             onSelectBone(origin.parent)
@@ -139,7 +141,7 @@ private fun PoseFields(document: RigEditing, bone: String, current: RigBone) {
 
     Section(rigText("section_pose")) {
         Vec3Row(rigText("pose_position"), pose.position, "$path/position") { write(pose.copy(position = it)) }
-        Vec3Row(rigText("pose_rotation"), pose.rotation.eulerDegreesXyz(), "$path/rotation") { degrees ->
+        Vec3Row(rigText("pose_rotation"), pose.rotation.eulerDegreesXyz(), "$path/rotation", step = DegreeStep) { degrees ->
             write(pose.copy(rotation = eulerRotationXyz(degrees)))
         }
         Vec3Row(rigText("pose_scale"), pose.scale, "$path/scale") { write(pose.copy(scale = it)) }
@@ -287,3 +289,5 @@ internal fun RigAttachmentType<*>?.title(): String {
     return if (translated == titleKey) id.substringAfterLast('/') else translated
 }
 
+/** A degree a step, for the angles of a pose. */
+private const val DegreeStep = 1.0

@@ -169,23 +169,29 @@ fun ContextMenu(
 
 @Composable
 private fun DropdownSliderRow(id: String, label: String, slider: UiDropdownSlider, onEnter: () -> Unit) {
-    var live by remember(slider.value) { mutableStateOf(slider.value) }
+    val last = remember(id) { floatArrayOf(slider.value) }
     Row(
         id = id,
         tags = listOf("dropdown-item", "dropdown-slider-item"),
         modifier = Modifier.input(hoverable = true).alignItems(vertical = UiAlign.CENTER).onEnter { onEnter() },
     ) {
-        Text(label, tags = listOf("dropdown-item-label"))
-        Slider(
-            value = slider.value,
-            min = slider.min,
-            max = slider.max,
-            step = slider.step,
-            onValueChange = { live = it; slider.onChange?.invoke(it) },
-            onValueCommit = { slider.onCommit?.invoke(it) },
-            tags = listOf("dropdown-item-slider"),
-            modifier = Modifier.grow(),
-        )
-        Text(slider.valueLabel(live), tags = listOf("dropdown-item-value"))
+        NumberField(
+            value = slider.value.toDouble(),
+            id = "$id-field",
+            label = label,
+            min = slider.min.toDouble(),
+            max = slider.max.toDouble(),
+            step = slider.step.takeIf { it > 0f }?.toDouble() ?: ((slider.max - slider.min) / SliderSteps).toDouble(),
+            slider = true,
+            format = { slider.valueLabel(it.toFloat()) },
+            modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+            onGestureEnd = { slider.onCommit?.invoke(last[0]) },
+        ) { next ->
+            last[0] = next.toFloat()
+            slider.onChange?.invoke(last[0])
+        }
     }
 }
+
+/** How many steps a slider of a menu without a step of its own goes through, by its arrows or with Ctrl. */
+private const val SliderSteps = 20f

@@ -9,11 +9,9 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPickerWidth
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import java.util.*
-import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sign
 
 /**
  * The value of an unlinked input: its name, then a field per component, or for a color a swatch that
@@ -31,6 +29,10 @@ internal fun ValueFields(
     fun set(component: Int, value: Float) =
         actions.setValue(node.id, pin.name, shown.toMutableList().also { it[component] = value })
 
+    if (components == 1 && !pin.color) {
+        GraphNumber("sg-field-${node.id}-${pin.name}-0", shown[0], actions, label = pin.name) { set(0, it) }
+        return
+    }
     Text(pin.name, tags = listOf("sg-pin-label"), modifier = Modifier.size(0.px, UiLength.Auto).grow(1f))
     if (pin.color && components >= 3) {
         ColorSwatch("sg-color-${node.id}-${pin.name}", shown, actions) { actions.setValue(node.id, pin.name, it) }
@@ -38,96 +40,34 @@ internal fun ValueFields(
     }
     Row(tags = listOf("sg-fields"), modifier = Modifier.size(FieldsWidth.px, UiLength.Auto)) {
         shown.forEachIndexed { component, value ->
-            NumberField("sg-field-${node.id}-${pin.name}-$component", value, actions) { set(component, it) }
+            GraphNumber("sg-field-${node.id}-${pin.name}-$component", value, actions) { set(component, it) }
         }
     }
 }
 
 /**
- * A number shown as text that a drag sideways changes, by a hundredth per pixel, a thousandth with
- * Shift and a tenth with Ctrl, as one step back. A click without a drag types into it instead; while
- * it is typed into, the wheel steps it by a tenth, a hundredth with Shift and one with Ctrl.
- * Without [gestures], a drag leaves the steps back to whoever holds one open around the field.
+ * A number of a node: dragged, stepped or typed, as one step back. With a [label] it is the whole row of a
+ * one-number input. Without [gestures], what it changes is left to whoever holds a step open around it.
  */
 @Composable
-internal fun NumberField(
+internal fun GraphNumber(
     id: String,
     value: Float,
     actions: ShaderFieldActions,
     gestures: Boolean = true,
+    label: String? = null,
     onChange: (Float) -> Unit,
 ) {
-    var editing by remember(id) { mutableStateOf(false) }
-    val focus = LocalUiFocusRequester.current
-    val start = remember(id) { floatArrayOf(0f) }
-    // Whether the left button went down here, and whether it has moved since.
-    val gesture = remember(id) { booleanArrayOf(false, false) }
-
-    if (editing) {
-        TypedNumber("$id-edit", value, onChange) { editing = false }
-        return
-    }
-    Text(
-        formatValue(value),
+    NumberField(
+        value = value.toDouble(),
         id = id,
-        tags = listOf("sg-field", "sg-number"),
-        modifier = Modifier.size(0.px, FieldHeight.px).grow(1f)
-            .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
-                if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
-                gesture[0] = true
-                gesture[1] = false
-                start[0] = value
-                if (gestures) actions.beginGesture()
-                event.consume()
-            }.onDrag { event ->
-                if (!gesture[0]) return@onDrag
-                if (abs(event.dragTotalX) >= DRAG_THRESHOLD) gesture[1] = true
-                if (gesture[1]) onChange(rounded(start[0] + event.dragTotalX * step(event.modifiers, DRAG_STEP)))
-                event.consume()
-            }.onRelease { event ->
-                if (!gesture[0]) return@onRelease
-                gesture[0] = false
-                if (gestures) actions.endGesture()
-                if (!gesture[1]) {
-                    editing = true
-                    focus.request("$id-edit")
-                }
-                event.consume()
-            },
-    )
-}
-
-/** The field a number is typed into; it goes back to text on Enter, on Escape and when it loses focus. */
-@Composable
-private fun TypedNumber(id: String, value: Float, onChange: (Float) -> Unit, onDone: () -> Unit) {
-    var draft by remember(id) { mutableStateOf(formatValue(value)) }
-    TextField(
-        value = draft,
-        id = id,
-        filter = UiTextInputFilter.DECIMAL,
-        fontSize = 9f,
+        label = label,
+        format = { formatValue(it.toFloat()) },
         tags = listOf("sg-field"),
-        modifier = Modifier.size(0.px, FieldHeight.px).grow(1f).onUnfocus { onDone() }.onKeyInput { input ->
-                if (input.key == GLFW.GLFW_KEY_ENTER || input.key == GLFW.GLFW_KEY_KP_ENTER || input.key == GLFW.GLFW_KEY_ESCAPE) {
-                    onDone()
-                    input.consume()
-                }
-            }.onScroll { event ->
-                val next = rounded(
-                    (draft.toFloatOrNull() ?: value) + sign(event.rawScrollY) * step(
-                        event.modifiers,
-                        WHEEL_STEP
-                    )
-                )
-                draft = formatValue(next)
-                onChange(next)
-                event.consume()
-            },
-        onChange = { text ->
-            draft = text
-            text.toFloatOrNull()?.let(onChange)
-        },
-    )
+        modifier = Modifier.size(0.px, FieldHeight.px).grow(1f),
+        onGestureStart = { if (gestures) actions.beginGesture() },
+        onGestureEnd = { if (gestures) actions.endGesture() },
+    ) { onChange(rounded(it.toFloat())) }
 }
 
 /**
@@ -176,7 +116,7 @@ private fun ColorSwatch(id: String, values: List<Float>, actions: ShaderFieldAct
             )
             Row(tags = listOf("sg-fields"), modifier = Modifier.size(ColorPickerWidth.px, UiLength.Auto)) {
                 values.forEachIndexed { channel, value ->
-                    NumberField("$id-channel-$channel", value, actions, gestures = false) { typed ->
+                    GraphNumber("$id-channel-$channel", value, actions, gestures = false) { typed ->
                         onChange(values.toMutableList().also { it[channel] = typed })
                     }
                 }
@@ -200,6 +140,3 @@ internal fun formatValue(value: Float): String =
 private fun rounded(value: Float): Float = (value * 1000f).roundToInt() / 1000f
 
 /** Pixels a press has to move before it counts as a drag rather than a click. */
-private const val DRAG_THRESHOLD = 2f
-private const val DRAG_STEP = 0.01f
-private const val WHEEL_STEP = 0.1f

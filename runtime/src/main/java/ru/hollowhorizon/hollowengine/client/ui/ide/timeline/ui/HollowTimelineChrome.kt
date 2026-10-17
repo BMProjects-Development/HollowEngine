@@ -253,18 +253,18 @@ internal fun TimelineToolbar(
 
 private fun snapTooltip(): String = HollowKeys.FREE_MOVE.hint(CutsceneLang.SNAP.lang)
 
-/** How many frames a second the timeline snaps to, typed in. */
+/** How many frames a second the timeline snaps to, dragged or typed in. */
 @Composable
 private fun SnapFpsField() {
-    TextField(
-        value = TimelineSnap.fps.toString(),
+    NumberField(
+        value = TimelineSnap.fps.toDouble(),
         id = "timeline-snap-fps",
-        fontSize = 9f,
-        filter = UiTextInputFilter.INTEGER,
-        tags = listOfNotNull("timeline-time", "timeline-snap-fps", "off".takeUnless { TimelineSnap.enabled }),
+        whole = true,
+        min = 1.0,
+        max = TimelineSnap.MaxFps.toDouble(),
+        tags = listOfNotNull("timeline-snap-fps", "off".takeUnless { TimelineSnap.enabled }),
         modifier = Modifier.tooltipOnHover(CutsceneLang.SNAP_FPS.lang),
-        onChange = { typed -> typed.toIntOrNull()?.takeIf { it > 0 }?.let { TimelineSnap.fps = it } },
-    )
+    ) { TimelineSnap.fps = it.toInt() }
     Text(CutsceneLang.SNAP_UNIT.lang, tags = listOf("timeline-duration"))
 }
 

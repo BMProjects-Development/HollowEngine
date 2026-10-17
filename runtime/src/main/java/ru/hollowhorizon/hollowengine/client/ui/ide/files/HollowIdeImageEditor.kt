@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.checkerboard
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.math.ceil
@@ -238,18 +239,16 @@ internal fun HollowIdeImageEditor(
             }
 
             if (tool != ImageTool.EYEDROPPER) {
-                Text(
-                    "hollowengine.gui.image_editor.size".lang.format(brushRadius * 2 + 1),
-                    tags = listOf("image-editor-label"),
-                )
-                Slider(
-                    value = brushRadius.toFloat(),
-                    min = 0f,
-                    max = MaxBrushRadius.toFloat(),
-                    step = 1f,
-                    onValueChange = { brushRadius = it.toInt() },
-                    modifier = Modifier.size(100.percent, 16.px),
-                )
+                NumberField(
+                    value = brushRadius.toDouble(),
+                    id = "image-editor-brush",
+                    label = "hollowengine.gui.image_editor.size".lang,
+                    whole = true,
+                    min = 0.0,
+                    max = MaxBrushRadius.toDouble(),
+                    slider = true,
+                    format = { (it.toInt() * 2 + 1).toString() },
+                ) { brushRadius = it.toInt() }
             }
 
             SectionTitle("hollowengine.gui.image_editor.history".lang)

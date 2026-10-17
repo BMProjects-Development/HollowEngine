@@ -283,6 +283,22 @@
 
 .insp-input.numeric { text-align: right; }
 
+.insp-number-row {
+    size: 100% fit;
+    gap: 6px;
+    align-items: start center;
+}
+
+.insp-number-label {
+    size: 40% fit;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+}
+
+.insp-number-label.hinted { hoverable: true; }
+
+.insp-number-label.hinted:hover { foreground: $text; }
+
 /* ---- inline fields ---- */
 
 .insp-inline-label {
@@ -394,37 +410,9 @@
     checkbox-mark: $white;
 }
 
-.insp-slider { grow: 1; }
-
-.insp-slider-value {
-    size: fit fit;
-    min-width: 40px;
-    foreground: $text;
-    font-size: $font-size-small;
-    wrap: false;
-}
-
 .insp-vector {
     size: 100% fit;
     gap: 3px;
-}
-
-.insp-vector-cell {
-    grow: 1;
-    size: 0px fit;
-    gap: 4px;
-    align-items: start center;
-}
-
-.insp-vector-label {
-    size: fit fit;
-    foreground: $text-faint;
-    font-size: $font-size-small;
-}
-
-.insp-vector-cell .insp-input {
-    size: 0px fit;
-    grow: 1;
 }
 
 .insp-nested {

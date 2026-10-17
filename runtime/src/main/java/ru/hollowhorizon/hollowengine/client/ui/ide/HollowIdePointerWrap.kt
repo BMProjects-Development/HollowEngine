@@ -5,11 +5,12 @@ import androidx.compose.runtime.DisposableEffect
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.editor.GizmoSession
+import ru.hollowhorizon.hollowengine.client.ui.UiPointerWrap
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdePointerWrap.release
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 
 /** A part of the IDE that keeps pointer inside itself during a transform. */
-object HollowIdePointerWrap {
+object HollowIdePointerWrap : UiPointerWrap {
     private class Hold(
         val region: UiRect,
         val start: HollowIdeOverlayPoint,
@@ -28,7 +29,7 @@ object HollowIdePointerWrap {
      * Keeps the pointer in [region], in the IDE's coordinates, until [release] with the same [onWrap]. [startX] and
      * [startY] are where the owner counts the pointer from: one still outside is brought there first.
      */
-    fun hold(region: UiRect, startX: Float, startY: Float, onWrap: (dx: Float, dy: Float) -> Unit) {
+    override fun hold(region: UiRect, startX: Float, startY: Float, onWrap: (dx: Float, dy: Float) -> Unit) {
         val start = HollowIdeOverlayPoint(
             startX.coerceIn(region.x, region.x + region.width),
             startY.coerceIn(region.y, region.y + region.height),
@@ -36,7 +37,7 @@ object HollowIdePointerWrap {
         hold = Hold(region, start, onWrap)
     }
 
-    fun release(onWrap: (dx: Float, dy: Float) -> Unit) {
+    override fun release(onWrap: (dx: Float, dy: Float) -> Unit) {
         if (hold?.onWrap == onWrap) hold = null
     }
 

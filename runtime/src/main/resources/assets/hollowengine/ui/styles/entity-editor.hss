@@ -430,7 +430,7 @@
     text-overflow: dots;
 }
 .ee-attribute-value { size: 78px 22px; }
-.ee-attribute-value .insp-input { size: 100% 22px; text-align: right; }
+.ee-attribute-value .number-field-frame { size: 100% 22px; }
 .ee-attribute-actions { size: 32px fit; gap: 4px; align-items: end center; }
 .ee-attribute-tools { size: 100% fit; gap: 6px; align-items: start center; margin: 3px 0px; }
 .ee-attribute-search { size: 0px 22px; grow: 1; min-width: 0px; }

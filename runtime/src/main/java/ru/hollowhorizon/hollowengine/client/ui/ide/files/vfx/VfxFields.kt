@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.client.vfx.VfxExpressionLanguage
@@ -212,14 +212,15 @@ fun VfxFloat3Row(
     value: Vec3f,
     property: VfxProperty? = null,
     hint: String? = null,
+    step: Double? = null,
     onChange: (Vec3f) -> Unit,
 ) {
     val driven = property?.let { LocalVfxDriven.current(it) }
     Row(modifier = Modifier.size(100.percent).gap(3.px).alignItems(vertical = UiAlign.CENTER)) {
         VfxFieldLabel(label, hint, VectorLabelWidth)
-        AxisNumber("X", value.x, property, driven, 0) { onChange(Vec3f(it, value.y, value.z)) }
-        AxisNumber("Y", value.y, property, driven, 1) { onChange(Vec3f(value.x, it, value.z)) }
-        AxisNumber("Z", value.z, property, driven, 2) { onChange(Vec3f(value.x, value.y, it)) }
+        AxisNumber("X", value.x, property, driven, 0, step) { onChange(Vec3f(it, value.y, value.z)) }
+        AxisNumber("Y", value.y, property, driven, 1, step) { onChange(Vec3f(value.x, it, value.z)) }
+        AxisNumber("Z", value.z, property, driven, 2, step) { onChange(Vec3f(value.x, value.y, it)) }
         if (driven != null) DrivenMark(property)
     }
 }
@@ -263,6 +264,7 @@ private fun AxisNumber(
     property: VfxProperty?,
     driven: VfxDrivenValue?,
     channel: Int,
+    step: Double? = null,
     onChange: (Float) -> Unit,
 ) {
     Row(modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).gap(2.px).alignItems(vertical = UiAlign.CENTER)) {
@@ -270,7 +272,7 @@ private fun AxisNumber(
         if (driven != null && driven.drives(channel)) {
             DrivenCell(driven, property, channel)
         } else {
-            NumberCell(value, property, whole = false, onChange = onChange)
+            NumberCell(value, property, whole = false, step = step, onChange = onChange)
         }
     }
 }
@@ -297,29 +299,15 @@ private fun DrivenMark(property: VfxProperty?) {
 }
 
 @Composable
-private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, onChange: (Float) -> Unit) {
+private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, step: Double? = null, onChange: (Float) -> Unit) {
     val focus = LocalVfxFieldFocus.current
-    var draft by remember { mutableStateOf(formatNumber(value)) }
-    var lastExternal by remember { mutableStateOf(value) }
-    if (value != lastExternal) {
-        lastExternal = value
-        if (draft.toFloatOrNull() != value) draft = formatNumber(value)
-    }
-
-    TextField(
-        value = draft,
-        fontSize = 9f,
-        filter = if (whole) UiTextInputFilter.INTEGER else UiTextInputFilter.DECIMAL,
-        tags = listOf("insp-input", "insp-inline-input", "numeric"),
-        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).onFocus { if (property != null) focus(property) },
-        onChange = { text ->
-            draft = text
-            text.toFloatOrNull()?.let { number ->
-                lastExternal = number
-                onChange(number)
-            }
-        },
-    )
+    NumberField(
+        value = value.toDouble(),
+        whole = whole,
+        step = step,
+        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+        onGestureStart = { if (property != null) focus(property) },
+    ) { onChange(it.toFloat()) }
 }
 
 @Composable
