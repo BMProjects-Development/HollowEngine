@@ -297,8 +297,8 @@ data class ParticleComponents(
             }
         }
 
-        private object InwardsSerializer : ObjectAsString<Inwards>("inwards", Inwards)
-        private object OutwardsSerializer : ObjectAsString<Outwards>("outwards", Outwards)
+        object InwardsSerializer : ObjectAsString<Inwards>("inwards", Inwards)
+        object OutwardsSerializer : ObjectAsString<Outwards>("outwards", Outwards)
 
         object CustomSerializer : KSerializer<Custom> {
             private val inner = FloatVec3ExprSerializer
@@ -307,7 +307,7 @@ data class ParticleComponents(
             override fun serialize(encoder: Encoder, value: Custom) = inner.serialize(encoder, value.vec)
         }
 
-        private open class ObjectAsString<T>(private val str: String, private val value: T) : KSerializer<T> {
+        open class ObjectAsString<T>(private val str: String, private val value: T) : KSerializer<T> {
             private val inner = String.serializer()
             override val descriptor: SerialDescriptor = inner.descriptor
             override fun deserialize(decoder: Decoder) = inner.deserialize(decoder).let { value }
@@ -560,7 +560,7 @@ data class MolangGradient(
 
 object MolangColorOrGradientSerializer :
     JsonContentPolymorphicSerializer<MolangColorOrGradient>(MolangColorOrGradient::class) {
-    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<out MolangColorOrGradient> =
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<MolangColorOrGradient> =
         if (element is JsonObject) MolangGradient.serializer() else MolangColor.serializer()
 }
 

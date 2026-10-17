@@ -52,7 +52,7 @@ class SyncedSound(private val id: String = UUID.randomUUID().toString()) : AutoC
             start(source, playback, emitter, clock ?: playing.position)
             return
         }
-        if (jumped) return ClientSounds.seek(id, clock!!)
+        if (jumped) return ClientSounds.seek(id, clock)
         if (clock == null) return
         if (clock == previous) playing.pause() else playing.resume()
     }

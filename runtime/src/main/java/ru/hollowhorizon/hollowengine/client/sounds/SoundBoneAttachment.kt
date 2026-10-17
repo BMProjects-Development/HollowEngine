@@ -74,7 +74,7 @@ class SoundBoneAttachment(
             return
         }
         val playback = if (preview) spec.playback.copy(mode = SoundMode.GLOBAL) else spec.playback
-        sound.update(source!!, playback, emitter, clock?.toDouble())
+        sound.update(source, playback, emitter, clock?.toDouble())
     }
 
     /** What [SoundBoneAttachmentSpec.source] names, read once per value; null, with one error, when it names nothing. */

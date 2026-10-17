@@ -49,6 +49,7 @@ object HollowModProcessor {
             isClientOnly = isClientOnly || method.isAnnotationPresent(ClientOnly::class.java)
 
             if (!isClientOnly || isPhysicalClient) {
+                @Suppress("UNCHECKED_CAST")
                 EventHandler.get(method.parameterTypes[0].kotlin as KClass<Event>).register(listener)
             }
         }
@@ -60,6 +61,7 @@ object HollowModProcessor {
         }
 
         registerClassHandler<HollowPacketHandler> { type, _ ->
+            @Suppress("UNCHECKED_CAST")
             if (HollowPacket::class.java.isAssignableFrom(type)) registerPacket(type as Class<HollowPacket>)
             else HollowEngine.LOGGER.warn("Unsupported packet: ${type.simpleName}")
         }

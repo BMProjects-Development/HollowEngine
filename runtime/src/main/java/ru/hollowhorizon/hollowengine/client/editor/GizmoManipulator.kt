@@ -150,10 +150,8 @@ class GizmoManipulator(
 
             GizmoHandleId.SCALE_UNIFORM -> {
                 val originScreen = projector.project(handle.worldOrigin)
-                if (originScreen != null) {
-                    drag.referenceDistance = distance(originScreen.x, originScreen.y, pointerX, pointerY)
-                    drag.valid = drag.referenceDistance > 1e-3f
-                }
+                drag.referenceDistance = distance(originScreen.x, originScreen.y, pointerX, pointerY)
+                drag.valid = drag.referenceDistance > 1e-3f
             }
         }
         return drag
@@ -254,7 +252,7 @@ class GizmoManipulator(
     }
 
     private fun updateScale(drag: GizmoDrag, x: Float, y: Float, speed: Double, step: GizmoStep?): GizmoTransformValues? {
-        val originScreen = projector.project(drag.origin) ?: return null
+        val originScreen = projector.project(drag.origin)
         val current = distance(originScreen.x, originScreen.y, x, y)
         if (drag.referenceDistance <= 1e-3f) return null
         var factor = (current / drag.referenceDistance).toDouble()

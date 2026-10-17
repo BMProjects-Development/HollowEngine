@@ -98,7 +98,7 @@ internal object StoryNpcFunctions {
     }
 
     private fun StoryFunctionRegistry.animations() {
-        add("play-once", actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS.toFloat())) { args ->
+        add("play-once", actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS)) { args ->
             args.entity("who").playAndWait(args.string("animation"), args.fade(), args.fade())
         }
 
@@ -106,13 +106,13 @@ internal object StoryNpcFunctions {
         addPlayMode("play-clamped", AnimationPlayMode.ClampForever)
         addPlayMode("play-ping-pong", AnimationPlayMode.PingPong)
 
-        add("stop-animation", actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS.toFloat())) { args ->
+        add("stop-animation", actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS)) { args ->
             args.entity("who").stopAnimation(args.string("animation"), args.fade())
         }
     }
 
     private fun StoryFunctionRegistry.addPlayMode(name: String, mode: AnimationPlayMode) {
-        add(name, actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS.toFloat())) { args ->
+        add(name, actor("who"), string("animation"), number("fade", default = DEFAULT_FADE_MILLIS)) { args ->
             args.entity("who").play(args.string("animation"), mode, args.fade(), args.fade())
         }
     }
