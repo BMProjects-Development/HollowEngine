@@ -24,14 +24,20 @@ Attach handlers with `Modifier`:
 
 ```kotlin
 Box(
+    id = "accept-button",
     modifier = Modifier
+        .input(hoverable = true, clickable = true)
         .cursor(UiCursorShape.HAND)
         .onClick { send { putString("action", "accept") } }
-        .onHover { /* update local Compose state if needed */ },
+        .onHover { /* additional hover behavior */ },
 ) { Text("Accept") }
 ```
 
 Use `onPress`, `onRelease`, `onDrag`, `onScroll`, and key-input modifiers for custom controls. `Slider`, `Checkbox`, and `TextField` provide their own state and callbacks.
+
+Give interactive nodes stable `id` values to preserve hover, press, drag and focus across recompositions. Declare capabilities with `input(hoverable, clickable, draggable)`; an event handler does not replace that declaration. Style hover and press through HSS `:hover` and `:active` states rather than duplicating them in Compose state.
+
+A draggable node does not emit `onClick`: use `onPress` to select it. In `onDrag`, calculate position from the value captured on press and `event.dragTotalX` / `dragTotalY` rather than accumulating individual event deltas. Mark decorative layers over buttons with `inputTransparent()` when they should not intercept input.
 
 ## Client-to-server events
 

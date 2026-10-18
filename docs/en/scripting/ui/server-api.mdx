@@ -43,6 +43,8 @@ Each player gets a separate session. A server overlay is replaced on the client 
 
 ## State and patches
 
+Open an adaptive `surface` with `player.openSurface("project:dialogue")`. It returns the same `UiSession`: event handlers, `put`, `update` and closing work as for a screen. The client chooses overlay or screen from session data; see [adaptive surfaces](/docs/hollowengine/scripting/ui/ui-files).
+
 `DataKey<T>` gives each state entry a name, serializer, and optional default. The same key is read in UI code as `data[Key]` and written on the server with `put(Key, value)`.
 
 ```kotlin

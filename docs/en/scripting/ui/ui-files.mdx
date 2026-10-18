@@ -102,6 +102,30 @@ overlay("mypack:stamina") {
 
 `interactive()` is shorthand for `input = OverlayInput.INTERACTIVE`. During gameplay, an interactive overlay uses the screen centre until it receives a pointer event.
 
+## Adaptive surfaces
+
+`surface(id)` is for UI that alternates between a HUD overlay and a full screen. For example, a dialogue can stay over gameplay until an answer requires a screen with a cursor. One declaration uses one `content` and one session:
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
+
+val Choosing = dataKey<Boolean>("choosing") { false }
+
+surface("project:dialogue") {
+    anchor = "hotbar"
+    mode { state ->
+        if (state[Choosing]) UiSurfaceKind.SCREEN else UiSurfaceKind.OVERLAY
+    }
+    content {
+        Text(if (data[Choosing]) "Choose an answer" else "The story continues")
+    }
+}
+```
+
+Open it on the server with `player.openSurface("project:dialogue")`; `session.put(Choosing, true)` changes the mode without opening another session or losing its data. For UI on a model, use [panel](/docs/hollowengine/scripting/ui/world-panels) instead.
+
+For screens, `guiScale = UiGuiScale.Inherit` follows game settings by default; `guiScale(3)` chooses a fixed scale and `guiScale(0)` selects automatic scaling. On screens, overlays and adaptive surfaces, `exitDuration` keeps the UI mounted for a closing animation, in milliseconds. Closing sets the HSS `:closing` state, which can select an exit animation.
+
 ## Kotlin composition
 
 `content { }` is a composable `UiScope` receiver. It can call composables, read `data`, call `send { }`, and call `close()`. Put shared UI in normal Kotlin functions:

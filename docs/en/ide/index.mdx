@@ -1,6 +1,6 @@
 ---
 title: Working with the IDE
-order: 4
+order: 1
 ---
 
 <center><h1>Working with the IDE</h1></center>
@@ -21,6 +21,16 @@ Panels open as docked tabs. Drag a tab into a highlighted target to dock, split,
 The status bar at the bottom shows the open file or current object path and editor details. Click a path segment to reveal it in the project or open its tool window.
 
 ![IDE workspace with Project, editor, and Console](/hollowengine/pictures/ide/workspace.webp)
+
+## Keyboard shortcuts and history
+
+In **Help > Keyboard shortcuts**, search for an action, replace a binding, add an alternative or remove one. Actions are grouped by context: code editor, project, timeline, 3D view and graphs. Conflicting assignments in the same context are marked. Wheel, mouse-button and held-key actions can also be configured where supported. Import, export or reset the keymap as needed.
+
+All control tables in this documentation show **default bindings**. The current assignments appear in this dialog, menus and button tooltips. Basic text editing such as caret movement and Backspace is not part of the editor action keymap; `Alt + Enter` also remains a separate intention shortcut.
+
+Undo is `Ctrl + Z`; redo is `Ctrl + Y` or `Ctrl + Shift + Z`. They act on the active editor's or world's history. In **Windows > History**, choose a document or the world; clicking a step undoes or redoes up to it.
+
+See [Timeline](/docs/hollowengine/ide/timeline) for keys and curves, and [World objects](/docs/hollowengine/world/objects) for placement and transforms.
 
 ## Project tree
 
@@ -59,6 +69,8 @@ The item is only offered inside `scripts`, because the engine loads scripts and 
 ![Context menu for creating scripts](/hollowengine/pictures/ide/new-script-menu.webp)
 
 ## Code editor
+
+Buttons in the gutter fold code blocks and mark overrides, suspend calls and event handlers. Navigation markers help reach the corresponding declaration. Supported scripts also show **Run** and **Stop** controls; `@State` functions can be started individually. Running saves an edited file first; availability depends on server permissions and script type.
 
 Opening `.kts`, `.story`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics appear in the editor and in the **Problems** tab of the **Console** window. Its **Logs** tab shows log output, filters by severity and text, and accepts commands.
 
@@ -109,14 +121,18 @@ fun complete(event: IdeCompletionEvent) {
 
 ## File editors
 
+Change Inspector numbers by dragging horizontally or using the edge arrows. `Shift` makes the step ten times finer; `Ctrl` makes it ten times larger. Click without dragging to type an exact value; `Enter` confirms and `Escape` cancels. Bounded fields may display a slider.
+
 Some file types open in a dedicated editor instead of the text editor:
 
 | Files | Editor |
 | --- | --- |
 | `.vfx` | Visual effect editor with a live preview. The node tree appears in **Scene**, the selected node's settings in **Inspector**, and animation in **Timeline**. See [Visual effects (VFX)](/docs/hollowengine/vfx). |
 | `.material` | Node graph for materials, with a preview on a mesh. See [Material graph](/docs/hollowengine/vfx/material-graph). |
-| `.animator` | Layers, state graph, and parameters of an animation controller. See [Animator Editor](/docs/hollowengine/scripting/animator-editor). |
-| `.rig` | Bone aliases, attachments, and the physical skeleton. See [Rig Editor](/docs/hollowengine/scripting/rig-editor). |
+| `.animator` | Layers, state graph, and parameters of an animation controller. See [Animator Editor](/docs/hollowengine/models/animator-editor). |
+| `.rig` | Bone aliases, attachments, and the physical skeleton. See [Rig Editor](/docs/hollowengine/models/rig-editor). |
+| `.montage` | Clips, bone keys, temporary attachments and events. See [Montages](/docs/hollowengine/models/montages). |
+| `.ogg`, `.wav` and Media formats | Waveform, playback and seeking. See [Sounds](/docs/hollowengine/scripting/sounds). |
 | `.gltf`, `.glb`, `.fbx`, `.geo.json` | Model viewer. |
 | `.png`, `.jpg`, `.jpeg` | Image viewer. |
 | `.mp4` | Video player (needs the [Media addon](/docs/hollowengine/addons/media)). |
@@ -132,6 +148,8 @@ Saving a file writes it to the `hollowengine` directory. What must be reloaded d
 - use **File > Reload Server Resources** or `/reload` for datapack content and server reloadable scripts;
 - `.startup.kts` changes only apply after restarting the game;
 - ordinary `.kts` scripts are started explicitly with `/hollowengine scripting run <path>`.
+
+Server resource reload also replaces changed `.node.kts` instances on the server and loaded entities, restoring saved data and active states. See [Node scripts](/docs/hollowengine/scripting/node).
 
 The compiler addon is required to compile edited scripts. A modpack can instead ship scripts that were compiled ahead of time.
 

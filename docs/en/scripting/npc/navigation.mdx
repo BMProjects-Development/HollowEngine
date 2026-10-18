@@ -13,7 +13,7 @@ Every engine NPC finds and walks its paths the same way, whatever moves it: a sc
 
 ## The Navigation component
 
-Open the NPC's components with the NPC wand and add **Navigation** (`hollowengine:entity/navigation`). Its settings come in four groups. The component lives on the server only: clients see the NPC move and need nothing of it.
+Open the NPC's components with the NPC wand and add **Navigation** (`hollowengine:entity/navigation`). Its settings come in five groups. The component lives on the server only: clients see the NPC move and need nothing of it.
 
 ### Path
 
@@ -61,6 +61,45 @@ An NPC that already stands on a block it may never step on, or in water it does 
 
 ---
 
+## Flight
+
+The **Flight** group lets the same `move`, patrol and pathfinding APIs work in the air. Flight is disabled by default.
+
+| Setting | Options and meaning |
+| --- | --- |
+| `flies` | `FlightMode.NEVER`: walk only; `CAN`: choose walking or flying by path cost; `ALWAYS`: fly only, without landing. |
+| `style` | `FlightStyle.HOVER`: hover and move in any direction; `GLIDE`: fly forward, turn in arcs and circle while waiting. |
+| `flightCost`, `takeoffCost` | Cost per flown block and per takeoff, in blocks of walking. Defaults: `2` and `4`. |
+| `cruiseHeight`, `heightCost`, `maxHeight` | Preferred height above ground (`3` blocks), cost of deviating from it (`0.1`) and height limit (`0` means unlimited). |
+| `flightAcceleration` | Acceleration and braking time in seconds; default `0.5`. |
+| `turnRate`, `climbAngle` | Turning speed (`360` degrees per second) and maximum climb/dive angle (`90` degrees). |
+| `smoothing` | From `0` for tight path following to `1` for broad curves; default `0.5`. |
+| `wobble`, `wobbleRate` | Random path deviation in blocks and how often it changes. Deviation is off by default. |
+| `landAtGoal` | In `CAN` mode, land below the goal rather than hovering. Off by default. |
+
+The `minecraft:generic.flying_speed` attribute controls full flight speed in blocks per tick. Change it in the entity's attribute editor. A move's speed modifier multiplies this speed. Flight respects obstacles and body size; it cannot pass through walls.
+
+For example, allow flight for a single move:
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightMode
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightStyle
+
+npc.move(
+    pos(40, 80, 12),
+    MoveOptions(navigation = {
+        copy(flight = flight.copy(
+            flies = FlightMode.CAN,
+            style = FlightStyle.HOVER,
+            cruiseHeight = 6f,
+            landAtGoal = true,
+        ))
+    }),
+)
+```
+
+Animation expressions expose `q.is_flying`, `q.flight_pitch` and `q.flight_bank`: flight state, trajectory pitch and banking angle. Angles are in degrees. Use them to select a flight clip and tilt the model in its animator.
+
 ## Changing the settings for one move
 
 `MoveOptions(navigation = ...)` changes the settings for that move only. It is given the NPC's own settings, or the defaults when it has no component, and returns the ones to use:
@@ -88,7 +127,7 @@ Unlike [colliders](#colliders-and-blocking-bodies), these bodies take no part in
 
 ## Colliders and blocking bodies
 
-All mobs, not only NPCs, plan their paths around [solid colliders](/docs/hollowengine/scripting/colliders) and around the boxes of blocking bodies, the way they plan around blocks: a mob no longer walks into a 3×3 machine standing on what looks like empty floor. When such a collider moves into or out of the way of a mob walking a path, the mob plans the path again, as after a block change.
+All mobs, not only NPCs, plan their paths around [solid colliders](/docs/hollowengine/world/colliders) and around the boxes of blocking bodies, the way they plan around blocks: a mob no longer walks into a 3×3 machine standing on what looks like empty floor. When such a collider moves into or out of the way of a mob walking a path, the mob plans the path again, as after a block change.
 
 The top of a collider is not yet ground a path goes over, so a low solid collider, such as a rug, is walked around rather than stepped onto.
 
@@ -96,4 +135,4 @@ The top of a collider is not yet ground a path goes over, so a low solid collide
 
 ## Animations
 
-The standard player model plays its walk and run clips as fast as keeps its feet planted on the ground, walking backward plays the walk backward, and a sideways step plays the walk. For a model of your own, drive the clip speed in its [animator](/docs/hollowengine/scripting/animator-editor) the same way: `movement_animation_speed` is the entity's speed in blocks a second, negative when it walks backward, so divide it by how fast a planted foot of your clip moves over the ground, and use `local_side_speed`, its sideways speed in blocks a tick, for a clip that steps sideways.
+The standard player model plays its walk and run clips as fast as keeps its feet planted on the ground, walking backward plays the walk backward, and a sideways step plays the walk. For a model of your own, drive the clip speed in its [animator](/docs/hollowengine/models/animator-editor) the same way: `movement_animation_speed` is the entity's speed in blocks a second, negative when it walks backward, so divide it by how fast a planted foot of your clip moves over the ground, and use `local_side_speed`, its sideways speed in blocks a tick, for a clip that steps sideways.

@@ -1,6 +1,6 @@
 ---
 title: Animations
-order: 8
+order: 2
 ---
 
 <center><h1>Animations</h1></center>
@@ -21,7 +21,7 @@ animation-controller = "hollowengine:standard_player"
 
 An NPC created with `npc()` uses the built-in player model, which already names the standard animator and provides procedural head and eye rotation. You get all of that without writing anything.
 
-What a script adds on top are **clips**: one-off gestures, looping animations, and poses to hold. Those are what this page is about; see [Models and Materials](/docs/hollowengine/scripting/models) for the metadata file itself.
+What a script adds on top are **clips**: one-off gestures, looping animations, and poses to hold. Those are what this page is about; see [Models and Materials](/docs/hollowengine/models) for the metadata file itself.
 
 ---
 
@@ -72,7 +72,7 @@ entity.play("cheer", playMode = AnimationPlayMode.Loop, fadeIn = 0.1, fadeOut = 
 
 ## Writing your own animator
 
-An animator is an asset, not something a script builds: a stack of layers with a state machine, procedural bones, masks and blend weights. You put one together in the [animator editor](/docs/hollowengine/scripting/animator-editor). Create a `.animator` next to your model and name it in the model's `.hemeta`:
+An animator is an asset, not something a script builds: a stack of layers with a state machine, procedural bones, masks and blend weights. You put one together in the [animator editor](/docs/hollowengine/models/animator-editor). Create a `.animator` next to your model and name it in the model's `.hemeta`:
 
 ```toml
 animation-controller = "project:models/entity/guide.animator"

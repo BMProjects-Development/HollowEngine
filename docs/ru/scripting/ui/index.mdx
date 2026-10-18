@@ -37,7 +37,7 @@ screen("mypack:quest_log") {
 }
 ```
 
-Сервер открывает его из серверного скрипта через `player.openUi("mypack:quest_log")`. Подробнее см. в [Server UI API](/docs/hollowengine/scripting/ui/katari-ui).
+Сервер открывает его из серверного скрипта через `player.openUi("mypack:quest_log")`. Подробнее см. в [Server UI API](/docs/hollowengine/scripting/ui/server-api).
 
 ## Поверхности
 
@@ -46,6 +46,8 @@ screen("mypack:quest_log") {
 | Экран | `screen("namespace:id")` | `player.openUi(id)` | Обычный экран Minecraft |
 | HUD-оверлей | `overlay("namespace:id")` | `player.showOverlay(id)` | HUD, управляемый серверной сессией |
 | Клиентский HUD-оверлей | `overlay { autoShow = true }` | не нужен | Локальный постоянно видимый HUD |
+| Адаптивная поверхность | `surface("namespace:id")` | `player.openSurface(id)` | Переключается между HUD и экраном по данным |
+| Панель в мире | `panel("namespace:id")` | прикрепление в риге | Интерфейс на модели или объекте мира |
 
 Экран по умолчанию закрывается по Escape и не ставит одиночный мир на паузу. Оверлей по умолчанию рисуется после хотбара, не получает ввод и показывается только по запросу сервера.
 
@@ -58,12 +60,14 @@ screen("mypack:quest_log") {
 
 ## Дальше
 
+- [UI-панели в мире](/docs/hollowengine/scripting/ui/world-panels): терминалы и табло на моделях, общие данные сущности и серверные события
+
 - [Файлы UI-скриптов](/docs/hollowengine/scripting/ui/ui-files): синтаксис объявлений и параметры экрана или оверлея
 - [Узлы и виджеты](/docs/hollowengine/scripting/ui/nodes): композаблы и Kotlin-функции
 - [Инвентари и слоты](/docs/hollowengine/scripting/ui/slots): зоны, правила предметов, Shift + клик и клиентские виджеты
 - [Модификаторы](/docs/hollowengine/scripting/ui/modifiers): layout, внешний вид, события и вычисляемые стили
 - [События и состояние](/docs/hollowengine/scripting/ui/events): `UiScope`, `DataKey` и сессии
 - [Форматирование текста](/docs/hollowengine/scripting/ui/text-formatting): форматированные фрагменты, эффекты и динамический текст
-- [Server UI API](/docs/hollowengine/scripting/ui/katari-ui): открытие, обновление и закрытие UI
+- [Server UI API](/docs/hollowengine/scripting/ui/server-api): открытие, обновление и закрытие UI
 - [Примеры](/docs/hollowengine/scripting/ui/examples): клиентские и серверные примеры
 - [Стили UI](/docs/hollowengine/scripting/ui/styles): переиспользуемые правила HSS, переходы и анимации

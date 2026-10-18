@@ -41,7 +41,7 @@ npc.despawn()
 
 ## Тело
 
-Толкается ли NPC, не пускает ли других или пропускает их сквозь себя, задаёт компонент [Тело](/docs/hollowengine/scripting/colliders#the-body-of-an-entity). Без него NPC толкает и толкается, как мобы.
+Толкается ли NPC, не пускает ли других или пропускает их сквозь себя, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity). Без него NPC толкает и толкается, как мобы.
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
@@ -147,6 +147,6 @@ val id = uuid("00000000-0000-0000-0000-000000000000")
 
 Старые методы из Katari/block-документации - например, `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)` и отдельные обёртки `attack(...)` не относятся к основному API v2.3.
 
-- Для анимаций используйте [`play`](/docs/hollowengine/scripting/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- Для анимаций используйте [`play`](/docs/hollowengine/models/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
 - Для предметов в руках используйте Minecraft API `setItemInHand(...)` или [`equip`](/docs/hollowengine/scripting/npc/inventory).
-- Для внешнего вида используйте [`entity.materials`](/docs/hollowengine/scripting/models).
+- Для внешнего вида используйте [`entity.materials`](/docs/hollowengine/models).

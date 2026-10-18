@@ -37,14 +37,18 @@ Column(id = "panel", tags = listOf("dialog"), modifier = Modifier.padding(12.px)
 | `Slider` | `onValueChange`, `onValueCommit` |
 | `Checkbox` | `onCheckedChange`; checkbox, radio, or switch variants |
 | `TextField` | `onChange`; supports single/multi-line editing and editor features |
+| `NumberField` | `onChange(Double)`; exact input, dragging and bounded ranges |
 | `Popup` and overlays | Compose temporary UI above content |
+
+`NumberField` accepts `min`, `max`, `step`, `whole` for integers and `slider = true` for a bounded slider. Click to type an exact value or drag to adjust it; `Shift` makes the step finer and `Ctrl` makes it larger.
 
 Buttons are composed from `Box`, a style, and an input modifier:
 
 ```kotlin
 Box(
+    id = "save-button",
     tags = listOf("button", "primary"),
-    modifier = Modifier.padding(6.px, 10.px).onClick { send { putString("action", "save") } },
+    modifier = Modifier.padding(6.px, 10.px).input(hoverable = true, clickable = true).onClick { send { putString("action", "save") } },
 ) { Text("Save") }
 ```
 

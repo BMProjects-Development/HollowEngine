@@ -1,17 +1,17 @@
 ---
 title: Rig Editor
-order: 10
+order: 4
 ---
 
 <center><h1>Rig Editor</h1></center>
 
-*The visual editor for `.rig` files: bone aliases, hidden parts, colliders, and the physical skeleton a ragdoll is built from.*
+*The visual editor for `.rig` files: bones, poses, attachments, IK, colliders and physical skeletons.*
 
 ---
 
 ## What a rig is
 
-A model file says where the bones are. A rig says what they *mean*: which bone answers to another name, which ones are never drawn, and which of them physics may move.
+A model file does not contain everything you may need. You might want to add inverse kinematics, a UI panel, an effect or colliders that can take damage. These settings cannot be inferred automatically or exported directly from Blockbench or Blender, so the rig editor provides a place to configure them.
 
 It lives next to the model as `<model file>.rig` - `player.gltf` gets `player.gltf.rig` - the same way `.hemeta` does. Nothing points at it and nothing has to: one model, one rig.
 
@@ -23,29 +23,28 @@ A rig is optional. A model without one animates exactly as before.
 
 ## Opening it
 
-Right-click a folder in the project tree and create `<model file>.rig` - for example `player_model.gltf.rig`. An empty file is an empty rig, and the editor opens on the model straight away.
+Right-click a folder in the project tree and create `<model file>.rig`, for example `player_model.gltf.rig`. Alternatively, open the model and use its button to open the rig editor.
 
-The panel is in three parts:
+The editor uses the model tab and the shared **Scene** and **Inspector** windows from **Windows**:
 
-- **Bones** on the left - the model's hierarchy. A bone carrying attachments is marked `●2`, a bone with an alias `→name`. The eye icon beside a bone hides it in the preview.
+- **Scene** lists bones, nested models and attachments. Select an item to edit it; the eye icon hides a part in preview.
 - **The model** in the middle. Hold the left button to turn it, the right one to pan, the wheel to zoom. Clicking a bone selects it; clicking the same spot again steps to the next bone under the pointer, so joints stacked on top of each other are all clickable. Clicking empty space clears the selection.
-- **Parameters** on the right - what is hung on the selected bone. They appear with a selection and go away with it.
+- **Inspector** shows the selected bone's pose, material and attachments, or the selected attachment's settings.
 
-Both panel borders can be dragged.
+Move, dock and resize these windows independently of the model tab.
 
 ---
 
 ## The toolbar
 
-Down the left edge of the model view:
+The model view's toolbar provides:
 
 | Button | What it does |
 |--------|--------------|
 | Skeleton | draws the clickable bones over the model |
 | Colliders | draws the rig's bodies in the pose the model stands in |
-| Fit colliders | gives every bone that holds geometry a [collider](/docs/hollowengine/scripting/colliders) sized to it |
 | Simulation | drops the rig and simulates it right in the editor |
-| Generate rig | builds bodies and joints from the model's geometry |
+| Generate | opens generators for geometry-fitted [colliders](/docs/hollowengine/world/colliders) and, with the physics addon, ragdoll bodies and joints |
 
 While the simulation runs, dragging with the mouse shoves the bodies about instead of turning the camera.
 
@@ -61,7 +60,7 @@ While the simulation runs, dragging with the mouse shoves the bodies about inste
 
 **visible / hidden** - a hidden bone is not drawn, and neither is anything under it. For helper bones and for parts of a model that only exist as a base for something else.
 
-Everything else is an **attachment**: something hung on the bone that some part of the engine knows what to do with. **+ Attach** lists what is available; which kinds there are depends on which addons are loaded. A [collider](/docs/hollowengine/scripting/colliders), a box that takes hits, works as a button or blocks the way, is always there.
+Everything else is an **attachment**: something hung on the bone that some part of the engine knows what to do with. **+ Attach** lists what is available; which kinds there are depends on which addons are loaded. A [collider](/docs/hollowengine/world/colliders), a box that takes hits, works as a button or blocks the way, is always there.
 
 **The whole model** at the top of the bone list holds what hangs on no bone and lives in the model's own space.
 
@@ -69,9 +68,36 @@ Everything else is an **attachment**: something hung on the bone that some part 
 
 ---
 
+## Extra bones, poses and materials
+
+Use **Add bone** to create a helper under a selected bone or the whole model. Set its parent, offset and rotation. It can hold a sound source or IK target, for example. Added bones live in `.rig`; the source model stays unchanged. Deleting an added bone also deletes its added descendants and their attachments.
+
+**Pose** adds an adjustment over animation: translation in the parent's space, rotation and scale in the bone's space. Reset restores the original pose. Use gizmos and `G`, `R`, `S` in the model view; current bindings are shown in **Help > Keyboard shortcuts**. NumPad provides orthographic views and focus on the selection.
+
+In **Material**, choose the material used by a bone's meshes or create a variant. Edit it in the rig's **Materials** section without rewriting the model. Use **Restore from model** to return to its original appearance.
+
+## IK: reaching targets and grounding feet
+
+IK bends a bone chain so its end reaches a target. Use it for a hand on a handle or feet on uneven ground. It does not require the physics addon.
+
+1. Add an **IK target** to the model or a bone and give it a unique name. Place it where the hand or foot should reach.
+2. Add an **IK chain** to the end bone, such as a hand or foot. **Bones in chain** counts bending bones above it; `2` is typical for an arm or leg.
+3. Choose the target. Optionally use another target as a **Pole** to control which way the elbow or knee bends.
+4. Set **Weight** from `0` to `1`; it accepts animator expressions such as `d.holding_cup`. **Stretch** above `1` lets the chain and its geometry extend toward a distant target.
+
+The end rotation can stay **As animated**, match the **Target**, or **Follow the chain**. Targets are visible and movable in preview, and a [montage](/docs/hollowengine/models/montages) can animate their placement.
+
+For feet, enable **Ground**. The target follows the surface and looks ahead for steps; **Blend** controls the transition in seconds. Set the same **Pelvis** bone for both legs to lower it when a foot cannot reach. Grounding disengages in the air. Preview uses a ground plane at zero height.
+
+**Ground** changes rendering; colliders still follow the original animation. Do not use it to move the body or change collisions.
+
+## Other attachments
+
+Besides models, colliders and physics, rigs support [VFX](/docs/hollowengine/vfx/playback), [sounds and sound areas](/docs/hollowengine/scripting/sounds), [decals](/docs/hollowengine/world/decals) and [UI panels](/docs/hollowengine/scripting/ui/world-panels). Expand and edit nested models in the same tree. Attached VFX can override nested nodes for that attachment and reset them to the source effect.
+
 ## Building a ragdoll
 
-You can do all of it by hand - place the colliders and tie them together with joints. But you can make that easier by generating the rig automatically, with "Fill in bodies from the model's geometry" (the bottom button of the toolbar).
+You can place bodies and connect them with joints by hand. For an automatic draft, open **Generate** and choose to fill bodies from the model's geometry.
 
 What comes out is more of a rough draft: every model is exported differently, and the author may well have never bothered setting the rotations up properly. So you will most likely still have to sort out:
 
@@ -86,12 +112,11 @@ Press the play button and physics takes over the model; you can push it around w
 
 ## Rigid body
 
-A bone with a rigid body is a bone physics may move. A bone without one follows whatever it hangs off, which is how a hand keeps its fingers without a body per finger.
+A bone with a rigid body is a bone physics may move. Its shape is built from colliders on the same bone; an explicitly authored body without them is not simulated. A bone without one follows whatever it hangs off, which is how a hand keeps its fingers without a body per finger.
 
 | Parameter | Meaning |
 |-----------|---------|
-| Shape | a capsule, a box or a ball, in the space of the bone. A capsule stands along the bone's Y |
-| Offset, Rotation | where the shape sits on the bone and how it is turned, in blocks and degrees |
+| Colliders | Shapes that form the body. Select colliders on this bone by name; an empty list includes them all. Edit size, offset and rotation on the colliders themselves |
 | Density | kilograms per cubic metre. Flesh and bone together are a little denser than water, which is the default |
 | Linear damping | how quickly the body loses speed on its own. Higher settles it sooner |
 | Angular damping | the same for spinning |
@@ -147,13 +172,15 @@ How far the bone may turn, one axis at a time, in degrees. The axes are the bone
 
 ## How it works in the game
 
-A rig on its own changes nothing at runtime beyond aliases and hidden bones. What drops a model is a **Ragdoll** state in its [animator](/docs/hollowengine/scripting/animator-editor):
+Rig poses, materials, IK and attachments apply when the model is displayed. A physical skeleton does not make it fall by itself: a **Ragdoll** state in its [animator](/docs/hollowengine/models/animator-editor) does that:
 
 ```toml
 animation-controller = "project:models/entity/guide.animator"
 ```
 
 Add a state of kind **Ragdoll** to a controller layer and transition into it like into any other - on `!q.is_alive`, for example. On the way in, the ragdoll is built from the pose the controller was in when it started moving towards that state, so the fall carries on from the animation rather than snapping to a T-pose.
+
+By default, ragdolls are simulated on the server and clients receive a shared pose. A separate visual client mode is also available; see the [physics addon](/docs/hollowengine/addons/physics).
 
 Which bodies exist is read off the rig. A model that has never been rigged still falls: the state guesses a skeleton from the bones - handy as a fallback, but it can look rough.
 
@@ -165,6 +192,6 @@ The layer's bone mask still applies: a controller responsible for the upper body
 
 ## Notes
 
-- Physics needs the **HollowEnginePhysics** addon (for now it is on [Boosty](https://boosty.to/hollowhorizon); once the system is finished it will be freely available). Without it a `.rig` still opens and still edits aliases and hidden bones - there are simply no joints and no bodies.
+- Physical bodies and joints require the [physics addon](/docs/hollowengine/addons/physics). Aliases, poses, materials, IK and regular attachments work without it.
 - Colliders of zero size are not allowed: the native physics engine crashes with no logs and no explanation!
 - The rig is re-read on a resource reload, along with the models.

@@ -91,16 +91,40 @@ overlay("mypack:stamina") {
 }
 ```
 
-| Параметр | По умолчанию | Значение |
-| --- | --- | --- |
-| `anchor` | `hotbar` | Слой vanilla HUD; допустимы короткие имена, например `crosshair` и `experience_bar` |
-| `placement` | `HudPlacement.AFTER` | Рисовать до или после anchor |
-| `autoShow` | `false` | Показывать сразу после перезагрузки; для клиентского HUD |
-| `input` | `OverlayInput.NONE` | `NONE` для HUD без ввода, `INTERACTIVE` для получения ввода |
-| `aboveScreens` | `false` | Также рисовать поверх открытого экрана |
-| `rebuildEveryFrame` | `false` | Перекомпоновывать каждый кадр; только когда это необходимо |
+| Параметр            | По умолчанию         | Значение                                                                            |
+|---------------------|----------------------|-------------------------------------------------------------------------------------|
+| `anchor`            | `hotbar`             | Слой vanilla HUD; допустимы короткие имена, например `crosshair` и `experience_bar` |
+| `placement`         | `HudPlacement.AFTER` | Рисовать до или после anchor                                                        |
+| `autoShow`          | `false`              | Показывать сразу после перезагрузки; для клиентского HUD                            |
+| `input`             | `OverlayInput.NONE`  | `NONE` для HUD без ввода, `INTERACTIVE` для получения ввода                         |
+| `aboveScreens`      | `false`              | Также рисовать поверх открытого экрана                                              |
+| `rebuildEveryFrame` | `false`              | Перекомпоновывать каждый кадр; только когда это необходимо                          |
 
 `interactive()` сокращает запись `input = OverlayInput.INTERACTIVE`. Во время игры интерактивный оверлей использует центр экрана, пока не получит событие указателя.
+
+## Адаптивная поверхность
+
+`surface(id)` подходит для интерфейса, который иногда является HUD, а иногда - полноценным экраном. Например, диалог без вариантов ответа можно показывать поверх игры, а при выборе ответа включать экран с курсором. Объявление использует один `content` и одну сессию:
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
+
+val Choosing = dataKey<Boolean>("choosing") { false }
+
+surface("project:dialogue") {
+    anchor = "hotbar"
+    mode { state ->
+        if (state[Choosing]) UiSurfaceKind.SCREEN else UiSurfaceKind.OVERLAY
+    }
+    content {
+        Text(if (data[Choosing]) "Выберите ответ" else "Рассказ продолжается")
+    }
+}
+```
+
+Сервер открывает её через `player.openSurface("project:dialogue")`, а `session.put(Choosing, true)` меняет режим без открытия новой сессии и потери её данных. Для панели на модели используйте отдельное объявление [panel](/docs/hollowengine/scripting/ui/world-panels).
+
+У экранов `guiScale = UiGuiScale.Inherit` по умолчанию следует настройкам игры; `guiScale(3)` задаёт собственный масштаб, `guiScale(0)` выбирает автоматический. У экранов, оверлеев и адаптивных поверхностей `exitDuration` задаёт время сохранения интерфейса для анимации закрытия в миллисекундах. При закрытии движок выставляет состояние HSS `:closing`, по которому можно запустить анимацию исчезновения.
 
 ## Kotlin-композиция
 

@@ -1,6 +1,6 @@
 ---
 title: Cutscenes
-order: 14
+order: 5
 ---
 
 <center><h1>Cutscenes</h1></center>
@@ -94,23 +94,11 @@ what turns that segment into a spline.
 
 ### The curve editor
 
-The **Dope sheet / Curves** buttons in the toolbar (or `Ctrl+Tab`) switch modes.
+Use **Dope sheet / Curves** in the toolbar to switch modes. Keys live on channel rows; properties and layers group them. Each channel has its own color and visibility.
 
-- Keyframes live on the channel rows alone: a property and a layer are folders. The carets unfold a
-  property into layers and a layer into channels; every channel has its own colour and visibility toggle.
-- The wheel scrolls time, `Ctrl` + wheel zooms time, `Shift` + wheel zooms the value axis and
-  `Alt` + wheel pans it. The value axis glides on a spring rather than jumping.
-- The middle **or right** mouse button drags the canvas, in time and in value. A right button that
-  never moved opens the context menu instead, so one button does both.
-- The left button on empty space draws a selection band; `Ctrl` or `Shift` adds to what is selected.
-- `Ctrl` + dragging a key clones the selection and drags the copies, leaving the originals in place.
-- `Ctrl+C` / `Ctrl+X` / `Ctrl+V` copy, cut and paste keys. A paste lands on the same channels with the
-  earliest key on the playhead and the rest keeping their spacing.
-- `F` frames the visible curves, `S` smooths the selection.
-- Clicking a row in the track list picks **what the graph draws**; `Ctrl` adds to the pick and clicking
-  the same row again gives the whole graph back. This is a separate thing from the eye: hiding a track
-  also takes it out of the preview, and uncluttering a graph is no reason to change the shot.
-- The track list on the left is resizable by its splitter and scrolls when names do not fit.
+See the [shared timeline guide](/docs/hollowengine/ide/timeline) for navigation, selection, copying and key transforms. Rebind actions through **Help > Keyboard shortcuts**. In the current default layout, the wheel zooms time and Ctrl + wheel scrolls it; S scales selected keys. Smoothing is available through key menus and settings; assign a shortcut if needed.
+
+Click tracks to choose which curves the graph shows without disabling their contribution to the scene. Resize the track list with its splitter and scroll it as needed. The right button can pan the graph; a click without dragging opens its context menu.
 
 ## Start and stop playback
 

@@ -231,7 +231,7 @@ onDie {
 
 ### Colliders
 
-`onColliderHit`, `onColliderInteract`, `onColliderEnter`, `onCollideTick` and `onColliderExit` react to hits, clicks and touches on the [colliders](/docs/hollowengine/scripting/colliders#in-a-node-script) of the attached entity's model.
+`onColliderHit`, `onColliderInteract`, `onColliderEnter`, `onCollideTick` and `onColliderExit` react to hits, clicks and touches on the [colliders](/docs/hollowengine/world/colliders#in-a-node-script) of the attached entity's model.
 
 A small NPC example combining several handlers:
 
@@ -259,6 +259,14 @@ onLoad { context -> greeted = context.tag.getBoolean("greeted") }
 ```
 
 ---
+
+## Updating without rejoining
+
+After editing `.node.kts`, run `/reload` or **File > Reload Server Resources**. The engine recompiles changed scripts and replaces running instances on the server and loaded entities. It preserves `persisted`, editor properties, `onSave` / `onLoad` data and active states with their `stateTag` and child states.
+
+A state restarts with saved data rather than at its previous source line: use `runOnce` and `remember` for actions that must not repeat. Unchanged nodes stay running. Compilation errors keep the previous version running and are reported in the log. If the script's host type changed, detach it and attach it to a compatible host again.
+
+Recompilation needs the compiler addon. Saving a file alone does not restart server nodes.
 
 ## Commands
 

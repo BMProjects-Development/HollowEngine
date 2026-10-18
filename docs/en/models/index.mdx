@@ -1,11 +1,20 @@
 ---
-title: Models and Materials
-order: 7
+title: Models and animation
+order: 1
 ---
 
-<center><h1>Models and Materials</h1></center>
+<center><h1>Models and animation</h1></center>
 
-*Model metadata, material names, and dressing an entity from a script.*
+*Model metadata, material names, and changing materials from a script.*
+
+This section covers preparing models and their behavior in the engine's editors:
+
+- [Animations](/docs/hollowengine/models/animations): model clips and one-off playback.
+- [Animator Editor](/docs/hollowengine/models/animator-editor): layers, states and clip blending.
+- [Rig Editor](/docs/hollowengine/models/rig-editor): bones, poses, attachments, IK and physical skeletons.
+- [Montages](/docs/hollowengine/models/montages): actions combining clips, keys, temporary attachments and events.
+
+See [World objects](/docs/hollowengine/world/objects) for placement and [NPC scripting](/docs/hollowengine/scripting/npc) for creating NPCs.
 
 ![Model editor and material preview](/hollowengine/pictures/models/editor.webp)
 
@@ -46,7 +55,7 @@ cape = "material_3"
 |------|---------|
 | `preload` | Loads the model when resources load rather than when it is first used. Useful for frequently used models. It is disabled by default so that models used only a few times in a pack or map do not take up resources. |
 | `frustum-culling` | Allows the model to be culled outside the camera frustum. Enabled by default. Set it to `false` when GPU skinning or morph targets move vertices beyond the model's calculated bounds. This disables only frustum culling; the entity's distance culling still applies. |
-| `animation-controller` | The animator the model uses by default, see the [Animator Editor](/docs/hollowengine/scripting/animator-editor). |
+| `animation-controller` | The animator the model uses by default, see the [Animator Editor](/docs/hollowengine/models/animator-editor). |
 | `[materials]` | New names for the model's materials, see below. |
 
 ---

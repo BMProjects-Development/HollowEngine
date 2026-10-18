@@ -1,6 +1,6 @@
 ---
 title: Colliders and Bodies
-order: 11
+order: 4
 ---
 
 <center><h1>Colliders and Bodies</h1></center>
@@ -11,7 +11,7 @@ order: 11
 
 ## What a collider is
 
-A vanilla entity is a single box. A collider is a box hung on a bone of the model, or on the model as a whole, in its [rig](/docs/hollowengine/scripting/rig-editor). It moves with the animation: a raised arm takes a hit where the arm is, and a boss's tail can be stood on while it lies on the ground.
+A vanilla entity is a single box. A collider is a box hung on a bone of the model, or on the model as a whole, in its [rig](/docs/hollowengine/models/rig-editor). It moves with the animation: a raised arm takes a hit where the arm is, and a boss's tail can be stood on while it lies on the ground.
 
 Colliders live in the `.rig` file next to the model, so every entity wearing that model has them. The server poses them itself with the same animator the clients draw with, so a hit is checked against where the bone really was rather than where a client says it was.
 
@@ -21,13 +21,19 @@ Press **F3+B** to see them in the world: green ones take hits, blue ones are cli
 
 ## Adding colliders
 
-Open the model's `.rig` in the [rig editor](/docs/hollowengine/scripting/rig-editor), select a bone and press **+ Attach → Collider**. To hang one on the model as a whole, say a body box for a statue or a button on a control panel, select **The whole model** at the top of the bone list instead.
+Open the model's `.rig` in the [rig editor](/docs/hollowengine/models/rig-editor), select a bone and press **+ Attach → Collider**. To hang one on the model as a whole, say a body box for a statue or a button on a control panel, select **The whole model** at the top of the bone list instead.
 
-**Fit a collider around every bone that holds geometry** on the toolbar gives each such bone a collider sized to it. Treat it as a draft: delete what is decoration (eyes, a second skin layer) and merge what should be one box.
+**Fit a collider around every bone that holds geometry** in the generation menu gives each such bone a collider sized to it. Treat it as a draft: delete what is decoration (eyes, a second skin layer) and merge what should be one box.
 
 **Show the colliders** on the toolbar draws them over the preview.
 
 ## Parameters
+
+### Shapes
+
+Without addons, a collider is a box. The [physics addon](/docs/hollowengine/addons/physics) adds spheres, capsules, cylinders and convex hulls. **Size** provides the bounds the shape fits into; capsules and cylinders also have a longitudinal axis. A hull is defined by a set of points.
+
+These shapes serve hits and contacts and can also form a ragdoll body. If the addon providing a shape is missing, its settings are preserved and the collider falls back to a box. Restoring the addon restores the original shape.
 
 | Parameter | Meaning |
 |-----------|---------|
@@ -234,6 +240,6 @@ Projectiles hit only colliders that **take hits**. Mob attacks and explosions ar
 - Colliders act on living entities. Items, arrows and boats pass through solid colliders.
 - Mobs plan their paths around solid colliders and blocking bodies, the way they plan around blocks, and plan again when one moves into or out of their way; see [Navigation](/docs/hollowengine/scripting/npc/navigation#colliders-and-blocking-bodies). The top of a collider is not yet ground a path goes over.
 - A player riding a turning collider moves with it, but their view does not turn.
-- Colliders follow the animations the server knows of: the clips played and the controller. What a client lays over them on its own, a ragdoll or a cutscene pose, moves the model but not its colliders.
+- Colliders follow poses evaluated by the server: clips, controllers, montages and server ragdolls. Client-only changes, including client ragdolls and foot-grounding IK, do not move server colliders.
 - A player is moved by their own client, so the server does not stop players at solid colliders. Standing on one over a drop is not counted as flying.
 - Saving the rig in the editor applies it in the world at once, in single player and on the server the game itself runs. A dedicated server picks it up on its next resource reload.

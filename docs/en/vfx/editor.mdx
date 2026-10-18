@@ -39,7 +39,7 @@ The position of a node in the tree matters. A renderer directly below an emitter
 
 The **Inspector** shows the selected node's settings in collapsible sections. Common sections are **Node**, **Placement** (position, rotation, scale), and **Timeline**; the rest depend on the node type: **Emission**, **Shape**, **Particle**, **Material**, **Shader**, and so on. Hover a field label for a description.
 
-Most numeric fields hold a [value](/docs/hollowengine/vfx/values): a constant, a range, a curve, or an expression. A field whose value is driven by Timeline keys is shown as read-only with a link to its track; remove the keys to edit it by hand again.
+Most numeric fields hold a [value](/docs/hollowengine/vfx/values): a constant, a range, a curve, or an expression. Keyed fields show the current value and remain editable: recording writes a key, while editing without recording holds the change in preview until the playhead moves or playback starts. The button beside the field takes you to its track.
 
 ## Preview
 
@@ -54,6 +54,8 @@ The preview renders the effect in its own frame buffer, so screen effects and de
 The preview's clock is the editor's frame time, not the game's tick counter, so it keeps running when the game is paused.
 
 ## Timeline
+
+See [Timeline](/docs/hollowengine/ide/timeline) for shared controls, auto-keying, key transforms, events and conditional sections. The effect root provides `d.*` preview data to test expressions and rules. The preview supports `G`, `R`, `S` transforms, axis constraints and key insertion with `I`; rebind these in **Help > Keyboard shortcuts**.
 
 The **Timeline** animates node properties over **effect time**. A property gets a track when you add its first key. Any numeric node property can be animated: transform values, material values, shader uniforms, shake strength, and so on.
 

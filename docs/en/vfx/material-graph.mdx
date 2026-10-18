@@ -26,9 +26,13 @@ The graph canvas works like the other node editors in the IDE:
 
 Select a node to edit its options and input values in the **Inspector**; select nothing to edit the graph's **Properties** and preview settings.
 
+## Organizing a graph
+
+To organize a graph, select nodes and group them (`Ctrl + G` by default). Groups can be collapsed, expanded and ungrouped (`Ctrl + Shift + G`). The context menu also offers node alignment. A **Reroute** node routes a connection through an intermediate point without changing its value. These tools improve readability without affecting shader output.
+
 ## The Surface Output node
 
-Everything ends in **Surface Output**:
+A surface graph ends in **Surface Output**:
 
 | Input | Meaning |
 | --- | --- |
@@ -81,6 +85,16 @@ The **Preview** panel shows the selected node's output, or the final surface if 
 The **Problems** list shows a graph that does not compile, including shader compile errors mapped to the node that caused them.
 
 ## Using a material in an effect
+
+### Screen-effect graphs
+
+With nothing selected, switch the graph target from surface to **Post** in Inspector. A Post graph ends in **Post Output**, with **Color** and **Alpha** inputs, and goes in a VFX **Screen effect** node's **Shader** field. The initial Post graph passes **Scene Color** through unchanged; modify that color for grading or feed different UVs to **Scene Color** to distort the frame.
+
+In a Post graph, **Position** reconstructs the surface position from scene depth, and **Node Position** gives the effect node's position; both are relative to the camera. **Ray and Plane**, **Ray and Sphere** and **Point on Screen** help find ray intersections with planes or spheres and project points to screen UVs. For example, restrict an effect to a dome around its node. Not all surface inputs are available in Post; diagnostics identify incompatible nodes.
+
+Post preview settings accept a scene image and, optionally, its matching depth image, so you can test without placing the effect in the world. Graph properties work in VFX just as they do for surface materials.
+
+### Surface materials
 
 Select a plane, mesh, or ribbon in a VFX effect and enter the material in **Shader**:
 

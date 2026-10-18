@@ -5,7 +5,7 @@ order: 12
 
 # Звуки
 
-Файлы и события `sounds.json` используют один API воспроизведения. Ядро поддерживает потоковый OGG Vorbis и RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, моно/стерео, включая extensible WAV. Остальные кодеки и звуковые дорожки видеоконтейнеров предоставляет [аддон Media](/docs/hollowengine/addons/media).
+Используя HollowEngine вы можете запускать как просто аудио-файлы, так и события из `sounds.json`. Движок поддерживает OGG Vorbis и RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, моно/стерео, включая extensible WAV. Остальные кодеки и звуковые дорожки видеоконтейнеров предоставляет [аддон Media](/docs/hollowengine/addons/media) благодаря FFMPEG :)
 
 ![Редактор звуков](/hollowengine/pictures/sounds/editor.webp)
 
@@ -29,7 +29,7 @@ player.playSound("minecraft:entity.villager.yes")
 player.playSound("demo:dialogue/hello.ogg")
 ```
 
-Обычный вызов воспроизводит звук относительно слушателя. `Player.playSound` адресуется одному игроку, `Level.playSound` - всем игрокам уровня. Оба возвращают строковый id воспроизведения. Команда текста диалога `@play-sound` использует тот же API.
+Обычный вызов воспроизводит звук относительно слушателя. `Player.playSound` адресуется одному игроку, `Level.playSound` - текущим игрокам уровня. Оба возвращают `SoundHandle` - объект управления воспроизведением; строковый идентификатор доступен как `sound.id`. Команда текста диалога `@play-sound` использует тот же API.
 
 ```kotlin
 val voice = player.playSound("demo:dialogue/hello.wav") {
@@ -77,7 +77,7 @@ player.playSound("demo:machines/engine.ogg") {
 }
 
 player.playSound("demo:effects/electric.wav") {
-    followEffect(effectHandle)
+    followEffect(effectHandle.id)
 }
 ```
 
@@ -86,6 +86,62 @@ player.playSound("demo:effects/electric.wav") {
 Вложенные привязки задаются путями вроде `hand/tool/engine_sound`. Если у сущности несколько узлов моделей с одинаковым путём привязки, передайте `modelNodeId = nodeUuid.toString()` в `attach`: неоднозначные имена отклоняются. Ожидающая привязка к ригу/эффекту ждёт `timeoutSeconds`: по умолчанию 5 игровых секунд, 0 - без ограничения. Удаление владельца останавливает звук. Временная недоступность сохраняет последнюю корректную позицию. Переключение между режимами слушателя и мира создаёт новый нативный голос с начала; перемещение внутри мира сохраняет текущий голос.
 
 Клиентские системы используют `ClientSounds.play(source, settings, emitter)` и `SoundEmitter`, возвращающий `SoundEmitterState`. `SoundAttachments.register(id)` предоставляет привязку с явным обновлением положения; её нужно закрывать вместе с владельцем. `SoundEmitterSpec.Attachment(id)` адресует её из сценариев/пакетов. Управлять воспроизведением нужно на клиентском потоке. `ManagedSound` предоставляет остановку/затухание, громкость, pitch, смену источника положения и ошибки декодирования. Сетевые сценарные вызовы управляют звуком по возвращённому id.
+
+## Управление и ожидание завершения
+
+```kotlin
+val voice = player.playSound("demo:dialogue/hello.wav")
+voice.volume = 0.6f
+voice.pause()
+voice.seek(2f) // секунды от начала
+voice.resume()
+val completed = voice.await() // внутри suspend-функции
+```
+
+`isPlaying` показывает, осталось ли активное воспроизведение. `await()` ждёт завершения у всех адресатов и возвращает `true`, если каждый дослушал звук; остановка или уход игрока дают `false`. Зацикленный звук сам не завершится: остановите его через `voice.stop()` или `stopSound(voice)`. Методы `stopSound` и `updateSound` принимают как объект управления, так и его строковый `id`.
+
+`voice.update { ... }` меняет громкость, высоту тона, затухание по расстоянию и фильтры во время воспроизведения. Изменение повторов, fade-переходов или категории перезапускает звук.
+
+## Пространство, зоны и фильтры
+
+| Режим               | Поведение                                                                  |
+|---------------------|----------------------------------------------------------------------------|
+| `SoundMode.SPATIAL` | Звук приходит со стороны источника и затихает с расстоянием.               |
+| `SoundMode.FIXED`   | Без направления, но затихает с расстоянием; подходит для музыки в области. |
+| `SoundMode.GLOBAL`  | Без направления и затухания по расстоянию.                                 |
+
+Вместо точки звук может заполнять несколько коробок и сфер. Внутри них он окружает слушателя, снаружи слышен от ближайшего края. `range` задаёт расстояние затухания от края; `falloff.inside = true` переносит затухание внутрь области, чтобы на границе звук уже исчезал.
+
+```kotlin
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.sounds.SoundCurve
+import ru.hollowhorizon.hollowengine.common.sounds.SoundMode
+import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+
+val ambience = level.playSound("demo:ambience/hall.ogg") {
+    at(10.0, 64.0, 10.0)
+    box(size = Vec3(12.0, 4.0, 8.0))
+    sphere(radius = 3f, offset = Vec3(6.0, 0.0, 0.0))
+    repeat = SoundRepeat.Forever
+    mode = SoundMode.FIXED
+    falloff = falloff.copy(distance = 8f, curve = SoundCurve.SMOOTH)
+    reverb(decay = 2f, wet = 0.3f)
+}
+
+ambience.update {
+    lowPass(cutoff = 1200f)
+}
+```
+
+`box` и `sphere` задаются относительно `at(...)`; для звука на кости задайте области у звукового прикрепления в риге. Для точки и областей доступны кривые затухания `LINEAR`, `SMOOTH`, `NATURAL`. `doppler = 0f` отключает изменение высоты тона из-за движения источника.
+
+Фильтры добавляются по порядку: `lowPass` убирает высокие частоты, `highPass` - низкие, `bandPass` оставляет диапазон, `reverb` создаёт реверберацию, `echo` - эхо, `distortion` - искажение. Частоты задаются в герцах, времена - в секундах. `filters.clear()` в `update` удаляет прежнюю цепочку.
+
+## Звук в редакторах
+
+Аудиофайл открывается в IDE с волной, воспроизведением и перемоткой. Перетащите звук из ассетов в игровое окно, чтобы создать источник мира, или добавьте прикрепление **Звук** в риге. Области слышимости видны и редактируются в окне модели.
+
+В VFX узел **Звук** запускает аудио вместе с эффектом; его громкость и высоту тона можно анимировать. Для синхронизации звука с действием модели используйте временное звуковое прикрепление [монтажа](/docs/hollowengine/models/montages).
 
 ## `sounds.json`
 

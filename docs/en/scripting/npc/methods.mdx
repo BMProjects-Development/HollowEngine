@@ -41,7 +41,7 @@ Because `NpcEntity` inherits from Minecraft entities, standard methods such as `
 
 ## Body
 
-Whether an NPC pushes, blocks or lets others pass through is set by the [Body](/docs/hollowengine/scripting/colliders#the-body-of-an-entity) component. Without one, an NPC pushes and is pushed the way mobs are.
+Whether an NPC pushes, blocks or lets others pass through is set by the [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component. Without one, an NPC pushes and is pushed the way mobs are.
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
@@ -148,6 +148,6 @@ val id = uuid("00000000-0000-0000-0000-000000000000")
 
 Old Katari/block-doc methods such as `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)`, and separate `attack(...)` wrappers should not be treated as the main v2.3 API.
 
-- For animations, use [`play`](/docs/hollowengine/scripting/animations) or the action-based [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- For animations, use [`play`](/docs/hollowengine/models/animations) or the action-based [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
 - For held items, use the standard Minecraft API: `setItemInHand(...)`, or [`equip`](/docs/hollowengine/scripting/npc/inventory).
-- For appearance, use [`entity.materials`](/docs/hollowengine/scripting/models).
+- For appearance, use [`entity.materials`](/docs/hollowengine/models).

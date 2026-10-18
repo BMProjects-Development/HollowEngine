@@ -11,6 +11,8 @@ These nodes do not draw particles. They change how the world looks while the nod
 
 ## Screen effect
 
+Build a screen effect without GLSL by creating a `.material`, selecting the **Post** target and setting that file in the node's **Shader** field. See [screen-effect graphs](/docs/hollowengine/vfx/material-graph). The core-shader workflow below is also supported.
+
 A **Screen effect** node draws a full-screen shader over the frame. Its **Shader** field takes the `namespace:path` of a core shader (`assets/namespace/shaders/core/path.json`). Bundled shaders:
 
 | Shader | Effect |

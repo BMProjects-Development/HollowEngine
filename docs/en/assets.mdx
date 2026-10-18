@@ -32,6 +32,9 @@ hollowengine/
 | `assets/project/models/` | glTF, Blockbench, and entity models | `project:models/entity/guide.gltf` |
 | `assets/project/ui/` | HSS styles and other UI resources | `project:ui/dialogs/confirm.hss` |
 | `assets/project/sounds/` | Custom sound files | `project:sounds/voice/hello.ogg` |
+| `assets/project/montages/` | [Animation montages](/docs/hollowengine/models/montages) | `project:montages/attack.montage` |
+| `assets/project/vfx/` | Visual effects | `project:vfx/sparks.vfx` |
+| `assets/project/materials/` | Material and screen-effect graphs | `project:materials/orb.material` |
 | `scripts/` | Kotlin scripts and `.story` dialogue files | `quest/intro.node.kts` |
 
 Keep assets near the feature that owns them. UI declarations are Kotlin scripts under `hollowengine/scripts`; their HSS and textures use resource locations under `hollowengine/assets`:
@@ -75,7 +78,7 @@ Kotlin script imports are resolved within the script namespace rather than as re
 - Put UI textures under `assets/project/textures/ui/` unless they belong to one isolated UI folder.
 - Prefer resource locations over hardcoded file paths.
 - Keep model textures in the same namespace as the model.
-- A model can carry a `<model>.hemeta` beside it, see [Models and Materials](/docs/hollowengine/scripting/models).
+- A model can carry a `<model>.hemeta` beside it, see [Models and Materials](/docs/hollowengine/models).
 - Use lowercase paths with `a-z`, `0-9`, `_`, `-`, `.`, and `/`.
 
 If an asset is used from a `.ui.kts` or `.hss` file, document it beside that UI feature so future changes do not require searching through scripts.

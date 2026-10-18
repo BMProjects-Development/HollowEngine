@@ -30,6 +30,9 @@ hollowengine/
 | `assets/project/models/` | glTF, Blockbench и модели сущностей | `project:models/entity/guide.gltf` |
 | `assets/project/ui/` | HSS-стили и другие ресурсы интерфейса | `project:ui/dialogs/confirm.hss` |
 | `assets/project/sounds/` | Пользовательские звуки | `project:sounds/voice/hello.ogg` |
+| `assets/project/montages/` | [Монтажи анимаций](/docs/hollowengine/models/montages) | `project:montages/attack.montage` |
+| `assets/project/vfx/` | Визуальные эффекты | `project:vfx/sparks.vfx` |
+| `assets/project/materials/` | Графы материалов и экранных эффектов | `project:materials/orb.material` |
 | `scripts/` | Kotlin-скрипты и диалоги `.story` | `quest/intro.node.kts` |
 
 Держите связанные файлы рядом. UI объявляется Kotlin-скриптом в `hollowengine/scripts`, а HSS и текстуры лежат в `hollowengine/assets` и доступны через resource location:
@@ -73,7 +76,7 @@ val guide = npc(
 - Общие UI-текстуры держите в `assets/project/textures/ui/`, а локальные для одного экрана можно хранить рядом с этим экраном.
 - Используйте resource location вместо абсолютных путей.
 - Текстуры модели держите в том же namespace, что и модель.
-- Рядом с моделью может лежать `<модель>.hemeta`, см. [Модели и материалы](/docs/hollowengine/scripting/models).
+- Рядом с моделью может лежать `<модель>.hemeta`, см. [Модели и материалы](/docs/hollowengine/models).
 - В путях используйте нижний регистр и символы `a-z`, `0-9`, `_`, `-`, `.`, `/`.
 
 Если ассет используется из `.ui.kts` или `.hss`, укажите это рядом с документацией интерфейса, чтобы при изменениях не искать связь по всем скриптам.

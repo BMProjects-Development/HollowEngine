@@ -5,7 +5,7 @@ order: 12
 
 # Sounds
 
-Files and `sounds.json` events use the same playback API. Core supports streaming OGG Vorbis and RIFF WAV (PCM 8/16/24/32 and IEEE float 32/64, mono or stereo, including extensible WAV). Other codecs and audio tracks in video containers are provided by the [Media addon](/docs/hollowengine/addons/media).
+HollowEngine can play both audio files and events from `sounds.json`. The engine supports OGG Vorbis and RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, mono or stereo, including extensible WAV. The [Media addon](/docs/hollowengine/addons/media) provides other codecs and audio tracks from video containers through FFmpeg :)
 
 ![Sound editor](/hollowengine/pictures/sounds/editor.webp)
 
@@ -29,7 +29,7 @@ player.playSound("minecraft:entity.villager.yes")
 player.playSound("demo:dialogue/hello.ogg")
 ```
 
-A bare call is listener-relative. `Player.playSound` targets one player; `Level.playSound` targets every player in that level. Both return a string playback id. Dialogue `@play-sound` uses this same API.
+A bare call is listener-relative. `Player.playSound` targets one player; `Level.playSound` targets the level's current players. Both return a `SoundHandle` for controlling playback; its string identifier is `sound.id`. Dialogue `@play-sound` uses this same API.
 
 ```kotlin
 val voice = player.playSound("demo:dialogue/hello.wav") {
@@ -77,7 +77,7 @@ player.playSound("demo:machines/engine.ogg") {
 }
 
 player.playSound("demo:effects/electric.wav") {
-    followEffect(effectHandle)
+    followEffect(effectHandle.id)
 }
 ```
 
@@ -86,6 +86,62 @@ Add a Sound attachment to a bone in the rig editor. Its id is unique across that
 Nested attachments use paths such as `hand/tool/engine_sound`. If an entity has several model nodes containing the same attachment path, pass `modelNodeId = nodeUuid.toString()` to `attach`; ambiguous names are rejected. A pending rig/effect binding waits up to `timeoutSeconds` (default 5 game seconds; 0 means no timeout). Missing or removed owners stop the sound. Temporary unavailability retains the last valid position. Changing between listener and world space creates a new native voice from the beginning; moving within world space keeps the existing voice.
 
 Client systems use `ClientSounds.play(source, settings, emitter)` and a `SoundEmitter` returning `SoundEmitterState`. `SoundAttachments.register(id)` provides a push binding that must be closed with its owner; `SoundEmitterSpec.Attachment(id)` addresses it from scripts/packets. Playback control belongs on the client thread. `ManagedSound` exposes stop/fade, gain, pitch, emitter changes and decoding failures. Packet-backed script calls control sounds by their returned id.
+
+## Control and completion
+
+```kotlin
+val voice = player.playSound("demo:dialogue/hello.wav")
+voice.volume = 0.6f
+voice.pause()
+voice.seek(2f) // seconds from the start
+voice.resume()
+val completed = voice.await() // inside a suspend function
+```
+
+`isPlaying` reports whether playback is still active. `await()` waits for every recipient and returns `true` if all listened through; stopping or a player leaving gives `false`. An infinite loop does not finish by itself: stop it with `voice.stop()` or `stopSound(voice)`. `stopSound` and `updateSound` accept either a handle or its string `id`.
+
+`voice.update { ... }` changes volume, pitch, distance falloff and filters during playback. Changing repeat settings, fades or category restarts the sound.
+
+## Space, areas and filters
+
+| Mode | Behavior |
+| --- | --- |
+| `SoundMode.SPATIAL` | Directional sound that fades with distance. |
+| `SoundMode.FIXED` | No direction, but fades with distance; useful for area music. |
+| `SoundMode.GLOBAL` | No direction or distance attenuation. |
+
+A sound can fill several boxes and spheres instead of a point. Inside, it surrounds the listener; outside, it comes from the nearest edge. `range` sets fade distance from that edge; `falloff.inside = true` moves the fade inside so the sound is silent at the boundary.
+
+```kotlin
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.sounds.SoundCurve
+import ru.hollowhorizon.hollowengine.common.sounds.SoundMode
+import ru.hollowhorizon.hollowengine.common.sounds.SoundRepeat
+
+val ambience = level.playSound("demo:ambience/hall.ogg") {
+    at(10.0, 64.0, 10.0)
+    box(size = Vec3(12.0, 4.0, 8.0))
+    sphere(radius = 3f, offset = Vec3(6.0, 0.0, 0.0))
+    repeat = SoundRepeat.Forever
+    mode = SoundMode.FIXED
+    falloff = falloff.copy(distance = 8f, curve = SoundCurve.SMOOTH)
+    reverb(decay = 2f, wet = 0.3f)
+}
+
+ambience.update {
+    lowPass(cutoff = 1200f)
+}
+```
+
+`box` and `sphere` are relative to `at(...)`; for a bone-bound sound, define areas on its rig attachment. Points and areas support `LINEAR`, `SMOOTH` and `NATURAL` falloff curves. `doppler = 0f` disables movement-induced pitch changes.
+
+Filters are added in order: `lowPass` removes high frequencies, `highPass` removes low frequencies, `bandPass` keeps a band, `reverb` adds reverberation, `echo` adds echoes and `distortion` adds distortion. Frequencies are in hertz, times in seconds. Call `filters.clear()` in `update` to remove the previous chain.
+
+## Sound in editors
+
+Audio files open in the IDE with a waveform, playback and seeking. Drag audio from assets into the game view to create a world source, or add a **Sound** attachment in a rig. Sound areas can be viewed and edited in the model view.
+
+A VFX **Sound** node plays audio with the effect; volume and pitch can be animated. For audio synchronized with a model action, use a temporary sound attachment in a [montage](/docs/hollowengine/models/montages).
 
 ## `sounds.json`
 
