@@ -5,5 +5,6 @@
   "orientation": "Оси: %s. Нажмите, чтобы сменить",
   "orientation.global": "глобальные",
   "orientation.local": "локальные",
-  "orientation.view": "вида"
+  "orientation.view": "вида",
+  "orbit_selection": "Вращать вид вокруг выделенного, а не вокруг центра"
 }

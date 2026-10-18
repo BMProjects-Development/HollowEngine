@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeyAction
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
+import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitPivot
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** A manipulator of the gizmo as a toolbar shows it: its icon, its name and the key that starts it. */
@@ -46,7 +47,15 @@ internal fun GizmoToolbarButtons(iconSize: Float = 12f) {
         }
     }
     GizmoOrientationButton(iconSize)
+    IconButton(
+        OrbitSelectionIcon,
+        HollowKeys.ORBIT_PIVOT.hint("hollowengine.gui.ide.gizmo.orbit_selection".lang),
+        active = OrbitPivot.aroundSelection,
+        iconSize = iconSize,
+    ) { OrbitPivot.aroundSelection = !OrbitPivot.aroundSelection }
 }
+
+private const val OrbitSelectionIcon = "hollowengine:textures/gui/icons/orbit_selection.svg"
 
 @Composable
 internal fun GizmoOrientationButton(iconSize: Float = 12f, id: String? = null, tags: List<String> = emptyList()) =

@@ -75,6 +75,13 @@ class ModelViewerState(model: String) : OrbitCamera {
     var offsetX by mutableStateOf(0f)
     var offsetY by mutableStateOf(0f)
 
+    /** The point of the model the camera circles, which [offsetX] and [offsetY] slide the view from. */
+    var pivot by mutableStateOf(Vec3f.ZERO)
+        private set
+
+    /** Where the selection of the editor showing the preview is, in model space; see [OrbitCamera.selectionCenter]. */
+    var selection: () -> Vec3f? = { null }
+
     var showGrid by mutableStateOf(true)
     var showBoundingBox by mutableStateOf(false)
     var showWireframe by mutableStateOf(false)
@@ -217,13 +224,33 @@ class ModelViewerState(model: String) : OrbitCamera {
     fun panelMatrix(): Matrix4f =
         Matrix4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
             .scale(pixelsPerUnit, -pixelsPerUnit, pixelsPerUnit).rotateX(pitch * Mth.DEG_TO_RAD)
-            .rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD)
+            .rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD).translate(-pivot.x, -pivot.y, -pivot.z)
 
     private fun viewMatrix(): Mat4f {
         val scale = pixelsPerUnit
         return MutableMat4f().translate(lastRect.width / 2f + offsetX * zoom, lastRect.height / 2f + offsetY * zoom, 0f)
             .scale(Vec3f(scale, -scale, scale)).rotate(pitch.deg, Vec3f.X_AXIS)
-            .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS)
+            .rotate((yaw + PREVIEW_FRONT_YAW).deg, Vec3f.Y_AXIS).translate(-pivot.x, -pivot.y, -pivot.z)
+    }
+
+    override val selectionCenter: Vec3f? get() = selection()
+
+    override fun turnTo(yaw: Float, pitch: Float, around: Vec3f?) {
+        val before = around?.let { toView(it - pivot) }
+        this.yaw = yaw
+        this.pitch = pitch
+        if (around == null || before == null) return
+        // The view has no perspective, so keeping a point in place is sliding the view by how far turning moved it.
+        val after = toView(around - pivot)
+        val base = min(lastRect.width, lastRect.height)
+        offsetX += (before.x - after.x) * base
+        offsetY -= (before.y - after.y) * base
+    }
+
+    override fun focus(point: Vec3f) {
+        pivot = Vec3f(point.x, point.y, point.z)
+        offsetX = 0f
+        offsetY = 0f
     }
 
     override fun toView(world: Vec3f): Vec3f {
@@ -279,6 +306,7 @@ class ModelViewerState(model: String) : OrbitCamera {
         stack.scale(scale, -scale, scale)
         stack.mulPose(Quaternionf().rotateX(pitch * Mth.DEG_TO_RAD))
         stack.mulPose(Quaternionf().rotateY((yaw + PREVIEW_FRONT_YAW) * Mth.DEG_TO_RAD))
+        stack.translate(-pivot.x, -pivot.y, -pivot.z)
 
         val attachment = attachment
         val bounds = if (showBoundingBox) attachment.calculateBounds() else null
@@ -490,8 +518,7 @@ fun Model(
                 state.offsetX += event.deltaX / scale
                 state.offsetY += event.deltaY / scale
             } else {
-                state.yaw = (state.yaw + event.deltaX / 3f) % 360f
-                state.pitch = (state.pitch + event.deltaY / 3f).coerceIn(-90f, 90f)
+                state.orbitTo((state.yaw + event.deltaX / 3f) % 360f, (state.pitch + event.deltaY / 3f).coerceIn(-90f, 90f))
             }
             event.consume()
         }.onScroll { event ->

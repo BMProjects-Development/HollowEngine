@@ -66,11 +66,10 @@ internal fun TimelineLanes(
 
         override fun onRelease(event: UiEvent, row: TimelineRow) {
             if (event.isRightClick()) {
-                if (!pan.moved) {
+                if (pan.release()) {
                     val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
                     menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
                 }
-                pan.moved = false
                 refresh()
                 return
             }
@@ -130,7 +129,7 @@ private fun keysInMarquee(
     rows: List<TimelineRow>,
     pxPerSec: Float,
     marquee: TimelineMarquee,
-): List<Keyframe> = rows.filter { it.kind == TimelineRowKind.CHANNEL && !it.locked }.flatMap { row ->
+): List<Keyframe> = rows.filter { it.kind != TimelineRowKind.SEGMENTS && !it.locked }.flatMap { row ->
         val curve = row.curve ?: return@flatMap emptyList()
         val y = row.y - TimelineRulerHeight + row.height * 0.5f
         curve.keyframes.filter { key -> marquee.contains(TimelineLeftPadding + key.time * pxPerSec, y) }

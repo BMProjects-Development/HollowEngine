@@ -87,6 +87,23 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     var onHideGroup: ((TrackGroup) -> Unit)? = null
     var onHideLane: ((SegmentLane) -> Unit)? = null
 
+    /**
+     * Takes [curve] of [property] off the track list, or the whole property when [curve] is null or the last of its
+     * channels listed; what lists a property is the editor's, through [onHideProperty].
+     */
+    fun unlist(property: AnimProperty<*>, curve: ChannelCurve?) {
+        val hide = onHideProperty ?: return
+        if (curve != null && property.curves.any { it !== curve && it.isListed }) {
+            curve.isListed = false
+            return
+        }
+        property.curves.forEach { it.isListed = true }
+        hide(property)
+    }
+
+    /** Lists again every channel taken off the list alone, as showing every track does. */
+    fun relistChannels() = allProperties().forEach { property -> property.curves.forEach { it.isListed = true } }
+
     /** What the menu by the track list does; without it there is no menu. */
     var listing: TrackListing? = null
 
@@ -200,6 +217,14 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     fun requestFrameTime() {
         frameTimeRequests++
+    }
+
+    /** Bumped to ask the window to scroll the playhead into the middle of the lanes, keeping the zoom. */
+    var centerPlayheadRequests by mutableStateOf(0)
+        private set
+
+    fun requestCenterPlayhead() {
+        centerPlayheadRequests++
     }
 
     /**

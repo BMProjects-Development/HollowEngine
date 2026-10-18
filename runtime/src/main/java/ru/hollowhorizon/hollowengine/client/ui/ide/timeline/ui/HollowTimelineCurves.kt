@@ -24,12 +24,11 @@ internal data class CurveLane(
 )
 
 internal fun curveLanes(rows: List<TimelineRow>, controller: TimelineController): List<CurveLane> {
-    val lanes = rows.filter { it.kind == TimelineRowKind.PROPERTY && it.visible }
-        .mapNotNull { row -> row.property?.let { row to it } }
-        .flatMap { (row, property) ->
-            property.curves.filter { it.isVisible && it.spec.supportsCurveEditor }.map { curve ->
-                CurveLane(property, curve, curve.color.toUiColor(), row.locked)
-            }
+    val lanes = rows.filter { (it.kind == TimelineRowKind.PROPERTY || it.kind == TimelineRowKind.CHANNEL) && it.visible }
+        .mapNotNull { row ->
+            val property = row.property ?: return@mapNotNull null
+            val curve = row.curve?.takeIf { it.isVisible && it.spec.supportsCurveEditor } ?: return@mapNotNull null
+            CurveLane(property, curve, curve.color.toUiColor(), row.locked)
         }
     if (controller.focusedCurves.isEmpty()) return lanes
     return lanes.filter { controller.isFocused(it.curve) }
@@ -102,11 +101,10 @@ internal fun TimelineCurveGraph(
                 refresh()
             }.onRelease { event ->
                 if (event.isRightClick()) {
-                    if (!pan.moved) {
+                    if (pan.release()) {
                         val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
                         menu = TimelineMenuState(pan.pressX, pan.pressY, null, time, locked = false)
                     }
-                    pan.moved = false
                     refresh()
                     return@onRelease
                 }

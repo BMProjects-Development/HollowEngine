@@ -102,7 +102,7 @@ class HollowTimelinePointerTest {
             val scaled = frame.timelineKeyframes().filter { it.resolvedSnapshot.scale.x > 1.001f }
             assertEquals(1, scaled.size, "hover at $x,$y landed on ${scaled.size} keys")
 
-            translation.isExpanded = false
+            translation.curves.first().isListed = false
             surface.frame(900f, 600f, x, y, 420_000_000L)
             frame = surface.frame(900f, 600f, x, y, 700_000_000L)
             val afterCollapse = frame.timelineKeyframes().count { it.resolvedSnapshot.scale.x > 1.001f }

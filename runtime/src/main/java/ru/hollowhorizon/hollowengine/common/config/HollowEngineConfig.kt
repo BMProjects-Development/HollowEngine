@@ -46,6 +46,10 @@ object HollowEngineConfig : Config() {
     @PropertyName("transform_gizmo_orientation")
     var gizmoOrientation by property(GizmoOrientation.GLOBAL.name)
 
+    @PropertyComment("Whether the editor's previews turn around what is selected rather than around their own center")
+    @PropertyName("preview_orbit_selection")
+    var previewOrbitSelection by property(false)
+
     @PropertyComment("Whether the timeline snaps times to frames: keys, the playhead, blocks")
     @PropertyName("timeline_snap")
     var timelineSnap by property(true)

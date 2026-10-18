@@ -156,6 +156,14 @@ fun HollowTimelineEditor(
         bump()
     }
 
+    LaunchedEffect(controller.centerPlayheadRequests) {
+        if (controller.centerPlayheadRequests == 0 || laneViewport.width <= 0f) return@LaunchedEffect
+        val playheadX = TimelineLeftPadding + controller.currentTime * controller.pixelsPerSecond
+        val target = (playheadX - laneViewport.width / 2f).coerceAtLeast(0f)
+        scroll.animateScrollBy(deltaX = target - scroll.offsetX)
+        bump()
+    }
+
     Column(
         id = "cutscene-timeline-root",
         tags = listOf("timeline-root"),

@@ -44,6 +44,7 @@ object TimelineKeys {
         HollowKeys.NUDGE_LEFT_FAR to { moveSelectionOrPlayhead(it, -nudgeFar) },
         HollowKeys.NUDGE_RIGHT_FAR to { moveSelectionOrPlayhead(it, nudgeFar) },
         HollowKeys.TO_START to { it.applyCurrentTime(0f).let { true } },
+        HollowKeys.CENTER_PLAYHEAD to { it.requestCenterPlayhead().let { true } },
     )
 
     fun handle(timeline: TimelineController, key: Int, modifiers: Int): Boolean {

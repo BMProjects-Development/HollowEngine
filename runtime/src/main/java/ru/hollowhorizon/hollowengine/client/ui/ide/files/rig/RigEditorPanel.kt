@@ -164,7 +164,10 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
  */
 internal class RigEditorState(private val document: RigEditing, modelId: String) {
     // The floor drawn in the preview is the reference, so the flat grid behind the model goes.
-    val viewer = ModelViewerState(modelId).apply { showGrid = false }
+    val viewer = ModelViewerState(modelId).apply {
+        showGrid = false
+        selection = { selectedFrame()?.values?.translation }
+    }
 
     /** The selected bone, or null for the model itself. */
     var selected by mutableStateOf<String?>(null)

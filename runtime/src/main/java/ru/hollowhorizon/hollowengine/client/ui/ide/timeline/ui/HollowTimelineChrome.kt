@@ -420,7 +420,7 @@ private fun headerLabelWidth(row: TimelineRow): Float =
     8f + row.depth * 10f + row.label.length * 5.2f + headerControlsWidth(row)
 
 private fun headerControlsWidth(row: TimelineRow): Float = when (row.kind) {
-    TimelineRowKind.CHANNEL -> 20f
+    TimelineRowKind.SEGMENTS -> 20f
     else -> 58f
 }
 
@@ -477,12 +477,6 @@ private fun TimelineHeaderRow(
                     refresh()
                 }
 
-                row.kind == TimelineRowKind.PROPERTY && (row.property?.curves?.size
-                    ?: 0) > 1 -> DisclosureArrow("${row.id}-fold", row.property?.isExpanded == true) {
-                    row.property?.let { it.isExpanded = !it.isExpanded }
-                    refresh()
-                }
-
                 else -> Box(modifier = Modifier.size(10.px, 1.px))
             }
             row.color?.let { swatch ->
@@ -505,19 +499,22 @@ private fun TimelineHeaderRow(
 
 @Composable
 private fun HeaderControls(row: TimelineRow, controller: TimelineController, refresh: () -> Unit) {
-    val hideProperty = controller.onHideProperty
     val hideGroup = controller.onHideGroup
-    val property = row.property.takeIf { row.kind == TimelineRowKind.PROPERTY }
+    val property = row.property.takeIf { row.kind == TimelineRowKind.PROPERTY || row.kind == TimelineRowKind.CHANNEL }
     val group = row.group
 
-    if (property != null && hideProperty != null || group != null && hideGroup != null) {
+    if (property != null && controller.onHideProperty != null || group != null && hideGroup != null) {
         RowToggle(
             "${row.id}-remove",
             TimelineIcons.CLOSE,
             CutsceneLang.TRACK_REMOVE.lang,
             tags = listOf("hide-track")
         ) {
-            if (property != null) hideProperty?.invoke(property) else group?.let { hideGroup?.invoke(it) }
+            if (property != null) {
+                controller.unlist(property, row.curve.takeIf { row.kind == TimelineRowKind.CHANNEL })
+            } else {
+                group?.let { hideGroup?.invoke(it) }
+            }
             refresh()
         }
     }
@@ -525,8 +522,14 @@ private fun HeaderControls(row: TimelineRow, controller: TimelineController, ref
     when (row.kind) {
         TimelineRowKind.CHANNEL -> {
             val curve = row.curve ?: return
+            val owner = row.property ?: return
             VisibilityToggle("${row.id}-visible", curve.isVisible) {
                 curve.isVisible = !curve.isVisible
+                refresh()
+            }
+            // Locking stays a matter of the whole property: its channels are keyed together.
+            LockToggle("${row.id}-lock", owner.isLocked) {
+                owner.isLocked = !owner.isLocked
                 refresh()
             }
         }
@@ -638,7 +641,7 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
             refresh()
         })
 
-        val property = row.property.takeIf { row.kind == TimelineRowKind.PROPERTY }
+        val property = row.property.takeIf { row.kind == TimelineRowKind.PROPERTY || row.kind == TimelineRowKind.CHANNEL }
         val type = property?.type as? RotationPropertyType
         if (property != null && type != null) {
             add(
@@ -655,12 +658,11 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
             )
         }
 
-        val hideProperty = controller.onHideProperty
         val hideGroup = controller.onHideGroup
         val group = row.group
-        if (property != null && hideProperty != null) {
+        if (property != null && controller.onHideProperty != null) {
             add(UiDropdownItem(CutsceneLang.TRACK_REMOVE.lang, icon = TimelineIcons.CLOSE, separatorBefore = true) {
-                hideProperty(property)
+                controller.unlist(property, row.curve.takeIf { row.kind == TimelineRowKind.CHANNEL })
                 refresh()
             })
         } else if (group != null && hideGroup != null) {

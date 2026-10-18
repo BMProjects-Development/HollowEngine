@@ -89,6 +89,9 @@ class ChannelCurve(val spec: ChannelSpec) {
     val keyframes = mutableStateListOf<Keyframe>()
     var isVisible by mutableStateOf(true)
 
+    /** Whether a channel of a property of several has its track in the list; the property itself may still be off it. */
+    var isListed by mutableStateOf(true)
+
     val name: String get() = spec.name
     val color: Color get() = spec.color
 
@@ -215,8 +218,6 @@ class AnimProperty<T>(
     val apply: ((T) -> Unit)? = null,
 ) {
     var nameState by mutableStateOf(name)
-
-    var isExpanded by mutableStateOf(true)
 
     /** Whether the curves of this property are drawn in the graph; it does not change the value. */
     var isVisible by mutableStateOf(true)

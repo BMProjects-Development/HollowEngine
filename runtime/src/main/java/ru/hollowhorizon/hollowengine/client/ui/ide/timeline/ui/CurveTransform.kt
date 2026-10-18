@@ -65,7 +65,7 @@ internal class CurveTransform private constructor(
         pointerY = y
         when (mode) {
             GizmoEditMode.TRANSLATE -> {
-                val dx = if (axis == 1) 0f else x - startX
+                val dx = if (axis == 1) 0f else slide(x - startX)
                 val dy = if (axis == 0) 0f else y - startY
                 // Keys carry their handles along as they are; a handle picked alone moves with the pointer.
                 place(
@@ -103,6 +103,24 @@ internal class CurveTransform private constructor(
                 )
             }
         }
+    }
+
+    /** How far the pointer went past where the keys stop at the ends of the work area, dropped from its travel. */
+    private var overshootX = 0f
+
+    /**
+     * The pointer's [travel] along the time the keys follow: held where the first or last key meets an end of the
+     * work area, so turning back moves them at once instead of first winding back the overshoot.
+     */
+    private fun slide(travel: Float): Float {
+        if (keys.isEmpty()) return travel
+        val least = view.x(0f) - keys.minOf { it.x }
+        val most = view.x(controller.workAreaEnd) - keys.maxOf { it.x }
+        val slide = travel - overshootX
+        if (most < least) return slide
+        val held = slide.coerceIn(least, most)
+        overshootX += slide - held
+        return held
     }
 
     fun key(key: Int, modifiers: Int): GizmoKeyResult = when {

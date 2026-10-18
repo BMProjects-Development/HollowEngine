@@ -130,29 +130,30 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
             val propertyLocked = locked || property.isLocked
 
             val singleCurve = property.curves.singleOrNull()
-            rows += TimelineRow(
-                id = "timeline-property-${System.identityHashCode(property)}",
-                label = property.nameState,
-                depth = depth + 1,
-                y = y,
-                height = TimelinePropertyRowHeight,
-                kind = TimelineRowKind.PROPERTY,
-                property = property,
-                curve = singleCurve,
-                locked = propertyLocked,
-                visible = propertyVisible && (singleCurve?.isVisible ?: true),
-                color = singleCurve?.color,
-            )
-            y += TimelinePropertyRowHeight
-            if (!property.isExpanded) return@forEach
+            if (singleCurve != null) {
+                rows += TimelineRow(
+                    id = "timeline-property-${System.identityHashCode(property)}",
+                    label = property.nameState,
+                    depth = depth + 1,
+                    y = y,
+                    height = TimelinePropertyRowHeight,
+                    kind = TimelineRowKind.PROPERTY,
+                    property = property,
+                    curve = singleCurve,
+                    locked = propertyLocked,
+                    visible = propertyVisible && singleCurve.isVisible,
+                    color = singleCurve.color,
+                )
+                y += TimelinePropertyRowHeight
+                return@forEach
+            }
 
-            if (property.curves.size <= 1) return@forEach
-
-            property.curves.filter { !curveEditorOnly || it.spec.supportsCurveEditor }.forEach { curve ->
+            // A property of several channels has no row of its own: each channel is a track named after both.
+            property.curves.filter { it.isListed && (!curveEditorOnly || it.spec.supportsCurveEditor) }.forEach { curve ->
                 rows += TimelineRow(
                     id = "timeline-channel-${System.identityHashCode(curve)}",
-                    label = curve.name,
-                    depth = depth + 2,
+                    label = "${property.nameState} ${curve.name}",
+                    depth = depth + 1,
                     y = y,
                     height = TimelineChannelRowHeight,
                     kind = TimelineRowKind.CHANNEL,

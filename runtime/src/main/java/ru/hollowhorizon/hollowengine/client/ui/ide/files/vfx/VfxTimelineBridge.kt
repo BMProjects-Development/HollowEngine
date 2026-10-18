@@ -276,6 +276,7 @@ class VfxTimelineSession(
     override fun showAll() {
         hidden.clear()
         timeline.lanes.forEach { it.isListed = true }
+        timeline.relistChannels()
         onlySelected = false
     }
 

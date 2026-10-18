@@ -190,6 +190,7 @@ internal class VfxEditorState(private val document: HollowIdeVfxDocument) : VfxI
     init {
         document.onEdit = session::recordEdit
         preview.held = session::held
+        preview.selection = { selected?.let { preview.instance?.node(it) }?.frame?.position }
         session.playback.onPick = { pick -> playbackPick = pick }
         playbackPreview.onReset = {
             preview.data = playbackPreview.values

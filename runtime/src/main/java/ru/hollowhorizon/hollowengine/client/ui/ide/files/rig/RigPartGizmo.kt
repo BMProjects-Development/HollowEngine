@@ -233,13 +233,29 @@ internal class BonePoseFrame(private val bone: String, private val node: Runtime
 
     override fun restored(rig: ModelRig): ModelRig = write(rig, current)
 
-    override fun reset(rig: ModelRig, mode: GizmoEditMode): ModelRig = write(
-        rig, when (mode) {
-            GizmoEditMode.TRANSLATE -> current.copy(position = Vec3f.ZERO)
-            GizmoEditMode.ROTATE -> current.copy(rotation = QuatF.IDENTITY)
-            GizmoEditMode.SCALE -> current.copy(scale = Vec3f.ONES)
+    /**
+     * Puts [mode]'s part of the bone where the model has it at rest, as Blender clears a pose: over an animation the
+     * pose is what takes this moment of it back off, so the animation has the bone again elsewhere on the timeline.
+     */
+    override fun reset(rig: ModelRig, mode: GizmoEditMode): ModelRig {
+        val rest = node.definition.baseTransform
+        val pose = when (mode) {
+            GizmoEditMode.TRANSLATE -> current.copy(position = settled(Vec3f(rest.translation) - animatedTranslation, Vec3f.ZERO))
+            GizmoEditMode.ROTATE -> current.copy(rotation = settled(animatedRotation.inverted() * QuatF(rest.rotation)))
+            GizmoEditMode.SCALE -> current.copy(scale = settled(Vec3f(rest.scale) / animatedScale, Vec3f.ONES))
         }
-    )
+        return write(rig, pose)
+    }
+
+    /** [value], or [plain] when it only differs from it by rounding, so a bone with nothing animating it gets no pose. */
+    private fun settled(value: Vec3f, plain: Vec3f): Vec3f = if (value.isFuzzyEqual(plain, REST_EPSILON)) plain else value
+
+    private fun settled(turn: QuatF): QuatF =
+        turn.normed().let { if (it.isFuzzyEqualRotation(QuatF.IDENTITY, REST_EPSILON)) QuatF.IDENTITY else it }
+
+    private companion object {
+        const val REST_EPSILON = 1.0e-4f
+    }
 
     private fun write(rig: ModelRig, next: RigPose): ModelRig =
         rig.withBone(bone, rig.holder(bone).copy(pose = next.takeUnless(RigPose::isIdentity)))

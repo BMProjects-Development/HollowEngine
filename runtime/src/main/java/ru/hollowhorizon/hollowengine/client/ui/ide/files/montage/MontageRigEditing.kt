@@ -61,9 +61,9 @@ internal class MontageRigEditing(
         val authored = authored()
         val before = shown(authored)
         val after = change(before)
-        after.bones.forEach { (name, bone) ->
-            if (bone.pose == before.bone(name)?.pose) return@forEach
-            val pose = bone.pose ?: RigPose.IDENTITY
+        (before.bones.keys + after.bones.keys).forEach { name ->
+            val pose = after.bone(name)?.pose ?: RigPose.IDENTITY
+            if (pose == (before.bone(name)?.pose ?: RigPose.IDENTITY)) return@forEach
             if (timeline.isRecording) timeline.keyPose(name, pose) else timeline.holdBone(name, pose)
         }
         val resolved = resolve(authored, before, after, keyed(authored))

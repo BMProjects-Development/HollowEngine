@@ -4,6 +4,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.models.addedBones
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -20,11 +22,18 @@ class SkeletonBone(
     val name: String get() = node.name
 }
 
+/**
+ * Lays bones out from the bind pose of the model, then follows the current pose: which child a bone reaches to
+ * and where a bone without one ends are settled once at rest, so rotating a bone never makes its parent swap
+ * the child it points at.
+ */
 object SkeletonLayout {
     fun of(attachment: ModelAttachment): List<SkeletonBone> {
         val bones = boneNodes(attachment)
         val layout = ArrayList<SkeletonBone>()
-        attachment.nodes.forEach { root -> trace(root, parent = null, bones, layout) }
+        attachment.nodes.forEach { root ->
+            trace(root, root.parent?.globalMatrix ?: Mat4f.IDENTITY, parent = null, bones, layout)
+        }
         return layout
     }
 
@@ -38,37 +47,59 @@ object SkeletonLayout {
         return withoutGeometry.ifEmpty { null }
     }
 
-    private fun trace(node: RuntimeNode, parent: SkeletonBone?, bones: Set<Int>?, into: MutableList<SkeletonBone>) {
+    /** A bone in the bind pose: where it heads and how long it is there. */
+    private class RestBone(val direction: Vec3f, val length: Float)
+
+    private fun trace(
+        node: RuntimeNode,
+        parentRest: Mat4f,
+        parent: RestBone?,
+        bones: Set<Int>?,
+        into: MutableList<SkeletonBone>,
+    ) {
+        val rest = parentRest.mul(node.definition.baseTransform.matrixF, MutableMat4f())
         if (bones != null && node.definition.index !in bones) {
-            node.children.forEach { trace(it, parent, bones, into) }
+            node.children.forEach { trace(it, rest, parent, bones, into) }
             return
         }
 
-        val head = node.origin()
-        val heading = parent?.direction ?: node.axis(Vec3f.Y_AXIS, head)
-        val children = node.children.filter { bones == null || it.definition.index in bones }
-        val chain = children.chainChild(head, heading)
+        val restHead = rest.origin()
+        val heading = parent?.direction ?: rest.axis(Vec3f.Y_AXIS, restHead)
+        val children = node.children
+            .filter { bones == null || it.definition.index in bones }
+            .map { it to rest.mul(it.definition.baseTransform.matrixF, MutableMat4f()).origin() }
+        val chain = children.chainChild(restHead, heading)
+        val restTail = chain?.second ?: (restHead + heading * stubLength(parent))
 
-        val bone = SkeletonBone(
+        val head = node.globalMatrix.origin()
+        into += SkeletonBone(
             node = node,
             head = head,
-            tail = chain?.origin() ?: (head + heading * stubLength(parent)),
-            roll = node.axis(Vec3f.Z_AXIS, head),
-            links = children.filter { it !== chain }.map { it.origin() },
+            tail = chain?.first?.globalMatrix?.origin() ?: node.posed(restTail, rest),
+            roll = node.globalMatrix.axis(Vec3f.Z_AXIS, head),
+            links = children.filter { it !== chain }.map { it.first.globalMatrix.origin() },
         )
-        into += bone
 
-        node.children.forEach { trace(it, bone, bones, into) }
+        val restBone = (restTail - restHead).let { RestBone(it.directionOr(heading), it.length()) }
+        node.children.forEach { trace(it, rest, restBone, bones, into) }
     }
 
-    private fun stubLength(parent: SkeletonBone?): Float =
+    /** Where [restPoint], held by this node in the bind pose, is now. */
+    private fun RuntimeNode.posed(restPoint: Vec3f, rest: Mat4f): Vec3f {
+        val inverse = MutableMat4f()
+        if (!rest.invert(inverse)) return restPoint
+        val local = inverse.transform(restPoint, 1f, MutableVec3f())
+        return globalMatrix.transform(local, 1f, MutableVec3f())
+    }
+
+    private fun stubLength(parent: RestBone?): Float =
         (parent?.length ?: DEFAULT_LENGTH).coerceIn(MIN_STUB_LENGTH, MAX_STUB_LENGTH)
 
-    private fun List<RuntimeNode>.chainChild(head: Vec3f, heading: Vec3f): RuntimeNode? {
+    private fun List<Pair<RuntimeNode, Vec3f>>.chainChild(head: Vec3f, heading: Vec3f): Pair<RuntimeNode, Vec3f>? {
         if (isEmpty()) return null
 
         val aligned = mapNotNull { child ->
-            val offset = child.origin() - head
+            val offset = child.second - head
             if (offset.length() < MIN_LENGTH) null else child to (offset.normed() dot heading)
         }
         if (aligned.size == 1) return aligned[0].first
@@ -78,14 +109,12 @@ object SkeletonLayout {
         return aligned.first { it.second >= best.second - TIE }.first
     }
 
-    private fun RuntimeNode.origin(): Vec3f = MutableVec3f().also { globalMatrix.transform(Vec3f.ZERO, 1f, it) }
+    private fun Mat4f.origin(): Vec3f = transform(Vec3f.ZERO, 1f, MutableVec3f())
 
-    internal fun RuntimeNode.axis(axis: Vec3f, origin: Vec3f): Vec3f {
-        val end = MutableVec3f()
-        globalMatrix.transform(axis, 1f, end)
-        end.subtract(origin)
-        return if (end.length() < MIN_LENGTH) axis else end.norm()
-    }
+    private fun Mat4f.axis(axis: Vec3f, origin: Vec3f): Vec3f =
+        (transform(axis, 1f, MutableVec3f()) - origin).directionOr(axis)
+
+    private fun Vec3f.directionOr(fallback: Vec3f): Vec3f = if (length() < MIN_LENGTH) fallback else normed()
 
     internal const val MIN_LENGTH = 1.0e-4f
     private const val DEFAULT_LENGTH = 0.1f

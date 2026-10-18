@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCamera
 import ru.hollowhorizon.hollowengine.client.ui.widgets.anglesAround
+import ru.hollowhorizon.hollowengine.client.ui.widgets.orbitTo
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBudget
 import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlaneEnvironment
@@ -189,9 +190,33 @@ class VfxPreviewState(initialDistance: Float = 4.5f) : OrbitCamera {
         dragTarget.set(targetX, targetY, targetZ)
     }
 
-    fun orbit(totalX: Float, totalY: Float) {
-        yaw = (dragYaw - totalX * ORBIT_SPEED) % 360f
-        pitch = (dragPitch + totalY * ORBIT_SPEED).coerceIn(-89f, 89f)
+    fun orbit(totalX: Float, totalY: Float) =
+        orbitTo((dragYaw - totalX * ORBIT_SPEED) % 360f, (dragPitch + totalY * ORBIT_SPEED).coerceIn(-89f, 89f))
+
+    /** Where the selected node is, in effect space; see [OrbitCamera.selectionCenter]. */
+    var selection: () -> Vec3f? = { null }
+
+    override val selectionCenter: Vec3f? get() = selection()
+
+    override fun turnTo(yaw: Float, pitch: Float, around: Vec3f?) {
+        val before = around?.let { cameraBasis() }
+        this.yaw = yaw
+        this.pitch = pitch
+        if (around == null || before == null) return
+        val after = cameraBasis()
+        val offset = Vector3f(targetX - around.x, targetY - around.y, targetZ - around.z)
+        val turned = Vector3f(after.right).mul(offset.dot(before.right))
+            .add(Vector3f(after.up).mul(offset.dot(before.up)))
+            .add(Vector3f(after.forward).mul(offset.dot(before.forward)))
+        targetX = around.x + turned.x
+        targetY = around.y + turned.y
+        targetZ = around.z + turned.z
+    }
+
+    override fun focus(point: Vec3f) {
+        targetX = point.x
+        targetY = point.y
+        targetZ = point.z
     }
 
     /** Slides point, that camera circles around, along the screen, by a share of the distance. */

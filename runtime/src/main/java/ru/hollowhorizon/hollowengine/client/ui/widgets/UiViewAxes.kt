@@ -34,7 +34,19 @@ interface OrbitCamera {
 
     /** The yaw and pitch that look at the target from [back], a world direction pointing at the camera. */
     fun anglesFor(back: Vec3f): Pair<Float, Float>
+
+    /** Where what is selected in the view is, in the camera's world; null when nothing is. */
+    val selectionCenter: Vec3f? get() = null
+
+    /** Turns to [yaw] and [pitch]; about [around], a world point that stays where the view shows it, when given. */
+    fun turnTo(yaw: Float, pitch: Float, around: Vec3f? = null)
+
+    /** Moves the view, without turning it, so [point] is in its middle and the camera circles it from then on. */
+    fun focus(point: Vec3f)
 }
+
+/** Turns [OrbitCamera] to [yaw] and [pitch] about whatever [OrbitPivot] says the previews circle now. */
+fun OrbitCamera.orbitTo(yaw: Float, pitch: Float) = turnTo(yaw, pitch, OrbitPivot.of(this))
 
 /**
  * Yaw and pitch for [back] on a camera whose back direction is (sin y, sin p, cos y) scaled by cos p, with y the yaw
@@ -70,6 +82,8 @@ class OrbitCameraTurn(val camera: OrbitCamera) {
             return true
         }
         when {
+            HollowKeys.VIEW_SELECTED.matches(key, modifiers) -> camera.focus(camera.selectionCenter ?: return false)
+            HollowKeys.ORBIT_PIVOT.matches(key, modifiers) -> OrbitPivot.aroundSelection = !OrbitPivot.aroundSelection
             HollowKeys.ORBIT_LEFT.matches(key, modifiers) -> orbitBy(-OrbitStep, 0f)
             HollowKeys.ORBIT_RIGHT.matches(key, modifiers) -> orbitBy(OrbitStep, 0f)
             HollowKeys.ORBIT_UP.matches(key, modifiers) -> orbitBy(0f, OrbitStep)
@@ -93,12 +107,11 @@ class OrbitCameraTurn(val camera: OrbitCamera) {
                 val yawLeft = shortest(yaw - camera.yaw)
                 val pitchLeft = pitch - camera.pitch
                 if (abs(yawLeft) < SnapDegrees && abs(pitchLeft) < SnapDegrees) {
-                    camera.yaw = yaw % 360f
-                    camera.pitch = pitch
+                    camera.orbitTo(camera.yaw + yawLeft, pitch)
+                    camera.yaw %= 360f
                     target = null
                 } else {
-                    camera.yaw += yawLeft * share
-                    camera.pitch += pitchLeft * share
+                    camera.orbitTo(camera.yaw + yawLeft * share, camera.pitch + pitchLeft * share)
                 }
             }
         }

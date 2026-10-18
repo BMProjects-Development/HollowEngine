@@ -62,6 +62,10 @@ internal class TimelinePanGesture {
     var scrollY = 0f
     var center = 0f
     var moved = false
+        private set
+
+    /** Whether the press began here; a release left by a press another node took, like ending a transform, is not a click. */
+    private var pressed = false
 
     var pressX = 0f
         private set
@@ -78,11 +82,20 @@ internal class TimelinePanGesture {
         pressY = event.y
         pressLocalX = event.localX
         moved = false
+        pressed = true
     }
 
     fun advance(event: UiEvent): Boolean {
         if (abs(event.dragTotalX) > MinDragUnit || abs(event.dragTotalY) > MinDragUnit) moved = true
         return moved
+    }
+
+    /** Ends the gesture on a release; true when it was a click here, which opens the menu. */
+    fun release(): Boolean {
+        val click = pressed && !moved
+        pressed = false
+        moved = false
+        return click
     }
 }
 
