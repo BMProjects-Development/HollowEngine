@@ -105,6 +105,9 @@ fun HollowTimelineEditor(
 ) {
     val bump = refresh
     val scroll = rememberScrollState()
+    DisposableEffect(controller) {
+        onDispose { controller.viewStart = 0f }
+    }
     val zoomGlide = remember(controller) { TimelineZoomGlide() }
     val curveTransforms = remember(controller) { CurveTransformHost() }
     val playheadHold = remember(controller) { TimelinePlayheadHold() }
@@ -140,7 +143,7 @@ fun HollowTimelineEditor(
             withFrameNanos { now ->
                 zoomGlide.advance(now, controller, scroll)
                 playheadHold.advance(controller, now)
-                extendLeft(controller, scroll, laneViewport.width, curveTransforms)
+                followLeft(controller, scroll, laneViewport.width, curveTransforms)
             }
         }
     }
@@ -256,11 +259,21 @@ fun HollowTimelineEditor(
     }
 }
 
-private fun extendLeft(controller: TimelineController, scroll: UiScrollHandle, width: Float, transforms: CurveTransformHost) {
-    if (width <= 0f || transforms.active != null || scroll.offsetX >= width * 0.5f) return
-    controller.viewStart -= width / controller.pixelsPerSecond
-    scroll.shiftContent(deltaX = width)
+private fun followLeft(controller: TimelineController, scroll: UiScrollHandle, width: Float, transforms: CurveTransformHost) {
+    if (width <= 0f || transforms.active != null) return
+    val start = when {
+        scroll.offsetX < width * 0.5f -> controller.viewStart - width / controller.pixelsPerSecond
+        scroll.offsetX > width * LeftRoomViews -> minOf(0f, timelineMinKeyTime(controller), controller.timeAtX(scroll.offsetX - width))
+        else -> return
+    }
+    if (start == controller.viewStart) return
+    val shift = (controller.viewStart - start) * controller.pixelsPerSecond
+    controller.viewStart = start
+    scroll.shiftContent(deltaX = shift)
 }
+
+/** How many views of room may pile up before the view, scrolled past, until they are given back. */
+private const val LeftRoomViews = 3f
 
 /** Drag to give the track list more or less room. */
 @Composable

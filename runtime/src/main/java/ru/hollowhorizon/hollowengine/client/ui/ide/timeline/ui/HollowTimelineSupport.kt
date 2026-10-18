@@ -211,11 +211,13 @@ internal fun TimelineController.visibleTimeRange(
     viewportWidth: Float,
     pixelsPerSecond: Float,
 ): ClosedFloatingPointRange<Float> {
-    if (viewportWidth <= 0f) return -Float.MAX_VALUE..Float.MAX_VALUE
+    val width = viewportWidth.takeIf { it > 0f } ?: UnmeasuredViewWidth
     val start = timeAtX(scrollX - TimelineCullMargin, pixelsPerSecond)
-    val end = timeAtX(scrollX + viewportWidth + TimelineCullMargin, pixelsPerSecond)
+    val end = timeAtX(scrollX + width + TimelineCullMargin, pixelsPerSecond)
     return start..max(start, end)
 }
+
+private const val UnmeasuredViewWidth = 2000f
 
 internal fun curveValueToY(value: Float, center: Float, span: Float, height: Float): Float {
     if (span <= 0f || height <= 0f) return height * 0.5f
@@ -261,6 +263,9 @@ internal fun autoPanToContentX(scroll: UiScrollHandle, viewport: UiRect, content
 
 internal fun timelineMaxKeyTime(controller: TimelineController): Float =
     controller.allCurves().flatMap { it.keyframes }.maxOfOrNull { it.time } ?: 0f
+
+internal fun timelineMinKeyTime(controller: TimelineController): Float =
+    controller.allCurves().flatMap { it.keyframes }.minOfOrNull { it.time } ?: 0f
 
 internal fun Color.toUiColor(alphaMultiplier: Float = 1f): UiColor {
     return UiColor(r, g, b, (a * alphaMultiplier).coerceIn(0f, 1f))
