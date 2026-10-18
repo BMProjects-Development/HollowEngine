@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
@@ -58,7 +54,7 @@ internal fun HollowIdeReadOnlyImageViewer(document: HollowIdeImageDocument) {
             }
         }
         Text(
-            "${document.width} × ${document.height} px · Ctrl+wheel to zoom · Right-drag to pan",
+            "${document.width} × ${document.height} px | Ctrl+wheel to zoom | Right-drag to pan",
             tags = listOf("image-editor-info", "read-only"),
         )
     }

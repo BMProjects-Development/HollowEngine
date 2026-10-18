@@ -12,4 +12,9 @@ open class LevelEvent(val level: Level) : Event {
     class Load(level: Level) : LevelEvent(level) {
         companion object : EventHandler<Load>()
     }
+
+    /** The level is closing, on either side: whatever is kept per level has to let go of it. */
+    class Unload(level: Level) : LevelEvent(level) {
+        companion object : EventHandler<Unload>()
+    }
 }

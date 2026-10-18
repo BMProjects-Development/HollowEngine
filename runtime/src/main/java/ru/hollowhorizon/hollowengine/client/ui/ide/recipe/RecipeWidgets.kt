@@ -23,7 +23,7 @@ fun RecipeLayout(content: HollowUiContent) {
     Row(tags = listOf("recipe-layout"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER), content = content)
 }
 
-/** [rows] × [columns] slots; [slot] draws the one at a row and a column. */
+/** [rows] x [columns] slots; [slot] draws the one at a row and a column. */
 @Composable
 fun RecipeGrid(rows: Int, columns: Int, slot: @Composable (row: Int, column: Int) -> Unit) {
     Column(tags = listOf("recipe-grid")) {
@@ -56,7 +56,7 @@ fun RecipeEditing.ResultSlot(key: String = "result", count: Boolean = true) {
     Row(tags = listOf("recipe-result"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
         Slot(RecipeSlotBinding.key(key, RecipeSlotKind.RESULT, id = "result-$key", counted = count))
         if (count && result != null) {
-            IntRow(recipeLang("count").lang, result.count, id = "recipe-$key-count", min = 1, max = MaxCount) { next ->
+            NumberRow(recipeLang("count").lang, result.count, id = "recipe-$key-count", min = 1, max = MaxCount) { next ->
                 edit { RecipeResult.of(get(key))?.let { put(key, it.withCount(next).json) } }
             }
         }
@@ -81,23 +81,23 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
     val dropping = dragAndDrop?.hoveredTargetId == dropId && dragAndDrop.canDrop
 
     val interactive = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).dropTarget(
-            id = dropId,
-            accepts = { item ->
-                val pick = item.payload as? RecipePick
-                pick != null && !readOnly && (binding.kind == RecipeSlotKind.INGREDIENT || pick.tag == null)
-            },
-            onDrop = { item, _, _ ->
-                session.apply(binding, item.payload as RecipePick)
-                session.select(binding)
-                true
-            },
-        ).onClick { event ->
-            when {
-                event.isLeftClick() -> session.select(binding)
-                event.isRightClick() -> session.write(binding, null)
-            }
-            event.consume()
+        id = dropId,
+        accepts = { item ->
+            val pick = item.payload as? RecipePick
+            pick != null && !readOnly && (binding.kind == RecipeSlotKind.INGREDIENT || pick.tag == null)
+        },
+        onDrop = { item, _, _ ->
+            session.apply(binding, item.payload as RecipePick)
+            session.select(binding)
+            true
+        },
+    ).onClick { event ->
+        when {
+            event.isLeftClick() -> session.select(binding)
+            event.isRightClick() -> session.write(binding, null)
         }
+        event.consume()
+    }
     Box(
         id = "recipe-slot-${binding.id}",
         mode = UiBoxMode.STACK,
@@ -122,9 +122,7 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
             )
 
             unknown -> Text(
-                "?",
-                tags = listOf("recipe-slot-unknown"),
-                modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
+                "?", tags = listOf("recipe-slot-unknown"), modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
             )
         }
     }
@@ -133,7 +131,7 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
 /** A whole number under [key]; [default] is left out of the file, as vanilla does. */
 @Composable
 fun RecipeEditing.IntField(key: String, label: String, default: Int = 0, min: Int = 0, max: Int = Int.MAX_VALUE) =
-    IntRow(label.lang, int(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
+    NumberRow(label.lang, int(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
 
 @Composable
 fun RecipeEditing.FloatField(
@@ -142,7 +140,7 @@ fun RecipeEditing.FloatField(
     default: Float = 0f,
     min: Float = 0f,
     max: Float = Float.MAX_VALUE,
-) = FloatRow(label.lang, float(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
+) = NumberRow(label.lang, float(key, default), id = "recipe-field-$key", min = min, max = max) { set(key, it, default) }
 
 @Composable
 fun RecipeEditing.StringField(key: String, label: String, default: String = "") =

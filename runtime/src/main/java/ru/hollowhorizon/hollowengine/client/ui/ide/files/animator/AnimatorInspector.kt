@@ -1,17 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.animator
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeAnimatorDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiSyntaxHighlighter
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.common.models.*
 
 
@@ -63,12 +54,12 @@ private fun LayerSection(
             document.edit { it.withLayerRenamed(layerId, value) }
             onRenamed(value)
         }
-        IntRow(animatorText("priority"), layer.priority) { value -> document.edit { it.withLayer(layer.withCommon(priority = value)) } }
+        NumberRow(animatorText("priority"), layer.priority) { value -> document.edit { it.withLayer(layer.withCommon(priority = value)) } }
         ExpressionField(animatorText("weight"), layer.weight.source) { value ->
             document.edit { it.withLayer(layer.withCommon(weight = AnimationExpression(value))) }
         }
-        FloatRow(animatorText("fade_in"), layer.fadeIn) { value -> document.edit { it.withLayer(layer.withCommon(fadeIn = value)) } }
-        FloatRow(animatorText("fade_out"), layer.fadeOut) { value -> document.edit { it.withLayer(layer.withCommon(fadeOut = value)) } }
+        NumberRow(animatorText("fade_in"), layer.fadeIn) { value -> document.edit { it.withLayer(layer.withCommon(fadeIn = value)) } }
+        NumberRow(animatorText("fade_out"), layer.fadeOut) { value -> document.edit { it.withLayer(layer.withCommon(fadeOut = value)) } }
         Label(animatorText("blend"))
         Pills(LayerBlendMode.entries, layer.blendMode, { it.name.lowercase() }) { mode ->
             document.edit { it.withLayer(layer.withCommon(blendMode = mode)) }
@@ -144,12 +135,28 @@ private fun StateSection(
                 }
             }
 
+            is BlendStateSpec -> BlendStateFields(document, layerId, state)
+
+            is MontageStateSpec -> {
+                TextRow(animatorText("montage"), state.montage) { value ->
+                    document.edit { it.withState(layerId, state.copy(montage = value)) }
+                }
+                PlayModeRow(state.playMode) { mode ->
+                    document.edit { it.withState(layerId, state.copy(playMode = mode)) }
+                }
+                ExpressionField(animatorText("speed"), state.speed.source) { value ->
+                    document.edit { it.withState(layerId, state.copy(speed = AnimationExpression(value))) }
+                }
+            }
+
             // A state this build has no editor for: an addon's own kind, or one whose addon is missing.
             is UnknownAnimatorStateSpec -> Hint(animatorText("unknown_state"))
 
             else -> Hint(animatorText("no_state_editor"))
         }
     }
+
+    if (state is BlendStateSpec) BlendMotionsSection(document, layerId, state)
 
     val links = controller.transitions.withIndex()
         .filter { (_, transition) -> transition.from == state.id || transition.to == state.id }
@@ -197,8 +204,8 @@ private fun TransitionSection(
         ExpressionField(animatorText("duration"), transition.duration.source) { value ->
             update { it.copy(duration = AnimationExpression(value)) }
         }
-        IntRow(animatorText("priority"), transition.priority) { value -> update { it.copy(priority = value) } }
-        FloatRow(animatorText("exit_time"), transition.exitTime ?: 0f) { value ->
+        NumberRow(animatorText("priority"), transition.priority) { value -> update { it.copy(priority = value) } }
+        NumberRow(animatorText("exit_time"), transition.exitTime ?: 0f) { value ->
             update { it.copy(exitTime = value.takeIf { time -> time > 0f }) }
         }
     }
@@ -210,8 +217,7 @@ private fun TransitionSection(
 }
 
 @Composable
-private fun PlayModeRow(current: AnimationPlayMode, onChange: (AnimationPlayMode) -> Unit) {
+internal fun PlayModeRow(current: AnimationPlayMode, onChange: (AnimationPlayMode) -> Unit) {
     Label(animatorText("play_mode"))
     Pills(AnimationPlayMode.entries, current, { it.name.lowercase() }, onChange)
 }
-

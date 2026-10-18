@@ -1,13 +1,5 @@
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxGroupSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxKey
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTimelineSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrack
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrackCurve
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -42,6 +34,8 @@ class VfxEffectTreeTests {
         val moved = effect.withMoved("plane-b", "emitter-a", 0)
         assertEquals(listOf("group-a"), moved.nodes.map { it.id })
         assertEquals(listOf("plane-b", "plane-a"), moved.node("emitter-a")?.children?.map { it.id })
+        assertEquals(moved.node("emitter-a"), moved.parentOf("plane-b"))
+        assertEquals(moved.node("emitter-a"), moved.parentOf("plane-a"))
     }
 
     @Test

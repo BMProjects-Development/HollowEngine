@@ -6,6 +6,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -23,13 +27,19 @@ enum class TimelineViewMode {
     CURVES,
 }
 
-class TimelineController {
+class TimelineController(override val history: UndoHistory = UndoHistory()) : UndoOwner {
     companion object {
         const val KEYFRAME_TIME_EPSILON = ChannelCurve.KEY_TIME_EPSILON
         private const val DEFAULT_CURVE_SPAN = 20f
+
+        /** How near the playhead, in seconds, a key is changed by recording instead of getting one beside it. */
+        private const val RECORD_REUSE = 1f / 60f
     }
 
     val groups = mutableStateListOf<TrackGroup>()
+
+    /** Lanes of segments that stand on their own above the groups, such as a montage's clips. */
+    val lanes = mutableStateListOf<SegmentLane>()
 
     var currentTime by mutableStateOf(0f)
     var isPlaying by mutableStateOf(false)
@@ -38,6 +48,12 @@ class TimelineController {
     val playbackSpeed = mutableStateOf(1f)
 
     var pixelsPerSecond by mutableStateOf(100f)
+
+    /**
+     * The earliest time the lanes reach, never after zero: the window moves it back as the view nears it, so the time
+     * goes on to the left without end. Where everything stands across the lanes is measured from it.
+     */
+    var viewStart by mutableStateOf(0f)
     var viewMode by mutableStateOf(TimelineViewMode.DOPE_SHEET)
     var headerWidth by mutableStateOf(240f)
     val curveAxis = TimelineCurveAxis(DEFAULT_CURVE_SPAN)
@@ -57,7 +73,15 @@ class TimelineController {
      */
     var isRecording by mutableStateOf(false)
 
-    val history = TimelineHistory(this)
+    /** The tracks as they were when the transaction under way began. */
+    private var transactionStart: TimelineSnapshot? = null
+    private var transactionLabel = UndoLabel.EDIT
+
+    /**
+     * Where the playhead gets to from a time, played on for some seconds; straight on unless the owner has places
+     * it goes instead, as sections with rules do.
+     */
+    var advance: ((from: Float, by: Float) -> Float)? = null
 
     var onChanged: (() -> Unit)? = null
     var onTimeChanged: (() -> Unit)? = null
@@ -67,6 +91,27 @@ class TimelineController {
 
     var onHideProperty: ((AnimProperty<*>) -> Unit)? = null
     var onHideGroup: ((TrackGroup) -> Unit)? = null
+    var onHideLane: ((SegmentLane) -> Unit)? = null
+
+    /**
+     * Takes [curve] of [property] off the track list, or the whole property when [curve] is null or the last of its
+     * channels listed; what lists a property is the editor's, through [onHideProperty].
+     */
+    fun unlist(property: AnimProperty<*>, curve: ChannelCurve?) {
+        val hide = onHideProperty ?: return
+        if (curve != null && property.curves.any { it !== curve && it.isListed }) {
+            curve.isListed = false
+            return
+        }
+        property.curves.forEach { it.isListed = true }
+        hide(property)
+    }
+
+    /** Lists again every channel taken off the list alone, as showing every track does. */
+    fun relistChannels() = allProperties().forEach { property -> property.curves.forEach { it.isListed = true } }
+
+    /** What the menu by the track list does; without it there is no menu. */
+    var listing: TrackListing? = null
 
     fun group(path: List<String>): TrackGroup {
         require(path.isNotEmpty()) { "Timeline group path must not be empty" }
@@ -132,7 +177,8 @@ class TimelineController {
 
     fun onUpdate(deltaSeconds: Float) {
         if (isPlaying) {
-            applyCurrentTime(currentTime + deltaSeconds * playbackSpeed.value)
+            val by = deltaSeconds * playbackSpeed.value
+            applyCurrentTime(advance?.invoke(currentTime, by) ?: (currentTime + by))
 
             val end = workAreaEnd
             if (currentTime >= end) {
@@ -179,6 +225,14 @@ class TimelineController {
         frameTimeRequests++
     }
 
+    /** Bumped to ask the window to scroll the playhead into the middle of the lanes, keeping the zoom. */
+    var centerPlayheadRequests by mutableStateOf(0)
+        private set
+
+    fun requestCenterPlayhead() {
+        centerPlayheadRequests++
+    }
+
     /**
      * Moves the playhead to the nearest key after it ([direction] > 0) or before it, on the tracks the
      * list shows. Returns false when there is none that way.
@@ -198,13 +252,83 @@ class TimelineController {
 
     fun isSelected(keyframe: Keyframe): Boolean = selectedKeyframes.any { it === keyframe }
 
-    fun clearSelection() {
+    /**
+     * Bumped whenever keys change. Keys keep their numbers in plain fields, so what draws from them reads this to
+     * draw again, whoever changed them: an edit here, an undo, a transform.
+     */
+    var keysRevision by mutableStateOf(0)
+        private set
+
+    /** Tells whoever draws or keeps the keys that they changed. */
+    fun notifyKeysChanged() {
+        keysRevision++
+        onChanged?.invoke()
+    }
+
+    /** Handles picked in the graph on their own, which G, R and S turn and stretch about their keys. */
+    val selectedHandles = mutableStateListOf<HandlePick>()
+
+    fun isSelected(keyframe: Keyframe, side: TangentSide): Boolean =
+        selectedHandles.any { it.keyframe === keyframe && it.side == side }
+
+    /** Whether the graph shows the handles of [keyframe]: it is picked, or one of its handles is. */
+    fun showsHandles(keyframe: Keyframe): Boolean = isSelected(keyframe) || selectedHandles.any { it.keyframe === keyframe }
+
+    /** Adds [picks] to the handles picked alone. */
+    fun selectHandles(picks: List<HandlePick>) {
+        picks.forEach { pick -> if (!isSelected(pick.keyframe, pick.side)) selectedHandles += pick }
+    }
+
+    /** Picks the [side] handle of [keyframe] alone, or adds it to what is picked, or takes it off. */
+    fun selectHandle(keyframe: Keyframe, side: TangentSide, additive: Boolean) {
+        if (additive) {
+            if (isSelected(keyframe, side)) selectedHandles.removeAll { it.keyframe === keyframe && it.side == side }
+            else selectedHandles += HandlePick(keyframe, side)
+            return
+        }
+        selectSegment(null, null)
         selectedKeyframes.clear()
+        selectedHandles.clear()
+        selectedHandles += HandlePick(keyframe, side)
         isWorkAreaSelected = false
     }
 
+    fun clearSelection() {
+        selectedKeyframes.clear()
+        selectedHandles.clear()
+        isWorkAreaSelected = false
+        selectSegment(null, null)
+    }
+
+    /** The segment the author picked on a [SegmentLane]; picking one lets go of the keys, and keys let go of it. */
+    var selectedSegment by mutableStateOf<TimelineSegment?>(null)
+        private set
+    private var selectedLane: SegmentLane? = null
+
+    /**
+     * Picks [segment] on [lane], or nothing. Without [notify] the lanes are not told, as when the owner rebuilt
+     * its segments and only puts back the one that was picked.
+     */
+    fun selectSegment(lane: SegmentLane?, segment: TimelineSegment?, notify: Boolean = true) {
+        if (segment === selectedSegment) return
+        val previous = selectedLane
+        selectedSegment = segment
+        selectedLane = lane.takeIf { segment != null }
+        if (segment != null) {
+            selectedKeyframes.clear()
+            isWorkAreaSelected = false
+        }
+        if (!notify) return
+        if (previous !== lane) previous?.onSelect?.invoke(null)
+        lane?.onSelect?.invoke(segment)
+    }
+
     fun select(keys: List<Keyframe>, additive: Boolean) {
-        if (!additive) selectedKeyframes.clear()
+        if (keys.isNotEmpty()) selectSegment(null, null)
+        if (!additive) {
+            selectedKeyframes.clear()
+            selectedHandles.clear()
+        }
         keys.forEach { key -> if (!isSelected(key)) selectedKeyframes.add(key) }
         isWorkAreaSelected = false
     }
@@ -248,15 +372,16 @@ class TimelineController {
         isWorkAreaSelected = false
     }
 
-    fun edit(label: String, block: () -> Unit) {
-        history.record(label) {
-            block()
-            onChanged?.invoke()
-        }
+    /** Changes the tracks with [block], as one step called [label]; inside a transaction it joins that one. */
+    fun edit(label: UndoLabel, block: () -> Unit) {
+        val before = createSnapshot().takeIf { transactionStart == null }
+        block()
+        notifyKeysChanged()
+        if (before != null) recordSince(before, label)
     }
 
     fun deleteSelectedKeyframes() {
-        edit("Delete keyframes") {
+        edit(TimelineEdits.DELETE_KEYS) {
             val doomed = selectedKeyframes.toList()
             allProperties().forEach { property ->
                 if (isLocked(property)) return@forEach
@@ -269,16 +394,15 @@ class TimelineController {
     }
 
     fun setKey(curve: ChannelCurve, time: Float, value: Float, selectKey: Boolean = true): Keyframe {
-        val clamped = time.coerceIn(0f, workAreaEnd)
         val bounded = curve.spec.normalize(boundsOf(curve).clamp(value))
-        val existing = curve.keyAt(clamped)
+        val existing = curve.keyAt(time)
         val key = if (existing != null) {
             existing.value = bounded
             existing
         } else {
-            val previous = curve.keyframes.filter { it.time <= clamped }.maxByOrNull { it.time }
+            val previous = curve.keyframes.filter { it.time <= time }.maxByOrNull { it.time }
             Keyframe(
-                time = clamped,
+                time = time,
                 value = bounded,
                 interpolation = if (curve.spec.supportsCurveEditor) {
                     previous?.interpolation ?: KeyInterpolation.BEZIER
@@ -295,7 +419,7 @@ class TimelineController {
     fun setSelectedKeyframeValue(reference: Keyframe, value: Float) {
         val referenceCurve = curveOf(reference) ?: return
         val delta = value - reference.value
-        edit("Edit keyframe value") {
+        edit(TimelineEdits.EDIT_VALUE) {
             selectedKeyframes.forEach { key ->
                 val property = propertyOf(key) ?: return@forEach
                 if (isLocked(property)) return@forEach
@@ -311,11 +435,17 @@ class TimelineController {
         }
     }
 
-    fun addKeyframes(property: AnimProperty<*>, time: Float): List<Keyframe> {
+    /**
+     * Keys every channel of [property] at [time]: with [values] when given, as what the edited thing shows there,
+     * otherwise with what the curves already hold.
+     */
+    fun addKeyframes(property: AnimProperty<*>, time: Float, values: FloatArray? = null): List<Keyframe> {
         if (isLocked(property)) return emptyList()
-        return edited("Add keyframe") {
+        return edited(TimelineEdits.ADD_KEY) {
             property.curves.mapIndexed { channel, curve ->
-                setKey(curve, time, curve.valueAt(time, defaultChannel(property, channel)), selectKey = false)
+                val current = curve.valueAt(time, defaultChannel(property, channel))
+                val value = values?.getOrNull(channel)?.let { curve.spec.unwrap(it, current) } ?: current
+                setKey(curve, time, value, selectKey = false)
             }.also { select(it, additive = false) }
         }
     }
@@ -328,14 +458,15 @@ class TimelineController {
     fun recordKeys(property: AnimProperty<*>, values: Map<Int, Float>, previous: FloatArray? = null) {
         if (values.isEmpty() || isLocked(property)) return
         val time = currentTime
-        edit("Record keys") {
+        edit(TimelineEdits.RECORD_KEYS) {
             values.forEach { (channel, value) ->
                 val curve = property.curves.getOrNull(channel) ?: return@forEach
                 val before = previous?.getOrNull(channel) ?: curve.valueAt(time, defaultChannel(property, channel))
                 if (curve.keyframes.isEmpty() && time > KEYFRAME_TIME_EPSILON) {
                     setKey(curve, 0f, before, selectKey = false)
                 }
-                setKey(curve, time, curve.spec.unwrap(value, curve.valueAt(time, before)), selectKey = false)
+                val at = curve.keyframes.minByOrNull { abs(it.time - time) }?.time?.takeIf { abs(it - time) <= RECORD_REUSE } ?: time
+                setKey(curve, at, curve.spec.unwrap(value, curve.valueAt(at, before)), selectKey = false)
             }
         }
     }
@@ -370,13 +501,13 @@ class TimelineController {
     fun pasteKeyframes(time: Float = currentTime) {
         if (clipboard.isEmpty()) return
         val live = allCurves()
-        edit("Paste keyframes") {
+        edit(TimelineEdits.PASTE_KEYS) {
             val created = mutableListOf<Keyframe>()
             clipboard.forEach { clip ->
                 if (live.none { it === clip.curve }) return@forEach
                 val owner = propertyOf(clip.curve)
                 if (owner != null && isLocked(owner)) return@forEach
-                val target = (time + clip.offset).coerceIn(0f, workAreaEnd)
+                val target = time + clip.offset
                 clip.curve.keyframes.removeAll { abs(it.time - target) <= KEYFRAME_TIME_EPSILON }
                 val key = clip.state.toKeyframe().also {
                     it.time = target
@@ -390,7 +521,7 @@ class TimelineController {
         }
     }
 
-    private fun boundsOf(curve: ChannelCurve?): ChannelBounds {
+    internal fun boundsOf(curve: ChannelCurve?): ChannelBounds {
         curve ?: return ChannelBounds.Unbounded
         val property = propertyOf(curve) ?: return ChannelBounds.Unbounded
         val channel = property.curves.indexOfFirst { it === curve }.takeIf { it >= 0 }
@@ -402,7 +533,7 @@ class TimelineController {
 
         val originals = selectedKeyframes.toList()
         if (originals.isEmpty()) return
-        edit("Duplicate keyframes") {
+        edit(TimelineEdits.DUPLICATE_KEYS) {
             val created = mutableListOf<Keyframe>()
             originals.forEach { original ->
                 val curve = curveOf(original) ?: return@forEach
@@ -432,7 +563,7 @@ class TimelineController {
     fun isDragDriver(keyframe: Keyframe): Boolean = dragDriver === keyframe
 
     fun beginKeyframeDrag(focus: Keyframe) {
-        beginHistoryTransaction("Move keyframes")
+        beginHistoryTransaction(TimelineEdits.MOVE_KEYS)
         dragStartTimes = selectedKeyframes.associateWith { it.time }
         dragFocusKeyframe = focus
         dragDriver = focus
@@ -440,7 +571,7 @@ class TimelineController {
 
     fun beginCloneDrag(driver: Keyframe, withValues: Boolean): Boolean {
         val originals = selectedKeyframes.toList().ifEmpty { listOf(driver) }
-        beginHistoryTransaction("Clone keyframes")
+        beginHistoryTransaction(TimelineEdits.CLONE_KEYS)
         val clones = LinkedHashMap<Keyframe, Keyframe>()
         originals.forEach { original ->
             val curve = curveOf(original) ?: return@forEach
@@ -462,7 +593,7 @@ class TimelineController {
         if (withValues) dragStartValues = clones.values.associateWith { it.value }
         dragFocusKeyframe = clones[driver] ?: clones.values.first()
         dragDriver = driver
-        onChanged?.invoke()
+        notifyKeysChanged()
         return true
     }
 
@@ -473,7 +604,7 @@ class TimelineController {
 
     fun applyKeyframeDrag(deltaSeconds: Float) {
         val starts = dragStartTimes ?: return
-        if (moveKeyframesFromStarts(starts, deltaSeconds)) onChanged?.invoke()
+        if (moveKeyframesFromStarts(starts, deltaSeconds)) notifyKeysChanged()
     }
 
     fun applyCurveDrag(deltaSeconds: Float, deltaValue: Float) {
@@ -486,7 +617,7 @@ class TimelineController {
                 changed = true
             }
         }
-        if (changed) onChanged?.invoke()
+        if (changed) notifyKeysChanged()
     }
 
     fun endKeyframeDrag() {
@@ -499,7 +630,7 @@ class TimelineController {
 
     fun nudgeSelectedKeyframes(deltaSeconds: Float) {
         if (selectedKeyframes.isEmpty()) return
-        edit("Nudge keyframes") {
+        edit(TimelineEdits.NUDGE_KEYS) {
             val starts = selectedKeyframes.associateWith { it.time }
             moveKeyframesFromStarts(starts, deltaSeconds)
         }
@@ -507,12 +638,8 @@ class TimelineController {
 
     private fun moveKeyframesFromStarts(starts: Map<Keyframe, Float>, deltaSeconds: Float): Boolean {
         if (starts.isEmpty()) return false
-        val clampedDelta = deltaSeconds.coerceIn(
-            minimumValue = -starts.values.min(),
-            maximumValue = workAreaEnd - starts.values.max(),
-        )
         val dragged = starts.keys
-        val targets = starts.mapValues { (_, startTime) -> startTime + clampedDelta }
+        val targets = starts.mapValues { (_, startTime) -> startTime + deltaSeconds }
         val blocked = targets.any { (keyframe, target) ->
             curveOf(keyframe)?.keyframes?.any { other ->
                 dragged.none { it === other } && abs(other.time - target) <= KEYFRAME_TIME_EPSILON
@@ -533,7 +660,7 @@ class TimelineController {
 
     fun applyPreset(preset: CurvePreset) {
         if (!canEditSelectedCurves) return
-        edit("Apply curve preset") {
+        edit(TimelineEdits.CURVE_PRESET) {
             selectedKeyframes.toList().forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -544,7 +671,7 @@ class TimelineController {
     }
 
     fun setSelectedHandleMode(mode: HandleMode) {
-        edit("Edit keyframe handles") {
+        edit(TimelineEdits.EDIT_HANDLES) {
             selectedKeyframes.forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -575,7 +702,7 @@ class TimelineController {
         keyframe.setTangent(side, clamped)
 
         if (mode == HandleMode.FREE) {
-            onChanged?.invoke()
+            notifyKeysChanged()
             return
         }
         val partnerSide = if (side == TangentSide.OUTGOING) TangentSide.INCOMING else TangentSide.OUTGOING
@@ -590,12 +717,12 @@ class TimelineController {
             keyframe.setTangent(partnerSide, partner)
             curve.useSpline(keyframe, partnerSide)
         }
-        onChanged?.invoke()
+        notifyKeysChanged()
     }
 
     fun smoothSelectedKeyframes() {
         if (!canEditSelectedCurves) return
-        edit("Smooth keyframes") {
+        edit(TimelineEdits.SMOOTH_KEYS) {
             selectedKeyframes.forEach { key ->
                 val curve = curveOf(key) ?: return@forEach
                 if (!curve.spec.supportsCurveEditor) return@forEach
@@ -647,23 +774,33 @@ class TimelineController {
     val canEditSelectedCurves: Boolean
         get() = selectedKeyframes.any { key -> curveOf(key)?.spec?.supportsCurveEditor == true }
 
-    fun beginHistoryTransaction(label: String) = history.begin(label)
-
-    fun commitHistoryTransaction() = history.commit()
-
-    fun undo() {
-        history.undo()
-        onChanged?.invoke()
-        onTimeChanged?.invoke()
+    /** Starts a drag or a recording whose changes go back as one step called [label]. */
+    fun beginHistoryTransaction(label: UndoLabel) {
+        if (transactionStart != null) return
+        transactionStart = createSnapshot()
+        transactionLabel = label
     }
 
-    fun redo() {
-        history.redo()
-        onChanged?.invoke()
-        onTimeChanged?.invoke()
+    fun commitHistoryTransaction() {
+        val before = transactionStart ?: return
+        transactionStart = null
+        recordSince(before, transactionLabel)
     }
 
-    fun clearHistory() = history.clear()
+    fun clearHistory() {
+        transactionStart = null
+        history.clear()
+    }
+
+    private fun recordSince(before: TimelineSnapshot, label: UndoLabel) {
+        if (createSnapshot() != before) history.record(SnapshotStep(this, label, before, ::createSnapshot, ::restoreFromHistory))
+    }
+
+    private fun restoreFromHistory(snapshot: TimelineSnapshot) {
+        restoreSnapshot(snapshot)
+        notifyKeysChanged()
+        onTimeChanged?.invoke()
+    }
 
     internal fun createSnapshot(): TimelineSnapshot = TimelineSnapshot(
         properties = allProperties().map { property ->
@@ -684,13 +821,20 @@ class TimelineController {
         snapshot.properties.forEach { propertySnapshot ->
             propertySnapshot.state.applyTo(propertySnapshot.property)
             propertySnapshot.curves.forEachIndexed { index, curve ->
-                curve.keyframes.clear()
-                propertySnapshot.keys.getOrNull(index)
-                    ?.let { keys -> curve.keyframes.addAll(keys.map { it.toKeyframe() }) }
+                val keys = propertySnapshot.keys.getOrNull(index).orEmpty()
+                if (curve.keyframes.size == keys.size) {
+                    curve.keyframes.forEachIndexed { key, keyframe -> keys[key].applyTo(keyframe) }
+                } else {
+                    curve.keyframes.clear()
+                    curve.keyframes.addAll(keys.map { it.toKeyframe() })
+                }
             }
             propertySnapshot.property.restoreState(propertySnapshot.type, propertySnapshot.curves)
         }
-        selectedKeyframes.clear()
+        val liveKeys = allCurves().flatMap { it.keyframes }
+        selectedKeyframes.retainAll { key -> liveKeys.any { it === key } }
+        selectedHandles.retainAll { pick -> liveKeys.any { it === pick.keyframe } }
+        keysRevision++
         val liveCurves = allCurves()
         focusedCurves.retainAll { curve -> liveCurves.any { it === curve } }
         currentTime = snapshot.currentTime
@@ -698,17 +842,15 @@ class TimelineController {
         restoreExtraState?.invoke(snapshot.extra)
     }
 
-    private fun <T> edited(label: String, block: () -> T): T {
+    private fun <T> edited(label: UndoLabel, block: () -> T): T {
         var result: T? = null
         edit(label) { result = block() }
         return result as T
     }
 
     private fun findFreeTime(curve: ChannelCurve, requestedTime: Float): Float {
-        var time = requestedTime.coerceIn(0f, workAreaEnd)
-        while (curve.keyAt(time) != null && time < workAreaEnd) {
-            time = (time + KEYFRAME_TIME_EPSILON * 2f).coerceAtMost(workAreaEnd)
-        }
+        var time = requestedTime
+        while (curve.keyAt(time) != null) time += KEYFRAME_TIME_EPSILON * 2f
         return time
     }
 }

@@ -2,8 +2,8 @@ package ru.hollowhorizon.hollowengine.client.ui.layout
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollOffset
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
+import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertTrue

@@ -9,7 +9,7 @@ import kotlinx.serialization.SerialInfo
  * What the component editor knows about a component beyond its serial form.
  */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
 annotation class EditorName(val name: String)
 
 /** The line under a field, or under a component's header. */
@@ -22,7 +22,6 @@ annotation class EditorDescription(val description: String)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 annotation class EditorIcon(val icon: String)
 
-// TODO:
 /** Groups a component under a heading in the "add component" list. */
 @SerialInfo
 @Target(AnnotationTarget.CLASS)
@@ -32,6 +31,14 @@ annotation class EditorCategory(val category: String)
 @SerialInfo
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
 annotation class EditorHidden
+
+/**
+ * A field a timeline does not offer to animate, though it holds a number or a flag: one that is read once, as
+ * whether an effect starts by itself, or that changes what is built rather than how it moves.
+ */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorNotAnimated
 
 /**
  * Bounds a numeric field, and turns it into a slider when [slider] is set. An infinite bound is no bound.
@@ -44,9 +51,34 @@ annotation class EditorRange(
     val slider: Boolean = false,
 )
 
+/** JSON value used when enabling a nullable field; leaves its runtime default unchanged. */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorDefault(val json: String)
+
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorBone
+
+/** Edits the field with the editor registered under [id] instead of the one its type would get. */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY)
+annotation class EditorWidget(val id: String)
+
+/** The field editors the engine registers, by the id [EditorWidget] names them with. */
+object EditorWidgets {
+    /** A list of names of the colliders on the same bone as the attachment, ticked off among those there are. */
+    const val COLLIDERS = "hollowengine:colliders"
+
+    /** The name of one IK target of the rig, picked among those there are. */
+    const val RIG_TARGETS = "hollowengine:rig_targets"
+
+    /** An expression of the animator's language, with its completion and highlighting. */
+    const val ANIMATION_EXPRESSION = "hollowengine:animation_expression"
+
+    /** A sound event or a sound file, offered among those there are, with a button to listen to it. */
+    const val SOUND_SOURCE = "hollowengine:sound_source"
+}
 
 /** A string field that deserves more than one line. */
 @SerialInfo

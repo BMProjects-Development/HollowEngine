@@ -1,0 +1,62 @@
+---
+title: Timeline
+order: 2
+---
+
+# Timeline
+
+Cutscenes, VFX and montages share the **Timeline** window. It follows the active editor; available tracks depend on the asset. Time values are in seconds.
+
+## Navigation and selection
+
+These are the default bindings. Change them in the [IDE keymap settings](/docs/hollowengine/ide).
+
+| Action | Control |
+| --- | --- |
+| Play / pause | `Space` |
+| Go to start | `Home` |
+| Center on playhead | `NumPad 0` |
+| Keys / curves | `Ctrl + Tab` |
+| Zoom time | Wheel |
+| Scroll along time | `Ctrl` + wheel |
+| Scroll tracks or graph vertically | `Shift` + wheel |
+| Zoom graph values | `Alt` + wheel |
+| Pan | Middle mouse button |
+| Zoom by dragging | `Ctrl` + middle mouse button |
+| Previous / next key | Down / up arrow |
+| Nudge selection in time | Left / right arrow; `Shift` for larger steps |
+
+Hold the left mouse button and drag to select several keys; `Ctrl` or `Shift` + click adds a key to the selection. `Ctrl` + dragging a key creates a copy. `Ctrl + C`, `Ctrl + X`, `Ctrl + V` copy, cut and paste keys relative to the playhead. Hold `Alt` while moving to disable grid snapping.
+
+Toggle frame snapping on the toolbar and set its FPS beside the toggle; the default is `20`. This sets editing precision, not rendering frame rate. With no keys selected, left and right arrows move the playhead; holding an arrow advances time until release.
+
+Click tracks to choose which curves appear in the graph. This differs from disabling track visibility: a hidden track stops contributing to the preview. `F` frames visible curves.
+
+## Recording and curves
+
+The record button enables auto-keying where supported. Editing a property or using a gizmo writes its value at the playhead. To insert explicitly, use the key button beside a field or `I` in a view with a gizmo for position, rotation, scale or all transforms.
+
+In the graph, move (`G`), rotate (`R`) or scale (`S`) selected keys and handles. `X` constrains to time, `Y` to value; pressing again clears the constraint. `Enter` or left click confirms, `Escape` or right click cancels. Inspector provides exact key values and handle settings. See [Cutscenes](/docs/hollowengine/world/cutscenes) for interpolation and handle modes.
+
+## Events and sections
+
+**Montages and VFX** support named events and sections. Add them through the corresponding lane's context menu; select an item to edit it in Inspector.
+
+An event marks a moment you can jump to by name. In montages it also calls handlers registered by scripts. A section is a non-overlapping time span with entry and exit rules:
+
+| Rule | Checked | Result |
+| --- | --- | --- |
+| Skip | On entry | Move to the end of the section. |
+| Repeat | On exit | Return to its start. |
+| Jump to event | On entry or exit | Continue from a named event. |
+
+Rules are checked in order; the first true condition wins. A blank condition is always true. With no matching rule, playback continues. Conditions use their editor's expression language; for example, `d.waiting` can keep a waiting section looping until a script changes its data.
+
+Select the montage or VFX root to enter test values in **Preview data**:
+
+```text
+d.waiting = true;
+d.charge = 0.5;
+```
+
+These values affect only the preview. Reset reapplies them and restarts the preview. In game, VFX data comes from the effect handle; montage data comes from the entity.

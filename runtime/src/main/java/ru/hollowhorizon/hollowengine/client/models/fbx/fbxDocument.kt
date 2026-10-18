@@ -1,12 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.models.fbx
 
-import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.util.bool
 import ru.hollowhorizon.hollowengine.client.models.util.strncmp
 import ru.hollowhorizon.hollowengine.client.models.util.trimNUL
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
 
 class LazyObject(val id: Long, val element: Element, val doc: Document) {
@@ -17,8 +17,9 @@ class LazyObject(val id: Long, val element: Element, val doc: Document) {
     enum class Flags { NULL, BEING_CONSTRUCTED, FAILED_TO_CONSTRUCT }
 
     infix fun Int.wo(other: Flags) = and(other.ordinal.inv())
-    infix fun Int.or(f: LazyObject.Flags) = or(f.ordinal)
+    infix fun Int.or(f: Flags) = or(f.ordinal)
 
+    @Suppress("UNCHECKED_CAST")
     fun <T> get(dieOnError: Boolean = false) = get(dieOnError) as? T
 
     fun get(dieOnError: Boolean = false): Object? {
@@ -163,8 +164,6 @@ open class NodeAttribute(id: Long, element: Element, doc: Document, name: String
 
         val classname = element[2].parseAsString
 
-        /*  hack on the deriving type but Null/LimbNode attributes are the only case in which the property table is by
-            design absent and no warning should be generated for it. */
         val isNullOrLimb = classname == "Null" || classname == "LimbNode"
         props = getPropertyTable(doc, "NodeAttribute.Fbx$classname", element, sc, isNullOrLimb)
     }
@@ -216,7 +215,7 @@ class Light(id: Long, element: Element, doc: Document, name: String) : NodeAttri
     enum class Decay { None, Linear, Quadratic, Cubic }
 
     val color get() = props("Color", Vec3f(1f, 1f, 1f))
-    val type get() = Type.values()[props("Type", Type.Point.ordinal)]
+    val type get() = Type.entries[props("Type", Type.Point.ordinal)]
     val castLightOnObject get() = props("CastLightOnObject", defaultValue = false)
     val drawVolumetricLight get() = props("DrawVolumetricLight", defaultValue = true)
     val drawGroundProjection get() = props("DrawGroundProjection", defaultValue = true)
@@ -306,7 +305,7 @@ class Model(id: Long, element: Element, doc: Document, name: String) : Object(id
     val rotationMaxY get() = props("RotationMaxY", defaultValue = false)
     val rotationMinZ get() = props("RotationMinZ", defaultValue = false)
     val rotationMaxZ get() = props("RotationMaxZ", defaultValue = false)
-    val inheritType get() = TransformInheritance.values()[props("InheritType", TransformInheritance.RrSs.ordinal)]
+    val inheritType get() = TransformInheritance.entries[props("InheritType", TransformInheritance.RrSs.ordinal)]
 
     val scalingActive get() = props("ScalingActive", defaultValue = false)
     val scalingMin get() = props("ScalingMin", Vec3f(0f, 0f, 0f))
@@ -418,7 +417,7 @@ class Texture(id: Long, element: Element, doc: Document, name: String) : Object(
 class LayeredTexture(id: Long, element: Element, doc: Document, name: String) : Object(id, element, name) {
 
     val textures = ArrayList<Texture>()
-    val blendMode = element.scope["BlendModes"]?.let { BlendMode.values()[it[0].parseAsInt] }
+    val blendMode = element.scope["BlendModes"]?.let { BlendMode.entries[it[0].parseAsInt] }
         ?: BlendMode.Translucent
     val alpha = element.scope["Alphas"]?.get(0)?.parseAsFloat ?: 0f
 
@@ -436,8 +435,6 @@ class LayeredTexture(id: Long, element: Element, doc: Document, name: String) : 
             (ob as? Texture)?.let { textures += it }
         }
     }
-
-    val textureCount get() = textures.size
 
     enum class BlendMode { Translucent, Additive, Modulate, Modulate2, Over, Normal, Dissolve, Darken, ColorBurn,
         LinearBurn, DarkerColor, Lighten, Screen, ColorDodge, LinearDodge, LighterColor, SoftLight, HardLight,
@@ -688,7 +685,6 @@ class AnimationCurveNode(id: Long, element: Element, name: String, val doc: Docu
 
     val targetAsModel get() = target as? Model
 
-    val targetAsNodeAttribute get() = target as? NodeAttribute
 }
 
 /** Represents a FBX animation layer (i.e. a list of node animations) */
@@ -1233,7 +1229,7 @@ class Document(val parser: Parser) {
                 val pName = t[0].parseAsString
                 s["Properties70"]?.let {
                     val props = PropertyTable(it, null)
-                    templates[oName + "." + pName] = props
+                    templates["$oName.$pName"] = props
                 }
             }
         }
@@ -1317,8 +1313,8 @@ class Document(val parser: Parser) {
 //    std::unique_ptr<FileGlobalSettings> globals
 
     companion object {
-        val lowerSupportedVersion = 7100
-        val upperSupportedVersion = 7400
+        const val lowerSupportedVersion = 7100
+        const val upperSupportedVersion = 7400
 
     }
 }

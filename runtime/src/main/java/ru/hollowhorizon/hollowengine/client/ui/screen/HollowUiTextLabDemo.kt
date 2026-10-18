@@ -1,11 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.screen
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.text.*
@@ -128,7 +123,7 @@ fun TextLab() {
         sectionTitle("3 · Все шрифты на разных размерах")
         Text(
             "Ванильный шрифт задуман под кратные 8px: на них он попиксельно совпадает с ванилью, " +
-                    "между ними — размывается, как и у самой ванили.",
+                    "между ними размывается, как и в самой ваниле.",
             tags = listOf("textlab-hint"),
         )
         Column(tags = listOf("textlab-table")) {
@@ -152,8 +147,7 @@ fun TextLab() {
 
         sectionTitle("4 · Стыки: шрифт × комбинация эффектов")
         Text(
-            "Здесь ловятся артефакты на пересечениях — жирный поверх наклонного, линейки поверх " +
-                    "анимации, слои (тень/обводка) поверх всего.",
+            "Здесь ловятся артефакты на пересечениях.",
             tags = listOf("textlab-hint"),
         )
         Column(tags = listOf("textlab-table")) {
@@ -313,7 +307,7 @@ private const val Pangram = "Съешь ещё Wavy 123"
 
 private const val DefaultSample =
     "Съешь же ещё этих мягких французских булок да выпей чаю. " +
-            "The quick brown fox jumps over the lazy dog — 0123456789. " +
+            "The quick brown fox jumps over the lazy dog. 0123456789. " +
             "Длинноеслово-которое-негде-переносить проверяет разрыв по символам.\n" +
             "А жёсткий перенос строкой выше срабатывает даже с выключенным wrap."
 

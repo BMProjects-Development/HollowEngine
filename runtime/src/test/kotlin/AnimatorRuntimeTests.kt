@@ -1,6 +1,7 @@
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
@@ -8,11 +9,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpola
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
-import ru.hollowhorizon.hollowengine.common.models.ServerModelAnimationMetadata
-import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -258,8 +257,8 @@ class AnimatorRuntimeTests {
 
         assertTrue(evaluator.boolean(runTransition.condition, context))
         assertFalse(evaluator.boolean(idleTransition.condition, context))
-        assertEquals(-0.6f, evaluator.float(walkState.speed, context), 0.0001f)
-        assertEquals(-0.6f, evaluator.float(runState.speed, context), 0.0001f)
+        assertEquals(-1.2f / 1.43f, evaluator.float(walkState.speed, context), 0.0001f)
+        assertEquals(-1.2f / 3.19f, evaluator.float(runState.speed, context), 0.0001f)
         assertEquals(6.5f, evaluator.vector(headTransform.rotation!!, context).x, 0.0001f)
         assertEquals(-18.6f, evaluator.vector(headTransform.rotation, context).y, 0.0001f)
         assertEquals(0f, evaluator.vector(leftEyeTransform.translation!!, context).x, 0.0001f)

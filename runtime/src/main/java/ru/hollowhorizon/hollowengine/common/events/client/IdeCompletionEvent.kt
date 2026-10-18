@@ -1,0 +1,20 @@
+package ru.hollowhorizon.hollowengine.common.events.client
+
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
+import ru.hollowhorizon.hollowengine.common.events.ClientEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
+
+/**
+ * Posted on client thread once per caret position of an IDE completion request. Handlers can
+ * contribute declarations or snippets with imports, insertion text and a caret position, using
+ * current world safely. [items] starts with engine's context snippets; language service's
+ * results are computed in background and shown next to them.
+ */
+class IdeCompletionEvent(
+    val path: String,
+    val text: String,
+    val caret: Int,
+    val items: MutableList<UiTextCompletion>,
+) : ClientEvent {
+    companion object : EventHandler<IdeCompletionEvent>()
+}

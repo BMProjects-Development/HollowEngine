@@ -47,12 +47,49 @@ class UiScrollHandle {
 
     internal var pendingX: Float? = null
     internal var pendingY: Float? = null
+
+    /** Whether [jumpTo] moved the offset, which the scroll state still has to count as a change. */
+    internal var jumped = false
+
+    /** What the last `scrollTo` asked for, kept until the layout has measured the content it scrolls. */
+    internal var requestedX: Float? = null
+    internal var requestedY: Float? = null
     internal var pendingAnimatedDeltaX = 0f
     internal var pendingAnimatedDeltaY = 0f
 
     fun scrollTo(x: Float? = null, y: Float? = null) {
         if (x != null) pendingX = x
         if (y != null) pendingY = y
+    }
+
+    /**
+     * Moves to the offset at once, so the composition about to run and its layout both see it, as a view that changes
+     * the size of its content in the same step must (a zoom driven from a frame callback): [scrollTo] lands only with
+     * the next frame. The layout clamps the offset to the content it measures.
+     */
+    fun jumpTo(x: Float? = null, y: Float? = null) {
+        val next = UiScrollOffset((x ?: offsetX).coerceAtLeast(0f), (y ?: offsetY).coerceAtLeast(0f))
+        animating = false
+        target = next
+        pendingX = null
+        pendingY = null
+        requestedX = null
+        requestedY = null
+        if (applyOffset(next)) jumped = true
+    }
+
+    /**
+     * The content moved ([deltaX], [deltaY]) under the view, as content that grows at its start does: the offset, where an
+     * animation runs from and to and what was asked for follow it, so nothing on screen moves.
+     */
+    fun shiftContent(deltaX: Float = 0f, deltaY: Float = 0f) {
+        target = UiScrollOffset(target.x + deltaX, target.y + deltaY)
+        animationStart = UiScrollOffset(animationStart.x + deltaX, animationStart.y + deltaY)
+        pendingX = pendingX?.plus(deltaX)
+        pendingY = pendingY?.plus(deltaY)
+        requestedX = requestedX?.plus(deltaX)
+        requestedY = requestedY?.plus(deltaY)
+        if (applyOffset(UiScrollOffset(offsetX + deltaX, offsetY + deltaY))) jumped = true
     }
 
     fun scrollBy(deltaX: Float = 0f, deltaY: Float = 0f) {

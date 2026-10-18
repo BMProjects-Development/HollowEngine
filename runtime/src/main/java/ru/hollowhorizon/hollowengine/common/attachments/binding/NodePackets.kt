@@ -1,15 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.attachments.binding
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import net.minecraft.client.Minecraft
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
@@ -24,19 +18,6 @@ data class EntitySnapshotRemovePacket(
     override fun handle(player: Player) {
         val entity = player.level().getEntity(entityId) ?: return
         AttachmentRegistry.componentsById(entity).clear()
-    }
-}
-
-@HollowPacketHandler(HollowPacketHandler.Direction.TO_SERVER)
-@Serializable
-data class EntitySnapshotUpdatePacket(
-    val entityId: Int,
-    val snapshot: EntitySnapshot,
-) : HollowPacket {
-    override fun handle(player: Player) {
-        if (!player.hasPermissions(PlayerPermissions.GAMEMASTER)) return
-        val entity = player.level().getEntity(entityId) ?: return
-        AttachmentRegistry.updateEntitySnapshot(entity, snapshot)
     }
 }
 

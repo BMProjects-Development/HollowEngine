@@ -217,6 +217,23 @@ void main() {
         return;
     }
 
+    if (effect.w > 1.5) {
+        vec2 inner = max(size - borderWidth * 2.0, vec2(0.0));
+        float innerRadius = max(radius - borderWidth, 0.0);
+        vec2 point = localPosition - borderWidth;
+        float boxCoverage = sdfCoverage(roundedRectDistance(point, inner, innerRadius), pixelSize);
+        if (boxCoverage <= 0.0) discard;
+        float spread = effect.z;
+        vec2 hole = max(inner - spread * 2.0, vec2(0.0));
+        vec2 offset = texelFetch(RecordBuffer, base + 2).xy;
+        float holeDistance = roundedRectDistance(point - offset - spread, hole, max(innerRadius - spread, 0.0));
+        vec4 shadowColor = samplePaint(paintIndex);
+        shadowColor.a *= boxCoverage * (1.0 - softenedCoverage(holeDistance, effect.y, pixelSize));
+        if (shadowColor.a <= 0.0) discard;
+        fragColor = shadowColor;
+        return;
+    }
+
     float distance = roundedRectDistance(localPosition, size, radius);
     if (effect.w > 0.5) {
         float shadowCoverage = softenedCoverage(distance - effect.z, effect.y, pixelSize);

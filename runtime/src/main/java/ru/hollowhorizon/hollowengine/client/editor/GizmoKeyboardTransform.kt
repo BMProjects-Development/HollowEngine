@@ -1,0 +1,155 @@
+package ru.hollowhorizon.hollowengine.client.editor
+
+import net.minecraft.world.phys.Vec3
+import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
+import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+
+/** What a key or a click did to a [GizmoKeyboardTransform]. */
+enum class GizmoKeyResult {
+    /** Not one of its keys; the editor may use it. */
+    IGNORED,
+
+    /** The transform changed how it is held; apply [GizmoKeyboardTransform.update] again. */
+    CHANGED,
+
+    /** Done: keep what it made. */
+    CONFIRMED,
+
+    /** Done: put back [GizmoKeyboardTransform.start]. */
+    CANCELLED,
+}
+
+/**
+ * A transform started from the keyboard, the way Blender does it: G, R or S begins it where the pointer
+ * is, the pointer drives it, X, Y or Z holds it to an axis (of the orientation the gizmo is set to first, of
+ * its [alternate][GizmoOrientation.alternate] on a second press, free again on a third), a click or Enter
+ * applies it and Escape or the right button puts the object back. Scale is always along the object's own axes.
+ */
+class GizmoKeyboardTransform(
+    val mode: GizmoEditMode,
+    val start: GizmoTransformValues,
+    private val startX: Float,
+    private val startY: Float,
+    private val projector: GizmoProjector,
+    private val geometry: GizmoGeometry,
+    private val manipulator: GizmoManipulator,
+) {
+    var axis: Int? = null
+        private set
+
+    /** Whose axis [axis] is; null while the transform is free. */
+    var orientation: GizmoOrientation? = null
+        private set
+
+    private val primary = if (mode == GizmoEditMode.SCALE) GizmoOrientation.LOCAL else GizmoSettings.orientation
+
+    private lateinit var handle: GizmoHandle
+    private lateinit var drag: GizmoDrag
+
+    init {
+        restart()
+    }
+
+    /** Where the pointer at ([x], [y]) takes the object, or null while it cannot tell. */
+    fun update(x: Float, y: Float, modifiers: Int): GizmoTransformValues? = manipulator.update(drag, x, y, modifiers)
+
+    fun key(key: Int, modifiers: Int): GizmoKeyResult {
+        val axis = AXIS_ACTIONS.indexOfFirst { it.matches(key, modifiers) }
+        return when {
+            axis >= 0 -> {
+                constrain(axis)
+                GizmoKeyResult.CHANGED
+            }
+
+            key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER -> GizmoKeyResult.CONFIRMED
+            key == GLFW.GLFW_KEY_ESCAPE -> GizmoKeyResult.CANCELLED
+            else -> GizmoKeyResult.IGNORED
+        }
+    }
+
+    fun click(button: Int): GizmoKeyResult =
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) GizmoKeyResult.CANCELLED else GizmoKeyResult.CONFIRMED
+
+    /** The line of the axis it is held to, and the angle swept while rotating. */
+    fun draw(scope: UiCanvasDrawScope) {
+        GizmoRenderer.drawRotationSector(scope, geometry, projector, drag)
+        GizmoRenderer.drawHandles(scope, listOf(handle), null, null)
+    }
+
+    /**
+     * Holds the transform to [index]: along the gizmo's orientation, then the other one, then free again. Starts
+     * over from where it began, so motion along the old axis does not carry over.
+     */
+    private fun constrain(index: Int) {
+        when {
+            axis != index -> {
+                axis = index
+                orientation = primary
+            }
+
+            orientation == primary && mode != GizmoEditMode.SCALE -> orientation = primary.alternate
+            else -> {
+                axis = null
+                orientation = null
+            }
+        }
+        restart()
+    }
+
+    private fun restart() {
+        val origin = start.translation.toVec3()
+        val direction = axis?.let { index ->
+            geometry.axes(orientation ?: primary, start.rotation)?.toList()?.get(index)
+        }?.toVec3()
+        val id = when (mode) {
+            GizmoEditMode.TRANSLATE -> axis?.let(TRANSLATE_IDS::get) ?: GizmoHandleId.CENTER
+            GizmoEditMode.ROTATE -> ROTATE_IDS[axis ?: 0]
+            GizmoEditMode.SCALE -> axis?.let(SCALE_IDS::get) ?: GizmoHandleId.SCALE_UNIFORM
+        }
+        val turnAround = direction ?: if (mode == GizmoEditMode.ROTATE) towardCamera(origin) else null
+        handle = GizmoHandle(
+            id = id,
+            worldOrigin = origin,
+            worldAxis = turnAround,
+            renderLines = listOfNotNull(direction?.let { guideLine(origin, it) }),
+            fillPolygon = null,
+            color = GUIDE_COLORS[axis ?: 0],
+            width = GUIDE_WIDTH,
+            depth = 0f,
+            pick = PickPrimitive.Disc(Pt(0f, 0f), 0f),
+        )
+        drag = manipulator.begin(handle, start, startX, startY)
+    }
+
+    private fun towardCamera(origin: Vec3): Vec3 = projector.cameraPosition.subtract(origin).normalize()
+
+    /** The line through the object along the axis it is held to, across the whole view. */
+    private fun guideLine(origin: Vec3, axis: Vec3): GizmoStroke? {
+        val reach = axis.scale(GUIDE_REACH_PIXELS * projector.worldPerPixel(origin).toDouble())
+        return geometry.projectPolyline(listOf(origin.subtract(reach), origin.add(reach)))?.let(::GizmoStroke)
+    }
+
+    private fun Vec3f.toVec3() = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
+
+    companion object {
+        /** The transform a key starts (G, R or S unless rebound), or null for any other key. */
+        fun modeFor(key: Int, modifiers: Int): GizmoEditMode? = when {
+            HollowKeys.GRAB.matches(key, modifiers) -> GizmoEditMode.TRANSLATE
+            HollowKeys.ROTATE.matches(key, modifiers) -> GizmoEditMode.ROTATE
+            HollowKeys.SCALE.matches(key, modifiers) -> GizmoEditMode.SCALE
+            else -> null
+        }
+
+        private val AXIS_ACTIONS = listOf(HollowKeys.AXIS_X, HollowKeys.AXIS_Y, HollowKeys.AXIS_Z)
+
+        private const val GUIDE_REACH_PIXELS = 4000f
+        private const val GUIDE_WIDTH = 1.5f
+
+        private val TRANSLATE_IDS = listOf(GizmoHandleId.AXIS_X, GizmoHandleId.AXIS_Y, GizmoHandleId.AXIS_Z)
+        private val ROTATE_IDS = listOf(GizmoHandleId.ROTATE_X, GizmoHandleId.ROTATE_Y, GizmoHandleId.ROTATE_Z)
+        private val SCALE_IDS = listOf(GizmoHandleId.SCALE_X, GizmoHandleId.SCALE_Y, GizmoHandleId.SCALE_Z)
+        private val GUIDE_COLORS = listOf(GizmoColors.AXIS_X, GizmoColors.AXIS_Y, GizmoColors.AXIS_Z)
+    }
+}

@@ -3,11 +3,10 @@ package ru.hollowhorizon.hollowengine.common.entities
 import com.mojang.authlib.GameProfile
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntityType
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.PathfinderMob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
@@ -17,19 +16,15 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.GameType
 import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
-import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.components.HitboxComponent
-import ru.hollowhorizon.hollowengine.common.attachments.components.hitboxComponent
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.snapshotOf
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionController
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcMoveControl
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathNavigation
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.maxDrop
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.utils.FakePlayer
-import ru.hollowhorizon.hollowengine.common.utils.rl
-import java.util.UUID
+import ru.hollowhorizon.hollowengine.common.utils.mutableAttributes
+import java.util.*
 
 class NpcEntity : PathfinderMob {
     constructor(level: Level) : super(ModEntities.NPC_ENTITY, level)
@@ -69,28 +64,20 @@ class NpcEntity : PathfinderMob {
 
     override fun createNavigation(pLevel: Level) = NpcPathNavigation(pLevel, this)
 
+    val npcNavigation: NpcPathNavigation get() = navigation as NpcPathNavigation
+
+    /** How far it steps off a ledge, by its navigation settings rather than by its health as mobs do. */
+    override fun getMaxFallDistance(): Int = npcNavigation.settings.path.maxDrop(this)
+
     override fun registerGoals() {
         goalSelector.addGoal(1, FloatGoal(this))
         goalSelector.addGoal(1, MeleeAttackGoal(this, 1.0, false))
     }
 
-    override fun isInvulnerable() = true
     override fun shouldDespawnInPeaceful() = false
     override fun canPickUpLoot() = true
     override fun wantsToPickUp(pStack: ItemStack) = false
 
-
-    override fun doPush(pEntity: Entity) {
-        if (hitboxMode != HitboxMode.EMPTY) super.doPush(pEntity)
-    }
-
-    override fun isPushable(): Boolean {
-        return super.isPushable() && hitboxMode == HitboxMode.PULLING
-    }
-
-    override fun canBeCollidedWith(): Boolean {
-        return hitboxMode == HitboxMode.BLOCKING && isAlive
-    }
 
     override fun aiStep() {
         updateSwingTime()
@@ -103,6 +90,7 @@ class NpcEntity : PathfinderMob {
     override fun addAdditionalSaveData(compound: CompoundTag) {
         super.addAdditionalSaveData(compound)
         compound.put(INVENTORY_KEY, CompoundTag().also { inventory.save(it, registryAccess()) })
+        if (npcNavigation.pilot.isAirborne) compound.putBoolean(FLYING_KEY, true)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -110,28 +98,22 @@ class NpcEntity : PathfinderMob {
         if (compound.contains(INVENTORY_KEY)) {
             inventory.load(compound.getCompound(INVENTORY_KEY), registryAccess())
         }
+        npcNavigation.pilot.restore(compound.getBoolean(FLYING_KEY))
     }
 
     override fun tickDeath() {
-        ++this.deathTime;
+        ++this.deathTime
 
         val c0 = this.deathTime >= this.maxDeathTime
         val c1 = !this.level().isClientSide()
         val c2 = !this.isRemoved
         if (c0 && c1 && c2) {
-            this.level().broadcastEntityEvent(this, 60);
-            this.remove(RemovalReason.KILLED);
+            this.level().broadcastEntityEvent(this, 60)
+            this.remove(RemovalReason.KILLED)
         }
     }
 
     val pickupDistance get() = pickupReach
-
-    var hitboxMode: HitboxMode
-        get() = hitboxComponent?.mode ?: HitboxMode.PULLING
-        set(value) {
-            set(HitboxComponent(value))
-        }
-
 
     fun seat() {
         SeatEntity.seat(this)
@@ -147,21 +129,20 @@ class NpcEntity : PathfinderMob {
 
     fun setAttributes(attributes: Map<String, Float>) {
         attributes.forEach { (attributeName, value) ->
-            BuiltInRegistries.ATTRIBUTE.getHolder(attributeName.rl).orElseThrow()
-                ?.let { attribute ->
-                    this.attributes.getInstance(attribute)?.let { instance ->
-                        instance.baseValue = value.toDouble()
-                    }
-                }
+            if (!value.isFinite()) return@forEach
+            val location = ResourceLocation.tryParse(attributeName) ?: return@forEach
+            val attribute = BuiltInRegistries.ATTRIBUTE.getHolder(location).orElse(null) ?: return@forEach
+            this.attributes.mutableAttributes.getOrCreate(attribute).baseValue = attribute.value().sanitizeValue(value.toDouble())
         }
     }
 
 
     companion object {
         private const val INVENTORY_KEY = "NpcInventory"
+        private const val FLYING_KEY = "NpcFlying"
 
         fun createAttributes(): AttributeSupplier.Builder {
-            return LivingEntity.createLivingAttributes()
+            return createLivingAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.23)
                 .add(Attributes.ARMOR, 0.0)

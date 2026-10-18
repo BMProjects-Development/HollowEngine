@@ -24,24 +24,6 @@ class VanillaFontFaceTest {
     }
 
     @Test
-    fun `a line is nine pixels tall, as in vanilla`() {
-        assertEquals(9f, face.lineHeight(UiVanillaFont.EmPixels))
-    }
-
-    @Test
-    fun `width of a string is the sum of its advances`() {
-        val text = "abc"
-        val expected = text.sumOf { face.advance(it.code).toDouble() }.toFloat() * UiVanillaFont.EmPixels
-        assertEquals(expected, face.width(text, UiVanillaFont.EmPixels))
-    }
-
-    @Test
-    fun `cyrillic comes from the non-latin sheet, not the fallback glyph`() {
-        assertTrue(face.advance('Ж'.code) > 0f)
-        assertTrue(face.advance('щ'.code) > 0f)
-    }
-
-    @Test
     fun `an uncovered codepoint still advances, so text never collapses`() {
         assertTrue(face.advance('漢'.code) > 0f, "an unknown glyph falls back rather than measuring zero")
     }

@@ -1,6 +1,6 @@
 ---
 title: Служебные методы
-order: 8
+order: 9
 ---
 
 <center><h1>Служебные методы</h1></center>
@@ -39,20 +39,18 @@ npc.despawn()
 
 Так как `NpcEntity` наследуется от Minecraft entity, также доступны стандартные методы `remove(...)`, `discard()`, `teleportTo(...)`, `setItemInHand(...)` и другие методы из Minecraft API.
 
-## Хитбокс
+## Тело
 
-У NPC есть удобное свойство `hitboxMode`:
-
-```kotlin
-npc.hitboxMode = HitboxMode.PULLING   // обычное столкновение и pushing
-npc.hitboxMode = HitboxMode.EMPTY     // сущность не мешает проходу
-npc.hitboxMode = HitboxMode.BLOCKING  // можно ходить по нему, как по блоку
-```
-
-Нужен импорт:
+Толкается ли NPC, не пускает ли других или пропускает их сквозь себя, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity). Без него NPC толкает и толкается, как мобы.
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+
+npc.set(BodyComponent(mode = BodyMode.PUSHING))   // толкает и толкается, как моб
+npc.set(BodyComponent(mode = BodyMode.EMPTY))     // другие проходят сквозь него
+npc.set(BodyComponent(mode = BodyMode.BLOCKING))  // не пускает других, на нём можно стоять
 ```
 
 ## Посадить и поднять NPC
@@ -149,6 +147,6 @@ val id = uuid("00000000-0000-0000-0000-000000000000")
 
 Старые методы из Katari/block-документации - например, `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)` и отдельные обёртки `attack(...)` не относятся к основному API v2.3.
 
-- Для анимаций используйте [`play`](/docs/hollowengine/scripting/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- Для анимаций используйте [`play`](/docs/hollowengine/models/animations) или action-метод [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
 - Для предметов в руках используйте Minecraft API `setItemInHand(...)` или [`equip`](/docs/hollowengine/scripting/npc/inventory).
-- Для внешнего вида используйте [`entity.materials`](/docs/hollowengine/scripting/models).
+- Для внешнего вида используйте [`entity.materials`](/docs/hollowengine/models).

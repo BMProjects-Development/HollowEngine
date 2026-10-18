@@ -56,6 +56,15 @@ class VfxHandle internal constructor(
         broadcast(VfxStopPacket(id, immediate))
     }
 
+    /**
+     * Moves the timeline of the effect to its event [name] and plays on from there, on every client that shows it.
+     * Rules of the timeline's sections are answered on the clients, which play the effect.
+     */
+    fun jumpTo(name: String) {
+        if (isStopped) return
+        broadcast(VfxJumpPacket(id, name))
+    }
+
     /** Writes a value the effect expressions can read as `d.<name>`. */
     operator fun <T : Any> set(key: DataKey<T>, value: T) {
         data[key] = value
@@ -120,6 +129,14 @@ class VfxPlayPacket(
 class VfxStopPacket(val handle: Int = 0, val immediate: Boolean = false) : HollowPacket {
     override fun handle(player: Player) {
         VfxScenes.stop(handle, immediate)
+    }
+}
+
+@Serializable
+@HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
+class VfxJumpPacket(val handle: Int = 0, val event: String = "") : HollowPacket {
+    override fun handle(player: Player) {
+        VfxScenes.jump(handle, event)
     }
 }
 

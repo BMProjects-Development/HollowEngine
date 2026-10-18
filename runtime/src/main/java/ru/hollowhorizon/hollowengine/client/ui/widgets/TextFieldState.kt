@@ -3,6 +3,10 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.SnapshotStep
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
@@ -30,10 +34,12 @@ class TextFieldState(
     caretColor: UiColor = DefaultTextFieldCaretColor,
     selectionColor: UiColor = DefaultTextFieldSelectionColor,
     textShadow: Shadow? = Shadow(offsetX = 1f, offsetY = 1f),
-    private val historyMergeWindowNanos: Long = TextFieldStateHistoryMergeWindowNanos,
-    private val nanoTime: () -> Long = System::nanoTime,
-) {
+    historyMergeWindowNanos: Long = TextFieldStateHistoryMergeWindowNanos,
+    nanoTime: () -> Long = System::nanoTime,
+) : UndoOwner {
     val scroll: UiScrollHandle = UiScrollHandle()
+    internal val autoScroll = TextFieldAutoScroll()
+    val folding = TextFieldFolding()
 
     var fontSize: Float by mutableStateOf(fontSize)
     var fontFamily: String? by mutableStateOf(fontFamily)
@@ -65,9 +71,8 @@ class TextFieldState(
     val selectionAnchor: Int? get() = primaryCaret.selectionAnchor
     val hasSelection: Boolean get() = caretRanges.any { it.hasSelection }
 
-    private val undoStack = ArrayDeque<TextFieldHistoryEntry>()
-    private val redoStack = ArrayDeque<TextFieldHistoryEntry>()
-    private var lastHistoryEditNanos = Long.MIN_VALUE
+    /** The text and carets before each burst of typing; a pause or a caret move starts the next one. */
+    override val history = UndoHistory(TextFieldStateHistoryLimit, mergeWindowNanos = historyMergeWindowNanos, nanoTime = nanoTime)
     private var restoringHistory = false
 
     fun insert(insertion: String): Boolean {
@@ -146,7 +151,8 @@ class TextFieldState(
         }
         val ranges = activeCaretRanges().mapNotNull { range ->
             if (range.position <= 0) null
-            else TextEditRange(if (word) wordLeft(text, range.position) else range.position - 1, range.position)
+            else TextEditRange(folding.visibleOffset(if (word) wordLeft(text, range.position) else range.position - 1,
+                range.position), range.position)
         }
         return replaceRanges(ranges, "")
     }
@@ -156,7 +162,8 @@ class TextFieldState(
         if (activeCaretRanges().any { it.hasSelection }) return replaceSelectedRanges("")
         val ranges = activeCaretRanges().mapNotNull { range ->
             if (range.position >= text.length) null
-            else TextEditRange(range.position, if (word) wordRight(text, range.position) else range.position + 1)
+            else TextEditRange(range.position, folding.visibleOffset(
+                if (word) wordRight(text, range.position) else range.position + 1, range.position))
         }
         return replaceRanges(ranges, "")
     }
@@ -189,33 +196,22 @@ class TextFieldState(
         val size = indentSize ?: return insert("\n")
         if (activeCaretRanges().any { it.hasSelection }) return insert("\n")
 
-        val position = caret.coerceIn(0, text.length)
-        val lineStart = if (position == 0) 0 else {
-            val lastLineBreak = text.lastIndexOf('\n', position - 1)
-            if (lastLineBreak < 0) 0 else lastLineBreak + 1
+        val edits = activeCaretRanges().map { newlineEdit(text, it.position, size) }
+            .distinctBy { it.start to it.end }.sortedBy { it.start }
+        if (edits.zipWithNext().any { (left, right) -> right.start < left.end }) return false
+        val carets = ArrayList<UiTextCaret>()
+        val next = buildString {
+            var cursor = 0
+            for (edit in edits) {
+                append(text, cursor, edit.start)
+                carets += UiTextCaret(length + edit.caretOffset)
+                append(edit.replacement)
+                cursor = edit.end
+            }
+            append(text, cursor, text.length)
         }
-        val lineEnd = text.indexOf('\n', position).let { if (it < 0) text.length else it }
-        val line = text.substring(lineStart, lineEnd)
-        val column = position - lineStart
-        val context = newlineIndentContext(lineStart, line, column, size)
-        val baseIndent = context.baseIndent
-        val beforeCaret = line.substring(0, column).trimEnd()
-        val afterCaret = line.substring(column).trimStart()
-        val opensBlock = beforeCaret.endsWith("{") || beforeCaret.endsWith("(") || beforeCaret.endsWith("[") ||
-                line.isBlank() && context.previousOpensBlock
-        val closesBlock = afterCaret.startsWith("}") || afterCaret.startsWith(")") || afterCaret.startsWith("]")
-
-        return if (opensBlock && closesBlock) {
-            val innerIndent = baseIndent + " ".repeat(size)
-            val changed = insert("\n$innerIndent\n$baseIndent")
-            if (changed) moveCarets({ range -> range.position - baseIndent.length - 1 })
-            changed
-        } else {
-            val nextIndent = if (opensBlock) baseIndent + " ".repeat(size) else baseIndent
-            insert("\n$nextIndent")
-        }
+        return applyEdit(next, carets)
     }
-
     /**
      * Applies a programmatic edit (e.g. accepting a completion item) as a single undoable step:
      * the whole next text plus the carets it should leave behind.
@@ -228,9 +224,11 @@ class TextFieldState(
             setCarets(carets)
             return false
         }
+        breakHistoryGroup()
         recordHistorySnapshot()
         text = normalized
-        setCaretsAfterEdit(carets)
+        setCaretsAndReveal(carets)
+        breakHistoryGroup()
         return true
     }
 
@@ -240,11 +238,7 @@ class TextFieldState(
         if (!filter.accepts(normalized)) return
         val changed = normalized != text
         text = normalized
-        if (changed) {
-            undoStack.clear()
-            redoStack.clear()
-            breakHistoryGroup()
-        }
+        if (changed) history.clear()
         if (moveCaretToEnd) setCarets(listOf(UiTextCaret(text.length)))
         else setCarets(caretRanges.map { it.coerceIn(text.length) })
     }
@@ -256,13 +250,13 @@ class TextFieldState(
     ) {
         val previous = primaryCaret
         val anchor = if (select) previous.selectionAnchor ?: previous.position else null
-        setCarets(listOf(UiTextCaret(position.coerceIn(0, text.length), anchor, inlayAffinity)))
+        setCaretsAndReveal(listOf(UiTextCaret(position.coerceIn(0, text.length), anchor, inlayAffinity)))
         if (caretRanges.last() != previous) breakHistoryGroup()
     }
 
     fun moveCarets(transform: (UiTextCaret) -> Int, select: Boolean = false) {
         val next = activeCaretRanges().map { range ->
-            val position = transform(range).coerceIn(0, text.length)
+            val position = folding.visibleOffset(transform(range).coerceIn(0, text.length), range.position)
             UiTextCaret(position, if (select) range.selectionAnchor ?: range.position else null)
         }
         setCarets(next)
@@ -274,7 +268,8 @@ class TextFieldState(
     ) {
         val next = activeCaretRanges().map { range ->
             val moved = transform(range).coerceIn(text.length)
-            moved.copy(selectionAnchor = if (select) range.selectionAnchor ?: range.position else null)
+            moved.copy(position = folding.visibleOffset(moved.position, range.position),
+                selectionAnchor = if (select) range.selectionAnchor ?: range.position else null)
         }
         setCarets(next)
     }
@@ -355,28 +350,16 @@ class TextFieldState(
     }
 
     fun setCarets(ranges: List<UiTextCaret>) {
+        folding.synchronizeText(text)
+        ranges.forEach { folding.reveal(it.position) }
         val previous = caretRanges
         applyCaretRanges(ranges)
         if (caretRanges != previous) caretVisibilityRevision++
     }
 
-    fun undo(): Boolean {
-        if (readOnly) return false
-        val entry = undoStack.removeLastOrNull() ?: return false
-        redoStack.addLast(historyEntry())
-        restoreHistory(entry)
-        breakHistoryGroup()
-        return true
-    }
+    fun undo(): Boolean = !readOnly && history.undo()
 
-    fun redo(): Boolean {
-        if (readOnly) return false
-        val entry = redoStack.removeLastOrNull() ?: return false
-        undoStack.addLast(historyEntry())
-        restoreHistory(entry)
-        breakHistoryGroup()
-        return true
-    }
+    fun redo(): Boolean = !readOnly && history.redo()
 
     private fun replaceSelectedRanges(replacement: String): Boolean {
         val ranges = activeCaretRanges().map { TextEditRange(it.selectionStart, it.selectionEnd) }
@@ -415,7 +398,7 @@ class TextFieldState(
             UiTextCaret(position)
         }
         text = nextValue
-        setCaretsAfterEdit(nextCarets)
+        setCaretsAndReveal(nextCarets)
         return true
     }
 
@@ -457,11 +440,11 @@ class TextFieldState(
             if (selectInserted && edit.replacement.isNotEmpty()) UiTextCaret(position, insertStart) else UiTextCaret(position)
         }
         text = nextValue
-        setCaretsAfterEdit(nextCarets)
+        setCaretsAndReveal(nextCarets)
         return true
     }
 
-    private fun setCaretsAfterEdit(ranges: List<UiTextCaret>) {
+    private fun setCaretsAndReveal(ranges: List<UiTextCaret>) {
         val previousRevision = caretVisibilityRevision
         setCarets(ranges)
         if (caretVisibilityRevision == previousRevision) caretVisibilityRevision++
@@ -519,40 +502,12 @@ class TextFieldState(
         return starts.toList()
     }
 
-    private fun newlineIndentContext(lineStart: Int, line: String, column: Int, indentSize: Int): NewlineIndentContext {
-        if (line.isNotBlank()) return NewlineIndentContext(line.takeWhile { it == ' ' }, previousOpensBlock = false)
-
-        var scanEnd = (lineStart - 1).coerceAtLeast(0)
-        while (scanEnd > 0) {
-            val previousStart = text.lastIndexOf('\n', scanEnd - 1).let { if (it < 0) 0 else it + 1 }
-            val previousLine = text.substring(previousStart, scanEnd)
-            if (previousLine.isNotBlank()) {
-                val indent = previousLine.takeWhile { it == ' ' }
-                val opens = previousLine.trimEnd().let { it.endsWith("{") || it.endsWith("(") || it.endsWith("[") }
-                return NewlineIndentContext(indent, opens)
-            }
-            scanEnd = (previousStart - 1).coerceAtLeast(0)
-            if (previousStart == 0) break
-        }
-        return NewlineIndentContext(" ".repeat((column / indentSize) * indentSize), previousOpensBlock = false)
-    }
-
     private fun recordHistorySnapshot() {
         if (restoringHistory) return
-        val now = nanoTime()
-        val entry = historyEntry()
-        val startsNewGroup = lastHistoryEditNanos == Long.MIN_VALUE || now - lastHistoryEditNanos > historyMergeWindowNanos
-        if (startsNewGroup && undoStack.lastOrNull() != entry) {
-            undoStack.addLast(entry)
-            while (undoStack.size > TextFieldStateHistoryLimit) undoStack.removeFirst()
-        }
-        lastHistoryEditNanos = now
-        redoStack.clear()
+        history.record(SnapshotStep(this, TypingLabel, historyEntry(), ::historyEntry, ::restoreHistory), TypingMergeKey)
     }
 
-    private fun breakHistoryGroup() {
-        lastHistoryEditNanos = Long.MIN_VALUE
-    }
+    private fun breakHistoryGroup() = history.breakMerge()
 
     private fun historyEntry(): TextFieldHistoryEntry = TextFieldHistoryEntry(text, caretRanges.toList())
 
@@ -569,7 +524,6 @@ class TextFieldState(
 
     private data class TextEditRange(val start: Int, val end: Int)
     private data class TextEdit(val range: TextEditRange, val replacement: String)
-    private data class NewlineIndentContext(val baseIndent: String, val previousOpensBlock: Boolean)
     private data class TextFieldHistoryEntry(val text: String, val caretRanges: List<UiTextCaret>)
 }
 
@@ -578,6 +532,8 @@ private val DefaultTextFieldSelectionColor = UiColor(0.28f, 0.54f, 0.95f, 0.35f)
 
 private const val TextFieldStateHistoryLimit = 128
 private const val TextFieldStateHistoryMergeWindowNanos = 600_000_000L
+private const val TypingMergeKey = "typing"
+private val TypingLabel = UndoLabel("${UndoLabel.LANG}.typing")
 private val AutoPairClosings = mapOf(
     '(' to ')',
     '[' to ']',

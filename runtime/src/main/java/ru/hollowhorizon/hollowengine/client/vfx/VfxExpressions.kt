@@ -1,12 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Coercions
-import ru.hollowhorizon.hollowengine.common.utils.expressions.CompiledUnit
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.References
-import ru.hollowhorizon.hollowengine.common.utils.expressions.mathNamespace
+import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import kotlin.random.Random
 
 /**

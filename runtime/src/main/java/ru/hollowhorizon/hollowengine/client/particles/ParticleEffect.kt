@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.particles
 
 import net.minecraft.client.renderer.texture.AbstractTexture
-import ru.hollowhorizon.hollowengine.client.audio.Wave
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
 import ru.hollowhorizon.hollowengine.client.particles.file.ParticleComponents
 import ru.hollowhorizon.hollowengine.client.utils.toTexture
+import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 class ParticleEffect(
@@ -16,7 +16,7 @@ class ParticleEffect(
     val events: Map<String, BedrockParticleFile.Event>,
     val texture: AbstractTexture?,
     val referencedEffects: Map<String, ParticleEffect>,
-    val referencedSounds: Map<String, Wave>,
+    val referencedSounds: Map<String, SoundSource>,
 ) {
     val renderPass = texture?.let { RenderPass(material, it) }
 

@@ -249,12 +249,6 @@ open class Config {
                 lastModified = currentModified
             }
         }
-
-        @JvmStatic
-        fun shutdown() {
-            saveExecutor.shutdown()
-            fileWatcher.close()
-        }
     }
 
     private data class FileWatcherEntry(val config: Config, val configPath: Path, val fileName: String)

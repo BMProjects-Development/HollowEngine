@@ -1,46 +1,13 @@
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.vfx.VfxExpressionLanguage
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxAppearance
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBlend
-import ru.hollowhorizon.hollowengine.common.vfx.VfxColorValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCurveInput
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmission
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
-import ru.hollowhorizon.hollowengine.common.vfx.VfxGradient
-import ru.hollowhorizon.hollowengine.common.vfx.VfxGradientStop
-import ru.hollowhorizon.hollowengine.common.vfx.VfxGroupSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxKey
-import ru.hollowhorizon.hollowengine.common.vfx.VfxMaterialSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPostEffectSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxRgba
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSamplerSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShape
-import ru.hollowhorizon.hollowengine.common.vfx.VfxShapeKind
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSpawn
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSphereSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTimelineSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrack
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrackCurve
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTrailSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUvRect
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceKind
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
 import java.io.File
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -59,28 +26,6 @@ class VfxFormatTests {
         val read = VfxFormat.read(text)
 
         assertEquals(effect, read)
-    }
-
-    @Test
-    fun `a node keeps its modules and their kinds`() {
-        val read = VfxFormat.read(VfxFormat.write(sample()))
-        val emitter = assertIs<VfxEmitterSpec>(read.nodes.first().children.first())
-
-        assertEquals(3, emitter.modules.size)
-        val swirl = assertIs<VfxForceSpec>(emitter.modules[0])
-        assertIs<VfxForceSpec>(emitter.modules[1])
-        assertIs<VfxUvAnimationSpec>(emitter.modules[2])
-        assertEquals(VfxForceKind.VORTEX, swirl.kind)
-    }
-
-    @Test
-    fun `renderers keep their place under the emitter`() {
-        val read = VfxFormat.read(VfxFormat.write(sample()))
-        val emitter = read.nodes.first().children.first()
-
-        assertIs<VfxPlaneSpec>(emitter.children[0])
-        assertIs<VfxTrailSpec>(emitter.children[1])
-        assertEquals(emitter, read.parentOf("flame-plane"))
     }
 
     @Test

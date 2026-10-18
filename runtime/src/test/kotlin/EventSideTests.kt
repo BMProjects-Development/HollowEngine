@@ -1,11 +1,7 @@
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import ru.hollowhorizon.hollowengine.common.events.ClientEvent
-import ru.hollowhorizon.hollowengine.common.events.Event
-import ru.hollowhorizon.hollowengine.common.events.LogicalSide
-import ru.hollowhorizon.hollowengine.common.events.ServerEvent
-import ru.hollowhorizon.hollowengine.common.events.StartupEvent
+import ru.hollowhorizon.hollowengine.common.events.*
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import kotlin.test.AfterTest
 import kotlin.test.Test

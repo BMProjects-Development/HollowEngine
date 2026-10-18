@@ -1,12 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec4f
 import ru.hollowhorizon.hollowengine.client.models.gltf.FloatAccessor
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfAccessor
 import ru.hollowhorizon.hollowengine.client.models.gltf.Vec3fAccessor
 import ru.hollowhorizon.hollowengine.client.models.gltf.Vec4fAccessor
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec4f
 
 /**
  * Sealed interface for animation channel data that supports multiple data sources.

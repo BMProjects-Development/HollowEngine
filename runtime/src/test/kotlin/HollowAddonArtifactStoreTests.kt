@@ -11,19 +11,8 @@ import ru.hollowhorizon.hollowengine.runtime.remap.PayloadRemapTable
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.jar.Attributes
-import java.util.jar.JarEntry
-import java.util.jar.JarFile
-import java.util.jar.JarInputStream
-import java.util.jar.JarOutputStream
-import java.util.jar.Manifest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import java.util.jar.*
+import kotlin.test.*
 
 class HollowAddonArtifactStoreTests {
     @Test

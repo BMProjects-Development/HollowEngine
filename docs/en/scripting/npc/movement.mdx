@@ -35,6 +35,7 @@ Movement functions return a `MoveResult`, so you can tell what actually happened
 | `MoveResult.Arrived` | The NPC reached the target distance. |
 | `MoveResult.Unreachable` | No path could be found for a while (see `unreachable` below). |
 | `MoveResult.TargetUnavailable` | The target entity disappeared, changed dimension, or its reference went stale (see `unavailableTarget` below). |
+| `MoveResult.Closest(reason, distance)` | The NPC stopped as close to the point as it got, `distance` blocks from it. `reason` says why (see [Getting as close as it can](#getting-as-close-as-it-can)). |
 
 ```kotlin
 val result = npc.move(player)
@@ -65,7 +66,11 @@ npc.move(
 | Field | Default | Meaning |
 |-------|---------|---------|
 | `speed` | `1.0` | Pathfinding movement speed. |
-| `arrivalDistance` | `1.5` | How close counts as "arrived". |
+| `arrivalDistance` | `1.5` | How close counts as "arrived". The NPC brakes to stop there. `0` walks it right onto the point, as close as it gets. |
+| `facing` | `Facing.Path` | Which way the NPC faces while it walks; see [Which way the NPC faces](#which-way-the-npc-faces). |
+| `passDistance` | `1.0` | How close a point the move passes through, rather than ends at, counts as passed; see [Walking through several points](#walking-through-several-points). |
+| `avoid` | none | Zones this move keeps out of; see [Keeping out of zones](#keeping-out-of-zones). |
+| `navigation` | none | Changes the NPC's [navigation settings](/docs/hollowengine/scripting/npc/navigation) for this move only. |
 | `repathIntervalTicks` | `10` | How often the NPC recalculates its path while walking. |
 | `targetMoveThreshold` | `1.0` | If a moving target (like a player) moves further than this since the last path, the NPC repaths immediately instead of waiting for the next interval. |
 | `stuckTimeoutTicks` | `60` | If the NPC hasn't made progress for this many ticks, it is considered stuck and forces a repath. |
@@ -73,12 +78,89 @@ npc.move(
 | `unreachable` | `WAIT_AND_RETRY` | What to do when no path can be found (see below). |
 | `unavailableTarget` | `WAIT_AND_RETRY` | What to do when the target entity is gone or invalid (see below). |
 
-Both policies work the same way: `WAIT_AND_RETRY` keeps trying forever (useful for "just get there eventually" scripted scenes), while `FAIL` gives up and returns `MoveResult.Unreachable` / `MoveResult.TargetUnavailable` so your script can decide what to do next.
+Both policies work the same way: `WAIT_AND_RETRY` keeps trying forever (useful for "just get there eventually" scripted scenes), while `FAIL` gives up and returns `MoveResult.Unreachable` / `MoveResult.TargetUnavailable`, or `MoveResult.Closest` with `NO_PATH` or `BLOCKED`, so your script can decide what to do next.
 
 ```kotlin
 enum class UnreachablePolicy { WAIT_AND_RETRY, FAIL }
 enum class UnavailableTargetPolicy { WAIT_AND_RETRY, FAIL }
 ```
+
+How the NPC finds its way and walks it, its jumps, its speed on straights and in turns, the blocks it walks around, is set up per NPC by its [Navigation component](/docs/hollowengine/scripting/npc/navigation).
+
+### Getting as close as it can
+
+A point the NPC's body cannot stand at, such as one inside a wall, in the air or too close to a fence for its width, is not waited at forever: the NPC walks to the nearest spot within two blocks of it where it can stand, and the move ends there with `MoveResult.Closest`. `reason` is one of:
+
+| `Shortfall` | Means | When |
+|-------------|-------|------|
+| `NO_ROOM` | The point has no room for the NPC; it stands on the nearest spot that has. | Always, whatever `unreachable` says. |
+| `NO_PATH` | No way leads to the point; the NPC went as far as a way does. | With `unreachable = FAIL`; with `WAIT_AND_RETRY` it waits there and keeps trying. |
+| `BLOCKED` | Something it can neither pass nor push aside stood in its way: walking got it nowhere twice in a row for `stuckTimeoutTicks`. | With `unreachable = FAIL`; with `WAIT_AND_RETRY` it keeps trying. |
+
+```kotlin
+when (val result = npc.move(pos(10, 64, 10), MoveOptions(arrivalDistance = 0.0, unreachable = UnreachablePolicy.FAIL))) {
+    MoveResult.Arrived -> npc.say("Here I am.")
+    is MoveResult.Closest -> when (result.reason) {
+        Shortfall.NO_ROOM -> npc.say("This is as close as I fit.")
+        Shortfall.NO_PATH -> npc.say("I can't find a way there.")
+        Shortfall.BLOCKED -> npc.say("Someone is in my way.")
+    }
+    else -> {}
+}
+```
+
+A point on the way, in [a walk through several points](#walking-through-several-points), that has no room counts as passed at the spot nearest it.
+
+### Walking through several points
+
+Give `move` a list of points and the NPC walks through them in turn without stopping at any but the last:
+
+```kotlin
+val route = listOf(pos(10, 64, 10), pos(20, 64, 10), pos(20, 64, 25))
+npc.move(route)
+npc.move(route, MoveOptions(passDistance = 2.0, arrivalDistance = 0.5))
+```
+
+A point before the last counts as passed once the NPC is within `passDistance` of it, and `arrivalDistance` is for the last one. The NPC plans its pace along the points still ahead, so it rounds a point like any other turn and brakes only for the last. To stand at a point for a while or look around there, use separate moves. `startMove(points)` is the background form.
+
+The patrol component (`hollowengine:patrol_path`) walks its points the same way: through those it does not wait at, without stopping.
+
+### Which way the NPC faces
+
+By default the NPC faces the way it walks. `facing` keeps it facing something else, and it walks sideways or backward as it has to, slower by the [backward and sideways speeds](/docs/hollowengine/scripting/npc/navigation#movement) of its settings:
+
+```kotlin
+npc.move(pos(0, 64, 5), MoveOptions(facing = Facing.at(player)))   // backs away from the player, keeping an eye on them
+npc.move(pos(0, 64, 5), MoveOptions(facing = Facing.at(pos(0, 64, 0))))
+npc.move(pos(0, 64, 5), MoveOptions(facing = Facing.Yaw(90f)))
+```
+
+| Value | Faces |
+|-------|-------|
+| `Facing.Path` | the way it walks |
+| `Facing.at(entity)` | the entity, for as long as it is there |
+| `Facing.at(position)` | the position |
+| `Facing.Yaw(degrees)` | a fixed direction, as vanilla counts yaw |
+
+A short walk to a point behind the NPC is taken backward on its own, without `facing`: see **Step back** in its [settings](/docs/hollowengine/scripting/npc/navigation#movement). For a jump over a gap the NPC turns to face the landing, and turns back once it is down. When the move ends, the NPC turns the rest of the way to what it faced before it is done.
+
+[`lookAt`](#looking-at-something) while the NPC walks works as `facing` too: the body turns to what it looks at and the NPC walks on sideways or backward. Whichever was asked for later wins, the look or the facing of the move, and once the look ends the facing of the move is back.
+
+### Keeping out of zones
+
+A `Zone` is a box or a sphere in the world. The NPC either never enters it or walks around it at a cost, in blocks of walking for every block of it it crosses; a block counts as in a zone when its middle is.
+
+```kotlin
+val yard = Zone.box(pos(0, 60, 0), pos(10, 70, 10))           // never enters
+val flowers = Zone.sphere(pos(5, 64, 20), 3.0, cost = 6f)     // walks around if it is worth it
+
+npc.move(pos(30, 64, 30), MoveOptions(avoid = listOf(yard, flowers)))   // for this move
+npc.avoid(yard)                                                          // for every way it walks
+npc.stopAvoiding(yard)
+npc.stopAvoidingAll()
+```
+
+A zone given to `avoid(...)` holds for every way the NPC walks, its goals included, until a script lets it in again. It is not saved with the NPC: a script that needs it after a reload adds it again. An NPC that stands in a zone it may not enter walks out of it the shortest way and does not come back.
 
 ### Stopping
 
@@ -97,7 +179,7 @@ npc.lookAt(pos(0, 64, 0))
 npc.lookAt(player)
 ```
 
-Smoothly turns the NPC's head and body toward a position or entity over about 1.5 seconds (this is the `suspend`, waiting form). Use `startLookingAt(...)` for the background form, and `clearLookTarget()` to cancel it early:
+Smoothly turns the NPC's head and body toward a position or entity over about 1.5 seconds (this is the `suspend`, waiting form). While the NPC walks, it turns its body to what it looks at and walks on sideways or backward, see [Which way the NPC faces](#which-way-the-npc-faces). Use `startLookingAt(...)` for the background form, and `clearLookTarget()` to cancel it early:
 
 ```kotlin
 npc.startLookingAt(player)  // does not wait

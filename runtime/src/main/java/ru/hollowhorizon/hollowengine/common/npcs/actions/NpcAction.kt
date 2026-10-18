@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.npcs.actions
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 
 @JvmInline
 value class NpcActionKey(val id: String) {

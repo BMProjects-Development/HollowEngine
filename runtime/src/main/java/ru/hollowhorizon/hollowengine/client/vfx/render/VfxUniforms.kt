@@ -2,13 +2,7 @@ package ru.hollowhorizon.hollowengine.client.vfx.render
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.ShaderInstance
-import ru.hollowhorizon.hollowengine.client.vfx.VfxColorSampler
-import ru.hollowhorizon.hollowengine.client.vfx.VfxEvalContext
-import ru.hollowhorizon.hollowengine.client.vfx.VfxFloatSampler
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeRuntime
-import ru.hollowhorizon.hollowengine.client.vfx.VfxRangeMode
-import ru.hollowhorizon.hollowengine.client.vfx.VfxSamplers
-import ru.hollowhorizon.hollowengine.client.vfx.VfxVec3Sampler
+import ru.hollowhorizon.hollowengine.client.vfx.*
 import ru.hollowhorizon.hollowengine.common.utils.MutableColor
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl

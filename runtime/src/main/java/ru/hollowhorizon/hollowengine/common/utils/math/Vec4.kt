@@ -5,7 +5,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.listSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
@@ -251,7 +250,7 @@ open class Vec4f(open val x: Float, open val y: Float, open val z: Float, open v
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4f> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Float>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Float>("hollowengine.Vec4f")
 
         override fun serialize(encoder: Encoder, value: Vec4f) {
             encoder.encodeCollection(descriptor, 4) {
@@ -264,13 +263,14 @@ open class Vec4f(open val x: Float, open val y: Float, open val z: Float, open v
 
         override fun deserialize(decoder: Decoder): Vec4f {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeFloatElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeFloatElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeFloatElement(descriptor, 2)
-            require(dec.decodeElementIndex(descriptor) == 3)
+            vector.expect(3)
             val w = dec.decodeFloatElement(descriptor, 3)
             dec.endStructure(descriptor)
             return Vec4f(x, y, z, w)
@@ -609,7 +609,7 @@ open class Vec4d(open val x: Double, open val y: Double, open val z: Double, ope
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4d> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Double>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Double>("hollowengine.Vec4d")
 
         override fun serialize(encoder: Encoder, value: Vec4d) {
             encoder.encodeCollection(descriptor, 4) {
@@ -622,13 +622,14 @@ open class Vec4d(open val x: Double, open val y: Double, open val z: Double, ope
 
         override fun deserialize(decoder: Decoder): Vec4d {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeDoubleElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeDoubleElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeDoubleElement(descriptor, 2)
-            require(dec.decodeElementIndex(descriptor) == 3)
+            vector.expect(3)
             val w = dec.decodeDoubleElement(descriptor, 3)
             dec.endStructure(descriptor)
             return Vec4d(x, y, z, w)
@@ -904,7 +905,7 @@ open class Vec4i(open val x: Int, open val y: Int, open val z: Int, open val w: 
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec4Serializer : KSerializer<Vec4i> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Int>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Int>("hollowengine.Vec4i")
 
         override fun serialize(encoder: Encoder, value: Vec4i) {
             encoder.encodeCollection(descriptor, 4) {
@@ -917,13 +918,14 @@ open class Vec4i(open val x: Int, open val y: Int, open val z: Int, open val w: 
 
         override fun deserialize(decoder: Decoder): Vec4i {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeIntElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeIntElement(descriptor, 1)
-            require(dec.decodeElementIndex(descriptor) == 2)
+            vector.expect(2)
             val z = dec.decodeIntElement(descriptor, 2)
-            require(dec.decodeElementIndex(descriptor) == 3)
+            vector.expect(3)
             val w = dec.decodeIntElement(descriptor, 3)
             dec.endStructure(descriptor)
             return Vec4i(x, y, z, w)

@@ -1,28 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.*
 import kotlinx.coroutines.isActive
 import ru.hollowhorizon.hollowengine.client.ui.Box
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.drawBehind
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import ru.hollowhorizon.hollowengine.common.vfx.VfxFacing
-import ru.hollowhorizon.hollowengine.common.vfx.VfxMeshSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSurfaceSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxTransform
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 /**
  * The material being edited on its own, turning slowly in an empty view.
  */
 @Composable
-internal fun VfxMaterialPreview(state: VfxEditorState, surface: VfxSurfaceSpec) {
+internal fun VfxMaterialPreview(state: VfxInspectorState, surface: VfxSurfaceSpec) {
     val preview = state.materialPreview
     val effect = remember(surface) { VfxEffect(nodes = listOf(previewNode(surface))) }
     val current by rememberUpdatedState(effect)

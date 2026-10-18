@@ -7,14 +7,20 @@ import net.minecraft.client.gui.screens.ChatScreen
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.montage.MontageEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph.ShaderGraphEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFilePanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditorPanel
+import ru.hollowhorizon.hollowengine.client.ui.ide.history.HistoryDock
+import ru.hollowhorizon.hollowengine.client.ui.ide.history.IdeHistories
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineDock
@@ -33,12 +39,11 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
-import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.hssColorLiteralText
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -66,10 +71,10 @@ internal const val SceneId = "ide-scene"
 internal const val InspectorId = "ide-inspector"
 internal const val GameViewportId = "ide-game-viewport"
 internal const val GameViewportNodeId = "game-viewport"
+internal const val HistoryId = "ide-history"
 
 private const val LayoutSaveDelayMillis = 600L
 
-private const val StripeShortcutCount = 9
 internal const val UiProfilerId = "ide-ui-profiler"
 internal const val LogoIcon = "hollowengine:textures/gui/logo/logo.svg"
 internal const val ProjectIcon = "hollowengine:textures/gui/icons/folder.svg"
@@ -94,9 +99,11 @@ object HollowIdeOverlay {
                     modifier = Modifier.size(100.percent, 100.percent),
                 )
             },
+            audioEditor = { file -> AudioFilePanel(file.path) },
             animatorEditor = { file -> HollowIdeAnimatorEditor(file) },
             rigEditor = { file -> RigEditorPanel(file) },
             vfxEditor = { file -> VfxEditorPanel(file) },
+            montageEditor = { file -> MontageEditorPanel(file) },
             shaderGraphEditor = { file -> ShaderGraphEditor(file) },
             textEditor = { file -> FileEditor(file) },
         )
@@ -104,6 +111,7 @@ object HollowIdeOverlay {
             imageEditor = { file -> HollowIdeImageEditor(file, file::save) },
             textEditor = { file -> FileEditor(file) },
             jsonModelEditor = { file -> VanillaModelEditorPanel(file.path) },
+            audioEditor = { file -> AudioFilePanel(file.path) },
         )
     }
     private val previews = HollowIdePreviewRegistry().apply { registerBuiltinPreviews() }
@@ -119,7 +127,7 @@ object HollowIdeOverlay {
     private var activeButton: Int? = null
     private var collapsed by mutableStateOf(true)
     private var hideToolbarConfirmationVisible by mutableStateOf(false)
-    private var shortcutsVisible by mutableStateOf(false)
+    private var keymapVisible by mutableStateOf(false)
     private val projectFilter = UiTreeFilterState(ProjectFilterInputId)
     private var openDropdown by mutableStateOf<String?>(null)
     private var statusText by mutableStateOf("")
@@ -145,8 +153,10 @@ object HollowIdeOverlay {
     private var editorAnalysisRevision by mutableStateOf(0)
     private val editorSessions = mutableMapOf<String, HollowIdeEditorSession>()
     private val editorStates = mutableMapOf<String, TextFieldState>()
+    private val histories = IdeHistories(model) { file -> editorStates[file.path]?.history }
     private val fileViews = mutableMapOf<String, HollowIdeFileView>()
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
+    private var gutterNavigation by mutableStateOf<List<GutterNavigationTarget>>(emptyList())
     private val dragAndDrop = UiDragAndDropState()
     private var refreshFilesRequested = false
     private val externalFiles = HollowIdeExternalFiles(
@@ -364,7 +374,7 @@ object HollowIdeOverlay {
         if (!isVisible()) return false
         if (isGameCaptured) return false
         pipeline.await()
-        val point = hollowIdeOverlayPoint(x, y)
+        val point = HollowIdePointerWrap.wrap(hollowIdeOverlayPoint(x, y))
         val deltaX = point.x - lastMouseX
         val deltaY = point.y - lastMouseY
         lastMouseX = point.x
@@ -388,7 +398,7 @@ object HollowIdeOverlay {
         if (nativeFileDragActive) return true
         if (!isVisible()) return false
         pipeline.await()
-        val point = hollowIdeOverlayPoint(x, y)
+        val point = HollowIdePointerWrap.wrap(hollowIdeOverlayPoint(x, y))
 
         settleGesture()
         return when (action) {
@@ -457,9 +467,20 @@ object HollowIdeOverlay {
         }
         if (action == GLFW.GLFW_PRESS || action == GLFW.GLFW_REPEAT) {
             pipeline.await()
-            surface.runtime.keyPressed(key, scanCode, modifiers, repeat = action == GLFW.GLFW_REPEAT)
+            val taken = surface.runtime.keyPressed(key, scanCode, modifiers, repeat = action == GLFW.GLFW_REPEAT)
+            if (!taken && action == GLFW.GLFW_PRESS) historyKey(key, modifiers)
         }
         return true
+    }
+
+    /**
+     * A key nothing in the editor took. Undo and redo go to the history of the focused window, or of the one
+     * focused before, wherever the focus was left: on the inspector, a toolbar, or nowhere.
+     */
+    private fun historyKey(key: Int, modifiers: Int) {
+        if (UndoKeys.direction(key, modifiers) == null) return
+        histories.follow(dock.focusedItemId)
+        UndoKeys.handle(histories.resolve(dock.focusedItemId)?.history, key, modifiers)
     }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean {
@@ -560,7 +581,22 @@ object HollowIdeOverlay {
         model.onFileRemoved = ::forgetFile
         contributions.start()
         restoreLayout()
+        surface.pointerWrap = HollowIdePointerWrap
         surface.setContent { Content() }
+        TagModuleRevision.observe(::rereadFilesSoon)
+    }
+
+    @Volatile
+    private var rereadPending = false
+
+    /** Reads the open files again once the kinds they are stored as have changed. */
+    private fun rereadFilesSoon() {
+        if (rereadPending) return
+        rereadPending = true
+        Minecraft.getInstance().execute {
+            rereadPending = false
+            model.rereadUnchangedFiles()
+        }
     }
 
     private fun restoreLayout() {
@@ -569,13 +605,24 @@ object HollowIdeOverlay {
         applyDefaultLayout()
     }
 
-    private fun toolWindow(id: String): HollowIdeToolWindow? = HollowIdeToolWindows.byId(id) ?: contributions.toolWindow(id)
+    private fun toolWindow(id: String): HollowIdeToolWindow? =
+        HollowIdeToolWindows.byId(id) ?: contributions.toolWindow(id)
 
     private fun restoreDockItem(itemId: String): DockItem? {
         toolWindow(itemId)?.let { return it.dockItem() }
         val path = fileDockItemPath(itemId) ?: return null
+        if (SourceDocumentPath.parse(path) is SourceDocumentPath.Decompiled) return restoreDecompiledDocument(path)
         val opened = model.openFile(path) as? HollowIdeOpenResult.File ?: return null
         return opened.file.dockItem()
+    }
+
+    /** The tab comes back at once; its text follows when the class has been decompiled again. */
+    private fun restoreDecompiledDocument(path: String): DockItem {
+        val file = model.openReadOnly(path, "")
+        editorSession(path).loadDocument { text ->
+            if (text != null) model.openReadOnly(path, text) else dock.close(file.id)
+        }
+        return file.dockItem()
     }
 
     private fun applyDefaultLayout() {
@@ -646,9 +693,9 @@ object HollowIdeOverlay {
         )
     }
 
-    private fun closeShortcuts(): Boolean {
-        if (!shortcutsVisible) return false
-        shortcutsVisible = false
+    private fun closeKeymap(): Boolean {
+        if (!keymapVisible) return false
+        keymapVisible = false
         return true
     }
 
@@ -722,7 +769,7 @@ object HollowIdeOverlay {
             modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").style("hollowengine:ui/styles/ide.hss")
                 .size(100.percent, 100.percent).focusScope().onKeyInput { input ->
                     val handled =
-                        !input.repeat && (input.key == GLFW.GLFW_KEY_ESCAPE && packaging.closeDialogs() || input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() || input.key == GLFW.GLFW_KEY_ESCAPE && closeShortcuts() || handleHollowIdeSearchKey(
+                        !input.repeat && (input.key == GLFW.GLFW_KEY_ESCAPE && packaging.closeDialogs() || input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() || input.key == GLFW.GLFW_KEY_ESCAPE && closeKeymap() || handleHollowIdeSearchKey(
                             search, input.key, input.modifiers, ::openSearchResult
                         ) || project.handleNameDialogKey(input.key) || handleSearchOverlayShortcut(
                             input.key, input.modifiers
@@ -734,7 +781,7 @@ object HollowIdeOverlay {
                             input.key, input.modifiers
                         ) || handleEditorShortcut(
                             input.key, input.modifiers
-                        ) || input.key == GLFW.GLFW_KEY_F4 && goToDefinition())
+                        ))
                     if (handled) input.consume()
                 }) {
             CompositionLocalProvider(LocalDragAndDrop provides dragAndDrop) {
@@ -748,8 +795,11 @@ object HollowIdeOverlay {
                             id = "ide-dock",
                             modifier = Modifier.size(100.percent, 0.px).grow(1f),
                             tabBarActions = { item ->
-                                if (item.id == ProjectTreeId) HollowIdeProjectActions(packaging)
-                                else fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
+                                when (item.id) {
+                                    SceneId -> SceneHeaderActions()
+                                    ProjectTreeId -> HollowIdeProjectActions(packaging)
+                                    else -> fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
+                                }
                             },
                             content = { item -> DockContent(item) },
                         )
@@ -762,8 +812,16 @@ object HollowIdeOverlay {
                     )
                     HollowIdeSearchDialog(search, ::openSearchResult)
                     HollowIdeProjectDialogs(packaging)
-                    HollowIdeShortcutsDialog(shortcutsVisible) { shortcutsVisible = false }
+                    HollowIdeKeymapDialog(keymapVisible) { keymapVisible = false }
                     EditorColorPickerPopup()
+                    if (gutterNavigation.isNotEmpty()) ContextMenu(
+                        id = "ide-gutter-navigation",
+                        anchorBounds = UiRect(lastMouseX, lastMouseY, 0f, 0f),
+                        items = gutterNavigation.map { (label, location) ->
+                            UiDropdownItem(label = label, onClick = { openDefinition(location) })
+                        },
+                        onExpandedChange = { if (!it) gutterNavigation = emptyList() },
+                    )
                     UiDragGhost(dragAndDrop)
                 }
                 HollowIdeHideToolbarDialog(
@@ -790,6 +848,8 @@ object HollowIdeOverlay {
         LaunchedEffect(focused) {
             if (focused != null) activeEditorPath = focused
         }
+        val focusedItem = dock.focusedItemId
+        LaunchedEffect(focusedItem) { histories.follow(focusedItem) }
     }
 
     private fun activeEditorFile(): HollowIdeOpenFile? {
@@ -931,7 +991,7 @@ object HollowIdeOverlay {
             ToolbarIconButton(
                 id = "ide-toolbar-search",
                 icon = SearchIcon,
-                tooltip = "$MenuLang.search".lang + " (Ctrl+N)",
+                tooltip = HollowKeys.SEARCH.hint("$MenuLang.search".lang),
                 onClick = ::openSearch,
             )
         }
@@ -964,8 +1024,12 @@ object HollowIdeOverlay {
             label = "hollowengine.gui.ide.windows".lang,
             expanded = openDropdown == "windows",
             onExpandedChange = { openDropdown = if (it) "windows" else null },
-            items = hollowIdeWindowMenuItems(model, dock, contributions.windowMenu(), ::applyDefaultLayout) +
-                contributions.menuItems(HollowIdeMenu.WINDOW),
+            items = hollowIdeWindowMenuItems(
+                model,
+                dock,
+                contributions.windowMenu(),
+                ::applyDefaultLayout
+            ) + contributions.menuItems(HollowIdeMenu.WINDOW),
         )
         UiDropdown(
             id = "ide-tools-menu",
@@ -991,8 +1055,9 @@ object HollowIdeOverlay {
             label = "hollowengine.gui.ide.help".lang,
             expanded = openDropdown == "help",
             onExpandedChange = { openDropdown = if (it) "help" else null },
-            items = hollowIdeHelpMenuItems(onShowShortcuts = { shortcutsVisible = true }) +
-                contributions.menuItems(HollowIdeMenu.HELP),
+            items = hollowIdeHelpMenuItems(onShowKeymap = { keymapVisible = true }) + contributions.menuItems(
+                HollowIdeMenu.HELP
+            ),
         )
     }
 
@@ -1012,9 +1077,11 @@ object HollowIdeOverlay {
             ConsoleId -> HollowIdeConsolePanel(console, currentProblems())
             TimelineId -> TimelineDock(keyboardActive = dock.focusedItemId == TimelineId)
 
-            SceneId -> SceneDock()
+            SceneId -> SceneDock(onFilterOpened = ::requestSurfaceFocus)
 
             InspectorId -> IdeInspectorDock()
+
+            HistoryId -> HistoryDock(histories, dock.focusedItemId)
 
             GameViewportId -> GameViewportDock(
                 active = isGameViewportActive,
@@ -1099,7 +1166,12 @@ object HollowIdeOverlay {
                 onShowInExplorer = project::showInExplorer,
                 onDelete = project::delete,
                 onDismiss = { project.closePopups() },
-                contributedActions = { menu -> contributions.projectActions(menu.path, menu.path.fromReadablePath().isDirectory) },
+                contributedActions = { menu ->
+                    contributions.projectActions(
+                        menu.path,
+                        menu.path.fromReadablePath().isDirectory
+                    )
+                },
             )
             val dialog = project.nameDialog
             HollowIdeProjectNameDialog(
@@ -1125,6 +1197,13 @@ object HollowIdeOverlay {
         val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
         val diagnostics = editorSession.diagnostics(file.text)
         val inlayHints = editorSession.inlayHints(file.text)
+        val structure = editorSession.structure(file.text)
+        val gutterMarkers = ideGutterMarkers(file, structure, { model.save(file.path) }) { offset ->
+            editorSession.resolveGutterTargets(file.text, offset) { targets ->
+                if (targets.size == 1) openDefinition(targets.single().location)
+                else gutterNavigation = targets
+            }
+        }
         val fontSize = HollowIdeFontSize.size
         val editorId = "editor-${file.id}"
         val find = findStates[file.path]
@@ -1169,6 +1248,8 @@ object HollowIdeOverlay {
                     signatureHelp = editorSession.signatures,
                     hoverInfo = editorSession.hover,
                     diagnostics = diagnostics,
+                    folds = structure.folds,
+                    gutterMarkers = gutterMarkers,
                     searchMatches = matches,
                     activeSearchMatch = find?.let { matches.getOrNull(it.currentIndex) },
                     inlayHints = inlayHints,
@@ -1257,7 +1338,7 @@ object HollowIdeOverlay {
         }
         val modelTypeId = assetFileTypeId(
             scope, asset.location.path, ByteArray(0), forceText
-        )?.takeIf { it == AssetJsonModelFileTypeId || it == "model" }
+        )?.takeIf { it == AssetJsonModelFileTypeId || it == AssetAudioFileTypeId || it == "model" }
         val bytes = if (modelTypeId != null) {
             ByteArray(0)
         } else {
@@ -1328,37 +1409,32 @@ object HollowIdeOverlay {
         }
     }
 
-    private fun handleDockShortcut(key: Int, modifiers: Int): Boolean {
-        val command = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-        if (!command || key != GLFW.GLFW_KEY_W) return false
-        return dock.closeFocused()
-    }
+    private fun handleDockShortcut(key: Int, modifiers: Int): Boolean =
+        HollowKeys.CLOSE_TAB.matches(key, modifiers) && dock.closeFocused()
 
     private fun handleStripeShortcut(key: Int, modifiers: Int): Boolean {
-        if (modifiers and GLFW.GLFW_MOD_ALT == 0) return false
-        if (modifiers and (GLFW.GLFW_MOD_CONTROL or GLFW.GLFW_MOD_SUPER) != 0) return false
-        val index = key - GLFW.GLFW_KEY_1
-        if (index < 0 || index >= StripeShortcutCount) return false
-        val side = if (modifiers and GLFW.GLFW_MOD_SHIFT != 0) DockSide.RIGHT else DockSide.LEFT
+        val left = HollowKeys.STRIPE_LEFT.indexOfFirst { it.matches(key, modifiers) }
+        val right = HollowKeys.STRIPE_RIGHT.indexOfFirst { it.matches(key, modifiers) }
+        val (side, index) = when {
+            left >= 0 -> DockSide.LEFT to left
+            right >= 0 -> DockSide.RIGHT to right
+            else -> return false
+        }
         val pinned = dock.pinnedOn(side).getOrNull(index) ?: return false
         dock.togglePinned(pinned.item.id)
         return true
     }
 
-    /** Ctrl+N opens the project-wide search overlay, wherever the focus is. */
+    /** Opens the project-wide search overlay, wherever the focus is. */
     private fun handleSearchOverlayShortcut(key: Int, modifiers: Int): Boolean {
-        if (modifiers and GLFW.GLFW_MOD_CONTROL == 0) return false
-        if (modifiers and GLFW.GLFW_MOD_SHIFT != 0 || modifiers and GLFW.GLFW_MOD_ALT != 0) return false
-        if (key != GLFW.GLFW_KEY_N) return false
+        if (!HollowKeys.SEARCH.matches(key, modifiers)) return false
         openSearch()
         return true
     }
 
     /** Project filtering must work even when the tree itself does not own keyboard focus. */
     private fun handleProjectFilterShortcut(key: Int, modifiers: Int): Boolean {
-        if (dock.focusedItemId != ProjectTreeId || key != GLFW.GLFW_KEY_F) return false
-        if (modifiers and GLFW.GLFW_MOD_CONTROL == 0) return false
-        if (modifiers and (GLFW.GLFW_MOD_SHIFT or GLFW.GLFW_MOD_ALT) != 0) return false
+        if (dock.focusedItemId != ProjectTreeId || !HollowKeys.FIND.matches(key, modifiers)) return false
         projectFilter.open()
         return true
     }
@@ -1375,24 +1451,19 @@ object HollowIdeOverlay {
     }
 
     /** Editor-wide shortcuts that work wherever the focus sits inside the IDE. */
-    private fun handleEditorShortcut(key: Int, modifiers: Int): Boolean {
-        val control = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-        val shift = modifiers and GLFW.GLFW_MOD_SHIFT != 0
-        val alt = modifiers and GLFW.GLFW_MOD_ALT != 0
-        if (key == GLFW.GLFW_KEY_F3 && !control && !alt) {
-            return focusedEditorFile()?.let { navigateFind(it, if (shift) -1 else 1) } == true
-        }
-        if (!control) return false
-        return when {
-            alt && key == GLFW.GLFW_KEY_L -> focusedEditorFile()?.let(::formatFile) == true
-            !alt && key == GLFW.GLFW_KEY_F -> openFind(replace = false)
-            !alt && key == GLFW.GLFW_KEY_R -> openFind(replace = true)
-            !alt && key == GLFW.GLFW_KEY_S -> focusedFile()?.let { file ->
-                model.save(file.path).also { dock.updateItem(file.dockItem()) }
-            } == true
+    private fun handleEditorShortcut(key: Int, modifiers: Int): Boolean = when {
+        HollowKeys.NEXT_MATCH.matches(key, modifiers) -> focusedEditorFile()?.let { navigateFind(it, 1) } == true
+        HollowKeys.PREVIOUS_MATCH.matches(key, modifiers) -> focusedEditorFile()?.let { navigateFind(it, -1) } == true
+        HollowKeys.FORMAT.matches(key, modifiers) -> focusedEditorFile()?.let(::formatFile) == true
+        HollowKeys.FIND.matches(key, modifiers) -> openFind(replace = false)
+        HollowKeys.REPLACE.matches(key, modifiers) -> openFind(replace = true)
+        HollowKeys.SAVE.matches(key, modifiers) -> focusedFile()?.let { file ->
+            model.save(file.path).also { dock.updateItem(file.dockItem()) }
+        } == true
 
-            else -> false
-        }
+        HollowKeys.DEFINITION.matches(key, modifiers) -> goToDefinition()
+        HollowKeys.KEYMAP.matches(key, modifiers) -> true.also { keymapVisible = true }
+        else -> false
     }
 
     /**
@@ -1636,7 +1707,8 @@ object HollowIdeOverlay {
         colorPicker = picker.copy(text = next, end = picker.start + literal.length, color = color)
     }
 
-    private fun openDefinition(definition: DefinitionLocation) {
+    private fun openDefinition(location: DefinitionLocation) {
+        val definition = location.withNormalizedLineSeparators()
         val file = if (definition.text != null || definition.readOnly) {
             model.openReadOnly(definition.path, definition.text.orEmpty())
         } else {

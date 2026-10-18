@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.utils
 
+import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.utils.Color.Companion.GAMMA_LINEAR_TO_sRGB
 import ru.hollowhorizon.hollowengine.common.utils.Color.Companion.GAMMA_sRGB_TO_LINEAR
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec4f
@@ -10,23 +11,11 @@ import ru.hollowhorizon.hollowengine.common.utils.math.toDeg
 import ru.hollowhorizon.hollowengine.common.utils.math.toRad
 import kotlin.math.*
 
-fun Vec3f.toColor(alpha: Float = 1f): Color = Color(x, y, z, alpha)
-fun Vec4f.toColor(): Color = Color(x, y, z, w)
-
+@Serializable
 open class Color(open val r: Float, open val g: Float, open val b: Float, open val a: Float = 1f) {
 
     val rgb: Vec3f
         get() = Vec3f(r, g, b)
-
-    /**
-     * This color's perceived brightness (assuming sRGB color space): r * 0.299f + g * 0.587f + b * 0.114f.
-     */
-    val brightness: Float get() = r * 0.299f + g * 0.587f + b * 0.114f
-
-    /**
-     * This color's perceived brightness (assuming linear color space): r * 0.2126f + g * 0.7152f + b * 0.0722f.
-     */
-    val luminanceLinear: Float get() = r * 0.2126f + g * 0.7152f + b * 0.0722f
 
     constructor(other: Color) : this(other.r, other.g, other.b, other.a)
     constructor(rgb: Vec3f, a: Float) : this(rgb.x, rgb.y, rgb.z, a)

@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.common.data
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import java.util.Collections
+import java.util.*
 
 /**
  * The persistent typed NBT document attached to any entity, players included:

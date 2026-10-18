@@ -69,27 +69,21 @@
 
 .dock-close-button {
     margin: 0px 4px 0px 2px;
-    border-radius: $radius-small;
-    background: transparent;
-    transition: background 100ms ease-out;
+    padding: 0px;
 }
 
-.dock-close-button:hover {
-    background: $bg-hover;
-}
-
-.dock-close-icon {
+/* The cross stays faint until its tab is hovered or selected, and turns white only under the pointer. */
+.dock-close-button .button-icon {
     size: 8px 8px;
     tint: $text-faint;
-    transition: tint 100ms ease-out;
 }
 
-.dock-tab:hover .dock-close-icon,
-.dock-tab.selected .dock-close-icon {
+.dock-tab:hover .dock-close-button .button-icon,
+.dock-tab.selected .dock-close-button .button-icon {
     tint: $text-soft;
 }
 
-.dock-close-button:hover .dock-close-icon {
+.dock-tab .dock-close-button:hover .button-icon {
     tint: $white;
 }
 

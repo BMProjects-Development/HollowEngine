@@ -6,9 +6,7 @@ data class StoryCompileResult(
     val program: StoryProgram?,
     val cst: StoryFileCst,
     val diagnostics: List<StoryDiagnostic>,
-) {
-    val succeeded: Boolean get() = program != null
-}
+)
 
 /**
  * Turns story text into a [StoryProgram]. Runs off the game thread: the result is cached by address
@@ -110,7 +108,10 @@ class StoryCompiler(
                 is StoryLineKind.If -> compileIfChain(nodes, i)
                 is StoryLineKind.Choice -> compileChoiceGroup(nodes, i)
                 is StoryLineKind.ElseIf, is StoryLineKind.Else -> {
-                    error("'@${if (node.line.kind is StoryLineKind.Else) "else" else "else-if"}' without a matching '@if'", node.line)
+                    error(
+                        "'@${if (node.line.kind is StoryLineKind.Else) "else" else "else-if"}' without a matching '@if'",
+                        node.line
+                    )
                     i + 1
                 }
 
@@ -315,11 +316,15 @@ class StoryCompiler(
         val syncPc = (bodyStart until bodyEnd).firstOrNull { instructions[it] is StoryInstruction.Sync } ?: bodyEnd
         for (pc in bodyStart until syncPc) {
             when (instructions[pc]) {
-                is StoryInstruction.Say ->
-                    errorAt("Dialogue lines are not allowed inside '@async' before '@sync'", instructions[pc].anchor)
+                is StoryInstruction.Say -> errorAt(
+                    "Dialogue lines are not allowed inside '@async' before '@sync'",
+                    instructions[pc].anchor
+                )
 
-                is StoryInstruction.Menu ->
-                    errorAt("Choices are not allowed inside '@async' before '@sync'", instructions[pc].anchor)
+                is StoryInstruction.Menu -> errorAt(
+                    "Choices are not allowed inside '@async' before '@sync'",
+                    instructions[pc].anchor
+                )
 
                 else -> {}
             }
@@ -362,8 +367,11 @@ class StoryCompiler(
             val viable = overloads.filter { matches(it, positional, named) }
             if (viable.isEmpty()) {
                 error(
-                    "No overload of '@${kind.function}' accepts these arguments " +
-                        "(candidates: ${overloads.joinToString(", ") { describe(it) }})",
+                    "No overload of '@${kind.function}' accepts these arguments " + "(candidates: ${
+                        overloads.joinToString(
+                            ", "
+                        ) { describe(it) }
+                    })",
                     line,
                 )
             } else {
@@ -419,7 +427,7 @@ class StoryCompiler(
         for (part in template.parts) {
             if (part is TextPart.InlineCall && catalog.overloads(part.call.function) == null) {
                 diagnostics.warning(
-                    "Unknown inline command '[${part.call.function}]' — it must be registered before the story runs",
+                    "Unknown inline command '[${part.call.function}]'. It must be registered before the story runs.",
                     part.span,
                 )
             }

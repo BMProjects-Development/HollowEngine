@@ -26,10 +26,10 @@ class SimpleDeclarationProviderFactory(
     private val projectEnvironment: KotlinCoreProjectEnvironment,
     private val builtins: Builtins,
     private val binaryRoots: List<Path>,
+    private val projectStructureProvider: ProjectStructureProviderImpl,
 ) : KotlinDeclarationProviderFactory {
-
-    // Храним список активных скриптов, чтобы искать в них объявления
-    private val registeredScripts = mutableListOf<KtFile>()
+    private val sourceFiles: List<KtFile>
+        get() = projectStructureProvider.allSourceFiles.filterIsInstance<KtFile>()
 
     private val virtualFiles = getVirtualFilesByRoots(binaryRoots, projectEnvironment)
     internal val javaClassNameIndex = JavaClassNameIndex(virtualFiles)
@@ -49,23 +49,19 @@ class SimpleDeclarationProviderFactory(
         skipBuiltins = true
     )
 
-    fun registerScript(file: KtFile) {
-        registeredScripts.add(file)
-    }
-
     /**
-     * Classes that name [superName] among their supertypes, from the libraries and from the scripts
+     * Classes that name [superName] among their supertypes, from the libraries and from the sources
      * that are open. Feeds [HollowDirectInheritorsProvider]; see it for why this is not simply
      * `KotlinStandaloneFirDirectInheritorsProvider`.
      */
     fun directInheritorCandidates(superName: Name): Set<KtClassOrObject> =
-        binaryFactory.getDirectInheritorCandidates(superName) + scriptCandidates(superName)
+        binaryFactory.getDirectInheritorCandidates(superName) + sourceCandidates(superName)
 
     fun inheritableTypeAliases(superName: Name): Set<KtTypeAlias> =
         binaryFactory.getInheritableTypeAliases(superName)
 
-    private fun scriptCandidates(superName: Name): List<KtClassOrObject> =
-        registeredScripts.flatMap { file ->
+    private fun sourceCandidates(superName: Name): List<KtClassOrObject> =
+        sourceFiles.flatMap { file ->
             file.collectDescendantsOfType<KtClassOrObject>().filter { candidate ->
                 candidate.superTypeListEntries.any { entry ->
                     entry.typeAsUserType?.referencedName == superName.asString()
@@ -79,16 +75,13 @@ class SimpleDeclarationProviderFactory(
     ): KotlinDeclarationProvider {
         val providers = mutableListOf<KotlinDeclarationProvider>()
 
-        // 1. Добавляем провайдер для библиотек
-        providers.add(binaryFactory.createDeclarationProvider(scope, contextualModule))
-        providers.add(builtins.symbolProvider.createDeclarationProvider(scope, contextualModule))
-        // 2. Добавляем провайдеры для скриптов
-        // Проходимся по всем скриптам. Если скрипт попадает в область видимости (scope) — создаем для него провайдер.
-        registeredScripts.forEach { ktFile ->
+        sourceFiles.forEach { ktFile ->
             if (scope.contains(ktFile.virtualFile)) {
                 providers.add(KotlinFileBasedDeclarationProvider(ktFile))
             }
         }
+        providers.add(binaryFactory.createDeclarationProvider(scope, contextualModule))
+        providers.add(builtins.symbolProvider.createDeclarationProvider(scope, contextualModule))
 
         return KotlinCompositeDeclarationProvider.create(providers)
     }

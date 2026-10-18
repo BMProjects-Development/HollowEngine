@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat3f
 import net.minecraft.client.Minecraft
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.EquipmentSlot
@@ -10,6 +9,7 @@ import org.joml.Quaternionf
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix3f
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat3f
 
 class ItemNode(val entity: () -> LivingEntity?, val slot: EquipmentSlot, parent: Attachment?): Attachment(parent) {
     override fun collectCommands(pipeline: RenderPipeline) {

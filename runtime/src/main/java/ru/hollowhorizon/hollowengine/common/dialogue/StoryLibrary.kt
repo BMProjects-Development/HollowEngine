@@ -17,10 +17,6 @@ class StoryLoadException(message: String, cause: Throwable? = null) : RuntimeExc
 /**
  * Loads and compiles stories, and keeps the results. Compilation happens once per address and text:
  * playback never parses.
- *
- * Localisation is resolved here. A story is looked up as `<base>.<locale>.story` first and falls back
- * to the base file, because a translation is a full story of its own. Translators may split a line
- * in two where the language needs it.
  */
 class StoryLibrary(
     private val catalog: () -> StoryFunctionCatalog = { StoryFunctionCatalog.PERMISSIVE },
@@ -56,8 +52,7 @@ class StoryLibrary(
                 return LoadedStory(localized, locale, compile(localized, source))
             }
         }
-        val source = readSource(address)
-            ?: throw StoryLoadException("Story '$address' not found")
+        val source = readSource(address) ?: throw StoryLoadException("Story '$address' not found")
         return LoadedStory(address, null, compile(address, source))
     }
 
@@ -67,8 +62,7 @@ class StoryLibrary(
         return compile(address, source)
     }
 
-    private fun readSource(address: String): String? =
-        providers.asReversed().firstNotNullOfOrNull { it.read(address) }
+    private fun readSource(address: String): String? = providers.asReversed().firstNotNullOfOrNull { it.read(address) }
 
     private fun compile(address: String, source: String): StoryProgram {
         val hash = StoryCompiler.hash(source)
@@ -97,9 +91,7 @@ class StoryLibrary(
 }
 
 data class LoadedStory(
-    /** The address actually loaded — the localized file when one exists. */
     val address: String,
-    /** The locale that was used, or null when the base story was loaded. */
     val locale: String?,
     val program: StoryProgram,
 )

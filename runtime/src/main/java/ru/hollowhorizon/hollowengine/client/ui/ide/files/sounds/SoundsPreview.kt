@@ -2,11 +2,14 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.sounds.SoundDecoders
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
+import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
+import ru.hollowhorizon.hollowengine.client.ui.inspector.ToggleRow
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -255,12 +258,12 @@ private fun SoundCard(
             SoundsIconButton(RemoveIcon, tags = listOf("sounds-editor-sound-delete"), onClick = onDelete)
         }
 
-        SliderRow(key("volume").lang, sound.volume, 0f, 1f) { sound.volume = it; onChanged() }
-        SliderRow(key("pitch").lang, sound.pitch, 0.5f, 2f) { sound.pitch = it; onChanged() }
+        NumberRow(key("volume").lang, sound.volume, min = 0f, max = 1f, slider = true) { sound.volume = it; onChanged() }
+        NumberRow(key("pitch").lang, sound.pitch, min = 0.5f, max = 2f, slider = true) { sound.pitch = it; onChanged() }
 
         Row(modifier = Modifier.size(100.percent, 22.px).gap(6.px).alignItems(vertical = UiAlign.CENTER)) {
-            IntRow(key("weight").lang, sound.weight, min = 1) { sound.weight = it; onChanged() }
-            IntRow(key("attenuation").lang, sound.attenuationDistance, min = 0) { sound.attenuationDistance = it; onChanged() }
+            NumberRow(key("weight").lang, sound.weight, min = 1) { sound.weight = it; onChanged() }
+            NumberRow(key("attenuation").lang, sound.attenuationDistance, min = 0) { sound.attenuationDistance = it; onChanged() }
         }
 
         Row(modifier = Modifier.size(100.percent, 20.px).gap(10.px).alignItems(vertical = UiAlign.CENTER)) {
@@ -296,32 +299,12 @@ private fun LabeledField(label: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SoundsButton(labelKey: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(
-        tags = listOf("sounds-editor-button"),
-        modifier = modifier.cursor(UiCursorShape.HAND).alignItems(UiAlign.CENTER, UiAlign.CENTER).gap(4.px)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    ) {
-        Image(icon, tags = listOf("sounds-editor-button-icon"))
-        Text(labelKey.lang, tags = listOf("sounds-editor-button-label"))
-    }
-}
+private fun SoundsButton(labelKey: String, icon: String, modifier: Modifier = Modifier, onClick: () -> Unit) =
+    Button(labelKey.lang, icon = icon, modifier = modifier, onClick = onClick)
 
 @Composable
-private fun SoundsIconButton(icon: String, tags: List<String>, onClick: () -> Unit) {
-    Image(
-        icon,
-        tags = listOf("sounds-editor-icon-button") + tags,
-        modifier = Modifier.size(16.px, 16.px).cursor(UiCursorShape.HAND)
-            .onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onClick()
-                event.consume()
-            },
-    )
-}
+private fun SoundsIconButton(icon: String, tags: List<String>, onClick: () -> Unit) =
+    IconButton(icon, tooltip = null, tags = listOf("inline", "danger") + tags, modifier = Modifier.size(16.px, 16.px), onClick = onClick)
 
 /** Enumerates audio files under `<namespace>/sounds/` as `namespace:path` ids for name suggestions. */
 private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<String> {
@@ -329,7 +312,7 @@ private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<S
     val soundsRoot = runCatching { "$namespaceDir/sounds".fromReadablePath() }.getOrNull() ?: return emptyList()
     if (!soundsRoot.isDirectory) return emptyList()
     return soundsRoot.walkTopDown()
-        .filter { it.isFile && it.extension.lowercase() in AudioExtensions }
+        .filter { it.isFile && it.extension.lowercase() in SoundDecoders.extensions }
         .map { relativeSoundId(soundsRoot, it, namespace) }
         .distinct()
         .sorted()
@@ -338,7 +321,7 @@ private fun scanAvailableSounds(namespaceDir: String, namespace: String): List<S
 
 private fun relativeSoundId(root: File, file: File, namespace: String): String {
     val relative = root.toPath().relativize(file.toPath()).toString().replace('\\', '/')
-    val withoutExtension = relative.substringBeforeLast('.')
+    val withoutExtension = if (file.extension.lowercase() == "ogg") relative.substringBeforeLast('.') else relative
     return "$namespace:$withoutExtension"
 }
 
@@ -349,5 +332,3 @@ private fun sanitizeEventName(input: String): String =
 /** Same as [sanitizeEventName] but also allows the `:` namespace separator. */
 private fun sanitizeSoundName(input: String): String =
     input.lowercase().filter { it in 'a'..'z' || it in '0'..'9' || it in "_./-:" }
-
-private val AudioExtensions = setOf("ogg", "wav", "mp3")

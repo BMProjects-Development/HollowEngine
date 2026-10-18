@@ -2,19 +2,21 @@ package ru.hollowhorizon.hollowengine.client.ui.layout
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
-import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
 import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 
 class DockedScrollRangeTest {
-    private fun box(vararg mods: Modifier, policy: UiMeasurePolicy = UiMeasurePolicies.box(), id: String? = null): BoxNode =
-        BoxNode(id = id, measurePolicy = policy, modifiers = mods.toList())
+    private fun box(
+        vararg mods: Modifier,
+        policy: UiMeasurePolicy = UiMeasurePolicies.box(),
+        id: String? = null,
+    ): BoxNode = BoxNode(id = id, measurePolicy = policy, modifiers = mods.toList())
 
     private fun col(vararg mods: Modifier, id: String? = null) = box(*mods, policy = UiMeasurePolicies.Column, id = id)
 
     private fun scrollRangeYWith(shellHeight: UiLength?): Float {
-        val scrollable = box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
+        val scrollable =
+            box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
         scrollable.children.add(box(Modifier.size(100.percent, 600.px)))
         val editorStack = box(Modifier.grow(1f), policy = UiMeasurePolicies.box(UiBoxMode.STACK))
         editorStack.children.add(scrollable)
@@ -68,28 +70,30 @@ class DockedScrollRangeTest {
     }
 
     private fun scrollRangeHssShell(): Float {
-        val scrollable = box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
+        val scrollable =
+            box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
         scrollable.children.add(box(Modifier.size(100.percent, 600.px)))
         val editorStack = box(Modifier.grow(1f), policy = UiMeasurePolicies.box(UiBoxMode.STACK))
         editorStack.children.add(scrollable)
-        val shell = col(id = "shell") // NO size modifier — size comes only from HSS
-        shell.tags.add("ide-editor-shell")
-        shell.children.add(editorStack)
+        val shell = col(id = "shell").apply {
+            tags.add("ide-editor-shell")
+            children.add(editorStack)
+        }
         val contentBox = box(Modifier.size(100.percent, 0.px).grow(1f).clip(), id = "content")
         contentBox.children.add(shell)
         val stackCol = col(Modifier.size(100.percent, 100.percent), id = "stack")
         stackCol.children.add(box(Modifier.size(100.percent, 20.px)))
         stackCol.children.add(contentBox)
         val sheet = ru.hollowhorizon.hollowengine.client.ui.style.compileHss(".ide-editor-shell { size: fill fill; }")
-        // Apply the stylesheet SCOPED via .style() on the root, like the real IDE (#ide-root).
         val space = box(Modifier.style(sheet).size(100.percent, 100.percent).clip(), id = "space")
         space.children.add(stackCol)
-        ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver().resolve(space)
+        UiModifierResolver().resolve(space)
         return UiLayoutPipeline().compute(space, 300f, 300f, UiScrollState()).nodes.getValue(scrollable).scrollRange.y
     }
 
     private fun scrollRangeNestedScopes(): Float {
-        val scrollable = box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
+        val scrollable =
+            box(Modifier.size(100.percent, 100.percent).then(scrollModifier(horizontal = false)), id = "editor")
         scrollable.children.add(box(Modifier.size(100.percent, 600.px)))
         val editorStack = box(Modifier.grow(1f), policy = UiMeasurePolicies.box(UiBoxMode.STACK))
         editorStack.children.add(scrollable)
@@ -100,14 +104,16 @@ class DockedScrollRangeTest {
         val stackCol = col(Modifier.size(100.percent, 100.percent), id = "stack")
         stackCol.children.add(box(Modifier.size(100.percent, 20.px)))
         stackCol.children.add(contentBox)
-        // DockSpace applies its own stylesheet (nested scope).
         val docking = ru.hollowhorizon.hollowengine.client.ui.style.compileHss(".dock-space { gap: 0px; }")
-        val dockSpace = box(Modifier.style(docking).size(100.percent, 100.percent).clip(), id = "dock").also { it.tags.add("dock-space") }
+        val dockSpace = box(
+            Modifier.style(docking).size(100.percent, 100.percent).clip(),
+            id = "dock"
+        ).also { it.tags.add("dock-space") }
         dockSpace.children.add(stackCol)
         val ide = ru.hollowhorizon.hollowengine.client.ui.style.compileHss(".ide-editor-shell { size: fill fill; }")
         val ideRoot = box(Modifier.style(ide).size(100.percent, 100.percent), id = "ide-root")
         ideRoot.children.add(dockSpace)
-        ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver().resolve(ideRoot)
+        UiModifierResolver().resolve(ideRoot)
         return UiLayoutPipeline().compute(ideRoot, 300f, 300f, UiScrollState()).nodes.getValue(scrollable).scrollRange.y
     }
 

@@ -15,6 +15,8 @@ object InspectorLang {
     val search: String get() = (ROOT + "search").lang
     val nothingFound: String get() = (ROOT + "nothing_found").lang
     val close: String get() = (ROOT + "close").lang
+    val animate: String get() = (ROOT + "animate").lang
+    val stopAnimating: String get() = (ROOT + "stop_animating").lang
 
     fun assetMissing(path: String): String = (ROOT + "asset_missing").lang.format(path)
     fun useAsset(path: String): String = (ROOT + "asset_use").lang.format(path)
@@ -26,7 +28,6 @@ internal object InspectorIcons {
     const val ADD = "hollowengine:textures/gui/icons/add.svg"
     const val REMOVE = "hollowengine:textures/gui/icons/remove.svg"
     const val FOLDER = "hollowengine:textures/gui/icons/folder.svg"
-    const val HELP = "hollowengine:textures/gui/icons/docs.svg"
     const val SEARCH = "hollowengine:textures/gui/icons/search.svg"
     const val CLOSE = "hollowengine:textures/gui/icons/cross.svg"
 }

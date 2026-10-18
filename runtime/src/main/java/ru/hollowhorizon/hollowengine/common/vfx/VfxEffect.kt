@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.vfx
 
 import kotlinx.serialization.Serializable
+import ru.hollowhorizon.hollowengine.common.playback.PlaybackSection
+import ru.hollowhorizon.hollowengine.common.playback.TimelineEvent
 
 /** One authored effect: a tree of nodes and timeline that drives them. */
 @Serializable
@@ -18,7 +20,9 @@ data class VfxEffect(
     fun parentOf(id: String): VfxNodeSpec? = walk().firstOrNull { parent -> parent.children.any { it.id == id } }
 
     /** Every expression in the file, so they compile as one unit. */
-    fun expressions(): List<String> = walk().flatMap { it.expressions() }.filter { it.isNotBlank() }.distinct()
+    fun expressions(): List<String> =
+        (walk().flatMap { it.expressions() } + timeline.sections.flatMap(PlaybackSection::conditions))
+            .filter { it.isNotBlank() }.distinct()
 
     /** The effect with [node] put in place of the node with the same id, wherever it sits. */
     fun withNode(node: VfxNodeSpec): VfxEffect = copy(nodes = nodes.map { it.replacing(node) })
@@ -155,9 +159,14 @@ data class VfxTimelineSpec(
     val duration: Float = 5f,
     val loop: Boolean = true,
     val tracks: List<VfxTrack> = emptyList(),
+    val events: List<TimelineEvent> = emptyList(),
+    val sections: List<PlaybackSection> = emptyList(),
 ) {
     fun track(node: String, property: VfxProperty): VfxTrack? =
         tracks.firstOrNull { it.node == node && it.property == property }
 
     val isEmpty: Boolean get() = tracks.isEmpty()
+
+    /** Whether any section has rules, so the timeline does not simply run from start to end. */
+    val hasRules: Boolean get() = sections.any(PlaybackSection::hasRules)
 }

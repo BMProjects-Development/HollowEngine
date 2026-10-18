@@ -62,15 +62,19 @@ object StandardPlayerAnimatorPreset {
             speed = AnimationExpression(stateSpeedExpression(animation)),
         )
 
+    /**
+     * A gait plays as fast as its feet have to move to keep up with the ground: the entity's speed over the
+     * speed a planted foot of the clip sweeps back at. Signed, so walking backward plays it backward.
+     */
     private fun stateSpeedExpression(animation: String): String =
         when (animation) {
-            "walk",
-            "run",
-            "sneak",
-                -> "movement_animation_speed / 2.0"
-
+            "walk", "sneak" -> "movement_animation_speed / $WALK_GROUND_SPEED"
+            "run" -> "movement_animation_speed / $RUN_GROUND_SPEED"
             else -> "1"
         }
+
+    private const val WALK_GROUND_SPEED = 1.43
+    private const val RUN_GROUND_SPEED = 3.19
 
     private fun locomotionTransitions(): List<AnimationControllerTransitionSpec> = listOf(
         transition("death", "death_progress > 0.0", priority = 100, duration = "0.1"),

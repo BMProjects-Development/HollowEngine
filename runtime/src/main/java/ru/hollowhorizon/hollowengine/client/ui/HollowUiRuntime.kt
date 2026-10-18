@@ -95,7 +95,6 @@ data class HollowUiFrame(
 
     fun nodeByIdentifier(identifier: String): UiNode? = nodesByIdentifier[identifier]
 
-    fun nodeByKey(key: String): UiNode? = nodeByIdentifier(key)
 }
 
 internal fun UiLayoutNode.inputContains(x: Float, y: Float): Boolean {
@@ -270,9 +269,12 @@ class HollowUiRuntime(
                 if (profile != null) profile.layoutReuses++
                 lastLayout!!
             }
+
             else -> scrolledOnly(layoutKey)?.let { previous ->
                 layoutPipeline.rescroll(root, previous, scrollState, profile)
             } ?: layoutPipeline.compute(root, width, height, scrollState, profile)
+        }.let { placed ->
+            if (scrollState.takeSettled()) layoutPipeline.rescroll(root, placed, scrollState, profile) ?: placed else placed
         }
         lastLayout = layout
         lastLayoutKey = layoutKey
@@ -297,10 +299,8 @@ class HollowUiRuntime(
 
     /**
      * Processes an input against [frame] (always the last presented frame). Input is handled
-     * synchronously — not deferred to the next built frame — so callers get an accurate
-     * "handled" result, and the click/drag hit-tests the layout the user actually saw. Only
-     * the layout rebuild is per-frame; dispatching a handful of events against the existing
-     * layout is cheap.
+     * synchronously, not deferred to the next built frame. Only layout rebuild is per-frame;
+     * dispatching a handful of events against the existing layout is cheap.
      */
     private fun processInput(frame: HollowUiFrame, input: QueuedUiInput): UiInputResult {
         return when (input) {
@@ -329,10 +329,7 @@ class HollowUiRuntime(
 
             is QueuedUiInput.MouseScrolled -> handleQueuedScroll(frame, input)
             is QueuedUiInput.CharTyped -> this.input.charTyped(
-                frame,
-                input.codePoint,
-                input.modifiers,
-                ::dispatchUiEvent
+                frame, input.codePoint, input.modifiers, ::dispatchUiEvent
             )
 
             is QueuedUiInput.KeyPressed -> this.input.keyPressed(
@@ -496,11 +493,10 @@ class HollowUiRuntime(
     fun mouseClicked(mouseX: Float, mouseY: Float, button: Int, modifiers: Int = 0): Boolean = profileInput {
         val frame = lastFrame ?: return@profileInput false
         processInput(frame, QueuedUiInput.MouseClicked(mouseX, mouseY, button, modifiers)).orConsumed(
-                frame.hitsVisible(
-                    mouseX,
-                    mouseY
-                )
+            frame.hitsVisible(
+                mouseX, mouseY
             )
+        )
     }
 
     fun mouseReleased(mouseX: Float, mouseY: Float, button: Int, modifiers: Int = 0): Boolean =
@@ -532,8 +528,7 @@ class HollowUiRuntime(
     ): Boolean = profileInput {
         val frame = lastFrame ?: return@profileInput false
         processInput(
-            frame,
-            QueuedUiInput.MouseScrolled(mouseX, mouseY, scrollX, scrollY, modifiers)
+            frame, QueuedUiInput.MouseScrolled(mouseX, mouseY, scrollX, scrollY, modifiers)
         ).orConsumed(input.scrollTargetAt(frame, mouseX, mouseY) != null)
     }
 

@@ -1,22 +1,16 @@
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateSetOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnosticSeverity
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextEdit
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextQuickFix
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeView
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
+import ru.hollowhorizon.hollowengine.client.vfx.VfxAssets
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
+import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
 
 
 private const val AssetCompletionLimit = 60
@@ -136,6 +130,11 @@ fun AssetPathField(
 object EditorAssetSources {
     private val providers = LinkedHashMap<String, () -> List<String>>()
 
+    init {
+        register(*HollowModelManager.allSupportedFormats.toTypedArray()) { HollowModelManager.allModels.map { it.toString() } }
+        register(VfxFormat.EXTENSION) { VfxAssets.ids.map { it.toString() } }
+    }
+
     fun register(vararg extensions: String, provider: () -> List<String>) {
         extensions.forEach {
             providers[it] = provider
@@ -150,6 +149,8 @@ object EditorAssetSources {
         val root = when {
             extension.endsWith("png") -> "textures"
             extension.endsWith("ogg") || extension.endsWith("wav") -> "sounds"
+            extension.removePrefix(".") in SoundSource.fileExtensions -> "sounds"
+            extension in DecalSpec.VideoExtensions -> "videos"
             else -> "models"
         }
         return runCatching {

@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.common.addons
 
 import io.github.classgraph.ClassGraph
 import kotlinx.coroutines.CoroutineScope
-import ru.hollowhorizon.hollowengine.common.events.ClientOnly
-import ru.hollowhorizon.hollowengine.common.events.Event
-import ru.hollowhorizon.hollowengine.common.events.RequireMod
-import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
-import ru.hollowhorizon.hollowengine.common.events.createEventListener
-import ru.hollowhorizon.hollowengine.common.events.createStaticEventListener
+import ru.hollowhorizon.hollowengine.common.events.*
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler

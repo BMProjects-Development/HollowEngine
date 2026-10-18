@@ -1,14 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.addons
 
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensionChange
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class HollowAddonExtensionsTests {
     @Test

@@ -12,8 +12,8 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiTransition
 import ru.hollowhorizon.hollowengine.client.ui.style.parseColor
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayouter
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import ru.hollowhorizon.hollowengine.generated.Assets
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.generated.Assets
 import kotlin.math.floor
 
 /** Completion popup placement in viewport coordinates (relative to the field's content box). */
@@ -331,7 +331,7 @@ private fun CompletionRowContent(
                     .position(CompletionFadeOvershoot.px, 0.px)
                     .opacity(if (atEnd) 0f else 1f)
                     .transition(UiTransition("opacity", durationMillis = CompletionFadeDurationMillis))
-                    .background(0f, completionFadeStops(fadeColor)),
+                    .background(90f, completionFadeStops(fadeColor)),
             )
             Box(
                 tags = listOf("ide-completion-fade"),
@@ -340,7 +340,7 @@ private fun CompletionRowContent(
                     .position((-CompletionFadeOvershoot).px, 0.px)
                     .opacity(if (atEnd) 1f else 0f)
                     .transition(UiTransition("opacity", durationMillis = CompletionFadeDurationMillis))
-                    .background(180f, completionFadeStops(fadeColor)),
+                    .background(270f, completionFadeStops(fadeColor)),
             )
         }
     }

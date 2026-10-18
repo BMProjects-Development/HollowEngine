@@ -14,10 +14,6 @@ import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.reflect.KProperty
 
 open class HollowRegistry(val modId: String = MODID) {
-    /**
-     * Avoid fake NotNulls parameters like BlockEntityType.Builder::build
-     */
-    fun <T> promise(): T = null as T
 
     inline fun <reified T : Any> register(
         location: ResourceLocation,

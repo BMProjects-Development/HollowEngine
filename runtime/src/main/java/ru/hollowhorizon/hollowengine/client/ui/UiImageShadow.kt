@@ -3,22 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutNode
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
-import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
-import ru.hollowhorizon.hollowengine.client.ui.style.UiFilterChain
-import ru.hollowhorizon.hollowengine.client.ui.style.UiImageFit
-import ru.hollowhorizon.hollowengine.client.ui.style.UiImageUv
-import ru.hollowhorizon.hollowengine.client.ui.style.imageUv
-import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
-import ru.hollowhorizon.hollowengine.client.ui.style.background
-import ru.hollowhorizon.hollowengine.client.ui.style.border
-import ru.hollowhorizon.hollowengine.client.ui.style.clip
-import ru.hollowhorizon.hollowengine.client.ui.style.clipShape
-import ru.hollowhorizon.hollowengine.client.ui.style.filter
-import ru.hollowhorizon.hollowengine.client.ui.style.image
-import ru.hollowhorizon.hollowengine.client.ui.style.imageFit
-import ru.hollowhorizon.hollowengine.client.ui.style.imageSlice
-import ru.hollowhorizon.hollowengine.client.ui.style.shape
-import ru.hollowhorizon.hollowengine.client.ui.style.tint
+import ru.hollowhorizon.hollowengine.client.ui.style.*
 
 /** Image geometry and alpha-affecting decoration, before the node's transform and opacity. */
 data class UiImageShadow(

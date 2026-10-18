@@ -1,17 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorAssetRequest
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorHost
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorLang
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorPanel
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
-import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalInspectorHost
+import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 
 /**
  * What the inspector window of the IDE offers the fields it shows: the assets of the loaded packs,

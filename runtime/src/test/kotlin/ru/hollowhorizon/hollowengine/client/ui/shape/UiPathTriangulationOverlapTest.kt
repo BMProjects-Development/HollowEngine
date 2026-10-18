@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.shape
 
 import org.junit.jupiter.api.Test
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
+import kotlin.math.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

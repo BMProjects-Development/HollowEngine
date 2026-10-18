@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.fabric.internal.rendering
 
-import ru.hollowhorizon.hollowengine.client.models.internal.SHADER
-import ru.hollowhorizon.hollowengine.client.models.internal.Material
-import ru.hollowhorizon.hollowengine.client.models.internal.drawWithShader
-import ru.hollowhorizon.hollowengine.client.models.internal.opaqueShaderState
+import ru.hollowhorizon.hollowengine.client.models.internal.*
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.*
-import ru.hollowhorizon.hollowengine.client.models.internal.translucentShaderState
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 
 object IrisInstancingBackend : ModelInstancingBackend {

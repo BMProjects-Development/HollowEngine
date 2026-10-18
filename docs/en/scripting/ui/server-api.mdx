@@ -1,0 +1,84 @@
+---
+title: Server UI API
+order: 9
+---
+
+<center><h1>Server UI API</h1></center>
+
+The server controls a declared UI through a `UiSession`. It opens a screen or overlay by the id declared in a client `.ui.kts` file, seeds typed state, receives events, and closes the session when it is no longer needed.
+
+## Open a screen
+
+```kotlin
+val Title = dataKey<String>("title") { "No quest" }
+
+val session = player.openUi("mypack:quest_log") {
+    put(Title, "The Missing Cargo")
+    onEvent { payload ->
+        if (payload.getString("action") == "accept") {
+            acceptQuest(player)
+            close()
+        }
+    }
+    onClose { clearQuestMarker(player) }
+}
+```
+
+`openUi` returns immediately; it does not suspend the script. The client sends explicit payloads from `send { ... }` in the UI declaration.
+
+## Show an overlay
+
+```kotlin
+val Stamina = dataKey<Float>("stamina") { 1f }
+
+val overlay = player.showOverlay("mypack:stamina") {
+    put(Stamina, 1f)
+}
+
+overlay.put(Stamina, 0.5f)
+overlay.close()
+```
+
+Each player gets a separate session. A server overlay is replaced on the client if another session shows the same overlay id.
+
+## State and patches
+
+Open an adaptive `surface` with `player.openSurface("project:dialogue")`. It returns the same `UiSession`: event handlers, `put`, `update` and closing work as for a screen. The client chooses overlay or screen from session data; see [adaptive surfaces](/docs/hollowengine/scripting/ui/ui-files).
+
+`DataKey<T>` gives each state entry a name, serializer, and optional default. The same key is read in UI code as `data[Key]` and written on the server with `put(Key, value)`.
+
+```kotlin
+@Serializable
+data class Quest(val title: String, val progress: Int)
+
+val CurrentQuest = dataKey<Quest>("quest") { Quest("No quest", 0) }
+
+session.edit {
+    put(CurrentQuest, Quest("The Missing Cargo", 3))
+    put(Title, "Quest updated")
+}
+```
+
+`put` sends only the changed key. `edit { }` batches several writes into one patch, and `remove(Key)` removes a value on both sides. Reads inside a UI composition subscribe per key, so updating one key recomposes only content that reads it.
+
+## Session lifecycle
+
+| API | Effect |
+| --- | --- |
+| `session.onEvent { payload -> }` | Receives a client payload from `send { }` |
+| `session.onClose { }` | Runs when the player dismisses it or the server closes it |
+| `session.close()` | Closes one UI session |
+| `player.closeUi()` | Closes every HollowEngine UI session for the player |
+| `player.showOverlay(id)` | Opens a server-driven overlay |
+
+Each session belongs to one player. The server discards it on disconnect. Validate event actions and values on the server.
+
+## HUD visibility
+
+```kotlin
+player.hideHudLayers(VanillaHudLayers.CROSSHAIR, VanillaHudLayers.HOTBAR)
+// ...
+player.showAllHudLayers()
+```
+
+Use `hiddenHudLayers()` to inspect the current server-side set. Call `resendHiddenHudLayers()` when client state must be restored, for example after a respawn.

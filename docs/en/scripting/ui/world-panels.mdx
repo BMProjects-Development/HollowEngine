@@ -1,0 +1,62 @@
+---
+title: World UI panels
+order: 11
+---
+
+# World UI panels
+
+`panel(id)` declares UI drawn on a flat panel in the world: a terminal, display or button on a model. A rig attachment places it on a bone or the whole model and follows its movement.
+
+## Declaration and placement
+
+Declare a panel in a client `.ui.kts` script:
+
+```kotlin
+panel("project:terminal") {
+    size(256, 160)
+    content {
+        Column(modifier = Modifier.padding(12.px).gap(8.px)) {
+            Text("Terminal")
+            Box(
+                id = "terminal-open",
+                modifier = Modifier.input(hoverable = true, clickable = true)
+                    .onClick { send { putString("action", "open") } },
+            ) {
+                Text("Open")
+            }
+        }
+    }
+}
+```
+
+In the [rig editor](/docs/hollowengine/models/rig-editor), add a **UI panel** attachment and enter `project:terminal`. Set its width in blocks, offset and rotation. World height follows the proportions of `size`; the front faces local `+Z`.
+
+The attachment has interactivity, interaction reach (5 blocks by default) and emissive lighting settings. Disable interactivity for a decorative display. Players interact by aiming at the panel; surfaces in front of it block access.
+
+## Declaration settings
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `width`, `height` or `size(w, h)` | `256 × 160` | Resolution, from 1 to 1024 pixels per side. |
+| `frameRate` | `30` | Maximum redraw rate. |
+| `background` | `0xFF101418.toInt()` | ARGB background; panels are opaque. |
+| `keyboard` | `false` | Allow text input. |
+| `rebuildEveryFrame` | `false` | Recompose on every redraw to read live game state. |
+
+With `keyboard = true`, clicking a text field gives it the keyboard until Escape or looking away. Otherwise the panel takes no keys from the game.
+
+## Data and server actions
+
+Inside `content`, `entity` is the panel's owner, `data` is that entity's synchronized data, and `isHovered` reports whether the viewer is pointing at the panel. Entity data is shared by viewers; local Compose state belongs to each viewer. Panels do not open a `UiSession` and do not need `player.openUi(...)`.
+
+`send { ... }` sends an NBT payload to the server. Handle it in a `.node.kts` script attached to the same entity:
+
+```kotlin
+onPanelEvent("project:terminal") { event ->
+    if (event.payload.getString("action") == "open") {
+        event.player.openUi("project:terminal_menu")
+    }
+}
+```
+
+The event exposes `entity`, `player`, `panel` and `payload`. With no argument, `onPanelEvent { ... }` handles every panel on that entity. Check gameplay conditions on the server, such as player permissions and whether the terminal is available.

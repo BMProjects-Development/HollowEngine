@@ -17,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStag
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathDebugPacket
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathDebugPoint
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 @ClientOnly
 object NpcPathDebugRenderer {
@@ -41,7 +42,9 @@ object NpcPathDebugRenderer {
         ).apply {
             nextNodeIndex = packet.nextNodeIndex.coerceIn(0, nodes.lastIndex)
         }
-        paths[packet.entityId] = DebugPath(path, packet.steeringTarget, Util.getMillis())
+        val jumps = packet.nodes.indices.filter { packet.nodes[it].jump }
+        val flights = packet.nodes.indices.filter { it > 0 && packet.nodes[it].flown }
+        paths[packet.entityId] = DebugPath(path, jumps, flights, packet.steeringTarget, packet.lookTarget, packet.speedShare, Util.getMillis())
     }
 
     @SubscribeEvent
@@ -66,29 +69,87 @@ object NpcPathDebugRenderer {
                 camera.y,
                 camera.z,
             )
-            renderSteeringTarget(event, bufferSource, debugPath.steeringTarget)
+            renderMarker(event, bufferSource, debugPath.steeringTarget, MARKER_SIZE, 0.0f, 1.0f, 1.0f)
+            debugPath.lookTarget?.let { renderMarker(event, bufferSource, it, LOOK_MARKER_SIZE, 1.0f, 0.2f, 1.0f) }
+            val heading = debugPath.steeringTarget
+            DebugRenderer.renderFloatingText(
+                event.poseStack, bufferSource, "x%.2f".format(debugPath.speedShare),
+                heading.x, heading.y + MARKER_HEIGHT + SHARE_TEXT_LIFT, heading.z, SHARE_TEXT_COLOR,
+            )
+            renderJumps(event, bufferSource, debugPath)
+            renderFlights(event, bufferSource, debugPath)
         }
         bufferSource.endBatch()
     }
 
-    private fun renderSteeringTarget(
+    /** A post at [target]: cyan where the NPC heads, magenta where it looks. */
+    private fun renderMarker(
         event: RenderLevelStageEvent,
         bufferSource: MultiBufferSource,
         target: NpcPathDebugPoint,
+        size: Double,
+        red: Float,
+        green: Float,
+        blue: Float,
     ) {
         val camera = event.camera.position
         val bounds = AABB.ofSize(
             Vec3(target.x, target.y + MARKER_HEIGHT * 0.5, target.z),
-            MARKER_SIZE,
+            size,
             MARKER_HEIGHT,
-            MARKER_SIZE,
+            size,
         ).move(-camera.x, -camera.y, -camera.z)
-        DebugRenderer.renderFilledBox(event.poseStack, bufferSource, bounds, 0.0f, 1.0f, 1.0f, 0.8f)
+        DebugRenderer.renderFilledBox(event.poseStack, bufferSource, bounds, red, green, blue, 0.8f)
+    }
+
+    private fun renderJumps(event: RenderLevelStageEvent, bufferSource: MultiBufferSource, debugPath: DebugPath) {
+        if (debugPath.jumps.isEmpty()) return
+        val camera = event.camera.position
+        val lines = DebugLines.batch(bufferSource, event.poseStack)
+        for (index in debugPath.jumps) {
+            if (index == 0) continue
+            val from = debugPath.path.getNode(index - 1)
+            val to = debugPath.path.getNode(index)
+            var previous = arcPoint(from, to, 0f, camera)
+            for (step in 1..ARC_SEGMENTS) {
+                val point = arcPoint(from, to, step.toFloat() / ARC_SEGMENTS, camera)
+                lines.line(previous, point, JUMP_COLOR)
+                previous = point
+            }
+        }
+    }
+
+    private fun renderFlights(event: RenderLevelStageEvent, bufferSource: MultiBufferSource, debugPath: DebugPath) {
+        if (debugPath.flights.isEmpty()) return
+        val camera = event.camera.position
+        val lines = DebugLines.batch(bufferSource, event.poseStack)
+        for (index in debugPath.flights) {
+            lines.line(middleOf(debugPath.path.getNode(index - 1), camera), middleOf(debugPath.path.getNode(index), camera), FLIGHT_COLOR)
+        }
+    }
+
+    private fun middleOf(node: Node, camera: Vec3): Vec3f = Vec3f(
+        (node.x + 0.5 - camera.x).toFloat(),
+        (node.y + 0.5 - camera.y).toFloat(),
+        (node.z + 0.5 - camera.z).toFloat(),
+    )
+
+    private fun arcPoint(from: Node, to: Node, t: Float, camera: Vec3): Vec3f {
+        val height = from.y + (to.y - from.y) * t + ARC_HEIGHT * 4f * t * (1f - t)
+        return Vec3f(
+            (from.x + 0.5f + (to.x - from.x) * t - camera.x).toFloat(),
+            (height - camera.y).toFloat(),
+            (from.z + 0.5f + (to.z - from.z) * t - camera.z).toFloat(),
+        )
     }
 
     private data class DebugPath(
         val path: Path,
+        val jumps: List<Int>,
+        val flights: List<Int>,
         val steeringTarget: NpcPathDebugPoint,
+        val lookTarget: NpcPathDebugPoint?,
+        val speedShare: Float,
         val updatedAt: Long,
     )
 
@@ -96,4 +157,11 @@ object NpcPathDebugRenderer {
     private const val NODE_RADIUS = 0.3f
     private const val MARKER_SIZE = 0.2
     private const val MARKER_HEIGHT = 0.7
+    private const val LOOK_MARKER_SIZE = 0.1
+    private const val SHARE_TEXT_LIFT = 0.3
+    private const val SHARE_TEXT_COLOR = 0xFFFFFF
+    private const val ARC_SEGMENTS = 12
+    private const val ARC_HEIGHT = 1.25f
+    private const val JUMP_COLOR = 0xFFFFAA00.toInt()
+    private const val FLIGHT_COLOR = 0xFF55CCFF.toInt()
 }

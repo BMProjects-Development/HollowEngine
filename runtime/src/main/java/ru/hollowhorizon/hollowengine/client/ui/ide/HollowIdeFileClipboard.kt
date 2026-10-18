@@ -6,12 +6,7 @@ import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFWNativeWin32
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.awt.Toolkit
-import java.awt.datatransfer.Clipboard
-import java.awt.datatransfer.ClipboardOwner
-import java.awt.datatransfer.DataFlavor
-import java.awt.datatransfer.SystemFlavorMap
-import java.awt.datatransfer.Transferable
-import java.awt.datatransfer.UnsupportedFlavorException
+import java.awt.datatransfer.*
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException

@@ -29,6 +29,7 @@ val parchmentVersion: String by rootProject.properties
 val kotlinVersion: String by rootProject.properties
 val composeRuntimeVersion: String by rootProject.properties
 val serializationVersion: String by rootProject.properties
+val coroutinesVersion: String by rootProject.properties
 val koolVersion: String by rootProject.properties
 val koinVersion: String by rootProject.properties
 val hollowcore: String by rootProject.properties
@@ -115,7 +116,7 @@ dependencies {
     modImplementation("lib:iris-fabric:1.8.14-beta.1+mc1.21.1-devpatch")
     modImplementation("lib:sodium-fabric:0.8.13+mc1.21.1")
 
-    implementation(project(":bridge"))
+    implementation(project(path = ":bridge", configuration = "namedElements"))
 
     addShadow("net.peanuuutz.tomlkt:tomlkt:0.5.0")
     addShadow("com.github.weisj:jsvg:2.1.0")
@@ -123,7 +124,7 @@ dependencies {
     addShadow("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     addShadow("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
     addShadow("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-    addShadow("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    addShadow("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
     addShadow("io.insert-koin:koin-core:$koinVersion")
     addShadow("org.jetbrains.kotlin:kotlin-metadata-jvm:$kotlinVersion")
     addShadow("org.jetbrains.kotlin:kotlin-scripting-common:$kotlinVersion")

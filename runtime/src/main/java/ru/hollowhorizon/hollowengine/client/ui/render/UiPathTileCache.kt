@@ -2,16 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.render
 
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiResourceAccess
 import ru.hollowhorizon.hollowengine.client.ui.UiMatrix4
-import ru.hollowhorizon.hollowengine.client.ui.shape.Shape
-import ru.hollowhorizon.hollowengine.client.ui.shape.SvgResourceShape
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathContour
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathPoint
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathStrokeLineCap
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiPathStrokeLineJoin
-import ru.hollowhorizon.hollowengine.client.ui.shape.UiShapeSize
-import ru.hollowhorizon.hollowengine.client.ui.shape.flatten
-import ru.hollowhorizon.hollowengine.client.ui.shape.strokedPath
-import java.util.LinkedHashMap
+import ru.hollowhorizon.hollowengine.client.ui.shape.*
 import kotlin.math.max
 import kotlin.math.min
 

@@ -1,6 +1,6 @@
 ---
 title: Custom Data
-order: 7
+order: 8
 ---
 
 <center><h1>Custom Data</h1></center>
@@ -83,7 +83,7 @@ The value has one owner, the server. A synced key written on the client survives
 
 ### In animator conditions
 
-The numeric values of synced keys are visible to [expressions](/docs/hollowengine/scripting/animator-editor) under the `d.` prefix, addressed by their path inside the NBT. That is how a server script turns an animation layer on without sending anything by hand:
+The numeric values of synced keys are visible to [expressions](/docs/hollowengine/models/animator-editor) under the `d.` prefix, addressed by their path inside the NBT. That is how a server script turns an animation layer on without sending anything by hand:
 
 ```kotlin
 @Serializable data class Emotion(val happy: Float = 0f, val angry: Float = 0f)

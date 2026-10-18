@@ -37,7 +37,4 @@ class KotlinMetadataRemappingClassVisitor(private val remapper: Remapper, next: 
         }
         return result
     }
-    fun getRuntimeKotlinVersion(): String {
-        return KotlinVersion.CURRENT.toString()
-    }
 }

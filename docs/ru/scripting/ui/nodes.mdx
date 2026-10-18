@@ -37,14 +37,18 @@ Column(id = "panel", tags = listOf("dialog"), modifier = Modifier.padding(12.px)
 | `Slider` | `onValueChange`, `onValueCommit` |
 | `Checkbox` | `onCheckedChange`; варианты checkbox, radio и switch |
 | `TextField` | `onChange`; однострочное/многострочное редактирование и функции редактора |
+| `NumberField` | `onChange(Double)`; точный ввод, перетаскивание и ограниченный диапазон |
 | `Popup` и оверлеи | Временный UI поверх содержимого |
+
+У `NumberField` доступны `min`, `max`, `step`, `whole` для целых чисел и `slider = true` для ползунка при заданных границах. Клик включает точный ввод, перетаскивание меняет значение; `Shift` уменьшает шаг, `Ctrl` увеличивает.
 
 Кнопка собирается из `Box`, стиля и модификатора ввода:
 
 ```kotlin
 Box(
+    id = "save-button",
     tags = listOf("button", "primary"),
-    modifier = Modifier.padding(6.px, 10.px).onClick { send { putString("action", "save") } },
+    modifier = Modifier.padding(6.px, 10.px).input(hoverable = true, clickable = true).onClick { send { putString("action", "save") } },
 ) { Text("Сохранить") }
 ```
 

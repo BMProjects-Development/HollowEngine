@@ -25,34 +25,9 @@
     align-items: start center;
 }
 
-.timeline-button {
-    size: fit fit;
-    padding: 3px;
-    border-radius: $radius-small;
-    background: transparent;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
+.timeline-text-button {
+    height: 20px;
 }
-
-.timeline-button:hover { background: $bg-hover; }
-
-.timeline-button.active { background: $bg-selected; }
-
-.timeline-button-icon {
-    size: 12px 12px;
-    tint: $text-soft;
-    transition: tint 110ms ease-out;
-}
-
-.timeline-button:hover .timeline-button-icon { tint: $white; }
-
-.timeline-button.active .timeline-button-icon { tint: $accent; }
-
-/* Auto-keying reads as recording: red, not the accent of an ordinary toggle. */
-.timeline-button.record.active { background: $danger-soft; }
-
-.timeline-button.record.active .timeline-button-icon { tint: $danger; }
 
 .timeline-separator {
     size: 1px 12px;
@@ -80,6 +55,10 @@
 
 .timeline-time:focus { border: 1px $accent; }
 
+.number-field.timeline-snap-fps { size: 44px fit; }
+
+.number-field.timeline-snap-fps.off .number-field-value { foreground: $text-faint; }
+
 .timeline-duration {
     margin: 0px 4px 0px 3px;
     foreground: $text-faint;
@@ -103,6 +82,16 @@
     margin: 0px 0px 0px 8px;
     foreground: $text-faint;
     font-size: $font-size-small;
+}
+
+/* The ruler is lower than a toolbar, so the button by the title is smaller than the others. */
+.icon-button.timeline-corner-button {
+    padding: 2px;
+    margin: 0px 4px 0px 0px;
+}
+
+.icon-button.timeline-corner-button .button-icon {
+    size: 12px 12px;
 }
 
 .timeline-row {
@@ -140,29 +129,44 @@
 
 .timeline-row.muted .timeline-row-label { foreground: $text-faint; }
 
-.timeline-row-toggle {
-    size: fit fit;
-    padding: 2px;
-    border-radius: $radius-small;
+/* The strips at the ends of a block that trim it: shown only while the pointer is on one. */
+.timeline-segment-grip {
     background: transparent;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
+    transition: background 90ms ease-out;
 }
 
-.timeline-row-toggle:hover { background: $bg-hover; }
+.timeline-segment-grip:hover { background: alpha($white, 0.25); }
 
-.timeline-row-icon {
+/* Where a fade of a block ends, dragged along its top edge. */
+.timeline-fade-handle {
+    border-radius: 3.5px;
+    background: alpha($white, 0.35);
+    border: 1px alpha(#000000, 0.4);
+    transition: background 90ms ease-out;
+}
+
+.timeline-fade-handle:hover { background: $white; }
+
+/* What a segment or a marker is called, drawn on it in the lane. */
+.timeline-segment-label {
+    foreground: $text-strong;
+    font-size: $font-size-small;
+    wrap: false;
+    padding: 0px 3px;
+}
+
+.timeline-row-toggle {
+    padding: 2px;
+}
+
+.timeline-row-toggle .button-icon {
     size: 10px 10px;
     tint: $text-faint;
-    transition: tint 110ms ease-out;
 }
 
-.timeline-row-toggle:hover .timeline-row-icon { tint: $white; }
+.timeline-row-toggle.on .button-icon { tint: $text-soft; }
 
-.timeline-row-toggle.on .timeline-row-icon { tint: $text-soft; }
-
-.timeline-row-toggle.warn .timeline-row-icon { tint: $accent; }
+.timeline-row-toggle:hover .button-icon { tint: $white; }
 
 /* Taking a track off the list is rare; the cross only shows on the row the pointer is on. */
 .timeline-row-toggle.hide-track {

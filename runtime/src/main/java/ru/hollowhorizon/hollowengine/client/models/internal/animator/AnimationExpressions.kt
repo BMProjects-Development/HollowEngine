@@ -2,10 +2,10 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.coroutines.scopeAsync
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -73,6 +73,9 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityBool("is_passenger") { it.isPassenger }
         entityBool("is_vehicle") { it.isVehicle }
         entityBool("is_no_gravity") { it.isNoGravity }
+        entityBool("is_flying") { if (it is Player) it.abilities.flying else it.isNoGravity && !it.onGround() }
+        contextFloat("flight_pitch") { it.flightPitch }
+        contextFloat("flight_bank") { it.flightBank }
         entityBool("is_in_wall") { it.isInWall }
         entityBool("is_shift_key_down") { it.isShiftKeyDown }
         entityBool("is_sneaking") { it.isShiftKeyDown }
@@ -192,6 +195,9 @@ class AnimatorEvaluationContext {
     var localSideSpeed: Float = 0f
     var signedHorizontalSpeed: Float = 0f
 
+    var flightPitch: Float = 0f
+    var flightBank: Float = 0f
+
     var bodyYaw: Float = 0f
     var headYaw: Float = 0f
     var headPitch: Float = 0f
@@ -207,6 +213,15 @@ class AnimatorEvaluationContext {
      * and read-only here; `d.` reads it, `v.` does not.
      */
     var data: Map<String, Float> = emptyMap()
+
+    /**
+     * The montages the animator played this frame, in the order it played them, for what they lay over the
+     * model's rig once the pose is done.
+     */
+    val montages = ArrayList<MontageMoment>()
+
+    /** Whether this is the client's copy of the model, which reads its assets from resource packs. */
+    val isClientSide: Boolean get() = entity?.level()?.isClientSide ?: true
 
     /**
      * The value of an entity-derived name when there is no entity, as in a model preview: whatever was
@@ -244,6 +259,20 @@ object AnimatorExpressionEvaluator {
         val source = expression.source
         if (source.isBlank()) return default
         val ready = bakedBooleans[source] ?: run { bakeLater(source); return default }
+        return ready.eval(context)
+    }
+
+    /**
+     * Whether [source] holds, compiled on the spot the first time rather than in the background: a rule of a
+     * section is asked once, at its boundary, and has no later frame to get it right.
+     */
+    fun condition(source: String, context: AnimatorEvaluationContext): Boolean {
+        if (source.isBlank()) return true
+        source.toFloatOrNull()?.let { return it != 0f }
+        val ready = bakedBooleans[source] ?: run {
+            prepareNow(listOf(source))
+            bakedBooleans[source]
+        } ?: return false
         return ready.eval(context)
     }
 

@@ -209,6 +209,10 @@ internal class Resolver(
             return null
         }
         val owner = resolve(target.target) ?: return null
+        (owner as? Ir.BagRead)?.takeIf { it.bag.nested && it.bag.write != null }?.let { parent ->
+            val value = resolve(ast.value) ?: return null
+            return Ir.BagWrite(parent.owner, parent.bag, "${parent.key}.${target.name}", value)
+        }
         val bag = owner.type as? ExprType.Dynamic
         if (bag?.write == null) {
             diagnostics.error("'${target.target.describe()}' is read-only", target.span)

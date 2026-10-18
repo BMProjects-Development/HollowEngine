@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.config
 
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
+import ru.hollowhorizon.hollowengine.client.editor.GizmoOrientation
 
 @ConfigName("hollowengine")
 object HollowEngineConfig : Config() {
@@ -40,6 +41,27 @@ object HollowEngineConfig : Config() {
     @PropertyComment("Gizmo editing modes shown together, separated by commas: TRANSLATE, ROTATE, SCALE")
     @PropertyName("transform_gizmo_modes")
     var gizmoModes by property(GizmoEditMode.TRANSLATE.name)
+
+    @PropertyComment("Which axes the gizmo's handles follow: GLOBAL (the world's), LOCAL (the object's) or VIEW (the camera's)")
+    @PropertyName("transform_gizmo_orientation")
+    var gizmoOrientation by property(GizmoOrientation.GLOBAL.name)
+
+    @PropertyComment("Whether the editor's previews turn around what is selected rather than around their own center")
+    @PropertyName("preview_orbit_selection")
+    var previewOrbitSelection by property(false)
+
+    @PropertyComment("Whether the timeline snaps times to frames: keys, the playhead, blocks")
+    @PropertyName("timeline_snap")
+    var timelineSnap by property(true)
+
+    @PropertyComment("Whether the curve graph shows the handles of every key, not only of the picked ones")
+    @PropertyName("timeline_curve_handles")
+    var timelineCurveHandles by property(true)
+
+    @PropertyComment("Frames per second the timeline snaps times to")
+    @PropertyName("timeline_snap_fps")
+    @PropertyRange(1.0f, 240.0f)
+    var timelineSnapFps by property(20)
 
     @PropertyComment("Whether nodes dragged in a graph land on its grid")
     @PropertyName("graph_snap_to_grid")

@@ -49,9 +49,11 @@
     text-overflow: dots;
 }
 
+/* The scrollbar lies over the panel, so the fields keep clear of it on the right. */
 .insp-body {
     size: 100% fit;
     gap: 3px;
+    padding: 0 8px 0 0;
 }
 
 .insp-empty-state {
@@ -186,10 +188,35 @@
     opacity: 1;
 }
 
+/* A field a timeline can animate: its editor, and the key that starts or stops animating it. */
+.insp-animated-field {
+    size: 100% fit;
+    gap: 3px;
+    align-items: start end;
+}
+
+.insp-animated-value { size: 0px fit; }
+
+.insp-key-toggle {
+    size: 10px 10px;
+    margin: 0px 0px 6px 0px;
+    tint: $text-faint;
+    cursor: hand;
+    transition: tint 110ms ease-out;
+}
+
+.insp-key-toggle:hover { tint: $text-strong; }
+
+.insp-key-toggle.active { tint: $accent; }
+
 .insp-hint {
     size: 100% fit;
     foreground: $text-faint;
     font-size: $font-size-small;
+}
+
+.insp-hint.warning {
+    foreground: $warning;
 }
 
 .insp-readonly {
@@ -251,7 +278,21 @@
 
 .insp-input.flat:focus { border: 1px $accent; }
 
-.insp-input.numeric { text-align: right; }
+.insp-number-row {
+    size: 100% fit;
+    gap: 6px;
+    align-items: start center;
+}
+
+.insp-number-label {
+    size: 40% fit;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+}
+
+.insp-number-label.hinted { hoverable: true; }
+
+.insp-number-label.hinted:hover { foreground: $text; }
 
 /* ---- inline fields ---- */
 
@@ -273,7 +314,7 @@
     padding: 1px 4px;
 }
 
-.insp-icon-button.insp-inline-icon {
+.insp-icon-button.insp-inline-icon .button-icon {
     size: 11px 11px;
 }
 
@@ -288,13 +329,6 @@
     shadow: 1px 1px 3px 0px $shadow;
 }
 
-/* A field the timeline writes: read-only, and tinted like the accent so it reads as "keyed". */
-.vfx-driven {
-    background: $bg-field;
-    border: 1px alpha($accent, 0.5);
-    foreground: $text-soft;
-}
-
 .vfx-curve-dialog {
     padding: 10px;
 }
@@ -305,13 +339,6 @@
     border-radius: $radius-small;
     foreground: $text-strong;
     font-size: $font-size;
-}
-
-.vfx-detail {
-    size: 100% fit;
-    gap: 3px;
-    padding: 3px 0px 3px 6px;
-    border-left: 1px $divider;
 }
 
 .vfx-node-head {
@@ -336,12 +363,6 @@
     clip: true;
 }
 
-.vfx-module-head {
-    size: 100% fit;
-    gap: 4px;
-    align-items: start center;
-}
-
 .insp-check-row {
     size: 100% fit;
     min-height: 16px;
@@ -364,31 +385,9 @@
     checkbox-mark: $white;
 }
 
-.insp-slider { grow: 1; }
-
-.insp-slider-value {
-    size: fit fit;
-    min-width: 40px;
-    foreground: $text;
-    font-size: $font-size-small;
-    wrap: false;
-}
-
 .insp-vector {
     size: 100% fit;
     gap: 3px;
-}
-
-.insp-vector-cell {
-    grow: 1;
-    size: 0px fit;
-    gap: 2px;
-}
-
-.insp-vector-label {
-    size: fit fit;
-    foreground: $text-faint;
-    font-size: $font-size-small;
 }
 
 .insp-nested {
@@ -450,19 +449,9 @@
 
 .insp-pill.active .insp-pill-label { foreground: $white; }
 
-.insp-icon-button {
+.insp-icon-button .button-icon {
     size: 14px 14px;
-    tint: $text-muted;
-    hoverable: true;
-    clickable: true;
-    transition: tint 110ms ease-out;
 }
-
-.insp-icon-button:hover { tint: $white; }
-
-.insp-icon-button.active { tint: $accent; }
-
-.insp-icon-button.danger:hover { tint: $danger; }
 
 .insp-pick-button {
     size: 18px 18px;
@@ -477,43 +466,13 @@
 .insp-button {
     size: 100% fit;
     min-height: 18px;
-    gap: 5px;
     padding: 3px 8px;
-    align-items: center center;
-    background: $bg-hover;
-    border-radius: $radius;
-    hoverable: true;
-    clickable: true;
-    transition: background 110ms ease-out;
-}
-
-.insp-button:hover { background: $bg-pressed; }
-
-.insp-button.primary { background: $accent-fill; }
-
-.insp-button.primary:hover { background: $accent-fill-hover; }
-
-.insp-button.danger { background: $danger-soft; }
-
-.insp-button.danger:hover { background: alpha($danger, 0.32); }
-
-.insp-button-icon {
-    size: 11px 11px;
-    tint: $text;
-}
-
-.insp-button.primary .insp-button-icon { tint: $white; }
-
-.insp-button-label {
-    size: fit fit;
-    foreground: $text;
     font-size: $font-size-small;
-    wrap: false;
 }
 
-.insp-button.primary .insp-button-label { foreground: $white; }
-
-.insp-button.danger .insp-button-label { foreground: $danger; }
+.insp-button .button-icon {
+    size: 11px 11px;
+}
 
 /* ---- asset picker ---- */
 

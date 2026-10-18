@@ -1,21 +1,14 @@
 package ru.hollowhorizon.hollowengine.common.scripting.ide.story
 
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryBool
-import ru.hollowhorizon.hollowengine.common.dialogue.StoryValue
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryNumber
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryString
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryArg
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryExpression
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryFunctionCatalog
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryLine
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryLineKind
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.StoryParser
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.TextPart
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.TextTemplate
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
-import ru.hollowhorizon.hollowengine.common.utils.expressions.UnaryOp
+import ru.hollowhorizon.hollowengine.common.dialogue.StoryValue
+import ru.hollowhorizon.hollowengine.common.dialogue.lang.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.TextSpan
+import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
+import ru.hollowhorizon.hollowengine.common.utils.expressions.UnaryOp
 
 /**
  * Coloring for `.story`. It reads the same tree the compiler does, so the editor can never disagree

@@ -71,7 +71,7 @@ This lets you restore any data the node needs after a restart. You can register 
 
 ### `persisted(name) { default }`
 
-When you only need a value to survive a restart, you do not have to write the `onSave`/`onLoad` pair by hand — there is a delegate for it:
+When you only need a value to survive a restart, you do not have to write the `onSave`/`onLoad` pair by hand, you can use delegate:
 
 ```kotlin
 var radius by persisted("radius") { 3 }
@@ -84,7 +84,7 @@ onUpdate(every = 20.ticks) {
 
 This is the same mechanism as `onSave`/`onLoad`, just written shorter. The value stays private to this node: another node, even one attached to the same entity, cannot see it. For data other scripts should reach, use [`entity.data`](/docs/hollowengine/scripting/npc/data).
 
-The default block is evaluated lazily — only when the property is read and nothing was loaded from the save. An expensive default therefore costs nothing on a node restored from a world.
+The default block is evaluated lazily, only when the property is read and nothing was loaded from the save. An expensive default therefore costs nothing on a node restored from a world.
 
 Reading the default does not by itself write anything; only assigning does. That way changing the default in your script keeps taking effect on worlds that already exist.
 
@@ -229,6 +229,10 @@ onDie {
 }
 ```
 
+### Colliders
+
+`onColliderHit`, `onColliderInteract`, `onColliderEnter`, `onCollideTick` and `onColliderExit` react to hits, clicks and touches on the [colliders](/docs/hollowengine/world/colliders#in-a-node-script) of the attached entity's model.
+
 A small NPC example combining several handlers:
 
 ```kotlin
@@ -255,6 +259,14 @@ onLoad { context -> greeted = context.tag.getBoolean("greeted") }
 ```
 
 ---
+
+## Updating without rejoining
+
+After editing `.node.kts`, run `/reload` or **File > Reload Server Resources**. The engine recompiles changed scripts and replaces running instances on the server and loaded entities. It preserves `persisted`, editor properties, `onSave` / `onLoad` data and active states with their `stateTag` and child states.
+
+A state restarts with saved data rather than at its previous source line: use `runOnce` and `remember` for actions that must not repeat. Unchanged nodes stay running. Compilation errors keep the previous version running and are reported in the log. If the script's host type changed, detach it and attach it to a compatible host again.
+
+Recompilation needs the compiler addon. Saving a file alone does not restart server nodes.
 
 ## Commands
 

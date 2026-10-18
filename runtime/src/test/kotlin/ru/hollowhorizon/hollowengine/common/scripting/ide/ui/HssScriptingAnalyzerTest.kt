@@ -2,8 +2,8 @@ package ru.hollowhorizon.hollowengine.common.scripting.ide.ui
 
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItem
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
-import ru.hollowhorizon.hollowengine.common.scripting.ide.collectCompletions
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.common.scripting.ide.collectCompletions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

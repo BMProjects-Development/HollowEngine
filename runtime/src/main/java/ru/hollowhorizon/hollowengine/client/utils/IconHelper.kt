@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.utils
 
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.generated.Assets
 
@@ -41,7 +42,7 @@ object IconHelper {
      */
     fun forFile(path: String): ResourceLocation {
         val name = path.substringAfterLast('/').lowercase()
-        val icon = FileIcons.firstOrNull { (suffixes, _) -> suffixes.any(name::endsWith) }?.second ?: "file"
+        val icon = FileIcons.firstOrNull { (suffixes, _) -> suffixes.any(name::endsWith) }?.second ?: if (name.substringAfterLast('.') in SoundSource.fileExtensions) "sound" else "file"
         return "hollowengine:textures/gui/icons/files/$icon.svg".rl
     }
 

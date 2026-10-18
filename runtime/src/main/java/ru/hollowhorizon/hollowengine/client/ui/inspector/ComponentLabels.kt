@@ -34,6 +34,23 @@ internal object ComponentLabels {
         return key?.let(::translateOrNull) ?: prettify(name)
     }
 
+    /** What a value of an enum is called: its [EditorName] when it has one, its own name otherwise. */
+    fun enumValueName(descriptor: SerialDescriptor, index: Int, fieldKey: String? = null): String =
+        descriptor.getElementAnnotations(index).filterIsInstance<EditorName>().firstOrNull()?.let { translate(it.name) }
+            ?: fieldKey?.let { translateOrNull("$it.${descriptor.getElementName(index).lowercase()}") }
+            ?: prettify(descriptor.getElementName(index))
+
+    fun typeName(descriptor: SerialDescriptor): String =
+        descriptor.annotations.filterIsInstance<EditorName>().firstOrNull()?.let { translate(it.name) }
+            ?: prettify(descriptor.serialName.substringAfterLast('/').substringAfterLast('.'))
+
+    fun fieldKey(owner: ResourceLocation?, descriptor: SerialDescriptor, index: Int): String? =
+        descriptor.getElementAnnotations(index).filterIsInstance<EditorName>().firstOrNull()?.name
+            ?: owner?.let { "${componentKey(it)}.${descriptor.getElementName(index)}" }
+
+    fun initialValue(descriptor: SerialDescriptor, index: Int): String? =
+        descriptor.getElementAnnotations(index).filterIsInstance<EditorDefault>().firstOrNull()?.json
+
     fun fieldDescription(descriptor: SerialDescriptor, index: Int): String? =
         descriptor.getElementAnnotations(index).filterIsInstance<EditorDescription>().firstOrNull()
             ?.let { translate(it.description) }
@@ -50,6 +67,9 @@ internal object ComponentLabels {
 
     fun isBone(descriptor: SerialDescriptor, index: Int): Boolean =
         descriptor.getElementAnnotations(index).any { it is EditorBone }
+
+    fun widget(descriptor: SerialDescriptor, index: Int): String? =
+        descriptor.getElementAnnotations(index).filterIsInstance<EditorWidget>().firstOrNull()?.id
 
     fun isMultiline(descriptor: SerialDescriptor, index: Int): Boolean =
         descriptor.getElementAnnotations(index).any { it is EditorMultiline }

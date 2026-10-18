@@ -283,7 +283,6 @@ class CutscenePlaybackController {
         if (existing != null && existing.type.id == type.id) {
             val bound = AnimProperty(id, existing.nameState, existing.type as PropertyType<T>, defaultValue, apply)
             bound.adoptCurves(existing)
-            bound.isExpanded = existing.isExpanded
             val group = timeline.groupOf(existing) ?: timeline.group(path)
             group.properties[group.properties.indexOf(existing)] = bound
             return bound

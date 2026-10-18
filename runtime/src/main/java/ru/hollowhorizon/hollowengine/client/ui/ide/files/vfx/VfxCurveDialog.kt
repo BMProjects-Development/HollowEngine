@@ -8,6 +8,8 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.EmbeddedTimelineEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineFeatures
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
+import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCurveInput
 import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
@@ -47,13 +49,16 @@ internal fun VfxCurveDialog(value: VfxValue.OverTime, onChange: (VfxValue) -> Un
                 InspectorButton(vfxText("curve_flat")) { preset(VfxCurve.flat(1f)) }
                 VfxFieldLabel(vfxText("curve_scale"), width = 58f)
                 Row(modifier = Modifier.size(56.px)) {
-                    VfxNumberCellInline(current.scale) { publish(current.copy(scale = it)) }
+                    NumberField(
+                        value = current.scale.toDouble(),
+                        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+                    ) { publish(current.copy(scale = it.toFloat())) }
                 }
                 VfxSourcePicker(current.input) { input ->
                     controller.workAreaEnd = domainOf(input, current.curve)
                     publish(current.copy(input = input))
                 }
-                InspectorIcon(CloseIcon, vfxText("close")) { onClose() }
+                InspectorIconButton(CloseIcon, vfxText("close"), tags = listOf("insp-inline-icon")) { onClose() }
             }
             EmbeddedTimelineEditor(
                 controller = controller,

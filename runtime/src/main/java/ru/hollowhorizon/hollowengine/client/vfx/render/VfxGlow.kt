@@ -11,6 +11,7 @@ import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.vfx.render.VfxGlow.begin
 
 /**
  * The glow of the frame: surfaces with a glow draw a second time into a float texture that shares the

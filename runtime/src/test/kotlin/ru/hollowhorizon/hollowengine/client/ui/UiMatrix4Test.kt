@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test
 import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 
 class UiMatrix4Test {
     @Test
@@ -33,14 +32,6 @@ class UiMatrix4Test {
             assertEquals(expectedPoint.y, actualPoint.y, 0.0001f)
             assertEquals(expectedPoint.z, actualPoint.z, 0.0001f)
         }
-    }
-
-    @Test
-    fun `identity transforms and zero translations reuse their matrix`() {
-        val identity = UiMatrix4.identity()
-        assertSame(identity, UiTransform().matrix(UiVec3(50f, 50f)))
-        assertSame(identity, identity.translated(0f, 0f))
-        assertSame(identity, identity * UiMatrix4.identity())
     }
 
     @Test

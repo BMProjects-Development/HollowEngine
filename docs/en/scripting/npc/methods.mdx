@@ -1,6 +1,6 @@
 ---
 title: Utility Methods
-order: 8
+order: 9
 ---
 
 <center><h1>Utility Methods</h1></center>
@@ -39,20 +39,18 @@ npc.despawn()
 
 Because `NpcEntity` inherits from Minecraft entities, standard methods such as `remove(...)`, `discard()`, `teleportTo(...)`, `setItemInHand(...)`, and other Minecraft API methods are also available.
 
-## Hitbox
+## Body
 
-NPCs have a convenient `hitboxMode` property:
-
-```kotlin
-npc.hitboxMode = HitboxMode.PULLING   // normal collision and pushing
-npc.hitboxMode = HitboxMode.EMPTY     // passable entity
-npc.hitboxMode = HitboxMode.BLOCKING  // can be walked on top of, like a block
-```
-
-Import the enum:
+Whether an NPC pushes, blocks or lets others pass through is set by the [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component. Without one, an NPC pushes and is pushed the way mobs are.
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.npcs.HitboxMode
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+
+npc.set(BodyComponent(mode = BodyMode.PUSHING))   // shoves and is shoved, like a mob
+npc.set(BodyComponent(mode = BodyMode.EMPTY))     // others pass through it
+npc.set(BodyComponent(mode = BodyMode.BLOCKING))  // stops others and can be stood on
 ```
 
 ## Seating and standing up
@@ -150,6 +148,6 @@ val id = uuid("00000000-0000-0000-0000-000000000000")
 
 Old Katari/block-doc methods such as `npc.playAnimation(...)`, `npc.stopAnimation(...)`, `npc.setSkin(...)`, and separate `attack(...)` wrappers should not be treated as the main v2.3 API.
 
-- For animations, use [`play`](/docs/hollowengine/scripting/animations) or the action-based [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
+- For animations, use [`play`](/docs/hollowengine/models/animations) or the action-based [`startAnimation`](/docs/hollowengine/scripting/npc/actions).
 - For held items, use the standard Minecraft API: `setItemInHand(...)`, or [`equip`](/docs/hollowengine/scripting/npc/inventory).
-- For appearance, use [`entity.materials`](/docs/hollowengine/scripting/models).
+- For appearance, use [`entity.materials`](/docs/hollowengine/models).

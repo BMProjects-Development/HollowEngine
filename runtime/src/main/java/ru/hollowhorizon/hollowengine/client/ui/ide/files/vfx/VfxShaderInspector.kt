@@ -4,30 +4,13 @@ import androidx.compose.runtime.Composable
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraph
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderTarget
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.Row
-import ru.hollowhorizon.hollowengine.client.ui.Text
-import ru.hollowhorizon.hollowengine.client.ui.UiAlign
-import ru.hollowhorizon.hollowengine.client.ui.UiLength
-import ru.hollowhorizon.hollowengine.client.ui.alignItems
-import ru.hollowhorizon.hollowengine.client.ui.gap
-import ru.hollowhorizon.hollowengine.client.ui.grow
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
-import ru.hollowhorizon.hollowengine.client.ui.percent
-import ru.hollowhorizon.hollowengine.client.ui.px
-import ru.hollowhorizon.hollowengine.client.ui.size
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxShaderDeclarations
-import ru.hollowhorizon.hollowengine.common.vfx.VfxCameraShakeSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxPostEffectSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSamplerSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSkySpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxUniformValue
+import ru.hollowhorizon.hollowengine.common.vfx.*
 
 @Composable
-internal fun PostEffectFields(document: HollowIdeVfxDocument, state: VfxEditorState, post: VfxPostEffectSpec) {
+internal fun PostEffectFields(document: VfxEditing, state: VfxInspectorState, post: VfxPostEffectSpec) {
     Folding(state, "post", vfxText("section_post"), VfxIcons.POST) {
         VfxShaderRow(post.shader, vfxText("shader_post_hint"), "vfx-post-shader", graphs = ShaderTarget.POST) { shader ->
             document.replace(post.copy(shader = shader.orEmpty(), uniforms = alignUniforms(shader, post.uniforms)))
@@ -43,7 +26,7 @@ internal fun PostEffectFields(document: HollowIdeVfxDocument, state: VfxEditorSt
 }
 
 @Composable
-internal fun SkyFields(document: HollowIdeVfxDocument, state: VfxEditorState, sky: VfxSkySpec) {
+internal fun SkyFields(document: VfxEditing, state: VfxInspectorState, sky: VfxSkySpec) {
     Folding(state, "sky", vfxText("section_sky"), VfxIcons.SKY) {
         VfxShaderRow(sky.shader, vfxText("shader_sky_hint"), "vfx-sky-shader") { shader ->
             document.replace(sky.copy(shader = shader.orEmpty(), uniforms = alignUniforms(shader, sky.uniforms)))
@@ -59,7 +42,7 @@ internal fun SkyFields(document: HollowIdeVfxDocument, state: VfxEditorState, sk
 }
 
 @Composable
-internal fun CameraShakeFields(document: HollowIdeVfxDocument, state: VfxEditorState, shake: VfxCameraShakeSpec) {
+internal fun CameraShakeFields(document: VfxEditing, state: VfxInspectorState, shake: VfxCameraShakeSpec) {
     Folding(state, "shake", vfxText("section_shake"), VfxIcons.SHAKE) {
         VfxValueRow(vfxText("shake_strength"), shake.strength, VfxProperty.SHAKE_STRENGTH, vfxText("shake_strength_hint")) {
             document.replace(shake.copy(strength = it))

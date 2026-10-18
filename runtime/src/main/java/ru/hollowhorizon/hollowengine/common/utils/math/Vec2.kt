@@ -4,7 +4,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.listSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
@@ -218,7 +217,7 @@ open class Vec2f(open val x: Float, open val y: Float) {
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec2Serializer : KSerializer<Vec2f> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Float>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Float>("hollowengine.Vec2f")
 
         override fun serialize(encoder: Encoder, value: Vec2f) {
             encoder.encodeCollection(descriptor, 2) {
@@ -229,9 +228,10 @@ open class Vec2f(open val x: Float, open val y: Float) {
 
         override fun deserialize(decoder: Decoder): Vec2f {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeFloatElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeFloatElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2f(x, y)
@@ -538,7 +538,7 @@ open class Vec2d(open val x: Double, open val y: Double) {
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec2Serializer : KSerializer<Vec2d> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Double>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Double>("hollowengine.Vec2d")
 
         override fun serialize(encoder: Encoder, value: Vec2d) {
             encoder.encodeCollection(descriptor, 2) {
@@ -549,9 +549,10 @@ open class Vec2d(open val x: Double, open val y: Double) {
 
         override fun deserialize(decoder: Decoder): Vec2d {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeDoubleElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeDoubleElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2d(x, y)
@@ -793,7 +794,7 @@ open class Vec2i(open val x: Int, open val y: Int) {
 
     @OptIn(ExperimentalSerializationApi::class)
     object Vec2Serializer : KSerializer<Vec2i> {
-        override val descriptor: SerialDescriptor = listSerialDescriptor<Int>()
+        override val descriptor: SerialDescriptor = VectorDescriptors.of<Int>("hollowengine.Vec2i")
 
         override fun serialize(encoder: Encoder, value: Vec2i) {
             encoder.encodeCollection(descriptor, 2) {
@@ -804,9 +805,10 @@ open class Vec2i(open val x: Int, open val y: Int) {
 
         override fun deserialize(decoder: Decoder): Vec2i {
             val dec = decoder.beginStructure(descriptor)
-            require(dec.decodeElementIndex(descriptor) == 0)
+            val vector = VectorReader(dec, descriptor)
+            vector.expect(0)
             val x = dec.decodeIntElement(descriptor, 0)
-            require(dec.decodeElementIndex(descriptor) == 1)
+            vector.expect(1)
             val y = dec.decodeIntElement(descriptor, 1)
             dec.endStructure(descriptor)
             return Vec2i(x, y)

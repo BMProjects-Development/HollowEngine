@@ -93,22 +93,16 @@
 
 .asset-refresh {
     size: 15px 15px;
-    align-items: center center;
-    border-radius: $radius-small;
+    padding: 0px;
     transition: background 100ms ease-out, rotate 240ms ease-out;
-}
-
-.asset-refresh:hover {
-    background: $bg-hover;
 }
 
 .asset-refresh.loading {
     rotate: 0 0 180;
 }
 
-.asset-refresh-icon {
+.asset-refresh .button-icon {
     size: 9px 9px;
-    tint: $text-soft;
 }
 
 .asset-grid-scroll {
@@ -192,7 +186,7 @@
     align: center center;
 }
 
-.asset-filter-icon, .asset-filter-close {
+.asset-filter-icon, .asset-filter-close .button-icon {
     size: 11px 11px;
     tint: $text-soft;
 }

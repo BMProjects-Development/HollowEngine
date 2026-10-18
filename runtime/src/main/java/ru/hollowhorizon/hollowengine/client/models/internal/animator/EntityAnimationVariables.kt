@@ -1,19 +1,25 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
-import net.minecraft.client.Minecraft
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import kotlin.math.abs
+import kotlin.math.atan
+import kotlin.math.atan2
 
 /**
  * Fills [context] with what an animation expression can read this frame.
+ *
+ * [gameTicks] is the level clock; without an entity, as in a preview, the caller says which clock it runs on.
  */
-fun fillAnimationVariables(context: AnimatorEvaluationContext, entity: Entity?, partialTick: Float) {
-    val gameTicks = entity?.level()?.gameTime ?: Minecraft.getInstance().level?.gameTime ?: 0L
-
+fun fillAnimationVariables(
+    context: AnimatorEvaluationContext,
+    entity: Entity?,
+    partialTick: Float,
+    gameTicks: Long = entity?.level()?.gameTime ?: 0L,
+) {
     context.temporaries.clear()
     context.entity = entity
     context.partialTick = partialTick
@@ -33,6 +39,11 @@ fun fillAnimationVariables(context: AnimatorEvaluationContext, entity: Entity?, 
     context.localSideSpeed = localSideSpeed(velocity, movementYaw)
     context.horizontalSpeed = velocity.horizontalDistance().toFloat() * 20f
     context.signedHorizontalSpeed = signedLocomotionSpeed(context.horizontalSpeed, context.localForwardSpeed)
+    context.flightPitch = flightPitch(velocity)
+    context.flightBank = when (entity) {
+        is LivingEntity -> flightBank(velocity.horizontalDistance(), Mth.wrapDegrees(entity.yBodyRot - entity.yBodyRotO))
+        else -> 0f
+    }
 
     if (entity !is LivingEntity) return
 
@@ -56,4 +67,27 @@ internal fun signedLocomotionSpeed(horizontalSpeed: Float, localForwardSpeed: Fl
     if (abs(localForwardSpeed) > LOCAL_MOVEMENT_EPSILON && localForwardSpeed < 0f) -horizontalSpeed
     else horizontalSpeed
 
+internal fun flightPitch(velocity: Vec3): Float {
+    if (velocity.length() < MIN_FLIGHT_SPEED) return 0f
+    return (atan2(velocity.y, velocity.horizontalDistance()) * Mth.RAD_TO_DEG).toFloat()
+}
+
+internal fun flightBank(speed: Double, turn: Float): Float {
+    val sideways = speed * turn * Mth.DEG_TO_RAD / BANK_GRAVITY
+    return (atan(sideways) * Mth.RAD_TO_DEG).toFloat()
+}
+
 private const val LOCAL_MOVEMENT_EPSILON = 0.001f
+
+private const val MIN_FLIGHT_SPEED = 0.01
+private const val BANK_GRAVITY = 0.08
+
+/**
+ * The conditions of an entity's montage sections, asked of the entity as it is at [partialTick]; what they read
+ * is gathered the first time one is asked, as most playback asks none.
+ */
+class EntityConditions(private val entity: Entity, private val partialTick: Float = 1f) : (String) -> Boolean {
+    private val context by lazy { AnimatorEvaluationContext().also { fillAnimationVariables(it, entity, partialTick) } }
+
+    override fun invoke(source: String): Boolean = AnimatorExpressionEvaluator.condition(source, context)
+}

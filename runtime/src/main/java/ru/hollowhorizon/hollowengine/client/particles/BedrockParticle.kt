@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.util.Mth
+import ru.hollowhorizon.hollowengine.client.models.bedrock.*
 import ru.hollowhorizon.hollowengine.client.particles.file.ParticleComponents
 import ru.hollowhorizon.hollowengine.client.utils.color
 import ru.hollowhorizon.hollowengine.client.utils.math.*
@@ -12,11 +13,6 @@ import ru.hollowhorizon.hollowengine.client.utils.uv2
 import ru.hollowhorizon.hollowengine.client.utils.vertex
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.math.*
-import ru.hollowhorizon.hollowengine.client.models.bedrock.FloatExpr
-import ru.hollowhorizon.hollowengine.client.models.bedrock.LivingEntityQuery
-import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
-import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
-import ru.hollowhorizon.hollowengine.client.models.bedrock.VariablesMap
 import java.util.*
 import kotlin.math.absoluteValue
 import kotlin.math.sqrt

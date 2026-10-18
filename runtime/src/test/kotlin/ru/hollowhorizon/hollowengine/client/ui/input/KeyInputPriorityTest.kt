@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.input
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

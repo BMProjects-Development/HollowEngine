@@ -39,8 +39,12 @@ data class RagdollStateSpec(
     val blockRadius: Int = 3,
     /** Per-bone overrides, by bone name. */
     val bones: Map<String, RagdollBoneSpec> = emptyMap(),
+    /** Where the bodies are simulated; see [RagdollSimulation]. */
+    val simulation: RagdollSimulation = RagdollSimulation.SERVER,
 ) : AnimationControllerStateSpec() {
     override fun withId(id: String) = copy(id = id)
+
+    override val runsOnServer: Boolean get() = simulation == RagdollSimulation.SERVER
 
     fun boneSpec(name: String): RagdollBoneSpec? = bones[name]
 
@@ -55,6 +59,18 @@ data class RagdollStateSpec(
             createDefault = { id -> RagdollStateSpec(id = id) },
         )
     }
+}
+
+/** Where a ragdoll is simulated. */
+@Serializable
+enum class RagdollSimulation {
+    /**
+     * On the server, which sends the bodies to everyone who sees the entity.
+     */
+    SERVER,
+
+    /** On each client by itself: only a picture, which the colliders and the entity know nothing of. */
+    CLIENT,
 }
 
 /**

@@ -1,11 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.particles
 
+import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.client.models.bedrock.Variables
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
 import ru.hollowhorizon.hollowengine.client.utils.math.bezier
 import ru.hollowhorizon.hollowengine.client.utils.math.catmullRom
 import ru.hollowhorizon.hollowengine.client.utils.math.lerp
-import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
-import ru.hollowhorizon.hollowengine.client.models.bedrock.Variables
 
 class CurveVariables(
     private val context: () -> BedrockContext,

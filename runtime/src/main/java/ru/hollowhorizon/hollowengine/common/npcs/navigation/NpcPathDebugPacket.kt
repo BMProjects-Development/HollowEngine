@@ -13,6 +13,8 @@ data class NpcPathDebugNode(
     val z: Int,
     val type: String,
     val costMalus: Float,
+    val jump: Boolean = false,
+    val flown: Boolean = false,
 )
 
 @Serializable
@@ -33,6 +35,8 @@ data class NpcPathDebugPacket(
     val targetZ: Int,
     val reached: Boolean,
     val steeringTarget: NpcPathDebugPoint,
+    val lookTarget: NpcPathDebugPoint? = null,
+    val speedShare: Float = 1f,
 ) : HollowPacket {
     override fun handle(player: Player) {
         NpcPathDebugRenderer.update(this)

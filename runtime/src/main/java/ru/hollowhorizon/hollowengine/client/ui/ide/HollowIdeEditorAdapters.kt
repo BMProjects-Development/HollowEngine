@@ -3,14 +3,16 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import kotlinx.coroutines.*
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.EditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.PlainEditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.pathExtension
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
+import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
+import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -30,26 +32,49 @@ internal class HollowIdeEditorSession(
     private val scope = CoroutineScope(SupervisorJob() + analysisDispatcher)
     private val analysisRevision = AtomicLong()
     private val completionRevision = AtomicLong()
+
     @Volatile
     private var requestedAnalysis: AnalysisKey? = null
+
     @Volatile
     private var requestedCompletion: CompletionKey? = null
+
     @Volatile
     private var requestedOccurrence: OccurrenceKey? = null
+
     @Volatile
     private var analysisJob: Job? = null
+
     @Volatile
     private var completionJob: Job? = null
-    @Volatile
     private var definitionJob: Job? = null
-    @Volatile
+    private var gutterJob: Job? = null
     private var formatJob: Job? = null
+
     @Volatile
     private var occurrenceJob: Job? = null
+
     @Volatile
     private var snapshot = EditorAnalysisSnapshot.Empty
+
     @Volatile
     private var completionSnapshot = CompletionSnapshot.Empty
+
+    @Volatile
+    private var contextCompletionJob: Job? = null
+
+    @Volatile
+    private var contextCompletionSnapshot = CompletionSnapshot.Empty
+
+    @Volatile
+    private var requestedIntentions: CompletionKey? = null
+
+    @Volatile
+    private var intentionJob: Job? = null
+
+    @Volatile
+    private var intentionSnapshot = CompletionSnapshot.Empty
+
     @Volatile
     private var occurrenceSnapshot = OccurrenceSnapshot.Empty
     private val publishedRevision = AtomicLong()
@@ -87,6 +112,7 @@ internal class HollowIdeEditorSession(
                     inlayHints = current.inlayHints,
                     exact = true,
                 )
+
                 current.hasText -> {
                     requestAnalysis(text, analyzer)
                     if (exactOnly) {
@@ -99,6 +125,7 @@ internal class HollowIdeEditorSession(
                         )
                     }
                 }
+
                 else -> {
                     requestAnalysis(text, analyzer)
                     null
@@ -123,10 +150,17 @@ internal class HollowIdeEditorSession(
     }
     val highlighter: UiCaretAwareSyntaxHighlighter = textAnalyzer
 
+    /** Called while the UI frame is built, off the client thread: it only reads published snapshots. */
     val completions: UiCompletionContributor = UiCompletionContributor { context ->
         val analyzer = currentAnalyzer()
+        if (context.intentions) {
+            requestIntentions(context.text, context.caret, analyzer)
+            return@UiCompletionContributor intentionSnapshot.itemsAt(context.text, context.caret, analyzer)
+        }
         requestCompletions(context.text, context.caret, analyzer)
-        completionSnapshot.takeIf { it.matches(context.text, context.caret, analyzer) }?.items.orEmpty()
+        completionSnapshot.itemsAt(
+            context.text, context.caret, analyzer
+        ) + contextCompletionSnapshot.itemsAt(context.text, context.caret, analyzer)
     }
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
@@ -157,6 +191,14 @@ internal class HollowIdeEditorSession(
         }
     }
 
+    fun structure(text: String): EditorStructure {
+        val analyzer = currentAnalyzer()
+        val current = snapshot
+        if (current.matchesText(text, analyzer)) return current.structure
+        requestAnalysis(text, analyzer)
+        return EditorStructure(folds = shiftCodeFoldsThroughEdit(current.text, text, current.structure.folds))
+    }
+
     val canFormat: Boolean get() = currentAnalyzer().canFormat
 
     /**
@@ -165,13 +207,14 @@ internal class HollowIdeEditorSession(
      */
     fun format(text: String, onFormatted: (String?) -> Unit) {
         val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
         formatJob?.cancel()
         formatJob = scope.launch {
             val formatted = runCatching { analyzer.format(path, text) }.getOrElse { failure ->
                 reportAnalysisFailure("format", failure)
                 null
             }
-            Minecraft.getInstance().execute {
+            withContext(publicationDispatcher) {
                 onFormatted(formatted)
             }
         }
@@ -179,14 +222,48 @@ internal class HollowIdeEditorSession(
 
     fun resolveDefinition(text: String, caret: Int, onResolved: (DefinitionLocation?) -> Unit) {
         val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
         val safeCaret = caret.coerceIn(0, text.length)
         definitionJob?.cancel()
         definitionJob = scope.launch {
             val definition = runCatching {
                 analyzer.definition(path, text, safeCaret)
-            }.getOrNull()
-            Minecraft.getInstance().execute {
+            }.getOrElse { failure ->
+                reportAnalysisFailure("definition", failure)
+                null
+            }
+            withContext(publicationDispatcher) {
                 onResolved(definition)
+            }
+        }
+    }
+
+    fun resolveGutterTargets(text: String, offset: Int, onResolved: (List<GutterNavigationTarget>) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        gutterJob?.cancel()
+        gutterJob = scope.launch {
+            val targets = runCatching { analyzer.gutterTargets(path, text, offset) }.getOrElse { failure ->
+                reportAnalysisFailure("gutter targets", failure)
+                emptyList()
+            }
+            withContext(publicationDispatcher) {
+                onResolved(targets)
+            }
+        }
+    }
+
+    /** Fills a read-only document whose text the language produces, such as a restored decompiled class. */
+    fun loadDocument(onLoaded: (String?) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        scope.launch {
+            val text = runCatching { analyzer.documentText(path) }.getOrElse { failure ->
+                reportAnalysisFailure("document", failure)
+                null
+            }
+            withContext(publicationDispatcher) {
+                onLoaded(text)
             }
         }
     }
@@ -228,6 +305,10 @@ internal class HollowIdeEditorSession(
                 highlights = lines.toHighlights(text, lineStarts),
                 inlayHints = lines.toInlayHints(lineStarts, text.length),
                 diagnostics = diagnostics,
+                structure = runCatching { analyzer.structure(path, text) }.getOrElse { failure ->
+                    reportAnalysisFailure("structure", failure)
+                    EditorStructure()
+                },
             )
             publishAnalysisIfCurrent(requestRevision) {
                 snapshot = next
@@ -285,6 +366,20 @@ internal class HollowIdeEditorSession(
             }
             if (publishedSize != collected.size) publish()
         }
+        contextCompletionJob?.cancel()
+        contextCompletionJob = scope.launch(Minecraft.getInstance().dispatcher) {
+            val context = UiCompletionContext(text, key.caret)
+            val items = runCatching {
+                val candidates = ideContextCompletions(path, context).toMutableList()
+                IdeCompletionEvent.post(IdeCompletionEvent(path, text, key.caret, candidates)).items.toList()
+            }.getOrElse { failure ->
+                HollowEngine.LOGGER.error("Context completions failed for '{}'", path, failure)
+                emptyList()
+            }
+            publishCompletionIfCurrent(requestRevision) {
+                contextCompletionSnapshot = CompletionSnapshot(key.textHash, key.textLength, key.caret, analyzer, items)
+            }
+        }
     }
 
     private fun publishAnalysisIfCurrent(requestRevision: Long, update: () -> Unit) {
@@ -292,6 +387,24 @@ internal class HollowIdeEditorSession(
         update()
         publishedRevision.incrementAndGet()
         Minecraft.getInstance().execute(onUpdated)
+    }
+
+    private fun requestIntentions(text: String, caret: Int, analyzer: ScriptingAnalyzer) {
+        val key = CompletionKey(text.hashCode(), text.length, caret.coerceIn(0, text.length), analyzer)
+        if (requestedIntentions == key) return
+        requestedIntentions = key
+        intentionJob?.cancel()
+        intentionJob = scope.launch {
+            val items = runCatching { analyzer.intentionActions(path, text, key.caret) }.getOrElse { failure ->
+                reportAnalysisFailure("intentions", failure)
+                emptyList()
+            }.map { it.toUi().toCompletion() }
+            ensureActive()
+            if (requestedIntentions != key) return@launch
+            intentionSnapshot = CompletionSnapshot(key.textHash, key.textLength, key.caret, analyzer, items)
+            publishedRevision.incrementAndGet()
+            Minecraft.getInstance().execute(onUpdated)
+        }
     }
 
     private fun publishCompletionIfCurrent(requestRevision: Long, update: () -> Unit) {
@@ -313,7 +426,7 @@ internal class HollowIdeEditorSession(
         HollowEngine.LOGGER.error("Scripting analysis ({}) failed for '{}'", stage, path, failure)
     }
 
-    private val reportedFailures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val reportedFailures = HashSet<String>()
 
     private fun currentAnalyzer(): ScriptingAnalyzer {
         return languageService.analyzer
@@ -344,10 +457,9 @@ private data class OccurrenceSnapshot(
     val ranges: List<OccurrenceRange>,
 ) {
     fun matches(text: String, offset: Int, analyzer: ScriptingAnalyzer): Boolean {
-        return textHash == text.hashCode() &&
-                textLength == text.length &&
-                caret == offset.coerceIn(0, text.length) &&
-                this.analyzer === analyzer
+        return textHash == text.hashCode() && textLength == text.length && caret == offset.coerceIn(
+            0, text.length
+        ) && this.analyzer === analyzer
     }
 
     companion object {
@@ -369,11 +481,11 @@ private data class CompletionSnapshot(
     val analyzer: ScriptingAnalyzer,
     val items: List<UiTextCompletion>,
 ) {
-    fun matches(text: String, offset: Int, analyzer: ScriptingAnalyzer): Boolean {
-        return textHash == text.hashCode() &&
-                textLength == text.length &&
-                caret == offset.coerceIn(0, text.length) &&
-                this.analyzer === analyzer
+    fun itemsAt(text: String, offset: Int, analyzer: ScriptingAnalyzer): List<UiTextCompletion> {
+        val matches = textHash == text.hashCode() && textLength == text.length && caret == offset.coerceIn(
+            0, text.length
+        ) && this.analyzer === analyzer
+        return if (matches) items else emptyList()
     }
 
     companion object {
@@ -389,6 +501,7 @@ private data class EditorAnalysisSnapshot(
     val highlights: List<UiTextHighlight>,
     val inlayHints: List<UiInlayHint>,
     val diagnostics: List<UiTextDiagnostic>,
+    val structure: EditorStructure = EditorStructure(),
 ) {
     fun matchesText(text: String, analyzer: ScriptingAnalyzer): Boolean {
         return textHash == text.hashCode() && textLength == text.length && this.analyzer === analyzer
@@ -425,11 +538,10 @@ private data class EditorAnalysisSnapshot(
 internal fun mapCaretThroughFormat(original: String, formatted: String, caret: Int): Int {
     val position = caret.coerceIn(0, original.length)
 
-    fun after(index: Int) = (codeCharOffset(formatted, codeCharsBefore(original, index)) + 1)
-        .coerceIn(0, formatted.length)
+    fun after(index: Int) =
+        (codeCharOffset(formatted, codeCharsBefore(original, index)) + 1).coerceIn(0, formatted.length)
 
-    fun before(index: Int) = codeCharOffset(formatted, codeCharsBefore(original, index))
-        .coerceIn(0, formatted.length)
+    fun before(index: Int) = codeCharOffset(formatted, codeCharsBefore(original, index)).coerceIn(0, formatted.length)
 
     if (position > 0 && !original[position - 1].isWhitespace()) return after(position - 1)
 
@@ -439,8 +551,8 @@ internal fun mapCaretThroughFormat(original: String, formatted: String, caret: I
         return before(index)
     }
 
-    val lineStart = original.lastIndexOf('\n', (position - 1).coerceAtLeast(0))
-        .let { if (it < 0 || position == 0) 0 else it + 1 }
+    val lineStart =
+        original.lastIndexOf('\n', (position - 1).coerceAtLeast(0)).let { if (it < 0 || position == 0) 0 else it + 1 }
     for (index in position - 1 downTo lineStart) {
         if (original[index].isWhitespace()) continue
         return after(index)
@@ -564,11 +676,11 @@ internal fun shiftDiagnosticsForEditedText(
 
 internal fun languageServiceForPath(path: String): EditorLanguageService {
     val contributed = HollowIdeExtensionPoints.LANGUAGES.registrations.firstOrNull { extension ->
-        runCatching { extension.invoke { language -> language.matches(path) } }
-            .onFailure { failure ->
-                HollowEngine.LOGGER.error("IDE language extension '{}' failed while matching '{}'", extension.qualifiedId, path, failure)
-            }
-            .getOrDefault(false)
+        runCatching { extension.invoke { language -> language.matches(path) } }.onFailure { failure ->
+            HollowEngine.LOGGER.error(
+                "IDE language extension '{}' failed while matching '{}'", extension.qualifiedId, path, failure
+            )
+        }.getOrDefault(false)
     }
     if (contributed != null) return ExtensionEditorLanguageService(contributed)
     return runCatching { EditorLanguageService(pathExtension(path)) }.getOrNull() ?: PlainEditorLanguageService
@@ -637,7 +749,9 @@ private fun CompletionItemTag.completionIcon(): String {
     val name = when (this) {
         CompletionItemTag.FUNCTION -> "method"
         CompletionItemTag.PROPERTY,
-        CompletionItemTag.LOCAL_VARIABLE -> "variable"
+        CompletionItemTag.LOCAL_VARIABLE,
+            -> "variable"
+
         CompletionItemTag.CLASS -> "class"
         CompletionItemTag.KEYWORD -> "package"
     }
@@ -654,23 +768,25 @@ private fun Diagnostic.toUi(text: String, lineStarts: List<Int>): UiTextDiagnost
         severity = severity.toUi(),
         line = range.start.line + 1,
         column = range.start.column + 1,
-        fixes = fixes.map { fix ->
-            UiTextQuickFix(
-                title = fix.title.lang(*fix.titleArgs.toTypedArray()),
-                edits = fix.edits.map { UiTextEdit(it.start, it.end, it.replacement) },
-            )
-        },
+        fixes = fixes.map(DiagnosticFix::toUi),
     )
 }
+
+private fun DiagnosticFix.toUi() = UiTextQuickFix(
+    title = title.lang(*titleArgs.toTypedArray()),
+    edits = edits.map { UiTextEdit(it.start, it.end, it.replacement) },
+)
 
 private fun Severity.toUi(): UiTextDiagnosticSeverity {
     return when (this) {
         Severity.ERROR,
-        Severity.FATAL -> UiTextDiagnosticSeverity.ERROR
+        Severity.FATAL,
+            -> UiTextDiagnosticSeverity.ERROR
 
         Severity.WARNING -> UiTextDiagnosticSeverity.WARNING
         Severity.DEBUG,
-        Severity.INFO -> UiTextDiagnosticSeverity.INFO
+        Severity.INFO,
+            -> UiTextDiagnosticSeverity.INFO
     }
 }
 

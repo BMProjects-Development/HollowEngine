@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.utils.nbt
 
-import com.google.gson.JsonParser
-import com.mojang.serialization.JsonOps
-import io.netty.buffer.Unpooled
 import kotlinx.serialization.*
-import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -13,15 +9,10 @@ import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeStructure
-import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonEncoder
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.*
-import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.network.chat.Component
-import net.minecraft.resources.RegistryOps
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.monster.Zombie
@@ -30,33 +21,13 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3d
 import org.joml.Vector3f
-import ru.hollowhorizon.hollowengine.common.utils.*
-import ru.hollowhorizon.hollowengine.common.utils.json.JsonFormat
+import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.readItem
+import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.common.utils.serialization.registries
 import java.util.*
-
-object FriendlyByteBufSerializer : KSerializer<FriendlyByteBuf> {
-    @OptIn(ExperimentalSerializationApi::class)
-    override val descriptor = SerialDescriptor("FriendlyByteBuf", ByteArraySerializer().descriptor)
-
-    override fun serialize(encoder: Encoder, value: FriendlyByteBuf) {
-        val index = value.readerIndex()
-        val bytes = ByteArray(value.readableBytes())
-        value.readBytes(bytes)
-        value.readerIndex(index)
-
-        encoder.encodeSerializableValue(ByteArraySerializer(), bytes)
-    }
-
-    override fun deserialize(decoder: Decoder): FriendlyByteBuf {
-        val bytes = decoder.decodeSerializableValue(ByteArraySerializer())
-        val buf = FriendlyByteBuf(Unpooled.buffer()).apply { writeBytes(bytes) }
-
-        return buf
-    }
-}
 
 object ForBlockPos : KSerializer<BlockPos> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("BlockPos", PrimitiveKind.LONG)
@@ -131,8 +102,7 @@ object ForNbtNull : KSerializer<EndTag> {
 object ForByteArrayNBT : KSerializer<ByteArrayTag> {
     override val descriptor: SerialDescriptor = PublicisedListLikeDescriptorImpl(ForByteNBT.descriptor, "ByteArrayNBT")
 
-    override fun serialize(encoder: Encoder, value: ByteArrayTag) =
-        ListSerializer(ForByteNBT).serialize(encoder, value)
+    override fun serialize(encoder: Encoder, value: ByteArrayTag) = ListSerializer(ForByteNBT).serialize(encoder, value)
 
     override fun deserialize(decoder: Decoder): ByteArrayTag =
         ByteArrayTag(ListSerializer(ForByteNBT).deserialize(decoder).map { it.asByte })
@@ -141,8 +111,7 @@ object ForByteArrayNBT : KSerializer<ByteArrayTag> {
 object ForIntArrayNBT : KSerializer<IntArrayTag> {
     override val descriptor: SerialDescriptor = PublicisedListLikeDescriptorImpl(ForIntNBT.descriptor, "IntArrayNBT")
 
-    override fun serialize(encoder: Encoder, value: IntArrayTag) =
-        ListSerializer(ForIntNBT).serialize(encoder, value)
+    override fun serialize(encoder: Encoder, value: IntArrayTag) = ListSerializer(ForIntNBT).serialize(encoder, value)
 
     override fun deserialize(decoder: Decoder): IntArrayTag =
         IntArrayTag(ListSerializer(ForIntNBT).deserialize(decoder).map { it.asInt })
@@ -151,22 +120,45 @@ object ForIntArrayNBT : KSerializer<IntArrayTag> {
 object ForMatrix4f : KSerializer<Matrix4f> {
     override val descriptor: SerialDescriptor = PublicisedListLikeDescriptorImpl(ForFloatNBT.descriptor, "Matrix4f")
 
-    override fun serialize(encoder: Encoder, value: Matrix4f) =
-        ListSerializer(ForFloatNBT).serialize(
-            encoder, listOf(
-                value.m00(), value.m01(), value.m02(), value.m03(),
-                value.m10(), value.m11(), value.m12(), value.m13(),
-                value.m20(), value.m21(), value.m22(), value.m23(),
-                value.m30(), value.m31(), value.m32(), value.m33()
-            ).map { FloatTag.valueOf(it) })
+    override fun serialize(encoder: Encoder, value: Matrix4f) = ListSerializer(ForFloatNBT).serialize(
+        encoder, listOf(
+            value.m00(),
+            value.m01(),
+            value.m02(),
+            value.m03(),
+            value.m10(),
+            value.m11(),
+            value.m12(),
+            value.m13(),
+            value.m20(),
+            value.m21(),
+            value.m22(),
+            value.m23(),
+            value.m30(),
+            value.m31(),
+            value.m32(),
+            value.m33()
+        ).map { FloatTag.valueOf(it) })
 
     override fun deserialize(decoder: Decoder): Matrix4f {
         val array = ListSerializer(ForFloatNBT).deserialize(decoder).map { it.asFloat }
         return Matrix4f(
-            array[0], array[1], array[2], array[3],
-            array[4], array[5], array[6], array[7],
-            array[8], array[9], array[10], array[11],
-            array[12], array[13], array[14], array[15]
+            array[0],
+            array[1],
+            array[2],
+            array[3],
+            array[4],
+            array[5],
+            array[6],
+            array[7],
+            array[8],
+            array[9],
+            array[10],
+            array[11],
+            array[12],
+            array[13],
+            array[14],
+            array[15]
         )
     }
 }
@@ -174,8 +166,7 @@ object ForMatrix4f : KSerializer<Matrix4f> {
 object ForLongArrayNBT : KSerializer<LongArrayTag> {
     override val descriptor: SerialDescriptor = PublicisedListLikeDescriptorImpl(ForLongNBT.descriptor, "LongArrayNBT")
 
-    override fun serialize(encoder: Encoder, value: LongArrayTag) =
-        ListSerializer(ForLongNBT).serialize(encoder, value)
+    override fun serialize(encoder: Encoder, value: LongArrayTag) = ListSerializer(ForLongNBT).serialize(encoder, value)
 
     override fun deserialize(decoder: Decoder): LongArrayTag =
         LongArrayTag(ListSerializer(ForLongNBT).deserialize(decoder).map { it.asLong })
@@ -187,10 +178,8 @@ object ForTag : KSerializer<Tag> {
         buildSerialDescriptor("kotlinx.serialization.Polymorphic", PolymorphicKind.OPEN) {
             element("type", String.serializer().descriptor)
             element(
-                "value",
-                buildSerialDescriptor(
-                    "kotlinx.serialization.Polymorphic<${Tag::class.simpleName}>",
-                    SerialKind.CONTEXTUAL
+                "value", buildSerialDescriptor(
+                    "kotlinx.serialization.Polymorphic<${Tag::class.simpleName}>", SerialKind.CONTEXTUAL
                 )
             )
         }
@@ -231,9 +220,7 @@ object ForCompoundNBT : KSerializer<CompoundTag> {
             encoder.encodeCompoundNBT(value)
         } else {
             MapSerializer(String.serializer(), ForTag).serialize(
-                encoder,
-                value.allKeys.associateWith { value.get(it)!! }
-            )
+                encoder, value.allKeys.associateWith { value.get(it)!! })
         }
 
     }
@@ -289,49 +276,6 @@ object ForItemStack : KSerializer<ItemStack> {
     }
 }
 
-object ForItemStackJson : KSerializer<ItemStack> {
-    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
-
-    override fun serialize(encoder: Encoder, value: ItemStack) {
-        val jsonEncoder = encoder as? JsonEncoder ?: throw SerializationException("Requires JsonEncoder")
-        val ops = RegistryOps.create(JsonOps.INSTANCE, encoder.registries)
-
-        val gsonElement = ItemStack.CODEC.encodeStart(ops, value)
-            .getOrThrow { id -> SerializationException("Failed to serialize ItemStack: $id") }
-
-
-        val jsonPrimitive: JsonElement = JsonFormat.decodeFromString(gsonElement.toString())
-
-        jsonEncoder.encodeJsonElement(jsonPrimitive)
-    }
-
-    override fun deserialize(decoder: Decoder): ItemStack {
-        val jsonDecoder = decoder as? JsonDecoder ?: throw SerializationException("Requires JsonDecoder")
-        val jsonElement = jsonDecoder.decodeJsonElement()
-
-        val ops = RegistryOps.create(JsonOps.INSTANCE, decoder.registries)
-
-        val gsonElement = JsonFormat.encodeToString(jsonElement)
-
-        return ItemStack.CODEC.parse(ops, JsonParser.parseString(gsonElement))
-            .getOrThrow { id -> SerializationException("Failed to deserialize ItemStack: $id") }
-
-
-    }
-}
-
-object ForStringUUID : KSerializer<UUID> {
-    override val descriptor: SerialDescriptor = String.serializer().descriptor
-
-    override fun serialize(encoder: Encoder, value: UUID) {
-        return encoder.encodeString(value.toString())
-    }
-
-    override fun deserialize(decoder: Decoder): UUID {
-        return UUID.fromString(decoder.decodeString())
-    }
-}
-
 object ForUuid : KSerializer<UUID> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Uuid") {
         element("most", Long.serializer().descriptor)
@@ -383,10 +327,7 @@ object ForUuid : KSerializer<UUID> {
             }
         }
         dec.endStructure(descriptor)
-        return UUID(
-            most ?: missingField("most", "UUID") { 0L },
-            least ?: missingField("least", "UUID") { 0L }
-        )
+        return UUID(most ?: missingField("most", "UUID") { 0L }, least ?: missingField("least", "UUID") { 0L })
     }
 }
 
@@ -748,18 +689,5 @@ object ForEntity : KSerializer<Entity> {
 
     override fun serialize(encoder: Encoder, value: Entity) {
         encoder.encodeInt(value.id)
-    }
-}
-
-
-object ForColor : KSerializer<Color> {
-    override val descriptor: SerialDescriptor = String.serializer().descriptor
-
-    override fun serialize(encoder: Encoder, value: Color) {
-        encoder.encodeString(value.toHexString())
-    }
-
-    override fun deserialize(decoder: Decoder): Color {
-        return Color(decoder.decodeString())
     }
 }

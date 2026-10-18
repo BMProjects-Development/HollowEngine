@@ -3,14 +3,15 @@ package ru.hollowhorizon.hollowengine.common.npcs.navigation
 import net.minecraft.core.BlockPos
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Mob
+import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.level.BlockGetter
 import net.minecraft.world.level.CollisionGetter
+import net.minecraft.world.level.pathfinder.WalkNodeEvaluator
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderPathObstacles
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcNavigationGeometry.SPOT_REACH
+import kotlin.math.*
 
 internal object NpcNavigationGeometry {
     private const val COLLISION_EPSILON = 1.0e-3
@@ -23,6 +24,20 @@ internal object NpcNavigationGeometry {
     private const val MAX_JUMP_DISTANCE = 1.75
     private const val MAX_SAFE_DROP = 1.25
     private const val JUMP_CLEARANCE = 0.05
+
+    /** How far under the feet the block that sets the ground friction is looked for, as vanilla does. */
+    private const val GROUND_PROBE = 0.5000001
+
+    /**
+     * How far around a point without room for the NPC, in blocks, a spot with room is looked for: sideways, and
+     * the cells above and below its own.
+     */
+    private const val SPOT_REACH = 2
+    private const val SPOT_RISE = 1
+    private const val SPOT_DROP = 2
+
+    /** How many halvings find how far the NPC slides toward a point before something stops it. */
+    private const val SLIDE_STEPS = 6
 
     fun canWalkDirectly(
         level: CollisionGetter,
@@ -64,15 +79,6 @@ internal object NpcNavigationGeometry {
         return null
     }
 
-    /**
-     * Диагональное "протискивание" сквозь угол: игрок проскакивает такие проходы, идя прямо на
-     * скорости, даже если с одной стороны стоит блок, а с другой — щель/лава без опоры под ногами.
-     *
-     * В отличие от [findWalkableWaypoint] здесь опора под ногами требуется только в конечных точках
-     * (там нода реально стоит), а вдоль самого прохода достаточно свободного места под тело — так же
-     * как проскакивает игрок, не задерживаясь над щелью. Полностью закрытый угол (блоки с обеих
-     * сторон) по-прежнему отбраковывается: свободного зазора там нет.
-     */
     fun canSqueezeDiagonally(
         level: CollisionGetter,
         mob: Mob,
@@ -85,10 +91,6 @@ internal object NpcNavigationGeometry {
         return findSqueezeWaypoint(level, mob, from, to) != null
     }
 
-    /**
-     * Точка, огибая которую тело NPC проходит сквозь угол без столкновений. Опора под ногами не
-     * проверяется — проход считается транзитным. Возвращает саму цель, если прямой путь свободен.
-     */
     fun findSqueezeWaypoint(level: CollisionGetter, mob: Mob, from: Vec3, to: Vec3): Vec3? {
         if (hasBodyClearance(level, mob, from, to)) return to
 
@@ -127,7 +129,7 @@ internal object NpcNavigationGeometry {
 
         val elevatedY = to.y + JUMP_CLEARANCE
         val ascent = bodyBox(mob, from).expandTowards(0.0, elevatedY - from.y, 0.0)
-        if (!level.noCollision(mob, ascent)) return false
+        if (!isFree(level, mob, ascent)) return false
 
         val elevatedFrom = Vec3(from.x, elevatedY, from.z)
         val elevatedTo = Vec3(to.x, elevatedY, to.z)
@@ -151,7 +153,7 @@ internal object NpcNavigationGeometry {
         val ledgeTarget = Vec3(to.x, from.y, to.z)
         if (!hasBodyClearance(level, mob, from, ledgeTarget)) return false
         val descent = bodyBox(mob, to).expandTowards(0.0, drop, 0.0)
-        return level.noCollision(mob, descent) && hasSupport(level, mob, to)
+        return isFree(level, mob, descent) && hasSupport(level, mob, to)
     }
 
     fun hasStepableSurface(
@@ -164,14 +166,9 @@ internal object NpcNavigationGeometry {
         if (shape.isEmpty) return false
         val localX = (approachPosition.x - surfacePos.x).coerceIn(COLLISION_EPSILON, 1.0 - COLLISION_EPSILON)
         val localZ = (approachPosition.z - surfacePos.z).coerceIn(COLLISION_EPSILON, 1.0 - COLLISION_EPSILON)
-        val surfaceHeight = shape.toAabbs()
-            .asSequence()
-            .filter { box ->
-                localX >= box.minX - COLLISION_EPSILON && localX <= box.maxX + COLLISION_EPSILON &&
-                        localZ >= box.minZ - COLLISION_EPSILON && localZ <= box.maxZ + COLLISION_EPSILON
-            }
-            .maxOfOrNull(AABB::maxY)
-            ?: return false
+        val surfaceHeight = shape.toAabbs().asSequence().filter { box ->
+                localX >= box.minX - COLLISION_EPSILON && localX <= box.maxX + COLLISION_EPSILON && localZ >= box.minZ - COLLISION_EPSILON && localZ <= box.maxZ + COLLISION_EPSILON
+            }.maxOfOrNull(AABB::maxY) ?: return false
         return surfaceHeight > COLLISION_EPSILON && surfaceHeight <= maxStepHeight + COLLISION_EPSILON
     }
 
@@ -183,7 +180,7 @@ internal object NpcNavigationGeometry {
         for (sample in 1..sampleCount) {
             val progress = sample.toDouble() / sampleCount
             val position = from.lerp(to, progress)
-            if (!level.noCollision(mob, bodyBox(mob, position))) return false
+            if (!isFree(level, mob, bodyBox(mob, position))) return false
             if (!hasSupport(level, mob, position)) return false
         }
         return true
@@ -195,12 +192,12 @@ internal object NpcNavigationGeometry {
         val sampleCount = max(1, ceil(distance / sampleDistance).toInt())
         for (sample in 0..sampleCount) {
             val position = from.lerp(to, sample.toDouble() / sampleCount)
-            if (!level.noCollision(mob, bodyBox(mob, position))) return false
+            if (!isFree(level, mob, bodyBox(mob, position))) return false
         }
         return true
     }
 
-    private fun bodyBox(mob: Mob, position: Vec3): AABB {
+    fun bodyBox(mob: Mob, position: Vec3): AABB {
         val halfWidth = mob.bbWidth * 0.5 - COLLISION_EPSILON
         val height = mob.bbHeight - COLLISION_EPSILON * 2.0
         return AABB(
@@ -226,6 +223,97 @@ internal object NpcNavigationGeometry {
         )
         return !level.noCollision(mob, support)
     }
+
+    /** Whether [box] meets neither blocks nor the colliders and blocking bodies of other entities. */
+    fun isFree(level: CollisionGetter, mob: Mob, box: AABB): Boolean =
+        level.noCollision(mob, box) && !ColliderPathObstacles.overlaps(mob, box)
+
+    /** What a jump of [mob] is simulated in: the blocks of [level] and the obstacles around them. */
+    fun jumpSpace(level: CollisionGetter, mob: Mob): JumpSpace = JumpSpace { box -> !isFree(level, mob, box) }
+
+    /** [mob] running at [speed], vanilla's speed of it, on ground of [friction]. */
+    fun jumpBody(mob: Mob, speed: Double, friction: Double) = JumpBody(
+        halfWidth = mob.bbWidth * 0.5,
+        height = mob.bbHeight.toDouble(),
+        speed = speed,
+        jumpPower = mob.getAttributeValue(Attributes.JUMP_STRENGTH) + mob.jumpBoostPower,
+        gravity = mob.gravity,
+        friction = friction,
+    )
+
+    /** The friction of the ground under a body standing at [position]. */
+    fun frictionUnder(level: BlockGetter, position: Vec3): Double = level.getBlockState(
+        BlockPos.containing(
+            position.x,
+            position.y - GROUND_PROBE,
+            position.z
+        )
+    ).block.friction.toDouble()
+
+    /**
+     * The point nearest [target] where [mob] can stand: on a floor, its body clear of blocks and of what it plans
+     * around, within [SPOT_REACH] blocks of it sideways. [target] itself when it is in water, which takes the NPC
+     * anywhere; null when nothing near has room.
+     */
+    fun standingSpot(level: CollisionGetter, mob: Mob, target: Vec3): Vec3? {
+        val origin = BlockPos.containing(target.x, target.y + COLLISION_EPSILON, target.z)
+        if (!level.getFluidState(origin).isEmpty) return target
+        val cell = BlockPos.MutableBlockPos()
+        var best: Vec3? = null
+        var bestDistance = Double.MAX_VALUE
+        for (dy in SPOT_RISE downTo -SPOT_DROP) for (dx in -SPOT_REACH..SPOT_REACH) for (dz in -SPOT_REACH..SPOT_REACH) {
+            cell.set(origin.x + dx, origin.y + dy, origin.z + dz)
+            val nearX = target.x.coerceIn(cell.x.toDouble(), cell.x + 1.0) - target.x
+            val nearZ = target.z.coerceIn(cell.z.toDouble(), cell.z + 1.0) - target.z
+            if (nearX * nearX + nearZ * nearZ >= bestDistance) continue
+            val spot = spotIn(level, mob, cell, target) ?: continue
+            val distance = spot.distanceToSqr(target)
+            if (distance < bestDistance) {
+                best = spot
+                bestDistance = distance
+            }
+        }
+        return best
+    }
+
+    /**
+     * Where in [cell] nearest [target] the NPC stands, coming from the middle of the cell straight toward it, one
+     * axis at a time as a body slides along a wall; null when there is no room in the middle.
+     */
+    private fun spotIn(level: CollisionGetter, mob: Mob, cell: BlockPos, target: Vec3): Vec3? {
+        val floor = WalkNodeEvaluator.getFloorLevel(level, cell)
+        if (floor <= cell.y - 1.0 + COLLISION_EPSILON) return null
+        val middle = nodeCenter(mob, cell.x, floor, cell.z)
+        if (!stands(level, mob, middle)) return null
+        val aim = Vec3(
+            target.x.coerceIn(cell.x.toDouble(), cell.x + 1.0),
+            floor,
+            target.z.coerceIn(cell.z.toDouble(), cell.z + 1.0)
+        )
+        if (stands(level, mob, aim)) return aim
+        val alongX = Vec3(aim.x, floor, middle.z)
+        val alongZ = Vec3(middle.x, floor, aim.z)
+        return if (abs(aim.x - middle.x) >= abs(aim.z - middle.z)) {
+            approach(level, mob, middle, alongX).let { approach(level, mob, it, Vec3(it.x, floor, aim.z)) }
+        } else {
+            approach(level, mob, middle, alongZ).let { approach(level, mob, it, Vec3(aim.x, floor, it.z)) }
+        }
+    }
+
+    /** The farthest point from [from], where the NPC stands, toward [to] that it still stands at, found by halving. */
+    private fun approach(level: CollisionGetter, mob: Mob, from: Vec3, to: Vec3): Vec3 {
+        if (stands(level, mob, to)) return to
+        var free = 0.0
+        var blocked = 1.0
+        repeat(SLIDE_STEPS) {
+            val middle = (free + blocked) * 0.5
+            if (stands(level, mob, from.lerp(to, middle))) free = middle else blocked = middle
+        }
+        return from.lerp(to, free)
+    }
+
+    private fun stands(level: CollisionGetter, mob: Mob, position: Vec3): Boolean =
+        isFree(level, mob, bodyBox(mob, position)) && hasSupport(level, mob, position)
 
     fun nodeCenter(mob: Mob, x: Int, floorY: Double, z: Int): Vec3 {
         val horizontalOffset = Mth.floor(mob.bbWidth + 1.0f) / 2.0

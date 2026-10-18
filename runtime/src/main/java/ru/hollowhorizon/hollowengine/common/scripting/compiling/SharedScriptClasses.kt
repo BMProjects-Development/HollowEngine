@@ -4,6 +4,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache.SharedScriptRef
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses.clearInstances
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import java.io.File
 import java.util.jar.JarFile

@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.utils.font
 
-import kotlin.math.floor
 import ru.hollowhorizon.hollowengine.client.ui.text.MinGlyphPxRange
 import ru.hollowhorizon.hollowengine.client.ui.text.glyphCoverage
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.test.Test

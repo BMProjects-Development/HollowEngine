@@ -98,8 +98,7 @@ class UiStyleProp<T> internal constructor(
         }
 
         internal val all: List<UiStyleProp<*>>
-            @Suppress("UNUSED_EXPRESSION")
-            get() {
+            @Suppress("UNUSED_EXPRESSION") get() {
                 UiProps // force full property registration before first use
                 return registered
             }
@@ -141,8 +140,7 @@ class UiStyleProp<T> internal constructor(
 
 /**
  * Sparse, mutable set of style property values written by modifiers, HSS declarations
- * and engine defaults. Absent means "not set here" — resolution falls back to the
- * property default (or inherits from the parent style).
+ * and engine defaults.
  */
 class UiStylePatch {
     internal val values = LinkedHashMap<UiStyleProp<*>, Any?>()
@@ -159,11 +157,7 @@ class UiStylePatch {
         if (value == null) values.remove(prop) else values[prop] = value
     }
 
-    /**
-     * Cascade overlay of [other] onto this patch: structural props deep-merge, scalars and
-     * transforms are replaced (last-wins). Used for the base layer and for laying an active
-     * state's combined effect over the base — base never stacks with a state.
-     */
+    /** Cascade overlay of [other] onto this patch. */
     fun merge(other: UiStylePatch) {
         for ((prop, value) in other.values) {
             values[prop] = prop.mergeRaw(values[prop], value)
@@ -171,10 +165,7 @@ class UiStylePatch {
         other.explicitProperties?.let { explicitProperties = explicitProperties.orEmpty() + it }
     }
 
-    /**
-     * Stacks [other] onto this patch using combine semantics — the effects of multiple
-     * simultaneously-active state rules accumulate (transform add, scale/tint multiply).
-     */
+    /** Stacks [other] onto this patch using combine semantics. */
     fun combineWith(other: UiStylePatch) {
         for ((prop, value) in other.values) {
             values[prop] = prop.combineRaw(values[prop], value)
@@ -194,9 +185,7 @@ class UiStylePatch {
     }
 
     override fun equals(other: Any?): Boolean {
-        return other is UiStylePatch &&
-                values == other.values &&
-                explicitProperties.orEmpty() == other.explicitProperties.orEmpty()
+        return other is UiStylePatch && values == other.values && explicitProperties.orEmpty() == other.explicitProperties.orEmpty()
     }
 
     override fun hashCode(): Int = 31 * values.hashCode() + explicitProperties.orEmpty().hashCode()
@@ -287,9 +276,7 @@ class UiComputedStyle internal constructor(
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        return other is UiComputedStyle &&
-                values.contentEquals(other.values) &&
-                explicitProperties == other.explicitProperties
+        return other is UiComputedStyle && values.contentEquals(other.values) && explicitProperties == other.explicitProperties
     }
 
     override fun hashCode(): Int {

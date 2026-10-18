@@ -1,6 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.UiBorder
+import ru.hollowhorizon.hollowengine.client.ui.UiColor
+import ru.hollowhorizon.hollowengine.client.ui.UiLength
+import ru.hollowhorizon.hollowengine.client.ui.UiSize
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
 
@@ -101,9 +104,6 @@ data class UiTextFieldStyle(
         textShadowSet = other.textShadowSet || textShadowSet,
     )
 }
-
-internal fun Map<String, String>.readSliderValue(name: String, fallback: Float): Float =
-    this[name]?.toFloatOrNull() ?: fallback
 
 internal fun Map<String, String>.readBoolean(name: String, fallback: Boolean = false): Boolean =
     when (this[name]?.lowercase()) {

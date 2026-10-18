@@ -1,0 +1,31 @@
+---
+title: Decals
+order: 3
+---
+
+# Decals
+
+A decal projects an image onto surfaces: footprints, puddles, markings, graffiti or a projector image.
+
+## Placement
+
+- Drag a `.png` from assets onto the IDE's game view to create a [world object](/docs/hollowengine/world/objects) with a decal.
+- In a [rig](/docs/hollowengine/models/rig-editor), add a **Decal** attachment to a bone or the whole model. Its projection follows the attachment.
+- In the VFX editor, add a **Decal** node. A standalone node creates one projection; a direct child of an emitter creates one for each particle, using that particle's size, rotation and color.
+
+Choose a texture such as `project:textures/decals/mark.png`. With the [Media addon](/docs/hollowengine/addons/media), you can also use `.mp4`, `.webm`, `.mkv`, `.mov` or `.avi` video.
+
+## Projection
+
+A decal projects along its own down axis. Rotate it to point at a wall or another surface.
+
+| Mode | Use |
+| --- | --- |
+| **BOX** | Parallel projection through a box volume: puddles, footprints and stickers. |
+| **PROJECTOR** | Projection from a point, widening with distance: slides and video projectors. |
+
+**Width** and **Length** control image size and proportions. Leaving length unset preserves the source image's proportions. **Reach** limits projection depth; when unset, the decal looks for a surface below. A projector's **Field of view** controls its opening angle.
+
+**Color** tints the image, **Opacity** controls visibility, and **Angle fade** removes it from surfaces at steep angles. Normal, additive and multiply blending are available. **Emissive** makes the image independent of world lighting.
+
+In VFX, opacity and tint can use expressions and timeline keys. They multiply the decal's own opacity and color, for example to fade out a footprint.

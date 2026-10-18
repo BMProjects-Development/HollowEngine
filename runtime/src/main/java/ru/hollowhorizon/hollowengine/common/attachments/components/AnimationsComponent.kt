@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.api.Registerable
 import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
+import ru.hollowhorizon.hollowengine.common.models.MontageLayerSpec
 
 /**
  * The animations gameplay asked this entity to play.
@@ -15,7 +16,11 @@ import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 @SerialName("hollowengine:animations")
 data class AnimationsComponent(
     val clips: List<ClipAnimationLayerSpec> = emptyList(),
+    val montages: List<MontageLayerSpec> = emptyList(),
 )
+
+fun AnimationsComponent.withMontage(montage: MontageLayerSpec): AnimationsComponent =
+    copy(montages = montages.filterNot { it.id == montage.id } + montage)
 
 fun AnimationsComponent.withClip(clip: ClipAnimationLayerSpec): AnimationsComponent =
     copy(clips = clips.filterNot { it.id == clip.id } + clip)

@@ -12,17 +12,12 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.animal.FlyingAnimal
-import net.minecraft.world.level.block.entity.BlockEntity
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.MOVEMENT_FACTOR
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.calculateSpeedViaDeltaMovement
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
-import ru.hollowhorizon.hollowengine.common.utils.expressions.Expression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.FloatExpression
-import ru.hollowhorizon.hollowengine.common.utils.expressions.References
-import ru.hollowhorizon.hollowengine.common.utils.expressions.mathNamespace
+import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
 import kotlin.reflect.KProperty
@@ -70,13 +65,6 @@ interface Query {
                 get() = GLFW.glfwGetTime().toFloat()
         }
     }
-}
-
-class BlockEntityQuery(val blockEntity: BlockEntity) : Query {
-    private val startTime = anim_time
-
-    override val anim_time: Float get() = TickHandler.gameTime
-    override val life_time: Float get() = anim_time - startTime
 }
 
 class LivingEntityQuery(val entity: LivingEntity) : Query {

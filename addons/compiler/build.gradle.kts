@@ -294,6 +294,19 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 tasks.withType<Test>().configureEach {
+    val runtimeProject = project(":runtime")
+    val analysisClasspath = runtimeProject.configurations.named("compileClasspath")
+    dependsOn(":writeIdeSourceRoots")
+    dependsOn(provider {
+        val runtimeTasks = runtimeProject.tasks
+        val cachedSources = runtimeTasks.matching { it.name.startsWith("genSourcesWith") }
+            .flatMap { it.outputs.files.files }.any { it.isFile && it.name.endsWith("-sources.jar") }
+        if (cachedSources) emptyList<Task>() else runtimeTasks.matching { it.name == "genSources" }.toList()
+    })
+    inputs.files(analysisClasspath).withPropertyName("ideAnalysisClasspath")
+    doFirst {
+        systemProperty("hollowengine.ide.testClasspath", analysisClasspath.get().asPath)
+    }
     useJUnitPlatform()
     maxHeapSize = "2g"
 }

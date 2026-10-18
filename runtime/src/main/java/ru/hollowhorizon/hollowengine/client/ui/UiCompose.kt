@@ -11,16 +11,10 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.PopupOverlayMeasurePolicy
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.layout.detachLayoutParentRecursively
 import ru.hollowhorizon.hollowengine.client.ui.layout.invalidateLayout
-import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
-import ru.hollowhorizon.hollowengine.client.ui.style.TransitionEasing
-import ru.hollowhorizon.hollowengine.client.ui.style.UiProps
-import ru.hollowhorizon.hollowengine.client.ui.style.UiTransition
-import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkKeyframes
-import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkPeriodMillis
-import ru.hollowhorizon.hollowengine.client.ui.style.UiStylesheetReference
-import ru.hollowhorizon.hollowengine.client.ui.style.fontFamily
+import ru.hollowhorizon.hollowengine.client.ui.style.*
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.roundToInt
 
@@ -530,6 +524,8 @@ fun TextField(
     caretColor: UiColor? = null,
     selectionColor: UiColor? = null,
     lineNumbers: Boolean = false,
+    folds: List<CodeFold> = emptyList(),
+    gutterMarkers: List<UiGutterMarker> = emptyList(),
     lineNumberColor: UiColor? = null,
     indentGuides: Boolean = false,
     indentGuideColor: UiColor? = null,
@@ -625,6 +621,8 @@ fun TextField(
         activeSearchMatch = activeSearchMatch,
         placeholder = placeholder,
         lineNumbers = lineNumbers,
+        folds = folds,
+        gutterMarkers = gutterMarkers,
         lineNumberColor = lineNumberColor ?: EditableFieldLineNumberColor,
         indentGuides = indentGuides,
         indentGuideColor = indentGuideColor ?: EditableFieldIndentGuideColor,

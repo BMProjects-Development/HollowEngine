@@ -55,11 +55,6 @@ interface Mappings {
     }
 }
 
-data class GenericMappings(
-    override val namespaces: List<String>,
-    override val classes: List<MappedClass>,
-) : Mappings
-
 sealed interface MappingsFormat<T : Mappings> {
     fun detect(lines: List<String>): Boolean
     fun parse(lines: List<String>): T

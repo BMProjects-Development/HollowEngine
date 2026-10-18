@@ -1,14 +1,8 @@
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
-import ru.hollowhorizon.hollowengine.common.utils.expressions.BinaryOp
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Diagnostics
-import ru.hollowhorizon.hollowengine.common.utils.expressions.UnaryOp
 import ru.hollowhorizon.hollowengine.common.utils.expressions.parseExpression
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class ExpressionParserTests {
     private fun parse(source: String): Ast? = parseExpression(source, Diagnostics())

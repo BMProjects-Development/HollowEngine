@@ -42,6 +42,8 @@ Entity-anchored effects follow their entity automatically, so `moveTo` has no ef
 
 ## Passing data to an effect
 
+Use `handle.jumpTo("release")` to move to a named timeline event and continue from there. VFX [section rules](/docs/hollowengine/ide/timeline) are evaluated on the clients playing the effect; keep server gameplay logic independent of what a client displays.
+
 Every handle has a data store that effect expressions read as `d.<name>`. Write to it with a `dataKey`, the same typed key used for [NPC data](/docs/hollowengine/scripting/npc/data):
 
 ```kotlin
@@ -57,7 +59,7 @@ In the effect, use the name from the key: `d.charge * 4`. A value that was never
 
 ## On a model bone
 
-An effect can be a bone attachment of a model. Open the model in the [Rig Editor](/docs/hollowengine/scripting/rig-editor), select a bone, and use **+ Attach** to add a VFX attachment:
+An effect can be a bone attachment of a model. Open the model in the [Rig Editor](/docs/hollowengine/models/rig-editor), select a bone, and use **+ Attach** to add a VFX attachment:
 
 | Field | Meaning |
 | --- | --- |

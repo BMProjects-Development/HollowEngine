@@ -55,6 +55,30 @@ abstract class UiScript {
         val location = ResourceLocation.parse(id)
         UiDefinitionRegistry.register(UiSurfaceBuilder(location).apply(body).build())
     }
+
+    /**
+     * A panel that hangs on something in the world, as the screen of a computer does, through the rig attachment
+     * `hollowengine:rig/ui_panel` that names it. The player points at it with the crosshair and clicks:
+     *
+     * ```kotlin
+     * val Clicks = dataKey<Int>("mypack:clicks", sync = Sync.TRACKING) { 0 }
+     *
+     * panel("mypack:terminal") {
+     *     size(256, 160)
+     *     content {
+     *         Text("Clicked ${data[Clicks]} times")
+     *         Box(modifier = Modifier.onClick { send { putString("action", "click") } }) { Text("Click") }
+     *     }
+     * }
+     * ```
+     *
+     * The content reads the data of the entity it hangs on, which the server syncs, and sends what the player does
+     * to `onPanelEvent` of that entity's node scripts.
+     */
+    fun panel(id: String, body: UiPanelBuilder.() -> Unit) {
+        val location = ResourceLocation.parse(id)
+        UiDefinitionRegistry.register(UiPanelBuilder(location).apply(body).build())
+    }
 }
 
 /**
@@ -221,8 +245,7 @@ class UiOverlayBuilder internal constructor(id: ResourceLocation) : UiHostBuilde
 
     /**
      * Whether this overlay takes pointer/keyboard input. Draw-only ([OverlayInput.NONE]) is the
-     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks. The engine does not
-     * force a round trip either way — an interactive overlay can still handle everything client-side.
+     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks.
      */
     var input: OverlayInput = OverlayInput.NONE
 

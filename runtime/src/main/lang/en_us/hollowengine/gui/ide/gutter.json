@@ -1,0 +1,12 @@
+{
+  "expand": "Expand code",
+  "collapse": "Collapse code",
+  "override": "Go to overridden declaration",
+  "coroutine": "Suspend function call",
+  "event": "Event handler",
+  "run": "Run script",
+  "run_state": "Run state %s",
+  "stop": "Stop script",
+  "stopping": "Stopping script…",
+  "run_failed": "Could not run script: %s"
+}

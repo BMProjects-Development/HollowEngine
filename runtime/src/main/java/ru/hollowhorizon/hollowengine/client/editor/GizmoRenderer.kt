@@ -107,3 +107,10 @@ object GizmoRenderer {
 
 fun GizmoHandleId.isRotation(): Boolean =
     this == GizmoHandleId.ROTATE_X || this == GizmoHandleId.ROTATE_Y || this == GizmoHandleId.ROTATE_Z
+
+/** The manipulator a handle belongs to. */
+val GizmoHandleId.editMode: GizmoEditMode
+    get() = when (this) {
+        GizmoHandleId.SCALE_X, GizmoHandleId.SCALE_Y, GizmoHandleId.SCALE_Z, GizmoHandleId.SCALE_UNIFORM -> GizmoEditMode.SCALE
+        else -> if (isRotation()) GizmoEditMode.ROTATE else GizmoEditMode.TRANSLATE
+    }

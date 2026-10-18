@@ -1,21 +1,18 @@
 package ru.hollowhorizon.hollowengine.runtime.remap
 
+import org.objectweb.asm.Opcodes
 import org.objectweb.asm.commons.Remapper
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remap
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.jar.JarEntry
-import java.util.jar.JarFile
-import java.util.jar.JarInputStream
-import java.util.jar.JarOutputStream
-import java.util.jar.Manifest
+import java.util.jar.*
 
 /**
  * A remapper that reports whether it changed anything while a class was being visited.
  */
-abstract class TrackingRemapper : Remapper() {
+abstract class TrackingRemapper : Remapper(Opcodes.ASM9) {
     var changed: Boolean = false
         private set
 

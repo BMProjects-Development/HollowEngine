@@ -1,0 +1,88 @@
+---
+title: Аддон Media
+order: 8
+---
+
+<center><h1>Аддон Media</h1></center>
+
+*Воспроизведение видео и потоков в игре.*
+
+Аддон Media (id `hollowengine-media`) декодирует видео и звук через FFmpeg. Он даёт полноэкранный плеер, виджет `Video` для UI-скриптов и команду.
+
+:::advice
+FFmpeg - нативная библиотека, поэтому аддон загружается при старте игры. После установки или обновления перезапустите Minecraft. Нативные библиотеки встроены для Windows, Linux (x64 и ARM64) и macOS (Intel и Apple Silicon).
+:::
+
+## Источники
+
+Источник - это либо:
+
+- **ресурс пака**: `resource:namespace:videos/intro.mp4`;
+- **локальный файл**. Относительный путь разрешается от папки `hollowengine`; абсолютный используется как есть;
+- **URL** любой схемы, понятной FFmpeg, например `https://`.
+
+Декодирование идёт вне потока рендера, а в очереди аддон держит лишь несколько кадров.
+
+## Команда
+
+```text
+/he video "<source>" <player>
+```
+
+Открывает полноэкранный плеер у выбранного игрока. Источник нужно взять в кавычки:
+
+```text
+/he video "videos/intro.mp4" @a
+/he video "https://example.com/stream.m3u8" @p
+```
+
+## В UI-скриптах
+
+Composable `Video` проигрывает видео прямо в экране. См. [UI-скрипты](/docs/hollowengine/scripting/ui):
+
+```kotlin
+Video(
+    source = "videos/intro.mp4",
+    controls = true,
+    autoPlay = true,
+    volume = 0.8f,
+    onEnded = { /* закрыть экран, продолжить историю... */ },
+)
+```
+
+| Параметр | Значение |
+| --- | --- |
+| `source` | Путь к файлу или URL. |
+| `controls` | Показывать панель управления: пауза, время, перемотка и громкость при наведении. |
+| `autoPlay` | Начать сразу. |
+| `volume` | От `0` до `1`. |
+| `startSeconds` | Позиция, с которой начать. |
+| `fit` | Как кадр вписывается в свою область: по умолчанию `CONTAIN`. |
+| `onEnded` | Вызывается, когда воспроизведение закончилось. |
+
+Плеер принадлежит composable и освобождается, когда тот покидает композицию. Без аддона виджет показывает заглушку «нет аддона видео».
+
+## Из аддона или скрипта Kotlin
+
+Другой код обращается к аддону через `VideoApi.find()`, который возвращает `null`, если аддон не установлен:
+
+```kotlin
+val video = VideoApi.find() ?: return
+
+video.play("videos/intro.mp4")                 // на весь экран, закрывается в конце
+val player = video.createPlayer("videos/loop.mp4")   // без UI: рисуйте player.texture сами
+player?.pause()
+player?.seek(12.5)
+player?.close()
+```
+
+`VideoPlaybackOptions` задаёт `closeOnEnd`, `volume`, `startSeconds`, `autoPlay` и размеры очередей кадров и звука. У `VideoPlayer` есть `texture`, `videoWidth`, `videoHeight`, `durationSeconds`, `positionSeconds`, `playing`, `ended` и `error`, а управлять им можно через `play()`, `pause()`, `seek(seconds)` и `setVolume(volume)`.
+
+
+## Звуковые дорожки
+
+Аддон предоставляет FFmpeg-декодер общей звуковой системе движка. Через `player.playSound`, `level.playSound` и `ClientSounds.play` можно воспроизводить MP3, FLAC, AAC/M4A, Opus и аудиодорожки MP4, WebM, MKV и других контейнеров FFmpeg. Для воспроизведения звука видеодорожка не требуется. OGG Vorbis и PCM/float WAV работают без аддона. См. [Звуки](/docs/hollowengine/scripting/sounds).
+
+`MediaSource.Resource`, `MediaSource.File` и `MediaSource.Url` описывают один физический источник для звука и видео. `VideoApi` также принимает типизированный `MediaSource`. Ресурсы паков читаются через собственный ввод-вывод FFmpeg без извлечения во временные файлы. Перемотка сжатого ресурса пака может потребовать повторного открытия и чтения его сжатых байтов.
+
+Прежний аддон `hollowengine-video` переименован в `hollowengine-media`: установите новый jar вместо старого, не оставляя обе версии. Команда `/he video`, виджет `Video` и `VideoApi` сохраняются. Видеоплеер сохраняет собственные часы презентации и очереди кадров; воспроизведение только звука использует звуковой движок Minecraft и громкость его категорий.

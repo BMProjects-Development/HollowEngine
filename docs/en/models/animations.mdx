@@ -1,0 +1,95 @@
+---
+title: Animations
+order: 2
+---
+
+<center><h1>Animations</h1></center>
+
+*Playing entity animations from Kotlin.*
+
+![Animation controller](/hollowengine/pictures/animation_controller/controller.webp)
+
+---
+
+## Where animation comes from
+
+A model animates itself. Everything that runs on its own, walking, idling, looking around, is described by an **animator**, which the model names in its `.hemeta`:
+
+```toml
+animation-controller = "hollowengine:standard_player"
+```
+
+An NPC created with `npc()` uses the built-in player model, which already names the standard animator and provides procedural head and eye rotation. You get all of that without writing anything.
+
+What a script adds on top are **clips**: one-off gestures, looping animations, and poses to hold. Those are what this page is about; see [Models and Materials](/docs/hollowengine/models) for the metadata file itself.
+
+---
+
+## Playing a clip
+
+These work on any `Entity`, not just an NPC, as long as the entity or player has a model.
+
+```kotlin
+entity.play("wave")                 // fire-and-forget, once
+entity.playLooped("idle_alt")       // fire-and-forget, looping
+entity.playClamped("sit")           // fire-and-forget, holds the last frame
+entity.playPingPong("breathe")      // fire-and-forget, forward and backward
+entity.stopAnimation("wave")        // fades it out early
+
+val finished = entity.playAndWait("wave") // suspend: waits for the clip to actually finish
+```
+
+`playAndWait` is a plain `suspend` function: your script pauses until the clip finishes. On an `NpcEntity` there is also a background form, `startAnimation(...)`, which runs on the `ANIMATION` channel described in [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions), so it can play at the same time as movement and looking:
+
+```kotlin
+val walking = npc.startMove(player)
+npc.startAnimation("walk_wave") // plays in parallel with the walk above
+walking.await()
+```
+
+`entity.stopAllAnimations()` removes every clip started this way at once.
+
+:::advice
+`play`/`playOnce`/`playLooped`/`playClamped`/`playPingPong` all take the same optional `fadeIn`/`fadeOut` (seconds, `0.33` by default). The last four are just `play(...)` with a fixed `playMode`.
+:::
+
+---
+
+## Playback modes
+
+| Mode | Behavior |
+|------|----------|
+| `AnimationPlayMode.Once` | Plays the clip once, then the layer goes away. |
+| `AnimationPlayMode.Loop` | Loops the clip. Use it for idle/walk/ambient animations. |
+| `AnimationPlayMode.ClampForever` | Holds the final frame. Useful for poses such as `sit`, `sleep`, or `death`. |
+| `AnimationPlayMode.PingPong` | Plays forward and backward without snapping to the start. |
+
+```kotlin
+entity.play("cheer", playMode = AnimationPlayMode.Loop, fadeIn = 0.1, fadeOut = 0.25)
+```
+
+---
+
+## Writing your own animator
+
+An animator is an asset, not something a script builds: a stack of layers with a state machine, procedural bones, masks and blend weights. You put one together in the [animator editor](/docs/hollowengine/models/animator-editor). Create a `.animator` next to your model and name it in the model's `.hemeta`:
+
+```toml
+animation-controller = "project:models/entity/guide.animator"
+```
+
+The other way is to register an animator from code and point at it by id, which is how the standard player animator is built:
+
+```kotlin
+AnimatorAssets.register(StandardPlayerAnimatorPreset.ID.rl, StandardPlayerAnimatorPreset.create())
+```
+
+```toml
+animation-controller = "hollowengine:standard_player"
+```
+
+Take `StandardPlayerAnimatorPreset` as the worked example: it builds a locomotion state machine and a procedural look layer, which is very close to what most humanoid models want. Register your own under your own id, before models load.
+
+:::advice
+If your entity only needs to play a clip in response to an event, use `play(...)` from a script. Your own animator is not needed for that.
+:::

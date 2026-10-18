@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.style
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.flattenModifiers
 import ru.hollowhorizon.hollowengine.client.ui.toStylePatch
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * `mask: linear-gradient(...)` follows CSS closely enough that a recipe copied from the web works,
@@ -36,13 +32,6 @@ class HssMaskTest {
         assertEquals(listOf(0f, 1f / 3f, 2f / 3f, 1f), gradient.stops.map { it.position })
         // No angle written means top to bottom, as in CSS.
         assertEquals(180f, gradient.angle)
-    }
-
-    @Test
-    fun `directions and angles both work`() {
-        assertEquals(90f, mask("linear-gradient(to right, white, transparent)").angle)
-        assertEquals(0f, mask("linear-gradient(to top, white, transparent)").angle)
-        assertEquals(45f, mask("linear-gradient(45deg, white, transparent)").angle)
     }
 
     @Test

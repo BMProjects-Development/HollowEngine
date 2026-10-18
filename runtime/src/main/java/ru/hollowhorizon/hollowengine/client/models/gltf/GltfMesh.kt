@@ -21,24 +21,13 @@ data class GltfMesh(
         val attributes: Map<String, Int>,
         val indices: Int = -1,
         val material: Int = -1,
-        val mode: Int = MODE_TRIANGLES,
+        val mode: Int = 4,
         val targets: List<Map<String, Int>> = emptyList(),
     ) {
         @Transient
         var materialRef: GltfMaterial? = null
 
         companion object {
-            const val MODE_POINTS = 0
-            const val MODE_LINES = 1
-            const val MODE_LINE_LOOP = 2
-            const val MODE_LINE_STRIP = 3
-            const val MODE_TRIANGLES = 4
-            const val MODE_TRIANGLE_STRIP = 5
-            const val MODE_TRIANGLE_FAN = 6
-            const val MODE_QUADS = 7
-            const val MODE_QUAD_STRIP = 8
-            const val MODE_POLYGON = 9
-
             const val ATTRIBUTE_POSITION = "POSITION"
             const val ATTRIBUTE_NORMAL = "NORMAL"
             const val ATTRIBUTE_TANGENT = "TANGENT"

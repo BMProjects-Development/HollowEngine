@@ -74,17 +74,19 @@ object ScriptLoader {
         id: ScriptId,
         validate: (KClass<*>) -> Unit = {},
         body: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
-    ): Result<T> = executeCompiled(id, { compiled -> validate(compiled.type) }, body)
+    ): Result<T> = executeCompiled(id, { compiled -> validate(compiled.type) }, body = body)
 
+    /** [precompiled], when the caller already compiled [id], is used for the first attempt. */
     internal fun <T> executeCompiled(
         id: ScriptId,
         validate: (CompiledScript) -> Unit = {},
+        precompiled: CompiledScript? = null,
         body: ScriptEvaluationConfiguration.Builder.() -> Unit = {},
     ): Result<T> {
         var lastFailure: Throwable? = null
         repeat(2) { attempt ->
             val result = runCatching {
-                val compiled = compile(id).getOrThrow()
+                val compiled = precompiled?.takeIf { attempt == 0 } ?: compile(id).getOrThrow()
                 validate(compiled)
                 compiled.execute<T>(body).getOrThrow()
             }

@@ -7,7 +7,7 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollOffset
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.layer
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
-import java.util.IdentityHashMap
+import java.util.*
 
 data class UiRect(
     val x: Float,

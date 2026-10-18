@@ -1,11 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeyAction
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 
 /**
- * One entry of the menu a right click on a file tab opens. A file type contributes its own on top
- * of [HollowIdeStandardFileActions], so an editor can offer what only it can do without the IDE
- * knowing about it.
+ * Command of a file's context menu. [keyAction] is the keymap action that does the same, whose chord the menu shows
+ * as it is bound now; [shortcut] is fixed text for an action the keymap does not know.
  */
 class HollowIdeFileAction(
     val id: String,
@@ -15,11 +16,14 @@ class HollowIdeFileAction(
     val separatorBefore: Boolean = false,
     val isVisible: (HollowIdeFileActionContext) -> Boolean = { true },
     val isEnabled: (HollowIdeFileActionContext) -> Boolean = { true },
+    val keyAction: HollowKeyAction? = null,
     val run: (HollowIdeFileActionContext) -> Unit,
 ) {
     init {
         require(id.isNotBlank()) { "File action ID cannot be blank" }
     }
+
+    val shortcutText: String get() = keyAction?.let { it.shortcut.orEmpty() } ?: shortcut
 }
 
 interface HollowIdeFileActionContext {
@@ -53,7 +57,7 @@ object HollowIdeStandardFileActions {
         HollowIdeFileAction(
             id = SaveId,
             label = "Save",
-            shortcut = "Ctrl+S",
+            keyAction = HollowKeys.SAVE,
             icon = SaveIcon,
             isVisible = { !it.file.readOnly },
             isEnabled = { it.file.dirty },
@@ -62,7 +66,7 @@ object HollowIdeStandardFileActions {
         HollowIdeFileAction(
             id = ReformatId,
             label = "Reformat Code",
-            shortcut = "Ctrl+Alt+L",
+            keyAction = HollowKeys.FORMAT,
             icon = ReformatIcon,
             isVisible = { it.canFormat },
             run = { it.reformat() },
@@ -70,7 +74,7 @@ object HollowIdeStandardFileActions {
         HollowIdeFileAction(
             id = CloseId,
             label = "Close",
-            shortcut = "Ctrl+W",
+            keyAction = HollowKeys.CLOSE_TAB,
             icon = CloseIcon,
             separatorBefore = true,
             run = { it.close() },
@@ -145,6 +149,7 @@ private fun HollowIdeFileAction.withSeparator() = HollowIdeFileAction(
     separatorBefore = true,
     isVisible = isVisible,
     isEnabled = isEnabled,
+    keyAction = keyAction,
     run = run,
 )
 

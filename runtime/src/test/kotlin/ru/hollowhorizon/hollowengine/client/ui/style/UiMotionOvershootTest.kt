@@ -1,13 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.BoxNode
-import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.UiState
-import ru.hollowhorizon.hollowengine.client.ui.flattenModifiers
-import ru.hollowhorizon.hollowengine.client.ui.opacity
-import ru.hollowhorizon.hollowengine.client.ui.toStylePatch
-import ru.hollowhorizon.hollowengine.client.ui.translate
+import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 

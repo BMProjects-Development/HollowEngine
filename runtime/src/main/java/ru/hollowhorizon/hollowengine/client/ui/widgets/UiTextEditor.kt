@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 
 private const val HighlightedRichTextCacheSize = 24
@@ -67,6 +66,7 @@ interface UiDeferredSyntaxHighlighter : UiCaretAwareSyntaxHighlighter {
 data class UiCompletionContext(
     val text: String,
     val caret: Int,
+    val intentions: Boolean = false,
 )
 
 data class UiTextCompletion(
@@ -89,6 +89,7 @@ data class UiTextCompletion(
      * [ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionCloseness].
      */
     val closeness: Int = 0,
+    val edits: List<UiTextEdit> = emptyList(),
 )
 
 fun interface UiCompletionContributor {
@@ -185,6 +186,8 @@ data class UiInlayHint(
     val content: List<UiInlayContent>,
     val tags: List<String> = emptyList(),
     val action: UiInlayAction? = null,
+    /** Source characters represented by this widget, used by code-fold placeholders. */
+    val sourceLength: Int = 0,
 ) {
     constructor(offset: Int, text: String, tags: List<String> = emptyList(), action: UiInlayAction? = null) :
             this(offset, listOf(UiInlayContent.Label(text)), tags, action)
@@ -265,7 +268,10 @@ fun shiftTextInlayHintsThroughEdit(
     if (inlayHints.isEmpty()) return emptyList()
     if (originalText == editedText) return inlayHints
     val edit = uiTextEditSpan(originalText, editedText)
-    return inlayHints.map { hint ->
+    return inlayHints.mapNotNull { hint ->
+        if (hint.sourceLength > 0 && edit.oldStart < hint.offset + hint.sourceLength && edit.oldEnd > hint.offset) {
+            return@mapNotNull null
+        }
         val offset = when {
             hint.offset < edit.oldStart -> hint.offset
             hint.offset >= edit.oldEnd -> hint.offset + edit.delta
@@ -527,7 +533,7 @@ internal fun sanitizeInlayHints(textLength: Int, inlayHints: List<UiInlayHint>):
     var needsCopy = false
     for (hint in inlayHints) {
         val offset = hint.offset.coerceIn(0, textLength)
-        if (hint.isEmpty() || offset != hint.offset) {
+        if (hint.isEmpty() || offset != hint.offset || hint.sourceLength !in 0..textLength - offset) {
             needsCopy = true
             break
         }
@@ -538,7 +544,9 @@ internal fun sanitizeInlayHints(textLength: Int, inlayHints: List<UiInlayHint>):
     for (hint in inlayHints) {
         if (hint.isEmpty()) continue
         val offset = hint.offset.coerceIn(0, textLength)
-        clean += if (offset == hint.offset) hint else hint.copy(offset = offset)
+        val sourceLength = hint.sourceLength.coerceIn(0, textLength - offset)
+        clean += if (offset == hint.offset && sourceLength == hint.sourceLength) hint
+            else hint.copy(offset = offset, sourceLength = sourceLength)
     }
     return if (clean.isEmpty()) emptyList() else clean
 }
@@ -581,15 +589,24 @@ private fun String.mergeTextWithInlays(
 ): List<UiInlineItem> {
     val items = mutableListOf<UiInlineItem>()
     val inlayOffsets = inlaysByOffset.keys.sorted()
-    var emittedOffset: Int? = null
-    var inlayOffsetIndex = 0
     var inlayIndex = 0
-
-    fun emitInlaysAt(offset: Int) {
-        if (emittedOffset == offset) return
-        emittedOffset = offset
-        inlaysByOffset[offset]?.forEach { hint ->
-            val id = textFieldInlayWidgetId(hint, inlayIndex++)
+    val indexedInlays = inlayOffsets.associateWith { offset ->
+        inlaysByOffset.getValue(offset).map { it to textFieldInlayWidgetId(it, inlayIndex++) }
+    }
+    val boundaries = buildSet {
+        add(0)
+        add(length)
+        segments.forEach { add(it.start); add(it.end) }
+        indexedInlays.forEach { (offset, hints) ->
+            add(offset)
+            hints.forEach { (hint, _) -> add(offset + hint.sourceLength) }
+        }
+    }.sorted()
+    var hiddenUntil = 0
+    var segmentIndex = 0
+    boundaries.forEachIndexed { boundaryIndex, offset ->
+        indexedInlays[offset].orEmpty().forEach { (hint, id) ->
+            if (offset < hiddenUntil) return@forEach
             val metrics = inlayWidgetMetrics[id]
             items += UiInlineItem.Widget(
                 id = id,
@@ -597,29 +614,16 @@ private fun String.mergeTextWithInlays(
                 height = metrics?.height ?: 0f,
                 align = UiInlineAlign.MIDDLE,
                 alt = "",
-                sourceLength = 0,
+                sourceLength = hint.sourceLength,
             )
+            hiddenUntil = maxOf(hiddenUntil, offset + hint.sourceLength)
+        }
+        val end = boundaries.getOrNull(boundaryIndex + 1) ?: return@forEachIndexed
+        while (segmentIndex < segments.lastIndex && segments[segmentIndex].end <= offset) segmentIndex++
+        if (offset >= hiddenUntil && offset < end) {
+            items += UiInlineItem.Text(substring(offset, end), segments[segmentIndex].style)
         }
     }
-
-    for (segment in segments) {
-        var cursor = segment.start
-        emitInlaysAt(cursor)
-
-        while (cursor < segment.end) {
-            while (inlayOffsetIndex < inlayOffsets.size && inlayOffsets[inlayOffsetIndex] <= cursor) {
-                inlayOffsetIndex++
-            }
-            val nextInlay = inlayOffsets.getOrNull(inlayOffsetIndex)?.takeIf { it <= segment.end } ?: segment.end
-
-            if (cursor < nextInlay) {
-                items += UiInlineItem.Text(substring(cursor, nextInlay), segment.style)
-            }
-            cursor = nextInlay
-            emitInlaysAt(cursor)
-        }
-    }
-    emitInlaysAt(length)
     return items
 }
 

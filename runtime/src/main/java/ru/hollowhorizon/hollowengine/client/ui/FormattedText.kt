@@ -2,24 +2,12 @@ package ru.hollowhorizon.hollowengine.client.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import ru.hollowhorizon.hollowengine.client.ui.text.Bold
-import ru.hollowhorizon.hollowengine.client.ui.text.Glitch
-import ru.hollowhorizon.hollowengine.client.ui.text.Gradient as UiGradient
-import ru.hollowhorizon.hollowengine.client.ui.text.Italic
-import ru.hollowhorizon.hollowengine.client.ui.text.Pulse
-import ru.hollowhorizon.hollowengine.client.ui.text.Rainbow
-import ru.hollowhorizon.hollowengine.client.ui.text.Shake
-import ru.hollowhorizon.hollowengine.client.ui.text.Strikethrough
-import ru.hollowhorizon.hollowengine.client.ui.text.Swing
-import ru.hollowhorizon.hollowengine.client.ui.text.TextColor
-import ru.hollowhorizon.hollowengine.client.ui.text.UiTextEffect
-import ru.hollowhorizon.hollowengine.client.ui.text.Underline
-import ru.hollowhorizon.hollowengine.client.ui.text.Wave
-import ru.hollowhorizon.hollowengine.client.ui.text.Wiggle
+import ru.hollowhorizon.hollowengine.client.ui.text.*
 import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextAnimation
 import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextDocument
 import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextStyle
+import ru.hollowhorizon.hollowengine.client.ui.text.Gradient as UiGradient
 
 /**
  * Renders the lightweight markup understood by [FormattedTextParser] as an ordinary inline-flow

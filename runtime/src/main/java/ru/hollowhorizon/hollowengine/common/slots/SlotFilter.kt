@@ -13,6 +13,7 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemMatchMode
+import ru.hollowhorizon.hollowengine.common.slots.SlotFilter.Companion.custom
 import ru.hollowhorizon.hollowengine.common.utils.areItemsEqual
 import ru.hollowhorizon.hollowengine.common.utils.areStacksEqual
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForItemStack

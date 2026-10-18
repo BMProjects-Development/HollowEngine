@@ -2,10 +2,9 @@ package ru.hollowhorizon.hollowengine.client.particles
 
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import net.minecraft.world.level.Level
 import org.joml.Matrix4f
+import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.particles.collision.CollisionProvider
 import ru.hollowhorizon.hollowengine.client.particles.collision.WorldCollisionProvider
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
@@ -14,7 +13,8 @@ import ru.hollowhorizon.hollowengine.client.particles.light.WorldLightProvider
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateSelfBy
 import ru.hollowhorizon.hollowengine.client.utils.use
-import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
 
 class ParticleSystem(

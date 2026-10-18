@@ -1,7 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
-import ru.hollowhorizon.hollowengine.client.ui.*
-
 // Value parsers for the motion properties: transitions, animations and the keyframe
 // property names an animation touches.
 

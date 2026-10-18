@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.vfx
 
+import ru.hollowhorizon.hollowengine.client.vfx.VfxParticleLook.Companion.STRIDE
 import ru.hollowhorizon.hollowengine.common.utils.MutableColor
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxAppearance

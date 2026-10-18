@@ -373,8 +373,7 @@ private fun breakIntoLines(pieces: List<Piece>, wrapWidth: Float, wrap: Boolean)
     var breakBefore = false
     var index = 0
     while (index < pieces.size) {
-        val piece = pieces[index]
-        when (piece) {
+        when (val piece = pieces[index]) {
             is BreakPiece -> {
                 commit(hard = true)
                 breakBefore = false

@@ -1,6 +1,8 @@
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollBone
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollCollisions
+import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPart
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollShape
+import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
 import ru.hollowhorizon.hollowengine.addons.physics.rig.BodyCollision
 import ru.hollowhorizon.hollowengine.addons.physics.rig.JointLimits
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
@@ -29,7 +31,7 @@ class RagdollCollisionsTests {
         modelParent = null,
         bindPosition = at,
         bindRotation = rotation,
-        shape = RagdollShape.Box(half, Vec3f.ZERO, QuatF.IDENTITY),
+        shape = RagdollShape(listOf(RagdollPart(BoxShapeSpec, Vec3f.ZERO, QuatF.IDENTITY, half))),
         pivot = Vec3f.ZERO,
         density = 1050f,
         collision = collision,
@@ -105,9 +107,9 @@ class RagdollCollisionsTests {
 
     @Test
     fun `boxes are apart until they really share space`() {
-        val chest = RagdollCollisions.boxOf(bone("chest", Vec3f(0f, 1f, 0f), Vec3f(0.25f, 0.375f, 0.125f)))
-        val near = RagdollCollisions.boxOf(bone("shin", Vec3f(0f, 0.6f, 0f), Vec3f(0.1f, 0.02f, 0.1f)))
-        val inside = RagdollCollisions.boxOf(bone("shin", Vec3f(0f, 0.7f, 0f), Vec3f(0.1f, 0.02f, 0.1f)))
+        val chest = RagdollCollisions.boxesOf(bone("chest", Vec3f(0f, 1f, 0f), Vec3f(0.25f, 0.375f, 0.125f))).single()
+        val near = RagdollCollisions.boxesOf(bone("shin", Vec3f(0f, 0.6f, 0f), Vec3f(0.1f, 0.02f, 0.1f))).single()
+        val inside = RagdollCollisions.boxesOf(bone("shin", Vec3f(0f, 0.7f, 0f), Vec3f(0.1f, 0.02f, 0.1f))).single()
 
         assertFalse(RagdollCollisions.overlap(chest, near), "A body just below the chest is not inside it")
         assertTrue(RagdollCollisions.overlap(chest, inside))
@@ -115,15 +117,15 @@ class RagdollCollisionsTests {
 
     @Test
     fun `a turned box is measured as it is turned`() {
-        val post = RagdollCollisions.boxOf(bone("post", Vec3f.ZERO, Vec3f(0.1f, 0.5f, 0.1f)))
+        val post = RagdollCollisions.boxesOf(bone("post", Vec3f.ZERO, Vec3f(0.1f, 0.5f, 0.1f))).single()
         val above = Vec3f(0f, 0.9f, 0f)
         val half = Vec3f(0.1f, 0.5f, 0.1f)
 
-        assertTrue(RagdollCollisions.overlap(post, RagdollCollisions.boxOf(bone("beam", above, half))))
+        assertTrue(RagdollCollisions.overlap(post, RagdollCollisions.boxesOf(bone("beam", above, half)).single()))
         assertFalse(
             RagdollCollisions.overlap(
                 post,
-                RagdollCollisions.boxOf(bone("beam", above, half, rotation = QuatF(90f.deg, Vec3f.Z_AXIS))),
+                RagdollCollisions.boxesOf(bone("beam", above, half, rotation = QuatF(90f.deg, Vec3f.Z_AXIS))).single(),
             )
         )
     }

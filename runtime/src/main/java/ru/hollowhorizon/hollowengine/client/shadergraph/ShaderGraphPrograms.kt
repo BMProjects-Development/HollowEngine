@@ -1,11 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.shadergraph
 
 import com.mojang.blaze3d.vertex.VertexFormat
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.ShaderInstance
 import net.minecraft.resources.ResourceLocation
@@ -13,7 +9,7 @@ import net.minecraft.server.packs.resources.Resource
 import net.minecraft.server.packs.resources.ResourceProvider
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.io.ByteArrayInputStream
-import java.util.Optional
+import java.util.*
 
 /** A uniform a program json declares: its GLSL type as the json names it, and its starting values. */
 class ShaderGraphUniform(val name: String, val type: String, val values: List<Float>)

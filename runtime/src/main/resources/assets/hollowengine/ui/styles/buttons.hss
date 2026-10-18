@@ -1,0 +1,139 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+/*
+ * The two buttons of the editor (Button and IconButton in UiButtons.kt). Their look lives only here; a panel's
+ * own tag on a button sizes and places it, and nothing else.
+ *   .button       a label, maybe after an icon, on its own fill; .primary, .danger, .active, .disabled.
+ *   .icon-button  an icon whose fill shows under the pointer; .active, .disabled, and .inline without a fill.
+ */
+.button {
+    height: 22px;
+    padding: 0px 10px;
+    gap: 5px;
+    align-items: center center;
+    border-radius: $radius;
+    background: $button;
+    foreground: $text-strong;
+    shadow: inset 0px 1px 0px 0px $button-highlight;
+    text-overflow: dots;
+    transition: background 100ms ease-out;
+}
+
+.button:hover {
+    background: $button-hover;
+}
+
+.button.primary {
+    background: $accent-fill;
+    foreground: $white;
+}
+
+.button.primary:hover {
+    background: $accent-fill-hover;
+}
+
+.button.danger {
+    background: $danger-soft;
+    foreground: $danger;
+}
+
+.button.danger:hover {
+    background: alpha($danger, 0.32);
+}
+
+/* One picked out of a few, like the current tool: the selection's fill inside a thin accent ring. */
+.button.active, .button.active:hover {
+    background: $bg-selected;
+    foreground: $white;
+    shadow: inset 0px 0px 0px 1px alpha($accent, 0.7);
+}
+
+.button.disabled, .button.disabled:hover {
+    background: $bg-hover;
+    foreground: $text-faint;
+    shadow: none;
+}
+
+.button-label {
+    wrap: false;
+}
+
+.button-icon {
+    size: $icon-small $icon-small;
+    tint: $text-strong;
+    transition: tint 110ms ease-out;
+}
+
+.button.primary .button-icon {
+    tint: $white;
+}
+
+.button.danger .button-icon {
+    tint: $danger;
+}
+
+.button.disabled .button-icon {
+    tint: $text-faint;
+}
+
+.icon-button {
+    size: fit fit;
+    padding: 3px;
+    border-radius: $radius-small;
+    background: transparent;
+    transition: background 110ms ease-out;
+}
+
+.icon-button:hover {
+    background: $bg-hover;
+}
+
+.icon-button.active {
+    background: $bg-selected;
+}
+
+.icon-button .button-icon {
+    size: $icon $icon;
+    tint: $text-soft;
+}
+
+.icon-button:hover .button-icon {
+    tint: $white;
+}
+
+.icon-button.active .button-icon {
+    tint: $accent;
+}
+
+.icon-button.disabled, .icon-button.disabled:hover, .icon-button.inline, .icon-button.inline:hover {
+    background: transparent;
+}
+
+.icon-button.disabled .button-icon, .icon-button.disabled:hover .button-icon {
+    tint: $text-faint;
+}
+
+.icon-button.inline {
+    padding: 0px;
+}
+
+.icon-button.inline .button-icon {
+    size: 11px 11px;
+    tint: $text-muted;
+}
+
+.icon-button.inline:hover .button-icon {
+    tint: $white;
+}
+
+.icon-button.inline.active .button-icon {
+    tint: $accent;
+}
+
+.icon-button.danger:hover .button-icon, .icon-button.danger.active .button-icon {
+    tint: $danger;
+}
+
+.icon-button.danger.active {
+    background: $danger-soft;
+}

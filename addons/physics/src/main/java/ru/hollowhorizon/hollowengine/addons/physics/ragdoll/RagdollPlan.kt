@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.physics.ragdoll
 
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.physics.rig.*
 import ru.hollowhorizon.hollowengine.addons.physics.rotatedInverse
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
@@ -26,10 +27,7 @@ class RagdollBone(
     val collision: BodyCollision,
     /** How far this bone may move relative to its parent; see [JointLimits]. */
     val limits: JointLimits,
-) {
-    /** Where the body's center of mass sits relative to the joint, in the bone's own space. */
-    val centreOfMass: Vec3f get() = shape.center
-}
+)
 
 /**
  * The skeleton a [RagdollStateSpec] describes for one model.
@@ -53,27 +51,35 @@ class RagdollPlan(
             if (order.isEmpty()) return null
 
             val bindGlobals = bindGlobalsOf(order)
-            return fromRig(order, bindGlobals, allowed) ?: fromSkeleton(target, spec, order, bindGlobals, allowed)
+            if (order.none { target.bodyOf(it) != null }) return fromSkeleton(target, spec, order, bindGlobals, allowed)
+
+            order.filter { target.bodyOf(it) != null && target.bodyShapeOf(it) == null }.takeIf { it.isNotEmpty() }?.let { bare ->
+                HollowEngine.LOGGER.warn("Bodies on {} have no colliders to be made of and are left out", bare.joinToString { it.name })
+            }
+            return fromRig(target, order, bindGlobals, allowed)
         }
 
         private fun fromRig(
+            target: PoseTarget,
             order: List<RuntimeNode>,
             bindGlobals: Map<Int, Mat4f>,
             allowed: Set<Int>,
         ): RagdollPlan? {
-            val bodies = order.filter { it.definition.index in allowed && it.rigidBody() != null }
+            val shapes = order.filter { it.definition.index in allowed }
+                .mapNotNull { node -> target.bodyShapeOf(node)?.let { node to it } }.toMap()
+            val bodies = order.filter { it in shapes }
             if (bodies.isEmpty()) return null
 
             val byName = bodies.associateBy { it.name }
-            val parents = bodies.associateWith { node -> node.physicalParent(byName, bodies.toSet()) }
+            val parents = bodies.associateWith { node -> node.physicalParent(target.jointOf(node), byName, bodies.toSet()) }
             val sorted = parentsFirst(bodies, parents)
 
             val positionByNode = HashMap<Int, Int>(sorted.size)
             sorted.forEachIndexed { position, node -> positionByNode[node.definition.index] = position }
 
             val bones = sorted.mapIndexed { position, node ->
-                val body = requireNotNull(node.rigidBody()).spec
-                val joint = node.joint()?.spec
+                val body = requireNotNull(target.bodyOf(node))
+                val joint = target.jointOf(node)
                 val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
 
                 RagdollBone(
@@ -83,7 +89,7 @@ class RagdollPlan(
                     modelParent = node.parentNode()?.definition?.index,
                     bindPosition = bindPosition,
                     bindRotation = bindRotation,
-                    shape = RagdollShape.of(body.shape),
+                    shape = shapes.getValue(node),
                     pivot = joint?.pivot?.toVec3f() ?: Vec3f.ZERO,
                     density = body.density,
                     collision = body.collision,
@@ -236,8 +242,25 @@ class RagdollPlan(
 
 private fun RuntimeNode.parentNode(): RuntimeNode? = parent as? RuntimeNode
 
-private fun RuntimeNode.physicalParent(byName: Map<String, RuntimeNode>, bodies: Set<RuntimeNode>): RuntimeNode? {
-    joint()?.spec?.parent?.takeIf { it.isNotBlank() }?.let { named ->
+/**
+ * The body the rig puts on [node]. It is read from the rig itself, so the server, which builds no attachments
+ * for the nodes it poses, plans the same skeleton the client does.
+ */
+private fun PoseTarget.bodyOf(node: RuntimeNode): RigidBodyAttachmentSpec? =
+    rig.bone(node.name)?.attachments?.firstNotNullOfOrNull { it as? RigidBodyAttachmentSpec }
+
+private fun PoseTarget.jointOf(node: RuntimeNode): JointAttachmentSpec? =
+    rig.bone(node.name)?.attachments?.firstNotNullOfOrNull { it as? JointAttachmentSpec }
+
+/** What the body on [node] is made of: the colliders it takes from its bone. Null with no body, or none to make it of. */
+private fun PoseTarget.bodyShapeOf(node: RuntimeNode): RagdollShape? {
+    val body = bodyOf(node) ?: return null
+    val parts = body.partsOn(rig.bone(node.name)?.attachments.orEmpty()).map(RagdollPart::of)
+    return parts.takeIf { it.isNotEmpty() }?.let(::RagdollShape)
+}
+
+private fun RuntimeNode.physicalParent(joint: JointAttachmentSpec?, byName: Map<String, RuntimeNode>, bodies: Set<RuntimeNode>): RuntimeNode? {
+    joint?.parent?.takeIf { it.isNotBlank() }?.let { named ->
         return byName[named]?.takeIf { it !== this }
     }
 

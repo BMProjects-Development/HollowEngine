@@ -4,14 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContext
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsightHighlight
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiHoverInfoProvider
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDeferredSignatureHelpProvider
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiSignatureHelpResult
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextHoverInfo
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextSignature
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextSignatureHelp
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.HoverInfo
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
 import ru.hollowhorizon.hollowengine.common.scripting.ide.SignatureHelp

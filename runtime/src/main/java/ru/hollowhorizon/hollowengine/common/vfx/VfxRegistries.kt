@@ -7,13 +7,9 @@ import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.rl
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxCollisionSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxForceSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxModuleSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
-import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxVelocityOverLifetimeSpec
+import ru.hollowhorizon.hollowengine.common.vfx.modules.*
 import kotlin.reflect.KClass
 
 /**
@@ -50,6 +46,8 @@ object VfxNodeTypes {
         builtIn("post_effect", VfxPostEffectSpec.serializer(), "vfx/node_post_effect.svg") { VfxPostEffectSpec() }
         builtIn("sky", VfxSkySpec.serializer(), "vfx/node_sky.svg") { VfxSkySpec() }
         builtIn("camera_shake", VfxCameraShakeSpec.serializer(), "vfx/node_camera_shake.svg") { VfxCameraShakeSpec() }
+        builtIn("sound", VfxSoundSpec.serializer(), "vfx/node_sound.svg") { VfxSoundSpec() }
+        builtIn("decal", VfxDecalSpec.serializer(), "vfx/node_decal.svg") { VfxDecalSpec() }
     }
 
     private inline fun <reified S : VfxNodeSpec> builtIn(
@@ -189,5 +187,6 @@ object VfxModuleRevision {
     @Synchronized
     fun invalidate() {
         current++
+        TagModuleRevision.invalidate()
     }
 }

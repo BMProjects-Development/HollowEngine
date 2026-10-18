@@ -1,15 +1,15 @@
 package ru.hollowhorizon.hollowengine.common.ide.session
 
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
-import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KaModuleBase
+import org.jetbrains.kotlin.analysis.api.platform.projectStructure.KotlinProjectStructureProvider
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaNotUnderContentRootModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.contextModule
@@ -23,13 +23,13 @@ import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryMo
 
 class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), KotlinProjectStructureProvider {
     private val libraryModules = mutableListOf<KaRekotLibraryModule>()
-    private val scriptModules = linkedMapOf<KtFile, KaModule>()
+    private val sourceModules = linkedMapOf<KtFile, KaModule>()
 
     override val allModules: List<KaModule>
-        get() = libraryModules + scriptModules.values
+        get() = libraryModules + sourceModules.values.distinct()
 
     override val allSourceFiles: List<PsiFileSystemItem>
-        get() = scriptModules.keys.toList()
+        get() = sourceModules.keys.toList()
 
     private val notUnderContentRootModules = mutableMapOf<Project, KaNotUnderContentRootModule>()
 
@@ -50,8 +50,7 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
     override fun getModule(element: PsiElement, useSiteModule: KaModule?): KaModule {
         val containingFile = element.containingFile
 
-        val virtualFile: VirtualFile = containingFile.virtualFile
-            ?: error("Virtual file for $containingFile not found")
+        val virtualFile: VirtualFile = containingFile.virtualFile ?: containingFile.viewProvider.virtualFile
         virtualFile.kaModule?.let { return it }
 
         for (jarLibraryModule in libraryModules) {
@@ -61,11 +60,13 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
                         return jarLibraryModule
                     }
                 }
+
                 is KaJdkLibraryModuleImpl -> {
                     if (jarLibraryModule.baseContentScope.contains(virtualFile)) {
                         return jarLibraryModule
                     }
                 }
+
                 else -> error("Unknown library module type: $jarLibraryModule")
             }
         }
@@ -78,19 +79,23 @@ class ProjectStructureProviderImpl : KotlinStaticProjectStructureProvider(), Kot
     }
 
     fun setModule(file: PsiFile, module: KaModule) {
-        setModule(file.virtualFile, module)
+        setModule(file.virtualFile ?: file.viewProvider.virtualFile, module)
         if (file is KtFile) {
             file.contextModule = module
-            scriptModules[file] = module
+            sourceModules[file] = module
         }
+    }
+
+    internal fun setLibraryContext(file: PsiFile) {
+        setModule(file, getNotUnderContentRootModule(file.project))
     }
 
     fun removeModule(file: PsiFile) {
         if (file is KtFile) {
             file.contextModule = null
-            scriptModules.remove(file)
+            sourceModules.remove(file)
         }
-        file.virtualFile?.kaModule = null
+        (file.virtualFile ?: file.viewProvider.virtualFile).kaModule = null
     }
 
     fun registerLibraryModule(module: KaRekotLibraryModule) {

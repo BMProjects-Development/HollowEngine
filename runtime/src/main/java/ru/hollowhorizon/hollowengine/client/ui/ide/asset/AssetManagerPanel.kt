@@ -1,19 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.asset
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import net.minecraft.server.packs.resources.ResourceManager
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeFilterState
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeView
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 internal const val FolderIcon = "hollowengine:textures/gui/icons/folder.svg"
@@ -210,7 +208,7 @@ internal fun AssetManagerPanel(
             tags = listOf("asset-content"),
             modifier = Modifier.size(0.px, 100.percent).grow(1f).focus()
                 .onKeyInput(FilterShortcutPriority) { input ->
-                    if (input.repeat || !input.command || input.key != GLFW.GLFW_KEY_F) return@onKeyInput
+                    if (input.repeat || !HollowKeys.FIND.matches(input)) return@onKeyInput
                     gridFilter.open()
                     input.consume()
                 },
@@ -341,13 +339,11 @@ private fun AssetToolbar(
                     input.consume()
                 },
             )
-            Image(
+            IconButton(
                 CloseIcon,
-                tags = listOf("asset-filter-close"),
-                modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-                    filter.close()
-                    event.consume()
-                }.tooltipOnHover(AssetManagerLang.CLOSE_FILTER.lang),
+                AssetManagerLang.CLOSE_FILTER.lang,
+                tags = listOf("inline", "asset-filter-close"),
+                onClick = filter::close,
             )
         } else {
             Text(
@@ -379,13 +375,13 @@ private fun AssetToolbar(
                 )
             }
         }
-        Box(
+        IconButton(
+            ReloadIcon,
+            AssetManagerLang.REFRESH.lang,
+            enabled = !loading,
             tags = if (loading) listOf("asset-refresh", "loading") else listOf("asset-refresh"),
-            modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-                if (event.isLeftClick() && !loading) onRefresh()
-                event.consume()
-            }.tooltipOnHover(AssetManagerLang.REFRESH.lang),
-        ) { Image(ReloadIcon, tags = listOf("asset-refresh-icon")) }
+            onClick = onRefresh,
+        )
     }
 }
 

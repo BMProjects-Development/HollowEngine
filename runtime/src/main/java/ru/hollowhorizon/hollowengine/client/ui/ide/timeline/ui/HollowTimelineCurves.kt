@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
@@ -22,12 +24,11 @@ internal data class CurveLane(
 )
 
 internal fun curveLanes(rows: List<TimelineRow>, controller: TimelineController): List<CurveLane> {
-    val lanes = rows.filter { it.kind == TimelineRowKind.PROPERTY && it.visible }
-        .mapNotNull { row -> row.property?.let { row to it } }
-        .flatMap { (row, property) ->
-            property.curves.filter { it.isVisible && it.spec.supportsCurveEditor }.map { curve ->
-                CurveLane(property, curve, curve.color.toUiColor(), row.locked)
-            }
+    val lanes = rows.filter { (it.kind == TimelineRowKind.PROPERTY || it.kind == TimelineRowKind.CHANNEL) && it.visible }
+        .mapNotNull { row ->
+            val property = row.property ?: return@mapNotNull null
+            val curve = row.curve?.takeIf { it.isVisible && it.spec.supportsCurveEditor } ?: return@mapNotNull null
+            CurveLane(property, curve, curve.color.toUiColor(), row.locked)
         }
     if (controller.focusedCurves.isEmpty()) return lanes
     return lanes.filter { controller.isFocused(it.curve) }
@@ -43,37 +44,46 @@ internal fun TimelineCurveGraph(
     scrollX: Float,
     visibleTimes: ClosedFloatingPointRange<Float>,
     scroll: UiScrollHandle,
+    transforms: CurveTransformHost,
     refresh: () -> Unit,
 ) {
     var menu by remember { mutableStateOf<TimelineMenuState?>(null) }
     var marquee by remember { mutableStateOf<TimelineMarquee?>(null) }
     val pan = remember { TimelinePanGesture() }
-    val revision = LocalTimelineRevision.current
+    val revision = LocalTimelineRevision.current to controller.keysRevision
     val center = controller.curveValueCenter
     val span = controller.curveValueSpan
     val pxPerValue = curvePixelsPerValue(span, height)
-    val fromX = max(0f, TimelineLeftPadding + visibleTimes.start * pxPerSec)
-    val toX = min(contentWidth, TimelineLeftPadding + visibleTimes.endInclusive * pxPerSec)
+    transforms.view = CurveView(pxPerSec, controller.viewStart, center, span, height)
+    transforms.viewport = scroll.viewport
+    TrackPointer(transforms)
+    CurvePointerWrap(transforms, scroll)
+    val fromX = max(0f, controller.timeX(visibleTimes.start, pxPerSec))
+    val toX = min(contentWidth, controller.timeX(visibleTimes.endInclusive, pxPerSec))
 
     val grid = remember(revision, center, span, height, fromX, toX) {
         buildCurveGrid(center, span, height, fromX, toX)
     }
     val curves = remember(revision, center, span, height, fromX, toX, pxPerSec, lanes) {
-        lanes.map { lane -> lane.color to buildCurveShape(lane, pxPerSec, fromX, toX, center, span, height) }
+        lanes.map { lane -> lane.color to buildCurveShape(controller, lane, pxPerSec, fromX, toX, center, span, height) }
     }
-    val guides = remember(revision, center, span, height, pxPerSec, lanes, controller.selectedKeyframes.toList()) {
+    val guides = remember(
+        revision, center, span, height, pxPerSec, lanes, controller.selectedKeyframes.toList(), controller.selectedHandles.toList(),
+        CurveHandleDisplay.all,
+    ) {
         buildHandleGuides(controller, lanes, pxPerSec, center, span, height, visibleTimes)
     }
 
     Box(
         id = "timeline-curve-content",
         modifier = Modifier.size(contentWidth.px, height.coerceAtLeast(1f).px)
+            .onPlaced { transforms.content = it }
             .drawBehind(key = listOf(revision, center, span, height, fromX, toX, pxPerSec)) {
                 drawShape(grid, UiPaint.Color(TimelineColors.Grid), UiDrawStyle.Stroke(1f))
-                guides.forEach { drawShape(it, UiPaint.Color(TimelineColors.Handle), UiDrawStyle.Stroke(1f)) }
                 curves.forEach { (color, shape) ->
                     drawShape(shape, UiPaint.Color(color), UiDrawStyle.Stroke(1.6f))
                 }
+                guides.forEach { drawShape(it, UiPaint.Color(TimelineColors.Handle), UiDrawStyle.Stroke(1f)) }
             }.panCurveOnDrag(controller, scroll, pxPerValue, pan, refresh).onPress { event ->
                 if (!event.isLeftClick()) {
                     marquee = null
@@ -91,11 +101,10 @@ internal fun TimelineCurveGraph(
                 refresh()
             }.onRelease { event ->
                 if (event.isRightClick()) {
-                    if (!pan.moved) {
-                        val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd, event.modifiers)
+                    if (pan.release()) {
+                        val time = controller.timelineTimeAt(pan.pressLocalX, pxPerSec)
                         menu = TimelineMenuState(pan.pressX, pan.pressY, null, time, locked = false)
                     }
-                    pan.moved = false
                     refresh()
                     return@onRelease
                 }
@@ -103,9 +112,10 @@ internal fun TimelineCurveGraph(
                 marquee = null
                 if (band.isDrag) {
                     controller.select(
-                        keysInCurveMarquee(lanes, pxPerSec, center, span, height, band),
+                        keysInCurveMarquee(controller, lanes, pxPerSec, center, span, height, band),
                         additive = band.additive,
                     )
+                    controller.selectHandles(handlesInCurveMarquee(controller, lanes, pxPerSec, center, span, height, band))
                 }
                 refresh()
             },
@@ -128,6 +138,7 @@ internal fun TimelineCurveGraph(
         MarqueeOverlay(marquee)
         CurveValueLabels(center, span, height, scrollX, commonValueFormatter(lanes))
         Playhead(controller, pxPerSec, height)
+        transforms.active?.let { transform -> CurveTransformLayer(transform, transforms, contentWidth, height, refresh) }
     }
 
     menu?.let { state ->
@@ -182,13 +193,14 @@ private fun CurveKeyPoint(
     onContextMenu: (UiEvent, ChannelCurve?, Float) -> Unit,
     refresh: () -> Unit,
 ) {
+    controller.keysRevision
     val selected = controller.isSelected(keyframe)
-    val x = TimelineLeftPadding + keyframe.time * pxPerSec
+    val x = controller.timeX(keyframe.time, pxPerSec)
     val y = curveValueToY(keyframe.value, center, span, height)
     val half = CurvePointSize * 0.5f
     val press = remember { KeyPressGesture() }
 
-    if (selected && !lane.locked) {
+    if ((CurveHandleDisplay.all || controller.showsHandles(keyframe)) && !lane.locked) {
         TangentSide.entries.forEach { side ->
             if (lane.curve.hasNeighbour(keyframe, side)) {
                 CurveHandle(controller, lane, keyframe, side, x, y, pxPerSec, pxPerValue, refresh)
@@ -216,7 +228,7 @@ private fun CurveKeyPoint(
                 if (!event.isLeftClick()) return@onPress
                 event.consume()
                 press.begin(keyframe, event.modifiers, controller) {
-                    stackedInGraph(lanes, keyframe, pxPerSec, center, span, height)
+                    stackedInGraph(controller, lanes, keyframe, pxPerSec, center, span, height)
                 }
                 refresh()
             }.onDrag { event ->
@@ -226,7 +238,7 @@ private fun CurveKeyPoint(
                 val focus = controller.dragFocusKeyframe ?: return@onDrag
                 val origin = controller.dragStartTimes?.get(focus) ?: focus.time
                 val delta = timelineTimeDelta(event.dragTotalX, pxPerSec)
-                val time = snapTimelineTime(origin + delta, event.modifiers)
+                val time = snapTimelineTime(origin + delta)
                 controller.applyCurveDrag(time - origin, -event.dragTotalY / pxPerValue)
                 event.consume()
                 refresh()
@@ -250,36 +262,44 @@ private fun CurveHandle(
     pxPerValue: Float,
     refresh: () -> Unit,
 ) {
+    controller.keysRevision
     val tangent = lane.curve.effectiveTangents(keyframe).tangent(side)
     val active = lane.curve.isTangentUsed(keyframe, side)
     val x = keyX + tangent.time * pxPerSec
     val y = keyY - tangent.value * pxPerValue
     val half = CurveHandleSize * 0.5f
-    var grabbed by remember { mutableStateOf(KeyTangent.ZERO) }
+    val grabbed = remember { ArrayList<HandleGrab>() }
+    val picked = controller.isSelected(keyframe, side)
+    val color = if (picked) TimelineColors.Accent else TimelineColors.Handle
 
     Box(
         id = "curve-handle-${System.identityHashCode(lane.curve)}-${side.name}-${System.identityHashCode(keyframe)}",
-        tags = listOf("timeline-curve-handle"),
+        tags = if (picked) listOf("timeline-curve-handle", "selected") else listOf("timeline-curve-handle"),
         modifier = Modifier.position((x - half).px, (y - half).px).size(CurveHandleSize.px, CurveHandleSize.px)
-            .background(TimelineColors.Handle.withAlpha(if (active) 1f else 0.4f)).borderRadius(half)
+            .background(color.withAlpha(if (active || picked) 1f else 0.4f)).borderRadius(half)
             .cursor(UiCursorShape.MOVE).onPress { event ->
                 if (!event.isLeftClick()) return@onPress
-                grabbed = lane.curve.effectiveTangents(keyframe).tangent(side)
-                controller.beginHistoryTransaction("Edit handle")
+                val inSelection = picked || controller.isSelected(keyframe)
+                if (!inSelection || event.isAdditiveSelection()) {
+                    controller.selectHandle(keyframe, side, event.isAdditiveSelection())
+                }
+                grabbed.clear()
+                grabbed += handlesDragged(controller, keyframe, side)
+                controller.beginHistoryTransaction(TimelineEdits.EDIT_HANDLES)
                 event.consume()
             }.onDrag { event ->
-                val next = KeyTangent(
-                    time = grabbed.time + event.dragTotalX / pxPerSec.coerceAtLeast(1f),
-                    value = grabbed.value - event.dragTotalY / pxPerValue.coerceAtLeast(1e-6f),
-                )
-                controller.setTangent(
-                    keyframe = keyframe,
-                    side = side,
-                    tangent = next,
-                    mode = handleModeFor(event.modifiers),
-                    timeScale = pxPerSec,
-                    valueScale = pxPerValue,
-                )
+                val time = event.dragTotalX / pxPerSec.coerceAtLeast(1f)
+                val value = -event.dragTotalY / pxPerValue.coerceAtLeast(1e-6f)
+                grabbed.forEach { grab ->
+                    controller.setTangent(
+                        keyframe = grab.keyframe,
+                        side = grab.side,
+                        tangent = KeyTangent(grab.start.time + time, grab.start.value + value),
+                        mode = handleModeFor(event.modifiers),
+                        timeScale = pxPerSec,
+                        valueScale = pxPerValue,
+                    )
+                }
                 event.consume()
                 refresh()
             }.onRelease {
@@ -287,6 +307,26 @@ private fun CurveHandle(
                 refresh()
             },
     )
+}
+
+/** A handle a drag moves, and its tangent when the drag began. */
+private class HandleGrab(val keyframe: Keyframe, val side: TangentSide, val start: KeyTangent)
+
+/**
+ * The handles a drag of the [side] handle of [keyframe] moves, all by the same amount: when it is among what is picked,
+ * every handle picked alone and that side of every picked key; otherwise it alone.
+ */
+private fun handlesDragged(controller: TimelineController, keyframe: Keyframe, side: TangentSide): List<HandleGrab> {
+    val inSelection = controller.isSelected(keyframe, side) || controller.isSelected(keyframe)
+    val picks = if (!inSelection) listOf(HandlePick(keyframe, side))
+    else controller.selectedHandles + controller.selectedKeyframes.map { HandlePick(it, side) }
+    return picks.distinctBy { System.identityHashCode(it.keyframe) to it.side }.mapNotNull { pick ->
+        val curve = controller.curveOf(pick.keyframe) ?: return@mapNotNull null
+        val property = controller.propertyOf(curve) ?: return@mapNotNull null
+        if (!curve.spec.supportsCurveEditor || controller.isLocked(property)) return@mapNotNull null
+        if (!curve.hasNeighbour(pick.keyframe, pick.side)) return@mapNotNull null
+        HandleGrab(pick.keyframe, pick.side, curve.effectiveTangents(pick.keyframe).tangent(pick.side))
+    }
 }
 
 private fun handleModeFor(modifiers: Int): HandleMode = when {
@@ -319,6 +359,7 @@ private fun buildCurveGrid(center: Float, span: Float, height: Float, fromX: Flo
 }
 
 private fun buildCurveShape(
+    controller: TimelineController,
     lane: CurveLane,
     pxPerSec: Float,
     fromX: Float,
@@ -330,27 +371,28 @@ private fun buildCurveShape(
     val keys = lane.curve.keyframes
     val first = keys.minOfOrNull { it.time } ?: 0f
     val last = keys.maxOfOrNull { it.time } ?: 0f
-    val startX = max(fromX, TimelineLeftPadding + first * pxPerSec)
-    val endX = min(toX, TimelineLeftPadding + last * pxPerSec)
+    val startX = max(fromX, controller.timeX(first, pxPerSec))
+    val endX = min(toX, controller.timeX(last, pxPerSec))
     return GenericShape {
         if (keys.isEmpty() || endX < startX) return@GenericShape
         var x = startX
         var started = false
         while (x <= endX) {
-            val time = (x - TimelineLeftPadding) / pxPerSec
+            val time = controller.timeAtX(x, pxPerSec)
             val y = curveValueToY(lane.curve.valueAt(time, 0f), center, span, height)
             if (started) lineTo(x, y) else moveTo(x, y)
             started = true
             x += CurveSampleStep
         }
         if (started) {
-            val time = (endX - TimelineLeftPadding) / pxPerSec
+            val time = controller.timeAtX(endX, pxPerSec)
             lineTo(endX, curveValueToY(lane.curve.valueAt(time, 0f), center, span, height))
         }
     }
 }
 
 private fun stackedInGraph(
+    controller: TimelineController,
     lanes: List<CurveLane>,
     pressed: Keyframe,
     pxPerSec: Float,
@@ -358,12 +400,12 @@ private fun stackedInGraph(
     span: Float,
     height: Float,
 ): List<Keyframe> {
-    val x = TimelineLeftPadding + pressed.time * pxPerSec
+    val x = controller.timeX(pressed.time, pxPerSec)
     val y = curveValueToY(pressed.value, center, span, height)
     val radius = CurvePointSize * 0.5f
     return lanes.filterNot { it.locked }.flatMap { lane ->
         lane.curve.keyframes.filter { key ->
-            abs(TimelineLeftPadding + key.time * pxPerSec - x) <= radius && abs(
+            abs(controller.timeX(key.time, pxPerSec) - x) <= radius && abs(
                 curveValueToY(
                     key.value, center, span, height
                 ) - y
@@ -386,8 +428,8 @@ private fun buildHandleGuides(
         val segments = mutableListOf<FloatArray>()
         lane.curve.keyframes.forEach { keyframe ->
             if (keyframe.time !in visibleTimes) return@forEach
-            if (!controller.isSelected(keyframe)) return@forEach
-            val keyX = TimelineLeftPadding + keyframe.time * pxPerSec
+            if (!CurveHandleDisplay.all && !controller.showsHandles(keyframe)) return@forEach
+            val keyX = controller.timeX(keyframe.time, pxPerSec)
             val keyY = curveValueToY(keyframe.value, center, span, height)
             val tangents = lane.curve.effectiveTangents(keyframe)
             listOf(
@@ -427,24 +469,39 @@ private fun Modifier.panCurveOnDrag(
     pan: TimelinePanGesture,
     refresh: () -> Unit,
 ): Modifier {
+    val zoom = remember { TimelineZoomDrag() }
     return this.onPress { event ->
-        if (!event.isMiddleClick() && !event.isRightClick()) return@onPress
-        pan.begin(event, scroll.offsetX, scroll.offsetY, controller.curveAxis.targetCenter)
+        if (zoom.begin(event, controller, scroll, event.localX)) {
+            event.consume()
+            return@onPress
+        }
+        if (!isPanPress(event)) return@onPress
+        pan.begin(event, controller, scroll, controller.curveAxis.targetCenter)
         event.consume()
     }.onDrag { event ->
-        if (!event.isMiddleClick() && !event.isRightClick()) return@onDrag
+        if (zoom.drag(event, controller, scroll, values = true)) {
+            event.consume()
+            refresh()
+            return@onDrag
+        }
+        if (!isPanPress(event)) return@onDrag
         if (!pan.advance(event)) return@onDrag
-        scroll.scrollTo(x = (pan.scrollX - event.dragTotalX).coerceAtLeast(0f))
+        scroll.scrollTo(x = pan.scrollX(controller, event))
         controller.curveAxis.snapTo(
             center = pan.center + event.dragTotalY / pixelsPerValue.coerceAtLeast(1e-6f),
             span = controller.curveAxis.targetSpan,
         )
         event.consume()
         refresh()
-    }
+    }.onRelease { zoom.end() }
 }
 
+/** The keymap's pan drag, or the right button, which pans the graph too and opens its menu on a click. */
+private fun isPanPress(event: UiEvent): Boolean =
+    event.isRightClick() || HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
+
 private fun keysInCurveMarquee(
+    controller: TimelineController,
     lanes: List<CurveLane>,
     pxPerSec: Float,
     center: Float,
@@ -454,8 +511,90 @@ private fun keysInCurveMarquee(
 ): List<Keyframe> = lanes.filterNot { it.locked }.flatMap { lane ->
     lane.curve.keyframes.filter { key ->
         marquee.contains(
-            TimelineLeftPadding + key.time * pxPerSec,
+            controller.timeX(key.time, pxPerSec),
             curveValueToY(key.value, center, span, height),
         )
     }
+}
+
+/** The handles shown inside [marquee] whose keys it leaves out: a key inside carries its handles anyway. */
+private fun handlesInCurveMarquee(
+    controller: TimelineController,
+    lanes: List<CurveLane>,
+    pxPerSec: Float,
+    center: Float,
+    span: Float,
+    height: Float,
+    marquee: TimelineMarquee,
+): List<HandlePick> {
+    val pxPerValue = curvePixelsPerValue(span, height)
+    return lanes.filterNot { it.locked }.flatMap { lane ->
+        lane.curve.keyframes.flatMap { key ->
+            if (!CurveHandleDisplay.all && !controller.showsHandles(key)) return@flatMap emptyList()
+            val keyX = controller.timeX(key.time, pxPerSec)
+            val keyY = curveValueToY(key.value, center, span, height)
+            if (marquee.contains(keyX, keyY)) return@flatMap emptyList()
+            val tangents = lane.curve.effectiveTangents(key)
+            TangentSide.entries.filter { side ->
+                val tangent = tangents.tangent(side)
+                lane.curve.hasNeighbour(key, side) &&
+                    marquee.contains(keyX + tangent.time * pxPerSec, keyY - tangent.value * pxPerValue)
+            }.map { HandlePick(key, it) }
+        }
+    }
+}
+
+/** Keeps where the pointer is for [host] without the graph composing again on every move. */
+@Composable
+private fun TrackPointer(host: CurveTransformHost) {
+    val pointer = LocalPointer.current
+    SideEffect {
+        host.pointerX = pointer.x
+        host.pointerY = pointer.y
+    }
+}
+
+/** While a transform runs, the pointer stays over the graph, wrapping around its edges. */
+@Composable
+private fun CurvePointerWrap(host: CurveTransformHost, scroll: UiScrollHandle) {
+    val wrap = LocalUiPointerWrap.current ?: return
+    val active = host.active != null
+    DisposableEffect(active) {
+        if (active) wrap.hold(scroll.viewport, host.pointerX, host.pointerY, host.onWrap)
+        onDispose { wrap.release(host.onWrap) }
+    }
+}
+
+/**
+ * The layer over the graph while [transform] runs: it takes the pointer, so the keys under it do not, ends the
+ * transform on a click and draws the line from the middle to the pointer while turning or stretching.
+ */
+@Composable
+private fun CurveTransformLayer(
+    transform: CurveTransform,
+    host: CurveTransformHost,
+    width: Float,
+    height: Float,
+    refresh: () -> Unit,
+) {
+    Box(
+        id = "timeline-curve-transform",
+        modifier = Modifier.position(0.px, 0.px).size(width.px, height.coerceAtLeast(1f).px)
+            .input(hoverable = true, clickable = true)
+            .onHover { event ->
+                host.move(event.localX, event.localY)
+                refresh()
+            }.onPress { event ->
+                host.click(event.button)
+                event.consume()
+                refresh()
+            }.drawBehind(key = listOf(transform.pointerX, transform.pointerY, transform.mode)) {
+                if (transform.mode == GizmoEditMode.TRANSLATE) return@drawBehind
+                val line = GenericShape {
+                    moveTo(transform.pivotX, transform.pivotY)
+                    lineTo(transform.pointerX, transform.pointerY)
+                }
+                drawShape(line, UiPaint.Color(TimelineColors.Muted), UiDrawStyle.Stroke(1f))
+            },
+    )
 }

@@ -8,14 +8,14 @@ import org.jetbrains.kotlin.analysis.api.standalone.base.packages.KotlinStandalo
 import org.jetbrains.kotlin.psi.KtFile
 
 /**
- * Knows packages declared by scripts open in the analyzer.
+ * Knows packages declared by Kotlin sources and scripts open in the analyzer.
  */
 class HollowPackageProviderFactory(
     private val project: Project,
-    private val scripts: ProjectStructureProviderImpl,
+    private val sources: ProjectStructureProviderImpl,
 ) : KotlinPackageProviderFactory {
     override fun createPackageProvider(searchScope: GlobalSearchScope): KotlinPackageProvider {
-        val packages = scripts.allSourceFiles.mapNotNullTo(HashSet()) { file ->
+        val packages = sources.allSourceFiles.mapNotNullTo(HashSet()) { file ->
             (file as? KtFile)?.takeIf { it.virtualFile?.let(searchScope::contains) == true }?.packageFqName
         }
         return KotlinStandalonePackageProvider(project, searchScope, packages)

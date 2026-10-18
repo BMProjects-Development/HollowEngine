@@ -7,10 +7,10 @@ import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 import ru.hollowhorizon.hollowengine.common.npcs.query.EntityQuery
 import ru.hollowhorizon.hollowengine.common.npcs.query.EntityQuerySort
 import ru.hollowhorizon.hollowengine.common.npcs.query.entityQuery
-import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 
 fun <T : Entity> NpcEntity.findEntities(query: EntityQuery<T>): List<Ref<T>> {
     if (query.limit == 0) return emptyList()

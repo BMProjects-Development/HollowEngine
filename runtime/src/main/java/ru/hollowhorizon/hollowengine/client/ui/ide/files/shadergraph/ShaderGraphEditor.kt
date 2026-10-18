@@ -4,6 +4,8 @@ import androidx.compose.runtime.*
 import com.mojang.blaze3d.systems.RenderSystem
 import kotlinx.coroutines.delay
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
@@ -259,15 +261,13 @@ internal fun ShaderGraphEditor(file: HollowIdeOpenFile) {
 
     fun handleKey(input: UiKeyInput): Boolean {
         when {
-            input.key == GLFW.GLFW_KEY_DELETE -> deleteSelection()
-            input.control && input.key == GLFW.GLFW_KEY_D -> duplicateSelection()
-            input.control && input.key == GLFW.GLFW_KEY_A -> select(ShaderGraphSelection(all.keys.toSet()))
-            input.control && input.key == GLFW.GLFW_KEY_G -> select(
-                if (input.shift) document.ungroup(selection) else document.groupNodes(selection.nodes)
-            )
+            HollowKeys.DELETE.matches(input) -> deleteSelection()
+            HollowKeys.DUPLICATE.matches(input) -> duplicateSelection()
+            HollowKeys.SELECT_ALL.matches(input) -> select(ShaderGraphSelection(all.keys.toSet()))
+            HollowKeys.GROUP.matches(input) -> select(document.groupNodes(selection.nodes))
+            HollowKeys.UNGROUP.matches(input) -> select(document.ungroup(selection))
 
-            input.control && input.key == GLFW.GLFW_KEY_Z && !input.shift -> document.undo()
-            input.control && (input.key == GLFW.GLFW_KEY_Y || input.shift && input.key == GLFW.GLFW_KEY_Z) -> document.redo()
+            UndoKeys.handle(document.history, input.key, input.modifiers) -> Unit
             input.key == GLFW.GLFW_KEY_ESCAPE -> if (link != null) {
                 link = null
                 document.endGesture()
@@ -462,7 +462,7 @@ internal fun ShaderGraphEditor(file: HollowIdeOpenFile) {
                         pointer.screenY,
                         listOf(
                             rerouteItem { select(document.addReroute(edge, pointer.graphX, pointer.graphY)) },
-                            UiDropdownItem(graphText("delete_link"), shortcut = "Del") {
+                            UiDropdownItem(graphText("delete_link"), shortcut = HollowKeys.DELETE.shortcut) {
                                 document.edit { it.withoutLinkAt(edge) }
                                 select(ShaderGraphSelection.None)
                             },

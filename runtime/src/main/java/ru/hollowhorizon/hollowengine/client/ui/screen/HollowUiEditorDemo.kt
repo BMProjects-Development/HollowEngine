@@ -2,9 +2,12 @@ package ru.hollowhorizon.hollowengine.client.ui.screen
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeEditorSession
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeEditorSession
+import ru.hollowhorizon.hollowengine.client.ui.widgets.EditableTextField
+import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiInlayHintsProvider
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 
 @Composable
 internal fun HollowUiEditorDemo(

@@ -2,17 +2,18 @@ import ru.hollowhorizon.hollowengine.addons.physics.matrixOf
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollStateSpec
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPlan
 import ru.hollowhorizon.hollowengine.addons.physics.ragdoll.RagdollPose
-import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachment
 import ru.hollowhorizon.hollowengine.addons.physics.rig.JointAttachmentSpec
-import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachment
 import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
@@ -166,14 +167,14 @@ class RagdollPoseTests {
         head.parent = helper
         helper.parent = chest
 
-        val target = PoseTarget(listOf(RuntimeNode(chest, parent = null)).byIndex(), emptyMap())
-        listOf("chest", "head").forEach { name ->
-            val node = requireNotNull(target.node(name))
-            node.attachments += RigidBodyAttachment(RigidBodyAttachmentSpec(), node)
-        }
-        requireNotNull(target.node("head")).let {
-            it.attachments += JointAttachment(JointAttachmentSpec(parent = "chest"), it)
-        }
+        val collider = ColliderAttachmentSpec(id = "collider", size = Vec3f(0.2f, 0.2f, 0.2f))
+        val rig = ModelRig(
+            bones = mapOf(
+                "chest" to RigBone(attachments = listOf(collider, RigidBodyAttachmentSpec())),
+                "head" to RigBone(attachments = listOf(collider, RigidBodyAttachmentSpec(), JointAttachmentSpec(parent = "chest"))),
+            ),
+        )
+        val target = PoseTarget(listOf(RuntimeNode(chest, parent = null)).byIndex(), emptyMap(), rig = rig)
 
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
         assertEquals(listOf("chest", "head"), plan.bones.map { it.name })

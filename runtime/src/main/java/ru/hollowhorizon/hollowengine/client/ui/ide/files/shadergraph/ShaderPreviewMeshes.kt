@@ -1,10 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 
-import com.mojang.blaze3d.vertex.BufferBuilder
-import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.Tesselator
-import com.mojang.blaze3d.vertex.VertexBuffer
-import com.mojang.blaze3d.vertex.VertexFormat
+import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.renderer.texture.OverlayTexture
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderPreviewMesh

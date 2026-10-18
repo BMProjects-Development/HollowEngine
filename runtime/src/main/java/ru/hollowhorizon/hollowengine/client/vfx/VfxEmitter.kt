@@ -5,12 +5,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
-import ru.hollowhorizon.hollowengine.common.vfx.VfxParticleEvent
-import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
-import ru.hollowhorizon.hollowengine.common.vfx.VfxSimulationSpace
-import ru.hollowhorizon.hollowengine.common.vfx.VfxValue
-import ru.hollowhorizon.hollowengine.common.vfx.VfxVec3Value
+import ru.hollowhorizon.hollowengine.common.vfx.*
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxUvAnimationSpec
 import kotlin.math.ceil
 import kotlin.math.sqrt
@@ -96,6 +91,9 @@ class VfxEmitter(
     private var born: Int = 0
     private var stopping: Boolean = false
 
+    /** Set while the effect is held: the emitter makes nothing and its own clock stands, while what it made lives on. */
+    private var held: Boolean = false
+
     /** Whether this emitter will ever produce anything again. */
     val isFinished: Boolean
         get() {
@@ -135,6 +133,24 @@ class VfxEmitter(
     }
 
     /**
+     * Holds the emitter: it makes nothing new and its loops stand where they are, while its particles live on. A
+     * sub-emitter is not held, as what it makes comes from those particles.
+     */
+    fun hold() {
+        held = true
+    }
+
+    /**
+     * Goes on after [hold], from where the loop stood. An emitter that had already run its course without looping
+     * runs it again, since it is let go of to play, and would otherwise make nothing.
+     */
+    fun release() {
+        if (!held) return
+        held = false
+        if (subInput == null && !spec.emission.loop && isExpired()) startLoop()
+    }
+
+    /**
      * Puts the emitter back where it was when the effect was created.
      */
     override fun restart() {
@@ -147,6 +163,7 @@ class VfxEmitter(
         sleepLeft = 0f
         born = 0
         stopping = false
+        held = false
         spawnDebt = spec.emission.burst.toFloat()
         rollEmitterRandoms()
     }
@@ -191,13 +208,13 @@ class VfxEmitter(
     }
 
     private fun advance(dt: Float) {
-        age += dt
-
         val input = subInput
         if (input != null) {
+            age += dt
             if (enabled && !stopping) spawnEvents(input)
             input.events.clear()
-        } else {
+        } else if (!held) {
+            age += dt
             advanceEmission(dt)
         }
 

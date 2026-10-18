@@ -3,12 +3,14 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rendering
 import com.mojang.blaze3d.vertex.VertexConsumer
 import org.joml.Matrix3f
 import org.joml.Matrix4f
-import ru.hollowhorizon.hollowengine.client.models.internal.*
+import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
+import ru.hollowhorizon.hollowengine.client.models.internal.batchingRenderType
+import ru.hollowhorizon.hollowengine.client.models.internal.packedLight
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.utils.*
+import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.utils.Color
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat3f
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -42,14 +44,16 @@ class BatchingRenderer(
             val renderType = batchingRenderType.apply(material)
             openedBatchedRenderTypes?.add(renderType)
             val vertexConsumer = source.getBuffer(renderType)
-            val pose = stack.last().pose()
-            val normal = stack.last().normal()
+            val nodeMatrix = instance.matrix.asMatrix4f()
+            val pose = Matrix4f(stack.last().pose()).mul(nodeMatrix)
+            val normal = Matrix3f(stack.last().normal()).mul(normalMatrixOf(nodeMatrix))
+            val transformedNormal = Vector3f()
             val color = material.color
 
             val packedLight = material.packedLight(light)
             for (i in iterator) {
                 putVertex(
-                    instance, i, vertexConsumer, pose, normal, color, overlay, packedLight,
+                    i, vertexConsumer, pose, normal, transformedNormal, color, overlay, packedLight,
                     posArray, normArray, texArray,
                 )
             }
@@ -57,11 +61,11 @@ class BatchingRenderer(
     }
 
     private fun putVertex(
-        instance: MeshAttachment,
         index: Int,
         consumer: VertexConsumer,
         pose: Matrix4f,
         normalMat: Matrix3f,
+        transformedNormal: Vector3f,
         color: Color,
         overlayCoords: Int,
         packedLight: Int,
@@ -71,17 +75,17 @@ class BatchingRenderer(
     ) {
         if (index !in posArray.indices || index !in normArray.indices || index !in texArray.indices) return
 
-        val global = instance.matrix
-        val pos = global.transform(posArray[index], 1f, MutableVec3f())
-        val normal = global.getUpperLeft(MutableMat3f()).transform(normArray[index], MutableVec3f())
+        val position = posArray[index]
+        val sourceNormal = normArray[index]
+        val normal = normalMat.transform(sourceNormal.x, sourceNormal.y, sourceNormal.z, transformedNormal).normalize()
 
         consumer
-            .vertex(pose, pos.x, pos.y, pos.z)
+            .vertex(pose, position.x, position.y, position.z)
             .color(color.r, color.g, color.b, color.a)
             .uv(texArray[index].x, texArray[index].y)
             .overlayCoords(overlayCoords)
             .uv2(packedLight)
-            .normal(normalMat, normal.x, normal.y, normal.z)
+            .normal(normal.x, normal.y, normal.z)
     }
 
     override fun destroy() {

@@ -1,0 +1,181 @@
+---
+title: Working with the IDE
+order: 1
+---
+
+<center><h1>Working with the IDE</h1></center>
+
+*Open project files, arrange tools, edit scripts, and recover the toolbar if it was hidden.*
+
+## Opening and arranging the workspace
+
+The HollowEngine logo in the upper-left corner controls the IDE overlay. Left-click it to expand or collapse the workspace. The expanded toolbar contains four menus:
+
+- **File** - saving, project settings, import and export, project folder, and resource reload actions;
+- **Windows** - Project, Asset Manager, Console, Cutscenes, editors, and other panels;
+- **Tools** - editor mode, transform controls, UI profiler, and interface scale;
+- **Help** - documentation and community links.
+
+Panels open as docked tabs. Drag a tab into a highlighted target to dock, split, or pin the panel to a side stripe; drag separators to resize panels. A pinned panel can collapse to a stripe button and expand again. Use **Windows > Side Bars** to toggle the stripes, or **Windows > Reset Window Layout** to restore the default arrangement. `Ctrl + W` closes the focused tab.
+
+The status bar at the bottom shows the open file or current object path and editor details. Click a path segment to reveal it in the project or open its tool window.
+
+![IDE workspace with Project, editor, and Console](/hollowengine/pictures/ide/workspace.webp)
+
+## Keyboard shortcuts and history
+
+In **Help > Keyboard shortcuts**, search for an action, replace a binding, add an alternative or remove one. Actions are grouped by context: code editor, project, timeline, 3D view and graphs. Conflicting assignments in the same context are marked. Wheel, mouse-button and held-key actions can also be configured where supported. Import, export or reset the keymap as needed.
+
+All control tables in this documentation show **default bindings**. The current assignments appear in this dialog, menus and button tooltips. Basic text editing such as caret movement and Backspace is not part of the editor action keymap; `Alt + Enter` also remains a separate intention shortcut.
+
+Undo is `Ctrl + Z`; redo is `Ctrl + Y` or `Ctrl + Shift + Z`. They act on the active editor's or world's history. In **Windows > History**, choose a document or the world; clicking a step undoes or redoes up to it.
+
+See [Timeline](/docs/hollowengine/ide/timeline) for keys and curves, and [World objects](/docs/hollowengine/world/objects) for placement and transforms.
+
+## Project tree
+
+Open **Windows > Project** to browse the `hollowengine` work directory. A double-click opens a supported file. Right-click a file or folder for create, rename, copy, move, delete, and **Show in Explorer** actions. Files can also be dragged between project folders or imported from the operating system.
+
+When the Project panel is focused, these shortcuts are available:
+
+| Shortcut                           | Action                        |
+|------------------------------------|-------------------------------|
+| `Ctrl + F`                         | Open the folder / file filter |
+| `Ctrl + C`, `Ctrl + X`, `Ctrl + V` | Copy, cut, and paste          |
+| `F2`                               | Rename the selected path      |
+| `Delete`                           | Delete the selection          |
+| `Alt + Insert`                     | Create a file                 |
+| `Alt + Shift + Insert`             | Create a folder               |
+
+## Creating scripts
+
+Right-clicking the `scripts` folder or any folder inside it shows the **New Script** item. Hover over it and pick a type:
+
+| Item                     | File                                  | What it contains                                   |
+|--------------------------|---------------------------------------|----------------------------------------------------|
+| **Script**               | `.kts`                                | a function and a call to it                        |
+| **Server Reload Script** | `.reload.kts`                         | a chat greeting for joining players                |
+| **Client Reload Script** | `.reload.kts` with `@file:ClientSide` | a line of text on the HUD                          |
+| **Startup Script**       | `.startup.kts`                        | an item registered under the file's name           |
+| **Node Script**          | `.node.kts`                           | start, stop, and once-a-second handlers            |
+| **UI Script**            | `.ui.kts`                             | a simple screen                                    |
+| **Mixin Script**         | `.mixin.kts`                          | a script mixin starter                             |
+| **Dialogue**             | `.story`                              | a dialogue with two answers                        |
+
+Then enter the file name. The extension can be omitted, the IDE adds it. The new file opens in the editor right away with a working example to start from.
+
+The item is only offered inside `scripts`, because the engine loads scripts and dialogues from there only.
+
+![Context menu for creating scripts](/hollowengine/pictures/ide/new-script-menu.webp)
+
+## Code editor
+
+Buttons in the gutter fold code blocks and mark overrides, suspend calls and event handlers. Navigation markers help reach the corresponding declaration. Supported scripts also show **Run** and **Stop** controls; `@State` functions can be started individually. Running saves an edited file first; availability depends on server permissions and script type.
+
+Opening `.kts`, `.story`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics appear in the editor and in the **Problems** tab of the **Console** window. Its **Logs** tab shows log output, filters by severity and text, and accepts commands.
+
+
+![Kotlin script completion in the code editor](/hollowengine/pictures/ide/code-editor.webp)
+
+In Kotlin mode, the Console's **Logs** tab can run short code snippets and show their output in the log.
+
+![Running Kotlin code in the IDE Console](/hollowengine/pictures/ide/kotlin-console.webp)
+
+Useful editor shortcuts:
+
+| Shortcut           | Action                                                                    |
+|--------------------|---------------------------------------------------------------------------|
+| `Ctrl + S`         | Save the focused file                                                     |
+| `Ctrl + F`         | Find in the focused file                                                  |
+| `Ctrl + R`         | Find and replace                                                          |
+| `F3`, `Shift + F3` | Next or previous match                                                    |
+| `F4`               | Go to definition                                                          |
+| `Alt + Enter`      | Show intention actions: imports and fixes on the current line              |
+| `Ctrl + Space`     | Open completion, including inside an existing identifier                   |
+| `Ctrl + Alt + L`   | Format the focused file                                                   |
+| `Ctrl + N`         | Search across the project; selected editor text becomes the initial query |
+
+### Library sources
+
+Place library and mod source archives (`*-sources.jar`, or `.zip`) in `hollowengine/sources`. Subdirectories are supported, and archives can be added or replaced while the game runs. Navigation reads attached sources before using the decompiler and matches the declaration's owner and parameter types. Java files support PSI-based navigation, hover information, reference highlighting, and syntax diagnostics when the compiler addon is installed.
+
+### Custom completion
+
+`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. It is posted once per caret position. Its `path`, `text`, and `caret` identify the request; `items` starts with the engine's context snippets and accepts additional `UiTextCompletion` entries. The language service's own results are computed in the background and shown next to them. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
+import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import ru.hollowhorizon.hollowengine.common.events.client.IdeCompletionEvent
+
+@SubscribeEvent
+fun complete(event: IdeCompletionEvent) {
+    if (!event.path.endsWith(".kts")) return
+    event.items += UiTextCompletion(
+        label = "example",
+        insertText = "println(\"example\")",
+        filterText = "example",
+    )
+}
+```
+
+## File editors
+
+Change Inspector numbers by dragging horizontally or using the edge arrows. `Shift` makes the step ten times finer; `Ctrl` makes it ten times larger. Click without dragging to type an exact value; `Enter` confirms and `Escape` cancels. Bounded fields may display a slider.
+
+Some file types open in a dedicated editor instead of the text editor:
+
+| Files | Editor |
+| --- | --- |
+| `.vfx` | Visual effect editor with a live preview. The node tree appears in **Scene**, the selected node's settings in **Inspector**, and animation in **Timeline**. See [Visual effects (VFX)](/docs/hollowengine/vfx). |
+| `.material` | Node graph for materials, with a preview on a mesh. See [Material graph](/docs/hollowengine/vfx/material-graph). |
+| `.animator` | Layers, state graph, and parameters of an animation controller. See [Animator Editor](/docs/hollowengine/models/animator-editor). |
+| `.rig` | Bone aliases, attachments, and the physical skeleton. See [Rig Editor](/docs/hollowengine/models/rig-editor). |
+| `.montage` | Clips, bone keys, temporary attachments and events. See [Montages](/docs/hollowengine/models/montages). |
+| `.ogg`, `.wav` and Media formats | Waveform, playback and seeking. See [Sounds](/docs/hollowengine/scripting/sounds). |
+| `.gltf`, `.glb`, `.fbx`, `.geo.json` | Model viewer. |
+| `.png`, `.jpg`, `.jpeg` | Image viewer. |
+| `.mp4` | Video player (needs the [Media addon](/docs/hollowengine/addons/media)). |
+
+Some JSON resources, such as `sounds.json` and recipes, also offer **Text**, **Split**, and **Preview** buttons in the tab bar. The text is always the source of truth: the preview edits it, so undo and autosave work as usual, and a file that cannot be parsed stays in the text editor without being overwritten.
+
+Editors of nodes, such as the animator and the material graph, share the same graph canvas: drag with the right or middle mouse button to pan, use the wheel to zoom, and drag on empty space to select several nodes. Selecting an object in an editor shows its settings in the shared **Inspector**.
+## Reloading changes
+
+Saving a file writes it to the `hollowengine` directory. What must be reloaded depends on the file:
+
+- use **File > Reload Client Resources** or `F3 + T` for models, textures, HSS, UI declarations, client reloadable scripts (`@file:ClientSide`), and other client resources;
+- use **File > Reload Server Resources** or `/reload` for datapack content and server reloadable scripts;
+- `.startup.kts` changes only apply after restarting the game;
+- ordinary `.kts` scripts are started explicitly with `/hollowengine scripting run <path>`.
+
+Server resource reload also replaces changed `.node.kts` instances on the server and loaded entities, restoring saved data and active states. See [Node scripts](/docs/hollowengine/scripting/node).
+
+The compiler addon is required to compile edited scripts. A modpack can instead ship scripts that were compiled ahead of time.
+
+## Collapsing and hiding the toolbar
+
+Left-clicking the HollowEngine logo only collapses the workspace; the logo remains available and another left-click opens it again.
+
+Right-clicking the logo opens visibility options:
+
+- **Show always** - keep the logo available;
+- **Collapse** - close the workspace but keep the logo;
+- **Hide** - disable the logo and toolbar;
+- **Show only in chat menu** - show the logo while chat is open.
+
+The **Hide** action asks for confirmation and explains how to recover the toolbar. Select **Don't show again** only if you do not want this warning on later hides.
+
+![Confirmation before hiding the HollowEngine toolbar](/hollowengine/pictures/ide/toolbar-visibility.webp)
+
+If the toolbar is already hidden, open `config/hollowengine.toml` and set:
+
+```toml
+edit_mode = "ENABLED"
+```
+
+To restore the confirmation dialog as well, set:
+
+```toml
+show_toolbar_hide_confirmation = true
+```

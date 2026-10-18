@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.dialogue.lang
 
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryBool
-import ru.hollowhorizon.hollowengine.common.dialogue.StoryNumber
 import ru.hollowhorizon.hollowengine.common.dialogue.StoryString
 
 data class StoryParseResult(

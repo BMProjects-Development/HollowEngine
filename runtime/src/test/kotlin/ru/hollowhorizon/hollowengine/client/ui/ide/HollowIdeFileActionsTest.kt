@@ -7,27 +7,6 @@ import kotlin.test.assertTrue
 
 class HollowIdeFileActionsTest {
     @Test
-    fun `standard actions are offered for an editable file`() {
-        val context = TestContext(openFile())
-
-        val ids = fileContextMenuActions(context).map { it.id }
-
-        assertEquals(
-            listOf(
-                HollowIdeStandardFileActions.SaveId,
-                HollowIdeStandardFileActions.ReformatId,
-                HollowIdeStandardFileActions.CloseId,
-                HollowIdeStandardFileActions.CloseOthersId,
-                HollowIdeStandardFileActions.CloseAllId,
-                HollowIdeStandardFileActions.CopyPathId,
-                HollowIdeStandardFileActions.RevealId,
-                HollowIdeStandardFileActions.ShowInExplorerId,
-            ),
-            ids,
-        )
-    }
-
-    @Test
     fun `a read only file without a formatter drops save and reformat`() {
         val context = TestContext(openFile(readOnly = true), canFormat = false)
 

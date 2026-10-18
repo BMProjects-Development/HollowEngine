@@ -1,5 +1,10 @@
 {
   "translate": "Move",
   "rotate": "Rotate",
-  "scale": "Scale"
+  "scale": "Scale",
+  "orientation": "Axes: %s. Click for the next",
+  "orientation.global": "global",
+  "orientation.local": "local",
+  "orientation.view": "view",
+  "orbit_selection": "Orbit around the selection instead of the view's center"
 }

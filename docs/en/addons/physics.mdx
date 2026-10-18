@@ -15,22 +15,28 @@ Because it carries native libraries, this addon is loaded at game start. After i
 
 ## What it adds
 
-- **Rigid body** and **Joint** attachments in the [Rig Editor](/docs/hollowengine/scripting/rig-editor), and a button that fills in bodies from the model's geometry.
-- A **Ragdoll** state kind for [animator](/docs/hollowengine/scripting/animator-editor) controllers.
+- **Rigid body** and **Joint** attachments in the [Rig Editor](/docs/hollowengine/models/rig-editor), and a button that fills in bodies from the model's geometry.
+- A **Ragdoll** state kind for [animator](/docs/hollowengine/models/animator-editor) controllers.
 - Collisions between the ragdoll and the blocks around it.
+- Sphere, capsule, cylinder and convex-hull [collider shapes](/docs/hollowengine/world/colliders).
 
-Everything you need to configure is described in the [Rig Editor](/docs/hollowengine/scripting/rig-editor) page: rigid bodies, collision, joints, and building a ragdoll.
+Everything you need to configure is described in the [Rig Editor](/docs/hollowengine/models/rig-editor) page: rigid bodies, collision, joints, and building a ragdoll.
 
 ## How it works
 
 A ragdoll is a state of the animation controller, not a separate layer. A transition condition decides when the model enters it, for example `!q.is_alive`, and the transition's duration is the blend between the animation and the simulation. The bodies are built when the state is entered, from the pose the controller was leaving, so a fall continues from the animation instead of snapping to a T-pose. They are destroyed when the state exits, so a model can be knocked down and stand up again without extra logic.
 
+## Simulation modes and body shapes
+
+By default, a ragdoll state uses `simulation = RagdollSimulation.SERVER`: the server computes the pose and sends it to viewers. Colliders follow the server pose, and non-player entities follow the fallen body's position. With `RagdollSimulation.CLIENT`, each client simulates independently; this visual mode changes neither server colliders nor the entity's position.
+
+A rigid body's shape is built from colliders on its bone. Select specific colliders in **Rigid body**, or leave the list empty to use every collider on that bone. Bodies without suitable colliders are skipped. The rig generator prepares colliders, bodies and joints together.
+
 ## Limits
 
-- The simulation is client-side: every player sees a ragdoll fall on their own screen, and it does not push entities or affect gameplay.
 - Only the blocks in a radius around an active ragdoll are simulated as static bodies, and the block set is refreshed a few times a second, so a block broken beneath the ragdoll no longer holds it up.
 - Gravity is Earth's `9.81 m/s²` rather than Minecraft's faster fall, so bodies read as physical.
 - A ragdoll that is not being used is torn down after half a second.
-- Only the skin's joints become bodies. Decoration such as eyes or a second skin layer needs to be removed by hand in the Rig Editor.
+- An authored rig uses bones with physical bodies and colliders. Review generated drafts: decoration such as eyes or a second skin layer usually does not need a body of its own.
 
 A model with a ragdoll setup still loads and animates normally without the addon. The rig attachments and the ragdoll state stay in the files and start working again once the addon is installed.

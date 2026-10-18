@@ -10,25 +10,31 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.plus
 import kotlinx.serialization.serializer
 import net.minecraft.network.FriendlyByteBuf
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
-import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModule
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
 
-open class ByteBufFormat(context: SerializersModule = EmptySerializersModule()) : SerialFormat, Format<FriendlyByteBuf> {
-    override val serializersModule = context + TagModule
+open class ByteBufFormat(private val context: SerializersModule = EmptySerializersModule()) : SerialFormat, Format<FriendlyByteBuf> {
+    @Volatile
+    private var cachedModule: SerializersModule? = null
 
-    companion object Default : ByteBufFormat() {
-        fun serializeEntity(snapshot: EntitySnapshot, buf: FriendlyByteBuf = FriendlyByteBuf(Unpooled.buffer())): FriendlyByteBuf =
-            EntitySerialization.serializeToByteBuf(snapshot, buf)
+    @Volatile
+    private var cachedRevision = -1
 
-        fun serializeEntity(entity: MCEntity, buf: FriendlyByteBuf = FriendlyByteBuf(Unpooled.buffer())): FriendlyByteBuf =
-            EntitySerialization.serializeEntityToByteBuf(entity, buf)
+    /** Built again whenever an addon adds a kind of component, rig attachment or effect part, like [NBTFormat]'s. */
+    override val serializersModule: SerializersModule
+        get() {
+            val revision = TagModuleRevision.current
+            cachedModule?.takeIf { cachedRevision == revision }?.let { return it }
 
-        fun deserializeEntity(buf: FriendlyByteBuf): EntitySnapshot = EntitySerialization.deserializeFromByteBuf(buf)
-        fun deserializeInto(target: MCEntity, buf: FriendlyByteBuf): EntitySnapshot = EntitySerialization.deserializeInto(target, buf)
-    }
+            return (context + TagModule).also {
+                cachedModule = it
+                cachedRevision = revision
+            }
+        }
+
+    companion object Default : ByteBufFormat()
 
     fun <T> serialize(
         serializer: SerializationStrategy<T>,

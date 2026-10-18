@@ -1,9 +1,4 @@
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
-import ru.hollowhorizon.hollowengine.client.ui.widgets.completionScrollRowIndex
-import ru.hollowhorizon.hollowengine.client.ui.widgets.completionSelectionRowIndex
-import ru.hollowhorizon.hollowengine.client.ui.widgets.completionWindowStartIndex
-import ru.hollowhorizon.hollowengine.client.ui.widgets.computeEditableFieldLayout
-import ru.hollowhorizon.hollowengine.client.ui.widgets.editableFieldCompletionGeometry
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

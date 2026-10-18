@@ -1,15 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.gui.scripting
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileDocument
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileType
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileTypeRegistry
-import ru.hollowhorizon.hollowengine.client.ui.ide.isProbablyText
-import ru.hollowhorizon.hollowengine.client.ui.ide.registerBuiltinFileTypes
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertSame
+import ru.hollowhorizon.hollowengine.client.ui.ide.*
+import kotlin.test.*
 
 class HollowIdeFileTypeRegistryTest {
     @Test
@@ -90,9 +82,11 @@ class HollowIdeFileTypeRegistryTest {
                 modelEditor = {},
                 imageEditor = {},
                 videoEditor = {},
+                audioEditor = {},
                 animatorEditor = {},
                 rigEditor = {},
                 vfxEditor = {},
+                montageEditor = {},
                 shaderGraphEditor = {},
                 textEditor = {},
             )
@@ -105,6 +99,7 @@ class HollowIdeFileTypeRegistryTest {
         assertEquals("animator", registry.find("assets/demo/models/player.animator", byteArrayOf())?.id)
         assertEquals("rig", registry.find("assets/demo/models/player.glb.rig", byteArrayOf())?.id)
         assertEquals("vfx", registry.find("assets/demo/vfx/flame.vfx", byteArrayOf())?.id)
+        assertEquals("montage", registry.find("assets/demo/montages/laser.montage", byteArrayOf())?.id)
         assertEquals("material", registry.find("assets/demo/materials/fire.material", byteArrayOf())?.id)
         assertEquals("text", registry.find("assets/demo/other.json", "{}".toByteArray())?.id)
         assertEquals("text", registry.find("scripts/example.kts", "println(1)".toByteArray())?.id)

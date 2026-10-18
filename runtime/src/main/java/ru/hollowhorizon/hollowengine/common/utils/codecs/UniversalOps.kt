@@ -120,7 +120,7 @@ object UniversalOps : DynamicOps<DynamicValue> {
     override fun remove(
         input: DynamicValue?,
         key: String?,
-    ): DynamicValue? {
+    ): DynamicValue {
         if (input is DynamicValue.Obj && key != null) {
             return DynamicValue.Obj(input.map - key)
         }

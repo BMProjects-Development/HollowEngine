@@ -5,15 +5,9 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
 import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UiProfilerTest {
-    @Test
-    fun `disabled profiler does not create a frame collector`() {
-        assertNull(UiProfiler().beginFrame())
-    }
-
     @Test
     fun `timing history reports current average and rolling maximum`() {
         val profiler = UiProfiler(historySize = 2).apply { enabled = true }

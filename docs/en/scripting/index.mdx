@@ -14,6 +14,8 @@ All HollowEngine scripts are written in Kotlin in `.kts` files. They must be cre
 
 ## Script types
 
+Asset authoring is covered separately: [models, rigs, animation and montages](/docs/hollowengine/models), [world objects, decals, colliders and cutscenes](/docs/hollowengine/world), and [VFX](/docs/hollowengine/vfx). Those pages also show how to start and control them from scripts.
+
 - [Simple](/docs/hollowengine/scripting/simple) (`.kts`) - used for one-time execution or for importing your functions, variables, and so on.
 - [Reloadable](/docs/hollowengine/scripting/reload) (`.reload.kts`) - used to handle in-game events. By default it runs on the server and restarts when a world opens and on `/reload`. With the `@file:ClientSide` annotation it runs on the client and restarts on `F3 + T`.
 - [Startup](/docs/hollowengine/scripting/startup) (`.startup.kts`) - runs once while the game starts. This is where items, blocks, creative tabs, and everything else Minecraft only accepts during loading are registered.

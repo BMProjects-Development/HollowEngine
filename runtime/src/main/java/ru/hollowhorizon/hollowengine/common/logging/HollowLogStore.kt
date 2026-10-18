@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.logging
 
 import org.apache.logging.log4j.spi.StandardLevel
-import java.util.ArrayDeque
+import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 

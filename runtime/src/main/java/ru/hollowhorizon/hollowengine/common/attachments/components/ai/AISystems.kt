@@ -6,9 +6,11 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.entity.PathfinderMob
 import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NpcPathNavigation
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.faceTowards
 import java.util.*
 
@@ -20,6 +22,9 @@ private object AIRuntimeState {
 }
 
 object AIComponentSystems {
+    /** How many points ahead a patrol plans its pace along. */
+    private const val PATROL_LOOKAHEAD = 4
+
     private val attackId by lazy { descriptorId(AttackTargetComponent::class) }
     private val followId by lazy { descriptorId(FollowTargetComponent::class) }
     private val moveToId by lazy { descriptorId(MoveToPositionComponent::class) }
@@ -181,7 +186,26 @@ object AIComponentSystems {
         val activeIndex =
             AIRuntimeState.patrolIndices.getOrDefault(entityId, currentIndex).coerceIn(0, patrol.points.lastIndex)
         val activePoint = patrol.points[activeIndex]
+        (mob.navigation as? NpcPathNavigation)?.aim(activePoint.position, passedThrough(patrol, activeIndex), patrol.arrivalRadius.toDouble())
         mob.navigation.moveTo(activePoint.position.x, activePoint.position.y, activePoint.position.z, patrol.arrivalRadius.toInt(), patrol.speed.toDouble())
+    }
+
+    private fun passedThrough(patrol: PatrolPathComponent, index: Int): List<Vec3> {
+        if (patrol.points[index].waitTicks > 0) return emptyList()
+        val points = ArrayList<Vec3>()
+        var next = index
+        while (points.size < PATROL_LOOKAHEAD) {
+            next++
+            if (next > patrol.points.lastIndex) {
+                if (!patrol.loop) break
+                next = 0
+            }
+            if (next == index) break
+            val point = patrol.points[next]
+            points += point.position
+            if (point.waitTicks > 0) break
+        }
+        return points
     }
 
     private fun handleLookAt(entity: MCEntity, lookAt: LookAtTargetComponent?) {

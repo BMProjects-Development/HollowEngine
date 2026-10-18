@@ -1,12 +1,14 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx
 
 import net.minecraft.client.Minecraft
-import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
@@ -20,8 +22,12 @@ internal const val VfxRootId = "vfx-root"
  */
 internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorState, title: String) = SceneTarget(
     id = "vfx-nodes",
+    history = document.history,
     items = buildList {
         val nodes = document.effect.nodes
+        val timeline = document.effect.timeline
+        add(laneItem(VfxEventsId, "${playbackText("events")}  ●${timeline.events.size}", EventsIcon, state))
+        add(laneItem(VfxSectionsId, "${playbackText("sections")}  ●${timeline.sections.size}", SectionsIcon, state))
         add(
             UiTreeItem(
                 id = VfxRootId,
@@ -31,12 +37,18 @@ internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorStat
                 icon = VfxIcons.EFFECT,
                 hasChildren = nodes.isNotEmpty(),
                 expanded = state.rootExpanded,
-                selected = state.selected == null,
+                selected = state.selected == null && state.selectedLane == null,
             )
         )
         if (state.rootExpanded) appendNodes(nodes, state.expanded, state.selected, depth = 1)
     },
-    onSelect = { id -> state.select(id.takeUnless { it == VfxRootId }) },
+    onSelect = { id ->
+        when (id) {
+            VfxEventsId -> state.selectLane(id, state.session.playback.eventLane)
+            VfxSectionsId -> state.selectLane(id, state.session.playback.sectionLane)
+            else -> state.select(id.takeUnless { it == VfxRootId })
+        }
+    },
     onToggle = { id ->
         when (id) {
             VfxRootId -> state.rootExpanded = !state.rootExpanded
@@ -45,11 +57,46 @@ internal fun vfxSceneTarget(document: HollowIdeVfxDocument, state: VfxEditorStat
         }
     },
     hint = vfxText("no_nodes").takeIf { document.effect.nodes.isEmpty() },
-    menu = { id -> sceneMenu(document, state, id.takeUnless { it == VfxRootId }) },
-    onKey = { input -> handleSceneKey(document, state, input) },
+    menu = { id ->
+        val playback = state.session.playback
+        val time = state.session.timeline.currentTime
+        when (id) {
+            VfxEventsId -> listOf(UiDropdownItem(playbackText("add_event")) { playback.addEvent(time) })
+            VfxSectionsId -> listOf(UiDropdownItem(playbackText("add_section")) { playback.addSection(time) })
+            else -> vfxNodeMenu(document, state, id.takeUnless { it == VfxRootId })
+        }
+    },
+    onKey = { input -> handleVfxNodeKey(document, state, input.key, input.modifiers, input.repeat) },
     onMove = { dragged, target -> move(document, state, dragged, target.takeUnless { it == VfxRootId }) },
-    canMove = { dragged, target -> target == VfxRootId || !document.effect.isWithin(target, dragged) },
+    canMove = { dragged, target ->
+        dragged !in LaneItems && target !in LaneItems && (target == VfxRootId || !document.effect.isWithin(target, dragged))
+    },
 )
+
+/** The events and the sections of the timeline as objects of the scene, picked like nodes, which open their lanes. */
+private const val VfxEventsId = "vfx-events"
+private const val VfxSectionsId = "vfx-sections"
+private val LaneItems = setOf(VfxEventsId, VfxSectionsId)
+private const val EventsIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
+private const val SectionsIcon = "hollowengine:textures/gui/icons/loops.svg"
+
+private fun laneItem(id: String, label: String, icon: String, state: VfxEditorState) = UiTreeItem<Any?>(
+    id = id,
+    label = label,
+    depth = 0,
+    payload = null,
+    icon = icon,
+    hasChildren = false,
+    expanded = false,
+    selected = state.selectedLane == id,
+)
+
+/** Picks the lane row [id] of the scene, which stands for [lane], in place of a node. */
+private fun VfxEditorState.selectLane(id: String, lane: SegmentLane) {
+    select(null)
+    selectedLane = id
+    session.selectLane(lane)
+}
 
 private fun MutableList<UiTreeItem<Any?>>.appendNodes(
     nodes: List<VfxNodeSpec>,
@@ -61,7 +108,7 @@ private fun MutableList<UiTreeItem<Any?>>.appendNodes(
         add(
             UiTreeItem(
                 id = node.id,
-                label = if (node.enabled) node.name else "${node.name} (${vfxText("off")})",
+                label = node.treeLabel(),
                 depth = depth,
                 payload = node,
                 icon = VfxNodeTypes.of(node)?.icon,
@@ -76,8 +123,11 @@ private fun MutableList<UiTreeItem<Any?>>.appendNodes(
     }
 }
 
+/** How a node is named in a tree, with a mark when it is switched off. */
+internal fun VfxNodeSpec.treeLabel(): String = if (enabled) name else "$name (${vfxText("off")})"
+
 /** What a right click offers: adding under the node (or the effect), and what can be done to the node. */
-private fun sceneMenu(document: HollowIdeVfxDocument, state: VfxEditorState, id: String?): List<UiDropdownItem> {
+internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: String?): List<UiDropdownItem> {
     val add = UiDropdownItem(
         vfxText(if (id == null) "add_node" else "add_child"),
         icon = VfxIcons.ADD,
@@ -92,17 +142,17 @@ private fun sceneMenu(document: HollowIdeVfxDocument, state: VfxEditorState, id:
     val index = siblings.indexOfFirst { it.id == node.id }
     return listOf(
         add,
-        UiDropdownItem(vfxText("duplicate"), icon = VfxIcons.DUPLICATE, shortcut = "Ctrl+D", separatorBefore = true) {
+        UiDropdownItem(vfxText("duplicate"), icon = VfxIcons.DUPLICATE, shortcut = HollowKeys.DUPLICATE.shortcut, separatorBefore = true) {
             duplicate(document, state, node.id)
         },
-        UiDropdownItem(vfxText("rename"), icon = VfxIcons.RENAME, shortcut = "F2") { rename(state, node.id) },
+        UiDropdownItem(vfxText("rename"), icon = VfxIcons.RENAME, shortcut = HollowKeys.RENAME.shortcut) { rename(state, node.id) },
         UiDropdownItem(vfxText(if (node.enabled) "disable" else "enable"), icon = VfxIcons.TOGGLE) {
             document.replace(node.withCommon(enabled = !node.enabled))
         },
-        UiDropdownItem(vfxText("move_up"), shortcut = "Alt+↑", enabled = index > 0, separatorBefore = true) {
+        UiDropdownItem(vfxText("move_up"), shortcut = HollowKeys.MOVE_UP.shortcut, enabled = index > 0, separatorBefore = true) {
             document.edit { it.withShifted(node.id, -1) }
         },
-        UiDropdownItem(vfxText("move_down"), shortcut = "Alt+↓", enabled = index < siblings.lastIndex) {
+        UiDropdownItem(vfxText("move_down"), shortcut = HollowKeys.MOVE_DOWN.shortcut, enabled = index < siblings.lastIndex) {
             document.edit { it.withShifted(node.id, 1) }
         },
         UiDropdownItem(vfxText("move_out"), enabled = document.effect.parentOf(node.id) != null) {
@@ -111,38 +161,33 @@ private fun sceneMenu(document: HollowIdeVfxDocument, state: VfxEditorState, id:
             val at = (grand?.children ?: document.effect.nodes).indexOfFirst { it.id == parent.id } + 1
             document.edit { it.withMoved(node.id, grand?.id, at) }
         },
-        UiDropdownItem(vfxText("remove_node"), icon = VfxIcons.REMOVE, shortcut = "Del", separatorBefore = true) {
+        UiDropdownItem(vfxText("remove_node"), icon = VfxIcons.REMOVE, shortcut = HollowKeys.DELETE.shortcut, separatorBefore = true) {
             remove(document, state, node.id)
         },
     )
 }
 
-private fun handleSceneKey(document: HollowIdeVfxDocument, state: VfxEditorState, input: UiKeyInput): Boolean {
-    if (input.control && !input.repeat) {
-        when (input.key) {
-            GLFW.GLFW_KEY_Z if input.shift -> return document.redo()
-            GLFW.GLFW_KEY_Z -> return document.undo()
-            GLFW.GLFW_KEY_Y -> return document.redo()
-        }
-    }
+/** Undo and redo, and what the menu of the selected node offers by key. */
+internal fun handleVfxNodeKey(document: VfxEditing, state: VfxNodeSelection, key: Int, modifiers: Int, repeat: Boolean): Boolean {
+    if (!repeat && UndoKeys.handle(document.history, key, modifiers)) return true
     val id = state.selected ?: return false
     return when {
-        input.key == GLFW.GLFW_KEY_DELETE -> remove(document, state, id).let { true }
-        input.key == GLFW.GLFW_KEY_F2 -> rename(state, id).let { true }
-        input.control && input.key == GLFW.GLFW_KEY_D && !input.repeat -> duplicate(document, state, id).let { true }
-        input.alt && input.key == GLFW.GLFW_KEY_UP -> document.edit { it.withShifted(id, -1) }.let { true }
-        input.alt && input.key == GLFW.GLFW_KEY_DOWN -> document.edit { it.withShifted(id, 1) }.let { true }
+        HollowKeys.DELETE.matches(key, modifiers) -> remove(document, state, id).let { true }
+        HollowKeys.RENAME.matches(key, modifiers) -> rename(state, id).let { true }
+        HollowKeys.DUPLICATE.matches(key, modifiers) && !repeat -> duplicate(document, state, id).let { true }
+        HollowKeys.MOVE_UP.matches(key, modifiers) -> document.edit { it.withShifted(id, -1) }.let { true }
+        HollowKeys.MOVE_DOWN.matches(key, modifiers) -> document.edit { it.withShifted(id, 1) }.let { true }
         else -> false
     }
 }
 
-private fun add(document: HollowIdeVfxDocument, state: VfxEditorState, parent: String?, node: VfxNodeSpec) {
+private fun add(document: VfxEditing, state: VfxNodeSelection, parent: String?, node: VfxNodeSpec) {
     document.edit { it.withChild(parent, node) }
-    if (parent == null) state.rootExpanded = true else if (parent !in state.expanded) state.expanded.add(parent)
+    state.reveal(parent)
     state.select(node.id)
 }
 
-private fun duplicate(document: HollowIdeVfxDocument, state: VfxEditorState, id: String) {
+private fun duplicate(document: VfxEditing, state: VfxNodeSelection, id: String) {
     var created: String? = null
     document.edit { effect ->
         val (next, copy) = effect.withDuplicate(id) ?: return@edit effect
@@ -152,7 +197,7 @@ private fun duplicate(document: HollowIdeVfxDocument, state: VfxEditorState, id:
     created?.let(state::select)
 }
 
-private fun remove(document: HollowIdeVfxDocument, state: VfxEditorState, id: String) {
+private fun remove(document: VfxEditing, state: VfxNodeSelection, id: String) {
     val parent = document.effect.parentOf(id)?.id
     document.edit { it.withoutNode(id) }
     state.select(parent)
@@ -162,13 +207,13 @@ private fun move(document: HollowIdeVfxDocument, state: VfxEditorState, dragged:
     if (target != null && document.effect.isWithin(target, dragged)) return false
     if (document.effect.parentOf(dragged)?.id == target && target != null) return false
     document.edit { it.withMoved(dragged, target) }
-    if (target == null) state.rootExpanded = true else if (target !in state.expanded) state.expanded.add(target)
+    state.reveal(target)
     state.select(dragged)
     return true
 }
 
 /** Selects the node and puts the caret into its name in the inspector. */
-private fun rename(state: VfxEditorState, id: String) {
+private fun rename(state: VfxNodeSelection, id: String) {
     state.select(id)
     Minecraft.getInstance().execute { HollowIdeOverlay.focusSurface("vfx-node-name-$id") }
 }

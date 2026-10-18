@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.config
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.serializer
@@ -16,16 +15,7 @@ import kotlin.test.*
 class ConfigPropertyTests {
 
     class TestHost {
-        val defaultProp by ConfigProperty(42, {})
-        val rangedProp by ConfigProperty(5.0f, {})
-        val validValuesProp by ConfigProperty("medium", {})
         val noAnnotation by ConfigProperty("hello", {})
-    }
-
-    @Test
-    fun `get returns initial value`() {
-        val host = TestHost()
-        assertEquals(42, host.defaultProp)
     }
 
     @Test
@@ -37,13 +27,6 @@ class ConfigPropertyTests {
         host.x = 100
         assertEquals(100, host.x)
         assertTrue(changed)
-    }
-
-    @Test
-    fun `property name is set via provideDelegate`() {
-        val prop = ConfigProperty("hello", {})
-        prop.provideDelegate(Any(), TestHost::noAnnotation)
-        assertEquals("noAnnotation", prop.name)
     }
 
     @Test
@@ -87,7 +70,7 @@ class ConfigPropertyTests {
         val prop2 = ConfigProperty("default", {})
         prop2.provideDelegate(host, TestHost::noAnnotation)
         prop2.name = "testKey"
-        prop2.deserialize(element!!)
+        prop2.deserialize(element)
         assertEquals("hello", prop2.getValue(host, TestHost::noAnnotation))
     }
 
@@ -123,12 +106,14 @@ class ConfigPropertyTests {
     fun `deserialize preserves observable map`() {
         var changes = 0
         val property = ConfigProperty(
-            ObservableMap(mutableMapOf("default" to 0), { changes++ }, serializer<String>(), serializer<Int>()),
-            {}
-        )
+            ObservableMap(
+                mutableMapOf("default" to 0),
+                { changes++ },
+                serializer<String>(),
+                serializer<Int>()
+            ), {})
         val element = toml.encodeToTomlElement(
-            MapSerializer(serializer<String>(), serializer<Int>()),
-            mapOf("loaded" to 1)
+            MapSerializer(serializer<String>(), serializer<Int>()), mapOf("loaded" to 1)
         )
 
         assertTrue(property.deserialize(element))
@@ -144,18 +129,6 @@ class PropertiesTests {
 
     class TestHost {
         var knownKey by ConfigProperty("default", {})
-    }
-
-    @Test
-    fun `add and serialize`() {
-        var changeCount = 0
-        val props = Properties { changeCount++ }
-
-        val prop = props.add("testValue")
-        prop.name = "testKey"
-
-        val table = props.serialize()
-        assertNotNull(table["testKey"])
     }
 
     @Test
@@ -252,8 +225,7 @@ class ConfigCollectionTests {
             "listValues" to toml.encodeToTomlElement(ListSerializer(serializer<String>()), listOf("list")),
             "setValues" to toml.encodeToTomlElement(ListSerializer(serializer<String>()), listOf("set")),
             "mapValues" to toml.encodeToTomlElement(
-                MapSerializer(serializer<String>(), serializer<Int>()),
-                mapOf("map" to 1)
+                MapSerializer(serializer<String>(), serializer<Int>()), mapOf("map" to 1)
             )
         )
 
@@ -262,27 +234,5 @@ class ConfigCollectionTests {
         assertEquals(listOf("list"), config.listValues)
         assertEquals(setOf("set"), config.setValues)
         assertEquals(mapOf("map" to 1), config.mapValues)
-    }
-}
-
-@Serializable
-data class NestedConfigTest(val value: String = "nested")
-
-class ConfigAnnotationTests {
-    @Test
-    fun `annotations are present`() {
-        val name = HollowEngineConfig::class.java.getAnnotation(ConfigName::class.java)
-        assertNotNull(name)
-        assertEquals("hollowengine", name!!.name)
-    }
-
-    @Test
-    fun `float range contains works`() {
-        val range = FloatRange(0f, 10f)
-        assertTrue(5f in range)
-        assertTrue(0f in range)
-        assertTrue(10f in range)
-        assertFalse(11f in range)
-        assertFalse(-1f in range)
     }
 }

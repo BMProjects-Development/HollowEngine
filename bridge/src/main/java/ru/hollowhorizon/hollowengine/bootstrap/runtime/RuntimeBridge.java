@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.mojang.blaze3d.audio.SoundBuffer;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -24,6 +25,9 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.client.sounds.AudioStream;
+import net.minecraft.client.sounds.ChannelAccess;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
@@ -51,6 +55,10 @@ import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import ru.hollowhorizon.hollowengine.api.ModList;
@@ -65,6 +73,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public interface RuntimeBridge extends AutoCloseable {
@@ -97,6 +107,9 @@ public interface RuntimeBridge extends AutoCloseable {
     RepositorySource[] augmentPackRepositorySources(RepositorySource[] providers);
 
     void onPlayerRespawn(ServerPlayer original, boolean returnFromEnd);
+
+    /** The server has just sent {@code player} its permission level: on join, op and deop. */
+    void onPlayerPermissionsChanged(ServerPlayer player);
 
     ChatResult onServerChat(ServerPlayer player, Component content);
 
@@ -157,6 +170,17 @@ public interface RuntimeBridge extends AutoCloseable {
 
     @Nullable FileToIdConverter createSoundConverter();
 
+    default void onSoundEngineTick(boolean paused) {}
+
+    default void onSoundEngineReset() {}
+
+    /** The sound engine paused every channel, as the pause menu does, or let them go on. */
+    default void onSoundEnginePaused(boolean paused) {}
+
+    default void onSoundFrame(Map<SoundInstance, ChannelAccess.ChannelHandle> channels, Executor executor) {}
+
+    default void onSoundStop(@Nullable ResourceLocation id, @Nullable SoundSource category) {}
+
     @Nullable String getOpenGlVersionOverride();
 
     boolean shouldForceAutoGuiScale(@Nullable Screen screen);
@@ -199,6 +223,52 @@ public interface RuntimeBridge extends AutoCloseable {
 
     boolean onEntityHurt(Entity entity, DamageSource damageSource, float amount);
 
+    float onLivingEntityHurt(LivingEntity entity, DamageSource damageSource, float amount);
+
+    boolean bodyPushable(Entity entity, boolean vanilla);
+
+    boolean bodyPushesOthers(Entity entity);
+
+    boolean bodySolid(Entity entity, boolean vanilla);
+
+    EntityDimensions bodyDimensions(Entity entity, EntityDimensions vanilla);
+
+    Vec3 collideWithColliders(Entity entity, Vec3 movement, Supplier<Vec3> move);
+
+    Vec3 collideShapesWithColliders(Vec3 movement, AABB box, List<VoxelShape> shapes, Supplier<Vec3> vanilla);
+
+    float[] stepHeightsWithColliders(AABB box, float limit, float[] vanilla);
+
+    void onLivingEntityTickStart(LivingEntity entity);
+
+    boolean isSupportedByColliders(Entity entity);
+
+    boolean isObstructedByColliders(Level level, VoxelShape shape);
+
+    boolean overlapsSolidColliders(Entity entity, AABB box);
+
+    @Nullable
+    PathObstacles pathObstacles(Mob mob);
+
+    DamageSource resolveColliderDamage(Entity entity, DamageSource damageSource);
+
+    boolean hasColliderTargets(Entity entity, boolean projectile);
+
+    @Nullable
+    EntityHitResult pickColliders(
+            Level level, @Nullable Entity source, Vec3 start, Vec3 end, AABB search,
+            Predicate<Entity> predicate, double maxDistanceSquared, @Nullable EntityHitResult vanilla, boolean projectile);
+
+    void onPlayerAttack(Player player, Entity target, Runnable attack);
+
+    void onProjectileHit(Entity projectile, HitResult result, Runnable hit);
+
+    AABB colliderReachBounds(Player player, Entity target, AABB vanilla);
+
+    boolean renderColliderHitbox(Entity entity, float partialTick, PoseStack poseStack, VertexConsumer lines);
+
+    void onClientTargetEntity(Entity target, @Nullable HitResult result);
+
     void onEntityChangedDimension(Entity original, Entity entity, Level fromLevel, Level toLevel);
 
     void onEntitySetLevel(Entity entity, Level level);
@@ -219,6 +289,8 @@ public interface RuntimeBridge extends AutoCloseable {
     boolean isEntityFrustumCullingDisabled(Entity entity);
 
     boolean onRenderEntityNameplate(Entity entity, boolean vanillaVisible);
+
+    @Nullable Vec3 entityNameplateAttachment(Entity entity, @Nullable Vec3 vanilla);
 
     CameraSetup onCameraSetup(GameRenderer gameRenderer, Camera camera, float yaw, float pitch, float roll, float partialTick);
 

@@ -4,15 +4,7 @@ import net.minecraft.nbt.Tag
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerLayerSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerStateSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationControllerTransitionSpec
-import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
-import ru.hollowhorizon.hollowengine.common.models.Animator
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateType
-import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
-import ru.hollowhorizon.hollowengine.common.models.ClipStateSpec
-import ru.hollowhorizon.hollowengine.common.models.UnknownAnimatorStateSpec
+import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize

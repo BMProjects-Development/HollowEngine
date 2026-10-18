@@ -12,11 +12,15 @@ import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.ui.SpringZoom
 import ru.hollowhorizon.hollowengine.client.ui.UiCanvasDrawScope
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitCamera
+import ru.hollowhorizon.hollowengine.client.ui.widgets.anglesAround
+import ru.hollowhorizon.hollowengine.client.ui.widgets.orbitTo
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBudget
 import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
 import ru.hollowhorizon.hollowengine.client.vfx.VfxPlaneEnvironment
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
-import kotlin.math.ceil
+import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -28,9 +32,10 @@ internal const val VfxPreviewFieldOfView = 50f
  * playing instance.
  */
 @Stable
-class VfxPreviewState(initialDistance: Float = 4.5f) {
-    var yaw by mutableStateOf(35f)
-    var pitch by mutableStateOf(22f)
+class VfxPreviewState(initialDistance: Float = 4.5f) : OrbitCamera {
+    override var yaw by mutableStateOf(35f)
+    override var pitch by mutableStateOf(22f)
+    override val pitchLimit: Float get() = 89f
     private val zoomSpring = SpringZoom(initialDistance, MIN_DISTANCE, MAX_DISTANCE, perNotch = ZOOM_PER_NOTCH)
     val distance: Float get() = zoomSpring.value
     var targetX by mutableStateOf(0f)
@@ -48,6 +53,17 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
     var time by mutableStateOf(0f)
         private set
 
+    /** Where the timeline of the effect is, which the rules of its sections may have taken off [time]. */
+    var timelineTime by mutableStateOf(0f)
+        private set
+
+    /** What the effect reads as `d.` in the preview, where there is no handle; see [PlaybackPreview]. */
+    var data: Map<String, Float> = emptyMap()
+        set(value) {
+            field = value
+            instance?.useData(value)
+        }
+
     /** Bumped whenever [instance] is replaced, so what reads its nodes knows to look again. */
     var revision by mutableStateOf(0)
         private set
@@ -58,6 +74,14 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
 
     var instance: VfxInstance? = null
         private set
+
+    /** What the editor holds over the timeline; see [VfxInstance.held]. */
+    var held: (String, VfxProperty) -> FloatArray? = { _, _ -> null }
+
+    /** Places the effect again, after what is held changed. */
+    fun repose() {
+        instance?.repose()
+    }
 
     private var builtFor: VfxEffect? = null
     private var lastFrameNanos = 0L
@@ -75,8 +99,12 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
             return false
         }
 
-        val at = time
-        instance = VfxInstance(effect, asset, VfxPlaneEnvironment(0.0), seed = PREVIEW_SEED).also { it.update(0f) }
+        val at = timelineTime
+        instance = VfxInstance(effect, asset, VfxPlaneEnvironment(0.0), seed = PREVIEW_SEED).also {
+            it.held = { node, property -> held(node, property) }
+            it.useData(data)
+            it.update(0f)
+        }
         revision++
         time = 0f
         lastFrameNanos = 0L
@@ -87,6 +115,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
     fun restart() {
         instance?.restart()
         time = 0f
+        timelineTime = 0f
         lastFrameNanos = 0L
         refreshCount()
     }
@@ -106,15 +135,10 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
      */
     fun seek(seconds: Float) {
         val target = seconds.coerceAtLeast(0f)
-        if (target < time) restart()
-
-        val distance = target - time
-        if (distance > CATCH_UP_EPSILON) {
-            val steps = ceil(distance / CATCH_UP_STEP).toInt().coerceIn(1, MAX_CATCH_UP_STEPS)
-            val step = distance / steps
-            repeat(steps) { advanceBy(step) }
-        }
+        instance?.seek(time, target, MAX_CATCH_UP_STEPS, advance = ::advanceBy)
         time = target
+        timelineTime = instance?.timelineTime ?: target
+        refreshCount()
     }
 
     private var pendingSeek = Float.NaN
@@ -146,6 +170,7 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         playing.budget = VfxBudget.share(1)
         playing.update(dt)
         time = playing.time
+        timelineTime = playing.timelineTime
         refreshCount()
     }
 
@@ -165,9 +190,33 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         dragTarget.set(targetX, targetY, targetZ)
     }
 
-    fun orbit(totalX: Float, totalY: Float) {
-        yaw = (dragYaw - totalX * ORBIT_SPEED) % 360f
-        pitch = (dragPitch + totalY * ORBIT_SPEED).coerceIn(-89f, 89f)
+    fun orbit(totalX: Float, totalY: Float) =
+        orbitTo((dragYaw - totalX * ORBIT_SPEED) % 360f, (dragPitch + totalY * ORBIT_SPEED).coerceIn(-89f, 89f))
+
+    /** Where the selected node is, in effect space; see [OrbitCamera.selectionCenter]. */
+    var selection: () -> Vec3f? = { null }
+
+    override val selectionCenter: Vec3f? get() = selection()
+
+    override fun turnTo(yaw: Float, pitch: Float, around: Vec3f?) {
+        val before = around?.let { cameraBasis() }
+        this.yaw = yaw
+        this.pitch = pitch
+        if (around == null || before == null) return
+        val after = cameraBasis()
+        val offset = Vector3f(targetX - around.x, targetY - around.y, targetZ - around.z)
+        val turned = Vector3f(after.right).mul(offset.dot(before.right))
+            .add(Vector3f(after.up).mul(offset.dot(before.up)))
+            .add(Vector3f(after.forward).mul(offset.dot(before.forward)))
+        targetX = around.x + turned.x
+        targetY = around.y + turned.y
+        targetZ = around.z + turned.z
+    }
+
+    override fun focus(point: Vec3f) {
+        targetX = point.x
+        targetY = point.y
+        targetZ = point.z
     }
 
     /** Slides point, that camera circles around, along the screen, by a share of the distance. */
@@ -185,6 +234,14 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
     fun advanceCamera(frameNanos: Long) = zoomSpring.advance(frameNanos)
 
     class Basis(val eye: Vector3f, val right: Vector3f, val up: Vector3f, val forward: Vector3f)
+
+    override fun toView(world: Vec3f): Vec3f {
+        val basis = cameraBasis()
+        val direction = Vector3f(world.x, world.y, world.z)
+        return Vec3f(direction.dot(basis.right), direction.dot(basis.up), -direction.dot(basis.forward))
+    }
+
+    override fun anglesFor(back: Vec3f): Pair<Float, Float> = anglesAround(back, yawSign = 1f, yawOffset = 0f)
 
     /** Where the camera is and where it looks, in effect space. */
     fun cameraBasis(): Basis {
@@ -280,8 +337,6 @@ class VfxPreviewState(initialDistance: Float = 4.5f) {
         const val MAX_DISTANCE = 60f
         const val ZOOM_PER_NOTCH = 1.1f
 
-        const val CATCH_UP_STEP = 1f / 30f
-        const val CATCH_UP_EPSILON = 1.0e-4f
         const val MAX_CATCH_UP_STEPS = 90
 
         const val CATCH_UP_LIMIT = 4f

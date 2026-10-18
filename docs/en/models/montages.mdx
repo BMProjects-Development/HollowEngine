@@ -1,0 +1,57 @@
+---
+title: Animation montages
+order: 5
+---
+
+# Animation montages
+
+A montage combines model clips, individual bone movements, temporary attachments and named events on one timeline. An attack montage can play a wind-up, enable a weapon collider, start a VFX effect and signal a script to apply damage.
+
+## Creating a montage
+
+Create `hollowengine/assets/project/montages/attack.montage` and open it in the IDE. A blank file opens as a new montage. Select a preview model and a duration in seconds in the Inspector. The preview model helps you author the montage; in game it runs on the target entity's model, so clip and bone names must match.
+
+Select bones and attachments in **Scene**, edit clips, keys, events and sections in **Timeline**, and adjust the selection in **Inspector**. See [Timeline](/docs/hollowengine/ide/timeline) for shared editing controls.
+
+## Clips and bones
+
+Add a clip and choose a model animation. Set its timeline start, length, offset into the source animation, speed, looping and fades. Overlapping clips blend together; a bone mask limits the part of the body a clip affects. Clip weight can also be animated with keys.
+
+For a selected bone, animate position, rotation, scale and visibility. These adjustments apply over the clips: for example, turn a wrist without changing the original animation. Hiding a bone hides its descendants too. Use the key button beside a property or `I` in the model view to record a pose.
+
+## Temporary attachments
+
+Add an attachment to a bone or the whole model, as in the [rig editor](/docs/hollowengine/models/rig-editor), and set its active windows. It exists only during those parts of the montage. Use this for a temporary collider, sound, nested model or effect. Available attachment types depend on installed addons.
+
+Keys can animate fields of both temporary attachments and attachments from the model's own rig. For example, move an IK target or change an effect's size. A montage does not rewrite the `.rig` file: its changes apply during playback.
+
+## Playing from a script
+
+Start montages on the server. The full id is a path within `assets/<namespace>/`; the `.montage` extension is optional.
+
+```kotlin
+val completed = npc.playMontage("project:montages/attack") {
+    onEvent("hit") {
+        // Perform an action when the hit event is reached.
+    }
+}
+```
+
+`playMontage` is a suspend function: it waits and returns `true` when the montage finishes, or `false` if it was stopped, replaced or could not be loaded.
+
+Use `startMontage` to continue your script while it plays:
+
+```kotlin
+val action = npc.startMontage("project:montages/charge", fadeIn = 0.1, speed = 1.2)
+action?.onEvent("ready") { println("Charge ready") }
+action?.jumpTo("release")
+action?.await()
+action?.stop(fadeOut = 0.3f)
+
+// Stop it without keeping the handle.
+npc.stopMontage("project:montages/charge", fadeOut = 0.3)
+```
+
+`startMontage` returns `null` if the server cannot read the asset. The handle exposes `isPlaying` and `time` in seconds. Starting the same id again on the same entity replaces its previous playback. Add named events on the timeline; repeating a section can fire an event again. `jumpTo` moves to an event and continues from there.
+
+A montage can also be a state in an [animator](/docs/hollowengine/models/animator-editor). For server logic triggered by events, start it from a script and use `onEvent`.

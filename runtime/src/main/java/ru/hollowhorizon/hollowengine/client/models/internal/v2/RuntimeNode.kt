@@ -1,12 +1,15 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
-import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
+import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
-abstract class Attachment(val parent: Attachment? = null) {
+abstract class Attachment(val parent: Attachment? = null) : AutoCloseable {
+    override fun close() = Unit
+    open fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = Unit
     val transform = TrsTransformF()
     val globalMatrix = MutableMat4f()
 
@@ -29,7 +32,8 @@ open class RuntimeNode(
     parent: Attachment?,
     private val materialResolver: (Material) -> Material = { it },
 ) : Attachment(parent) {
-    val name: String = definition.name ?: parent?.let { "Node_${definition.index}" } ?: "Root"
+    /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
+    val name: String = definition.name ?: "Node_${definition.index}"
     var isVisible = true
         set(value) {
             field = value
@@ -41,6 +45,16 @@ open class RuntimeNode(
     }
 
     val attachments = arrayListOf<Attachment>()
+
+    override fun close() {
+        attachments.forEach(Attachment::close)
+        children.forEach(RuntimeNode::close)
+    }
+
+    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
+        attachments.forEach { it.updateWorldPose(modelToWorld, entity) }
+        children.forEach { it.updateWorldPose(modelToWorld, entity) }
+    }
 
     val baseMorphWeights: FloatArray = definition.mesh
         ?.primitives
@@ -57,8 +71,19 @@ open class RuntimeNode(
         }
     }
 
-    val children = definition.children.map {
+    private val ownChildren: MutableList<RuntimeNode> = definition.children.mapTo(ArrayList()) {
         RuntimeNode(it, this, materialResolver)
+    }
+
+    val children: List<RuntimeNode> get() = ownChildren
+
+    /**
+     * Builds a node under this one that the model itself does not have, as a bone a rig adds. The model's own
+     * definitions are shared by every instance and stay as they are.
+     */
+    fun adopt(definition: NodeDefinition): RuntimeNode {
+        definition.parent = this.definition
+        return RuntimeNode(definition, this, materialResolver).also(ownChildren::add)
     }
 
     val jointGetter by lazy {

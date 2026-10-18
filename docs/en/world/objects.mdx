@@ -1,0 +1,47 @@
+---
+title: World objects
+order: 2
+---
+
+# World objects
+
+A world object is a decoration, model, sound, decal or VFX placed in the world. It has no health, AI or gravity; it saves with the world and does not despawn like a mob. Components and node scripts add logic, interaction and colliders.
+
+## Placement
+
+Enable editing mode in **Tools**. World editing requires permission to use commands (cheats). Drag a file from `assets/` in the project tree or asset manager into the game view inside the IDE:
+
+| Asset | Result |
+| --- | --- |
+| Model | An object displaying the model. |
+| `.vfx` | A world effect. |
+| Audio file | A sound source. |
+| `.png` | A surface decal. |
+| Supported video | A video decal; requires the Media addon. |
+
+The marker shows the placement point. Hitting a block places the object on its surface; with nothing under the pointer, it appears in the air in front of the camera. Create empty objects in **Scene** to group other objects.
+
+## Scene and hierarchy
+
+While working with the world, **Scene** lists its objects. Choose nearby objects, objects in view or all loaded objects. Search covers every loaded object regardless of the display filter.
+
+Drag objects in the tree to change their parent. Children follow their parent's position, rotation and scale; changing parents preserves world placement. The context menu can unparent, duplicate, delete, drop to the ground, copy a UUID or add to favorites. Favorites help find an object again, including while its chunk is unloaded.
+
+Expand a model object to see its bones and attachments. Per-instance edits change its pose and nested parts without changing the source asset for other objects.
+
+## Transforms and history
+
+Select an object or part in the world or Scene. Edit numbers in **Inspector** or use the view's transform gizmo. Default shortcuts:
+
+| Shortcut | Action |
+| --- | --- |
+| `G`, `R`, `S` | Move, rotate, scale. |
+| `X`, `Y`, `Z` | Constrain the current transform to an axis. |
+| `Enter` / left click | Confirm. |
+| `Escape` / right click | Cancel the current transform. |
+| `Alt + G`, `Alt + R`, `Alt + S` | Reset the corresponding transform. |
+| `Ctrl + D`, `Delete` | Duplicate or delete the selection. |
+
+Switch the gizmo between local and world orientation. World edits support undo and redo; **History** lets you return to a selected step. See [Working with the IDE](/docs/hollowengine/ide) for key rebinding and history selection.
+
+Use [UI panels](/docs/hollowengine/scripting/ui/world-panels) for interfaces and overlays on objects, [decals](/docs/hollowengine/world/decals) for images on the environment, and [colliders](/docs/hollowengine/world/colliders) for blocking geometry and interaction zones.

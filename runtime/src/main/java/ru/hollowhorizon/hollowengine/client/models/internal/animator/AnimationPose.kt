@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose.Companion.mix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.utils.math.*
@@ -72,6 +73,53 @@ class AnimationPose {
 
             return result
         }
+
+        /**
+         * [poses] averaged by [weights], which need not sum to one. As in [mix], a pose that leaves a bone
+         * alone counts as holding it at rest.
+         */
+        fun blend(poses: List<AnimationPose>, weights: List<Float>): AnimationPose {
+            if (poses.size == 1) return poses[0]
+            val result = AnimationPose()
+            val total = weights.sum()
+            if (total <= 0f) return result
+
+            val nodes = LinkedHashSet<Int>()
+            poses.forEach { pose -> pose.entries.forEach { nodes += it.key } }
+            nodes.forEach { node ->
+                val bones = poses.map { it[node] }
+                val blended = result.bone(node)
+
+                if (bones.any { it?.translation != null }) {
+                    val sum = MutableVec3f()
+                    bones.forEachIndexed { i, bone -> sum += (bone?.translation ?: Vec3f.ZERO) * (weights[i] / total) }
+                    blended.translation = sum
+                }
+                if (bones.any { it?.rotation != null }) {
+                    val sum = MutableQuatF(0f, 0f, 0f, 0f)
+                    bones.forEachIndexed { i, bone ->
+                        val rotation = bone?.rotation ?: QuatF.IDENTITY
+                        val weight = weights[i] / total
+                        sum += rotation * if (sum.dot(rotation) < 0f) -weight else weight
+                    }
+                    blended.rotation = sum.norm()
+                }
+                if (bones.any { it?.scale != null }) {
+                    val sum = MutableVec3f()
+                    bones.forEachIndexed { i, bone -> sum += (bone?.scale ?: Vec3f.ONES) * (weights[i] / total) }
+                    blended.scale = sum
+                }
+                if (bones.any { it?.weights != null }) {
+                    val size = bones.maxOf { it?.weights?.size ?: 0 }
+                    blended.weights = FloatArray(size) { index ->
+                        bones.indices.sumOf { i ->
+                            ((bones[i]?.weights?.getOrNull(index) ?: 0f) * weights[i] / total).toDouble()
+                        }.toFloat()
+                    }
+                }
+            }
+            return result
+        }
     }
 }
 
@@ -80,6 +128,7 @@ class BonePose(val node: Int) {
     var rotation: QuatF? = null
     var scale: Vec3f? = null
     var weights: FloatArray? = null
+    var cover: Float = 1f
 }
 
 fun applyAnimationPose(
@@ -97,10 +146,11 @@ fun applyAnimationPose(
         val transform = runtimeNode.transform
         val base = runtimeNode.definition.baseTransform
         val reference = referencePose?.get(nodeIndex)
+        val boneWeight = clampedWeight * bonePose.cover.coerceIn(0f, 1f)
 
         when (blendMode) {
-            LayerBlendMode.Override -> transform.applyOverride(bonePose, base, clampedWeight)
-            LayerBlendMode.Additive -> transform.applyAdditive(bonePose, reference, clampedWeight)
+            LayerBlendMode.Override -> transform.applyOverride(bonePose, base, boneWeight)
+            LayerBlendMode.Additive -> transform.applyAdditive(bonePose, reference, boneWeight)
         }
         transform.markDirty()
 
@@ -110,7 +160,7 @@ fun applyAnimationPose(
                 sampled = weights,
                 reference = reference?.weights ?: runtimeNode.baseMorphWeights,
                 blendMode = blendMode,
-                weight = clampedWeight,
+                weight = boneWeight,
             )
         }
     }

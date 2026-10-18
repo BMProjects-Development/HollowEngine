@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.scripting.story.functions.effects
 
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlinx.serialization.Serializable
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.world.entity.Entity
@@ -9,6 +8,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.api.system
+import ru.hollowhorizon.hollowengine.client.models.bedrock.LivingEntityQuery
 import ru.hollowhorizon.hollowengine.client.particles.BedrockParticles
 import ru.hollowhorizon.hollowengine.client.particles.ParticleEffect
 import ru.hollowhorizon.hollowengine.client.particles.Transform
@@ -16,7 +16,7 @@ import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.network.sendAllInDimension
 import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntity
-import ru.hollowhorizon.hollowengine.client.models.bedrock.LivingEntityQuery
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForEntity
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForVec3
 import ru.hollowhorizon.hollowengine.common.utils.rl

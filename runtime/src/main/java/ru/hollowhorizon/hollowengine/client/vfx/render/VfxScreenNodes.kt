@@ -8,11 +8,7 @@ import com.mojang.blaze3d.vertex.VertexFormat
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeBehavior
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNodeRuntime
-import ru.hollowhorizon.hollowengine.client.vfx.VfxNoise
-import ru.hollowhorizon.hollowengine.client.vfx.VfxRangeMode
-import ru.hollowhorizon.hollowengine.client.vfx.VfxSamplers
+import ru.hollowhorizon.hollowengine.client.vfx.*
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCameraShakeSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxPostEffectSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty

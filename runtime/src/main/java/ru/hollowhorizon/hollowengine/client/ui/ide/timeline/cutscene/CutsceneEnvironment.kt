@@ -2,12 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelColors
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelSampling
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelSpec
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueFormatter
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ChannelValueOption
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.PropertyType
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
@@ -26,8 +21,6 @@ enum class CutsceneWeather(val value: Float, val labelKey: String) {
 }
 
 object EnvironmentRig {
-    const val WORLD_ID = "world"
-    const val ENVIRONMENT_ID = "world.environment"
     const val TIME_OF_DAY_ID = "world.environment.time_of_day"
     const val WEATHER_ID = "world.environment.weather"
 

@@ -2,6 +2,7 @@
 import dev.architectury.plugin.ArchitectPluginExtension
 import me.modmuss50.mpp.ReleaseType
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.task.GenerateSourcesTask
 import net.fabricmc.loom.task.RemapJarTask
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -41,6 +42,7 @@ fun Project.configureHollowAddon() {
     val fabricLoaderVersion = rootProject.property("fabricLoaderVersion") as String
     val kotlinVersion = rootProject.property("kotlinVersion") as String
     val serializationVersion = rootProject.property("serializationVersion") as String
+    val coroutinesVersion = rootProject.property("coroutinesVersion") as String
     val composeRuntimeVersion = rootProject.property("composeRuntimeVersion") as String
     val koinVersion = rootProject.property("koinVersion") as String
 
@@ -103,7 +105,8 @@ fun Project.configureHollowAddon() {
         add("compileOnly", "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-        add("compileOnly", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+        add("compileOnly", "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+        add("testImplementation", "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
         add("compileOnly", "io.insert-koin:koin-core:$koinVersion")
         add("compileOnly", "androidx.compose.runtime:runtime:$composeRuntimeVersion")
         add("testImplementation", kotlin("test"))
@@ -211,6 +214,21 @@ fun releaseTypeProvider(): Provider<ReleaseType> {
 
 apply(from = rootProject.file("gradle/universal-jar.gradle.kts"))
 apply(from = rootProject.file("gradle/development-jar.gradle.kts"))
+apply(from = rootProject.file("gradle/ide-sources.gradle.kts"))
+
+subprojects {
+    plugins.withId("dev.architectury.loom") {
+        val sourceGeneration = tasks.withType<GenerateSourcesTask>()
+        // Loom also updates the game's line numbers in the binary JAR while generating sources.
+        tasks.withType<JavaCompile>().configureEach { mustRunAfter(sourceGeneration) }
+        tasks.withType<KotlinCompile>().configureEach { mustRunAfter(sourceGeneration) }
+        extensions.configure<LoomGradleExtensionAPI> {
+            runs.configureEach {
+                jvmArguments.add("-Dhollowengine.ide.sourceRoots=${rootProject.layout.buildDirectory.file("ide/source-roots.txt").get().asFile.absolutePath}")
+            }
+        }
+    }
+}
 
 publishMods {
     changelog.set(providers.gradleProperty("publish.changelog").orElse(providers.provider {

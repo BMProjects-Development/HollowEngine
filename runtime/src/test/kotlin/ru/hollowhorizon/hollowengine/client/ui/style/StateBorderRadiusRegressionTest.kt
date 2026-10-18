@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.style
 
 import org.junit.jupiter.api.Test
-import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.*
+import ru.hollowhorizon.hollowengine.client.ui.BoxNode
+import ru.hollowhorizon.hollowengine.client.ui.UiState
 import kotlin.test.assertEquals
 
 class StateBorderRadiusRegressionTest {

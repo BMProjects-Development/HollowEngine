@@ -5,42 +5,48 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.mojang.blaze3d.systems.RenderSystem
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import net.minecraft.world.entity.Entity
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.render.ResolvedNodeTransform
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
+import ru.hollowhorizon.hollowengine.client.render.ResolvedNodeTransform
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
 import ru.hollowhorizon.hollowengine.client.render.resolveNodeTransform
 import ru.hollowhorizon.hollowengine.client.render.worldTransformToComponent
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeModifierMask
 import ru.hollowhorizon.hollowengine.client.ui.ide.hollowIdeWorldPoint
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiShadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.common.attachments.binding.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
+import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStageEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
-import ru.hollowhorizon.hollowengine.common.attachments.binding.*
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
 
 /**
  * The scene-node transform editor. The gizmo handles, bounds and light previews are projected
@@ -58,17 +64,21 @@ object TransformGizmoEditor {
     private var hoveredKey: GizmoEntryId? = null
     private var draggingKey: GizmoEntryId? = null
     private var activeKey: GizmoEntryId? = null
-    private var hoveredHandleId: GizmoHandleId? = null
-    private var draggingHandleId: GizmoHandleId? = null
-    private var currentDrag: GizmoDrag? = null
+
+    /** The entry of the part the scene window last selected, which the gizmo takes up on its own. */
+    private var selectedPartKey: GizmoEntryId? = null
+
+    /** Every drag and keyboard transform of the world goes through one session, the same as in the previews. */
+    private val session = GizmoSession(WorldToScreenProjector)
     private var isInitialized = false
     private var lastPhysX = 0f
     private var lastPhysY = 0f
 
     private var labelState by mutableStateOf<OverlayLabelState?>(null)
+
+    /** Where the hint of a transform from the keyboard is shown: where the pointer was when it began. */
     private var contextMenuState by mutableStateOf<ContextMenuState?>(null)
 
-    private var modesValue by mutableStateOf(setOf(GizmoEditMode.TRANSLATE))
     private var enabledValue by mutableStateOf(false)
 
     val isEnabled: Boolean
@@ -86,7 +96,7 @@ object TransformGizmoEditor {
     }
 
     /** The manipulators drawn together; never empty, the last one stays remembered while the gizmo is off. */
-    val modes: Set<GizmoEditMode> get() = modesValue
+    val modes: Set<GizmoEditMode> get() = GizmoSettings.modes
 
     /**
      * Entities the gizmo already boxes, because a node of theirs is on screen.
@@ -107,7 +117,7 @@ object TransformGizmoEditor {
         }
     }
 
-    fun isModeShown(mode: GizmoEditMode): Boolean = isEnabled && mode in modesValue
+    fun isModeShown(mode: GizmoEditMode): Boolean = isEnabled && mode in modes
 
     /**
      * Shows or hides gizmo manipulator and it's mode.
@@ -120,23 +130,19 @@ object TransformGizmoEditor {
                 setEnabled(true)
             }
 
-            shown -> setModes(modesValue + mode)
-            !isEnabled || mode !in modesValue -> Unit
-            modesValue.size == 1 -> setEnabled(false)
-            else -> setModes(modesValue - mode)
+            shown -> setModes(modes + mode)
+            !isEnabled || mode !in modes -> Unit
+            modes.size == 1 -> setEnabled(false)
+            else -> setModes(modes - mode)
         }
     }
 
     fun toggleMode(mode: GizmoEditMode) = setModeShown(mode, !isModeShown(mode))
 
     private fun setModes(modes: Set<GizmoEditMode>) {
-        if (modes.isEmpty() || modesValue == modes) return
-        modesValue = modes
-        HollowEngineConfig.gizmoModes = GizmoEditMode.entries.filter(modes::contains).joinToString(",") { it.name }
-        currentDrag = null
-        draggingKey = null
-        draggingHandleId = null
-        hoveredHandleId = null
+        if (modes.isEmpty() || GizmoSettings.modes == modes) return
+        GizmoSettings.modes = modes
+        session.settle()
         labelState = null
     }
 
@@ -144,10 +150,6 @@ object TransformGizmoEditor {
         if (isInitialized) return
         isInitialized = true
         enabledValue = HollowEngineConfig.gizmoEnabled
-        modesValue = HollowEngineConfig.gizmoModes.split(',')
-            .mapNotNull { name -> GizmoEditMode.entries.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) } }
-            .toSet()
-            .ifEmpty { setOf(GizmoEditMode.TRANSLATE) }
     }
 
     @SubscribeEvent
@@ -176,17 +178,8 @@ object TransformGizmoEditor {
         if (!isEditorAvailable()) return
         syncVisibleEntries()
         if (crosshairMode()) {
-            val drag = currentDrag
-            val entry = draggingKey?.let(entries::get)
-            if (drag != null && entry != null) {
-                val (cx, cy) = WorldToScreenProjector.screenCenter()
-                GizmoManipulator.World.update(drag, cx, cy, hollowIdeModifierMask())?.let { values ->
-                    entry.working = values
-                    applyFromGizmo(entry, values)
-                    updateLabel(entry, drag)
-                }
-            }
             val (cx, cy) = WorldToScreenProjector.screenCenter()
+            if (session.dragTo(cx, cy, hollowIdeModifierMask())) updateLabel()
             updateHover(cx, cy)
         }
         overlay.render()
@@ -199,7 +192,7 @@ object TransformGizmoEditor {
             UiCursorManager.release(window, this)
             return
         }
-        val hovering = hoveredHandleId != null || hoveredKey != null || overlay.isMouseOver(lastPhysX, lastPhysY)
+        val hovering = session.hovered != null || hoveredKey != null || overlay.isMouseOver(lastPhysX, lastPhysY)
         UiCursorManager.claim(
             window = window,
             owner = this,
@@ -214,6 +207,7 @@ object TransformGizmoEditor {
         if (!crosshairMode() && pointerOverIde() && action == GLFW.GLFW_PRESS) return false
         if (!crosshairMode() && overlay.handleMouseButton(physX, physY, button, action)) return true
         val (x, y) = pointerLogical(physX, physY)
+        if (session.keyboard != null) return action != GLFW.GLFW_PRESS || session.press(null, x, y, button)
         return when (action) {
             GLFW.GLFW_PRESS -> onPress(x, y, button)
             GLFW.GLFW_RELEASE -> onRelease(button)
@@ -226,8 +220,8 @@ object TransformGizmoEditor {
      * its handle: it is being held, not hovered.
      */
     fun releasePointer() {
-        if (currentDrag != null) return
-        hoveredHandleId = null
+        if (session.drag != null) return
+        session.clearHover()
         hoveredKey = null
     }
 
@@ -238,24 +232,18 @@ object TransformGizmoEditor {
         if (!isEditorAvailable() || crosshairMode()) return false
         overlay.handleMouseMove(physX, physY)
         val (x, y) = pointerLogical(physX, physY)
-        val drag = currentDrag
-        if (drag == null && pointerOverIde()) {
-            hoveredHandleId = null
+        if (session.moveTo(x, y, hollowIdeModifierMask())) return true
+        if (session.dragTo(x, y, hollowIdeModifierMask())) {
+            updateLabel()
+            return true
+        }
+        if (pointerOverIde()) {
+            session.clearHover()
             hoveredKey = null
             return false
         }
-        if (drag != null) {
-            val entry = draggingKey?.let(entries::get)
-            val values = GizmoManipulator.World.update(drag, x, y, hollowIdeModifierMask())
-            if (values != null && entry != null) {
-                entry.working = values
-                applyFromGizmo(entry, values)
-                updateLabel(entry, drag)
-            }
-            return true
-        }
         updateHover(x, y)
-        return hoveredHandleId != null
+        return session.hovered != null
     }
 
     fun handleMouseScroll(physX: Float, physY: Float, scrollX: Double, scrollY: Double): Boolean {
@@ -265,7 +253,18 @@ object TransformGizmoEditor {
 
     fun handleKey(key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
         if (!isEditorAvailable() || crosshairMode()) return false
+        if (action == GLFW.GLFW_PRESS && handleTransformKey(key, modifiers)) return true
         return overlay.handleKey(key, scanCode, action, modifiers)
+    }
+
+    /** G, R and S on the selected node, and the keys of a transform under way. */
+    private fun handleTransformKey(key: Int, modifiers: Int): Boolean {
+        val idle = session.keyboard == null
+        if (idle && pointerOverIde()) return false
+        val (x, y) = pointerLogical(lastPhysX, lastPhysY)
+        val taken = session.key(activeTarget(), key, modifiers, x, y)
+        if (idle && session.keyboard != null) contextMenuState = null
+        return taken
     }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean {
@@ -275,7 +274,7 @@ object TransformGizmoEditor {
 
     fun shouldBlockScreenInput(physX: Float, physY: Float): Boolean {
         if (!isInitialized || !isEditorAvailable()) return false
-        if (draggingKey != null) return true
+        if (session.isBusy) return true
         if (!crosshairMode()) {
             if (pointerOverIde()) return false
             if (overlay.isMouseOver(physX, physY)) return true
@@ -291,9 +290,7 @@ object TransformGizmoEditor {
             val entry = activeKey?.let(entries::get) ?: return false
             when (button) {
                 GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
-                    currentDrag = GizmoManipulator.World.begin(handle, entry.working ?: return false, x, y)
-                    draggingKey = entry.entryId
-                    draggingHandleId = handle.id
+                    if (!session.press(activeTarget(), x, y, button)) return false
                     contextMenuState = null
                     return true
                 }
@@ -331,45 +328,91 @@ object TransformGizmoEditor {
     }
 
     private fun onRelease(button: Int): Boolean {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || draggingKey == null) return false
-        val entry = draggingKey?.let(entries::get)
-        draggingKey = null
-        draggingHandleId = null
-        currentDrag = null
+        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !session.release()) return false
         labelState = null
-        entry?.let { refreshFromRuntime(it) }
         return true
     }
 
+    /** A drag or a keyboard transform of [entry] starts: whatever it ends up doing goes back in one step. */
+    private fun beginEdit(entry: GizmoEntry) {
+        entry.part?.editing?.beginGesture()
+        entry.worldObject?.let(WorldObjectHistory::beginGizmo)
+    }
+
+    /** A drag or a keyboard transform of [entry] is over: what shows it reads it again. */
+    private fun finishEdit(entry: GizmoEntry) {
+        entry.part?.editing?.endGesture()
+        refreshFromRuntime(entry)
+        entry.worldObject?.let(WorldObjectEditing::finishGizmo)
+    }
+
+    /** Puts the gizmo on the entity with [entityId], when it is boxed; the scene window selects through this. */
+    fun select(entityId: Int) {
+        val entryId = entries.entries.firstOrNull { it.value.entityId == entityId }?.key ?: return
+        activeKey = entryId
+        contextMenuState = null
+    }
+
     private fun updateHover(x: Float, y: Float) {
-        hoveredHandleId = activeEntryHandleAt(x, y)?.id
-        hoveredKey = if (hoveredHandleId != null) activeKey else pickBounds(x, y)
+        session.hover(activeTarget(), x, y)
+        hoveredKey = if (session.hovered != null) activeKey else pickBounds(x, y)
     }
 
-    private fun activeEntryHandleAt(x: Float, y: Float): GizmoHandle? {
-        val entry = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return null
-        val working = entry.working ?: return null
-        val handles = GizmoGeometry.World.buildHandles(working.translation, working.rotation, modes)
-        return GizmoPicker.pick(handles, x, y)
+    private fun activeEntryHandleAt(x: Float, y: Float): GizmoHandle? = session.handleAt(activeTarget(), x, y)
+
+    /** The selected node as the gizmo moves it, when it is on screen; made anew for each event. */
+    private fun activeTarget(): EntryTarget? =
+        activeKey?.let(entries::get)?.takeIf { it.visible && it.working != null }?.let(::EntryTarget)
+
+    /**
+     * A node of the world as the gizmo moves it. While a drag or a keyboard transform holds it, it is the node the
+     * scene keeps showing where the gizmo put it.
+     */
+    private class EntryTarget(private val entry: GizmoEntry) : GizmoTarget {
+        private val start = checkNotNull(entry.working)
+
+        override val values: GizmoTransformValues get() = start
+
+        override fun place(values: GizmoTransformValues, mode: GizmoEditMode) {
+            entry.working = values
+            applyFromGizmo(entry, values)
+        }
+
+        override fun restore() = place(start, GizmoEditMode.TRANSLATE)
+
+        override fun beginEdit() {
+            draggingKey = entry.entryId
+            beginEdit(entry)
+        }
+
+        override fun endEdit() {
+            draggingKey = null
+            finishEdit(entry)
+        }
     }
 
+    /** A world object gets the menu it has everywhere; any other node, the gizmo's own. */
     private fun openContextMenu(entryId: GizmoEntryId, x: Float, y: Float) {
+        val target = entries[entryId]?.worldObject
+        if (target != null) {
+            contextMenuState = null
+            WorldInspector.select(target.id)
+            WorldObjectContextMenu.open(target, x, y)
+            return
+        }
         contextMenuState = ContextMenuState(entryId, UiRect(x, y, 0f, 0f))
     }
 
     private fun clearSelection() {
         activeKey = null
         hoveredKey = null
-        hoveredHandleId = null
+        session.clearHover()
         contextMenuState = null
     }
 
     private fun cancelInteraction() {
-        currentDrag = null
-        draggingKey = null
-        draggingHandleId = null
+        session.cancel()
         hoveredKey = null
-        hoveredHandleId = null
         activeKey = null
         labelState = null
         contextMenuState = null
@@ -379,26 +422,19 @@ object TransformGizmoEditor {
     private fun GizmoOverlayContent() {
         Box(
             id = "transform-gizmo-root",
-            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss")
-                .size(100.percent, 100.percent)
+            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").size(100.percent, 100.percent)
                 .drawBehind(key = "transform-gizmo-layer") { drawGizmoLayer(this) },
         ) {
             labelState?.let { label ->
                 Text(
                     formatLabelValue(label.value),
-                    modifier = Modifier.position((label.x - 36f).px, (label.y - 18f).px)
-                        .padding(9.px, 5.px)
+                    modifier = Modifier.position((label.x - 36f).px, (label.y - 18f).px).padding(9.px, 5.px)
                         .background(UiColor(0.08f, 0.10f, 0.14f, 0.95f))
-                        .border(1.px, UiColor(0.45f, 0.55f, 0.70f, 0.75f), 7f)
-                        .shadow(
+                        .border(1.px, UiColor(0.45f, 0.55f, 0.70f, 0.75f), 7f).shadow(
                             UiShadow(
-                                offset = UiVec3(0f, 2f),
-                                blur = 7f,
-                                spread = 0f,
-                                color = UiColor(0f, 0f, 0f, 0.55f)
+                                offset = UiVec3(0f, 2f), blur = 7f, spread = 0f, color = UiColor(0f, 0f, 0f, 0.55f)
                             )
-                        )
-                        .foreground(UiColor(0.94f, 0.96f, 1f)),
+                        ).foreground(UiColor(0.94f, 0.96f, 1f)),
                 )
             }
 
@@ -440,20 +476,15 @@ object TransformGizmoEditor {
             }
             entry.lastBounds?.let { bounds ->
                 val width = boundsLineWidth(bounds)
-                for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) GizmoRenderer.strokeLine(scope, edge, boundsColor, width)
+                for (edge in GizmoGeometry.World.buildBoundsEdges(bounds)) GizmoRenderer.strokeLine(
+                    scope, edge, boundsColor, width
+                )
             }
         }
 
         val active = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return
-        val working = active.working ?: return
-
-        val drag = currentDrag
-        if (drag != null && draggingKey == active.entryId) {
-            GizmoRenderer.drawRotationSector(scope, GizmoGeometry.World, WorldToScreenProjector, drag)
-        }
-
-        val handles = GizmoGeometry.World.buildHandles(working.translation, working.rotation, modes)
-        GizmoRenderer.drawHandles(scope, handles, hoveredHandleId, draggingHandleId)
+        (active.part as? AttachmentGizmo)?.let { DecalPartOverlay.drawGuide(scope, it) }
+        session.draw(scope, if (active.working != null) EntryTarget(active) else null)
     }
 
     /** Thinner bounding-box lines when the box is small/distant on screen. */
@@ -482,8 +513,10 @@ object TransformGizmoEditor {
     }
 
 
-    private fun updateLabel(entry: GizmoEntry, drag: GizmoDrag) {
-        val origin = entry.working?.translation ?: return
+    /** The value of the drag under way, next to where the dragged node is now. */
+    private fun updateLabel() {
+        val drag = session.drag ?: return
+        val origin = draggingKey?.let(entries::get)?.working?.translation ?: return
         val screen = WorldToScreenProjector.project(
             origin.x.toDouble(), origin.y.toDouble(), origin.z.toDouble(),
         ) ?: return
@@ -495,13 +528,12 @@ object TransformGizmoEditor {
 
     private fun pointerOverIde(): Boolean = HollowIdeOverlay.holdsPointer()
 
-    private fun pointerLogical(physX: Float, physY: Float): Pair<Float, Float> =
-        if (crosshairMode()) {
-            WorldToScreenProjector.screenCenter()
-        } else {
-            val point = hollowIdeWorldPoint(physX, physY)
-            point.x to point.y
-        }
+    private fun pointerLogical(physX: Float, physY: Float): Pair<Float, Float> = if (crosshairMode()) {
+        WorldToScreenProjector.screenCenter()
+    } else {
+        val point = hollowIdeWorldPoint(physX, physY)
+        point.x to point.y
+    }
 
     private fun isEditorAvailable(): Boolean = isEnabled && EditorMode.isAvailable()
 
@@ -513,11 +545,10 @@ object TransformGizmoEditor {
         target: TransformGizmoTarget,
         resolved: ResolvedNodeTransform,
         localBounds: Pair<Vec3f, Vec3f>?,
-    ): AABB =
-        when (target.type) {
-            TransformGizmoTargetType.MODEL -> buildNodeRenderBounds(localBounds, resolved.transform)
-            TransformGizmoTargetType.TRANSFORM -> buildGenericBounds(resolved.transform)
-        }
+    ): AABB = when (target.type) {
+        TransformGizmoTargetType.MODEL -> buildNodeRenderBounds(localBounds, resolved.transform)
+        TransformGizmoTargetType.TRANSFORM -> buildGenericBounds(resolved.transform)
+    }
 
     /** The local box of what is drawn for a node, or null while nothing has drawn it yet. */
     private fun localBoundsOf(entity: Entity?, nodeId: UUID, model: Model?): Pair<Vec3f, Vec3f>? {
@@ -549,6 +580,7 @@ object TransformGizmoEditor {
         val partialTick = TickHandler.partialTick
 
         service.records.forEach { record ->
+            if (record.hostEntity is WorldObjectEntity) return@forEach
             val snapshot = service.snapshot(record.snapshotId) ?: return@forEach
             val hostEntityUuid = snapshot.hostEntityUuidOrNull() ?: record.hostEntityUuid
             val claimedNodes = hashSetOf<UUID>()
@@ -575,14 +607,48 @@ object TransformGizmoEditor {
 
         }
 
+        val camera = WorldToScreenProjector.cameraPosition
+        val reach = WorldObjectEditing.GIZMO_REACH * WorldObjectEditing.GIZMO_REACH
+        WorldObjects.all(level).forEach { target ->
+            if (target.distanceToSqr(camera) > reach) return@forEach
+            val entryId = GizmoEntryId(target.uuid, ROOT_COMPONENT_ID)
+            val entry = entries.getOrPut(entryId) { GizmoEntry(entryId) }
+            entry.hostEntityUuid = target.uuid
+            entry.entityId = target.id
+            entry.worldObject = target
+            entry.target = TransformGizmoTarget(TransformGizmoTargetType.TRANSFORM, "Object", TRANSFORM_ICON)
+            entry.visible = true
+            val dragging = draggingKey == entryId
+            val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, partialTick), 0)
+            val display = displayResolved(entry, resolved, dragging)
+            entry.updateFromResolved(display, WorldObjectEditing.bounds(target, partialTick), dragging)
+            seen += entryId
+        }
+
+        WorldObjectParts.selectedPart()?.let { part ->
+            val entryId = GizmoEntryId(part.entity.uuid, UUID.nameUUIDFromBytes(part.key.encodeToByteArray()))
+            val entry = entries.getOrPut(entryId) { GizmoEntry(entryId) }
+            entry.hostEntityUuid = part.entity.uuid
+            entry.entityId = null
+            entry.part = part
+            entry.target = TransformGizmoTarget(TransformGizmoTargetType.TRANSFORM, part.label, TRANSFORM_ICON)
+            entry.visible = true
+            val dragging = draggingKey == entryId
+            val display = displayResolved(entry, ResolvedNodeTransform(part.worldTransform(partialTick), 0), dragging)
+            entry.updateFromResolved(display, buildGenericBounds(display.transform), dragging)
+            if (selectedPartKey != entryId) {
+                selectedPartKey = entryId
+                activeKey = entryId
+            }
+            seen += entryId
+        } ?: run { selectedPartKey = null }
+
         val iterator = entries.entries.iterator()
         while (iterator.hasNext()) {
             val (entryId, _) = iterator.next()
             if (entryId in seen) continue
             if (hoveredKey == entryId) hoveredKey = null
-            if (draggingKey == entryId) {
-                draggingKey = null; currentDrag = null
-            }
+            if (draggingKey == entryId) session.settle()
             if (activeKey == entryId) activeKey = null
             if (contextMenuState?.entryId == entryId) contextMenuState = null
             iterator.remove()
@@ -590,6 +656,18 @@ object TransformGizmoEditor {
     }
 
     private fun refreshFromRuntime(entry: GizmoEntry) {
+        entry.part?.let { part ->
+            val resolved = ResolvedNodeTransform(part.worldTransform(TickHandler.partialTick), 0)
+            entry.updateFromResolved(resolved, buildGenericBounds(resolved.transform), dragging = false)
+            return
+        }
+        entry.worldObject?.let { target ->
+            val resolved = ResolvedNodeTransform(WorldObjectEditing.gizmoTransform(target, TickHandler.partialTick), 0)
+            entry.updateFromResolved(
+                resolved, WorldObjectEditing.bounds(target, TickHandler.partialTick), dragging = false
+            )
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
         val nodeSnapshot = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
@@ -652,6 +730,18 @@ object TransformGizmoEditor {
     }
 
     private fun applyFromGizmo(entry: GizmoEntry, values: GizmoTransformValues) {
+        entry.part?.let { part ->
+            if (values == entry.lastAppliedValues) return
+            entry.lastAppliedValues = values
+            part.apply(values, TickHandler.partialTick)
+            return
+        }
+        entry.worldObject?.let { target ->
+            if (values == entry.lastAppliedValues) return
+            entry.lastAppliedValues = values
+            WorldObjectEditing.applyGizmo(target, values)
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val worldPosition =
             Vec3(values.translation.x.toDouble(), values.translation.y.toDouble(), values.translation.z.toDouble())
@@ -681,6 +771,12 @@ object TransformGizmoEditor {
 
     private fun resetTransform(entryId: GizmoEntryId) {
         val entry = entries[entryId] ?: return
+        entry.worldObject?.let { target ->
+            WorldObjectEditing.resetRotationAndScale(target)
+            refreshFromRuntime(entry)
+            contextMenuState = null
+            return
+        }
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
         val node = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
@@ -701,6 +797,13 @@ object TransformGizmoEditor {
 
         var hostEntityUuid: UUID? = null
         var entityId: Int? = null
+
+        /** Set when the entry is a world object itself, which the gizmo moves whole. */
+        var worldObject: WorldObjectEntity? = null
+
+        /** Set when the entry is a part of a model selected in the scene window: a bone, or something placed on one. */
+        var part: PartGizmo? = null
+        var lastAppliedValues: GizmoTransformValues? = null
         var snapshot: Snapshot? = null
         var target: TransformGizmoTarget? = null
         var modelComponent: Model? = null
@@ -726,12 +829,6 @@ object TransformGizmoEditor {
     private data class GizmoEntryId(val snapshotId: UUID, val nodeId: UUID)
     private data class ContextMenuState(val entryId: GizmoEntryId, val anchor: UiRect)
     private data class OverlayLabelState(val x: Float, val y: Float, val value: Double)
-}
-
-enum class GizmoEditMode {
-    TRANSLATE,
-    ROTATE,
-    SCALE,
 }
 
 private fun formatLabelValue(value: Double): String {

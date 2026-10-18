@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
@@ -88,7 +89,7 @@ fun <T> UiTreeView(
     Column(
         tags = listOf("tree-view") + tags,
         modifier = modifier.focus().onKeyInput(FilterShortcutPriority) { input ->
-            if (filterState == null || input.repeat || !input.command || input.key != GLFW.GLFW_KEY_F) {
+            if (filterState == null || input.repeat || !HollowKeys.FIND.matches(input)) {
                 return@onKeyInput
             }
             filterState.open()
@@ -105,31 +106,59 @@ fun <T> UiTreeView(
                 onClose = filterState::close,
             )
         }
+        var treeWidth by remember { mutableStateOf(0f) }
         Column(
             tags = listOf("tree-view-scroll"),
-            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState).then(
-                if (onBackgroundClick == null && onBackgroundContextMenu == null) Modifier else Modifier.input(clickable = true).onClick { event ->
-                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && onBackgroundContextMenu != null) {
-                        onBackgroundContextMenu(event)
-                    } else {
-                        onBackgroundClick?.invoke()
-                    }
-                    event.consume()
-                },
+            modifier = Modifier.size(100.percent, 0.px).grow(1f).scrollable(state = scrollState)
+                .onPlaced { treeWidth = it.width }.then(
+                if (onBackgroundClick == null && onBackgroundContextMenu == null) Modifier else Modifier.input(clickable = true)
+                    .onClick { event ->
+                        if (event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && onBackgroundContextMenu != null) {
+                            onBackgroundContextMenu(event)
+                        } else {
+                            onBackgroundClick?.invoke()
+                        }
+                        event.consume()
+                    },
             ),
         ) {
-            items.forEachIndexed { index, item ->
+            // A long tree composes only the rows in view, with spacers standing in for the rest: rows are all one height.
+            val virtual = items.size > VirtualizeFrom
+            val window = if (virtual) visibleRows(scrollState, items.size) else items.indices
+            if (window.first > 0) Box(modifier = Modifier.size(1.px, (window.first * TreeRowHeight).px))
+            for (index in window) {
+                val item = items[index]
                 key(item.id) {
                     UiTreeRow(
-                        item, continuations[index], onToggle, onSelect, onIconClick, fillRowWidth, onDrop, canDrop,
+                        item,
+                        continuations[index],
+                        onToggle,
+                        onSelect,
+                        onIconClick,
+                        fillRowWidth,
+                        treeWidth,
+                        onDrop,
+                        canDrop,
                         draggable = dragItem != null,
+                        virtual = virtual,
                     ) {
                         dragItem?.invoke(item)
                     }
                 }
             }
+            val after = items.size - 1 - window.last
+            if (after > 0) Box(modifier = Modifier.size(1.px, (after * TreeRowHeight).px))
         }
     }
+}
+
+/** The rows of a tree of [count] that are in view of [scroll], with a few beyond each edge. */
+private fun visibleRows(scroll: UiScrollHandle, count: Int): IntRange {
+    val viewport = scroll.viewport.height
+    if (viewport <= 0f) return 0 until minOf(count, VirtualOverscan * 4)
+    val first = ((scroll.offsetY / TreeRowHeight).toInt() - VirtualOverscan).coerceIn(0, count - 1)
+    val last = (((scroll.offsetY + viewport) / TreeRowHeight).toInt() + VirtualOverscan).coerceIn(first, count - 1)
+    return first..last
 }
 
 private suspend fun <T> scrollToRow(scroll: UiScrollHandle, itemId: String, items: () -> List<UiTreeItem<T>>) {
@@ -152,7 +181,10 @@ private fun UiTreeFilter(
     placeholder: String,
     onClose: () -> Unit,
 ) {
-    Row(tags = listOf("tree-filter-row"), modifier = Modifier.dropTarget(accepts = { false }, onDrop = { _, _, _ -> false })) {
+    Row(
+        tags = listOf("tree-filter-row"),
+        modifier = Modifier.dropTarget(accepts = { false }, onDrop = { _, _, _ -> false })
+    ) {
         Image(SearchIcon, tags = listOf("tree-filter-icon"))
         TextField(
             value = state.query,
@@ -166,14 +198,7 @@ private fun UiTreeFilter(
                 input.consume()
             },
         )
-        Image(
-            CloseIcon,
-            tags = listOf("tree-filter-close"),
-            modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-                onClose()
-                event.consume()
-            },
-        )
+        IconButton(CloseIcon, tooltip = null, tags = listOf("inline", "tree-filter-close"), onClick = onClose)
     }
 }
 
@@ -185,9 +210,11 @@ private fun <T> UiTreeRow(
     onSelect: (UiTreeItem<T>, UiEvent) -> Unit,
     onIconClick: ((UiTreeItem<T>) -> Unit)?,
     fillRowWidth: Boolean,
+    minWidth: Float,
     onDrop: ((UiTreeItem<T>, UiDragItem) -> Boolean)?,
     canDrop: (UiTreeItem<T>, UiDragItem) -> Boolean,
     draggable: Boolean,
+    virtual: Boolean,
     drag: () -> UiDragItem?,
 ) {
     val id = "tree-item-${item.id}"
@@ -202,31 +229,62 @@ private fun <T> UiTreeRow(
         onSelect(item, event)
         event.consume()
     }
+    val width = if (fillRowWidth) 100.percent else UiLength.Auto
+    val minimum = if (fillRowWidth) Modifier else Modifier.minSize(minWidth.px)
+    Box(mode = UiBoxMode.STACK, id = "$id-stack", modifier = Modifier.size(width, TreeRowHeight.px).then(minimum)) {
+        Row(id = "$id-guides", modifier = Modifier.size(UiLength.Auto, TreeRowHeight.px).inputTransparent()) {
+            repeat(item.depth) { level ->
+                val parentLevel = level == item.depth - 1
+                val opensSubtree = item.hasChildren && item.expanded
+                val guide = when {
+                    parentLevel && opensSubtree -> if (continues[level]) "branch" else "last"
+                    parentLevel -> if (continues[level]) "line" else "end"
+                    continues[level] -> "line"
+                    else -> null
+                }
+                Box(tags = listOfNotNull("tree-indent", guide))
+            }
+        }
+        UiTreeRowContent(
+            item,
+            id,
+            width,
+            minimum,
+            onToggle,
+            onIconClick,
+            dragAndDrop,
+            virtual,
+            Modifier.then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
+                .dragSource(dragSource, drag).then(dropModifier))
+    }
+}
+
+@Composable
+private fun <T> UiTreeRowContent(
+    item: UiTreeItem<T>,
+    id: String,
+    width: UiLength,
+    minimum: Modifier,
+    onToggle: (UiTreeItem<T>) -> Unit,
+    onIconClick: ((UiTreeItem<T>) -> Unit)?,
+    dragAndDrop: UiDragAndDropState?,
+    virtual: Boolean,
+    interaction: Modifier,
+) {
     Row(
         id = id,
-        tags = listOfNotNull("tree-item", "selected".takeIf { item.selected },
+        tags = listOfNotNull(
+            "tree-item",
+            "selected".takeIf { item.selected },
+            "virtual".takeIf { virtual },
             if (dragAndDrop?.hoveredTargetId == id) {
                 if (dragAndDrop.canDrop) "drop-target" else "drop-rejected"
-            } else null),
-        modifier = Modifier.size(if (fillRowWidth) 100.percent else UiLength.Auto, TreeRowHeight.px)
-            .alignItems(vertical = UiAlign.CENTER)
-            .input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND)
-            .then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
-            .dragSource(dragSource, drag)
-            .then(dropModifier)
+            } else null
+        ),
+        modifier = Modifier.size(width, TreeRowHeight.px).then(minimum).alignItems(vertical = UiAlign.CENTER)
+            .input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).then(interaction)
     ) {
-        repeat(item.depth) { level ->
-            val parentLevel = level == item.depth - 1
-            val opensSubtree = item.hasChildren && item.expanded
-            val guide = when {
-                parentLevel && opensSubtree -> if (continues[level]) "branch" else "last"
-                parentLevel -> if (continues[level]) "line" else "end"
-                continues[level] -> "line"
-                else -> null
-            }
-            Box(tags = listOfNotNull("tree-indent", guide))
-        }
+        repeat(item.depth) { Box(tags = listOf("tree-indent-space")) }
         Box(
             tags = if (!item.hasChildren) listOf("tree-expander-empty") else listOf("tree-expander"),
             attributes = mapOf(
@@ -239,9 +297,7 @@ private fun <T> UiTreeRow(
         )
         if (item.icon != null) {
             val iconModifier = if (onIconClick != null) {
-                Modifier.input(hoverable = true, clickable = true)
-                    .cursor(UiCursorShape.HAND)
-                    .onClick { event ->
+                Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
                         onIconClick(item)
                         event.consume()
                     }
@@ -258,4 +314,8 @@ private fun <T> UiTreeRow(
 
 private const val FilterShortcutPriority = 100
 private const val TreeRowHeight = 20f
+
+/** How many rows a tree has before it composes only those in view, and how many it keeps beyond each edge. */
+private const val VirtualizeFrom = 200
+private const val VirtualOverscan = 8
 private const val RevealLayoutFrames = 4

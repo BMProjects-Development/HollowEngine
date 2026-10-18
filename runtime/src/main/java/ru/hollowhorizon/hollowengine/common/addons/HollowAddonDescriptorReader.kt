@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.common.addons
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 import java.io.File
-import java.util.Properties
+import java.util.*
 import java.util.jar.JarFile
 
 internal object HollowAddonDescriptorReader {

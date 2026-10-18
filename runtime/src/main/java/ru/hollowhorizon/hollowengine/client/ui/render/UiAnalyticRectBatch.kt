@@ -82,9 +82,9 @@ internal class UiAnalyticRectBatch {
         } else {
             paintEncoder.append(command.paint, command.opacity, command.filter, width, height)
         }
-        val borderColor = (borderPaint as? UiResolvedPaint.Color)
-            ?.color?.withOpacity(command.opacity)?.filtered(command.filter)
-            ?: UiColor.Transparent
+        val borderColor =
+            (borderPaint as? UiResolvedPaint.Color)?.color?.withOpacity(command.opacity)?.filtered(command.filter)
+                ?: UiColor.Transparent
         val borderPaintIndex = if (borderPaint is UiResolvedPaint.Color || borderPaint == UiResolvedPaint.None) {
             NoPaint
         } else {
@@ -111,7 +111,6 @@ internal class UiAnalyticRectBatch {
         if (width <= 0f || height <= 0f || command.opacity <= 0f || shadow.color.alpha <= 0f) return
         val blurRadius = shadow.blur.coerceAtLeast(0f)
         val spreadRadius = shadow.spread
-        val rasterMargin = abs(spreadRadius) + blurRadius * BlurExtentFactor + AntialiasMargin
         val paintIndex = paintEncoder.append(
             UiResolvedPaint.Color(shadow.color),
             command.opacity,
@@ -120,6 +119,15 @@ internal class UiAnalyticRectBatch {
             height,
         )
         val radius = command.radius.coerceIn(0f, min(width, height) * 0.5f)
+        if (shadow.inset) {
+            records.add(width, height, radius, command.borderWidth.coerceIn(0f, min(width, height) * 0.5f))
+            records.add(paintIndex.toFloat(), blurRadius, spreadRadius, InsetShadowMode)
+            records.add(shadow.offset.x, shadow.offset.y, 0f, 0f)
+            records.add(clip.minX, clip.minY, clip.maxX, clip.maxY)
+            appendInstance(transform, 0f, 0f, width, height)
+            return
+        }
+        val rasterMargin = abs(spreadRadius) + blurRadius * BlurExtentFactor + AntialiasMargin
         records.add(width, height, radius, 0f)
         records.add(paintIndex.toFloat(), blurRadius, spreadRadius, ShadowMode)
         records.add(0f, 0f, 0f, 0f)
@@ -210,9 +218,7 @@ internal class UiAnalyticRectBatch {
         val right = command.border.width.right.resolve(width)
         val bottom = command.border.width.bottom.resolve(height)
         return left.takeIf {
-            abs(it - top) <= BorderEpsilon &&
-                    abs(it - right) <= BorderEpsilon &&
-                    abs(it - bottom) <= BorderEpsilon
+            abs(it - top) <= BorderEpsilon && abs(it - right) <= BorderEpsilon && abs(it - bottom) <= BorderEpsilon
         }
     }
 
@@ -231,6 +237,7 @@ internal class UiAnalyticRectBatch {
         /** Record texel-0 x sentinel marking a glyph (rects always have positive width there). */
         const val GlyphMarker = -1f
         private const val ShadowMode = 1f
+        private const val InsetShadowMode = 2f
         private const val BlurExtentFactor = 3f
         private const val AntialiasMargin = 1f
         private const val BorderEpsilon = 0.001f
@@ -251,7 +258,8 @@ internal fun borderDashPattern(
     val halfWidth = width * 0.5f - inset
     val halfHeight = height * 0.5f - inset
     val centreRadius = (radius - inset).coerceIn(0f, min(halfWidth, halfHeight))
-    val perimeter = 4f * (halfWidth - centreRadius) + 4f * (halfHeight - centreRadius) + 2f * PI.toFloat() * centreRadius
+    val perimeter =
+        4f * (halfWidth - centreRadius) + 4f * (halfHeight - centreRadius) + 2f * PI.toFloat() * centreRadius
     val repeat = dash.length + dash.gap
     val count = (perimeter / repeat).roundToInt().coerceAtLeast(1)
     val period = perimeter / count

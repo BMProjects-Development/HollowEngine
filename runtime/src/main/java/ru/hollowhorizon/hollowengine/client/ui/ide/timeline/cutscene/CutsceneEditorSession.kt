@@ -2,8 +2,9 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
 
 import androidx.compose.runtime.mutableStateOf
 import net.minecraft.client.Minecraft
-import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 class CutsceneEditorSession {
@@ -45,7 +46,7 @@ class CutsceneEditorSession {
         val pose = CutsceneCameraSystem.capturePlayerPose(minecraft) ?: return
         val environment = minecraft.level?.captureCutsceneEnvironment() ?: return
         val frame = authoringFrame
-        timeline.edit("Capture keyframe") {
+        timeline.edit(TimelineEdits.CAPTURE_KEY) {
             timeline.clearSelection()
             val position = frame.toLocal(pose.position)
             writeChannels(playback.translation, time, listOf(position.x, position.y, position.z))
@@ -75,7 +76,7 @@ class CutsceneEditorSession {
     }
 
     fun moveOrigin(position: Vec3f, yaw: Float, keepWorld: Boolean) {
-        timeline.edit(if (keepWorld) "Re-anchor cutscene" else "Move cutscene") {
+        timeline.edit(if (keepWorld) TimelineEdits.REANCHOR_CUTSCENE else TimelineEdits.MOVE_CUTSCENE) {
             if (keepWorld) playback.reanchor(position, yaw)
             else playback.origin = playback.origin.moved(position, yaw)
         }
@@ -121,8 +122,6 @@ class CutsceneEditorSession {
         timeline.clearHistory()
         updatePreviewState()
     }
-
-    fun channelValues(property: AnimProperty<*>): List<Float> = property.decomposeAt(timeline.currentTime).toList()
 }
 
 

@@ -37,7 +37,7 @@ screen("mypack:quest_log") {
 }
 ```
 
-The server opens it from a server-capable script with `player.openUi("mypack:quest_log")`. See [Server UI API](/docs/hollowengine/scripting/ui/katari-ui).
+The server opens it from a server-capable script with `player.openUi("mypack:quest_log")`. See [Server UI API](/docs/hollowengine/scripting/ui/server-api).
 
 ## Surfaces
 
@@ -46,6 +46,8 @@ The server opens it from a server-capable script with `player.openUi("mypack:que
 | Screen | `screen("namespace:id")` | `player.openUi(id)` | A normal Minecraft screen |
 | HUD overlay | `overlay("namespace:id")` | `player.showOverlay(id)` | HUD owned by a server session |
 | Client HUD overlay | `overlay { autoShow = true }` | none | Local, always-visible HUD |
+| Adaptive surface | `surface("namespace:id")` | `player.openSurface(id)` | Switches between overlay and screen from its data |
+| World panel | `panel("namespace:id")` | a rig attachment | UI on a model or world object |
 
 Screens default to closing on Escape and do not pause single-player worlds. Overlays default to drawing after the hotbar, do not receive input, and are shown only when requested by the server.
 
@@ -58,12 +60,14 @@ Screens default to closing on Escape and do not pause single-player worlds. Over
 
 ## Next steps
 
+- [World UI panels](/docs/hollowengine/scripting/ui/world-panels): terminals and displays on models, shared entity data and server events
+
 - [UI script files](/docs/hollowengine/scripting/ui/ui-files): declaration syntax and surface options
 - [Nodes and widgets](/docs/hollowengine/scripting/ui/nodes): composables and reusable Kotlin functions
 - [Inventory slots](/docs/hollowengine/scripting/ui/slots): zones, item rules, quick-move, and client widgets
 - [Modifiers](/docs/hollowengine/scripting/ui/modifiers): layout, appearance, interaction, and computed styles
 - [Events and state](/docs/hollowengine/scripting/ui/events): `UiScope`, `DataKey`, and sessions
 - [Text formatting](/docs/hollowengine/scripting/ui/text-formatting): formatted runs, effects, and dynamic text
-- [Server UI API](/docs/hollowengine/scripting/ui/katari-ui): opening, updating, and closing UI
+- [Server UI API](/docs/hollowengine/scripting/ui/server-api): opening, updating, and closing UI
 - [Examples](/docs/hollowengine/scripting/ui/examples): client and server examples
 - [UI Styles](/docs/hollowengine/scripting/ui/styles): reusable HSS rules, transitions, and animations

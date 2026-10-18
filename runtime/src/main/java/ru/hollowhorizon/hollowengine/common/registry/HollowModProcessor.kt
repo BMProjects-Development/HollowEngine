@@ -7,12 +7,15 @@ import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.*
 import ru.hollowhorizon.hollowengine.api.utils.Polymorphic
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentSyncPolicy
 import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.config.ConfigName
 import ru.hollowhorizon.hollowengine.common.events.*
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterReloadListenersEvent
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryManager
@@ -46,6 +49,7 @@ object HollowModProcessor {
             isClientOnly = isClientOnly || method.isAnnotationPresent(ClientOnly::class.java)
 
             if (!isClientOnly || isPhysicalClient) {
+                @Suppress("UNCHECKED_CAST")
                 EventHandler.get(method.parameterTypes[0].kotlin as KClass<Event>).register(listener)
             }
         }
@@ -57,6 +61,7 @@ object HollowModProcessor {
         }
 
         registerClassHandler<HollowPacketHandler> { type, _ ->
+            @Suppress("UNCHECKED_CAST")
             if (HollowPacket::class.java.isAssignableFrom(type)) registerPacket(type as Class<HollowPacket>)
             else HollowEngine.LOGGER.warn("Unsupported packet: ${type.simpleName}")
         }

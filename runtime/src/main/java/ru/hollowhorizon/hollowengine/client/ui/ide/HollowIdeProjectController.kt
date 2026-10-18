@@ -4,9 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.lwjgl.glfw.GLFW
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiEvent
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
@@ -300,17 +301,14 @@ internal fun resolveProjectShortcut(
     modifiers: Int,
     hasSelectedPath: Boolean,
 ): ProjectShortcut? {
-    val command = modifiers and GLFW.GLFW_MOD_CONTROL != 0
-    val alt = modifiers and GLFW.GLFW_MOD_ALT != 0
-    val shift = modifiers and GLFW.GLFW_MOD_SHIFT != 0
     return when {
-        command && key == GLFW.GLFW_KEY_C && hasSelectedPath -> ProjectShortcut.Copy
-        command && key == GLFW.GLFW_KEY_X && hasSelectedPath -> ProjectShortcut.Cut
-        command && key == GLFW.GLFW_KEY_V -> ProjectShortcut.Paste
-        key == GLFW.GLFW_KEY_DELETE && hasSelectedPath -> ProjectShortcut.Delete
-        key == GLFW.GLFW_KEY_F2 && hasSelectedPath -> ProjectShortcut.Rename
-        key == GLFW.GLFW_KEY_INSERT && alt && shift -> ProjectShortcut.CreateFolder
-        key == GLFW.GLFW_KEY_INSERT && alt -> ProjectShortcut.CreateFile
+        HollowKeys.COPY.matches(key, modifiers) && hasSelectedPath -> ProjectShortcut.Copy
+        HollowKeys.CUT.matches(key, modifiers) && hasSelectedPath -> ProjectShortcut.Cut
+        HollowKeys.PASTE.matches(key, modifiers) -> ProjectShortcut.Paste
+        HollowKeys.DELETE.matches(key, modifiers) && hasSelectedPath -> ProjectShortcut.Delete
+        HollowKeys.RENAME.matches(key, modifiers) && hasSelectedPath -> ProjectShortcut.Rename
+        HollowKeys.NEW_FOLDER.matches(key, modifiers) -> ProjectShortcut.CreateFolder
+        HollowKeys.NEW_FILE.matches(key, modifiers) -> ProjectShortcut.CreateFile
         else -> null
     }
 }

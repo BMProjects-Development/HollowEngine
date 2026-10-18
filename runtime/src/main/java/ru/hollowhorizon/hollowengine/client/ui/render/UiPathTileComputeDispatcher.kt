@@ -1,16 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.ui.render
 
 import net.minecraft.resources.ResourceLocation
-import org.lwjgl.opengl.GL
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL40
-import org.lwjgl.opengl.GL42
-import org.lwjgl.opengl.GL43
+import org.lwjgl.opengl.*
 import org.lwjgl.system.MemoryUtil
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.nio.FloatBuffer
-import java.nio.IntBuffer
 
 internal class UiPathTileComputeDispatcher : AutoCloseable {
     private val inputBuffer = UiStreamingGpuBuffer(GL43.GL_SHADER_STORAGE_BUFFER, InputBinding)
