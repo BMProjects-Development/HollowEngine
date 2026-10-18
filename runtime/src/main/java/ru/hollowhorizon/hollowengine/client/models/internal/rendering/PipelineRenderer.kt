@@ -633,7 +633,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
     private data class InstancedShaderBinding(val vao: Int, val colorLocation: Int)
 }
 
-private fun normalMatrixOf(matrix: Matrix4f): Matrix3f {
+internal fun normalMatrixOf(matrix: Matrix4f): Matrix3f {
     val linear = Matrix3f(matrix)
     val determinant = linear.determinant()
 

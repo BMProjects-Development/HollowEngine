@@ -19,7 +19,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.AnimatorAsse
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBatchManager
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
@@ -32,7 +31,6 @@ import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStag
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderPlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
 import ru.hollowhorizon.hollowengine.common.models.StandardPlayerAnimatorPreset
-import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import java.util.*
@@ -155,7 +153,7 @@ object RenderManager {
                 }
             )
             val light =
-                if (isWorldPass) lightAt(level, entity, attachment, worldTransform, packedLight) else packedLight
+                if (isWorldPass) lightAt(level, entity, worldTransform, packedLight) else packedLight
 
             val hostRotation = hostRotation(entity, partialTick)
             val hostScale = hostScale(entity, partialTick)
@@ -198,18 +196,18 @@ object RenderManager {
         }
     }
 
+    /**
+     * Light at the node's origin, which follows the host entity. The middle of the mesh bounds is not used:
+     * geometry hidden under the floor would drag it into a dark block.
+     */
     private fun lightAt(
         level: Level,
         entity: Entity,
-        attachment: ModelAttachment,
         worldTransform: TrsTransformF,
         packedLight: Int,
     ): Int {
-        val (min, max) = attachment.calculateBounds() ?: return packedLight
-        val center = MutableVec3f()
-        worldTransform.matrixF.transform((min + max) * 0.5f, 1f, center)
-
-        val position = BlockPos.containing(center.x.toDouble(), center.y.toDouble(), center.z.toDouble())
+        val origin = worldTransform.translation
+        val position = BlockPos.containing(origin.x.toDouble(), origin.y.toDouble(), origin.z.toDouble())
         if (position == entity.blockPosition()) return packedLight
         if (!level.getBlockState(position).isAir) {
             val above = position.above()
