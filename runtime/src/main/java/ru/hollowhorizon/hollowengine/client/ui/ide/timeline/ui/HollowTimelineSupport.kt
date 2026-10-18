@@ -177,15 +177,16 @@ internal fun visibleKeys(row: TimelineRow, from: Float, to: Float): List<Keyfram
     return curve.keyframes.filter { it.time in from..to }
 }
 
+/** How wide the lanes are: past the work area and the last key, and as far as [reach], the pixels the view needs. */
 internal fun timelineContentWidth(
     workAreaEnd: Float,
     maxKeyTime: Float,
     pixelsPerSecond: Float,
-    viewportWidth: Float,
+    reach: Float,
 ): Float {
     val endWidth = (workAreaEnd + 5f) * pixelsPerSecond + TimelineLeftPadding
     val keyWidth = (maxKeyTime + 5f) * pixelsPerSecond + TimelineLeftPadding
-    return max(TimelineMinContentWidth, max(max(endWidth, keyWidth), viewportWidth))
+    return maxOf(TimelineMinContentWidth, endWidth, keyWidth, reach)
 }
 
 internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float): Float =
@@ -244,12 +245,6 @@ internal fun autoPanToContentX(scroll: UiScrollHandle, viewport: UiRect, content
         else -> return
     }
     if (abs(target - scroll.offsetX) > 0.5f) scroll.scrollTo(x = target.coerceAtLeast(0f))
-}
-
-internal fun timelineRulerSeconds(scrollX: Float, viewWidth: Float, pixelsPerSecond: Float): IntRange {
-    val start = floor((scrollX - TimelineLeftPadding).coerceAtLeast(0f) / pixelsPerSecond).toInt()
-    val end = ceil((scrollX + viewWidth) / pixelsPerSecond).toInt()
-    return start..end.coerceAtLeast(start)
 }
 
 internal fun timelineMaxKeyTime(controller: TimelineController): Float =

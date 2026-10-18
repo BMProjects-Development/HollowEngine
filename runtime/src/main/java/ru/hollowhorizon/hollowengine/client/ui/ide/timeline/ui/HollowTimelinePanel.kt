@@ -18,6 +18,8 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.round
 
 private const val TimelineScrollStep = 44f
@@ -111,14 +113,15 @@ fun HollowTimelineEditor(
     val rows = timelineRows(controller, curveEditorOnly = isCurveView)
     val rowsHeight = rows.sumOf { it.height.toDouble() }.toFloat()
     val pxPerSec = controller.pixelsPerSecond
+    var laneViewport by remember { mutableStateOf(UiRect.Zero) }
+    // A screen more than the view has reached, so the time goes on to the right however far it is scrolled or zoomed.
     val contentWidth = timelineContentWidth(
         controller.workAreaEnd,
         timelineMaxKeyTime(controller),
         pxPerSec,
-        TimelineMinContentWidth,
+        reach = scroll.offsetX + laneViewport.width * 2f,
     )
 
-    var laneViewport by remember { mutableStateOf(UiRect.Zero) }
     var isScrubbing by remember { mutableStateOf(false) }
     val scrollContentHeight = rowsHeight + if (laneViewport.height > 0f && rowsHeight > laneViewport.height) {
         TimelineScrollbarClearance
@@ -208,7 +211,7 @@ fun HollowTimelineEditor(
                         modifier = Modifier.position((-scroll.offsetX).px, 0.px)
                             .size(contentWidth.px, TimelineRulerHeight.px),
                     ) {
-                        TimeRuler(controller, pxPerSec, contentWidth, bump) { isScrubbing = it }
+                        TimeRuler(controller, pxPerSec, contentWidth, visibleTimes, bump) { isScrubbing = it }
                     }
                 }
 
@@ -337,6 +340,7 @@ private fun TimeRuler(
     controller: TimelineController,
     pxPerSec: Float,
     contentWidth: Float,
+    visibleTimes: ClosedFloatingPointRange<Float>,
     refresh: () -> Unit,
     onScrubbingChange: (Boolean) -> Unit,
 ) {
@@ -364,10 +368,11 @@ private fun TimeRuler(
     ) {
         val majorStep = rulerMajorStep(pxPerSec)
         val minorPerMajor = 5
-        val seconds = timelineRulerSeconds(0f, contentWidth, pxPerSec)
-        var second = 0f
-        val end = seconds.last.toFloat()
-        while (second <= end) {
+        val first = floor(visibleTimes.start.coerceAtLeast(0f) / majorStep).toInt()
+        val end = visibleTimes.endInclusive.coerceIn(0f, (contentWidth - TimelineLeftPadding) / pxPerSec)
+        val last = ceil(end / majorStep).toInt()
+        for (mark in first..last) {
+            val second = mark * majorStep
             val x = TimelineLeftPadding + second * pxPerSec
             Box(
                 modifier = Modifier.position(x.px, (TimelineRulerHeight - 6f).px)
@@ -390,7 +395,6 @@ private fun TimeRuler(
                     )
                 }
             }
-            second += majorStep
         }
         WorkAreaHandle(controller, pxPerSec, refresh)
         // Playhead head riding on the ruler: a thin line topped by a glowing marker.
