@@ -30,6 +30,7 @@ data class NavigationComponent(
     val jumps: JumpSettings = JumpSettings(),
     val movement: MovementSettings = MovementSettings(),
     val avoid: AvoidSettings = AvoidSettings(),
+    val flight: FlightSettings = FlightSettings(),
 )
 
 /** What the NPC keeps off on its way: water, and blocks it walks around or never steps on. */

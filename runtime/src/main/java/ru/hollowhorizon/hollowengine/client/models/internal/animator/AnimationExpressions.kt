@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.coroutines.scopeAsync
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -72,6 +73,9 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityBool("is_passenger") { it.isPassenger }
         entityBool("is_vehicle") { it.isVehicle }
         entityBool("is_no_gravity") { it.isNoGravity }
+        entityBool("is_flying") { if (it is Player) it.abilities.flying else it.isNoGravity && !it.onGround() }
+        contextFloat("flight_pitch") { it.flightPitch }
+        contextFloat("flight_bank") { it.flightBank }
         entityBool("is_in_wall") { it.isInWall }
         entityBool("is_shift_key_down") { it.isShiftKeyDown }
         entityBool("is_sneaking") { it.isShiftKeyDown }
@@ -190,6 +194,9 @@ class AnimatorEvaluationContext {
     var localForwardSpeed: Float = 0f
     var localSideSpeed: Float = 0f
     var signedHorizontalSpeed: Float = 0f
+
+    var flightPitch: Float = 0f
+    var flightBank: Float = 0f
 
     var bodyYaw: Float = 0f
     var headYaw: Float = 0f

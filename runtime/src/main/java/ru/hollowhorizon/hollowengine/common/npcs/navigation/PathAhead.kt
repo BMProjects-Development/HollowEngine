@@ -6,14 +6,15 @@ import kotlin.math.sqrt
 
 /**
  * Path in front of an NPC as a line. From where it stands through the nodes still ahead. [stopShort] is how
- * far short of the end of the line the NPC has to stop, at the end of the path or before a jump.
+ * far short of the end of the line the NPC has to stop, at the end of the path or before a jump. Lengths and
+ * turns are horizontal, or 3D when [inSpace].
  */
-internal class PathAhead(val points: List<Vec3>, val stopShort: Double?) {
+internal class PathAhead(val points: List<Vec3>, val stopShort: Double?, private val inSpace: Boolean = false) {
     /** A turn of the line: [distance] along it from the NPC, [degrees] between the stretch before and after. */
     class Turn(val distance: Double, val degrees: Double)
 
     private val lengths = DoubleArray(points.size).also { lengths ->
-        for (index in 1 until points.size) lengths[index] = lengths[index - 1] + horizontal(points[index - 1], points[index])
+        for (index in 1 until points.size) lengths[index] = lengths[index - 1] + distance(points[index - 1], points[index])
     }
 
     val length: Double get() = lengths.last()
@@ -51,20 +52,23 @@ internal class PathAhead(val points: List<Vec3>, val stopShort: Double?) {
 
     private fun turnAt(index: Int): Double? {
         val inX = points[index].x - points[index - 1].x
+        val inY = if (inSpace) points[index].y - points[index - 1].y else 0.0
         val inZ = points[index].z - points[index - 1].z
         val outX = points[index + 1].x - points[index].x
+        val outY = if (inSpace) points[index + 1].y - points[index].y else 0.0
         val outZ = points[index + 1].z - points[index].z
-        val inLength = sqrt(inX * inX + inZ * inZ)
-        val outLength = sqrt(outX * outX + outZ * outZ)
+        val inLength = sqrt(inX * inX + inY * inY + inZ * inZ)
+        val outLength = sqrt(outX * outX + outY * outY + outZ * outZ)
         if (inLength < MIN_SEGMENT || outLength < MIN_SEGMENT) return null
-        val cos = ((inX * outX + inZ * outZ) / (inLength * outLength)).coerceIn(-1.0, 1.0)
+        val cos = ((inX * outX + inY * outY + inZ * outZ) / (inLength * outLength)).coerceIn(-1.0, 1.0)
         return Math.toDegrees(acos(cos))
     }
 
-    private fun horizontal(from: Vec3, to: Vec3): Double {
+    private fun distance(from: Vec3, to: Vec3): Double {
         val dx = to.x - from.x
+        val dy = if (inSpace) to.y - from.y else 0.0
         val dz = to.z - from.z
-        return sqrt(dx * dx + dz * dz)
+        return sqrt(dx * dx + dy * dy + dz * dz)
     }
 
     private companion object {

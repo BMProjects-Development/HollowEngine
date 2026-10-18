@@ -106,7 +106,6 @@ private suspend fun NpcEntity.walkLeg(
     reach: Double,
     last: Boolean,
 ): MoveResult {
-    val arrivalDistanceSq = reach * reach
     val targetMoveThresholdSq = options.targetMoveThreshold * options.targetMoveThreshold
     var lastPathTarget: Vec3? = null
     var spotFor: Vec3? = null
@@ -121,10 +120,11 @@ private suspend fun NpcEntity.walkLeg(
 
     while (true) {
         val currentTarget = target() ?: return MoveResult.TargetUnavailable
-        if (distanceToSqr(currentTarget) <= arrivalDistanceSq) return MoveResult.Arrived
+        val arrival = maxOf(reach, npcNavigation.arrivalSlack)
+        if (distanceToSqr(currentTarget) <= arrival * arrival) return MoveResult.Arrived
         if (spotFor != currentTarget) {
             spotFor = currentTarget
-            spot = NpcNavigationGeometry.standingSpot(level(), this, currentTarget)
+            spot = npcNavigation.spotFor(currentTarget)
         }
         val goal = spot ?: currentTarget
         val shortBy = goal.distanceTo(currentTarget)

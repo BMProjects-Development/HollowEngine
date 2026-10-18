@@ -10,34 +10,51 @@ import net.minecraft.world.level.pathfinder.WalkNodeEvaluator
 import kotlin.math.abs
 import kotlin.math.max
 
-/** A path whose steps may be jumps over gaps. */
+/** A path with gap jumps and air nodes. */
 class NpcPath private constructor(
     private val nodeList: MutableList<Node>,
     target: BlockPos,
     reached: Boolean,
     private val jumps: BooleanArray,
+    private val aloft: BooleanArray,
 ) : Path(nodeList, target, reached) {
     /** Whether the step onto node [index] is a jump over a gap. */
     fun isJumpTo(index: Int): Boolean = jumps.getOrElse(index) { false }
 
-    override fun copy(): Path = NpcPath(nodeList, target, canReach(), jumps).also {
+    fun isAloft(index: Int): Boolean = aloft.getOrElse(index) { false }
+
+    /** Whether the step onto node [index] is a flight, including a landing. */
+    fun isFlownTo(index: Int): Boolean = isAloft(index) || index > 0 && isAloft(index - 1)
+
+    override fun copy(): Path = NpcPath(nodeList, target, canReach(), jumps, aloft).also {
         it.nextNodeIndex = nextNodeIndex
     }
 
     companion object {
         /**
-         * [path] as found by the search, its nodes pulled straight in [level] when [straighten] is on. A straight
-         * line never cuts across what [avoid] makes the NPC go around.
+         * Builds an [NpcPath] from a search result.
+         *
+         * @param straighten pull the path into straight lines where nothing is in the way; a line never crosses
+         * cells that [avoid] charges for and never joins walking to flying
          */
         internal fun of(path: Path, level: CollisionGetter, mob: Mob, straighten: Boolean, avoid: AvoidRules?): NpcPath {
-            val nodes = List(path.nodeCount, path::getNode)
-            val jumps = BooleanArray(nodes.size) { it > 0 && isGapJump(nodes[it - 1], nodes[it]) }
+            val nodes = FlightSteps.collapse(List(path.nodeCount, path::getNode), isAir = { it is AirNode })
+            val aloft = BooleanArray(nodes.size) { nodes[it] is AirNode }
+            val jumps = BooleanArray(nodes.size) {
+                it > 0 && !aloft[it] && !aloft[it - 1] && isGapJump(nodes[it - 1], nodes[it])
+            }
             val kept = if (straighten) {
                 PathStraightening.keep(
                     nodes,
                     jumps,
                     canSkip = { it.type in SKIPPABLE },
-                    canWalk = { from, to -> canWalkStraight(level, mob, from, to, avoid) },
+                    canWalk = { from, to ->
+                        when {
+                            from is AirNode && to is AirNode -> canFlyStraight(level, mob, from, to, avoid)
+                            from !is AirNode && to !is AirNode -> canWalkStraight(level, mob, from, to, avoid)
+                            else -> false
+                        }
+                    },
                 )
             } else {
                 nodes.indices.toList()
@@ -47,6 +64,7 @@ class NpcPath private constructor(
                 path.target,
                 path.canReach(),
                 BooleanArray(kept.size) { jumps[kept[it]] },
+                BooleanArray(kept.size) { aloft[kept[it]] },
             )
         }
 
@@ -67,6 +85,13 @@ class NpcPath private constructor(
             return NpcNavigationGeometry.canWalkDirectly(level, mob, start, end) && avoid?.crosses(start, end) != true
         }
 
+        private fun canFlyStraight(level: CollisionGetter, mob: Mob, from: Node, to: Node, avoid: AvoidRules?): Boolean {
+            val start = FlightGeometry.nodeCenter(mob, from.x, from.y, from.z)
+            val end = FlightGeometry.nodeCenter(mob, to.x, to.y, to.z)
+            if (start.distanceToSqr(end) > MAX_STRAIGHT * MAX_STRAIGHT) return false
+            return FlightGeometry.canFlyDirectly(level, mob, start, end) && avoid?.crosses(start, end) != true
+        }
+
         /** The ground a straight line may cross without the NPC having to stop on it, as doors and hazards make it. */
         private val SKIPPABLE = setOf(PathType.WALKABLE, PathType.WATER_BORDER, PathType.OPEN)
 
@@ -77,6 +102,25 @@ class NpcPath private constructor(
 
 /** Whether the step from [from] to [to] skips over at least one block: no walking step does. */
 internal fun isGapJump(from: Node, to: Node): Boolean = max(abs(to.x - from.x), abs(to.z - from.z)) > 1
+
+internal object FlightSteps {
+    /**
+     * Removes in-place takeoff and landing steps: when a ground node and an air node of the same cell follow
+     * each other, only the ground node is kept.
+     */
+    fun <T> collapse(nodes: List<T>, isAir: (T) -> Boolean, sameCell: (T, T) -> Boolean = { a, b -> a == b }): List<T> {
+        val kept = ArrayList<T>(nodes.size)
+        for (node in nodes) {
+            val last = kept.lastOrNull()
+            if (last == null || !sameCell(last, node) || isAir(last) == isAir(node)) {
+                kept += node
+            } else if (isAir(last)) {
+                kept[kept.lastIndex] = node
+            }
+        }
+        return kept
+    }
+}
 
 /** String pulling: the nodes of a path the NPC can go between in straight lines. */
 internal object PathStraightening {

@@ -19,6 +19,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     private val locomotion = NpcLocomotion(mob)
     internal val passing = PassingSteer(mob)
     internal val facing = WalkFacing(mob)
+    internal val pilot = FlightPilot(mob)
     private var steeringTarget: Vec3? = null
     private var lookTarget: Vec3? = null
 
@@ -82,12 +83,26 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     override fun tick() {
         steeringTarget = null
         lookTarget = null
+        val flight = settings.flight
+        pilot.update(flight)
         super.tick()
         closePassedDoors()
         val currentPath = path?.takeUnless(Path::isDone)
         if (currentPath !== backstepPath) onPathChanged(currentPath)
-        val jump = currentPath?.let(::gapJumpOf)
         val moveControl = mob.moveControl as? NpcMoveControl
+        if (!pilot.isAirborne && flight.enabled && (currentPath as? NpcPath)?.isAloft(currentPath.nextNodeIndex) == true) {
+            pilot.takeOff()
+        }
+        val command = if (pilot.isAirborne) fly(currentPath as? NpcPath, flight) else null
+        moveControl?.flight = command
+        if (command != null) {
+            moveControl?.gapJump = null
+            moveControl?.stride = null
+            locomotion.pause()
+            currentPath?.let { sendDebugPath(it, pilot.share) }
+            return
+        }
+        val jump = currentPath?.let(::gapJumpOf)
         moveControl?.gapJump = jump
         moveControl?.stride = null
         if (currentPath == null) {
@@ -102,7 +117,45 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         } else {
             walk(currentPath, moveControl)
         }
-        sendDebugPath(currentPath)
+        sendDebugPath(currentPath, locomotion.share)
+    }
+
+    private fun fly(currentPath: NpcPath?, flight: FlightSettings): FlightCommand? {
+        val held = facing.held()
+        val command = if (currentPath == null) {
+            pilot.idle(flight, flightSpeed(mob, IDLE_FLIGHT_SPEED))
+        } else {
+            pilot.follow(currentPath, flight, flightSpeed(mob, speedModifier), flightEnd(currentPath), stopDistance, held?.yaw)
+        } ?: return null
+        steeringTarget = command.aim
+        lookAt(held?.look ?: command.aim.add(0.0, mob.eyeHeight * LOOK_HEIGHT, 0.0))
+        return command
+    }
+
+    /** [exactTarget] if it lies at the last node of [currentPath]. */
+    private fun flightEnd(currentPath: NpcPath): Vec3? {
+        val target = exactTarget ?: return null
+        val node = currentPath.endNode ?: return null
+        val center = FlightGeometry.nodeCenter(mob, node.x, node.y, node.z)
+        if (abs(target.x - center.x) > EXACT_SPAN || abs(target.z - center.z) > EXACT_SPAN) return null
+        return target.takeIf { abs(it.y - center.y) <= EXACT_RISE }
+    }
+
+    /** @see FlightGeometry.spotFor */
+    fun spotFor(target: Vec3): Vec3? = FlightGeometry.spotFor(level, mob, settings.flight, target)
+
+    /** Extra arrival distance for a glider, which cannot stop on a point. */
+    val arrivalSlack: Double
+        get() = if (pilot.isAirborne && settings.flight.style == FlightStyle.GLIDE) GLIDE_ARRIVAL else 0.0
+
+    override fun canUpdatePath(): Boolean = pilot.isAirborne || super.canUpdatePath()
+
+    override fun getTempMobPos(): Vec3 = if (pilot.isAirborne) mob.position() else super.getTempMobPos()
+
+    /** Vanilla moves an air target down to the ground; a flying NPC keeps it in the air. */
+    override fun createPath(pos: BlockPos, accuracy: Int): Path? {
+        if (!settings.flight.enabled || !level.getBlockState(pos).isAir) return super.createPath(pos, accuracy)
+        return createPath(setOf(pos), FLIGHT_REGION_PADDING, false, accuracy)
     }
 
     /**
@@ -170,7 +223,8 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
                 return PathAhead(points, stopShort = stopDistance)
             }
             if (npcPath?.isJumpTo(index + 1) == true) return PathAhead(points, stopShort = 0.0)
-            if (length > PLANNING_REACH || !canCutCorner(currentPath.getNode(index).type)) break
+            val takesOff = npcPath?.isAloft(index + 1) == true
+            if (takesOff || length > PLANNING_REACH || !canCutCorner(currentPath.getNode(index).type)) break
         }
         return PathAhead(points, stopShort = null)
     }
@@ -248,6 +302,15 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     override fun followThePath() {
         val currentPath = path as? NpcPath
         val index = currentPath?.nextNodeIndex ?: return super.followThePath()
+        if (pilot.isAirborne) {
+            val flight = settings.flight
+            if (pilot.passes(currentPath, index, flight, flightEnd(currentPath))) {
+                if (pilot.isLanding(currentPath, index, flight)) pilot.land()
+                currentPath.advance()
+            }
+            doStuckDetection(tempMobPos)
+            return
+        }
         val takesOff = currentPath.isJumpTo(index + 1)
         val landed = currentPath.isJumpTo(index)
         if (!takesOff && !landed) {
@@ -335,7 +398,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         openedDoors.putIfAbsent(node.asBlockPos(), false)
     }
 
-    private fun sendDebugPath(currentPath: Path) {
+    private fun sendDebugPath(currentPath: Path, share: Double) {
         if (isProduction || level.isClientSide || mob.tickCount % DEBUG_SYNC_INTERVAL != 0) return
         val steeringTarget = steeringTarget ?: return
         val target = currentPath.target
@@ -344,7 +407,11 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
             mob.id,
             List(currentPath.nodeCount) { index ->
                 val node = currentPath.getNode(index)
-                NpcPathDebugNode(node.x, node.y, node.z, node.type.name, node.costMalus, npcPath?.isJumpTo(index) == true)
+                NpcPathDebugNode(
+                    node.x, node.y, node.z, node.type.name, node.costMalus,
+                    jump = npcPath?.isJumpTo(index) == true,
+                    flown = npcPath?.isFlownTo(index) == true,
+                )
             },
             currentPath.nextNodeIndex,
             target.x,
@@ -353,7 +420,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
             currentPath.canReach(),
             NpcPathDebugPoint(steeringTarget.x, steeringTarget.y, steeringTarget.z),
             lookTarget?.let { NpcPathDebugPoint(it.x, it.y, it.z) },
-            locomotion.share.toFloat(),
+            share.toFloat(),
         ).sendTrackingEntity(mob)
     }
 
@@ -408,6 +475,13 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
 
         /** How far from the middle of the last node's block, each way, a point still counts as in it. */
         private const val EXACT_SPAN = 0.75
+        private const val EXACT_RISE = 1.0
+
+        private const val IDLE_FLIGHT_SPEED = 1.0
+        private const val GLIDE_ARRIVAL = 1.5
+
+        /** Same padding vanilla adds to the search region, in blocks. */
+        private const val FLIGHT_REGION_PADDING = 8
 
         /** Blocks per tick below which an NPC that jumped onto a node has stopped on it. */
         private const val SETTLED_SPEED = 0.02

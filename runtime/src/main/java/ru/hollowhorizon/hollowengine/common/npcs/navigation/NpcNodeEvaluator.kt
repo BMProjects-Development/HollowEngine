@@ -23,6 +23,8 @@ class NpcNodeEvaluator(
     internal var avoid: AvoidRules? = null
         private set
 
+    private var flight: FlightLayer? = null
+
     init {
         setCanFloat(true)
         setCanOpenDoors(true)
@@ -36,6 +38,19 @@ class NpcNodeEvaluator(
         super.prepare(level, mob)
         landingRises = landingRisesOf(settings.jumps)
         avoid = AvoidRules(level, settings.avoid, zonesOf(), entityHeight, mob.blockPosition(), mob.isInWater)
+        flight = if (settings.flight.enabled) FlightLayer(level, mob, settings.flight, ::getCachedPathType) else null
+    }
+
+    override fun done() {
+        flight = null
+        super.done()
+    }
+
+    /** An airborne NPC starts its path from an air node. */
+    override fun getStart(): Node? {
+        val layer = flight ?: return super.getStart()
+        val aloft = settings.flight.flies == FlightMode.ALWAYS || mob.isNoGravity && !mob.onGround()
+        return if (aloft) layer.start() ?: super.getStart() else super.getStart()
     }
 
     /** A cell the NPC may not enter by its avoid rules is blocked, whatever is in it. */
@@ -46,7 +61,32 @@ class NpcNodeEvaluator(
         return if (cost == AvoidRules.FORBIDDEN) PathType.BLOCKED else type
     }
 
+    /** Besides walking and flying moves, adds a takeoff from a ground node and a landing from an air node. */
     override fun getNeighbors(outputArray: Array<Node>, node: Node): Int {
+        val layer = flight
+        val walks = settings.flight.flies != FlightMode.ALWAYS
+        if (node is AirNode) {
+            var count = layer?.neighbors(outputArray, 0, node) ?: 0
+            if (walks) landingAt(node)?.let { outputArray[count++] = it }
+            return count
+        }
+        var count = walkNeighbors(outputArray, node)
+        if (layer != null && walks) layer.node(node.x, node.y, node.z)?.takeUnless { it.closed }?.let { outputArray[count++] = it }
+        return count
+    }
+
+    private fun landingAt(node: AirNode): Node? {
+        val type = getCachedPathType(node.x, node.y, node.z)
+        val malus = mob.getPathfindingMalus(type)
+        if (type == PathType.OPEN || type == PathType.WATER || malus < 0.0f) return null
+        val ground = getNode(node.x, node.y, node.z)
+        if (ground.closed) return null
+        ground.type = type
+        ground.costMalus = maxOf(ground.costMalus, malus)
+        return ground
+    }
+
+    private fun walkNeighbors(outputArray: Array<Node>, node: Node): Int {
         var count = 0
         var stepHeight = 0
         val aboveType = getCachedPathType(node.x, node.y + 1, node.z)
@@ -264,9 +304,16 @@ class NpcNodeEvaluator(
         )
     }
 
-    /** What the step from [from] to [to] costs on top of its length: a jump is worth [JumpSettings.jumpCost] blocks of walking. */
-    internal fun additionalTravelCost(from: Node, to: Node): Float =
-        stepCost(from, to) + (avoid?.cost(to.x, to.y, to.z)?.coerceAtLeast(0f) ?: 0f)
+    /** Extra cost of the step from [from] to [to] on top of its length: jumps, takeoffs, flight and avoid rules. */
+    internal fun additionalTravelCost(from: Node, to: Node): Float {
+        val step = when {
+            from is AirNode && to is AirNode -> flight?.stepCost(from, to) ?: 0f
+            to is AirNode -> settings.flight.takeoffCost
+            from is AirNode -> 0f
+            else -> stepCost(from, to)
+        }
+        return step + (avoid?.cost(to.x, to.y, to.z)?.coerceAtLeast(0f) ?: 0f)
+    }
 
     private fun stepCost(from: Node, to: Node): Float {
         if (isGapJump(from, to)) return settings.jumps.jumpCost

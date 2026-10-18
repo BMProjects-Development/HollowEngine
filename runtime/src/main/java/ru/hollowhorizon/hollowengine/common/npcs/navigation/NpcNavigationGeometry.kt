@@ -197,7 +197,7 @@ internal object NpcNavigationGeometry {
         return true
     }
 
-    private fun bodyBox(mob: Mob, position: Vec3): AABB {
+    fun bodyBox(mob: Mob, position: Vec3): AABB {
         val halfWidth = mob.bbWidth * 0.5 - COLLISION_EPSILON
         val height = mob.bbHeight - COLLISION_EPSILON * 2.0
         return AABB(

@@ -90,6 +90,7 @@ class NpcEntity : PathfinderMob {
     override fun addAdditionalSaveData(compound: CompoundTag) {
         super.addAdditionalSaveData(compound)
         compound.put(INVENTORY_KEY, CompoundTag().also { inventory.save(it, registryAccess()) })
+        if (npcNavigation.pilot.isAirborne) compound.putBoolean(FLYING_KEY, true)
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -97,6 +98,7 @@ class NpcEntity : PathfinderMob {
         if (compound.contains(INVENTORY_KEY)) {
             inventory.load(compound.getCompound(INVENTORY_KEY), registryAccess())
         }
+        npcNavigation.pilot.restore(compound.getBoolean(FLYING_KEY))
     }
 
     override fun tickDeath() {
@@ -137,6 +139,7 @@ class NpcEntity : PathfinderMob {
 
     companion object {
         private const val INVENTORY_KEY = "NpcInventory"
+        private const val FLYING_KEY = "NpcFlying"
 
         fun createAttributes(): AttributeSupplier.Builder {
             return createLivingAttributes()

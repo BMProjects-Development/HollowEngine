@@ -54,13 +54,24 @@ class NpcMoveControl(mob: NpcEntity) : MoveControl(mob) {
     /** How to take the step toward the wanted position along a path; the navigation sets it every tick. */
     var stride: Stride? = null
 
+    /** Set by the navigation every tick the NPC flies. */
+    var flight: FlightCommand? = null
+
     private val gapJumps = GapJumpControl(mob)
+    private val flights = FlightControl(mob)
 
     /** The block the NPC steps back from to climb it, while it does, and the last one it stepped back from. */
     private var backingOffFrom: BlockPos? = null
     private var backedOffFrom: BlockPos? = null
 
     override fun tick() {
+        val flight = flight
+        if (flight != null) {
+            flights.tick(flight)
+            operation = Operation.WAIT
+            return
+        }
+        flights.rest()
         val jump = gapJump
         gapJumps.beginTick(jump, operation == Operation.JUMPING)
         if (jump != null && operation == Operation.MOVE_TO) {

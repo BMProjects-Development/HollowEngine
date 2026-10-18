@@ -43,7 +43,8 @@ object NpcPathDebugRenderer {
             nextNodeIndex = packet.nextNodeIndex.coerceIn(0, nodes.lastIndex)
         }
         val jumps = packet.nodes.indices.filter { packet.nodes[it].jump }
-        paths[packet.entityId] = DebugPath(path, jumps, packet.steeringTarget, packet.lookTarget, packet.speedShare, Util.getMillis())
+        val flights = packet.nodes.indices.filter { it > 0 && packet.nodes[it].flown }
+        paths[packet.entityId] = DebugPath(path, jumps, flights, packet.steeringTarget, packet.lookTarget, packet.speedShare, Util.getMillis())
     }
 
     @SubscribeEvent
@@ -76,6 +77,7 @@ object NpcPathDebugRenderer {
                 heading.x, heading.y + MARKER_HEIGHT + SHARE_TEXT_LIFT, heading.z, SHARE_TEXT_COLOR,
             )
             renderJumps(event, bufferSource, debugPath)
+            renderFlights(event, bufferSource, debugPath)
         }
         bufferSource.endBatch()
     }
@@ -117,6 +119,21 @@ object NpcPathDebugRenderer {
         }
     }
 
+    private fun renderFlights(event: RenderLevelStageEvent, bufferSource: MultiBufferSource, debugPath: DebugPath) {
+        if (debugPath.flights.isEmpty()) return
+        val camera = event.camera.position
+        val lines = DebugLines.batch(bufferSource, event.poseStack)
+        for (index in debugPath.flights) {
+            lines.line(middleOf(debugPath.path.getNode(index - 1), camera), middleOf(debugPath.path.getNode(index), camera), FLIGHT_COLOR)
+        }
+    }
+
+    private fun middleOf(node: Node, camera: Vec3): Vec3f = Vec3f(
+        (node.x + 0.5 - camera.x).toFloat(),
+        (node.y + 0.5 - camera.y).toFloat(),
+        (node.z + 0.5 - camera.z).toFloat(),
+    )
+
     private fun arcPoint(from: Node, to: Node, t: Float, camera: Vec3): Vec3f {
         val height = from.y + (to.y - from.y) * t + ARC_HEIGHT * 4f * t * (1f - t)
         return Vec3f(
@@ -129,6 +146,7 @@ object NpcPathDebugRenderer {
     private data class DebugPath(
         val path: Path,
         val jumps: List<Int>,
+        val flights: List<Int>,
         val steeringTarget: NpcPathDebugPoint,
         val lookTarget: NpcPathDebugPoint?,
         val speedShare: Float,
@@ -145,4 +163,5 @@ object NpcPathDebugRenderer {
     private const val ARC_SEGMENTS = 12
     private const val ARC_HEIGHT = 1.25f
     private const val JUMP_COLOR = 0xFFFFAA00.toInt()
+    private const val FLIGHT_COLOR = 0xFF55CCFF.toInt()
 }
