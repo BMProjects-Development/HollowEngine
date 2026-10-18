@@ -11,14 +11,21 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import kotlin.math.*
 
-internal data class CurveView(val pxPerSec: Float, val center: Float, val span: Float, val height: Float) {
+/** How the graph lies: its time scale and where its lanes start ([start], see [TimelineController.viewStart]), and its values. */
+internal data class CurveView(
+    val pxPerSec: Float,
+    val start: Float,
+    val center: Float,
+    val span: Float,
+    val height: Float,
+) {
     val pxPerValue: Float get() = curvePixelsPerValue(span, height)
 
-    fun x(time: Float): Float = TimelineLeftPadding + time * pxPerSec
+    fun x(time: Float): Float = TimelineLeftPadding + (time - start) * pxPerSec
 
     fun y(value: Float): Float = curveValueToY(value, center, span, height)
 
-    fun time(x: Float): Float = (x - TimelineLeftPadding) / pxPerSec
+    fun time(x: Float): Float = start + (x - TimelineLeftPadding) / pxPerSec
 
     fun value(y: Float): Float = curveYToValue(y, center, span, height)
 }
@@ -65,7 +72,7 @@ internal class CurveTransform private constructor(
         pointerY = y
         when (mode) {
             GizmoEditMode.TRANSLATE -> {
-                val dx = if (axis == 1) 0f else slide(x - startX)
+                val dx = if (axis == 1) 0f else x - startX
                 val dy = if (axis == 0) 0f else y - startY
                 // Keys carry their handles along as they are; a handle picked alone moves with the pointer.
                 place(
@@ -105,24 +112,6 @@ internal class CurveTransform private constructor(
         }
     }
 
-    /** How far the pointer went past where the keys stop at the ends of the work area, dropped from its travel. */
-    private var overshootX = 0f
-
-    /**
-     * The pointer's [travel] along the time the keys follow: held where the first or last key meets an end of the
-     * work area, so turning back moves them at once instead of first winding back the overshoot.
-     */
-    private fun slide(travel: Float): Float {
-        if (keys.isEmpty()) return travel
-        val least = view.x(0f) - keys.minOf { it.x }
-        val most = view.x(controller.workAreaEnd) - keys.maxOf { it.x }
-        val slide = travel - overshootX
-        if (most < least) return slide
-        val held = slide.coerceIn(least, most)
-        overshootX += slide - held
-        return held
-    }
-
     fun key(key: Int, modifiers: Int): GizmoKeyResult = when {
         HollowKeys.AXIS_X.matches(key, modifiers) -> constrain(0)
         HollowKeys.AXIS_Y.matches(key, modifiers) -> constrain(1)
@@ -153,8 +142,7 @@ internal class CurveTransform private constructor(
     ) {
         val targets = keys.map { start ->
             val (x, y) = point(start.x, start.y)
-            val time =
-                view.time(x).let { if (snapTime) snapTimelineTime(it) else it }.coerceIn(0f, controller.workAreaEnd)
+            val time = view.time(x).let { if (snapTime) snapTimelineTime(it) else it }
             start to (time to controller.boundsOf(start.curve).clamp(view.value(y)))
         }
         if (!collides(targets)) {

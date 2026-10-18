@@ -177,20 +177,28 @@ internal fun visibleKeys(row: TimelineRow, from: Float, to: Float): List<Keyfram
     return curve.keyframes.filter { it.time in from..to }
 }
 
-/** How wide the lanes are: past the work area and the last key, and as far as [reach], the pixels the view needs. */
-internal fun timelineContentWidth(
-    workAreaEnd: Float,
-    maxKeyTime: Float,
-    pixelsPerSecond: Float,
-    reach: Float,
-): Float {
-    val endWidth = (workAreaEnd + 5f) * pixelsPerSecond + TimelineLeftPadding
-    val keyWidth = (maxKeyTime + 5f) * pixelsPerSecond + TimelineLeftPadding
-    return maxOf(TimelineMinContentWidth, endWidth, keyWidth, reach)
-}
+/** Where [time] is across the lanes' content, at [pxPerSec] pixels a second, measured from [TimelineController.viewStart]. */
+internal fun TimelineController.timeX(time: Float, pxPerSec: Float = pixelsPerSecond): Float =
+    TimelineLeftPadding + (time - viewStart) * pxPerSec
 
-internal fun timelineTimeAt(localX: Float, pixelsPerSecond: Float, workAreaEnd: Float): Float =
-    snapTimelineTime((localX - TimelineLeftPadding) / pixelsPerSecond).coerceIn(0f, workAreaEnd)
+/** The time at [x] across the lanes' content: [timeX] the other way. */
+internal fun TimelineController.timeAtX(x: Float, pxPerSec: Float = pixelsPerSecond): Float =
+    viewStart + (x - TimelineLeftPadding) / pxPerSec
+
+/** How wide the lanes are: past the work area and the last key, and as far as [reach], the pixels the view needs. */
+internal fun TimelineController.timelineContentWidth(reach: Float): Float = maxOf(
+    TimelineMinContentWidth,
+    timeX(workAreaEnd + ContentTail),
+    timeX(timelineMaxKeyTime(this) + ContentTail),
+    reach,
+)
+
+/** Seconds the lanes go on past the work area and the last key, before the view itself asks for more. */
+private const val ContentTail = 5f
+
+/** The time at [localX] across the lanes where the playhead can go: snapped, and inside the work area. */
+internal fun TimelineController.timelineTimeAt(localX: Float, pxPerSec: Float): Float =
+    snapTimelineTime(timeAtX(localX, pxPerSec)).coerceIn(0f, workAreaEnd)
 
 internal fun snapTimelineTime(time: Float): Float = TimelineSnap.snap(time)
 
@@ -198,10 +206,14 @@ internal fun timelineTimeDelta(deltaX: Float, pixelsPerSecond: Float): Float {
     return deltaX / pixelsPerSecond.coerceAtLeast(1f)
 }
 
-internal fun visibleTimeRange(scrollX: Float, viewportWidth: Float, pixelsPerSecond: Float): ClosedFloatingPointRange<Float> {
+internal fun TimelineController.visibleTimeRange(
+    scrollX: Float,
+    viewportWidth: Float,
+    pixelsPerSecond: Float,
+): ClosedFloatingPointRange<Float> {
     if (viewportWidth <= 0f) return -Float.MAX_VALUE..Float.MAX_VALUE
-    val start = (scrollX - TimelineCullMargin - TimelineLeftPadding) / pixelsPerSecond
-    val end = (scrollX + viewportWidth + TimelineCullMargin - TimelineLeftPadding) / pixelsPerSecond
+    val start = timeAtX(scrollX - TimelineCullMargin, pixelsPerSecond)
+    val end = timeAtX(scrollX + viewportWidth + TimelineCullMargin, pixelsPerSecond)
     return start..max(start, end)
 }
 

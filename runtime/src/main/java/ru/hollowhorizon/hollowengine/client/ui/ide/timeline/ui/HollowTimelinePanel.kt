@@ -115,12 +115,7 @@ fun HollowTimelineEditor(
     val pxPerSec = controller.pixelsPerSecond
     var laneViewport by remember { mutableStateOf(UiRect.Zero) }
     // A screen more than the view has reached, so the time goes on to the right however far it is scrolled or zoomed.
-    val contentWidth = timelineContentWidth(
-        controller.workAreaEnd,
-        timelineMaxKeyTime(controller),
-        pxPerSec,
-        reach = scroll.offsetX + laneViewport.width * 2f,
-    )
+    val contentWidth = controller.timelineContentWidth(reach = scroll.offsetX + laneViewport.width * 2f)
 
     var isScrubbing by remember { mutableStateOf(false) }
     val scrollContentHeight = rowsHeight + if (laneViewport.height > 0f && rowsHeight > laneViewport.height) {
@@ -128,14 +123,14 @@ fun HollowTimelineEditor(
     } else {
         0f
     }
-    val visibleTimes = visibleTimeRange(scroll.offsetX, laneViewport.width, pxPerSec)
+    val visibleTimes = controller.visibleTimeRange(scroll.offsetX, laneViewport.width, pxPerSec)
 
     // Keep the moving focus (playhead while playing, or a dragged keyframe) in view by panning.
     val focusContentX = when {
         controller.dragFocusKeyframe != null ->
-            TimelineLeftPadding + controller.dragFocusKeyframe!!.time * pxPerSec
+            controller.timeX(controller.dragFocusKeyframe!!.time, pxPerSec)
 
-        controller.isPlaying || isScrubbing -> TimelineLeftPadding + controller.currentTime * pxPerSec
+        controller.isPlaying || isScrubbing -> controller.timeX(controller.currentTime, pxPerSec)
         else -> null
     }
     if (focusContentX != null) autoPanToContentX(scroll, laneViewport, focusContentX)
@@ -145,6 +140,7 @@ fun HollowTimelineEditor(
             withFrameNanos { now ->
                 zoomGlide.advance(now, controller, scroll)
                 playheadHold.advance(controller, now)
+                extendLeft(controller, scroll, laneViewport.width, curveTransforms)
             }
         }
     }
@@ -155,13 +151,14 @@ fun HollowTimelineEditor(
         val usable = laneViewport.width - TimelineLeftPadding - TimelineFrameMargin
         controller.pixelsPerSecond = (usable / controller.workAreaEnd.coerceAtLeast(0.1f))
             .coerceIn(TimelineMinZoom, TimelineMaxZoom)
-        scroll.scrollTo(x = 0f)
+        // Zero at the left of the view, however far back the lanes go.
+        scroll.scrollTo(x = controller.timeX(0f) - TimelineLeftPadding)
         bump()
     }
 
     LaunchedEffect(controller.centerPlayheadRequests) {
         if (controller.centerPlayheadRequests == 0 || laneViewport.width <= 0f) return@LaunchedEffect
-        val playheadX = TimelineLeftPadding + controller.currentTime * controller.pixelsPerSecond
+        val playheadX = controller.timeX(controller.currentTime, controller.pixelsPerSecond)
         val target = (playheadX - laneViewport.width / 2f).coerceAtLeast(0f)
         scroll.animateScrollBy(deltaX = target - scroll.offsetX)
         bump()
@@ -259,6 +256,12 @@ fun HollowTimelineEditor(
     }
 }
 
+private fun extendLeft(controller: TimelineController, scroll: UiScrollHandle, width: Float, transforms: CurveTransformHost) {
+    if (width <= 0f || transforms.active != null || scroll.offsetX >= width * 0.5f) return
+    controller.viewStart -= width / controller.pixelsPerSecond
+    scroll.shiftContent(deltaX = width)
+}
+
 /** Drag to give the track list more or less room. */
 @Composable
 private fun HeaderSplitter(controller: TimelineController, refresh: () -> Unit) {
@@ -353,13 +356,13 @@ private fun TimeRuler(
                 onScrubbingChange(true)
                 controller.clearSelection()
                 controller.applyCurrentTime(
-                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd), pxPerSec)
+                    controller.snapPlayhead(controller.timelineTimeAt(event.localX, pxPerSec), pxPerSec)
                 )
                 refresh()
             }
             .onDrag { event ->
                 controller.applyCurrentTime(
-                    controller.snapPlayhead(timelineTimeAt(event.localX, pxPerSec, controller.workAreaEnd), pxPerSec)
+                    controller.snapPlayhead(controller.timelineTimeAt(event.localX, pxPerSec), pxPerSec)
                 )
                 event.consume()
                 refresh()
@@ -368,12 +371,13 @@ private fun TimeRuler(
     ) {
         val majorStep = rulerMajorStep(pxPerSec)
         val minorPerMajor = 5
-        val first = floor(visibleTimes.start.coerceAtLeast(0f) / majorStep).toInt()
-        val end = visibleTimes.endInclusive.coerceIn(0f, (contentWidth - TimelineLeftPadding) / pxPerSec)
+        val start = visibleTimes.start.coerceAtLeast(controller.timeAtX(0f, pxPerSec))
+        val end = visibleTimes.endInclusive.coerceIn(start, controller.timeAtX(contentWidth, pxPerSec))
+        val first = floor(start / majorStep).toInt()
         val last = ceil(end / majorStep).toInt()
         for (mark in first..last) {
             val second = mark * majorStep
-            val x = TimelineLeftPadding + second * pxPerSec
+            val x = controller.timeX(second, pxPerSec)
             Box(
                 modifier = Modifier.position(x.px, (TimelineRulerHeight - 6f).px)
                     .size(1.px, 6.px)
@@ -387,7 +391,7 @@ private fun TimeRuler(
             if (pxPerSec > 60f) {
                 val minorStep = majorStep / minorPerMajor
                 for (i in 1 until minorPerMajor) {
-                    val mx = TimelineLeftPadding + (second + i * minorStep) * pxPerSec
+                    val mx = controller.timeX(second + i * minorStep, pxPerSec)
                     Box(
                         modifier = Modifier.position(mx.px, (TimelineRulerHeight - 3f).px)
                             .size(1.px, 3.px)
@@ -398,7 +402,7 @@ private fun TimeRuler(
         }
         WorkAreaHandle(controller, pxPerSec, refresh)
         // Playhead head riding on the ruler: a thin line topped by a glowing marker.
-        val px = TimelineLeftPadding + controller.currentTime * pxPerSec
+        val px = controller.timeX(controller.currentTime, pxPerSec)
         Box(
             modifier = Modifier.position((px - 0.5f).px, 0.px)
                 .size(1.px, TimelineRulerHeight.px)
@@ -424,7 +428,7 @@ private fun rulerMajorStep(pxPerSec: Float): Float = when {
 
 @Composable
 private fun WorkAreaHandle(controller: TimelineController, pxPerSec: Float, refresh: () -> Unit) {
-    val x = TimelineLeftPadding + controller.workAreaEnd * pxPerSec
+    val x = controller.timeX(controller.workAreaEnd, pxPerSec)
     val color = if (controller.isWorkAreaSelected) UiColor.White else TimelineColors.Accent
     // work-area end captured at grab, so total-offset dragging stays in sync past the min bound.
     var dragStartEnd by remember { mutableStateOf(0f) }
@@ -442,13 +446,8 @@ private fun WorkAreaHandle(controller: TimelineController, pxPerSec: Float, refr
                 refresh()
             }
             .onDrag { event ->
-                val maxKeyTime = timelineMaxKeyTime(controller)
-                val raw = (dragStartEnd + timelineTimeDelta(event.dragTotalX, pxPerSec))
-                    .coerceAtLeast(maxKeyTime)
-                    .coerceAtLeast(0.1f)
-                val next = snapTimelineTime(raw)
-                    .coerceAtLeast(maxKeyTime)
-                    .coerceAtLeast(0.1f)
+                val raw = (dragStartEnd + timelineTimeDelta(event.dragTotalX, pxPerSec)).coerceAtLeast(0.1f)
+                val next = snapTimelineTime(raw).coerceAtLeast(0.1f)
                 controller.workAreaEnd = if (event.modifiers == 0) round(next * 100f) / 100f else next
                 if (controller.currentTime > controller.workAreaEnd) controller.applyCurrentTime(0f)
                 controller.isWorkAreaSelected = true
@@ -464,7 +463,7 @@ private fun WorkAreaHandle(controller: TimelineController, pxPerSec: Float, refr
 
 @Composable
 internal fun Playhead(controller: TimelineController, pxPerSec: Float, rowsHeight: Float) {
-    val x = TimelineLeftPadding + controller.currentTime * pxPerSec
+    val x = controller.timeX(controller.currentTime, pxPerSec)
     Box(
         id = "timeline-playhead",
         modifier = Modifier.position((x - 0.5f).px, 0.px)

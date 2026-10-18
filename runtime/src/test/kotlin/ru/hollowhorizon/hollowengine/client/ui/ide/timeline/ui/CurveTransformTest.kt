@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class CurveTransformTest {
     /** A hundred pixels a second and a hundred a unit of value, the value 0 in the middle of a 200 px graph. */
-    private val view = CurveView(pxPerSec = 100f, center = 0f, span = 2f, height = 200f)
+    private val view = CurveView(pxPerSec = 100f, start = 0f, center = 0f, span = 2f, height = 200f)
 
     private fun curve(controller: TimelineController, vararg keys: Keyframe): ChannelCurve {
         controller.workAreaEnd = 10f
@@ -69,6 +69,25 @@ class CurveTransformTest {
         transform.key(GLFW.GLFW_KEY_ESCAPE, 0)
         assertEquals(1f, key.time, 1e-4f)
         assertEquals(0.5f, key.value, 1e-4f)
+    }
+
+    @Test
+    fun `a move takes keys before zero and past the work area, in lanes that start before zero`() {
+        val controller = TimelineController()
+        val key = Keyframe(1f, 0f)
+        curve(controller, key)
+        controller.select(listOf(key), additive = false)
+        val earlier = view.copy(start = -5f)
+
+        val back = assertNotNull(CurveTransform.start(controller, GizmoEditMode.TRANSLATE, earlier, earlier.x(1f), 0f))
+        back.update(earlier.x(-3f), 0f)
+        back.key(GLFW.GLFW_KEY_ENTER, 0)
+        assertEquals(-3f, key.time, 1e-4f)
+
+        val on = assertNotNull(CurveTransform.start(controller, GizmoEditMode.TRANSLATE, earlier, earlier.x(-3f), 0f))
+        on.update(earlier.x(12f), 0f)
+        on.key(GLFW.GLFW_KEY_ENTER, 0)
+        assertEquals(12f, key.time, 1e-4f)
     }
 
     @Test

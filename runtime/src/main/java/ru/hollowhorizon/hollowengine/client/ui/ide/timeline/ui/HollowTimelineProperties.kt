@@ -130,7 +130,7 @@ private fun KeyframeSection(
     val title = if (count == 1) CutsceneLang.KEYFRAME.lang else CutsceneLang.KEYFRAMES.lang(count)
     Section(title) {
         Readonly(CutsceneLang.CHANNEL.lang, channelPath(controller, curve))
-        NumberRow(CutsceneLang.TIME.lang, keyframe.time, min = 0f, max = controller.workAreaEnd) { time ->
+        NumberRow(CutsceneLang.TIME.lang, keyframe.time) { time ->
             controller.nudgeSelectedKeyframes(snapTimelineTime(time) - keyframe.time)
             refresh()
         }

@@ -48,6 +48,12 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     val playbackSpeed = mutableStateOf(1f)
 
     var pixelsPerSecond by mutableStateOf(100f)
+
+    /**
+     * The earliest time the lanes reach, never after zero: the window moves it back as the view nears it, so the time
+     * goes on to the left without end. Where everything stands across the lanes is measured from it.
+     */
+    var viewStart by mutableStateOf(0f)
     var viewMode by mutableStateOf(TimelineViewMode.DOPE_SHEET)
     var headerWidth by mutableStateOf(240f)
     val curveAxis = TimelineCurveAxis(DEFAULT_CURVE_SPAN)
@@ -388,16 +394,15 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     }
 
     fun setKey(curve: ChannelCurve, time: Float, value: Float, selectKey: Boolean = true): Keyframe {
-        val clamped = time.coerceIn(0f, workAreaEnd)
         val bounded = curve.spec.normalize(boundsOf(curve).clamp(value))
-        val existing = curve.keyAt(clamped)
+        val existing = curve.keyAt(time)
         val key = if (existing != null) {
             existing.value = bounded
             existing
         } else {
-            val previous = curve.keyframes.filter { it.time <= clamped }.maxByOrNull { it.time }
+            val previous = curve.keyframes.filter { it.time <= time }.maxByOrNull { it.time }
             Keyframe(
-                time = clamped,
+                time = time,
                 value = bounded,
                 interpolation = if (curve.spec.supportsCurveEditor) {
                     previous?.interpolation ?: KeyInterpolation.BEZIER
@@ -502,7 +507,7 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
                 if (live.none { it === clip.curve }) return@forEach
                 val owner = propertyOf(clip.curve)
                 if (owner != null && isLocked(owner)) return@forEach
-                val target = (time + clip.offset).coerceIn(0f, workAreaEnd)
+                val target = time + clip.offset
                 clip.curve.keyframes.removeAll { abs(it.time - target) <= KEYFRAME_TIME_EPSILON }
                 val key = clip.state.toKeyframe().also {
                     it.time = target
@@ -633,12 +638,8 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 
     private fun moveKeyframesFromStarts(starts: Map<Keyframe, Float>, deltaSeconds: Float): Boolean {
         if (starts.isEmpty()) return false
-        val clampedDelta = deltaSeconds.coerceIn(
-            minimumValue = -starts.values.min(),
-            maximumValue = workAreaEnd - starts.values.max(),
-        )
         val dragged = starts.keys
-        val targets = starts.mapValues { (_, startTime) -> startTime + clampedDelta }
+        val targets = starts.mapValues { (_, startTime) -> startTime + deltaSeconds }
         val blocked = targets.any { (keyframe, target) ->
             curveOf(keyframe)?.keyframes?.any { other ->
                 dragged.none { it === other } && abs(other.time - target) <= KEYFRAME_TIME_EPSILON
@@ -848,10 +849,8 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
     }
 
     private fun findFreeTime(curve: ChannelCurve, requestedTime: Float): Float {
-        var time = requestedTime.coerceIn(0f, workAreaEnd)
-        while (curve.keyAt(time) != null && time < workAreaEnd) {
-            time = (time + KEYFRAME_TIME_EPSILON * 2f).coerceAtMost(workAreaEnd)
-        }
+        var time = requestedTime
+        while (curve.keyAt(time) != null) time += KEYFRAME_TIME_EPSILON * 2f
         return time
     }
 }

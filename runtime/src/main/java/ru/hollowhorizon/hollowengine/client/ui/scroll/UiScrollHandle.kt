@@ -78,6 +78,20 @@ class UiScrollHandle {
         if (applyOffset(next)) jumped = true
     }
 
+    /**
+     * The content moved ([deltaX], [deltaY]) under the view, as content that grows at its start does: the offset, where an
+     * animation runs from and to and what was asked for follow it, so nothing on screen moves.
+     */
+    fun shiftContent(deltaX: Float = 0f, deltaY: Float = 0f) {
+        target = UiScrollOffset(target.x + deltaX, target.y + deltaY)
+        animationStart = UiScrollOffset(animationStart.x + deltaX, animationStart.y + deltaY)
+        pendingX = pendingX?.plus(deltaX)
+        pendingY = pendingY?.plus(deltaY)
+        requestedX = requestedX?.plus(deltaX)
+        requestedY = requestedY?.plus(deltaY)
+        if (applyOffset(UiScrollOffset(offsetX + deltaX, offsetY + deltaY))) jumped = true
+    }
+
     fun scrollBy(deltaX: Float = 0f, deltaY: Float = 0f) {
         scrollTo(
             x = (pendingX ?: offsetX) + deltaX,

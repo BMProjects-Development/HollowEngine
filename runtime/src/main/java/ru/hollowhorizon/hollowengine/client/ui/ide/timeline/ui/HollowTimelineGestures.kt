@@ -32,7 +32,7 @@ internal class TimelineZoomDrag {
         active = HollowKeys.DRAG_ZOOM.matchesMouse(event.button, event.modifiers)
         if (!active) return false
         zoom = controller.pixelsPerSecond
-        time = (localX - TimelineLeftPadding) / zoom
+        time = controller.timeAtX(localX, zoom)
         anchor = localX - scroll.offsetX
         span = controller.curveAxis.targetSpan
         return true
@@ -43,7 +43,7 @@ internal class TimelineZoomDrag {
         if (!active) return false
         val next = (zoom * exp(event.dragTotalX * DragZoomRate)).coerceIn(TimelineMinZoom, TimelineMaxZoom)
         controller.pixelsPerSecond = next
-        scroll.scrollTo(x = (time * next + TimelineLeftPadding - anchor).coerceAtLeast(0f))
+        scroll.scrollTo(x = (controller.timeX(time, next) - anchor).coerceAtLeast(0f))
         if (values) {
             val axis = controller.curveAxis
             val scaled = (span * exp(event.dragTotalY * DragZoomRate)).coerceIn(TimelineMinValueSpan, TimelineMaxValueSpan)
@@ -58,7 +58,8 @@ internal class TimelineZoomDrag {
 }
 
 internal class TimelinePanGesture {
-    var scrollX = 0f
+    /** The time at the left of the view when the press came: the lanes may grow to the left while it drags. */
+    private var leftTime = 0f
     var scrollY = 0f
     var center = 0f
     var moved = false
@@ -74,9 +75,9 @@ internal class TimelinePanGesture {
     var pressLocalX = 0f
         private set
 
-    fun begin(event: UiEvent, scrollX: Float, scrollY: Float, center: Float) {
-        this.scrollX = scrollX
-        this.scrollY = scrollY
+    fun begin(event: UiEvent, controller: TimelineController, scroll: UiScrollHandle, center: Float) {
+        leftTime = controller.timeAtX(scroll.offsetX)
+        scrollY = scroll.offsetY
         this.center = center
         pressX = event.x
         pressY = event.y
@@ -89,6 +90,10 @@ internal class TimelinePanGesture {
         if (abs(event.dragTotalX) > MinDragUnit || abs(event.dragTotalY) > MinDragUnit) moved = true
         return moved
     }
+
+    /** Where the view goes across the lanes for [event], dragged from where the press was. */
+    fun scrollX(controller: TimelineController, event: UiEvent): Float =
+        (controller.timeX(leftTime) - event.dragTotalX).coerceAtLeast(0f)
 
     /** Ends the gesture on a release; true when it was a click here, which opens the menu. */
     fun release(): Boolean {

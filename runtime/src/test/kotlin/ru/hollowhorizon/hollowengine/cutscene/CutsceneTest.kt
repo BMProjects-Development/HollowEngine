@@ -20,7 +20,7 @@ class CutsceneTest {
     }
 
     @Test
-    fun `group drag preserves spacing when clamped to the work area`() {
+    fun `group drag keeps its spacing past the ends of the work area`() {
         val controller = TimelineController().apply { workAreaEnd = 10f }
         val curve = floatCurve(controller)
         val first = Keyframe(2f, 0f)
@@ -32,8 +32,15 @@ class CutsceneTest {
         controller.applyKeyframeDrag(-10f)
         controller.endKeyframeDrag()
 
-        assertEquals(0f, first.time, 0.001f)
-        assertEquals(3f, second.time, 0.001f)
+        assertEquals(-8f, first.time, 0.001f)
+        assertEquals(-5f, second.time, 0.001f)
+
+        controller.beginKeyframeDrag(second)
+        controller.applyKeyframeDrag(20f)
+        controller.endKeyframeDrag()
+
+        assertEquals(12f, first.time, 0.001f)
+        assertEquals(15f, second.time, 0.001f)
     }
 
     @Test

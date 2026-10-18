@@ -35,7 +35,7 @@ internal fun TimelineLanes(
         override fun onPress(event: UiEvent, row: TimelineRow) {
             if (event.isRightClick() || event.isMiddleClick()) {
                 marquee = null
-                pan.begin(event, scroll.offsetX, scroll.offsetY, 0f)
+                pan.begin(event, controller, scroll, 0f)
                 event.consume()
                 return
             }
@@ -51,7 +51,7 @@ internal fun TimelineLanes(
             if (event.isRightClick() || event.isMiddleClick()) {
                 if (!pan.advance(event)) return
                 scroll.scrollTo(
-                    x = (pan.scrollX - event.dragTotalX).coerceAtLeast(0f),
+                    x = pan.scrollX(controller, event),
                     y = (pan.scrollY - event.dragTotalY).coerceAtLeast(0f),
                 )
                 event.consume()
@@ -67,7 +67,7 @@ internal fun TimelineLanes(
         override fun onRelease(event: UiEvent, row: TimelineRow) {
             if (event.isRightClick()) {
                 if (pan.release()) {
-                    val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
+                    val time = controller.timelineTimeAt(pan.pressLocalX, pxPerSec)
                     menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
                 }
                 refresh()
@@ -75,7 +75,7 @@ internal fun TimelineLanes(
             }
             val band = marquee ?: return
             marquee = null
-            if (band.isDrag) controller.select(keysInMarquee(rows, pxPerSec, band), additive = band.additive)
+            if (band.isDrag) controller.select(keysInMarquee(controller, rows, pxPerSec, band), additive = band.additive)
             refresh()
         }
     }
@@ -96,7 +96,7 @@ internal fun TimelineLanes(
                     refresh,
                     onSegmentMenu = { event, segment ->
                         // Where on the segment it was clicked, which is where "split here" splits it.
-                        val time = timelineTimeAt(event.contentX(), pxPerSec, controller.workAreaEnd)
+                        val time = controller.timelineTimeAt(event.contentX(), pxPerSec)
                         menu = TimelineMenuState(event.x, event.y, null, time, row.locked, row.lane, segment)
                     },
                 ) { event, curve, time ->
@@ -126,13 +126,14 @@ private fun UiEvent.contentY(row: TimelineRow): Float =
     localYInAncestor(LaneContentId) ?: (row.y - TimelineRulerHeight + localY)
 
 private fun keysInMarquee(
+    controller: TimelineController,
     rows: List<TimelineRow>,
     pxPerSec: Float,
     marquee: TimelineMarquee,
 ): List<Keyframe> = rows.filter { it.kind != TimelineRowKind.SEGMENTS && !it.locked }.flatMap { row ->
         val curve = row.curve ?: return@flatMap emptyList()
         val y = row.y - TimelineRulerHeight + row.height * 0.5f
-        curve.keyframes.filter { key -> marquee.contains(TimelineLeftPadding + key.time * pxPerSec, y) }
+        curve.keyframes.filter { key -> marquee.contains(controller.timeX(key.time, pxPerSec), y) }
     }
 
 internal class TimelineMenuState(
@@ -159,7 +160,7 @@ internal fun Modifier.panOnDrag(controller: TimelineController, scroll: UiScroll
         }
         panning[0] = HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
         if (!panning[0]) return@onPress
-        start[0] = scroll.offsetX
+        start[0] = controller.timeAtX(scroll.offsetX)
         start[1] = scroll.offsetY
         event.consume()
     }.onDrag { event ->
@@ -170,7 +171,7 @@ internal fun Modifier.panOnDrag(controller: TimelineController, scroll: UiScroll
         }
         if (!panning[0]) return@onDrag
         scroll.scrollTo(
-            x = (start[0] - event.dragTotalX).coerceAtLeast(0f),
+            x = (controller.timeX(start[0]) - event.dragTotalX).coerceAtLeast(0f),
             y = (start[1] - event.dragTotalY).coerceAtLeast(0f),
         )
         event.consume()
@@ -220,7 +221,7 @@ private fun TimelineLane(
         val curve = row.curve ?: return@Box
 
         val keys = visibleKeys(row, visibleTimes.start, visibleTimes.endInclusive)
-        KeyConnections(row, pxPerSec, keys)
+        KeyConnections(controller, row, pxPerSec, keys)
         keys.forEachIndexed { index, keyframe ->
             val halfSize = TimelineKeyframeSize * 0.5f
             val leftHalfWidth = keys.getOrNull(index - 1)?.let { previous ->
@@ -255,7 +256,7 @@ private fun TimelineKeyframe(
     val selected = controller.isSelected(keyframe)
     val color = keyframeColor(row.color?.toUiColor() ?: TimelineColors.Blue, selected, row.visible)
     val halfSize = TimelineKeyframeSize * 0.5f
-    val x = TimelineLeftPadding + keyframe.time * pxPerSec - leftHalfWidth
+    val x = controller.timeX(keyframe.time, pxPerSec) - leftHalfWidth
     val y = row.height * 0.5f - halfSize
     val press = remember { KeyPressGesture() }
     Box(
@@ -354,13 +355,13 @@ internal fun keyframeColor(base: UiColor, selected: Boolean, visible: Boolean): 
 }
 
 @Composable
-private fun KeyConnections(row: TimelineRow, pxPerSec: Float, keys: List<Keyframe>) {
+private fun KeyConnections(controller: TimelineController, row: TimelineRow, pxPerSec: Float, keys: List<Keyframe>) {
     val alpha = if (row.visible) 1f else 0.25f
     val color = row.color?.toUiColor() ?: TimelineColors.Blue
     for (index in 0 until keys.lastIndex) {
         val first = keys[index]
         val second = keys[index + 1]
-        val x = TimelineLeftPadding + first.time * pxPerSec
+        val x = controller.timeX(first.time, pxPerSec)
         val width = (second.time - first.time) * pxPerSec
         if (width <= 1f) continue
         val hold = first.interpolation == KeyInterpolation.CONSTANT
@@ -379,10 +380,10 @@ private fun KeyConnections(row: TimelineRow, pxPerSec: Float, keys: List<Keyfram
 internal fun WorkAreaShade(controller: TimelineController, pxPerSec: Float, contentWidth: Float, height: Float) {
     val shadeHeight = height.coerceAtLeast(1f).px
     Box(
-        modifier = Modifier.position(0.px, 0.px).size(TimelineLeftPadding.px, shadeHeight)
+        modifier = Modifier.position(0.px, 0.px).size(controller.timeX(0f, pxPerSec).px, shadeHeight)
             .background(OutsideWorkArea).inputTransparent(),
     )
-    val x = TimelineLeftPadding + controller.workAreaEnd * pxPerSec
+    val x = controller.timeX(controller.workAreaEnd, pxPerSec)
     if (x >= contentWidth) return
     Box(
         modifier = Modifier.position(x.px, 0.px).size((contentWidth - x).px, shadeHeight)

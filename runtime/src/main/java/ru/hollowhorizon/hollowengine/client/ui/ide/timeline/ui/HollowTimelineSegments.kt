@@ -91,7 +91,7 @@ private fun Block(
 ) {
     val drag = remember { SegmentDrag() }
     val selected = controller.selectedSegment === segment
-    val x = TimelineLeftPadding + segment.start * pxPerSec
+    val x = controller.timeX(segment.start, pxPerSec)
     val width = (segment.length * pxPerSec).coerceAtLeast(2f)
     val height = TimelineSegmentRowHeight - 4f
     val color = segment.color.toUiColor(if (row.visible) 1f else 0.4f)
@@ -284,7 +284,7 @@ private fun Marker(
 ) {
     val drag = remember { SegmentDrag() }
     val selected = controller.selectedSegment === segment
-    val x = TimelineLeftPadding + segment.start * pxPerSec - MarkerWidth / 2f
+    val x = controller.timeX(segment.start, pxPerSec) - MarkerWidth / 2f
     val color = segment.color.toUiColor(if (row.visible) 1f else 0.4f)
 
     Row(

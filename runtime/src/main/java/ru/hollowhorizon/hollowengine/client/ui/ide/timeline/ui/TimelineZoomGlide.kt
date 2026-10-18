@@ -20,7 +20,7 @@ internal class TimelineZoomGlide {
     fun zoomBy(controller: TimelineController, scroll: UiScrollHandle, width: Float, notches: Float) {
         if (target <= 0f) {
             anchor = width * 0.5f
-            time = (anchor + scroll.offsetX - TimelineLeftPadding) / controller.pixelsPerSecond
+            time = controller.timeAtX(anchor + scroll.offsetX)
         }
         val from = if (target > 0f) target else controller.pixelsPerSecond
         target = (from * WheelZoomFactor.pow(-notches)).coerceIn(TimelineMinZoom, TimelineMaxZoom)
@@ -37,7 +37,7 @@ internal class TimelineZoomGlide {
             if (abs(ln(target / zoom)) < SettledRatio) target else zoom * (target / zoom).pow(min(1f, step * GlideRate))
         if (next == target) target = 0f
         controller.pixelsPerSecond = next
-        scroll.jumpTo(x = time * next + TimelineLeftPadding - anchor)
+        scroll.jumpTo(x = controller.timeX(time, next) - anchor)
         return true
     }
 

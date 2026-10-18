@@ -54,18 +54,18 @@ internal fun TimelineCurveGraph(
     val center = controller.curveValueCenter
     val span = controller.curveValueSpan
     val pxPerValue = curvePixelsPerValue(span, height)
-    transforms.view = CurveView(pxPerSec, center, span, height)
+    transforms.view = CurveView(pxPerSec, controller.viewStart, center, span, height)
     transforms.viewport = scroll.viewport
     TrackPointer(transforms)
     CurvePointerWrap(transforms, scroll)
-    val fromX = max(0f, TimelineLeftPadding + visibleTimes.start * pxPerSec)
-    val toX = min(contentWidth, TimelineLeftPadding + visibleTimes.endInclusive * pxPerSec)
+    val fromX = max(0f, controller.timeX(visibleTimes.start, pxPerSec))
+    val toX = min(contentWidth, controller.timeX(visibleTimes.endInclusive, pxPerSec))
 
     val grid = remember(revision, center, span, height, fromX, toX) {
         buildCurveGrid(center, span, height, fromX, toX)
     }
     val curves = remember(revision, center, span, height, fromX, toX, pxPerSec, lanes) {
-        lanes.map { lane -> lane.color to buildCurveShape(lane, pxPerSec, fromX, toX, center, span, height) }
+        lanes.map { lane -> lane.color to buildCurveShape(controller, lane, pxPerSec, fromX, toX, center, span, height) }
     }
     val guides = remember(
         revision, center, span, height, pxPerSec, lanes, controller.selectedKeyframes.toList(), controller.selectedHandles.toList(),
@@ -102,7 +102,7 @@ internal fun TimelineCurveGraph(
             }.onRelease { event ->
                 if (event.isRightClick()) {
                     if (pan.release()) {
-                        val time = timelineTimeAt(pan.pressLocalX, pxPerSec, controller.workAreaEnd)
+                        val time = controller.timelineTimeAt(pan.pressLocalX, pxPerSec)
                         menu = TimelineMenuState(pan.pressX, pan.pressY, null, time, locked = false)
                     }
                     refresh()
@@ -112,7 +112,7 @@ internal fun TimelineCurveGraph(
                 marquee = null
                 if (band.isDrag) {
                     controller.select(
-                        keysInCurveMarquee(lanes, pxPerSec, center, span, height, band),
+                        keysInCurveMarquee(controller, lanes, pxPerSec, center, span, height, band),
                         additive = band.additive,
                     )
                     controller.selectHandles(handlesInCurveMarquee(controller, lanes, pxPerSec, center, span, height, band))
@@ -195,7 +195,7 @@ private fun CurveKeyPoint(
 ) {
     controller.keysRevision
     val selected = controller.isSelected(keyframe)
-    val x = TimelineLeftPadding + keyframe.time * pxPerSec
+    val x = controller.timeX(keyframe.time, pxPerSec)
     val y = curveValueToY(keyframe.value, center, span, height)
     val half = CurvePointSize * 0.5f
     val press = remember { KeyPressGesture() }
@@ -228,7 +228,7 @@ private fun CurveKeyPoint(
                 if (!event.isLeftClick()) return@onPress
                 event.consume()
                 press.begin(keyframe, event.modifiers, controller) {
-                    stackedInGraph(lanes, keyframe, pxPerSec, center, span, height)
+                    stackedInGraph(controller, lanes, keyframe, pxPerSec, center, span, height)
                 }
                 refresh()
             }.onDrag { event ->
@@ -359,6 +359,7 @@ private fun buildCurveGrid(center: Float, span: Float, height: Float, fromX: Flo
 }
 
 private fun buildCurveShape(
+    controller: TimelineController,
     lane: CurveLane,
     pxPerSec: Float,
     fromX: Float,
@@ -370,27 +371,28 @@ private fun buildCurveShape(
     val keys = lane.curve.keyframes
     val first = keys.minOfOrNull { it.time } ?: 0f
     val last = keys.maxOfOrNull { it.time } ?: 0f
-    val startX = max(fromX, TimelineLeftPadding + first * pxPerSec)
-    val endX = min(toX, TimelineLeftPadding + last * pxPerSec)
+    val startX = max(fromX, controller.timeX(first, pxPerSec))
+    val endX = min(toX, controller.timeX(last, pxPerSec))
     return GenericShape {
         if (keys.isEmpty() || endX < startX) return@GenericShape
         var x = startX
         var started = false
         while (x <= endX) {
-            val time = (x - TimelineLeftPadding) / pxPerSec
+            val time = controller.timeAtX(x, pxPerSec)
             val y = curveValueToY(lane.curve.valueAt(time, 0f), center, span, height)
             if (started) lineTo(x, y) else moveTo(x, y)
             started = true
             x += CurveSampleStep
         }
         if (started) {
-            val time = (endX - TimelineLeftPadding) / pxPerSec
+            val time = controller.timeAtX(endX, pxPerSec)
             lineTo(endX, curveValueToY(lane.curve.valueAt(time, 0f), center, span, height))
         }
     }
 }
 
 private fun stackedInGraph(
+    controller: TimelineController,
     lanes: List<CurveLane>,
     pressed: Keyframe,
     pxPerSec: Float,
@@ -398,12 +400,12 @@ private fun stackedInGraph(
     span: Float,
     height: Float,
 ): List<Keyframe> {
-    val x = TimelineLeftPadding + pressed.time * pxPerSec
+    val x = controller.timeX(pressed.time, pxPerSec)
     val y = curveValueToY(pressed.value, center, span, height)
     val radius = CurvePointSize * 0.5f
     return lanes.filterNot { it.locked }.flatMap { lane ->
         lane.curve.keyframes.filter { key ->
-            abs(TimelineLeftPadding + key.time * pxPerSec - x) <= radius && abs(
+            abs(controller.timeX(key.time, pxPerSec) - x) <= radius && abs(
                 curveValueToY(
                     key.value, center, span, height
                 ) - y
@@ -427,7 +429,7 @@ private fun buildHandleGuides(
         lane.curve.keyframes.forEach { keyframe ->
             if (keyframe.time !in visibleTimes) return@forEach
             if (!CurveHandleDisplay.all && !controller.showsHandles(keyframe)) return@forEach
-            val keyX = TimelineLeftPadding + keyframe.time * pxPerSec
+            val keyX = controller.timeX(keyframe.time, pxPerSec)
             val keyY = curveValueToY(keyframe.value, center, span, height)
             val tangents = lane.curve.effectiveTangents(keyframe)
             listOf(
@@ -474,7 +476,7 @@ private fun Modifier.panCurveOnDrag(
             return@onPress
         }
         if (!isPanPress(event)) return@onPress
-        pan.begin(event, scroll.offsetX, scroll.offsetY, controller.curveAxis.targetCenter)
+        pan.begin(event, controller, scroll, controller.curveAxis.targetCenter)
         event.consume()
     }.onDrag { event ->
         if (zoom.drag(event, controller, scroll, values = true)) {
@@ -484,7 +486,7 @@ private fun Modifier.panCurveOnDrag(
         }
         if (!isPanPress(event)) return@onDrag
         if (!pan.advance(event)) return@onDrag
-        scroll.scrollTo(x = (pan.scrollX - event.dragTotalX).coerceAtLeast(0f))
+        scroll.scrollTo(x = pan.scrollX(controller, event))
         controller.curveAxis.snapTo(
             center = pan.center + event.dragTotalY / pixelsPerValue.coerceAtLeast(1e-6f),
             span = controller.curveAxis.targetSpan,
@@ -499,6 +501,7 @@ private fun isPanPress(event: UiEvent): Boolean =
     event.isRightClick() || HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
 
 private fun keysInCurveMarquee(
+    controller: TimelineController,
     lanes: List<CurveLane>,
     pxPerSec: Float,
     center: Float,
@@ -508,7 +511,7 @@ private fun keysInCurveMarquee(
 ): List<Keyframe> = lanes.filterNot { it.locked }.flatMap { lane ->
     lane.curve.keyframes.filter { key ->
         marquee.contains(
-            TimelineLeftPadding + key.time * pxPerSec,
+            controller.timeX(key.time, pxPerSec),
             curveValueToY(key.value, center, span, height),
         )
     }
@@ -528,7 +531,7 @@ private fun handlesInCurveMarquee(
     return lanes.filterNot { it.locked }.flatMap { lane ->
         lane.curve.keyframes.flatMap { key ->
             if (!CurveHandleDisplay.all && !controller.showsHandles(key)) return@flatMap emptyList()
-            val keyX = TimelineLeftPadding + key.time * pxPerSec
+            val keyX = controller.timeX(key.time, pxPerSec)
             val keyY = curveValueToY(key.value, center, span, height)
             if (marquee.contains(keyX, keyY)) return@flatMap emptyList()
             val tangents = lane.curve.effectiveTangents(key)
