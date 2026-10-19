@@ -25,7 +25,7 @@ object ServerRuntimeState {
     fun create(server: MinecraftServer, levelRoot: Path) {
         states.computeIfAbsent(server) {
             ServerRuntimeStateEntry(
-                runtimeContext = ServerRuntimeContext(server),
+                runtimeContext = ServerRuntimeContext(server, levelRoot),
                 runtimePath = levelRoot.resolve("data").resolve(HOLLOWENGINE_RUNTIME_FILE),
             )
         }
@@ -71,6 +71,9 @@ object ServerRuntimeState {
     }
 
     fun context(server: MinecraftServer): ServerRuntimeContext = entry(server).runtimeContext
+
+    /** The server's runtime state, or null outside its lifetime: before it is created or after it stopped. */
+    fun contextOrNull(server: MinecraftServer): ServerRuntimeContext? = states[server]?.runtimeContext
 
     /** Every server with live runtime state, for engine-wide events such as an addon being reloaded. */
     fun servers(): List<MinecraftServer> = synchronized(states) { states.keys.toList() }

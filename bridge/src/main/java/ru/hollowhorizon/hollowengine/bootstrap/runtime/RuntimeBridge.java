@@ -273,7 +273,9 @@ public interface RuntimeBridge extends AutoCloseable {
 
     void onEntitySetLevel(Entity entity, Level level);
 
-    void onEntityRemoved(Entity entity);
+    void onEntityRemoved(Entity entity, Entity.RemovalReason reason);
+
+    void onChunkEntitiesLoaded(ServerLevel level, long chunkPos);
 
 
     void onRecipeManagerCreated(RecipeManager recipeManager);
