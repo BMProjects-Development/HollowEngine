@@ -1,0 +1,125 @@
+---
+title: NPCs Outside the World
+order: 3
+---
+
+<center><h1>NPCs Outside the World</h1></center>
+
+*How an NPC lives on while its chunk is unloaded, and how to find it, change it and keep it from wandering out of reach.*
+
+A regular Minecraft mob exists only inside its chunk: when the chunk unloads, the mob is written into the chunk file, and until a player comes back nothing can reach it. HollowEngine NPCs work differently. Every NPC has a **record** in the NPC registry, stored next to the world like player data, and the `NpcEntity` standing in a loaded chunk is only its **body**.
+
+This gives you three things:
+
+- an NPC can be found and changed by UUID or by its own id even when nobody is near it;
+- restarting a story stage does not spawn a second copy of the same character;
+- there is always exactly one NPC: chunks never save NPCs, so an old body cannot reappear somewhere after the NPC has moved on.
+
+## Ids: one NPC per name
+
+Give `npc()` an `id`, and the call becomes "get it or create it":
+
+```kotlin
+@State
+suspend fun main() {
+    val smith = npc(
+        pos = pos(10, 64, 10),
+        name = "Blacksmith",
+        id = "village:blacksmith",
+    )
+}
+```
+
+The first call creates the NPC. Every later call with the same id returns that same NPC and ignores the other arguments, so a stage that restarts, or a script that is reloaded, keeps working with the blacksmith it already has instead of creating a crowd of them. Without an `id`, each call creates a new NPC, as before.
+
+An id belongs to one living NPC at a time. Use the `namespace:name` form so ids from different stories do not collide.
+
+## Finding NPCs
+
+`npcs` gives access to every NPC of the world, loaded or not:
+
+```kotlin
+val smith = npcs["village:blacksmith"]   // by id
+val byUuid = npcs[someUuid]              // by UUID
+val around = npcs.near(overworld(), pos(0, 64, 0), 32.0) // within 32 blocks, nearest first
+val everyone = npcs.all
+```
+
+Each of these returns an `NpcRef` (or `null` when nothing is found). In code that has a `MinecraftServer` at hand, the same object is `server.npcs`.
+
+## `NpcRef`
+
+An `NpcRef` is a handle that stays valid whatever happens to the chunk. Get one from the registry or from a body with `npc.ref`.
+
+| Member | Meaning |
+|--------|---------|
+| `resolve()` | The NPC's entity, or `null` once it was despawned. See below. |
+| `isLoaded` | `true` while the NPC's body stands in a loaded chunk. |
+| `exists` | `true` until the NPC is despawned. |
+| `isDead` | `true` for an NPC [kept after death](#death-and-despawning). |
+| `teleportTo(level, pos, yaw, pitch)` | Moves the NPC; works without a body too. |
+| `despawn()` | Removes the NPC for good, record included. |
+
+```kotlin
+val smith = npcs["village:blacksmith"] ?: return
+smith.teleportTo(overworld(), pos(120, 70, -30))
+```
+
+To remember an NPC between server restarts, store its UUID (or rely on its id) and look it up again through `npcs`. `entityRef<NpcEntity>(uuid)` still works too, but it waits until the body appears in a loaded chunk.
+
+## An NPC without a body
+
+`resolve()` always gives you an `NpcEntity`. When the chunk is loaded, it is the body. When it is not, the registry builds the entity from the record outside the world, and that very entity becomes the body once its chunk loads.
+
+You can read and change it like any NPC: its inventory, its [data](/docs/hollowengine/scripting/npc/data), its components. The changes are saved with the world.
+
+```kotlin
+val smith = npcs["village:blacksmith"]?.resolve() ?: return
+smith.inventory.insert(ItemStack(Items.IRON_INGOT, 4))
+```
+
+:::warning
+Nothing ticks an NPC without a body. It does not walk, look around or play animations, so `move(...)` on it does not get anywhere. Check `isLoaded` first, or keep its chunks loaded (see below) when the NPC has to act far from players.
+:::
+
+## Death and despawning
+
+By default an NPC that dies is gone for good, exactly like a vanilla mob: its record is removed together with the body. `despawn()`, and any other code that discards the body, removes it as well.
+
+When a story still needs a dead character, for example to check later that the player killed it, keep its record:
+
+```kotlin
+boss.keepAfterDeath = true
+```
+
+After its death the NPC stays in the registry with `isDead == true`. Its body is not built again, and `npc(...)` with its id creates a fresh NPC in its place. Call `despawn()` once the record is no longer needed.
+
+## Keeping chunks loaded
+
+An NPC walks only while its chunk is loaded. For a walk that must finish even where no player is, keep the chunks around the NPC loaded for the duration of the action:
+
+```kotlin
+courier.forceLoad {
+    move(pos(800, 64, -1200))
+}
+```
+
+For an NPC that should keep living everywhere and all the time, turn the flag on instead. It is saved with the NPC, and after a server restart the NPC is brought back on its own:
+
+```kotlin
+courier.isForceLoaded = true
+```
+
+The loaded area follows the NPC as it moves.
+
+:::caution
+Every NPC that keeps chunks loaded costs the server about as much as a player standing there. Turn `isForceLoaded` off once the NPC no longer needs it, and prefer `forceLoad { }` for single trips.
+:::
+
+## Where NPCs are stored
+
+Records live in `<world>/hollowengine/npcs/`: one `<uuid>.dat` file per NPC plus `index.dat`, which lets the server start without reading every NPC. Chunk files no longer contain NPCs.
+
+NPCs from worlds created before this change, and NPCs created with `/summon`, join the registry the first time they appear in a loaded chunk and follow these rules from then on.
+
+The client knows nothing about the registry: players see bodies the same way as before.

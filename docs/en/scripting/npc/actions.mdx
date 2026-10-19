@@ -1,6 +1,6 @@
 ---
 title: Actions and Concurrency
-order: 3
+order: 4
 ---
 
 <center><h1>Actions and Concurrency</h1></center>
@@ -69,7 +69,7 @@ suspend fun main() {
 }
 ```
 
-In fact, the `suspend` version is nothing more than `startX(...).await()` written for you. So `npc.move(target)` is exactly the same as `npc.startMove(target).await()`, which means there's no need to rewrite everything to the `startX` form: keep calling the `suspend` functions exactly as before, and reach for `startX` only when you actually want two things to happen in parallel.
+Both versions do the same work, so there's no need to rewrite everything to the `startX` form: keep calling the `suspend` functions exactly as before, and reach for `startX` only when you actually want two things to happen in parallel. The one difference is [priority](#priorities): a `suspend` call belongs to the owner of the code it is called from, while `startX` always runs as an ordinary script.
 
 ## The action handle: `NpcAction<R>`
 
@@ -80,7 +80,7 @@ Every `startX` function returns an object that represents "a thing currently hap
 | `.await()` | Pause here (in a `suspend` function) until the action finishes, and get its result. |
 | `.cancel()` | Stop the action right now. |
 | `.isActive` | `true` while the action is still running. |
-| `.status` | One of `RUNNING`, `COMPLETED`, `CANCELLED`, `FAILED`. |
+| `.status` | One of `RUNNING`, `COMPLETED`, `CANCELLED`, `PREEMPTED` (taken by another owner, see [Priorities](#priorities)), `FAILED`. |
 
 ```kotlin
 val walking = npc.startMove(player)
@@ -143,8 +143,79 @@ All three channels run independently, so the NPC can perform several actions at 
 Because channels are shared across your whole script (and across other scripts and node handlers attached to the same NPC), a plain `suspend` call like `npc.move(...)` can still be interrupted from somewhere else.
 
 :::warning
-If an `onInteract`, `onHurt`, or any other handler from an [attached node script](/docs/hollowengine/scripting/node) starts a new `MOVEMENT` action on the same NPC while your `@State` is in the middle of `npc.move(...)`, that call gets cancelled, exactly as if you had called `stopMoving()` yourself. This is expected: the last action to start on a channel always wins. If two different pieces of your logic keep restarting the same channel, they will keep interrupting each other.
+If an `onInteract`, `onHurt`, or any other handler from an [attached node script](/docs/hollowengine/scripting/node) starts a new `MOVEMENT` action on the same NPC while your `@State` is in the middle of `npc.move(...)`, that call gets cancelled, exactly as if you had called `stopMoving()` yourself. This is expected: the last action to start on a channel always wins. If two different pieces of your logic keep restarting the same channel, they will keep interrupting each other. When one of them should always win, give it a higher [priority](#priorities).
 :::
+
+## Priorities
+
+Scripts are not the only ones that give orders to an NPC: a daily routine, a story and a cutscene can all want the same NPC at the same moment. That is why every action belongs to an **owner** with a priority, from the lowest to the highest:
+
+| Priority | Who uses it |
+|----------|-------------|
+| `NpcActionPriority.SCHEDULE` | Daily routines. |
+| `NpcActionPriority.SCRIPT` | Ordinary scripts, and every call made without an owner. |
+| `NpcActionPriority.STORY` | Story stages. |
+| `NpcActionPriority.CUTSCENE` | Cutscenes. |
+
+The rules for a busy channel:
+
+- **The same owner** replaces its own action, as described above: the old one is cancelled.
+- **Another owner of the same or a higher priority** takes the channel: the old action ends with a `Preempted` exception.
+- **A lower priority** is refused at once while a higher owner holds the channel, also with `Preempted`.
+
+Run code as an owner with `actingAs`:
+
+```kotlin
+actingAs(NpcActionPriority.CUTSCENE) {
+    npc.move(pos(5, 64, 5))
+    npc.lookAt(player)
+    npc.say("Look over there!")
+}
+```
+
+The channels used inside the block stay with the owner until the block ends, even in the pause between two actions, so a daily routine cannot pull the NPC away between two lines of a cutscene.
+
+The `suspend` functions (`move`, `lookAt`, `useBlock` and the rest) take the owner from the code they are called in; the `startX` functions always run as `SCRIPT`.
+
+`Preempted` tells the caller which channel was taken and by which priority. Nothing repeats the action for you: catch it if you want to decide what to do next.
+
+```kotlin
+try {
+    npc.move(target)
+} catch (e: Preempted) {
+    // e.channel was taken by e.priority, for example a cutscene; try again later or give up
+}
+```
+
+:::advice
+`Preempted` is a kind of cancellation. When nobody catches it, the coroutine that called the action simply stops, the same way it would after `stopMoving()`.
+:::
+
+## Several actions as one: `perform` and `queue`
+
+`perform` makes several actions one bundle:
+
+```kotlin
+npc.perform {
+    move(player)
+    lookAt(player)
+    say("Hello!")
+}
+```
+
+Every channel the bundle uses stays held until the block ends. If any of them is taken by someone else, the whole block is cancelled, and the caller gets a single `Preempted` for the whole bundle instead of one per action.
+
+`queue` is the same bundle that waits for its turn instead of replacing what is running:
+
+```kotlin
+npc.startMove(pointA)
+
+npc.queue {
+    move(pointB) // starts only after the walk to pointA has finished
+}
+```
+
+An action inside `queue` starts once the actions already running on its channel are over and no other bundle or higher owner holds it. Several queued blocks run in the order they were queued.
 
 ## Custom channels (advanced)
 

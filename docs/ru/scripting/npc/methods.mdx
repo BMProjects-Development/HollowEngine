@@ -1,6 +1,6 @@
 ---
 title: Служебные методы
-order: 9
+order: 10
 ---
 
 <center><h1>Служебные методы</h1></center>
@@ -31,7 +31,7 @@ npc.say("Hello there!")
 
 ## `npc.despawn()`
 
-Удаляет NPC из мира через с причиной `Entity.RemovalReason.DISCARDED`.
+Удаляет NPC насовсем: тело уходит из мира, а запись - из [реестра NPC](/docs/hollowengine/scripting/npc/registry). Для NPC в выгруженном чанке вызовите `despawn()` у его `NpcRef`.
 
 ```kotlin
 npc.despawn()

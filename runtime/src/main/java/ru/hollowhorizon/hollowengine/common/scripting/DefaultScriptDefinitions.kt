@@ -182,6 +182,8 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.slots.*",
                     "ru.hollowhorizon.hollowengine.common.data.*",
                     "ru.hollowhorizon.hollowengine.common.npcs.actions.*",
+                    "ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef",
+                    "ru.hollowhorizon.hollowengine.common.npcs.registry.ref",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveResult",
                     "ru.hollowhorizon.hollowengine.common.npcs.navigation.Shortfall",

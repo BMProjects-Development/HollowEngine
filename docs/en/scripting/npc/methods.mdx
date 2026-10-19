@@ -1,6 +1,6 @@
 ---
 title: Utility Methods
-order: 9
+order: 10
 ---
 
 <center><h1>Utility Methods</h1></center>
@@ -31,7 +31,7 @@ npc.say("Hello there!")
 
 ## `npc.despawn()`
 
-Removes the NPC from the world with `Entity.RemovalReason.DISCARDED`.
+Removes the NPC for good: its body leaves the world and its record leaves the [NPC registry](/docs/hollowengine/scripting/npc/registry). For an NPC whose chunk is unloaded, call `despawn()` on its `NpcRef`.
 
 ```kotlin
 npc.despawn()

@@ -15,6 +15,7 @@ An NPC is a regular Minecraft entity of type `NpcEntity`, so you can work with i
 ## Sections
 
 - [Creating NPCs](/docs/hollowengine/scripting/npc/create) - the current `npc()` signature and creation parameters.
+- [NPCs Outside the World](/docs/hollowengine/scripting/npc/registry) - the NPC registry: ids, finding NPCs whose chunk is unloaded, death, keeping chunks loaded.
 - [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions) - how an NPC can walk, look around, and use its hands at the same time.
 - [Movement and Interaction](/docs/hollowengine/scripting/npc/movement) - walking, looking, using blocks, and interacting with entities.
 - [Navigation](/docs/hollowengine/scripting/npc/navigation) - how an NPC finds its way and walks it: jumps, turns, speed, the blocks and zones it avoids.
@@ -64,7 +65,7 @@ suspend fun main() {
 }
 ```
 
-If an NPC should survive world reloads or script reloads, store its UUID through `stateTag()` or your own `onSave` / `onLoad` serialization, then restore the link after loading with `entityRef<NpcEntity>(uuid)`.
+An NPC outlives the chunk it stands in: it stays in the [NPC registry](/docs/hollowengine/scripting/npc/registry) until it dies or is despawned. To find it again after a world or script reload, give it an `id` in `npc(...)`, or store its UUID through `stateTag()` and look it up with `npcs[uuid]`.
 
 ## Attaching persistent behavior
 

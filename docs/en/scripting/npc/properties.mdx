@@ -1,6 +1,6 @@
 ---
 title: Entity Properties
-order: 10
+order: 11
 ---
 
 <center><h1>NPC and Entity Properties</h1></center>
@@ -121,7 +121,7 @@ val guideRef = entityRef<NpcEntity>(tag.getUUID("guide"))
 val guide = guideRef.resolve()
 ```
 
-This is safer than keeping a direct entity reference because Minecraft can unload or recreate entities.
+This is safer than keeping a direct entity reference because Minecraft can unload or recreate entities. `entityRef` waits until the body is loaded; to reach an NPC whose chunk is unloaded, use `npcs[uuid]` or its id instead, see [NPCs Outside the World](/docs/hollowengine/scripting/npc/registry).
 
 ---
 

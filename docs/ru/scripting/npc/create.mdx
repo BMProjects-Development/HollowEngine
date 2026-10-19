@@ -34,6 +34,7 @@ fun npc(
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
+    id: String? = null,
 ): NpcEntity
 ```
 
@@ -49,6 +50,7 @@ fun npc(
 | `nameplateMode`       | `NameplateMode`      | `NameplateMode.SHOW`                             | Начальный режим отображения неймплейта.                                                                                                    |
 | `inverseHeadRotation` | `Boolean`            | `false`                                          | Зарезервировано для особенностей поворота головы/модели.                                                                                   |
 | `inventorySize`       | `Int`                | `36`                                             | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
+| `id` | `String?` | `null` | Собственный id NPC, например `"village:blacksmith"`. Если живой NPC с таким id уже есть, `npc()` возвращает его и игнорирует остальные аргументы, см. [NPC вне мира](/docs/hollowengine/scripting/npc/registry#ids-one-npc-per-name). |
 
 :::caution
 Часть параметров уже присутствует в сигнатуре, но ещё не является полноценным стабильным пользовательским API. В v2.3 надёжно применяются позиция, поворот, мир, модель, имя, `nameplateMode`, атрибуты и стандартный аниматор. Для тонкой настройки модели, текстур и анимаций лучше явно назначать компоненты; как NPC толкается и не пускает других, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity).
@@ -125,6 +127,6 @@ val guard = npc(
 - `StandardPlayerAnimatorPreset.create()` - стандартную player-like locomotion анимацию;
 - `TransformComponent(...)` - базовую трансформацию модели;
 - `customName` и `isCustomNameVisible`;
-- саму сущность в выбранном мире через `level.addFreshEntity(...)`.
+- запись в [реестре NPC](/docs/hollowengine/scripting/npc/registry) и тело в выбранном мире.
 
 Это значит, что обычный NPC уже умеет стоять, ходить и поворачивать голову без ручной настройки аниматора.
