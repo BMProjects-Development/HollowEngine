@@ -273,8 +273,8 @@ class NpcRegistry(private val directory: Path) {
 
     private fun deleteFiles(name: String): Boolean {
         return try {
-            Files.deleteIfExists(directory.resolve("$name$EXTENSION"))
             Files.deleteIfExists(directory.resolve("$name$BACKUP_EXTENSION"))
+            Files.deleteIfExists(directory.resolve("$name$EXTENSION"))
             true
         } catch (exception: Exception) {
             HollowEngine.LOGGER.error("Failed to delete NPC data {} from {}", name, directory, exception)
