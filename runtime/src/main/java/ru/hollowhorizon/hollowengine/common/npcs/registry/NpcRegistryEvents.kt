@@ -20,9 +20,8 @@ fun onNpcJoinedLevel(event: EntityLoadedEvent) {
 }
 
 @SubscribeEvent
-fun onNpcRemoved(event: EntityEvent.Removed) {
-    val npc = event.entity as? NpcEntity ?: return
-    npc.server?.npcsOrNull?.onRemoved(npc, event.reason)
+fun onNpcEntityRemoved(event: EntityEvent.Removed) {
+    event.entity.server?.npcsOrNull?.onEntityRemoved(event.entity, event.reason)
 }
 
 @SubscribeEvent

@@ -70,6 +70,12 @@ class NpcEntity : PathfinderMob {
     /** Whether the chunks around the NPC are held loaded right now. */
     val keepsChunksLoaded: Boolean get() = isForceLoaded || forceLoadCalls > 0
 
+    /**
+     * The vehicle the NPC rode when it was saved. Vehicles leave NPCs out of their own NBT, so the NPC keeps the
+     * link and takes its seat again once both are back in the level.
+     */
+    internal var savedVehicle: UUID? = null
+
     private fun fakePlayerUuid(): UUID = UUID.nameUUIDFromBytes("hollowengine:npc:$uuid".encodeToByteArray())
 
     init {
@@ -108,6 +114,7 @@ class NpcEntity : PathfinderMob {
         if (npcNavigation.pilot.isAirborne) compound.putBoolean(FLYING_KEY, true)
         if (isForceLoaded) compound.putBoolean(FORCE_LOADED_KEY, true)
         if (keepAfterDeath) compound.putBoolean(KEEP_AFTER_DEATH_KEY, true)
+        (vehicle?.uuid ?: savedVehicle)?.let { compound.putUUID(VEHICLE_KEY, it) }
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -118,6 +125,7 @@ class NpcEntity : PathfinderMob {
         npcNavigation.pilot.restore(compound.getBoolean(FLYING_KEY))
         isForceLoaded = compound.getBoolean(FORCE_LOADED_KEY)
         keepAfterDeath = compound.getBoolean(KEEP_AFTER_DEATH_KEY)
+        savedVehicle = if (compound.hasUUID(VEHICLE_KEY)) compound.getUUID(VEHICLE_KEY) else null
     }
 
     override fun tickDeath() {
@@ -161,6 +169,7 @@ class NpcEntity : PathfinderMob {
         private const val FLYING_KEY = "NpcFlying"
         private const val FORCE_LOADED_KEY = "NpcForceLoaded"
         private const val KEEP_AFTER_DEATH_KEY = "NpcKeepAfterDeath"
+        private const val VEHICLE_KEY = "NpcVehicle"
 
         fun createAttributes(): AttributeSupplier.Builder {
             return createLivingAttributes()

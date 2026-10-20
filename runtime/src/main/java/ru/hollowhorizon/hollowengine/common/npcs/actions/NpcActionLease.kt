@@ -41,12 +41,16 @@ internal class NpcActionLease private constructor(
         return false
     }
 
-    fun belongsTo(owner: NpcActionOwner): Boolean = !isBundle && this.owner === owner
+    /** The owner's lease this one acts for: itself, or the lease its outermost bundle was taken on behalf of. */
+    val root: NpcActionLease get() = generateSequence(this) { it.parent }.last()
+
+    /** Whether this lease, or the bundle chain it is nested in, was taken by [owner]. */
+    fun belongsTo(owner: NpcActionOwner): Boolean = root.owner === owner
 
     /** The coroutine context an action of this lease runs in, so the calls it makes stay inside the lease. */
     fun context(controller: NpcActionController, base: NpcActionLeases?): CoroutineContext {
         val leases = (base ?: NpcActionLeases.EMPTY).with(controller, this)
-        val rootOwner = generateSequence(this) { it.parent }.last().owner
+        val rootOwner = root.owner
         return if (rootOwner != null) leases + rootOwner else leases
     }
 
@@ -82,7 +86,7 @@ internal class NpcChannel(val key: NpcActionKey) {
 /** What a change of channels does once the controller's lock is released. */
 internal class NpcActionEffects {
     private val cancelled = mutableListOf<Pair<NpcActionImpl<*>, CancellationException?>>()
-    private val jobs = mutableListOf<Pair<Job, CancellationException>>()
+    private val jobs = mutableListOf<Pair<Job, CancellationException?>>()
     private val gates = mutableListOf<CompletableDeferred<Unit>>()
     val dirty = linkedSetOf<NpcChannel>()
 
@@ -90,7 +94,7 @@ internal class NpcActionEffects {
         cancelled += action to cause
     }
 
-    fun cancel(job: Job, cause: CancellationException) {
+    fun cancel(job: Job, cause: CancellationException?) {
         jobs += job to cause
     }
 

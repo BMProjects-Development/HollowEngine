@@ -7,6 +7,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NpcActionControllerTest {
@@ -78,5 +80,45 @@ class NpcActionControllerTest {
         runCurrent()
         assertEquals(NpcActionStatus.CANCELLED, first.status)
         assertEquals(NpcActionStatus.CANCELLED, second.status)
+    }
+
+    @Test
+    fun `releasing an owner cancels its bundles and frees their channels`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val controller = NpcActionController(CoroutineScope(SupervisorJob() + dispatcher))
+        val owner = NpcActionOwner(NpcActionPriority.STORY)
+        val holding = launch(dispatcher + owner) {
+            controller.perform { controller.act(NpcActionKeys.MOVEMENT) { awaitCancellation() } }
+        }
+        val idle = launch(dispatcher + owner) {
+            controller.queue { awaitCancellation() }
+        }
+
+        runCurrent()
+        assertEquals(NpcActionPriority.STORY, controller.holder(NpcActionKeys.MOVEMENT))
+        controller.release(owner)
+        runCurrent()
+
+        assertTrue(holding.isCancelled)
+        assertTrue(idle.isCancelled)
+        assertNull(controller.holder(NpcActionKeys.MOVEMENT))
+    }
+
+    @Test
+    fun `the end of an owner's job cancels a bundle running elsewhere`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val controller = NpcActionController(CoroutineScope(SupervisorJob() + dispatcher))
+        val ownerJob = Job()
+        val owner = NpcActionOwner(NpcActionPriority.STORY, ownerJob)
+        val bundle = launch(dispatcher + owner) {
+            controller.perform { controller.act(NpcActionKeys.MOVEMENT) { awaitCancellation() } }
+        }
+
+        runCurrent()
+        ownerJob.complete()
+        runCurrent()
+
+        assertTrue(bundle.isCancelled)
+        assertNull(controller.holder(NpcActionKeys.MOVEMENT))
     }
 }

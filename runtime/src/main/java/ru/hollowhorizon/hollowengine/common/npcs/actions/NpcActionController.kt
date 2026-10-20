@@ -16,6 +16,7 @@ import kotlin.coroutines.CoroutineContext
 class NpcActionController(private val scope: CoroutineScope) {
     private val channels = mutableMapOf<NpcActionKey, NpcChannel>()
     private val ownerLeases = mutableMapOf<NpcActionOwner, NpcActionLease>()
+    private val bundles = linkedSetOf<NpcActionLease>()
 
     /** Starts [block] on [key], replacing what [owner] or its equals run there. */
     fun <R> start(
@@ -55,12 +56,12 @@ class NpcActionController(private val scope: CoroutineScope) {
      */
     suspend fun <R> queue(block: suspend CoroutineScope.() -> R): R = bundle(queued = true, block)
 
-    /** Ends the lease of [owner]: its actions are canceled and its channels are free. */
+    /** Ends the lease of [owner]: its actions and bundles are canceled and its channels are free. */
     fun release(owner: NpcActionOwner) = change { effects ->
         val leases = channels.values.flatMap { channel ->
             (channel.running + channel.waiting).map { it.lease } + listOfNotNull(channel.holder)
         }
-        (leases + listOfNotNull(ownerLeases[owner])).filter { it.belongsTo(owner) }.toSet()
+        (leases + ownerLeases.values + bundles).filter { it.belongsTo(owner) }.toSet()
             .forEach { release(it, null, effects) }
     }
 
@@ -107,6 +108,7 @@ class NpcActionController(private val scope: CoroutineScope) {
         try {
             return coroutineScope {
                 val bundle = NpcActionLease.bundle(parent, coroutineContext.job, queued).also { lease = it }
+                bundles += bundle
                 withContext(
                     (context[NpcActionLeases] ?: NpcActionLeases.EMPTY).with(this@NpcActionController, bundle),
                     block
@@ -137,7 +139,7 @@ class NpcActionController(private val scope: CoroutineScope) {
         when {
             holder == null || lease.isWithin(holder) -> take(channel, action, effects)
             lease.priority > holder.priority || lease.priority == holder.priority && !action.concurrent -> {
-                if (holder.isBundle) preemptBundle(holder, Preempted(channel.key, lease.priority), effects)
+                if (holder.isBundle) release(holder, Preempted(channel.key, lease.priority), effects)
                 take(channel, action, effects)
             }
 
@@ -169,17 +171,17 @@ class NpcActionController(private val scope: CoroutineScope) {
         channel.running += action
     }
 
-    private fun preemptBundle(bundle: NpcActionLease, cause: Preempted, effects: NpcActionEffects) {
-        if (!bundle.active) return
-        bundle.preemption = cause
-        bundle.job?.let { effects.cancel(it, cause) }
-        release(bundle, cause, effects)
-    }
-
+    /**
+     * Ends [lease]: its actions are canceled, and so are the bundles taken on its behalf, whose blocks stop
+     * with [cause]. A [Preempted] cause is what the callers of those bundles get.
+     */
     private fun release(lease: NpcActionLease, cause: CancellationException?, effects: NpcActionEffects) {
         if (!lease.active) return
         lease.active = false
+        if (cause is Preempted && lease.preemption == null) lease.preemption = cause
         lease.owner?.let { owner -> if (ownerLeases[owner] === lease) ownerLeases.remove(owner) }
+        if (bundles.remove(lease)) lease.job?.let { effects.cancel(it, cause) }
+        bundles.filter { it.parent === lease }.forEach { release(it, cause, effects) }
         channels.values.forEach { channel ->
             channel.running.forEach { if (it.lease === lease) effects.cancel(it, cause) }
             channel.waiting.forEach { if (it.lease === lease) effects.cancel(it, cause) }
