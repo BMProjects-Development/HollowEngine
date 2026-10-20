@@ -137,6 +137,7 @@ class ColliderHandle internal constructor(val entity: Entity, val name: String) 
             ComponentDescriptorRegistry.idFor(CollidersComponent::class)
                 ?.let { AttachmentRegistry.attachmentsOrNull(entity)?.components?.asMutableMap()?.remove(it) }
         }
+        EntityColliders.forget(entity)
     }
 }
 

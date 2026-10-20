@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.registry
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import net.minecraft.client.renderer.ShaderInstance
 import ru.hollowhorizon.hollowengine.HollowEngine.MODID
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMeshRenderer
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxQuadRenderer
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -34,6 +35,7 @@ object ModShaders {
             DefaultVertexFormat.NEW_ENTITY
         ) {
             GLTF_ENTITY_INSTANCED = it
+            StaticGeometry.invalidateBindings()
         }
         event.register(
             "$MODID:vfx_particle".rl,

@@ -7,7 +7,7 @@ import net.irisshaders.iris.pipeline.WorldRenderingPipeline
 import net.irisshaders.iris.uniforms.CapturedRenderingState
 import net.irisshaders.iris.vertices.IrisVertexFormats
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ModelInstancingBackend
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.PipelineRenderer
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.client.utils.InstancingEntityInfo
 import ru.hollowhorizon.hollowengine.common.utils.ModList
 import ru.hollowhorizon.hollowengine.fabric.internal.rendering.IrisInstancingBackend
@@ -44,6 +44,6 @@ object IrisHelper {
     @JvmStatic
     fun invalidateInstancingPrograms() {
         IrisInstancingPrograms.invalidate()
-        PipelineRenderer.invalidateRuntimeInstancedBindings()
+        StaticGeometry.invalidateBindings()
     }
 }

@@ -1,9 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.BatchingRenderer
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.MeshRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.PipelineRenderer
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.GeometryUtils
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.common.utils.math.*
@@ -23,66 +22,43 @@ class Primitive(
     val morphTargets: List<Map<String, FloatArray>> = listOf(),
     var weights: FloatArray = FloatArray(morphTargets.size) { 0f },
 ) {
-    enum class StaticRenderPath {
-        PIPELINE,
-        BATCHING,
-    }
-
     val hasSkinning = joints != null && jointWeights != null
     val positionsCount: Int get() = (positions?.size ?: 0) * 3
     var jointCount = 0
 
-    var staticRenderPath: StaticRenderPath = StaticRenderPath.PIPELINE
-        private set
-
-    val useBatching get() = !hasSkinning && morphTargets.isEmpty() && staticRenderPath == StaticRenderPath.BATCHING
+    /**
+     * Whether the vertices move on their own, by skinning or morph targets. Such a primitive is drawn by itself;
+     * the others of a model are merged into its [StaticGeometry].
+     */
+    val isDynamic: Boolean get() = hasSkinning || morphTargets.isNotEmpty()
 
     val localBounds: Pair<Vec3f, Vec3f>? = computeBounds()
 
-    /** Vertex order for drawing the batched mesh as quads, see [GeometryUtils.flatQuadOrder]. */
-    var batchingQuadOrder: IntArray? = null
-        private set
-
-    private var renderer: MeshRenderer? = null
+    private var renderer: PipelineRenderer? = null
 
     private var isLoaded = false
 
+    /** Uploads a dynamic primitive; a static one is uploaded as part of its model's [StaticGeometry]. */
     fun init() {
-        if (isLoaded) return
+        if (isLoaded || !isDynamic) return
         isLoaded = true
 
-        if (!useBatching) {
-            if (normals == null && positions != null) {
-                normals = GeometryUtils.recalculateNormals(indices, positions!!)
-            }
-            if (midCoords == null && texCoords != null) {
-                midCoords = GeometryUtils.recalculateMidCoords(indices, texCoords!!)
-            }
-            if (tangents == null && positions != null && texCoords != null && normals != null) {
-                tangents = GeometryUtils.recalculateTangents(indices, positions!!, texCoords!!, normals!!)
-            }
-        } else if (positions != null && normals != null) {
-            batchingQuadOrder = GeometryUtils.flatQuadOrder(indices, positions!!, normals!!)
-        }
-
-        renderer = if (useBatching) {
-            BatchingRenderer(this)
-        } else {
-            PipelineRenderer(this)
-        }
-
-        renderer?.init()
-
-        if (!useBatching) releaseCpu()
+        prepareGeometry()
+        renderer = PipelineRenderer(this).also(PipelineRenderer::init)
+        releaseCpu()
     }
 
-    fun setStaticRenderPath(path: StaticRenderPath) {
-        val desiredPath = if (hasSkinning || morphTargets.isNotEmpty()) StaticRenderPath.PIPELINE else path
-
-        if (staticRenderPath == desiredPath) return
-        if (isLoaded) return
-
-        staticRenderPath = desiredPath
+    /** Fills in what the loader left out and drawing needs: normals, centers of the UV rectangles and tangents. */
+    fun prepareGeometry() {
+        if (normals == null && positions != null) {
+            normals = GeometryUtils.recalculateNormals(indices, positions!!)
+        }
+        if (midCoords == null && texCoords != null) {
+            midCoords = GeometryUtils.recalculateMidCoords(indices, texCoords!!)
+        }
+        if (tangents == null && positions != null && texCoords != null && normals != null) {
+            tangents = GeometryUtils.recalculateTangents(indices, positions!!, texCoords!!, normals!!)
+        }
     }
 
     fun setupPipeline(
@@ -97,16 +73,15 @@ class Primitive(
         renderer?.destroy()
     }
 
-    private fun releaseCpu() {
-        if (!useBatching) {
-            positions = null
-            normals = null
-            texCoords = null
-            midCoords = null
-            tangents = null
-            joints = null
-            jointWeights = null
-        }
+    /** Drops the vertex data once the GPU has its own copy. */
+    fun releaseCpu() {
+        positions = null
+        normals = null
+        texCoords = null
+        midCoords = null
+        tangents = null
+        joints = null
+        jointWeights = null
     }
 
     private fun computeBounds(): Pair<Vec3f, Vec3f>? {
@@ -121,32 +96,5 @@ class Primitive(
             max.x = max(max.x, it.x); max.y = max(max.y, it.y); max.z = max(max.z, it.z)
         }
         return Vec3f(min) to Vec3f(max)
-    }
-
-    fun estimatedCubeCount(): Int {
-        val vertexEstimate = (positions?.size ?: 0) / VERTICES_PER_CUBE
-        val indexEstimate = (indices?.size ?: 0) / INDICES_PER_CUBE
-        return max(vertexEstimate, indexEstimate)
-    }
-
-    fun minInstancedBatchSize(isTranslucent: Boolean): Int {
-        val cubes = estimatedCubeCount()
-        val base = when {
-            cubes <= 2 -> 2
-            cubes <= 6 -> 3
-            cubes <= 16 -> 4
-            else -> 5
-        }
-        return base + if (isTranslucent) 1 else 0
-    }
-
-    fun prefersInstancing(instanceCount: Int, isTranslucent: Boolean): Boolean {
-        if (hasSkinning || morphTargets.isNotEmpty() || useBatching) return false
-        return instanceCount >= minInstancedBatchSize(isTranslucent)
-    }
-
-    companion object {
-        private const val VERTICES_PER_CUBE = 24
-        private const val INDICES_PER_CUBE = 36
     }
 }

@@ -1,5 +1,10 @@
 package ru.hollowhorizon.hollowengine.fabric.internal.rendering
 
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry.Companion.SLOT_ATTRIBUTE
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry.Companion.SLOT_COUNT_UNIFORM
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry.Companion.TRANSFORMS_UNIFORM
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticInstanceData
+
 object IrisInstancingShaderPatcher {
     private val versionPattern = Regex("#version\\s+(\\d+)([^\\n]*)")
     private val extensionPattern = Regex("(?m)^\\s*#extension[^\\n]*$")
@@ -14,21 +19,32 @@ object IrisInstancingShaderPatcher {
             appendLine("$attributeQualifier vec3 Position;")
             appendLine("$attributeQualifier vec2 UV0;")
             appendLine("$attributeQualifier vec3 Normal;")
-            appendLine("$attributeQualifier vec4 _he_InstanceModelView0;")
-            appendLine("$attributeQualifier vec4 _he_InstanceModelView1;")
-            appendLine("$attributeQualifier vec4 _he_InstanceModelView2;")
-            appendLine("$attributeQualifier vec4 _he_InstanceModelView3;")
-            appendLine("$attributeQualifier vec3 _he_InstanceNormal0;")
-            appendLine("$attributeQualifier vec3 _he_InstanceNormal1;")
-            appendLine("$attributeQualifier vec3 _he_InstanceNormal2;")
+            appendLine("$attributeQualifier float $SLOT_ATTRIBUTE;")
+            appendLine("uniform samplerBuffer $TRANSFORMS_UNIFORM;")
+            appendLine("uniform int $SLOT_COUNT_UNIFORM;")
+            appendLine("int _he_InstanceBase() {")
+            appendLine("    return gl_InstanceID * (${StaticInstanceData.HEADER_TEXELS} + ${StaticInstanceData.SLOT_TEXELS} * $SLOT_COUNT_UNIFORM);")
+            appendLine("}")
+            appendLine("mat4 _he_SlotMat() {")
+            appendLine("    int at = _he_InstanceBase() + ${StaticInstanceData.HEADER_TEXELS} + int($SLOT_ATTRIBUTE + 0.5) * ${StaticInstanceData.SLOT_TEXELS};")
+            appendLine("    return mat4(texelFetch($TRANSFORMS_UNIFORM, at), texelFetch($TRANSFORMS_UNIFORM, at + 1), texelFetch($TRANSFORMS_UNIFORM, at + 2), texelFetch($TRANSFORMS_UNIFORM, at + 3));")
+            appendLine("}")
             appendLine("mat4 _he_ModelViewMat() {")
-            appendLine("    return mat4(_he_InstanceModelView0, _he_InstanceModelView1, _he_InstanceModelView2, _he_InstanceModelView3);")
+            appendLine("    int base = _he_InstanceBase();")
+            appendLine("    return mat4(texelFetch($TRANSFORMS_UNIFORM, base), texelFetch($TRANSFORMS_UNIFORM, base + 1),")
+            appendLine("        texelFetch($TRANSFORMS_UNIFORM, base + 2), texelFetch($TRANSFORMS_UNIFORM, base + 3)) * _he_SlotMat();")
             appendLine("}")
             appendLine("mat4 _he_ModelViewProjectionMat() {")
             appendLine("    return gl_ProjectionMatrix * _he_ModelViewMat();")
             appendLine("}")
             appendLine("mat3 _he_NormalMat() {")
-            appendLine("    return mat3(_he_InstanceNormal0, _he_InstanceNormal1, _he_InstanceNormal2);")
+            appendLine("    int base = _he_InstanceBase();")
+            appendLine("    mat3 instanceNormal = mat3(texelFetch($TRANSFORMS_UNIFORM, base + 4).xyz, texelFetch($TRANSFORMS_UNIFORM, base + 5).xyz,")
+            appendLine("        texelFetch($TRANSFORMS_UNIFORM, base + 6).xyz);")
+            appendLine("    mat3 slot = mat3(_he_SlotMat());")
+            appendLine("    float det = determinant(slot);")
+            appendLine("    if (abs(det) < 1e-8) return instanceNormal;")
+            appendLine("    return instanceNormal * transpose(inverse(slot)) * pow(abs(det), 1.0 / 3.0);")
             appendLine("}")
             appendLine("vec4 _he_Vertex() {")
             appendLine("    return vec4(Position, 1.0);")

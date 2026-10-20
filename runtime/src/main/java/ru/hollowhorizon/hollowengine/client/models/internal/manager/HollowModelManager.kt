@@ -24,7 +24,6 @@ import ru.hollowhorizon.hollowengine.client.models.fbx.FbxModelLoader
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.renameMaterials
-import ru.hollowhorizon.hollowengine.client.models.internal.rendering.configureStaticRenderPaths
 import ru.hollowhorizon.hollowengine.client.models.obj.ObjModelLoader
 import ru.hollowhorizon.hollowengine.client.textures.GlTexture
 import ru.hollowhorizon.hollowengine.client.utils.stream
@@ -79,7 +78,6 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
             ?: error("No suitable model loader found for format .$extension")
 
         return loader.load(location).also { it.renameMaterials(metadata(location)) }
-            .also(Model::configureStaticRenderPaths)
     }
 
     override fun prepare(

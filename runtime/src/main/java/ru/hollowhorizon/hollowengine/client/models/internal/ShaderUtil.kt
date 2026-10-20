@@ -1,21 +1,17 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.irisshaders.iris.shadows.ShadowRenderer
-import net.minecraft.Util
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.LightTexture
-import net.minecraft.client.renderer.RenderStateShard
 import net.minecraft.client.renderer.RenderType
 import org.lwjgl.opengl.GL13
 import ru.hollowhorizon.hollowengine.bridge.mixins.client.ShaderInstanceAccessor
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
 import ru.hollowhorizon.hollowengine.common.registry.ModShaders
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
-import java.util.function.Function
 
 
 inline fun drawWithShader(
@@ -50,36 +46,6 @@ fun Material.packedLight(worldLight: Int): Int = if (emissive) LightTexture.FULL
 fun opaqueShaderState(): RenderType = RenderType.entityCutoutNoCull(Material.MISSING_TEXTURE)
 
 fun translucentShaderState(): RenderType = RenderType.entityTranslucent(Material.MISSING_TEXTURE)
-
-val batchingRenderType: Function<Material, RenderType> = Util.memoize<Material, RenderType> { material: Material ->
-    createBatchingRenderType(material, VertexFormat.Mode.TRIANGLES)
-}
-
-val batchingQuadRenderType: Function<Material, RenderType> = Util.memoize<Material, RenderType> { material: Material ->
-    createBatchingRenderType(material, VertexFormat.Mode.QUADS)
-}
-
-private fun createBatchingRenderType(material: Material, mode: VertexFormat.Mode): RenderType {
-    val compositeState = RenderType.CompositeState.builder()
-        .setShaderState(RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeEntityCutoutShader))
-        .setTextureState(RenderStateShard.TextureStateShard(material.texture, false, false)).setTransparencyState(
-            when (material.blend) {
-                Material.Blend.BLEND -> RenderStateShard.TRANSLUCENT_TRANSPARENCY
-                Material.Blend.OPAQUE -> RenderStateShard.NO_TRANSPARENCY
-            }
-        ).setCullState(if (material.doubleSided) RenderStateShard.NO_CULL else RenderStateShard.CULL)
-        .setLightmapState(RenderStateShard.LIGHTMAP).setOverlayState(RenderStateShard.OVERLAY)
-        .createCompositeState(true)
-    return RenderType.create(
-        "hollowengine:entity_cutout",
-        DefaultVertexFormat.NEW_ENTITY,
-        mode,
-        4096,
-        true,
-        false,
-        compositeState
-    )
-}
 
 val SHADER
     get() = if (IrisHelper.hasIris && (ShadowRenderer.ACTIVE || shouldOverrideShaders())) GameRenderer.getRendertypeEntityCutoutShader()!!
