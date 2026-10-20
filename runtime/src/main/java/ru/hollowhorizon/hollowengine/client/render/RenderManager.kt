@@ -33,6 +33,7 @@ import ru.hollowhorizon.hollowengine.common.events.client.render.RenderStage
 import ru.hollowhorizon.hollowengine.common.models.StandardPlayerAnimatorPreset
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 import java.util.*
 
 @ClientOnly
@@ -45,13 +46,24 @@ object RenderManager {
         AnimatorAssets.register(StandardPlayerAnimatorPreset.ID.rl, StandardPlayerAnimatorPreset.create())
     }
 
-    /** Whether entities are being drawn into the level now, rather than into an interface. */
-    var isWorldPass = false
-        private set
+    /** Whether the stages of the level are running: from the sky to the end of the level. */
+    private var isLevelStage = false
+
+    /**
+     * Whether entities are being drawn into the level now, rather than into an interface. Iris draws its shadows
+     * before the sky, outside the level stages, so its shadow pass counts here on its own.
+     */
+    val isWorldPass: Boolean get() = isLevelStage || isShadowPass
+
+    /**
+     * Whether a shader pack draws the level from its light now. Models drawn then are not where the camera sees
+     * them, so nothing should remember their placement for the frame.
+     */
+    val isShadowPass: Boolean get() = IrisHelper.isShadowRendering()
 
     @SubscribeEvent
     fun onTrackWorldPass(event: RenderLevelStageEvent) {
-        isWorldPass = event.stage != RenderStage.AFTER_LEVEL
+        isLevelStage = event.stage != RenderStage.AFTER_LEVEL
     }
 
     @SubscribeEvent

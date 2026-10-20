@@ -52,6 +52,14 @@ fun opaqueShaderState(): RenderType = RenderType.entityCutoutNoCull(Material.MIS
 fun translucentShaderState(): RenderType = RenderType.entityTranslucent(Material.MISSING_TEXTURE)
 
 val batchingRenderType: Function<Material, RenderType> = Util.memoize<Material, RenderType> { material: Material ->
+    createBatchingRenderType(material, VertexFormat.Mode.TRIANGLES)
+}
+
+val batchingQuadRenderType: Function<Material, RenderType> = Util.memoize<Material, RenderType> { material: Material ->
+    createBatchingRenderType(material, VertexFormat.Mode.QUADS)
+}
+
+private fun createBatchingRenderType(material: Material, mode: VertexFormat.Mode): RenderType {
     val compositeState = RenderType.CompositeState.builder()
         .setShaderState(RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeEntityCutoutShader))
         .setTextureState(RenderStateShard.TextureStateShard(material.texture, false, false)).setTransparencyState(
@@ -62,10 +70,10 @@ val batchingRenderType: Function<Material, RenderType> = Util.memoize<Material, 
         ).setCullState(if (material.doubleSided) RenderStateShard.NO_CULL else RenderStateShard.CULL)
         .setLightmapState(RenderStateShard.LIGHTMAP).setOverlayState(RenderStateShard.OVERLAY)
         .createCompositeState(true)
-    RenderType.create(
+    return RenderType.create(
         "hollowengine:entity_cutout",
         DefaultVertexFormat.NEW_ENTITY,
-        VertexFormat.Mode.TRIANGLES,
+        mode,
         4096,
         true,
         false,

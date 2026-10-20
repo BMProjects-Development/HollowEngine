@@ -14,10 +14,12 @@ import ru.hollowhorizon.hollowengine.client.models.internal.packedLight
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.toFloatBuffer
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
+import ru.hollowhorizon.hollowengine.client.utils.InstancingEntityInfo
 import ru.hollowhorizon.hollowengine.client.utils.areShadersEnabled
 import ru.hollowhorizon.hollowengine.client.utils.instancingEntityInfo
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.cbrt
@@ -110,8 +112,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
             tanBuffer = VboWrapper.createArrayBuffer().apply {
                 val data = tangents.toFloatBuffer(4) { v, b -> b.put(v.x).put(v.y).put(v.z).put(v.w) }
                 uploadData(data)
-                GL33.glVertexAttribPointer(9, 4, GL33.GL_FLOAT, false, 0, 0)
-                GL33.glEnableVertexAttribArray(9)
+                bindFloatAttribute(TANGENT_LOCATION, 4)
             }
         }
     }
@@ -133,8 +134,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
 
         tanBuffer = VboWrapper.createArrayBuffer().apply {
             allocate(vertexCount * 4 * 4L, GL33.GL_DYNAMIC_COPY)
-            GL33.glVertexAttribPointer(8, 4, GL33.GL_FLOAT, false, 0, 0)
-            GL33.glEnableVertexAttribArray(8)
+            bindFloatAttribute(TANGENT_LOCATION, 4)
         }
     }
 
@@ -152,6 +152,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
             midBuffer = VboWrapper.createArrayBuffer().apply {
                 val data = midCoords.toFloatBuffer(2) { v, b -> b.put(v.x).put(v.y) }
                 uploadData(data)
+                bindFloatAttribute(MID_TEX_COORD_LOCATION, 2)
             }
         }
 
@@ -163,6 +164,12 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
                 uploadData(buffer)
             }
         }
+    }
+
+    private fun bindFloatAttribute(location: Int, size: Int) {
+        if (location == -1) return
+        GL33.glVertexAttribPointer(location, size, GL33.GL_FLOAT, false, 0, 0)
+        GL33.glEnableVertexAttribArray(location)
     }
 
     private fun initInstancingBuffers() {
@@ -431,6 +438,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
 
         GL33.glVertexAttribI2i(3, instance.overlay and FFFF, instance.overlay shr 16 and FFFF)
         GL33.glVertexAttribI2i(4, instance.light and FFFF, instance.light shr 16 and FFFF)
+        setEntityInfo(instance.entityInfo)
 
         RenderSystem.glBindVertexArray(vao)
 
@@ -548,6 +556,7 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
 
         val packedLight = instance.material.packedLight(light)
         GL33.glVertexAttribI2i(4, packedLight and FFFF, packedLight shr 16 and FFFF)
+        setEntityInfo(instancingEntityInfo)
 
         RenderSystem.glBindVertexArray(vao)
 
@@ -578,6 +587,11 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         }
 
         GL33.glBindVertexArray(0)
+    }
+
+    private fun setEntityInfo(info: InstancingEntityInfo) {
+        if (ENTITY_LOCATION == -1) return
+        GL33.glVertexAttribI3i(ENTITY_LOCATION, info.entity, info.blockEntity, info.item)
     }
 
     private fun applyMaterial(shader: ShaderInstance, material: Material, colorLocation: Int = 1) {
@@ -615,6 +629,9 @@ class PipelineRenderer(private val primitive: Primitive) : MeshRenderer {
         private const val INT2_STRIDE_BYTES = 2 * Int.SIZE_BYTES
         private const val ENTITY_INFO_STRIDE_BYTES = 3 * Int.SIZE_BYTES
         private const val FFFF = '\uffff'.code
+        private val TANGENT_LOCATION = IrisHelper.entityAttributeLocation("at_tangent")
+        private val MID_TEX_COORD_LOCATION = IrisHelper.entityAttributeLocation("mc_midTexCoord")
+        private val ENTITY_LOCATION = IrisHelper.entityAttributeLocation("iris_Entity")
         private val RENDERERS = Collections.newSetFromMap(WeakHashMap<PipelineRenderer, Boolean>())
 
         fun invalidateRuntimeInstancedBindings() {

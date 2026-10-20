@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEva
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
+import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
@@ -154,7 +155,7 @@ class VfxBoneAttachment(
         if (!spec.autoPlay || spec.effect.isBlank() && spec.ownEffect == null) return
 
         pipeline.addBatchedRenderable {
-            if (!node.isVisible) return@addBatchedRenderable
+            if (!node.isVisible || RenderManager.isShadowPass) return@addBatchedRenderable
             if (!effect.claimFrame()) return@addBatchedRenderable
 
             effect.placement.set(stack.last().pose()).mul(globalMatrix.asMatrix4f())

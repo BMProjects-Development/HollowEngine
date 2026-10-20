@@ -39,6 +39,10 @@ class Primitive(
 
     val localBounds: Pair<Vec3f, Vec3f>? = computeBounds()
 
+    /** Vertex order for drawing the batched mesh as quads, see [GeometryUtils.flatQuadOrder]. */
+    var batchingQuadOrder: IntArray? = null
+        private set
+
     private var renderer: MeshRenderer? = null
 
     private var isLoaded = false
@@ -57,6 +61,8 @@ class Primitive(
             if (tangents == null && positions != null && texCoords != null && normals != null) {
                 tangents = GeometryUtils.recalculateTangents(indices, positions!!, texCoords!!, normals!!)
             }
+        } else if (positions != null && normals != null) {
+            batchingQuadOrder = GeometryUtils.flatQuadOrder(indices, positions!!, normals!!)
         }
 
         renderer = if (useBatching) {

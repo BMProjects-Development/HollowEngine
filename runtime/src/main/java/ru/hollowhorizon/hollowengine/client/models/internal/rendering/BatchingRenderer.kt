@@ -5,6 +5,7 @@ import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
+import ru.hollowhorizon.hollowengine.client.models.internal.batchingQuadRenderType
 import ru.hollowhorizon.hollowengine.client.models.internal.batchingRenderType
 import ru.hollowhorizon.hollowengine.client.models.internal.packedLight
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
@@ -30,7 +31,9 @@ class BatchingRenderer(
         val positions = primitive.positions
         val normals = primitive.normals
         val texCoords = primitive.texCoords
-        val iterator = indices?.asIterable() ?: (0 until primitive.positionsCount / 3)
+        val quadOrder = primitive.batchingQuadOrder
+        val iterator = quadOrder?.asIterable() ?: indices?.asIterable() ?: (0 until primitive.positionsCount / 3)
+        val renderTypes = if (quadOrder != null) batchingQuadRenderType else batchingRenderType
 
         pipeline.addBatchedRenderable {
             if (!instance.isVisible) return@addBatchedRenderable
@@ -41,7 +44,7 @@ class BatchingRenderer(
             if (indices != null && indices.isEmpty()) return@addBatchedRenderable
 
             val material = instance.material
-            val renderType = batchingRenderType.apply(material)
+            val renderType = renderTypes.apply(material)
             openedBatchedRenderTypes?.add(renderType)
             val vertexConsumer = source.getBuffer(renderType)
             val nodeMatrix = instance.matrix.asMatrix4f()

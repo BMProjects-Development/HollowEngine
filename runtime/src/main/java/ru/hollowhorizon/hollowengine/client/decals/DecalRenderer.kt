@@ -50,7 +50,7 @@ object Decals {
 
     /** Takes [draw] for the frame; a model drawn into an interface outside a preview that takes it hands in nothing. */
     fun submit(draw: DecalDraw) {
-        val into = captured ?: submitted.takeIf { RenderManager.isWorldPass } ?: return
+        val into = captured ?: submitted.takeIf { RenderManager.isWorldPass && !RenderManager.isShadowPass } ?: return
         into += draw
     }
 

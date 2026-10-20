@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.utils
 
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 object GeometryUtils {
@@ -235,37 +237,104 @@ object GeometryUtils {
         }
     }
 
+    private const val FLAT_QUAD_COSINE = 0.999f
+
+    /**
+     * Vertex order of the mesh as quads, or null when some pair of consecutive triangles is not one planar quad
+     * with a single normal.
+     *
+     * Shader packs take per-face data such as `mc_midTexCoord` from the polygon they are given, and expect quads
+     * like vanilla entity models. Iris also replaces quad normals with the face normal, so only flat quads qualify.
+     *
+     * @param indices triangle list, or null for sequential vertices.
+     */
+    fun flatQuadOrder(indices: IntArray?, positions: Array<Vec3f>, normals: Array<Vec3f>): IntArray? {
+        val count = min(positions.size, normals.size)
+        val elementCount = indices?.size ?: count
+        if (elementCount == 0 || elementCount % 6 != 0) return null
+
+        val getIndex = { i: Int -> indices?.get(i) ?: i }
+        val order = IntArray(elementCount / 6 * 4)
+        val first = IntArray(3)
+        val second = IntArray(3)
+
+        for (pair in 0 until elementCount / 6) {
+            for (k in 0 until 3) {
+                first[k] = getIndex(pair * 6 + k)
+                second[k] = getIndex(pair * 6 + 3 + k)
+            }
+            if (first.any { it !in 0 until count } || second.any { it !in 0 until count }) return null
+
+            val extra = second.singleOrNull { it !in first } ?: return null
+            val edge = (0 until 3).singleOrNull { first[(it + 2) % 3] !in second } ?: return null
+            val quad = pair * 4
+            order[quad] = first[(edge + 1) % 3]
+            order[quad + 1] = first[(edge + 2) % 3]
+            order[quad + 2] = first[edge]
+            order[quad + 3] = extra
+
+            if (!isFlatQuad(order, quad, positions, normals)) return null
+        }
+        return order
+    }
+
+    private fun isFlatQuad(order: IntArray, quad: Int, positions: Array<Vec3f>, normals: Array<Vec3f>): Boolean {
+        val normal = normals[order[quad]]
+        for (k in 1 until 4) {
+            val other = normals[order[quad + k]]
+            if (normal.x * other.x + normal.y * other.y + normal.z * other.z < FLAT_QUAD_COSINE) return false
+        }
+
+        val p0 = positions[order[quad]]
+        val p1 = positions[order[quad + 1]]
+        val p2 = positions[order[quad + 2]]
+        val p3 = positions[order[quad + 3]]
+        val ax = p2.x - p0.x
+        val ay = p2.y - p0.y
+        val az = p2.z - p0.z
+        val bx = p3.x - p1.x
+        val by = p3.y - p1.y
+        val bz = p3.z - p1.z
+        val faceX = ay * bz - az * by
+        val faceY = az * bx - ax * bz
+        val faceZ = ax * by - ay * bx
+        val faceLength = sqrt(faceX * faceX + faceY * faceY + faceZ * faceZ)
+        if (faceLength < TANGENT_EPSILON) return false
+
+        return (normal.x * faceX + normal.y * faceY + normal.z * faceZ) / faceLength >= FLAT_QUAD_COSINE
+    }
+
+    /**
+     * Center of the UV rectangle around each vertex: the union of the UV bounds of the triangles that use it.
+     */
     fun recalculateMidCoords(indices: IntArray?, uvs: Array<Vec2f>): Array<Vec2f> {
         val count = uvs.size
-        val accumMid = Array(count) { MutableVec2f() }
-        val contributions = IntArray(count)
+        val minU = FloatArray(count) { uvs[it].x }
+        val minV = FloatArray(count) { uvs[it].y }
+        val maxU = FloatArray(count) { uvs[it].x }
+        val maxV = FloatArray(count) { uvs[it].y }
         val getIndex = { i: Int -> indices?.get(i) ?: i }
         val loops = indices?.size ?: count
 
-        for (i in 0 until loops step 3) {
+        for (i in 0 until loops - 2 step 3) {
             val i1 = getIndex(i)
             val i2 = getIndex(i + 1)
             val i3 = getIndex(i + 2)
             if (i1 >= count || i2 >= count || i3 >= count) continue
 
-            val midU = (uvs[i1].x + uvs[i2].x + uvs[i3].x) / 3f
-            val midV = (uvs[i1].y + uvs[i2].y + uvs[i3].y) / 3f
+            val triangleMinU = min(uvs[i1].x, min(uvs[i2].x, uvs[i3].x))
+            val triangleMinV = min(uvs[i1].y, min(uvs[i2].y, uvs[i3].y))
+            val triangleMaxU = max(uvs[i1].x, max(uvs[i2].x, uvs[i3].x))
+            val triangleMaxV = max(uvs[i1].y, max(uvs[i2].y, uvs[i3].y))
 
-            accumMid[i1].x += midU
-            accumMid[i1].y += midV
-            accumMid[i2].x += midU
-            accumMid[i2].y += midV
-            accumMid[i3].x += midU
-            accumMid[i3].y += midV
-            contributions[i1]++
-            contributions[i2]++
-            contributions[i3]++
+            for (index in intArrayOf(i1, i2, i3)) {
+                minU[index] = min(minU[index], triangleMinU)
+                minV[index] = min(minV[index], triangleMinV)
+                maxU[index] = max(maxU[index], triangleMaxU)
+                maxV[index] = max(maxV[index], triangleMaxV)
+            }
         }
 
-        return Array(count) { i ->
-            val mid = accumMid[i]
-            val factor = contributions[i].takeIf { it > 0 }?.toFloat() ?: 1f
-            Vec2f(mid.x / factor, mid.y / factor)
-        }
+        return Array(count) { i -> Vec2f((minU[i] + maxU[i]) * 0.5f, (minV[i] + maxV[i]) * 0.5f) }
     }
 }
