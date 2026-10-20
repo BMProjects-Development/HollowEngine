@@ -118,8 +118,6 @@ Every NPC that keeps chunks loaded costs the server about as much as a player st
 
 ## Where NPCs are stored
 
-Records live in `<world>/hollowengine/npcs/`: one `<uuid>.dat` file per NPC plus `index.dat`, which lets the server start without reading every NPC. Chunk files no longer contain NPCs.
+Records live in `<world>/hollowengine/npcs.dat`, one file for every NPC, written in the background when the world saves. Chunk files no longer contain NPCs.
 
 NPCs from worlds created before this change, and NPCs created with `/summon`, join the registry the first time they appear in a loaded chunk and follow these rules from then on.
-
-The client knows nothing about the registry: players see bodies the same way as before.

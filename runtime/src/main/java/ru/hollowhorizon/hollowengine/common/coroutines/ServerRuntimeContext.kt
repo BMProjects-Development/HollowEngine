@@ -20,7 +20,7 @@ class ServerRuntimeContext(
         CoroutineScope(server.dispatcher + SupervisorJob(server.coroutineScope.coroutineContext[Job]))
     val nodes = NodeManager(server)
     val scriptRuns = ScriptRunService(server, scope, nodes)
-    val npcs = ServerNpcs(server, levelRoot.resolve("hollowengine").resolve("npcs"))
+    val npcs = ServerNpcs(server, levelRoot.resolve("hollowengine").resolve("npcs.dat"))
 
     fun serialize(tag: CompoundTag) {
         tag.put("nodes", CompoundTag().also(nodes::serialize))

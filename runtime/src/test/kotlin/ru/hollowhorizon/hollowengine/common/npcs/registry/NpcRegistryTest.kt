@@ -16,95 +16,75 @@ import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 
 class NpcRegistryTest {
     @TempDir
     lateinit var directory: Path
 
+    private val file: Path get() = directory.resolve("npcs.dat")
     private val uuid = UUID.randomUUID()
 
     @Test
-    fun `an index left behind by a crash gives way to the NPC files`() {
-        val registry = NpcRegistry(directory)
-        registry.put(record(OVERWORLD, Vec3(0.0, 64.0, 0.0)), entity(1))
-        registry.flush()
-
-        blockReplacing(INDEX)
-        registry.put(record(NETHER, Vec3(100.0, 70.0, 100.0)), entity(2))
-        registry.flush()
-
-        val restarted = NpcRegistry(directory).also { it.load() }
-        assertEquals(NETHER, restarted[uuid]?.dimension)
-        assertEquals(2, restarted.entityNbt(uuid)?.getInt(VERSION))
-    }
-
-    @Test
     fun `a write that failed is retried by the next flush`() {
-        val registry = NpcRegistry(directory)
-        registry.put(record(OVERWORLD, Vec3(0.0, 64.0, 0.0)), entity(1))
-        registry.flush()
+        val registry = NpcRegistry(file)
+        registry.put(record(), entity(1))
+        registry.close()
 
-        val blocked = blockReplacing("$uuid")
-        registry.put(record(OVERWORLD, Vec3(0.0, 64.0, 0.0)), entity(2))
+        val blocked = blockReplacing()
+        registry.put(record(), entity(2))
         registry.flush()
+        registry.close()
         blocked.toFile().deleteRecursively()
         registry.flush()
+        registry.close()
 
-        assertEquals(2, NpcRegistry(directory).also { it.load() }.entityNbt(uuid)?.getInt(VERSION))
+        assertEquals(2, load().entityNbt(uuid)?.getInt(VERSION))
     }
 
     @Test
-    fun `the index catching up removes the journal`() {
-        val registry = NpcRegistry(directory)
-        registry.put(record(OVERWORLD, Vec3(0.0, 64.0, 0.0)), entity(1))
-        registry.flush()
+    fun `a save without changes leaves the file alone`() {
+        val registry = NpcRegistry(file)
+        registry.put(record(), entity(1))
+        registry.close()
 
-        val blocked = blockReplacing(INDEX)
-        registry.put(record(NETHER, Vec3(0.0, 64.0, 0.0)), entity(2))
+        Files.delete(file)
+        registry.put(record(), entity(1))
         registry.flush()
-        blocked.toFile().deleteRecursively()
-        registry.flush()
+        registry.close()
 
-        assertFalse(directory.resolve("journal.dat").exists())
-        assertEquals(NETHER, NpcRegistry(directory).also { it.load() }[uuid]?.dimension)
+        assertFalse(file.exists())
     }
 
     @Test
-    fun `an NPC whose files could not be deleted stays removed`() {
-        val registry = NpcRegistry(directory)
-        registry.put(record(OVERWORLD, Vec3(0.0, 64.0, 0.0)), entity(1))
-        registry.flush()
+    fun `a broken file gives way to its previous version`() {
+        val registry = NpcRegistry(file)
+        registry.put(record(), entity(1))
+        registry.close()
+        registry.put(record(), entity(2))
+        registry.close()
 
-        val file = directory.resolve("$uuid.dat").toFile()
-        file.setWritable(false)
-        try {
-            registry.remove(uuid)
-            registry.flush()
-            assertNull(NpcRegistry(directory).also { it.load() }[uuid])
-        } finally {
-            file.setWritable(true)
-        }
+        file.writeText("broken")
+
+        assertEquals(1, load().entityNbt(uuid)?.getInt(VERSION))
     }
 
-    private fun record(dimension: ResourceKey<Level>, position: Vec3) = NpcRecord(uuid, "test:npc", dimension, position)
+    private fun load() = NpcRegistry(file).also { it.load() }
+
+    private fun record() = NpcRecord(uuid, "test:npc", OVERWORLD, Vec3(0.0, 64.0, 0.0))
 
     private fun entity(version: Int) = CompoundTag().apply { putInt(VERSION, version) }
 
-    /** Makes the next replacement of [name] fail: its backup cannot be made over a directory that is not empty. */
-    private fun blockReplacing(name: String): Path {
-        val backup = directory.resolve("$name.dat_old")
+    /** Makes the next write fail: the backup cannot be made over a directory that is not empty. */
+    private fun blockReplacing(): Path {
+        val backup = directory.resolve("npcs.dat_old")
         if (Files.isRegularFile(backup)) Files.delete(backup)
         backup.createDirectories().resolve("keep").writeText("")
         return backup
     }
 
     private companion object {
-        const val INDEX = "index"
         const val VERSION = "version"
         val OVERWORLD: ResourceKey<Level> =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("overworld"))
-        val NETHER: ResourceKey<Level> =
-            ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("the_nether"))
     }
 }

@@ -12,65 +12,52 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.exists
-import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 
 /**
- * The NPCs of one world, kept outside it like player data: `<uuid>.dat` per NPC with its [NpcRecord] and entity
- * NBT, plus `index.dat` with the records alone. Loading reads only the index; an NPC's NBT is read the first time
- * it is needed, and [flush] writes what changed.
+ * The NPCs of one world, kept outside it like player data: one file with every NPC's [NpcRecord] and entity NBT,
+ * replaced as a whole. [flush] hands a snapshot to a background writer, so saving does not hold up the server.
  */
-class NpcRegistry(private val directory: Path) {
+class NpcRegistry(private val file: Path) {
     private val records = HashMap<UUID, NpcRecord>()
     private val byId = HashMap<String, UUID>()
     private val byChunk = HashMap<ResourceKey<Level>, Long2ObjectOpenHashMap<MutableSet<UUID>>>()
+
+    /** The entity NBT of every NPC. A tag is never changed once it is here, so snapshots share it with the writer. */
     private val entities = HashMap<UUID, CompoundTag>()
-    private val dirty = linkedSetOf<UUID>()
-    private val deleted = linkedSetOf<UUID>()
+    private var changed = false
 
-    /** NPCs whose file may disagree with the index on disk. */
-    private val unindexed = linkedSetOf<UUID>()
+    /** The newest snapshot no write has taken yet; snapshots of one save that wait together are written once. */
+    private val pending = AtomicReference<CompoundTag?>()
+    private var writer: CompletableFuture<Unit> = CompletableFuture.completedFuture(Unit)
 
-    /** The NPCs `journal.dat` names as unindexed now. */
-    private val journaled = linkedSetOf<UUID>()
+    @Volatile
+    private var lastWriteFailed = false
 
-    /** The NPCs `journal.dat` names as removed now; their leftover files are not NPCs anymore. */
-    private val journaledRemovals = linkedSetOf<UUID>()
-    private var indexChanged = false
+    private val backup: Path get() = file.resolveSibling(file.name + BACKUP_SUFFIX)
 
     val size: Int get() = records.size
 
     val all: Collection<NpcRecord> get() = records.values
 
-    /**
-     * Reads index, catching up with record files it does not list and dropping entries whose file is gone.
-     * Files of NPCs the journal names as removed are deleted again rather than read.
-     */
+    /** Reads the file, or its previous version when a crash left the current one missing or broken. */
     fun load() {
         records.clear()
         byId.clear()
         byChunk.clear()
         entities.clear()
-        dirty.clear()
-        deleted.clear()
-        unindexed.clear()
-        journaled.clear()
-        journaledRemovals.clear()
+        changed = false
 
-        val journal = readTag(JOURNAL_NAME)
-        journaled += journal?.uuids(UNINDEXED_KEY).orEmpty()
-        journaledRemovals += journal?.uuids(REMOVED_KEY).orEmpty()
-        val stored = storedUuids()
-        deleted += stored.filter { it in journaledRemovals }
-        val present = stored - journaledRemovals
-        val saved = readTag(directory.resolve("$INDEX_NAME$EXTENSION"))
-            ?.getList(RECORDS_KEY, Tag.TAG_COMPOUND.toInt())
-            ?.mapNotNull { NpcRecord.load(it as CompoundTag) }
-        saved.orEmpty().filter { it.uuid in present && it.uuid !in journaled }.forEach(::index)
-        present.filter { it !in records }.forEach { uuid -> readFile(uuid)?.let { (record, _) -> index(record) } }
-        unindexed += journaled
-        indexChanged = saved == null || saved.size != records.size || journal != null
+        val tag = readTag(file) ?: readTag(backup) ?: return
+        tag.getList(NPCS_KEY, Tag.TAG_COMPOUND.toInt()).forEach { entry ->
+            entry as CompoundTag
+            val record = NpcRecord.load(entry.getCompound(RECORD_KEY)) ?: return@forEach
+            index(record)
+            entities[record.uuid] = entry.getCompound(ENTITY_KEY)
+        }
     }
 
     operator fun get(uuid: UUID): NpcRecord? = records[uuid]
@@ -97,15 +84,12 @@ class NpcRegistry(private val directory: Path) {
             .sortedBy { it.position.distanceToSqr(center) }
     }
 
-    /** The NPC's saved entity NBT, read from its file the first time. */
-    fun entityNbt(uuid: UUID): CompoundTag? {
-        entities[uuid]?.let { return it }
-        if (uuid !in records) return null
-        return readFile(uuid)?.second?.also { entities[uuid] = it }
-    }
+    /** A copy of the NPC's saved entity NBT. */
+    fun entityNbt(uuid: UUID): CompoundTag? = entities[uuid]?.copy()
 
     /**
-     * Adds or updates a record together with its entity NBT. A dead NPC that held the record's id gives way.
+     * Adds or updates a record together with its entity NBT, which the registry takes over: the caller must not
+     * change [entity] afterwards. A dead NPC that held the record's id gives way.
      *
      * @return the dead NPC that gave way, if any.
      * @throws IllegalStateException when a living NPC already has the record's id.
@@ -120,12 +104,9 @@ class NpcRegistry(private val directory: Path) {
         if (records[record.uuid] != record) {
             unindex(record.uuid)
             index(record)
-            unindexed += record.uuid
-            indexChanged = true
+            changed = true
         }
-        entities[record.uuid] = entity
-        deleted -= record.uuid
-        dirty += record.uuid
+        if (entities.put(record.uuid, entity) != entity) changed = true
         return replaced
     }
 
@@ -138,49 +119,44 @@ class NpcRegistry(private val directory: Path) {
 
     fun remove(uuid: UUID): Boolean {
         if (!unindex(uuid)) return false
-        indexChanged = true
         entities -= uuid
-        dirty -= uuid
-        deleted += uuid
+        changed = true
         return true
     }
 
-    /**
-     * Writes what changed; whatever fails to be written stays pending for the next flush.
-     */
+    /** Hands what changed to the background writer; a write that failed is repeated by the next flush. */
     fun flush() {
-        if (!journalCoversPending()) {
-            if (!writeJournal(journaled + unindexed, deleted)) return
-            journaled += unindexed
-            journaledRemovals.clear()
-            journaledRemovals += deleted
-        }
-        deleted.removeIf { deleteFiles("$it") }
-        dirty.removeIf { uuid ->
-            val record = records[uuid] ?: return@removeIf true
-            val entity = entities[uuid] ?: return@removeIf true
-            writeTag("$uuid", CompoundTag().apply {
-                put(RECORD_KEY, record.save())
-                put(ENTITY_KEY, entity)
-            })
-        }
-        if (indexChanged && writeIndex()) indexChanged = false
-        if (indexChanged) return
-        unindexed.retainAll(dirty)
-        val journalNeeded = unindexed.isNotEmpty() || deleted.isNotEmpty()
-        val journalExists = journaled.isNotEmpty() || journaledRemovals.isNotEmpty()
-        if (!journalNeeded && journalExists && deleteFiles(JOURNAL_NAME)) {
-            journaled.clear()
-            journaledRemovals.clear()
+        if (!changed && !lastWriteFailed) return
+        changed = false
+        pending.set(snapshot())
+        writer = writer.handleAsync({ _, _ -> writePending() }, Util.ioPool())
+    }
+
+    /** Waits for the background writer, then writes what is left on the calling thread. */
+    fun close() {
+        writer.handle { _, _ -> }.join()
+        if (changed || lastWriteFailed || pending.get() != null) {
+            changed = false
+            pending.set(snapshot())
+            writePending()
         }
     }
 
-    /**
-     * Whether the journal on disk stays true whatever part of the pending writes a crash interrupts: it names
-     * every file about to get a record the index lacks, every removal, and no NPC about to be written again.
-     */
-    private fun journalCoversPending(): Boolean =
-        journaledRemovals.containsAll(deleted) && dirty.none { it in journaledRemovals || it in unindexed && it !in journaled }
+    private fun snapshot(): CompoundTag = CompoundTag().apply {
+        put(NPCS_KEY, ListTag().apply {
+            records.values.forEach { record ->
+                add(CompoundTag().apply {
+                    put(RECORD_KEY, record.save())
+                    put(ENTITY_KEY, entities.getValue(record.uuid))
+                })
+            }
+        })
+    }
+
+    private fun writePending() {
+        val tag = pending.getAndSet(null) ?: return
+        lastWriteFailed = !writeTag(tag)
+    }
 
     private fun index(record: NpcRecord) {
         records[record.uuid] = record
@@ -202,38 +178,6 @@ class NpcRegistry(private val directory: Path) {
         return true
     }
 
-    /** The NPCs with a file, counting the ones a crash left with only the previous version. */
-    private fun storedUuids(): Set<UUID> {
-        if (!directory.exists()) return emptySet()
-        return directory.listDirectoryEntries("*{$EXTENSION,$BACKUP_EXTENSION}").mapNotNullTo(linkedSetOf()) { file ->
-            val name = file.name.removeSuffix(BACKUP_EXTENSION).removeSuffix(EXTENSION)
-            runCatching { UUID.fromString(name) }.getOrNull()
-        }
-    }
-
-    private fun readFile(uuid: UUID): Pair<NpcRecord, CompoundTag>? {
-        val tag = readTag("$uuid") ?: return null
-        val record = NpcRecord.load(tag.getCompound(RECORD_KEY))?.takeIf { it.uuid == uuid } ?: return null
-        return record to tag.getCompound(ENTITY_KEY)
-    }
-
-    private fun writeIndex(): Boolean = writeTag(INDEX_NAME, CompoundTag().apply {
-        put(RECORDS_KEY, ListTag().apply { records.values.forEach { add(it.save()) } })
-    })
-
-    private fun writeJournal(unindexed: Collection<UUID>, removed: Collection<UUID>): Boolean =
-        writeTag(JOURNAL_NAME, CompoundTag().apply {
-            put(UNINDEXED_KEY, ListTag().apply { unindexed.forEach { add(NbtUtils.createUUID(it)) } })
-            put(REMOVED_KEY, ListTag().apply { removed.forEach { add(NbtUtils.createUUID(it)) } })
-        })
-
-    private fun CompoundTag.uuids(key: String): List<UUID> =
-        getList(key, Tag.TAG_INT_ARRAY.toInt()).map(NbtUtils::loadUUID)
-
-    /** Reads [name], or its previous version when a crash left the current one missing or broken. */
-    private fun readTag(name: String): CompoundTag? =
-        readTag(directory.resolve("$name$EXTENSION")) ?: readTag(directory.resolve("$name$BACKUP_EXTENSION"))
-
     private fun readTag(file: Path): CompoundTag? {
         if (!file.exists()) return null
         return try {
@@ -249,49 +193,28 @@ class NpcRegistry(private val directory: Path) {
      *
      * @return whether the data reached the disk.
      */
-    private fun writeTag(name: String, tag: CompoundTag): Boolean {
+    private fun writeTag(tag: CompoundTag): Boolean {
         var temporary: Path? = null
         val written = try {
-            Files.createDirectories(directory)
-            temporary = Files.createTempFile(directory, "$name-", TEMPORARY_EXTENSION)
+            Files.createDirectories(file.parent)
+            temporary = Files.createTempFile(file.parent, file.name + "-", TEMPORARY_SUFFIX)
             NbtIo.writeCompressed(tag, temporary)
-            val replaced = Util.safeReplaceOrMoveFile(
-                directory.resolve("$name$EXTENSION"),
-                temporary,
-                directory.resolve("$name$BACKUP_EXTENSION"),
-                false
-            )
-            if (!replaced) HollowEngine.LOGGER.error("Failed to replace NPC data {} in {}", name, directory)
+            val replaced = Util.safeReplaceOrMoveFile(file, temporary, backup, false)
+            if (!replaced) HollowEngine.LOGGER.error("Failed to replace NPC data {}", file)
             replaced
         } catch (exception: Exception) {
-            HollowEngine.LOGGER.error("Failed to write NPC data {} to {}", name, directory, exception)
+            HollowEngine.LOGGER.error("Failed to write NPC data {}", file, exception)
             false
         }
         if (!written) temporary?.let { runCatching { Files.deleteIfExists(it) } }
         return written
     }
 
-    private fun deleteFiles(name: String): Boolean {
-        return try {
-            Files.deleteIfExists(directory.resolve("$name$BACKUP_EXTENSION"))
-            Files.deleteIfExists(directory.resolve("$name$EXTENSION"))
-            true
-        } catch (exception: Exception) {
-            HollowEngine.LOGGER.error("Failed to delete NPC data {} from {}", name, directory, exception)
-            false
-        }
-    }
-
     private companion object {
-        const val INDEX_NAME = "index"
-        const val JOURNAL_NAME = "journal"
-        const val RECORDS_KEY = "records"
+        const val NPCS_KEY = "npcs"
         const val RECORD_KEY = "record"
         const val ENTITY_KEY = "entity"
-        const val UNINDEXED_KEY = "unindexed"
-        const val REMOVED_KEY = "removed"
-        const val EXTENSION = ".dat"
-        const val BACKUP_EXTENSION = ".dat_old"
-        const val TEMPORARY_EXTENSION = ".tmp"
+        const val BACKUP_SUFFIX = "_old"
+        const val TEMPORARY_SUFFIX = ".tmp"
     }
 }

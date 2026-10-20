@@ -23,8 +23,8 @@ import java.util.*
  * The NPCs of one server. Each one has a single [NpcEntity]: its body when its chunk is loaded, otherwise an
  * instance built from the [NpcRegistry] record outside the world, which becomes the body once the chunk loads.
  */
-class ServerNpcs internal constructor(private val server: MinecraftServer, directory: Path) {
-    internal val registry = NpcRegistry(directory).also { it.load() }
+class ServerNpcs internal constructor(private val server: MinecraftServer, file: Path) {
+    internal val registry = NpcRegistry(file).also { it.load() }
     private val instances = HashMap<UUID, NpcEntity>()
     private val bodies = HashSet<UUID>()
     private val tickets = HashMap<UUID, Pair<ServerLevel, ChunkPos>>()
@@ -171,7 +171,7 @@ class ServerNpcs internal constructor(private val server: MinecraftServer, direc
     }
 
     internal fun close() {
-        registry.flush()
+        registry.close()
         instances.filterKeys { it !in bodies }.values.forEach(::forget)
         instances.clear()
         bodies.clear()
