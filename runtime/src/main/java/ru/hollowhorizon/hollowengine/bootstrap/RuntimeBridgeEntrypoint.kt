@@ -50,6 +50,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.BowItem
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.crafting.RecipeManager
+import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.SkullBlock
 import net.minecraft.world.level.block.state.BlockState
@@ -699,8 +700,13 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         AttachmentRegistry.onSetLevel(entity, level)
     }
 
-    override fun onEntityRemoved(entity: Entity) {
+    override fun onEntityRemoved(entity: Entity, reason: Entity.RemovalReason) {
+        if (!entity.level().isClientSide) EntityEvent.Removed.post(EntityEvent.Removed(entity, reason))
         AttachmentRegistry.onRemove(entity)
+    }
+
+    override fun onChunkEntitiesLoaded(level: ServerLevel, chunkPos: Long) {
+        LevelEvent.ChunkEntitiesLoaded.post(LevelEvent.ChunkEntitiesLoaded(level, ChunkPos(chunkPos)))
     }
 
     override fun onRecipeManagerCreated(recipeManager: RecipeManager) {

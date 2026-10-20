@@ -3,84 +3,50 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rendering
 import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.ShaderInstance
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.client.models.internal.*
+import ru.hollowhorizon.hollowengine.client.models.internal.INSTANCED_SHADER
+import ru.hollowhorizon.hollowengine.client.models.internal.drawWithShader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.models.internal.opaqueShaderState
+import ru.hollowhorizon.hollowengine.client.models.internal.translucentShaderState
 
 interface ModelInstancingBackend {
     fun canBatch(): Boolean = true
 
-    fun flush(batches: Map<PipelineRenderer, List<SubmittedInstance>>)
+    fun flush(batches: Map<StaticBatchKey, List<StaticInstance>>)
 }
 
 object VanillaInstancingBackend : ModelInstancingBackend {
-    override fun flush(batches: Map<PipelineRenderer, List<SubmittedInstance>>) {
+    override fun flush(batches: Map<StaticBatchKey, List<StaticInstance>>) {
         if (batches.isEmpty()) return
-        val materialBatches = groupByMaterial(batches)
-
         withInstancingRenderState {
-            renderPass(materialBatches, translucent = false)
-            renderPass(materialBatches, translucent = true)
-        }
-    }
-
-    private fun renderPass(batches: List<MaterialInstanceBatch>, translucent: Boolean) {
-        val passBatches = batches
-            .asSequence()
-            .filter { (it.material.blend == Material.Blend.BLEND) == translucent }
-            .let { sequence ->
-                if (translucent) {
-                    sequence.sortedByDescending {
-                        it.instances.maxOfOrNull(SubmittedInstance::sortKey) ?: Float.NEGATIVE_INFINITY
+            for (translucent in listOf(false, true)) {
+                val groups = drawOrder(batches, translucent)
+                if (groups.isEmpty()) continue
+                val shader = INSTANCED_SHADER
+                drawWithShader(shader, if (translucent) translucentShaderState() else opaqueShaderState()) {
+                    groups.forEach { (key, instances) ->
+                        key.part.geometry.drawInstanced(key.part, key.material, shader, instances, InstancedShaderLayoutMode.FIXED)
                     }
-                } else {
-                    sequence
-                }
-            }
-            .toList()
-        val (instanced, fallback) = passBatches.partition {
-            it.renderer.shouldUseInstancing(it.instances.size, it.material)
-        }
-        val state = if (translucent) translucentShaderState() else opaqueShaderState()
-
-        if (instanced.isNotEmpty()) {
-            val shader = INSTANCED_SHADER
-            drawWithShader(shader, state) {
-                instanced.forEach { batch ->
-                    batch.renderer.renderInstanced(
-                        batch.instances,
-                        shader,
-                        InstancedShaderLayoutMode.FIXED,
-                    )
-                }
-            }
-        }
-        if (fallback.isNotEmpty()) {
-            val shader = SHADER
-            drawWithShader(shader, state) {
-                fallback.forEach { batch ->
-                    fallbackToCapturedDraws(batch.renderer, batch.instances, shader)
                 }
             }
         }
     }
 }
 
-data class MaterialInstanceBatch(
-    val renderer: PipelineRenderer,
-    val material: Material,
-    val instances: List<SubmittedInstance>,
-)
-
-fun groupByMaterial(
-    batches: Map<PipelineRenderer, List<SubmittedInstance>>,
-): List<MaterialInstanceBatch> = buildList {
-    batches.forEach { (renderer, instances) ->
-        instances.groupBy { it.material }.forEach { (material, materialInstances) ->
-            add(MaterialInstanceBatch(renderer, material, materialInstances))
-        }
-    }
+/**
+ * The batches of one pass in the order they are drawn: as submitted when opaque, and far to near, both the batches
+ * and the instances within each, when [translucent].
+ */
+fun drawOrder(
+    batches: Map<StaticBatchKey, List<StaticInstance>>,
+    translucent: Boolean,
+): List<Pair<StaticBatchKey, List<StaticInstance>>> {
+    val pass = batches.entries.filter { it.key.material.isTranslucent == translucent }
+    if (!translucent) return pass.map { it.key to it.value }
+    return pass
+        .map { (key, instances) -> key to instances.sortedByDescending(StaticInstance::sortKey) }
+        .sortedByDescending { (_, instances) -> instances.first().sortKey }
 }
 
 inline fun withInstancingRenderState(body: () -> Unit) {
@@ -125,48 +91,4 @@ inline fun withInstancingRenderState(body: () -> Unit) {
 
         GlStateManager._glUseProgram(0)
     }
-}
-
-inline fun renderOpaque(
-    batches: List<MaterialInstanceBatch>,
-    shader: ShaderInstance,
-    render: (PipelineRenderer, List<SubmittedInstance>, ShaderInstance) -> Unit,
-) {
-    for (batch in batches.asSequence().filter { it.material.blend != Material.Blend.BLEND }) {
-        render(batch.renderer, batch.instances, shader)
-    }
-}
-
-inline fun renderTranslucent(
-    batches: List<MaterialInstanceBatch>,
-    shader: ShaderInstance,
-    render: (PipelineRenderer, List<SubmittedInstance>, ShaderInstance) -> Unit,
-) {
-    for (batch in batches
-        .asSequence()
-        .filter { it.material.blend == Material.Blend.BLEND }
-        .sortedByDescending { it.instances.maxOfOrNull(SubmittedInstance::sortKey) ?: Float.NEGATIVE_INFINITY }) {
-        render(batch.renderer, batch.instances, shader)
-    }
-}
-
-fun fallbackToCapturedDraws(
-    renderer: PipelineRenderer,
-    instances: List<SubmittedInstance>,
-    shader: ShaderInstance = SHADER,
-    layoutMode: InstancedShaderLayoutMode = InstancedShaderLayoutMode.FIXED,
-) {
-    val drawInstances = if (instances.firstOrNull()?.material?.blend == Material.Blend.BLEND) {
-        instances.sortedByDescending(SubmittedInstance::sortKey)
-    } else {
-        instances
-    }
-    for (instance in drawInstances) {
-        renderer.renderCapturedInstance(instance, shader, layoutMode)
-    }
-}
-
-enum class InstancedShaderLayoutMode {
-    FIXED,
-    RUNTIME,
 }

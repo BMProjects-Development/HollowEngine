@@ -75,12 +75,11 @@ fun hostRenderShift(host: Entity, partialTick: Float): Vec3 {
 
 /** The world-space box of a node, from the local bounds of whatever is drawn for it. */
 fun buildNodeRenderBounds(localBounds: Pair<Vec3f, Vec3f>?, transform: TrsTransformF): AABB {
-    val worldTransform = TrsTransformF().set(transform)
 
     if (localBounds == null) {
         val maxAxis =
-            max(max(abs(worldTransform.scale.x), abs(worldTransform.scale.y)), abs(worldTransform.scale.z)).toDouble()
-        val position = worldTransform.translation
+            max(max(abs(transform.scale.x), abs(transform.scale.y)), abs(transform.scale.z)).toDouble()
+        val position = transform.translation
         return AABB(
             position.x - maxAxis,
             position.y - maxAxis,
@@ -93,7 +92,7 @@ fun buildNodeRenderBounds(localBounds: Pair<Vec3f, Vec3f>?, transform: TrsTransf
 
     val min = localBounds.first
     val max = localBounds.second
-    val matrix = worldTransform.matrixF
+    val matrix = transform.matrixF
     val source = MutableVec3f()
     val transformed = MutableVec3f()
     var minX = Float.POSITIVE_INFINITY

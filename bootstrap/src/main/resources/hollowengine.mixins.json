@@ -16,6 +16,7 @@
     "MinecraftServerMixin",
     "PackRepositoryMixin",
     "PathfindingContextMixin",
+    "PersistentEntitySectionManagerMixin",
     "PlayerListMixin",
     "PlayerMixin",
     "ProjectileMixin",

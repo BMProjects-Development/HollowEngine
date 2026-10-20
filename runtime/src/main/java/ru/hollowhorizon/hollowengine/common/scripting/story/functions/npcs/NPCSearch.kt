@@ -6,11 +6,20 @@ import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
+import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.items.ItemFilter
 import ru.hollowhorizon.hollowengine.common.npcs.query.EntityQuery
 import ru.hollowhorizon.hollowengine.common.npcs.query.EntityQuerySort
 import ru.hollowhorizon.hollowengine.common.npcs.query.entityQuery
+import ru.hollowhorizon.hollowengine.common.npcs.registry.ServerNpcs
+import ru.hollowhorizon.hollowengine.common.utils.currentServer
+
+/**
+ * The NPCs of the current world, whether their chunks are loaded or not: `npcs[uuid]`,
+ * `npcs["village:blacksmith"]`, `npcs.near(level, pos, radius)`.
+ */
+val npcs: ServerNpcs get() = currentServer.runtimeContext.npcs
 
 fun <T : Entity> NpcEntity.findEntities(query: EntityQuery<T>): List<Ref<T>> {
     if (query.limit == 0) return emptyList()

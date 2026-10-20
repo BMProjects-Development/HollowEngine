@@ -76,5 +76,6 @@ fun onColliderServerTick(event: TickEvent.Server) {
 
 @SubscribeEvent
 fun onColliderLevelUnload(event: LevelEvent.Unload) {
+    EntityColliders.forget(event.level)
     if (!event.level.isClientSide) ServerColliderPoses.forget(event.level)
 }

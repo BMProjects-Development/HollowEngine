@@ -8,6 +8,7 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderTickPoses
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import java.util.IdentityHashMap
 import java.util.function.Predicate
 
 /** Where this entity's colliders are now, as this side sees them. */
@@ -39,15 +40,56 @@ object EntityColliders {
     fun hosts(level: Level): List<ColliderHost> =
         if (level.isClientSide) ClientColliderTickPoses.hosts else ServerColliderPoses.hostsIn(level)
 
-    fun rig(entity: Entity): ModelRig? =
-        if (entity.level().isClientSide) ClientColliderPoses.rig(entity) else ServerColliderPoses.rig(entity)
+    fun rig(entity: Entity): ModelRig? = lookup(entity).rig
 
     /** Whether [entity] has colliders of the [modes] that stand in for its box. */
     fun hasTargets(entity: Entity, modes: (ColliderModes) -> Boolean = ColliderModes::isTarget): Boolean {
-        val rig = rig(entity) ?: return false
-        if (entity.collidersComponent == null) return rig.hasColliders(modes)
-        return effectiveSpecs(entity, rig).any { modes(it.modes) }
+        val lookup = lookup(entity)
+        val rig = lookup.rig ?: return false
+        return lookup.specs?.any { modes(it.modes) } ?: rig.hasColliders(modes)
     }
+
+    /** Drops what this tick found for [entity], after its colliders were changed in the middle of it. */
+    fun forget(entity: Entity) {
+        lookupsOf(entity.level()).entities.remove(entity)
+    }
+
+    /** Lets go of the entities of [level], which is closing. */
+    fun forget(level: Level) {
+        lookupsOf(level).entities.clear()
+    }
+
+    /**
+     * The rig of [entity] and its colliders as overridden, worked out once a tick. Vanilla asks about every
+     * neighbor of every moving entity, so a crowd asks about one entity many times a tick.
+     */
+    private fun lookup(entity: Entity): ColliderLookup {
+        val level = entity.level()
+        val lookups = lookupsOf(level)
+        if (lookups.tick != level.gameTime) {
+            lookups.entities.clear()
+            lookups.tick = level.gameTime
+        }
+        return lookups.entities.getOrPut(entity) {
+            val rig = if (level.isClientSide) ClientColliderPoses.rig(entity) else ServerColliderPoses.rig(entity)
+            val specs = if (rig != null && entity.collidersComponent != null) effectiveSpecs(entity, rig) else null
+            ColliderLookup(rig, specs)
+        }
+    }
+
+    private fun lookupsOf(level: Level): TickLookups = if (level.isClientSide) clientLookups else serverLookups
+
+    /** [specs] are the colliders with scripts' overrides applied, null when no script overrides any. */
+    private class ColliderLookup(val rig: ModelRig?, val specs: List<ColliderAttachmentSpec>?)
+
+    /** The lookups of one tick on one side; each side asks from its own thread only. */
+    private class TickLookups {
+        var tick = Long.MIN_VALUE
+        val entities = IdentityHashMap<Entity, ColliderLookup>()
+    }
+
+    private val clientLookups = TickLookups()
+    private val serverLookups = TickLookups()
 
     /**
      * The nearest of [vanilla] and the colliders of the entities around [search] along the segment from

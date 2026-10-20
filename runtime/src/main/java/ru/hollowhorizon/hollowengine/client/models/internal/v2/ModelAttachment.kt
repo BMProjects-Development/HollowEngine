@@ -14,12 +14,13 @@ import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticSubmissions
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.submitStatic
 import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -73,6 +74,12 @@ class ModelAttachment(
     private var builtFor: Model? = null
     private var runtimeNodes: List<RuntimeNode> = emptyList()
 
+    /** Every node of [runtimeNodes], parents first; the hierarchy only changes when the model is built again. */
+    private var allNodes: List<RuntimeNode> = emptyList()
+
+    /** What hangs on the model and follows it through the world, as sounds on bones; see [Attachment.followsWorldPose]. */
+    private var worldPoseAttachments: List<Attachment> = emptyList()
+
     /**
      * Holds what hangs on the model itself rather than on a bone. It is not one of the model's nodes, so
      * no animation or name lookup ever reaches it.
@@ -84,6 +91,12 @@ class ModelAttachment(
     private var renderPipeline: ListRenderPipeline? = null
     private var target: PoseTarget? = null
     private var cachedBounds: Pair<Vec3f, Vec3f>? = null
+    private var keptCullingBounds: Pair<Vec3f, Vec3f>? = null
+    private var posesSinceCullingBounds = 0
+
+    /** Changes with every pose, so what is worked out from one can be kept until the next. */
+    var poseVersion = 0
+        private set
     private val modelChangeListeners = ArrayList<() -> Unit>()
 
     val model: Model get() = builtFor ?: Model.EMPTY
@@ -126,9 +139,7 @@ class ModelAttachment(
     private fun placeAddedBones() {
         val added = currentRig.addedBones
         if (added.isEmpty()) return
-        runtimeNodes.forEach { root ->
-            root.walk().forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
-        }
+        allNodes.forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
     }
 
     /** Asks the conditions of the attachments that have one; see [ConditionalAttachment]. */
@@ -140,9 +151,7 @@ class ModelAttachment(
             }
         }
         if (!hasConditions) return
-        runtimeNodes.forEach { root ->
-            root.walk().forEach { node -> node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
-        }
+        allNodes.forEach { node -> node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
         modelRoot?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
     }
 
@@ -152,7 +161,7 @@ class ModelAttachment(
 
     /** Hands the running attachments their specs again, after a change that left the rig's structure as it was. */
     private fun respecAttachments() {
-        val holders = runtimeNodes.flatMap { it.walk() }.map { it.name to it } + listOfNotNull(modelRoot?.let { null to it })
+        val holders = allNodes.map { it.name to it } + listOfNotNull(modelRoot?.let { null to it })
         holders.forEach { (bone, node) ->
             node.attachments.filterIsInstance<RespecAttachment>().forEach { running ->
                 currentRig.holder(bone).attachment(running.spec.id)?.let(running::respec)
@@ -191,7 +200,7 @@ class ModelAttachment(
     /** Puts every node back in "T-pose"; the animator then poses on top. */
     fun beginPose() {
         ensureReady()
-        runtimeNodes.forEach { it.walk().forEach(RuntimeNode::resetPose) }
+        allNodes.forEach(RuntimeNode::resetPose)
     }
 
     /** Turns the posed nodes into the matrices the renderer draws from. */
@@ -200,6 +209,8 @@ class ModelAttachment(
         runtimeNodes.forEach(RuntimeNode::updateHierarchyMatrices)
         modelRoot?.updateHierarchyMatrices()
         cachedBounds = null
+        posesSinceCullingBounds++
+        poseVersion++
     }
 
     /** Drops the draw commands, which something hung on this model changed under; they are collected again on the next draw. */
@@ -215,7 +226,18 @@ class ModelAttachment(
         dress()
     }
 
-    private fun dress() = runtimeMaterials.apply(dressedBy + currentRig.materials)
+    private fun dress() {
+        runtimeMaterials.apply(dressedBy + currentRig.materials)
+        appearanceChanged()
+    }
+
+    /** Changes when a node is shown or hidden or the materials are dressed, so what is drawn has to be gathered again. */
+    var appearanceVersion = 0
+        private set
+
+    internal fun appearanceChanged() {
+        appearanceVersion++
+    }
 
 
     /** What a pose is written into: this instance's nodes and the clips of its model. */
@@ -244,17 +266,20 @@ class ModelAttachment(
             currentRig,
             this,
         )
-        nodesByIndex = runtimeNodes.byIndex()
+        allNodes = runtimeNodes.flatMap { it.walk() }
+        nodesByIndex = allNodes.associateBy { it.definition.index }
         nodesByIndex.values.forEach(::customizeNode)
         modelRoot = RuntimeNode(NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF()), this).also { root ->
             val context = RigAttachmentContext(root, { entity }, this) { carrier }
             currentRig.attachments.forEach { spec -> RigAttachmentFactories.create(spec, context)?.let(root.attachments::add) }
         }
         carriesEffects = currentRig.carriesEffects()
+        worldPoseAttachments = (allNodes.flatMap { it.attachments } + modelRoot?.attachments.orEmpty()).filter { it.followsWorldPose }
         dress()
         renderPipeline = null
         target = null
         cachedBounds = null
+        keptCullingBounds = null
         modelChangeListeners.forEach { it() }
     }
 
@@ -262,14 +287,15 @@ class ModelAttachment(
         runtimeNodes.forEach(RuntimeNode::close)
         modelRoot?.close()
         runtimeNodes = emptyList()
+        allNodes = emptyList()
+        worldPoseAttachments = emptyList()
         modelRoot = null
         renderPipeline = null
         nodesByIndex = emptyMap()
     }
 
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
-        runtimeNodes.forEach { it.updateWorldPose(modelToWorld, entity) }
-        modelRoot?.updateWorldPose(modelToWorld, entity)
+        worldPoseAttachments.forEach { it.updateWorldPose(modelToWorld, entity) }
     }
 
     /**
@@ -300,14 +326,32 @@ class ModelAttachment(
 
     override fun collectCommands(pipeline: RenderPipeline) {
         super.collectCommands(pipeline)
+        collectStaticMeshes(pipeline)
         runtimeNodes.forEach { it.collectCommands(pipeline) }
         modelRoot?.collectCommands(pipeline)
+    }
+
+    /** Hands the unskinned meshes of this instance to the model's merged geometry, to be drawn as one. */
+    private fun collectStaticMeshes(pipeline: RenderPipeline) {
+        val geometry = model.staticGeometry ?: return
+        val meshes = arrayOfNulls<MeshAttachment>(geometry.slots.size)
+        val kept = StaticSubmissions(geometry)
+        allNodes.forEach { node ->
+            node.attachments.forEach { mesh ->
+                if (mesh !is MeshAttachment || mesh.primitive.isDynamic) return@forEach
+                geometry.slotOf(node.definition.index, mesh.primitive)?.let { meshes[it.index] = mesh }
+            }
+        }
+        pipeline.addInstancedRenderable { submitStatic(geometry, meshes, kept, poseVersion, appearanceVersion) }
     }
 
     companion object {
         /** The name of the node that holds what hangs on the model itself. */
         const val MODEL_ROOT = "#model"
         private const val MODEL_ROOT_INDEX = -2
+
+        /** How many poses the culling bounds are kept for before they are worked out again. */
+        private const val CULLING_BOUNDS_POSES = 4
     }
 
     fun child(name: String): RuntimeNode {
@@ -317,11 +361,21 @@ class ModelAttachment(
 
     fun findNode(name: String): RuntimeNode? {
         ensureReady()
-        return runtimeNodes.asSequence().flatMap { it.walk().asSequence() }.firstOrNull { it.name == name }
+        return allNodes.firstOrNull { it.name == name }
     }
 
     /** The instance's bounds in its own space, recomputed after every pose. */
     fun calculateBounds(): Pair<Vec3f, Vec3f>? = cachedBounds ?: calculateBoundsInternal().also { cachedBounds = it }
+
+    /**
+     * The bounds a renderer culls the instance by: [calculateBounds] of a pose a few poses old at most, as a pose
+     * moves little from one frame to the next and working them out takes every corner of every mesh.
+     */
+    fun cullingBounds(): Pair<Vec3f, Vec3f>? {
+        keptCullingBounds?.takeIf { posesSinceCullingBounds < CULLING_BOUNDS_POSES }?.let { return it }
+        posesSinceCullingBounds = 0
+        return calculateBounds().also { keptCullingBounds = it }
+    }
 
     private fun calculateBoundsInternal(): Pair<Vec3f, Vec3f>? {
         var minX = Float.POSITIVE_INFINITY

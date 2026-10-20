@@ -8,15 +8,12 @@ in vec4 Color;
 in vec2 UV0;
 in vec3 Normal;
 
-in vec4 InstanceModelView0;
-in vec4 InstanceModelView1;
-in vec4 InstanceModelView2;
-in vec4 InstanceModelView3;
-in vec3 InstanceNormal0;
-in vec3 InstanceNormal1;
-in vec3 InstanceNormal2;
+in float _he_Slot;
 in ivec2 InstanceUV1;
 in ivec2 InstanceUV2;
+
+uniform samplerBuffer _he_Transforms;
+uniform int _he_SlotCount;
 
 uniform sampler2D Sampler1;
 uniform sampler2D Sampler2;
@@ -33,6 +30,12 @@ out vec4 overlayColor;
 out vec2 texCoord0;
 out vec4 normal;
 
+mat3 slot_normal(mat3 slot) {
+    float det = determinant(slot);
+    if (abs(det) < 1e-8) return mat3(1.0);
+    return transpose(inverse(slot)) * pow(abs(det), 1.0 / 3.0);
+}
+
 float instanced_fog_distance(vec3 viewPos, int fogShape) {
     if (fogShape == 0) {
         return length(viewPos);
@@ -41,17 +44,25 @@ float instanced_fog_distance(vec3 viewPos, int fogShape) {
 }
 
 void main() {
+    int instance = gl_InstanceID * (7 + 4 * _he_SlotCount);
+    int at = instance + 7 + int(_he_Slot + 0.5) * 4;
+    mat4 slot = mat4(
+        texelFetch(_he_Transforms, at),
+        texelFetch(_he_Transforms, at + 1),
+        texelFetch(_he_Transforms, at + 2),
+        texelFetch(_he_Transforms, at + 3)
+    );
     mat4 modelView = mat4(
-        InstanceModelView0,
-        InstanceModelView1,
-        InstanceModelView2,
-        InstanceModelView3
-    );
+        texelFetch(_he_Transforms, instance),
+        texelFetch(_he_Transforms, instance + 1),
+        texelFetch(_he_Transforms, instance + 2),
+        texelFetch(_he_Transforms, instance + 3)
+    ) * slot;
     mat3 normalMat = mat3(
-        InstanceNormal0,
-        InstanceNormal1,
-        InstanceNormal2
-    );
+        texelFetch(_he_Transforms, instance + 4).xyz,
+        texelFetch(_he_Transforms, instance + 5).xyz,
+        texelFetch(_he_Transforms, instance + 6).xyz
+    ) * slot_normal(mat3(slot));
 
     vec4 viewPos = modelView * vec4(Position, 1.0);
     gl_Position = ProjMat * viewPos;

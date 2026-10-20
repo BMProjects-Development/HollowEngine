@@ -55,7 +55,10 @@ data class CollectOptions(
 suspend fun NpcEntity.collectItems(
     requests: List<ItemRequest>,
     options: CollectOptions = CollectOptions(),
-): CollectResult = startCollectItems(requests, options).await()
+): CollectResult {
+    require(requests.isNotEmpty()) { "At least one item request is required" }
+    return actions.act(NpcActionKeys.MOVEMENT) { collectItemsInternal(requests, options) }
+}
 
 fun NpcEntity.startCollectItems(
     requests: List<ItemRequest>,

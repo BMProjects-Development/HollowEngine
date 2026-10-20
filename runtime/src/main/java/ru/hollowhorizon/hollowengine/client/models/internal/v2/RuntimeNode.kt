@@ -10,17 +10,31 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 abstract class Attachment(val parent: Attachment? = null) : AutoCloseable {
     override fun close() = Unit
     open fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = Unit
+
+    /** Whether [updateWorldPose] does anything: a model asks only such attachments, every frame. */
+    open val followsWorldPose: Boolean get() = false
     val transform = TrsTransformF()
     val globalMatrix = MutableMat4f()
 
+    /** Changes whenever [globalMatrix] does, so what hangs below knows it has to follow. */
+    var globalVersion = 0
+        private set
+    private var appliedTransform = -1
+    private var appliedParent = -1
+
+    /** Works [globalMatrix] out again, unless neither [transform] nor the parent's matrix changed since. */
     open fun updateGlobalMatrix() {
-        val localM = transform.matrixF
-        if (parent != null) {
-            globalMatrix.set(parent.globalMatrix)
-            globalMatrix.mul(localM)
-        } else {
-            globalMatrix.set(localM)
+        val parentVersion = parent?.globalVersion ?: 0
+        if (transform.modCount == appliedTransform && parentVersion == appliedParent) return
+
+        when {
+            parent == null -> globalMatrix.set(transform.matrixF)
+            transform.isIdentity() -> globalMatrix.set(parent.globalMatrix)
+            else -> globalMatrix.set(parent.globalMatrix).mul(transform.matrixF)
         }
+        appliedTransform = transform.modCount
+        appliedParent = parentVersion
+        globalVersion++
     }
 
     open fun collectCommands(pipeline: RenderPipeline) {
@@ -36,9 +50,13 @@ open class RuntimeNode(
     val name: String = definition.name ?: "Node_${definition.index}"
     var isVisible = true
         set(value) {
+            if (field != value) owningModel()?.appearanceChanged()
             field = value
             children.forEach { it.isVisible = value }
         }
+
+    private fun owningModel(): ModelAttachment? =
+        generateSequence(parent) { it.parent }.firstNotNullOfOrNull { it as? ModelAttachment }
 
     init {
         transform.set(definition.baseTransform)
@@ -102,9 +120,18 @@ open class RuntimeNode(
 
     fun child(name: String): RuntimeNode = children.single { it.name == name }
 
+    private var restTransform = -1
+    private var restBase = -1
+
+    /** Puts the node back at rest; one nothing moved since the last time is left as it is. */
     fun resetPose() {
-        transform.set(definition.baseTransform)
-        baseMorphWeights.copyInto(morphWeights)
+        val base = definition.baseTransform
+        if (transform.modCount != restTransform || base.modCount != restBase) {
+            transform.set(base)
+            restTransform = transform.modCount
+            restBase = base.modCount
+        }
+        if (morphWeights.isNotEmpty()) baseMorphWeights.copyInto(morphWeights)
     }
 
     fun updateHierarchyMatrices() {
@@ -114,11 +141,18 @@ open class RuntimeNode(
     }
 }
 
-fun RuntimeNode.walk(): List<RuntimeNode> = buildList {
-    add(this@walk)
-    children.forEach {
-        addAll(it.walk())
-    }
+/** Whether the transform leaves everything where it is, as most meshes on their bones do. */
+private fun TrsTransformF.isIdentity(): Boolean =
+    translation.x == 0f && translation.y == 0f && translation.z == 0f &&
+        rotation.x == 0f && rotation.y == 0f && rotation.z == 0f && rotation.w == 1f &&
+        scale.x == 1f && scale.y == 1f && scale.z == 1f
+
+/** This node and every node under it, parents before children. */
+fun RuntimeNode.walk(): List<RuntimeNode> = ArrayList<RuntimeNode>().also { collectInto(it) }
+
+private fun RuntimeNode.collectInto(into: MutableList<RuntimeNode>) {
+    into += this
+    children.forEach { it.collectInto(into) }
 }
 
 val RuntimeNode.root: RuntimeNode

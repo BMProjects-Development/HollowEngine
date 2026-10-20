@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
@@ -29,6 +30,22 @@ data class Model(
      */
     val boneBounds: Map<Int, Pair<Vec3f, Vec3f>> = BoneGeometry.of(this)
 
+    private var geometry: StaticGeometry? = null
+    private var geometryBuilt = false
+
+    /**
+     * The unskinned primitives merged for drawing, null when there are none. Built the first time something draws
+     * the model, on the render thread, and shared by all its instances.
+     */
+    val staticGeometry: StaticGeometry?
+        get() {
+            if (!geometryBuilt) {
+                geometry = StaticGeometry.of(this)
+                geometryBuilt = true
+            }
+            return geometry
+        }
+
     fun walkNodes(): Sequence<NodeDefinition> {
         return sequence {
             suspend fun SequenceScope<NodeDefinition>.walk(node: NodeDefinition) {
@@ -49,9 +66,11 @@ data class Model(
         return walkNodes().find { it.name == name }
     }
 
-    /** Releases the GPU buffers of every primitive; called by the manager when a model is replaced. */
+    /** Releases the GPU buffers of the model; called by the manager when a model is replaced. */
     fun destroy() {
         walkNodes().mapNotNull { it.mesh }.flatMap { it.primitives }.forEach(Primitive::destroy)
+        geometry?.destroy()
+        geometry = null
     }
 
     companion object {

@@ -52,6 +52,7 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
     }
 
     override fun close() = model.close()
+    override val followsWorldPose: Boolean get() = true
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = model.updateWorldPose(modelToWorld, entity)
 
     companion object {

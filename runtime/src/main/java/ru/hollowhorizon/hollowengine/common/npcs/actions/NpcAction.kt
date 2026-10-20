@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.npcs.actions
 
 import kotlinx.coroutines.*
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 @JvmInline
 value class NpcActionKey(val id: String) {
@@ -17,10 +19,10 @@ object NpcActionKeys {
 }
 
 enum class NpcActionStatus {
-    RUNNING,
-    COMPLETED,
-    CANCELLED,
-    FAILED,
+    RUNNING, COMPLETED, CANCELLED,
+
+    /** The channel was taken by another owner; [NpcAction.await] throws [Preempted]. */
+    PREEMPTED, FAILED,
 }
 
 interface NpcAction<out R> {
@@ -31,81 +33,51 @@ interface NpcAction<out R> {
     suspend fun await(): R
 }
 
-class NpcActionController(private val scope: CoroutineScope) {
-    private val lock = Any()
-    private val actions = mutableMapOf<NpcActionKey, MutableSet<NpcActionImpl<*>>>()
-
-    fun <R> start(key: NpcActionKey, block: suspend CoroutineScope.() -> R): NpcAction<R> =
-        start(key, replaceRunning = true, block)
-
-    fun <R> startConcurrent(key: NpcActionKey, block: suspend CoroutineScope.() -> R): NpcAction<R> =
-        start(key, replaceRunning = false, block)
-
-    private fun <R> start(
-        key: NpcActionKey,
-        replaceRunning: Boolean,
-        block: suspend CoroutineScope.() -> R,
-    ): NpcAction<R> {
-        val deferred = scope.async(start = CoroutineStart.LAZY, block = block)
-        val action = NpcActionImpl(deferred)
-        val replaced = synchronized(lock) {
-            val running = actions.getOrPut(key, ::linkedSetOf)
-            val previous = if (replaceRunning) running.toList().also { running.clear() } else emptyList()
-            running += action
-            previous
-        }
-        replaced.forEach(NpcActionImpl<*>::cancel)
-        deferred.invokeOnCompletion {
-            synchronized(lock) {
-                actions[key]?.let { running ->
-                    running.remove(action)
-                    if (running.isEmpty()) actions.remove(key)
-                }
-            }
-        }
-        deferred.start()
-        return action
-    }
-
-    fun cancel(key: NpcActionKey) {
-        val running = synchronized(lock) { actions.remove(key)?.toList().orEmpty() }
-        running.forEach(NpcActionImpl<*>::cancel)
-    }
-
-    fun cancelAll() {
-        val running = synchronized(lock) {
-            actions.values.flatten().also { actions.clear() }
-        }
-        running.forEach(NpcActionImpl<*>::cancel)
-    }
+/** Who holds an NPC channel, from the lowest priority to the highest. */
+enum class NpcActionPriority {
+    SCHEDULE, SCRIPT, STORY, CUTSCENE,
 }
 
-private class NpcActionImpl<R>(private val deferred: Deferred<R>) : NpcAction<R> {
-    @Volatile
-    override var status: NpcActionStatus = NpcActionStatus.RUNNING
-        private set
-
-    init {
-        deferred.invokeOnCompletion { cause ->
-            status = when (cause) {
-                null -> NpcActionStatus.COMPLETED
-                is CancellationException -> NpcActionStatus.CANCELLED
-                else -> NpcActionStatus.FAILED
-            }
-        }
+/**
+ * A party that leases NPC channels.
+ *
+ * An owner with a [job] keeps the channels it used between its actions, so a lower priority cannot take
+ * them in the meantime; the lease ends with the job or with [NpcActionController.release]. An owner without
+ * a job holds a channel only while one of its actions runs.
+ *
+ * Put into a coroutine context, the owner applies to every suspending NPC call made inside it.
+ *
+ * @property priority the level this owner competes at.
+ * @property job the job the lease lives as long as.
+ */
+class NpcActionOwner(
+    val priority: NpcActionPriority,
+    val job: Job? = null,
+) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<NpcActionOwner> {
+        /** The owner of every call made without one. */
+        val SCRIPT = NpcActionOwner(NpcActionPriority.SCRIPT)
     }
 
-    override val isActive: Boolean
-        get() = deferred.isActive
+    override fun toString() = "NpcActionOwner($priority)"
+}
 
-    override fun cancel() {
-        deferred.cancel()
-    }
+/**
+ * Thrown to the caller of an action, or of a whole [NpcActionController.perform], whose channel was taken by
+ * another owner. Nothing retries it: the caller decides whether to start the action again.
+ *
+ * @property channel the channel that was taken.
+ * @property priority the priority of the owner that took it.
+ */
+class Preempted(
+    val channel: NpcActionKey,
+    val priority: NpcActionPriority,
+) : CancellationException("NPC channel ${channel.id} was taken by $priority")
 
-    override suspend fun await(): R = try {
-        deferred.await()
-    } catch (exception: CancellationException) {
-        deferred.cancel(exception)
-        throw exception
-    }
+/**
+ * Runs [block] as a new owner of [priority]: the channels its suspending NPC calls use stay leased to it
+ * until [block] returns.
+ */
+suspend fun <R> actingAs(priority: NpcActionPriority, block: suspend CoroutineScope.() -> R): R = coroutineScope {
+    withContext(NpcActionOwner(priority, coroutineContext.job), block)
 }

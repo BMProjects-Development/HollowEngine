@@ -18,4 +18,9 @@ open class EntityEvent(val entity: Entity) : Event {
     class ChangeDimension(entity: Entity, val new: Entity, val from: Level, val to: Level) : EntityEvent(entity) {
         companion object : EventHandler<ChangeDimension>()
     }
+
+    /** The entity is leaving its level for [reason]; it is still whole when this is posted. */
+    class Removed(entity: Entity, val reason: Entity.RemovalReason) : EntityEvent(entity) {
+        companion object : EventHandler<Removed>()
+    }
 }

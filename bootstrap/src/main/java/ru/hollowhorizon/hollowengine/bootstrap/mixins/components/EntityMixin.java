@@ -77,7 +77,7 @@ public abstract class EntityMixin implements EntityExtension {
     }
     @Inject(method = "setRemoved", at = @At("HEAD"))
     private void onRemove(Entity.RemovalReason removalReason, CallbackInfo ci) {
-        BootstrapRuntimeManager.bridge().onEntityRemoved((Entity) (Object) this);
+        BootstrapRuntimeManager.bridge().onEntityRemoved((Entity) (Object) this, removalReason);
     }
 
 }

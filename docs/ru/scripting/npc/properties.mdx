@@ -1,6 +1,6 @@
 ---
 title: Свойства сущностей
-order: 10
+order: 11
 ---
 
 <center><h1>Свойства NPC и сущностей</h1></center>
@@ -117,7 +117,7 @@ val guideRef = entityRef<NpcEntity>(tag.getUUID("guide"))
 val guide = guideRef.resolve()
 ```
 
-Это безопаснее, чем держать прямую ссылку на сущность, потому что Minecraft может выгрузить или пересоздать entity.
+Это безопаснее, чем держать прямую ссылку на сущность, потому что Minecraft может выгрузить или пересоздать entity. `entityRef` ждёт, пока тело загрузится; чтобы добраться до NPC в выгруженном чанке, используйте `npcs[uuid]` или его id, см. [NPC вне мира](/docs/hollowengine/scripting/npc/registry).
 ---
 
 ## Неймплейты

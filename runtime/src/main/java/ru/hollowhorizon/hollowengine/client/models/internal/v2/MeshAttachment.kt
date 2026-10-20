@@ -20,7 +20,8 @@ class MeshAttachment(
     fun skinMatrices(): Array<Mat4f> =
         node.definition.skin!!.compute(globalMatrix, node.jointGetter)
 
+    /** Only a skinned or morphed primitive draws itself; the model draws its static ones together. */
     override fun collectCommands(pipeline: RenderPipeline) {
-        primitive.setupPipeline(pipeline, this)
+        if (primitive.isDynamic) primitive.setupPipeline(pipeline, this)
     }
 }

@@ -36,6 +36,8 @@ class SoundBoneAttachment(
         if (spec is SoundBoneAttachmentSpec) this.spec = spec
     }
 
+    override val followsWorldPose: Boolean get() = true
+
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
         if (entity.isRemoved) return
         val bindingId = "${entity.uuid}/${model?.soundScope ?: node.name}/${spec.id}"

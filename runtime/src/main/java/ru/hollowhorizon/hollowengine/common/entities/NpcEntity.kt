@@ -55,6 +55,27 @@ class NpcEntity : PathfinderMob {
 
     var maxDeathTime: Int = 20
 
+    /**
+     * Keeps the chunks around the NPC loaded and ticking wherever it goes, across server restarts. Loading costs
+     * the server like a player standing there; turn it off once the NPC no longer needs it.
+     */
+    var isForceLoaded: Boolean = false
+
+    /** Keeps the NPC's record after it dies, so a script can still find it; otherwise death removes it for good. */
+    var keepAfterDeath: Boolean = false
+
+    /** How many `forceLoad { }` blocks are running for this NPC. */
+    internal var forceLoadCalls: Int = 0
+
+    /** Whether the chunks around the NPC are held loaded right now. */
+    val keepsChunksLoaded: Boolean get() = isForceLoaded || forceLoadCalls > 0
+
+    /**
+     * The vehicle the NPC rode when it was saved. Vehicles leave NPCs out of their own NBT, so the NPC keeps the
+     * link and takes its seat again once both are back in the level.
+     */
+    internal var savedVehicle: UUID? = null
+
     private fun fakePlayerUuid(): UUID = UUID.nameUUIDFromBytes("hollowengine:npc:$uuid".encodeToByteArray())
 
     init {
@@ -91,6 +112,9 @@ class NpcEntity : PathfinderMob {
         super.addAdditionalSaveData(compound)
         compound.put(INVENTORY_KEY, CompoundTag().also { inventory.save(it, registryAccess()) })
         if (npcNavigation.pilot.isAirborne) compound.putBoolean(FLYING_KEY, true)
+        if (isForceLoaded) compound.putBoolean(FORCE_LOADED_KEY, true)
+        if (keepAfterDeath) compound.putBoolean(KEEP_AFTER_DEATH_KEY, true)
+        (vehicle?.uuid ?: savedVehicle)?.let { compound.putUUID(VEHICLE_KEY, it) }
     }
 
     override fun readAdditionalSaveData(compound: CompoundTag) {
@@ -99,6 +123,9 @@ class NpcEntity : PathfinderMob {
             inventory.load(compound.getCompound(INVENTORY_KEY), registryAccess())
         }
         npcNavigation.pilot.restore(compound.getBoolean(FLYING_KEY))
+        isForceLoaded = compound.getBoolean(FORCE_LOADED_KEY)
+        keepAfterDeath = compound.getBoolean(KEEP_AFTER_DEATH_KEY)
+        savedVehicle = if (compound.hasUUID(VEHICLE_KEY)) compound.getUUID(VEHICLE_KEY) else null
     }
 
     override fun tickDeath() {
@@ -140,6 +167,9 @@ class NpcEntity : PathfinderMob {
     companion object {
         private const val INVENTORY_KEY = "NpcInventory"
         private const val FLYING_KEY = "NpcFlying"
+        private const val FORCE_LOADED_KEY = "NpcForceLoaded"
+        private const val KEEP_AFTER_DEATH_KEY = "NpcKeepAfterDeath"
+        private const val VEHICLE_KEY = "NpcVehicle"
 
         fun createAttributes(): AttributeSupplier.Builder {
             return createLivingAttributes()

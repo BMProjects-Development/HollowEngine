@@ -76,7 +76,7 @@ class UiPanelAttachment(
             shown.seenFrame = TickHandler.renderFrame
             shown.reach = spec.reach
             shown.interactive = spec.interactive
-            if (RenderManager.isWorldPass && carrier() != null) {
+            if (RenderManager.isWorldPass && !RenderManager.isShadowPass && carrier() != null) {
                 val camera = Minecraft.getInstance().gameRenderer.mainCamera.position
                 shown.worldPlacement = Matrix4f().translation(camera.x.toFloat(), camera.y.toFloat(), camera.z.toFloat())
                     .mul(placement)

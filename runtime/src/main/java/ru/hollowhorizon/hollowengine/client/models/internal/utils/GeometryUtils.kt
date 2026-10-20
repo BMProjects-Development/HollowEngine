@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.client.models.internal.utils
 
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 object GeometryUtils {
@@ -235,37 +237,37 @@ object GeometryUtils {
         }
     }
 
+    /**
+     * Center of the UV rectangle around each vertex: the union of the UV bounds of the triangles that use it.
+     */
     fun recalculateMidCoords(indices: IntArray?, uvs: Array<Vec2f>): Array<Vec2f> {
         val count = uvs.size
-        val accumMid = Array(count) { MutableVec2f() }
-        val contributions = IntArray(count)
+        val minU = FloatArray(count) { uvs[it].x }
+        val minV = FloatArray(count) { uvs[it].y }
+        val maxU = FloatArray(count) { uvs[it].x }
+        val maxV = FloatArray(count) { uvs[it].y }
         val getIndex = { i: Int -> indices?.get(i) ?: i }
         val loops = indices?.size ?: count
 
-        for (i in 0 until loops step 3) {
+        for (i in 0 until loops - 2 step 3) {
             val i1 = getIndex(i)
             val i2 = getIndex(i + 1)
             val i3 = getIndex(i + 2)
             if (i1 >= count || i2 >= count || i3 >= count) continue
 
-            val midU = (uvs[i1].x + uvs[i2].x + uvs[i3].x) / 3f
-            val midV = (uvs[i1].y + uvs[i2].y + uvs[i3].y) / 3f
+            val triangleMinU = min(uvs[i1].x, min(uvs[i2].x, uvs[i3].x))
+            val triangleMinV = min(uvs[i1].y, min(uvs[i2].y, uvs[i3].y))
+            val triangleMaxU = max(uvs[i1].x, max(uvs[i2].x, uvs[i3].x))
+            val triangleMaxV = max(uvs[i1].y, max(uvs[i2].y, uvs[i3].y))
 
-            accumMid[i1].x += midU
-            accumMid[i1].y += midV
-            accumMid[i2].x += midU
-            accumMid[i2].y += midV
-            accumMid[i3].x += midU
-            accumMid[i3].y += midV
-            contributions[i1]++
-            contributions[i2]++
-            contributions[i3]++
+            for (index in intArrayOf(i1, i2, i3)) {
+                minU[index] = min(minU[index], triangleMinU)
+                minV[index] = min(minV[index], triangleMinV)
+                maxU[index] = max(maxU[index], triangleMaxU)
+                maxV[index] = max(maxV[index], triangleMaxV)
+            }
         }
 
-        return Array(count) { i ->
-            val mid = accumMid[i]
-            val factor = contributions[i].takeIf { it > 0 }?.toFloat() ?: 1f
-            Vec2f(mid.x / factor, mid.y / factor)
-        }
+        return Array(count) { i -> Vec2f((minU[i] + maxU[i]) * 0.5f, (minV[i] + maxV[i]) * 0.5f) }
     }
 }

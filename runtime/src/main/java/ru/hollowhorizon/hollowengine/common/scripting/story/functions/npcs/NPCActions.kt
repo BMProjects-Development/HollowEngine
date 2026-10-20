@@ -24,6 +24,7 @@ import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcAction
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
+import ru.hollowhorizon.hollowengine.common.npcs.actions.Preempted
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
 import ru.hollowhorizon.hollowengine.common.scripting.state.waitPersistent
 import ru.hollowhorizon.hollowengine.common.scripting.state.waitRealtime
@@ -47,7 +48,7 @@ suspend fun NpcEntity.move(entity: Entity, dist: Double = 1.5, speed: Double = 1
     }
 
 suspend fun NpcEntity.move(target: Ref<out Entity>, options: MoveOptions = MoveOptions()): MoveResult =
-    startMove(target, options).await()
+    actions.act(NpcActionKeys.MOVEMENT) { moveToEntity(target, options) }
 
 fun NpcEntity.startMove(target: Ref<out Entity>, options: MoveOptions = MoveOptions()): NpcAction<MoveResult> =
     actions.start(NpcActionKeys.MOVEMENT) { moveToEntity(target, options) }
@@ -70,7 +71,7 @@ suspend fun NpcEntity.move(pos: Vec3, dist: Double = 1.5, speed: Double = 1.0): 
     move(pos, MoveOptions(arrivalDistance = dist, speed = speed))
 
 suspend fun NpcEntity.move(pos: Vec3, options: MoveOptions = MoveOptions()): MoveResult =
-    startMove(pos, options).await()
+    actions.act(NpcActionKeys.MOVEMENT) { moveToPosition({ pos }, options) }
 
 fun NpcEntity.startMove(pos: Vec3, options: MoveOptions = MoveOptions()): NpcAction<MoveResult> =
     actions.start(NpcActionKeys.MOVEMENT) { moveToPosition({ pos }, options) }
@@ -86,8 +87,10 @@ suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = positi
  * Moves the NPC through [points] in turn without stopping at any but the last: each one before it counts as
  * passed within [MoveOptions.passDistance], and [MoveOptions.arrivalDistance] is for the last.
  */
-suspend fun NpcEntity.move(points: List<Vec3>, options: MoveOptions = MoveOptions()): MoveResult =
-    startMove(points, options).await()
+suspend fun NpcEntity.move(points: List<Vec3>, options: MoveOptions = MoveOptions()): MoveResult {
+    require(points.isNotEmpty()) { "A move needs at least one point" }
+    return actions.act(NpcActionKeys.MOVEMENT) { moveThrough(points.map { point -> { point } }, options) }
+}
 
 fun NpcEntity.startMove(points: List<Vec3>, options: MoveOptions = MoveOptions()): NpcAction<MoveResult> {
     require(points.isNotEmpty()) { "A move needs at least one point" }
@@ -98,6 +101,15 @@ fun NpcEntity.stopMoving() {
     actions.cancel(NpcActionKeys.MOVEMENT)
     navigation.stop()
 }
+
+/**
+ * Runs several actions of the NPC as one: the channels they use stay held until [block] returns, and losing
+ * any of them to a higher priority cancels the whole block with a single [Preempted].
+ */
+suspend fun <R> NpcEntity.perform(block: suspend NpcEntity.() -> R): R = actions.perform { block() }
+
+/** [perform] that waits for the actions already running on its channels instead of replacing them. */
+suspend fun <R> NpcEntity.queue(block: suspend NpcEntity.() -> R): R = actions.queue { block() }
 
 /**
  * Keeps the NPC out of [zone] on every way it walks, its moves and its goals alike, until [stopAvoiding]. It is
@@ -135,7 +147,7 @@ fun NpcEntity.startLookingAt(
 }
 
 suspend fun NpcEntity.lookAt(position: Vec3, duration: Duration, maxAngularSpeed: Float = 360f) {
-    startLookingAt(position, duration, maxAngularSpeed).await()
+    actions.act(NpcActionKeys.LOOK) { rotate({ position }, duration.inWholeMilliseconds, maxAngularSpeed = maxAngularSpeed) }
 }
 
 suspend infix fun NpcEntity.lookAt(position: Vec3) {
@@ -163,7 +175,9 @@ suspend fun NpcEntity.lookAt(
     duration: Duration,
     maxAngularSpeed: Float = 360f,
 ) {
-    startLookingAt(target, duration, maxAngularSpeed).await()
+    actions.act(NpcActionKeys.LOOK) {
+        rotate({ target.resolve().eyePosition }, duration.inWholeMilliseconds, maxAngularSpeed = maxAngularSpeed)
+    }
 }
 
 suspend infix fun NpcEntity.lookAt(entity: Entity) {
@@ -189,7 +203,10 @@ suspend fun NpcEntity.useBlock(
     hand: InteractionHand = InteractionHand.MAIN_HAND,
     reach: Double = DEFAULT_INTERACTION_REACH,
     face: Direction? = null,
-): InteractionResult = startUseBlock(pos, hand, reach, face).await()
+): InteractionResult {
+    require(reach > 0.0) { "Interaction reach must be greater than zero" }
+    return actions.act(NpcActionKeys.HANDS) { useBlockReaching(pos, hand, reach, face) }
+}
 
 fun NpcEntity.startUseBlock(
     pos: Vec3,
@@ -198,17 +215,19 @@ fun NpcEntity.startUseBlock(
     face: Direction? = null,
 ): NpcAction<InteractionResult> {
     require(reach > 0.0) { "Interaction reach must be greater than zero" }
-    return actions.start(NpcActionKeys.HANDS) {
-        val target = Vec3.atCenterOf(BlockPos.containing(pos))
-        val movement = startMove(target, MoveOptions(arrivalDistance = reach * 0.8f))
-        try {
-            if (movement.await() != MoveResult.Arrived) return@start InteractionResult.FAIL
-            rotate({ target }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
-            useBlockAt(target, hand, face)
-        } finally {
-            if (movement.isActive) movement.cancel()
-        }
-    }
+    return actions.start(NpcActionKeys.HANDS) { useBlockReaching(pos, hand, reach, face) }
+}
+
+private suspend fun NpcEntity.useBlockReaching(
+    pos: Vec3,
+    hand: InteractionHand,
+    reach: Double,
+    face: Direction?,
+): InteractionResult {
+    val target = Vec3.atCenterOf(BlockPos.containing(pos))
+    if (move(target, MoveOptions(arrivalDistance = reach * 0.8f)) != MoveResult.Arrived) return InteractionResult.FAIL
+    rotate({ target }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
+    return useBlockAt(target, hand, face)
 }
 
 fun NpcEntity.useBlockNow(
@@ -240,64 +259,65 @@ private fun NpcEntity.useBlockAt(target: Vec3, hand: InteractionHand, face: Dire
  *
  * @param pos The position of the block to be destroyed.
  */
-suspend infix fun NpcEntity.destroyBlock(pos: Vec3): Boolean = startDestroyBlock(pos).await()
+suspend infix fun NpcEntity.destroyBlock(pos: Vec3): Boolean = destroyBlock(pos, DEFAULT_INTERACTION_REACH)
+
+suspend fun NpcEntity.destroyBlock(
+    pos: Vec3,
+    reach: Double,
+    requireCorrectTool: Boolean = true,
+): Boolean = actions.act(NpcActionKeys.HANDS) { destroyBlockReaching(pos, reach, requireCorrectTool) }
 
 fun NpcEntity.startDestroyBlock(
     pos: Vec3,
     reach: Double = DEFAULT_INTERACTION_REACH,
     requireCorrectTool: Boolean = true,
-): NpcAction<Boolean> = actions.start(NpcActionKeys.HANDS) {
+): NpcAction<Boolean> = actions.start(NpcActionKeys.HANDS) { destroyBlockReaching(pos, reach, requireCorrectTool) }
+
+private suspend fun NpcEntity.destroyBlockReaching(pos: Vec3, reach: Double, requireCorrectTool: Boolean): Boolean {
     val blockPos = BlockPos.containing(pos)
     val target = Vec3.atCenterOf(blockPos)
-    val movement = startMove(target, MoveOptions(arrivalDistance = reach * 0.8f))
-    try {
-        if (movement.await() != MoveResult.Arrived) return@start false
-        rotate({ target }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
-        syncFakePlayer()
-        val initialState = level().getBlockState(blockPos)
-        if (initialState.isAir || initialState.getDestroyProgress(fakePlayer, level(), blockPos) <= 0f) {
-            return@start false
-        }
-        if (requireCorrectTool && !fakePlayer.hasCorrectToolForDrops(initialState)) return@start false
+    if (move(target, MoveOptions(arrivalDistance = reach * 0.8f)) != MoveResult.Arrived) return false
+    rotate({ target }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
+    syncFakePlayer()
+    val initialState = level().getBlockState(blockPos)
+    if (initialState.isAir || initialState.getDestroyProgress(fakePlayer, level(), blockPos) <= 0f) return false
+    if (requireCorrectTool && !fakePlayer.hasCorrectToolForDrops(initialState)) return false
 
-        val face = interactionFace(target)
-        fakePlayer.gameMode.handleBlockBreakAction(blockPos, START_DESTROY_BLOCK, face, level().maxBuildHeight, 0)
-        try {
-            var elapsedTicks = 0
-            while (level().getBlockState(blockPos) == initialState) {
-                fakePlayer.gameMode.tick()
-                elapsedTicks++
-                faceTowards(target)
-                swing(InteractionHand.MAIN_HAND)
-                val progress = initialState.getDestroyProgress(fakePlayer, level(), blockPos)
-                if (progress * (elapsedTicks + 1) >= 1f) {
-                    fakePlayer.gameMode.handleBlockBreakAction(
-                        blockPos,
-                        STOP_DESTROY_BLOCK,
-                        face,
-                        level().maxBuildHeight,
-                        0,
-                    )
-                    break
-                }
-                delay(TICK_DURATION)
-            }
-            level().getBlockState(blockPos).isAir
-        } finally {
-            if (!level().getBlockState(blockPos).isAir) {
+    val face = interactionFace(target)
+    fakePlayer.gameMode.handleBlockBreakAction(blockPos, START_DESTROY_BLOCK, face, level().maxBuildHeight, 0)
+    try {
+        var elapsedTicks = 0
+        while (level().getBlockState(blockPos) == initialState) {
+            fakePlayer.gameMode.tick()
+            elapsedTicks++
+            faceTowards(target)
+            swing(InteractionHand.MAIN_HAND)
+            val progress = initialState.getDestroyProgress(fakePlayer, level(), blockPos)
+            if (progress * (elapsedTicks + 1) >= 1f) {
                 fakePlayer.gameMode.handleBlockBreakAction(
                     blockPos,
-                    ABORT_DESTROY_BLOCK,
+                    STOP_DESTROY_BLOCK,
                     face,
                     level().maxBuildHeight,
                     0,
                 )
+                break
             }
-            level().destroyBlockProgress(fakePlayer.id, blockPos, -1)
-            setItemInHand(InteractionHand.MAIN_HAND, fakePlayer.mainHandItem.copy())
+            delay(TICK_DURATION)
         }
+        return level().getBlockState(blockPos).isAir
     } finally {
-        if (movement.isActive) movement.cancel()
+        if (!level().getBlockState(blockPos).isAir) {
+            fakePlayer.gameMode.handleBlockBreakAction(
+                blockPos,
+                ABORT_DESTROY_BLOCK,
+                face,
+                level().maxBuildHeight,
+                0,
+            )
+        }
+        level().destroyBlockProgress(fakePlayer.id, blockPos, -1)
+        setItemInHand(InteractionHand.MAIN_HAND, fakePlayer.mainHandItem.copy())
     }
 }
 
@@ -320,23 +340,24 @@ fun NpcEntity.startInteract(
     target: Ref<out Entity>,
     hand: InteractionHand = InteractionHand.MAIN_HAND,
     reach: Double = DEFAULT_INTERACTION_REACH,
-): NpcAction<InteractionResult> = actions.start(NpcActionKeys.HANDS) {
-    val movement = startMove(target, MoveOptions(arrivalDistance = reach))
-    try {
-        if (movement.await() != MoveResult.Arrived) return@start InteractionResult.FAIL
-        val entity = target.resolve()
-        rotate({ entity.eyePosition }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
-        interactNow(entity, hand, reach)
-    } finally {
-        if (movement.isActive) movement.cancel()
-    }
+): NpcAction<InteractionResult> = actions.start(NpcActionKeys.HANDS) { interactReaching(target, hand, reach) }
+
+private suspend fun NpcEntity.interactReaching(
+    target: Ref<out Entity>,
+    hand: InteractionHand,
+    reach: Double,
+): InteractionResult {
+    if (move(target, MoveOptions(arrivalDistance = reach)) != MoveResult.Arrived) return InteractionResult.FAIL
+    val entity = target.resolve()
+    rotate({ entity.eyePosition }, DEFAULT_LOOK_DURATION.inWholeMilliseconds)
+    return interactNow(entity, hand, reach)
 }
 
 suspend fun NpcEntity.interact(
     target: Ref<out Entity>,
     hand: InteractionHand = InteractionHand.MAIN_HAND,
     reach: Double = DEFAULT_INTERACTION_REACH,
-): InteractionResult = startInteract(target, hand, reach).await()
+): InteractionResult = actions.act(NpcActionKeys.HANDS) { interactReaching(target, hand, reach) }
 
 private fun NpcEntity.syncFakePlayer() {
     val level = level() as ServerLevel

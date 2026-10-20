@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComp
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
+import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
@@ -39,6 +40,9 @@ import kotlin.contracts.ExperimentalContracts
  * @param transform Локальные трансформации модели: смещение, поворот и масштаб по всем осям.
  * @param nameplateMode Initial nameplate visibility mode.
  * @param inverseHeadRotation Если `true`, голова NPC будет поворачиваться в противоположную сторону (например, для камеры от 3-го лица).
+ * @param id Id автора, например `"village:blacksmith"`. Если живой NPC с таким id уже есть, возвращается он, а остальные
+ * параметры не применяются: перезапуск сцены не плодит двойников. Если его чанк не загружен, возвращается сущность вне
+ * мира, которая станет телом при загрузке чанка. Без id каждый вызов создаёт нового NPC.
  *
  * @return Созданный экземпляр [NpcEntity], добавленный в мир.
  */
@@ -54,10 +58,14 @@ fun npc(
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
+    id: String? = null,
 ): NpcEntity {
     assert(model.isValidRL()) {
         "Non [a-z0-9/._-] character in path of location: $model"
     }
+
+    val npcs = currentServer.npcs
+    if (id != null) npcs.alive(id)?.let { return it }
 
     val level = currentServer.getLevel(currentServer.levelKeys().find { it.location().toString() == world }
         ?: throw IllegalStateException("Dimension $world not found!"))
@@ -80,7 +88,20 @@ fun npc(
 
         setNameplate(name, nameplateMode)
 
-        level.addFreshEntity(this)
+        npcs.spawn(this, id)
+    }
+}
+
+/**
+ * Keeps the chunks around the NPC loaded while [block] runs, for walks and other actions that must finish even
+ * where no player is. [NpcEntity.isForceLoaded] does the same for good.
+ */
+suspend fun <R> NpcEntity.forceLoad(block: suspend NpcEntity.() -> R): R {
+    forceLoadCalls++
+    try {
+        return block()
+    } finally {
+        forceLoadCalls--
     }
 }
 
