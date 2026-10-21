@@ -90,6 +90,20 @@ class IdeCodeInsightTest {
     }
 
     @Test
+    fun `expression snippets fit only where an expression of their type may go`() {
+        val types = listOf("kotlin.String", "kotlin.Int")
+        fun accepted(text: String) =
+            analyzer.acceptedExpressionTypes("slots.kts", text.replace("|", ""), text.indexOf('|'), types)
+
+        assertEquals(listOf("kotlin.Int"), accepted("fun takesInt(value: Int) = value\ntakesInt(|)"))
+        assertEquals(listOf("kotlin.String"), accepted("val text: String = po|"))
+        assertEquals(types, accepted("val number = 1\npo|"))
+        assertEquals(types, accepted("fun run(block: () -> Unit) = block()\nrun { po| }"))
+        assertNull(accepted("val text = \"abc\".le|"))
+        assertNull(accepted("val po|"))
+    }
+
+    @Test
     fun `completion preserves existing lambda bodies and callable references`() {
         for (usage in listOf("someOldFunction { println(42) }", "::someOldFunction")) {
             val text = "fun someOtherFunction(block: () -> Unit) = block()\nval action = $usage"

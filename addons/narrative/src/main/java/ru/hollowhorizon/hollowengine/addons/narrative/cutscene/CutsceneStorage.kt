@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
