@@ -7,7 +7,5 @@
   "model_no_animation": "В модели %s нет анимации '%s'. Её анимации: %s",
   "tags": "§6[§bHollow Engine§6] §7Теги предмета: ",
   "scripting_state_requires_node_script": "Нельзя передать начальный стейт скрипту '%s': стейты поддерживаются только скриптами .node.kts. Используйте скрипт .node.kts либо запустите .kts без аргумента стейта.",
-  "expected_script_path": "Ожидался путь к скрипту, например scripts/nodes/example.node.kts или my-addon:nodes/example.node.kts",
-  "dialogue_not_in_dialogue": "Сейчас вы не участвуете в диалоге.",
-  "dialogue_no_such_option": "В вашем диалоге нет варианта %s."
+  "expected_script_path": "Ожидался путь к скрипту, например scripts/nodes/example.node.kts или my-addon:nodes/example.node.kts"
 }

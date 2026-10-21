@@ -102,6 +102,7 @@ fun Project.configureHollowAddon() {
         add("modCompileOnly", "net.fabricmc:fabric-loader:$fabricLoaderVersion")
         add("compileOnly", project(path = ":runtime", configuration = "namedElements"))
         add("testImplementation", project(path = ":runtime", configuration = "namedElements"))
+        add("testImplementation", project(path = ":bridge", configuration = "namedElements"))
         add("compileOnly", "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
@@ -282,9 +283,11 @@ tasks.named<Sync>("buildAndCollect") {
 
     val compilerJar = project(":addons:compiler").tasks.named<Jar>("addonJar")
     val mcpJar = project(":addons:mcp").tasks.named<Jar>("addonJar")
+    val narrativeJar = project(":addons:narrative").tasks.named<Jar>("addonJar")
 
     from(compilerJar.flatMap { it.archiveFile })
     from(mcpJar.flatMap { it.archiveFile })
+    from(narrativeJar.flatMap { it.archiveFile })
 }
 
 val buildAddons = tasks.register<Sync>("buildAddons") {

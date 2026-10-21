@@ -641,7 +641,11 @@ internal class HollowAddonRuntime(
         } finally {
             refreshEnabledSnapshot()
             mutex.unlock()
-            if (loadedSnapshot !== loadedBefore) reloadRunningServers()
+            if (loadedSnapshot !== loadedBefore) {
+                runCatching { HollowAddonsChangedEvent.post(HollowAddonsChangedEvent()) }
+                    .onFailure { HollowEngine.LOGGER.error("Failed to apply the changed set of addons", it) }
+                reloadRunningServers()
+            }
             if (started && assetsOf(packsBefore) != assetsOf(resourcePackSnapshot)) reloadClientResources()
         }
     }

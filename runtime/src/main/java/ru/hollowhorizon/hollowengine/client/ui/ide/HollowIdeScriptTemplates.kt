@@ -5,25 +5,25 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
 /**
- * The kinds of script the project tree can create, each with a starter file taken from
- * `internal/templates`. A template may use `{{name}}` (the file name without its extension), `{{id}}` (the
- * same, made a valid resource path), `{{constant}}` (the id as a Kotlin constant name), `{{namespace}}` (the
- * sandbox namespace) and `{{path}}` (new file's project path).
+ * A kind of script the project tree can create, with its starter text. The text may use `{{name}}` (the
+ * file name without its extension), `{{id}}` (the same, made a valid resource path), `{{constant}}` (the id
+ * as a Kotlin constant name), `{{namespace}}` (the sandbox namespace) and `{{path}}` (new file's project path).
+ *
+ * @param label shown in the "New script" menu and in the title of the name dialog.
+ * @param extension appended to the typed name when it lacks it, such as `.node.kts`.
+ * @param text reads the starter text; called each time a file is created.
  */
-internal enum class ScriptTemplate(
+class HollowIdeScriptTemplate(
+    val id: String,
     val label: String,
     val extension: String,
     private val defaultName: String,
-    private val resource: String,
+    private val text: () -> String,
 ) {
-    Plain("Script", ".kts", "script", "plain.kts"),
-    ServerReload("Server Reload Script", ".reload.kts", "server", "server.reload.kts"),
-    ClientReload("Client Reload Script", ".reload.kts", "client", "client.reload.kts"),
-    Startup("Startup Script", ".startup.kts", "ruby", "startup.kts"),
-    Node("Node Script", ".node.kts", "node", "node.kts"),
-    Ui("UI Script", ".ui.kts", "menu", "ui.kts"),
-    Mixin("Mixin Script", ".mixin.kts", "mixins", "mixin.kts"),
-    Dialogue("Dialogue", ".story", "dialogue", "dialogue.story");
+    init {
+        require(id.isNotBlank()) { "Script template ID cannot be blank" }
+        require(extension.startsWith('.')) { "Script template extension must start with a dot: $extension" }
+    }
 
     val suggestedFileName: String get() = defaultName + extension
 
@@ -42,11 +42,7 @@ internal enum class ScriptTemplate(
         val name = path.substringAfterLast('/').removeSuffix(extension)
         val id = name.lowercase().replace(INVALID_ID_CHARS, "_").ifEmpty { "script" }
         val constant = id.uppercase().replace(INVALID_CONSTANT_CHARS, "_").let { if (it.first().isDigit()) "_$it" else it }
-        val text = ScriptTemplate::class.java.classLoader
-            .getResourceAsStream("internal/templates/$resource.template")
-            ?.use { it.readBytes().toString(Charsets.UTF_8) }
-            .orEmpty()
-        return text
+        return text()
             .replace("{{name}}", name)
             .replace("{{id}}", id)
             .replace("{{constant}}", constant)
@@ -54,12 +50,44 @@ internal enum class ScriptTemplate(
             .replace("{{path}}", path)
     }
 
-    private companion object {
-        const val KOTLIN_SCRIPT = ".kts"
-        val INVALID_ID_CHARS = Regex("[^a-z0-9_.-]")
-        val INVALID_CONSTANT_CHARS = Regex("[^A-Z0-9_]")
+    companion object {
+        private const val KOTLIN_SCRIPT = ".kts"
+        private val INVALID_ID_CHARS = Regex("[^a-z0-9_.-]")
+        private val INVALID_CONSTANT_CHARS = Regex("[^A-Z0-9_]")
+
+        /** A template whose text is the `internal/templates/<resource>.template` file of [owner]'s jar. */
+        fun fromResource(
+            id: String,
+            label: String,
+            extension: String,
+            defaultName: String,
+            resource: String,
+            owner: Class<*>,
+        ) = HollowIdeScriptTemplate(id, label, extension, defaultName) {
+            owner.classLoader.getResourceAsStream("internal/templates/$resource.template")
+                ?.use { it.readBytes().toString(Charsets.UTF_8) }
+                .orEmpty()
+        }
     }
 }
+
+private fun builtIn(id: String, label: String, extension: String, defaultName: String, resource: String) =
+    HollowIdeScriptTemplate.fromResource(id, label, extension, defaultName, resource, HollowIdeScriptTemplate::class.java)
+
+/** The engine's own templates; addons add theirs through [HollowIdeExtensionPoints.SCRIPT_TEMPLATES]. */
+private val BuiltInScriptTemplates = listOf(
+    builtIn("plain", "Script", ".kts", "script", "plain.kts"),
+    builtIn("server_reload", "Server Reload Script", ".reload.kts", "server", "server.reload.kts"),
+    builtIn("client_reload", "Client Reload Script", ".reload.kts", "client", "client.reload.kts"),
+    builtIn("startup", "Startup Script", ".startup.kts", "ruby", "startup.kts"),
+    builtIn("node", "Node Script", ".node.kts", "node", "node.kts"),
+    builtIn("ui", "UI Script", ".ui.kts", "menu", "ui.kts"),
+    builtIn("mixin", "Mixin Script", ".mixin.kts", "mixins", "mixin.kts"),
+)
+
+/** What the "New script" menu offers: the engine's templates, then those of loaded addons. */
+internal fun scriptTemplates(): List<HollowIdeScriptTemplate> =
+    BuiltInScriptTemplates + HollowIdeExtensionPoints.SCRIPT_TEMPLATES.extensions
 
 /** Scripts are only picked up from the sandbox's `scripts` folder, so that is the only place to offer them. */
 internal fun isInsideScripts(path: String): Boolean =

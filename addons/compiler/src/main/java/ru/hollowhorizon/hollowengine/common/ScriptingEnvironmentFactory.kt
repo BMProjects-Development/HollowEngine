@@ -5,10 +5,12 @@ import kotlinx.coroutines.*
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonContext
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEntrypoint
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonsChangedEvent
 import ru.hollowhorizon.hollowengine.common.addons.publish
 import ru.hollowhorizon.hollowengine.common.compiler.ScriptingCompilerImpl
 import ru.hollowhorizon.hollowengine.common.compiler.configuration.HollowScriptConfiguration
 import ru.hollowhorizon.hollowengine.common.compiler.configuration.clientSideImplicitReceivers
+import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.ide.session.AnalysisEnvironment
 import ru.hollowhorizon.hollowengine.common.ide.session.EmptyLogger
 import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
@@ -37,6 +39,9 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
     @Volatile
     private var loaded: LoadedAddon? = null
 
+    @Volatile
+    private var built: BuiltEnvironment? = null
+
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
         loaded = LoadedAddon(context.addonFile, scope)
         setUp(context.addonFile, scope)
@@ -45,6 +50,7 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
 
     override suspend fun unload(context: HollowAddonContext) {
         loaded = null
+        built = null
         ScriptingEnvironment.clear()
     }
 
@@ -56,19 +62,50 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
         setUp(addon.file, addon.scope)
     }
 
+    /**
+     * Addons loaded after this one may add script types and imports. Once they are all in, the
+     * environment is recreated with them on the same classpath, so nothing is remapped again.
+     */
+    @SubscribeEvent
+    @Synchronized
+    fun onAddonsChanged(event: HollowAddonsChangedEvent) {
+        val addon = loaded ?: return
+        val current = built ?: return
+        val scriptTypes = DefaultScriptDefinitions.providers()
+        if (scriptTypes == current.scriptTypes) return
+        ScriptingEnvironment.clear()
+        start(addon, current.mappings, current.classpath, scriptTypes)
+    }
+
     private fun setUp(addonFile: File, scope: CoroutineScope) {
         val (mappings, classpath) = CommonEnvironment.setup(addonFile)
+        start(LoadedAddon(addonFile, scope), mappings, classpath, DefaultScriptDefinitions.providers())
+    }
+
+    private fun start(
+        addon: LoadedAddon,
+        mappings: Mappings,
+        classpath: List<File>,
+        scriptTypes: List<ScriptClassProvider>,
+    ) {
         val environment = initialize(
             javaHome = File(System.getProperty("java.home")),
             classpath = classpath,
-            hostClasspath = classpath + addonFile,
-            scriptTypes = DefaultScriptDefinitions.providers(),
+            hostClasspath = classpath + addon.file,
+            scriptTypes = scriptTypes,
             mappings = mappings,
         )
-        environment.warmUpAnalysis(scope)
+        built = BuiltEnvironment(mappings, classpath, scriptTypes)
+        environment.warmUpAnalysis(addon.scope)
     }
 
     private class LoadedAddon(val file: File, val scope: CoroutineScope)
+
+    private class BuiltEnvironment(
+        val mappings: Mappings,
+        val classpath: List<File>,
+        val scriptTypes: List<ScriptClassProvider>,
+    )
 
     override fun initialize(
         javaHome: File,

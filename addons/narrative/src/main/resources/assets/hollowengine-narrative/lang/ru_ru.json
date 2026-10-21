@@ -1,0 +1,5 @@
+{
+  "hollowengine.commands.dialogue_not_in_dialogue": "Сейчас вы не участвуете в диалоге.",
+  "hollowengine.commands.dialogue_no_such_option": "В вашем диалоге нет варианта %s.",
+  "hollowengine.dialogue.advance": "[ дальше ▶ ]"
+}

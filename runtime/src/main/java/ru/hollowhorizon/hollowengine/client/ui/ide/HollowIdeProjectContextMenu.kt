@@ -13,7 +13,7 @@ internal fun HollowIdeProjectContextMenu(
     menu: ProjectContextMenu?,
     onCreateFile: (String) -> Unit,
     onCreateFolder: (String) -> Unit,
-    onCreateScript: (String, ScriptTemplate) -> Unit,
+    onCreateScript: (String, HollowIdeScriptTemplate) -> Unit,
     onCreateSoundEvents: (String) -> Unit,
     onRename: (String) -> Unit,
     onCopy: (String) -> Unit,
@@ -73,7 +73,7 @@ internal fun HollowIdeProjectContextMenu(
             tags = listOf("dropdown-popup", "project-context-menu"),
             onDismiss = onDismiss,
         ) {
-            ScriptTemplate.entries.forEach { template ->
+            scriptTemplates().forEach { template ->
                 ProjectMenuItem(template.label, template.extension, template.icon) { onCreateScript(menu.path, template) }
             }
         }
@@ -173,7 +173,7 @@ internal data class ProjectNameDialog(
     val name: String,
     val x: Float,
     val y: Float,
-    val template: ScriptTemplate? = null,
+    val template: HollowIdeScriptTemplate? = null,
 ) {
     val title: String
         get() = when (action) {
