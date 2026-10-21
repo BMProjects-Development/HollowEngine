@@ -9,6 +9,22 @@ import kotlin.test.*
 
 class ScriptSourceTests {
     @Test
+    fun `compiled metadata resolves file paths URIs and portable identities`(@TempDir root: File) {
+        val file = root.resolve("a script.kts").apply { writeText("class Example") }
+        val id = ScriptId("metadata-locations", file.name)
+        ScriptRegistry.register(directorySource(id.namespace, root))
+        try {
+            ScriptRegistry.artifacts(id)
+            assertEquals(id, ScriptRegistry.idOfLocation(file.path))
+            assertEquals(id, ScriptRegistry.idOfLocation(file.toURI().toString()))
+            assertEquals(id, ScriptRegistry.idOfLocation(id.qualified))
+            assertNull(ScriptRegistry.idOfLocation("missing-namespace:missing.kts"))
+        } finally {
+            ScriptRegistry.unregister(id.namespace)
+        }
+    }
+
+    @Test
     fun `unqualified paths keep their pre-namespace spelling`() {
         val id = ScriptRegistry.parse("scripts/nodes/example.node.kts")
         assertEquals(ScriptRegistry.sandboxNamespace, id.namespace)

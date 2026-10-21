@@ -33,6 +33,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.structure.kotlinGutterTa
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptImportError
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -232,7 +233,11 @@ class ScriptingAnalyzerImpl internal constructor(
                     )
                     return@argumentLoop
                 }
-                importedFiles += createPsiFile(importedName, importedText, files, activeFiles)
+                val importedFile = createPsiFile(importedName, importedText, files, activeFiles)
+                if (file.isSharedScript() && !importedFile.isSharedScript()) {
+                    diagnostics += importDiagnostic(file, expression, sharedScriptImportError(file.name, importedName))
+                }
+                importedFiles += importedFile
             }
         }
         return ImportResolution(importedFiles, diagnostics)
@@ -255,6 +260,7 @@ class ScriptingAnalyzerImpl internal constructor(
 
     /** The path [HollowIdeModel][ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel] opens files by. */
     private fun editorPathOf(file: File): String {
+        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }?.let { return it.qualified }
         val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
         val path = file.toPath().toAbsolutePath().normalize()
         if (!path.startsWith(root)) return file.name

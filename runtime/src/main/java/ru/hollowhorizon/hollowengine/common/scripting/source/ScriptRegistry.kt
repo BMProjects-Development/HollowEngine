@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.HollowEngineBuild
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonClassLoader
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry.parse
 import java.io.File
+import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -118,6 +119,13 @@ object ScriptRegistry {
      * directory, so the path alone does not say which namespace owns them.
      */
     fun idOf(file: File): ScriptId? = filesToIds[file.canonicalPath]
+
+    /** Physical paths, file URIs and portable namespace IDs used by Kotlin script metadata. */
+    fun idOfLocation(location: String): ScriptId? {
+        val file = runCatching { if (location.startsWith("file:")) File(URI(location)) else File(location) }.getOrNull()
+        file?.let { runCatching { idOf(it) }.getOrNull() }?.let { return it }
+        return runCatching { parse(location) }.getOrNull()?.takeIf { artifacts(it) != null }
+    }
 
     /**
      * Classpath the scripts of [namespace] compile against: its own, plus that of every namespace it

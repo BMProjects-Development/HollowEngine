@@ -169,6 +169,7 @@ dependencies {
     runtimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
 
     testImplementation(kotlin("test"))
+    testImplementation("io.insert-koin:koin-core:${rootProject.property("koinVersion")}")
     testImplementation("androidx.compose.runtime:runtime:$composeRuntimeVersion")
     testRuntimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
     testRuntimeOnly(files(compilerPluginRuntimeJar.flatMap { it.archiveFile }))
