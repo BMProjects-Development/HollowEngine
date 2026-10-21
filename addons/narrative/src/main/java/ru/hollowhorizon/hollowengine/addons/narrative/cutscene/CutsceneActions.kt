@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneAnchor
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneAnchorKind
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneStorage
+import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 
@@ -99,7 +100,7 @@ class PlayCutscenePacket(
     val path: String,
     val loop: Boolean = false,
     val anchor: CutsceneAnchor = CutsceneAnchor.WHERE_RECORDED,
-) : HollowPacket {
+) : HollowAddonPacket {
     override fun handle(player: Player) {
         val data = CutsceneStorage.load(path)
         CutsceneCameraSystem.play(data, loop, anchor)
@@ -108,7 +109,7 @@ class PlayCutscenePacket(
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
 @Serializable
-object StopCutscenePacket : HollowPacket {
+object StopCutscenePacket : HollowAddonPacket {
     override fun handle(player: Player) {
         CutsceneCameraSystem.stop()
     }
