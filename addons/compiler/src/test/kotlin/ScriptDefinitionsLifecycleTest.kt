@@ -20,7 +20,6 @@ import java.util.jar.JarOutputStream
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -29,7 +28,7 @@ abstract class LifecycleScript
 
 class ScriptDefinitionsLifecycleTest {
     @Test
-    fun `compiler waits for addon batch and refreshes late definitions without remapping`(@TempDir directory: File) = runBlocking {
+    fun `compiler starts on load and refreshes late definitions without remapping`(@TempDir directory: File) = runBlocking {
         val scope = CoroutineScope(Job())
         val addonScope = CoroutineScope(Job())
         val classpath = System.getProperty("java.class.path").split(File.pathSeparator).map(::File).filter(File::exists)
@@ -55,8 +54,8 @@ class ScriptDefinitionsLifecycleTest {
             ScriptingEnvironment.clear()
             initializer.load(context, scope)
             HollowAddonsChangedEvent.subscribe(scope) { initializer.onAddonsChanged(it) }
-            assertEquals(0, preparations)
-            assertFalse(ScriptingEnvironment.isAvailable())
+            assertEquals(1, preparations)
+            val initial = ScriptingEnvironment.INSTANCE
             assertSame(initializer, services.findService(ScriptingEnvironmentInitializer::class))
 
             ScriptDefaultImportsEvent.subscribe(addonScope) { it.defaultImports += "java.time.Instant" }
@@ -65,6 +64,7 @@ class ScriptDefinitionsLifecycleTest {
             }
             HollowAddonsChangedEvent.post(HollowAddonsChangedEvent())
             val first = ScriptingEnvironment.INSTANCE
+            assertNotSame(initial, first)
             assertTrue(first.compiler.compile("first.addon.kts", "val value = Instant.EPOCH").isSuccess)
             assertTrue(first.analyzer.diagnostic("first.addon.kts", "val value = Instant.EPOCH").isEmpty())
             assertEquals(1, preparations)
