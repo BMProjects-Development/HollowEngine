@@ -2,12 +2,12 @@ package ru.hollowhorizon.hollowengine.addons.narrative.client
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraPose
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraPoseSource
+import ru.hollowhorizon.hollowengine.client.camera.CameraPose
+import ru.hollowhorizon.hollowengine.client.camera.CameraPoseSource
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderHudEvent
-import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
@@ -113,7 +113,7 @@ object StoryCameraSystem : CameraPoseSource {
      * is no longer alive to look through it.
      */
     @SubscribeEvent
-    fun onClientTick(event: TickEvent.Client) {
+    fun onRenderTick(event: RenderTickEvent.Pre) {
         if (releaseAfter != 0L && System.currentTimeMillis() >= releaseAfter) clear()
         if (target == null) return
         val player = Minecraft.getInstance().player

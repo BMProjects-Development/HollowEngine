@@ -17,8 +17,8 @@ Use `RegisterStoryFunctionsEvent` when every dialogue should see a command:
 
 ```kotlin
 import net.minecraft.network.chat.Component
-import ru.hollowhorizon.hollowengine.common.dialogue.RegisterStoryFunctionsEvent
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.string
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.RegisterStoryFunctionsEvent
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.string
 
 @SubscribeEvent
 fun registerDialogueCommands(event: RegisterStoryFunctionsEvent) {
@@ -76,8 +76,8 @@ Use full descriptors when parameters are optional, have defaults, need actor res
 ```kotlin
 import kotlinx.coroutines.delay
 import net.minecraft.network.chat.Component
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.number
-import ru.hollowhorizon.hollowengine.common.dialogue.lang.string
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.number
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.string
 import kotlin.time.Duration.Companion.milliseconds
 
 functions.add(

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.bootstrap.impl;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ru.hollowhorizon.hollowengine.bootstrap.impl.transform.RuntimeClassTransformers;
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract;
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimeBridge;
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.mixins.ScriptMixinProvider;
 
@@ -28,7 +29,12 @@ public final class BootstrapRuntimeManager {
     }
 
     private static List<File> addonSources(File hollowEngineDirectory) {
-        return List.of(new File(hollowEngineDirectory, "addons"), new File("mods"));
+        List<File> sources = new ArrayList<>();
+        File development = AddonBootstrapContract.developmentAddonsDirectory();
+        if (development != null) sources.add(development);
+        sources.add(new File(hollowEngineDirectory, "addons"));
+        sources.add(new File("mods"));
+        return sources;
     }
 
     private static String enginePackage() {
