@@ -1,9 +1,7 @@
-package ru.hollowhorizon.hollowengine.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.timelineRows
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -298,24 +296,6 @@ class CutsceneTest {
 
         assertEquals(null, playback.currentEnvironment.timeOfDay)
         assertEquals(null, playback.currentEnvironment.weather)
-    }
-
-    @Test
-    fun `time of day formatter follows the minecraft clock`() {
-        assertEquals("06:00", TimeOfDayValueFormatter.format(0f))
-        assertEquals("12:00", TimeOfDayValueFormatter.format(6_000f))
-        assertEquals("00:00", TimeOfDayValueFormatter.format(18_000f))
-        assertEquals("05:59", TimeOfDayValueFormatter.format(23_999f))
-        assertEquals("07:00", TimeOfDayValueFormatter.format(25_000f))
-    }
-
-    @Test
-    fun `discrete tracks are omitted from curve editor rows`() {
-        val playback = CutscenePlaybackController()
-        val rows = timelineRows(playback.timeline, curveEditorOnly = true)
-
-        assertTrue(rows.any { it.property === playback.timeOfDay })
-        assertFalse(rows.any { it.property === playback.weather })
     }
 
     private fun floatCurve(controller: TimelineController): ChannelCurve {

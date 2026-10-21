@@ -72,7 +72,8 @@ internal object MixinScriptStage {
     private class Addons {
         val store = HollowAddonArtifactStore(HollowAddonManager.cacheDirectory)
         private val directories = HollowAddonManager.defaultSources()
-        private val disabled = HollowAddonActivationStore(directories.first().resolve(".disabled-addons")).load()
+        private val disabled =
+            HollowAddonActivationStore(HollowAddonManager.addonsDirectory.resolve(".disabled-addons")).load()
         private val jars =
             directories.mapIndexed { priority, directory -> priority to HollowAddonProbe.listAddonJars(directory) }
 

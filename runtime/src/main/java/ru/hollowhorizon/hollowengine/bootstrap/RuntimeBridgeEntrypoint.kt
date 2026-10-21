@@ -67,6 +67,7 @@ import ru.hollowhorizon.hollowengine.bootstrap.runtime.EventBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.PathObstacles
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimeBridge
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
+import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
 import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
@@ -86,7 +87,6 @@ import ru.hollowhorizon.hollowengine.client.sounds.SoundStreams
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeGameViewport
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlayPoint
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCameraSystem
 import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationOverlay
 import ru.hollowhorizon.hollowengine.client.ui.panels.UiPanels
 import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost
@@ -565,7 +565,6 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientRenderTickPre(client: Minecraft) {
-        CutsceneCameraSystem.update(client)
         RenderTickEvent.Pre.post(RenderTickEvent.Pre(client))
     }
 
@@ -777,7 +776,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         roll: Float,
         partialTick: Float,
     ): RuntimeBridge.CameraSetup {
-        val pose = CutsceneCameraSystem.currentPose.takeIf { shouldApplyCutsceneCamera() }
+        val pose = CameraDirector.currentPose.takeIf { shouldApplyCameraPose() }
         val event = CameraSetupEvent(
             gameRenderer = gameRenderer,
             camera = camera,
@@ -791,8 +790,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun getCameraOverride(partialTick: Float): RuntimeBridge.CameraOverride {
-        if (!shouldApplyCutsceneCamera()) return RuntimeBridge.CameraOverride.NONE
-        val pose = CutsceneCameraSystem.currentPose ?: return RuntimeBridge.CameraOverride.NONE
+        if (!shouldApplyCameraPose()) return RuntimeBridge.CameraOverride.NONE
+        val pose = CameraDirector.currentPose ?: return RuntimeBridge.CameraOverride.NONE
         return RuntimeBridge.CameraOverride(
             true,
             pose.position.x.toDouble(),
@@ -817,13 +816,13 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
             camera = camera,
             partialTick = partialTick,
             changingFov = changingFov,
-            fov = CutsceneCameraSystem.currentPose?.takeIf { shouldApplyCutsceneCamera() }?.fov?.toDouble() ?: fov,
+            fov = CameraDirector.currentPose?.takeIf { shouldApplyCameraPose() }?.fov?.toDouble() ?: fov,
         )
         CameraFovEvent.post(event)
         return event.fov
     }
 
-    private fun shouldApplyCutsceneCamera(): Boolean {
+    private fun shouldApplyCameraPose(): Boolean {
         return !IrisHelper.isShadowRendering()
     }
 

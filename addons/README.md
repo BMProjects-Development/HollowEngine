@@ -15,6 +15,8 @@ Copy the jar to either of these directories:
 - `mods/` - the usual choice for distributed addons and modpacks;
 - `hollowengine/addons/`- useful during development or when you want to keep addons separate from mods.
 
+In a development run of this repository nothing has to be copied: `runClient` and `runServer` build every addon first and pass `build/addon-jars` to the game with `-Dhollowengine.devAddons`. That directory is looked at before the two others, so a copy of the same addon left in `mods/` never wins, and it is watched like them: run `./gradlew buildAddons` while the game is open and the rebuilt addons are reloaded in place. Addons with bootstrap libraries still need a restart.
+
 The runtime scans and watches both directories. If the same addon id is present in both at startup, the newest version wins; when the versions are equal, the copy in `hollowengine/addons/` has priority. Do not keep duplicate copies unless you are deliberately testing version selection.
 
 Runtime diagnostics and lifecycle controls are available to operators:

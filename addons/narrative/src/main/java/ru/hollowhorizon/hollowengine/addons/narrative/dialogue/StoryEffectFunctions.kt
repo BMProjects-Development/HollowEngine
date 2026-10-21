@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.number
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.string
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.playCutscene
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.stopCutscene
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.playCutscene
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.stopCutscene
 import ru.hollowhorizon.hollowengine.common.ui.hud.EngineHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.hiddenHudLayers

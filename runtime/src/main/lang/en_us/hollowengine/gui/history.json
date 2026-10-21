@@ -32,7 +32,5 @@
   "timeline.curve_preset": "Apply curve preset",
   "timeline.rotation_basis": "Change rotation basis",
   "timeline.record_keys": "Record keys",
-  "timeline.capture_key": "Capture keyframe",
-  "timeline.move_cutscene": "Move cutscene",
-  "timeline.reanchor_cutscene": "Re-anchor cutscene"
+  "timeline.capture_key": "Capture keyframe"
 }

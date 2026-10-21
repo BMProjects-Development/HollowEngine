@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.common.scripting.story.functions.player
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import kotlinx.serialization.Serializable
 import net.minecraft.core.BlockPos
@@ -6,10 +6,10 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneAnchor
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneAnchorKind
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCameraSystem
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneStorage
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneAnchorKind
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneStorage
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 

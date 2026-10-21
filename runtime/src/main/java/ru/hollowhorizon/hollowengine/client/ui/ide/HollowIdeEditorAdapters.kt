@@ -341,6 +341,14 @@ internal class HollowIdeEditorSession(
         val requestRevision = completionRevision.incrementAndGet()
         completionJob?.cancel()
         completionJob = scope.launch {
+            val acceptedTypes = runCatching {
+                analyzer.acceptedExpressionTypes(path, text, key.caret, ContextSnippetTypes)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("expected types", failure)
+                null
+            }
+            requestContextCompletions(text, key, analyzer, requestRevision, acceptedTypes)
+
             val collected = ArrayList<UiTextCompletion>()
             var publishedAt = 0L
             var publishedSize = -1
@@ -366,11 +374,20 @@ internal class HollowIdeEditorSession(
             }
             if (publishedSize != collected.size) publish()
         }
+    }
+
+    private fun requestContextCompletions(
+        text: String,
+        key: CompletionKey,
+        analyzer: ScriptingAnalyzer,
+        requestRevision: Long,
+        acceptedTypes: List<String>?,
+    ) {
         contextCompletionJob?.cancel()
         contextCompletionJob = scope.launch(Minecraft.getInstance().dispatcher) {
             val context = UiCompletionContext(text, key.caret)
             val items = runCatching {
-                val candidates = ideContextCompletions(path, context).toMutableList()
+                val candidates = ideContextCompletions(path, context, acceptedTypes).toMutableList()
                 IdeCompletionEvent.post(IdeCompletionEvent(path, text, key.caret, candidates)).items.toList()
             }.getOrElse { failure ->
                 HollowEngine.LOGGER.error("Context completions failed for '{}'", path, failure)

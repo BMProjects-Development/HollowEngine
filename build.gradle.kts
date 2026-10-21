@@ -4,6 +4,7 @@ import me.modmuss50.mpp.ReleaseType
 import net.fabricmc.loom.api.LoomGradleExtensionAPI
 import net.fabricmc.loom.task.GenerateSourcesTask
 import net.fabricmc.loom.task.RemapJarTask
+import net.fabricmc.loom.task.RunGameTask
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -226,7 +227,11 @@ subprojects {
         extensions.configure<LoomGradleExtensionAPI> {
             runs.configureEach {
                 jvmArguments.add("-Dhollowengine.ide.sourceRoots=${rootProject.layout.buildDirectory.file("ide/source-roots.txt").get().asFile.absolutePath}")
+                jvmArguments.add("-Dhollowengine.devAddons=${rootProject.layout.buildDirectory.dir("addon-jars").get().asFile.absolutePath}")
             }
+        }
+        tasks.withType<RunGameTask>().configureEach {
+            dependsOn(rootProject.tasks.named("buildAddons"))
         }
     }
 }

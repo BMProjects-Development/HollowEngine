@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import net.minecraft.world.Difficulty
 import net.minecraft.world.level.GameType
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.TimeOfDayValueFormatter
+import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimeOfDayValueFormatter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownSlider

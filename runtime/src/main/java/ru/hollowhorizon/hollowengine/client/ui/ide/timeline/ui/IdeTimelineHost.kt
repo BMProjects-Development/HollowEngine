@@ -2,15 +2,16 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.isActive
+import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.CutsceneIcon
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSessions
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /**
  * What the timeline window is showing.
@@ -34,6 +35,18 @@ class TimelineTarget(
 )
 
 /**
+ * What the timeline window shows while no editor has published a [TimelineTarget], such as the
+ * cutscene being authored. It draws the whole window itself.
+ */
+interface DefaultTimeline {
+    /** The timeline drawn, whose history the window's undo steps through. */
+    val controller: TimelineController
+
+    @Composable
+    fun Content(keyboardActive: Boolean)
+}
+
+/**
  * Whose timeline the shared window shows, wherever it is drawn.
  *
  * Last publisher wins, the same way the inspector works.
@@ -41,6 +54,11 @@ class TimelineTarget(
 object IdeTimelines {
     var current: TimelineTarget? by mutableStateOf(null)
         private set
+
+    /** Contributed by addons; the first one is shown while nothing is published. */
+    val defaults = ExtensionPoints.create("hollowengine:ide/default-timelines".rl, DefaultTimeline::class)
+
+    val default: DefaultTimeline? get() = defaults.extensions.firstOrNull()
 
     private var owner: String? = null
 
@@ -74,7 +92,8 @@ fun PublishTimeline(source: String, key: Any?, target: () -> TimelineTarget?) {
 fun TimelineDock(keyboardActive: Boolean = true) {
     val target = IdeTimelines.current
     if (target == null) {
-        CutsceneTimelineDock(CutsceneEditorSessions.default, keyboardActive)
+        val fallback = IdeTimelines.default
+        if (fallback != null) fallback.Content(keyboardActive) else EmptyTimeline()
         return
     }
 
@@ -107,7 +126,7 @@ fun TimelineDock(keyboardActive: Boolean = true) {
         if (!controller.hasInspectableSelection()) return@PublishInspector null
         InspectorTarget(
             id = "timeline-${target.id}-${controller.selectionKey()}",
-            title = CutsceneLang.PROPERTIES.lang,
+            title = TimelineLang.PROPERTIES.lang,
             icon = CutsceneIcon,
         ) {
             revision.value
@@ -195,3 +214,19 @@ fun EmbeddedTimelineEditor(
 }
 
 private const val EmbeddedSelectionWidth = 220f
+
+@Composable
+private fun EmptyTimeline() {
+    Box(
+        id = "ide-timeline-empty",
+        mode = UiBoxMode.STACK,
+        modifier = Modifier.size(100.percent, 100.percent).background(TimelineColors.Background),
+    ) {
+        Text(
+            TimelineLang.EMPTY.lang,
+            modifier = Modifier.align(horizontal = UiAlign.CENTER, vertical = UiAlign.CENTER)
+                .fontSize(11f)
+                .foreground(TimelineColors.Muted),
+        )
+    }
+}

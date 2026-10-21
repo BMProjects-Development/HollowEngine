@@ -11,7 +11,7 @@ import ru.hollowhorizon.hollowengine.addons.mcp.ToolInputException
 import ru.hollowhorizon.hollowengine.addons.mcp.ToolParameter
 import ru.hollowhorizon.hollowengine.addons.mcp.contentResult
 import ru.hollowhorizon.hollowengine.addons.mcp.errorResult
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraPose
+import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.Base64
 import java.util.Locale
