@@ -19,6 +19,12 @@ import ru.hollowhorizon.hollowengine.common.compiler.createHollowEngineCompilerP
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.MemoryClassLoader
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.isSharedScript
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptId
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptFingerprint
+import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.NeoForgeEnvironmentSetup
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.ClassRemappingSession
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.RemappingClasspath
@@ -29,10 +35,7 @@ import ru.hollowhorizon.hollowengine.common.plugin.mixins.MixinSpecWriter
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.isClientSideScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
-import java.io.ByteArrayInputStream
-import java.io.InputStream
 import java.io.Serializable
-import java.security.ProtectionDomain
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.ScriptingHostConfiguration
 import kotlin.script.experimental.jvm.compilationCache
@@ -110,6 +113,21 @@ class ScriptJvmCompilerRemapped(
         val jvmScript = script as? KJvmCompiledScript ?: return script
         val module = jvmScript.getCompiledModule() as? KJvmCompiledModuleInMemory ?: return jvmScript
         val outputFiles = module.compilerOutputFiles + extraFiles
+        val configuration = jvmScript.compilationConfiguration.with {
+            if (jvmScript.compilationConfiguration[ScriptCompilationConfiguration.isSharedScript] == true) {
+                val id = jvmScript.sourceLocationId?.let(ScriptRegistry::idOfLocation)
+                val fingerprint = id?.let(ScriptFingerprint::compute)
+                if (id != null && fingerprint != null) {
+                    sharedScriptId(id.qualified)
+                    sharedScriptFingerprint(fingerprint.code)
+                }
+            }
+        }
+        val imports = jvmScript.otherScripts.map { remapCompiledScript(it) }
+        val metadata = KJvmCompiledScript(
+            jvmScript.sourceLocationId, configuration, jvmScript.scriptClassFQName,
+            jvmScript.resultField, imports, null,
+        )
         val remappingSession = if (remapToRuntime && RuntimeFlags.production && !NeoForgeEnvironmentSetup.isAvailable()) {
             ClassRemappingSession(
                 mappings(),
@@ -124,14 +142,14 @@ class ScriptJvmCompilerRemapped(
                 debugSave(path, bytes)
                 if (path.endsWith(".class")) remappingSession?.remap(bytes) ?: bytes else bytes
             },
-            jvmScript.otherScripts,
+            listOf(metadata),
         )
         return KJvmCompiledScript(
             jvmScript.sourceLocationId,
-            jvmScript.compilationConfiguration,
+            configuration,
             jvmScript.scriptClassFQName,
             jvmScript.resultField,
-            jvmScript.otherScripts.map { remapCompiledScript(it) },
+            imports,
             remappedModule,
         )
     }
@@ -168,6 +186,7 @@ class HollowEngineScriptCompiler(
     ): ResultWithDiagnostics<CompiledScript> = withMessageCollector { messageCollector ->
         withScriptCompilationCache(script, scriptCompilationConfiguration, messageCollector) {
             withConfiguredK2ScriptCompilerWithLightTree(
+                definitions,
                 scriptCompilationConfiguration.with {
                     hostConfiguration(this@HollowEngineScriptCompiler.hostConfiguration)
                 },
@@ -193,6 +212,7 @@ class HollowEngineScriptCompiler(
 }
 
 private fun <T> withConfiguredK2ScriptCompilerWithLightTree(
+    definitions: List<ScriptDefinition>,
     scriptCompilationConfiguration: ScriptCompilationConfiguration,
     parentMessageCollector: MessageCollector? = null,
     configureCompiler: CompilerConfiguration.() -> Unit = {},
@@ -209,7 +229,8 @@ private fun <T> withConfiguredK2ScriptCompilerWithLightTree(
                         ?: defaultJvmScriptingHostConfiguration,
                     configureCompiler
                 ),
-                SourceCode::convertToFirViaLightTree
+                SourceCode::convertToFirViaLightTree,
+                definitions,
             )
         )
     } finally {
@@ -246,40 +267,8 @@ private class RemappedCompiledModule(
 ) : KJvmCompiledModuleInMemory, Serializable {
     override fun createClassLoader(baseClassLoader: ClassLoader?): ClassLoader {
         val parent = baseClassLoader ?: HollowEngine::class.java.classLoader
-        return RemappedCompiledScriptClassLoader(
-            compilerOutputFiles,
-            parent,
-            SharedScriptClasses.loadersFor(imports, compilerOutputFiles, parent),
-        )
-    }
-}
-
-private class RemappedCompiledScriptClassLoader(
-    private val files: Map<String, ByteArray>,
-    parent: ClassLoader?,
-    private val shared: Map<String, ClassLoader>,
-) : ClassLoader(parent) {
-    override fun loadClass(name: String, resolve: Boolean): Class<*> {
-        val owner = sharedOwnerOf(name) ?: return super.loadClass(name, resolve)
-        return owner.loadClass(name).also { if (resolve) resolveClass(it) }
-    }
-
-    /** Nested and synthetic classes belong to the script that declared them: `Quests$Payload` to `Quests`. */
-    private fun sharedOwnerOf(name: String): ClassLoader? {
-        if (shared.isEmpty()) return null
-        shared[name]?.let { return it }
-        val outer = name.substringBefore('$')
-        return if (outer == name) null else shared[outer]
-    }
-
-    override fun findClass(name: String): Class<*> {
-        val path = name.replace('.', '/') + ".class"
-        val bytes = files[path] ?: throw ClassNotFoundException(name)
-        val protectionDomain = ProtectionDomain(null, null)
-        return defineClass(name, bytes, 0, bytes.size, protectionDomain)
-    }
-
-    override fun getResourceAsStream(name: String): InputStream? {
-        return files[name]?.let(::ByteArrayInputStream)
+        return MemoryClassLoader(compilerOutputFiles, parent).apply {
+            shareClassesOf(SharedScriptClasses.loadersFor(imports, compilerOutputFiles, parent))
+        }
     }
 }

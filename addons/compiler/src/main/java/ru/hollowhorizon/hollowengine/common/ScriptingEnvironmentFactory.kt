@@ -35,7 +35,10 @@ import kotlin.script.experimental.jvm.JvmDependency
 import kotlin.script.experimental.jvm.JvmGetScriptingClass
 import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 
-class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, HollowAddonEntrypoint {
+class ScriptingEnvironmentInitializerImpl(
+    private val prepareClasspath: (File) -> Pair<Mappings, List<File>> = CommonEnvironment::setup,
+    private val definitions: () -> List<ScriptClassProvider> = DefaultScriptDefinitions::providers,
+) : ScriptingEnvironmentInitializer, HollowAddonEntrypoint {
     @Volatile
     private var loaded: LoadedAddon? = null
 
@@ -44,7 +47,6 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
 
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
         loaded = LoadedAddon(context.addonFile, scope)
-        setUp(context.addonFile, scope)
         context.hostServices.publish<ScriptingEnvironmentInitializer>(this)
     }
 
@@ -70,16 +72,20 @@ class ScriptingEnvironmentInitializerImpl : ScriptingEnvironmentInitializer, Hol
     @Synchronized
     fun onAddonsChanged(event: HollowAddonsChangedEvent) {
         val addon = loaded ?: return
-        val current = built ?: return
-        val scriptTypes = DefaultScriptDefinitions.providers()
+        val current = built ?: run {
+            setUp(addon.file, addon.scope)
+            return
+        }
+        val scriptTypes = definitions()
         if (scriptTypes == current.scriptTypes) return
+        logI("Reloading script definitions after addon imports or script types changed")
         ScriptingEnvironment.clear()
         start(addon, current.mappings, current.classpath, scriptTypes)
     }
 
     private fun setUp(addonFile: File, scope: CoroutineScope) {
-        val (mappings, classpath) = CommonEnvironment.setup(addonFile)
-        start(LoadedAddon(addonFile, scope), mappings, classpath, DefaultScriptDefinitions.providers())
+        val (mappings, classpath) = prepareClasspath(addonFile)
+        start(LoadedAddon(addonFile, scope), mappings, classpath, definitions())
     }
 
     private fun start(
