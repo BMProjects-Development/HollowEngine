@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.common.commands
 
 import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.arguments.FloatArgumentType
-import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
@@ -34,7 +33,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComp
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.commands.arguments.ScriptPathArgument
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueInput
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
@@ -284,27 +282,6 @@ private fun CommandExtension.registerUtilityCommands() {
         executes {
             copyTargetPositionToClipboard(source.playerOrException)
             SUCCESS
-        }
-    }
-
-    registerDialogueCommands()
-}
-
-private fun CommandExtension.registerDialogueCommands() {
-    "dialogue" {
-        "advance" {
-            executes {
-                if (DialogueInput.advance(source.playerOrException)) SUCCESS
-                else sendFailure("hollowengine.commands.dialogue_not_in_dialogue".mcTranslate())
-            }
-        }
-
-        "choose"(arg("option", IntegerArgumentType.integer(0))) {
-            executes {
-                val option = IntegerArgumentType.getInteger(this, "option")
-                if (DialogueInput.choose(source.playerOrException, option)) SUCCESS
-                else sendFailure("hollowengine.commands.dialogue_no_such_option".mcTranslate(option))
-            }
         }
     }
 }

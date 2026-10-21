@@ -78,7 +78,7 @@ internal class HollowIdeProjectController(
 
     fun openCreateFileDialog(path: String) = openNameDialog(ProjectNameAction.CreateFile, path)
 
-    fun openCreateScriptDialog(path: String, template: ScriptTemplate) =
+    fun openCreateScriptDialog(path: String, template: HollowIdeScriptTemplate) =
         openNameDialog(ProjectNameAction.CreateFile, path, template)
 
     fun openCreateFolderDialog(path: String) = openNameDialog(ProjectNameAction.CreateFolder, path)
@@ -102,7 +102,7 @@ internal class HollowIdeProjectController(
         if (result == HollowIdeFileOperationResult.Success) nameDialog = null
     }
 
-    private fun createScript(dialog: ProjectNameDialog, template: ScriptTemplate): HollowIdeFileOperationResult {
+    private fun createScript(dialog: ProjectNameDialog, template: HollowIdeScriptTemplate): HollowIdeFileOperationResult {
         val name = template.fileName(dialog.name)
         val directory = if (dialog.path.fromReadablePath().isDirectory) dialog.path else dialog.path.substringBeforeLast('/', "")
         val path = if (directory.isBlank()) name else "$directory/$name"
@@ -250,7 +250,7 @@ internal class HollowIdeProjectController(
         if (result != HollowIdeFileOperationResult.Success) HollowNotifications.error(result.statusText())
     }
 
-    private fun openNameDialog(action: ProjectNameAction, path: String, template: ScriptTemplate? = null) {
+    private fun openNameDialog(action: ProjectNameAction, path: String, template: HollowIdeScriptTemplate? = null) {
         val defaultName = when (action) {
             ProjectNameAction.Rename -> path.substringAfterLast('/')
             ProjectNameAction.CreateFile -> template?.suggestedFileName ?: "new_file.kts"
