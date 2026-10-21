@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.HandleMode

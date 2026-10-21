@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*

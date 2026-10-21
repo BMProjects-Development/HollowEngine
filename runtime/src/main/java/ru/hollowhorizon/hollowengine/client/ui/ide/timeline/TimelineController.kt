@@ -856,7 +856,8 @@ class TimelineController(override val history: UndoHistory = UndoHistory()) : Un
 }
 
 
-internal fun AnimProperty<*>.decomposeDefault(into: FloatArray) {
+/** Writes the channels of the property's default value into [into]. */
+fun AnimProperty<*>.decomposeDefault(into: FloatArray) {
     (type as PropertyType<Any?>).decompose(defaultValue, into)
 }
 

@@ -9,6 +9,10 @@ order: 1
 
 ![Dialogue system](/hollowengine/titles/dialogues/index.webp)
 
+:::advice
+Dialogues come with the [narrative addon](/docs/hollowengine/addons/narrative). Scripts in the `hollowengine` folder need `dependsOn=hollowengine-narrative` in the project's `plugin.properties` to use them.
+:::
+
 Dialogue scenarios use `.story` files. They live beside Kotlin scripts under `hollowengine/scripts`, but use a dedicated line-based language with highlighting, diagnostics, completion, and navigation in the built-in IDE.
 
 For example, `hollowengine/scripts/stories/gate.story` has the address `project:stories/gate.story`.
@@ -32,8 +36,8 @@ Adjacent `@choice` blocks form one menu. Only the selected block runs. `if=` hid
 ## Starting it from Kotlin
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueCharacter
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueController
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCharacter
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
 
 val gateDialogue = DialogueController("project:stories/gate.story")
 

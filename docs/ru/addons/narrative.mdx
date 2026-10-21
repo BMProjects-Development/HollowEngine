@@ -1,0 +1,39 @@
+---
+title: Аддон Narrative
+order: 9
+---
+
+<center><h1>Аддон Narrative</h1></center>
+
+*Диалоги, язык `.story` и катсцены.*
+
+Аддон Narrative (id `hollowengine-narrative`) содержит всё, что рассказывает историю поверх движка. NPC, их действия и управляющие ими нод-скрипты остаются в самом HollowEngine, поэтому мир с NPC загружается и без аддона.
+
+## Что он добавляет
+
+- [Диалоговую систему](/docs/hollowengine/dialogues): файлы `.story`, `DialogueController`, окно диалога и команды `/he dialogue advance` и `/he dialogue choose <n>`, чтобы проходить диалог через чат.
+- Встроенные [команды историй](/docs/hollowengine/dialogues/commands) для пауз, звука, NPC, камеры, HUD и катсцен, а также `RegisterStoryFunctionsEvent` для [своих команд](/docs/hollowengine/dialogues/custom-commands).
+- Поддержку `.story` в IDE: подсветку, диагностику, автодополнение, навигацию и пункт **Dialogue** в меню **New script** дерева проекта.
+- [Катсцены](/docs/hollowengine/world/cutscenes): таймлайн катсцены, `playCutscene` с вариантами и камеру, которая их проигрывает.
+
+## Использование из скриптов
+
+Скрипты папки `hollowengine` видят классы аддона, только если проект от него зависит. Добавьте аддон в `dependsOn` в `hollowengine/META-INF/plugin.properties` или в настройках проекта в IDE:
+
+```properties
+dependsOn=hollowengine-narrative
+```
+
+С этой зависимостью нод-скрипты используют `DialogueController`, `DialogueCharacter` и `playCutscene` без импортов, а reload-скрипты получают ещё и помощники сигнатур (`string`, `number`, `actor` и остальные) для регистрации команд историй. Без неё эти имена не находятся, а остальной проект компилируется как раньше.
+
+Аддон, который пользуется диалогами или катсценами, так же объявляет `dependsOn=hollowengine-narrative` в своём `plugin.properties`.
+
+## Пакеты
+
+| Что | Пакет |
+| --- | --- |
+| Диалоги, функции историй, события | `ru.hollowhorizon.hollowengine.addons.narrative.dialogue` |
+| Помощники сигнатур для команд историй | `ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang` |
+| Катсцены | `ru.hollowhorizon.hollowengine.addons.narrative.cutscene` |
+
+Скрипты для прошлых версий импортировали эти классы из `ru.hollowhorizon.hollowengine.common.dialogue`. Замените этот префикс на `ru.hollowhorizon.hollowengine.addons.narrative.dialogue`; функции катсцен раньше лежали в `ru.hollowhorizon.hollowengine.common.scripting.story.functions.player`.

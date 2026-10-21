@@ -1,8 +1,8 @@
-package ru.hollowhorizon.hollowengine.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.Keyframe
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.*
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -89,6 +89,4 @@ object TimelineEdits {
     val ROTATION_BASIS = label("rotation_basis")
     val RECORD_KEYS = label("record_keys")
     val CAPTURE_KEY = label("capture_key")
-    val MOVE_CUTSCENE = label("move_cutscene")
-    val REANCHOR_CUTSCENE = label("reanchor_cutscene")
 }

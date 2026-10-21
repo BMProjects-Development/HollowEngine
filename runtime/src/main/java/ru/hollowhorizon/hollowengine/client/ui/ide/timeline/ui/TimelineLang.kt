@@ -1,7 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui
 
-internal object CutsceneLang {
-    private const val ROOT = "hollowengine.gui.ide.cutscene."
+/** Translation keys of the timeline editor. */
+object TimelineLang {
+    private const val ROOT = "hollowengine.gui.ide.timeline."
 
     const val PROPERTIES = ROOT + "properties"
     const val TRACKS = ROOT + "tracks"
@@ -44,39 +45,20 @@ internal object CutsceneLang {
     const val ZOOM_OUT = ROOT + "action.zoom_out"
     const val MORE = ROOT + "action.more"
 
-    const val SAVE_TITLE = ROOT + "dialog.save_title"
-    const val LOAD_TITLE = ROOT + "dialog.load_title"
-    const val NAME = ROOT + "dialog.name"
-    const val NO_CUTSCENES = ROOT + "dialog.no_cutscenes"
-
-    const val PREVIEW = ROOT + "section.preview"
-    const val ORIGIN = ROOT + "section.origin"
     const val KEYFRAME = ROOT + "section.keyframe"
     const val KEYFRAMES = ROOT + "section.keyframes"
     const val INTERPOLATION = ROOT + "section.interpolation"
     const val WORK_AREA = ROOT + "section.work_area"
     const val SELECTION = ROOT + "section.selection"
 
-    const val CAMERA_ON = ROOT + "preview.camera_on"
-    const val CAMERA_OFF = ROOT + "preview.camera_off"
-    const val PLAYING = ROOT + "preview.playing"
-    const val PAUSED = ROOT + "preview.paused"
-    const val CURRENT_TIME = ROOT + "preview.current_time"
-    const val DURATION = ROOT + "preview.duration"
-    const val TIME_HINT = ROOT + "preview.time_hint"
+    /** Shown when nothing with a timeline is open. */
+    const val EMPTY = ROOT + "empty"
 
-    const val ORIGIN_X = ROOT + "origin.x"
-    const val ORIGIN_Y = ROOT + "origin.y"
-    const val ORIGIN_Z = ROOT + "origin.z"
-    const val ORIGIN_YAW = ROOT + "origin.yaw"
-    const val ORIGIN_MOVE_HERE = ROOT + "origin.move_here"
-    const val ORIGIN_REBASE = ROOT + "origin.rebase"
+    const val TIME_HINT = ROOT + "preview.time_hint"
 
     const val TIME = ROOT + "keyframe.time"
     const val VALUE = ROOT + "keyframe.value"
     const val CHANNEL = ROOT + "keyframe.channel"
-    const val WORLD = ROOT + "keyframe.world"
-    const val WORLD_ROTATION = ROOT + "keyframe.world_rotation"
     const val DELETE_KEY = ROOT + "keyframe.delete_key"
     const val DELETE_KEYS = ROOT + "keyframe.delete_keys"
     const val NO_SELECTION = ROOT + "keyframe.no_selection"
@@ -101,4 +83,4 @@ internal object CutsceneLang {
     const val ROTATION_MODE = ROOT + "rotation.mode"
     const val ROTATION_EULER = ROOT + "rotation.euler"
     const val ROTATION_QUATERNION = ROOT + "rotation.quaternion"
-    }
+}

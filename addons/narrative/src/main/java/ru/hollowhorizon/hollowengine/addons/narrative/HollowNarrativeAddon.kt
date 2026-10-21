@@ -18,7 +18,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 /**
- * Dialogues and the `.story` language. NPCs, their action channels and cutscenes stay in the engine;
+ * Dialogues, the `.story` language and cutscenes. NPCs and their action channels stay in the engine;
  * this addon builds stories on top of them.
  */
 class HollowNarrativeAddon : HollowAddonEntrypoint {
@@ -32,7 +32,7 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
     fun addDefaultImports(event: ScriptDefaultImportsEvent) {
         when (event.suffix) {
             RELOAD_SCRIPT_EXTENSION -> event.defaultImports += RELOAD_IMPORTS
-            NODE_SCRIPT_EXTENSION -> event.defaultImports += DIALOGUE_PACKAGE
+            NODE_SCRIPT_EXTENSION -> event.defaultImports += NODE_IMPORTS
         }
     }
 
@@ -58,5 +58,10 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
         val RELOAD_IMPORTS = listOf(DIALOGUE_PACKAGE) +
             listOf("actor", "any", "boolean", "list", "number", "signature", "string")
                 .map { "ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.$it" }
+
+        /** Nodes start dialogues and play cutscenes for players. */
+        val NODE_IMPORTS = listOf(DIALOGUE_PACKAGE) +
+            listOf("playCutscene", "playCutsceneAt", "playCutsceneNear", "playCutsceneHere", "stopCutscene")
+                .map { "ru.hollowhorizon.hollowengine.addons.narrative.cutscene.$it" }
     }
 }

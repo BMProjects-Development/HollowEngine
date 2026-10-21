@@ -1,7 +1,8 @@
-package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import androidx.compose.runtime.mutableStateOf
 import net.minecraft.client.Minecraft
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
@@ -76,7 +77,7 @@ class CutsceneEditorSession {
     }
 
     fun moveOrigin(position: Vec3f, yaw: Float, keepWorld: Boolean) {
-        timeline.edit(if (keepWorld) TimelineEdits.REANCHOR_CUTSCENE else TimelineEdits.MOVE_CUTSCENE) {
+        timeline.edit(if (keepWorld) REANCHOR else MOVE) {
             if (keepWorld) playback.reanchor(position, yaw)
             else playback.origin = playback.origin.moved(position, yaw)
         }
@@ -124,7 +125,9 @@ class CutsceneEditorSession {
     }
 }
 
-
 object CutsceneEditorSessions {
     val default = CutsceneEditorSession()
 }
+
+private val MOVE = UndoLabel("${UndoLabel.LANG}.timeline.move_cutscene")
+private val REANCHOR = UndoLabel("${UndoLabel.LANG}.timeline.reanchor_cutscene")

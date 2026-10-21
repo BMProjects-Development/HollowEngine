@@ -422,7 +422,7 @@ internal fun TimelineContextMenu(
         else -> buildList {
             val curve = state.curve
             if (curve != null && !state.locked) {
-                add(UiDropdownItem(CutsceneLang.ADD_KEYFRAME.lang, icon = PulseIcon) {
+                add(UiDropdownItem(TimelineLang.ADD_KEYFRAME.lang, icon = PulseIcon) {
                     controller.edit(TimelineEdits.ADD_KEY) {
                         controller.setKey(curve, state.time, curve.valueAt(state.time, 0f))
                     }
@@ -431,28 +431,28 @@ internal fun TimelineContextMenu(
             }
             add(
                 UiDropdownItem(
-                    CutsceneLang.CURVE_PRESET.lang,
+                    TimelineLang.CURVE_PRESET.lang,
                     icon = PresetIcon,
                     enabled = hasCurveSelection,
                     closeOnClick = false,
                 ) { showPresets = true })
-            add(UiDropdownItem(CutsceneLang.SMOOTH_SELECTED.lang, icon = GraphIcon, enabled = hasCurveSelection) {
+            add(UiDropdownItem(TimelineLang.SMOOTH_SELECTED.lang, icon = GraphIcon, enabled = hasCurveSelection) {
                 controller.smoothSelectedKeyframes()
                 refresh()
             })
-            add(UiDropdownItem(CutsceneLang.COPY_SELECTED.lang, icon = CopyIcon, enabled = hasSelection) {
+            add(UiDropdownItem(TimelineLang.COPY_SELECTED.lang, icon = CopyIcon, enabled = hasSelection) {
                 controller.copySelectedKeyframes()
                 refresh()
             })
-            add(UiDropdownItem(CutsceneLang.CUT_SELECTED.lang, icon = CutIcon, enabled = hasSelection) {
+            add(UiDropdownItem(TimelineLang.CUT_SELECTED.lang, icon = CutIcon, enabled = hasSelection) {
                 controller.cutSelectedKeyframes()
                 refresh()
             })
-            add(UiDropdownItem(CutsceneLang.PASTE.lang, icon = PasteIcon, enabled = controller.canPaste) {
+            add(UiDropdownItem(TimelineLang.PASTE.lang, icon = PasteIcon, enabled = controller.canPaste) {
                 controller.pasteKeyframes(state.time)
                 refresh()
             })
-            add(UiDropdownItem(CutsceneLang.DELETE_SELECTED.lang, icon = RemoveIcon, enabled = hasSelection) {
+            add(UiDropdownItem(TimelineLang.DELETE_SELECTED.lang, icon = RemoveIcon, enabled = hasSelection) {
                 controller.deleteSelectedKeyframes()
                 refresh()
             })

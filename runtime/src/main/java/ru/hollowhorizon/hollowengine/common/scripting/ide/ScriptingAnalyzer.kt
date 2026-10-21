@@ -43,6 +43,14 @@ interface ScriptingAnalyzer {
      * Alt+Enter actions at the caret, such as import suggestions.
      */
     fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
+
+    /**
+     * Which of [types], fully qualified class names as scripts see them, an expression typed at [offset]
+     * may have; used by completions that insert a whole expression. Null when [offset] is not where an
+     * expression starts. A language that cannot tell accepts every type.
+     */
+    fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? = types
+
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>

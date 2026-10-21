@@ -230,12 +230,9 @@ private fun rankAgainst(candidates: List<UiTextCompletion>, prefix: String): Lis
     candidates.asSequence()
         .filter { it.label.isNotBlank() || it.insertText.isNotBlank() }
         .mapIndexedNotNull { index, item ->
-            val filterMatch = matchCompletion(prefix, item.filterText)
-            val labelMatch = if (item.filterText == item.label) filterMatch else matchCompletion(prefix, item.label)
-            val match = filterMatch ?: labelMatch ?: return@mapIndexedNotNull null
-            val displayRanges = labelMatch?.ranges ?: filterMatch?.ranges
-                ?.shiftInto(item.filterText, item.label)
-                .orEmpty()
+            val match = matchCompletion(prefix, item.filterText) ?: return@mapIndexedNotNull null
+            val displayRanges = if (item.filterText == item.label) match.ranges
+            else match.ranges.shiftInto(item.filterText, item.label)
             RankedCompletion(item.copy(matchRanges = displayRanges), match.score, index)
         }
         .sortedWith(

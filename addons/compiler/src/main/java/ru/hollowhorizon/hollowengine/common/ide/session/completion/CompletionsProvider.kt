@@ -56,7 +56,7 @@ fun ScriptingAnalyzerImpl.createCompletions(file: KtFile, offset: Int, sink: Com
     }
 }
 
-private fun ScriptingAnalyzerImpl.createFileForCompletion(original: KtFile, offset: Int): KtFile {
+internal fun ScriptingAnalyzerImpl.createFileForCompletion(original: KtFile, offset: Int): KtFile {
     val safeOffset = offset.coerceIn(0, original.textLength)
     val textWithInsertedFakeIdentifier = original.text.replaceRange(safeOffset, safeOffset, COMPLETION_FAKE_IDENTIFIER)
     val copyKtFile = KtPsiFactory(original.project, markGenerated = true, eventSystemEnabled = true).createFile(
@@ -550,7 +550,7 @@ private fun CompletionItemsCollector.completeScope(scope: KaScope) {
 }
 
 context(_: KaSession)
-private fun getPosition(element: KtElement): CompletionPosition? {
+internal fun getPosition(element: KtElement): CompletionPosition? {
     // Проверка, находимся ли мы в директиве package или import
     val importDirective = element.parentOfType<KtImportDirective>(withSelf = true)
     val packageDirective = element.parentOfType<KtPackageDirective>(withSelf = true)
@@ -699,7 +699,7 @@ fun KtUserType.isAnnotation(): Boolean {
     return constructor.parent is KtAnnotationEntry
 }
 
-private sealed interface CompletionPosition {
+internal sealed interface CompletionPosition {
     val prefix: String?
 
     class Identifier(override val prefix: String) : CompletionPosition

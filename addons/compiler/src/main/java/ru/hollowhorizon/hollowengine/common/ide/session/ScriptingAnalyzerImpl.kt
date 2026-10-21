@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
@@ -317,6 +318,9 @@ class ScriptingAnalyzerImpl internal constructor(
         synchronized(lock) {
             kotlinGutterTargets(getOrCreateFile(name, text), offset)
         }
+
+    override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =
+        synchronized(lock) { findAcceptedExpressionTypes(getOrCreateFile(name, text), offset, types) }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)

@@ -1,19 +1,10 @@
-package ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene
+package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
+import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.max
 import kotlin.math.min
-
-data class CameraPose(
-    val position: Vec3f = Vec3f.ZERO,
-    val rotation: Vec3f = Vec3f.ZERO,
-    val fov: Float = 70f,
-) {
-    val pitch: Float get() = rotation.x
-    val yaw: Float get() = rotation.y
-    val roll: Float get() = rotation.z
-}
 
 /** The ids the camera rig is built from; a saved file binds back to its drivers through them. */
 object CameraRig {

@@ -22,8 +22,9 @@ import java.net.URLClassLoader
 internal class HollowAddonRuntime(
     private val sources: List<File>,
     cacheDirectory: File,
+    private val addonsDirectory: File,
+    private val modsDirectory: File,
 ) {
-    private val addonsDirectory = sources.first()
     private val mutex = Mutex()
     private val runtimeJob = SupervisorJob()
     private val runtimeScope = CoroutineScope(Dispatchers.IO + runtimeJob + CoroutineName("HollowEngine addons"))
@@ -616,11 +617,13 @@ internal class HollowAddonRuntime(
 
     private fun refreshSnapshot() {
         loadedSnapshot = loadedAddons.values.map { it.candidate.descriptor }
-        val addonsFolder = addonsDirectory.canonicalFile
+        val modsFolder = modsDirectory.canonicalFile
         resourcePackSnapshot = loadedAddons.values.toList().asReversed()
             .map(LoadedHollowAddon::candidate)
             .filter { candidate ->
-                (candidate.hasAssets || candidate.hasData) && candidate.sourceFile.parentFile?.canonicalFile == addonsFolder
+                // The mod loader already serves mods and the addons embedded in them.
+                (candidate.hasAssets || candidate.hasData) && candidate.embeddedModId == null &&
+                    candidate.sourceFile.parentFile?.canonicalFile != modsFolder
             }
             .map { candidate ->
                 HollowAddonResourcePack(
