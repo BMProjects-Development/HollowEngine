@@ -19,6 +19,7 @@ object HollowIdeExtensionPoints {
     val FILE_ACTIONS = ExtensionPoints.create("hollowengine:ide/file-actions".rl, HollowIdeFileActionProvider::class)
     val PROJECT_ACTIONS = ExtensionPoints.create("hollowengine:ide/project-actions".rl, HollowIdeProjectActionProvider::class)
     val LANGUAGES = ExtensionPoints.create("hollowengine:ide/languages".rl, HollowIdeLanguageService::class)
+    val SCRIPT_TEMPLATES = ExtensionPoints.create("hollowengine:ide/script-templates".rl, HollowIdeScriptTemplate::class)
 }
 
 /** Operations a contributed panel or menu action may request from the IDE. */
@@ -157,3 +158,9 @@ fun HollowAddonExtensions.registerIdeLanguage(
     language: HollowIdeLanguageService,
     priority: Int = 0,
 ): HollowAddonRegistration = register(HollowIdeExtensionPoints.LANGUAGES, language.id, language, priority)
+
+/** Adds a kind of script to the "New script" menu of the project tree. */
+fun HollowAddonExtensions.registerIdeScriptTemplate(
+    template: HollowIdeScriptTemplate,
+    priority: Int = 0,
+): HollowAddonRegistration = register(HollowIdeExtensionPoints.SCRIPT_TEMPLATES, template.id, template, priority)

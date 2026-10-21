@@ -6,7 +6,6 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ReloadListener
 import ru.hollowhorizon.hollowengine.common.compat.util.currentRecipeManagerOrNull
 import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
-import ru.hollowhorizon.hollowengine.common.dialogue.StoryEngine
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 
@@ -26,7 +25,7 @@ object ServerReloadScripts : ResourceManagerReloadListener {
     }
 
     override fun onResourceManagerReload(resourceManager: ResourceManager) {
-        StoryEngine.prepareReload()
+        ServerReloadScriptsEvent.Pre.post(ServerReloadScriptsEvent.Pre())
         val recipeManager = currentRecipeManagerOrNull()
         if (recipeManager == null) {
             HollowEngine.LOGGER.warn("Skipping reload scripts: RecipeManager is not initialized yet")
@@ -34,7 +33,7 @@ object ServerReloadScripts : ResourceManagerReloadListener {
             val dispatcher = RuntimeDispatcherState.loadingServerDispatcher()
             runner.run(dispatcher, resourceManager, ServerReloadContext(recipeManager))
         }
-        StoryEngine.completeReload()
+        ServerReloadScriptsEvent.Post.post(ServerReloadScriptsEvent.Post())
 
         pendingCommands?.let { event ->
             pendingCommands = null

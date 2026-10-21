@@ -3,10 +3,10 @@ package ru.hollowhorizon.hollowengine.client.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import ru.hollowhorizon.hollowengine.client.ui.text.*
-import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextAnimation
-import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextDocument
-import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextParser
-import ru.hollowhorizon.hollowengine.common.dialogue.text.FormattedTextStyle
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextAnimation
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextDocument
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextStyle
 import ru.hollowhorizon.hollowengine.client.ui.text.Gradient as UiGradient
 
 /**
