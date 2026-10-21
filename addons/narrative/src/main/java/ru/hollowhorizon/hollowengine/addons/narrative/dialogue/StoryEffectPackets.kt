@@ -6,7 +6,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryFadeOverlay
 import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
-import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
