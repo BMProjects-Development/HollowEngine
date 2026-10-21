@@ -47,6 +47,7 @@ class ScriptingEnvironmentInitializerImpl(
 
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
         loaded = LoadedAddon(context.addonFile, scope)
+        setUp(context.addonFile, scope)
         context.hostServices.publish<ScriptingEnvironmentInitializer>(this)
     }
 
@@ -72,10 +73,7 @@ class ScriptingEnvironmentInitializerImpl(
     @Synchronized
     fun onAddonsChanged(event: HollowAddonsChangedEvent) {
         val addon = loaded ?: return
-        val current = built ?: run {
-            setUp(addon.file, addon.scope)
-            return
-        }
+        val current = built ?: return
         val scriptTypes = definitions()
         if (scriptTypes == current.scriptTypes) return
         logI("Reloading script definitions after addon imports or script types changed")

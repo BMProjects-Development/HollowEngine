@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneAnchorKin
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneStorage
 import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
-import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 
 fun Player.playCutscene(path: String, loop: Boolean = false) {

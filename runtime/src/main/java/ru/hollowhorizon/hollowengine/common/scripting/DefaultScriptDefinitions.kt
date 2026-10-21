@@ -12,7 +12,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.reload.ReloadScript
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadContext
 import ru.hollowhorizon.hollowengine.common.scripting.startup.StartupScript
 import ru.hollowhorizon.hollowengine.common.scripting.ui.UiScript
-import ru.hollowhorizon.hollowengine.logI
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider as Provider
 
 const val NODE_SCRIPT_EXTENSION = "node.kts"
