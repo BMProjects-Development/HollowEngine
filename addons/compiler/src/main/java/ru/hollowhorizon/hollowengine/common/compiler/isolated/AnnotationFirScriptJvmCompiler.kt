@@ -39,7 +39,6 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.NameUtils
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.scripting.compiler.plugin.configureFirSession
-import org.jetbrains.kotlin.scripting.compiler.plugin.definitions.getOrStoreRefinedCompilationConfiguration
 import org.jetbrains.kotlin.scripting.compiler.plugin.definitions.getRefinedOrBaseCompilationConfiguration
 import org.jetbrains.kotlin.scripting.compiler.plugin.definitions.scriptRefinedCompilationConfigurationsCache
 import org.jetbrains.kotlin.scripting.compiler.plugin.dependencies.collectScriptsCompilationDependenciesRecursively
@@ -53,6 +52,8 @@ import org.jetbrains.kotlin.scripting.compiler.plugin.impl.makeCompiledScript
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.refineAllForK2
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.selectJvmTarget
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.updateWithCompilerOptions
+import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
+import ru.hollowhorizon.hollowengine.common.compiler.configuration.sharedImportDiagnostics
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import kotlin.script.experimental.api.CompiledScript
 import kotlin.script.experimental.api.ResultWithDiagnostics
@@ -83,6 +84,7 @@ import kotlin.script.experimental.jvm.util.toClassPathOrEmpty
 internal class AnnotationFirScriptJvmCompiler(
     state: K2ScriptingCompilerEnvironment,
     private val convertToFir: SourceCode.(FirSession, BaseDiagnosticsCollector) -> FirFile,
+    private val definitions: List<ScriptDefinition>,
 ) {
     private val state = state as? K2ScriptingCompilerEnvironmentInternal
         ?: error("Expected the internal K2 scripting compiler environment, got ${state::class}")
@@ -160,12 +162,21 @@ internal class AnnotationFirScriptJvmCompiler(
         val allSourceFiles = mutableListOf(script)
         val (classpath, importedSources, sourceDependencies) =
             collectScriptsCompilationDependenciesRecursively(allSourceFiles) { importedScript ->
-                state.hostConfiguration.getOrStoreRefinedCompilationConfiguration(importedScript) { source, baseConfig ->
-                    baseConfig.refineAll(source)
+                if (importedScript == script) scriptRefinedCompilationConfiguration.asSuccess()
+                else {
+                    val definition = definitions.filter { importedScript.name?.endsWith(it.fileExtension) == true }
+                        .maxByOrNull { it.fileExtension.length }
+                    val refined = (definition?.compilationConfiguration ?: state.baseScriptCompilationConfiguration)
+                        .refineAll(importedScript)
+                    state.hostConfiguration[ScriptingHostConfiguration.scriptRefinedCompilationConfigurationsCache]
+                        ?.storeRefinedCompilationConfiguration(importedScript, refined)
+                    refined
                 }
             }.valueOr { return it }
         allSourceFiles.addAll(importedSources)
         val compilationSources = importedSources + script
+        val sharedErrors = sharedImportDiagnostics(compilationSources, ::getRefinedConfiguration)
+        if (sharedErrors.isNotEmpty()) return failure(reporting, reporting.diagnosticsCollector, *sharedErrors.toTypedArray())
 
         val ignoredOptionsReportingState = state.compilerContext.ignoredOptionsReportingState
         val updatedCompilerOptions = allSourceFiles.flatMapTo(mutableListOf()) {

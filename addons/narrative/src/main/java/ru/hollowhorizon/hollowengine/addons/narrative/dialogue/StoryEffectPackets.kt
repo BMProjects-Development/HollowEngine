@@ -5,6 +5,7 @@ import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryFadeOverlay
 import ru.hollowhorizon.hollowengine.client.camera.CameraPose
+import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -15,13 +16,13 @@ class StoryFadePacket(
     private val alpha: Float,
     private val durationMillis: Long,
     private val color: Int,
-) : HollowPacket {
+) : HollowAddonPacket {
     override fun handle(player: Player) = StoryFadeOverlay.fadeTo(alpha, durationMillis, color)
 }
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
 @Serializable
-object StoryClearFadePacket : HollowPacket {
+object StoryClearFadePacket : HollowAddonPacket {
     override fun handle(player: Player) = StoryFadeOverlay.clear()
 }
 
@@ -36,7 +37,7 @@ class StoryCameraPacket(
     private val roll: Float,
     private val fov: Float,
     private val durationMillis: Long,
-) : HollowPacket {
+) : HollowAddonPacket {
     override fun handle(player: Player) = StoryCameraSystem.moveTo(
         CameraPose(Vec3f(x, y, z), Vec3f(pitch, yaw, roll), fov),
         durationMillis,
@@ -45,6 +46,6 @@ class StoryCameraPacket(
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
 @Serializable
-class StoryReleaseCameraPacket(private val durationMillis: Long) : HollowPacket {
+class StoryReleaseCameraPacket(private val durationMillis: Long) : HollowAddonPacket {
     override fun handle(player: Player) = StoryCameraSystem.release(durationMillis)
 }
