@@ -37,7 +37,7 @@ object NodeAttachTargets {
     fun of(id: ScriptId): AttachTarget {
         val file = ScriptRegistry.artifacts(id)?.sourceFile ?: return AttachTarget.Unknown
         val stamp = runCatching { file.lastModified() }.getOrDefault(0L)
-        val classLoader = ScriptRegistry.source(id.namespace)?.classLoader ?: NodeAttachTargets::class.java.classLoader
+        val classLoader = ScriptRegistry.classLoader(id.namespace) ?: NodeAttachTargets::class.java.classLoader
         val key = file.path
         cache[key]?.takeIf { it.stamp == stamp && it.classLoader === classLoader }?.let { return it.target }
         val target = read(file, id.fileName, classLoader)
