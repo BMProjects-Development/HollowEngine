@@ -157,10 +157,9 @@ object ScriptLoader {
         }
     }
 
-    private fun load(id: ScriptId, jar: File): CompiledScript {
-        val classLoader = ScriptRegistry.source(id.namespace)?.classLoader
-        return jar.loadKotlinCompiledScriptFromJar(classLoader)
-    }
+    /** Loads a compiled artifact in the classloader a fresh compilation would run in, dependencies included. */
+    private fun load(id: ScriptId, jar: File): CompiledScript =
+        jar.loadKotlinCompiledScriptFromJar(ScriptRegistry.classLoader(id.namespace))
 
     private const val SCRIPT_EXTENSION = ".kts"
     private const val MAX_CAUSE_DEPTH = 8
