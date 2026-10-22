@@ -30,6 +30,14 @@ suspend fun checkpoint(name: String): Unit =
 @Retention(AnnotationRetention.RUNTIME)
 annotation class StageEntry(val name: String)
 
+/**
+ * Marks the call the compiler generates for a stage lambda: the runtime calls it with the captured values and the
+ * parameters of a call, and the stage saves them all as its arguments.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class StageCall(val name: String)
+
 /** Marks a script class that declares stages with the source [path] its stages are addressed by. */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)

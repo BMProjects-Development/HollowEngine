@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.isNothing
 import org.jetbrains.kotlin.ir.types.isUnit
+import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.defaultValueForType
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
@@ -65,11 +66,11 @@ internal class StageRewriter(
         if (!returnType.isUnit()) reportReturns(statements)
         val rewritten = statements.map(::statement)
         val body = ArrayList<IrStatement>()
-        function.parameters.filter { it.kind == IrParameterKind.Regular }.forEach { parameter ->
+        stages.arguments(function).forEach { parameter ->
             body += frameCall(
                 builder,
                 "saveArg",
-                builder.irString(parameter.name.asString()),
+                builder.irString(stages.argumentName(function, parameter)),
                 serializer(builder, parameter.type),
                 builder.irGet(parameter)
             )
@@ -89,7 +90,8 @@ internal class StageRewriter(
                         serializer(this, variable.type),
                         irGet(variable)
                     )
-                    +irSet(variable, irAs(restored, variable.type))
+                    // A local the resumed site did not save comes back as the null it was declared with.
+                    +irSet(variable, irAs(restored, variable.type.makeNullable()))
                 }
             })
         }
@@ -128,7 +130,7 @@ internal class StageRewriter(
         return when (statement) {
             is IrWhen -> guard(positions, routeWhen(statement))
             is IrWhileLoop -> guard(positions, routeWhile(statement))
-            is IrDoWhileLoop -> guard(positions, statement.also { it.body = rewriteBlock(it.body) })
+            is IrDoWhileLoop -> guard(positions, statement.also { it.body = rewriteBody(it.body) })
             is IrTry -> guard(positions, statement.also { it.tryResult = rewriteBlock(it.tryResult)!! })
             is IrBlock -> guard(positions, statement.also { block ->
                 val rewritten = block.statements.map(::statement)
@@ -216,6 +218,12 @@ internal class StageRewriter(
         IrBlockImpl(it.startOffset, it.endOffset, builtIns.unitType, null, statementsOf(it).map(::statement))
     }
 
+    /** The body of a do-while stays a composite: its condition may read what the body declares. */
+    private fun rewriteBody(expression: IrExpression?): IrExpression? = expression?.let {
+        if (it !is IrComposite) return rewriteBlock(it)
+        IrCompositeImpl(it.startOffset, it.endOffset, builtIns.unitType).apply { statements += statementsOf(it).map(::statement) }
+    }
+
     private fun expandSite(site: StageSite, statement: IrStatement): IrStatement {
         val builder = stages.builder(function.symbol, statement)
         return when (site.form) {
@@ -223,10 +231,11 @@ internal class StageRewriter(
             SiteForm.VARIABLE -> {
                 val variable = statement as IrVariable
                 val value = value(builder, site, used = true)
-                if (variable in saved) builder.irSet(variable, value) else variable.also { it.initializer = value }
+                if (variable in saved) assignAt(builder, site, builder.irSet(variable, value))
+                else variable.also { it.initializer = value }
             }
 
-            SiteForm.ASSIGN -> (statement as IrSetValue).also { it.value = value(builder, site, used = true) }
+            SiteForm.ASSIGN -> assignAt(builder, site, (statement as IrSetValue).also { it.value = value(builder, site, used = true) })
             SiteForm.RETURN -> if (site.tail) tailCall(builder, site) else {
                 (statement as IrReturn).also {
                     it.value = returning(builder, value(builder, site, used = true), site.call.type)
@@ -235,16 +244,28 @@ internal class StageRewriter(
         }
     }
 
+    /**
+     * Assigns the value of a site only when the stage runs it or resumes to it: resuming elsewhere skips the site,
+     * and the variable keeps the value it was restored with.
+     */
+    private fun assignAt(builder: IrBuilderWithScope, site: StageSite, assignment: IrExpression): IrExpression = builder.irIfThen(
+        builtIns.unitType,
+        frameCall(builder, "enters", builder.irInt(site.callPosition), builder.irInt(site.afterPosition)),
+        assignment,
+    )
+
     /** The value of a site: resumed, taken from the save, or computed by calling. */
     private fun value(builder: IrBuilderWithScope, site: StageSite, used: Boolean): IrExpression {
         val type = if (used) site.call.type else builtIns.unitType
         val keepsResult = !type.isUnit() && !type.isNothing()
         val fresh = builder.irBlock(resultType = type) {
-            saveLocals(site)
             if (site.kind == SiteKind.CHECKPOINT) {
+                saveLocals(site)
                 +frameCall(this, "checkpoint", irInt(site.index))
             } else {
+                // The frame remembers where it was before the locals of the call overwrite the saved ones.
                 +frameCall(this, "beginCall", irInt(site.index))
+                saveLocals(site)
                 val completed = frameCall(this, "completeCall", irInt(site.index), site.call)
                 +(if (keepsResult) irAs(completed, type) else completed)
             }
@@ -306,12 +327,12 @@ internal class StageRewriter(
             val handOver = irBlock(resultType = builtIns.nothingType) {
                 val tag = irTemporary(irCallConstructor(symbols.compoundTagConstructor, emptyList()))
                 callee.parameters.forEachIndexed { index, parameter ->
-                    if (parameter.kind != IrParameterKind.Regular) return@forEachIndexed
+                    if (parameter.kind == IrParameterKind.DispatchReceiver) return@forEachIndexed
                     +with(stages) {
                         callObject(
                             symbols.put,
                             irGet(tag),
-                            irString(parameter.name.asString()),
+                            irString(stages.argumentName(callee, parameter)),
                             serializer(parameter.type),
                             irGet(arguments[index]!!)
                         )
@@ -321,8 +342,8 @@ internal class StageRewriter(
                 +irReturn(zero(returnType))
             }
             val ordinary = irBlock(resultType = builtIns.nothingType) {
-                saveLocals(site)
                 +frameCall(this, "beginCall", irInt(site.index))
+                saveLocals(site)
                 val completed = frameCall(this, "completeCall", irInt(site.index), call)
                 if (returnType.isUnit()) {
                     +completed
@@ -448,7 +469,7 @@ internal class StageRewriter(
                             callObject(
                                 symbols.get,
                                 irGet(args),
-                                irString(parameter.name.asString()),
+                                irString(stages.argumentName(function, parameter)),
                                 serializer(parameter.type)
                             )
                         }
@@ -462,5 +483,46 @@ internal class StageRewriter(
             } else +irReturn(call)
         }
         return entry
+    }
+
+    /**
+     * Generates the call of a stage made from a lambda: the runtime passes the [captures] it saved and the
+     * parameters of the call, which the stage takes after the captured values.
+     */
+    fun lambdaCall(name: String, captures: Int): IrSimpleFunction {
+        val script = stages.script
+        val call = stages.context.irFactory.buildFun {
+            startOffset = function.startOffset
+            endOffset = function.endOffset
+            this.name = Name.identifier("stage\$call\$${function.name.asString()}")
+            returnType = builtIns.anyNType
+            isSuspend = true
+            visibility = DescriptorVisibilities.PUBLIC
+        }
+        call.parent = script
+        val receiver = call.buildReceiverParameter { type = script.defaultType }
+        call.parameters = listOf(receiver)
+        val captured = call.addValueParameter("captured", symbols.compoundTagType)
+        val arguments = stages.arguments(function)
+        val parameters = arguments.drop(captures).map { call.addValueParameter(it.name, it.type) }
+        call.annotations = listOf(stages.callAnnotation(name))
+        call.body = stages.builder(call.symbol, function).irBlockBody {
+            val invocation = irCall(function.symbol).apply {
+                this.arguments[0] = irGet(receiver)
+                arguments.forEachIndexed { index, parameter ->
+                    this.arguments[index + 1] = if (index < captures) {
+                        val value = with(stages) {
+                            callObject(symbols.get, irGet(captured), irString(stages.argumentName(function, parameter)), serializer(parameter.type))
+                        }
+                        irAs(value, parameter.type)
+                    } else irGet(parameters[index - captures])
+                }
+            }
+            if (returnType.isUnit()) {
+                +invocation
+                +irReturn(irGetObject(builtIns.unitClass))
+            } else +irReturn(invocation)
+        }
+        return call
     }
 }

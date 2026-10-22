@@ -1,10 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.storage.LevelResource
 import ru.hollowhorizon.hollowengine.HollowEngine
@@ -26,16 +28,15 @@ import ru.hollowhorizon.hollowengine.common.utils.nbt.loadAsNBT
 import ru.hollowhorizon.hollowengine.common.utils.nbt.save
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
 
 /**
  * The owners stories run for, and how each keeps its runs: the server in a file of the world, an entity in its
  * own data, a node in its save.
  */
 object StoryOwners {
-    private val servers = WeakHashMap<MinecraftServer, StoryRuns>()
-    private val entities = WeakHashMap<Entity, StoryRuns>()
-    private val nodes = WeakHashMap<NodeScript, StoryRuns>()
+    private val servers = HashMap<MinecraftServer, StoryRuns>()
+    private val entities = HashMap<Entity, StoryRuns>()
+    private val nodes = HashMap<NodeScript, StoryRuns>()
 
     private val ENTITY_STORIES = DataKey("hollowengine-narrative:stories", ForCompoundNBT, null)
 
@@ -46,18 +47,21 @@ object StoryOwners {
         return entities.getOrPut(entity) { StoryRuns(EntityOwner(entity)) }
     }
 
-    fun node(node: NodeScript): StoryRuns = nodes.getOrPut(node) { StoryRuns(NodeOwner(node)) }
+    fun node(node: NodeScript): StoryRuns = nodes[node] ?: throw StoryException("Node '${node.path}' is not running")
 
     /** Makes every script that starts reachable to stories, and gives nodes their runs and their entry stage. */
     @SubscribeEvent
     fun onScriptStarted(event: ScriptStartedEvent) {
         StoryInstances.register(event.script, event.scope) // Каждый скрипт может содержать State-функции, поэтому их нужно зарегистрировать
         val node = event.script as? NodeScript ?: return
+        val runs = StoryRuns(NodeOwner(node))
+        nodes[node] = runs
+        event.scope.coroutineContext.job.invokeOnCompletion { nodes.remove(node) }
         node.section(NODE_SECTION, object : NodeSection {
-            override fun save(): Tag? = nodes[node]?.save()?.takeIf { !it.isEmpty }
+            override fun save(): Tag? = runs.save().takeIf { !it.isEmpty }
 
             override fun load(tag: Tag) {
-                (tag as? CompoundTag)?.let(node(node)::load)
+                (tag as? CompoundTag)?.let(runs::load)
             }
         })
         val entry = event.entry ?: return
@@ -102,10 +106,17 @@ object StoryOwners {
         entity.data[ENTITY_STORIES]?.let(entity(entity)::load)
     }
 
+    /**
+     * A player is the same object after a dimension change and keeps its runs; any other entity leaving its level
+     * takes them along. Only a destroyed entity ends its stories, and never a player, which is removed when it
+     * respawns as well.
+     */
     @SubscribeEvent
     fun onEntityRemoved(event: EntityEvent.Removed) {
-        if (!event.reason.shouldDestroy()) return
-        entities.remove(event.entity)?.let { runs -> runs.keys.toList().forEach(runs::stop) }
+        val entity = event.entity
+        if (entity is Player && event.reason == Entity.RemovalReason.CHANGED_DIMENSION) return
+        val runs = entities.remove(entity) ?: return
+        if (event.reason.shouldDestroy() && entity !is Player) runs.keys.toList().forEach(runs::stop)
     }
 
     private fun saveServer(server: MinecraftServer) {
@@ -123,7 +134,7 @@ object StoryOwners {
     private class ServerOwner(override val server: MinecraftServer) : StoryOwner {
         override val scope: CoroutineScope get() = server.runtimeContext.scope
         override val entity: Entity? get() = null
-        override fun changed() = Unit
+        override fun changed(runs: StoryRuns) = Unit
     }
 
     private class EntityOwner(override val entity: Entity) : StoryOwner {
@@ -131,8 +142,8 @@ object StoryOwners {
         override val server: MinecraftServer
             get() = entity.server ?: throw StoryException("Entity ${entity.uuid} has no server")
 
-        override fun changed() {
-            entity.data[ENTITY_STORIES] = entity(entity).save()
+        override fun changed(runs: StoryRuns) {
+            entity.data[ENTITY_STORIES] = runs.save()
         }
     }
 
@@ -140,7 +151,7 @@ object StoryOwners {
         override val scope: CoroutineScope get() = node
         override val server: MinecraftServer get() = node.server
         override val entity: Entity? get() = (node.host as? NodeHost.OfEntity)?.entity
-        override fun changed() = Unit
+        override fun changed(runs: StoryRuns) = Unit
     }
 
     private const val NODE_SECTION = "hollowengine-narrative:stories"

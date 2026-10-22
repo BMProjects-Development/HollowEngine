@@ -51,6 +51,8 @@ object StoryValues {
             classifier == List::class || classifier == Collection::class -> ListSerializer(arguments[0])
             classifier == Set::class -> SetSerializer(arguments[0])
             classifier == Map::class -> MapSerializer(arguments[0], arguments[1])
+            classifier == Map.Entry::class -> EntrySerializer(arguments[0], arguments[1])
+            classifier.java.isArray && !classifier.java.componentType.isPrimitive -> ArraySerializer(elementClass(type), arguments[0])
             classifier == Pair::class -> PairSerializer(arguments[0], arguments[1])
             classifier == Triple::class -> TripleSerializer(arguments[0], arguments[1], arguments[2])
             else -> runCatching { NBTFormat.serializersModule.serializer(type) }.getOrElse {
@@ -75,14 +77,24 @@ object StoryValues {
         tag.put(name, encode(serializer, value))
     }
 
-    /** Reads what [put] wrote under [name]. */
+    /** Reads what [put] wrote under [name]; a value that no longer reads as its type is reported by name. */
     @JvmStatic
     fun get(tag: CompoundTag, name: String, serializer: KSerializer<Any?>): Any? {
         val value = tag.get(name) ?: throw StoryException("The saved story has no value '$name'")
-        return decode(serializer, value)
+        return try {
+            decode(serializer, value)
+        } catch (missing: StoryEntityMissing) {
+            throw missing
+        } catch (failure: Exception) {
+            throw StoryException("The saved '$name' no longer reads as ${serializer.descriptor.serialName}", failure)
+        }
     }
 
-    private fun KClass<*>.isFunction(): Boolean = this == StageLambda::class || qualifiedName.orEmpty().let {
+    @Suppress("UNCHECKED_CAST")
+    private fun elementClass(type: KType): KClass<Any> = type.arguments.singleOrNull()?.type?.classifier as? KClass<Any>
+        ?: throw StoryException("A story cannot keep a value of type $type")
+
+    private fun KClass<*>.isFunction(): Boolean = StageLambda::class.java.isAssignableFrom(java) || qualifiedName.orEmpty().let {
         it.startsWith("kotlin.Function") || it.startsWith("kotlin.coroutines.SuspendFunction")
     } || Function::class.java.isAssignableFrom(java)
 
@@ -108,6 +120,19 @@ object StoryValues {
             }
             return entity
         }
+    }
+
+    /** A map entry as the pair it is: the NBT format would take kotlinx's entry for a map and fail on its key. */
+    private class EntrySerializer(key: KSerializer<Any?>, value: KSerializer<Any?>) : KSerializer<Map.Entry<Any?, Any?>> {
+        private val pair = PairSerializer(key, value)
+
+        override val descriptor: SerialDescriptor = SerialDescriptor("story.entry", pair.descriptor)
+
+        override fun serialize(encoder: Encoder, value: Map.Entry<Any?, Any?>) =
+            encoder.encodeSerializableValue(pair, value.key to value.value)
+
+        override fun deserialize(decoder: Decoder): Map.Entry<Any?, Any?> =
+            decoder.decodeSerializableValue(pair).let { AbstractMap.SimpleImmutableEntry(it.first, it.second) }
     }
 
     private object NpcReference : KSerializer<NpcRef> {

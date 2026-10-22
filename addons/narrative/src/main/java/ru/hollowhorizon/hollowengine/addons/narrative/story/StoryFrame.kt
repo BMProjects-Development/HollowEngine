@@ -37,6 +37,9 @@ class StoryFrame internal constructor(
     private var replaced = false
     private var failure: Throwable? = null
 
+    /** Where the frame was before the call in progress: a call that fails returns the frame there. */
+    private var previous: CompoundTag? = null
+
     /** Whether the stage is still finding its way back to the position it was saved at. */
     fun isResuming(): Boolean = resuming
 
@@ -68,15 +71,30 @@ class StoryFrame internal constructor(
         StoryValues.put(locals, name, serializer, value)
     }
 
-    /** The saved value of a local, or [current] when the boundary resumed to did not need it. */
+    /**
+     * The saved value of a local, or [current] when the boundary resumed to did not need it. A local that no
+     * longer reads as its type, after its declaration changed, makes the stage start over.
+     */
     fun restore(name: String, serializer: KSerializer<Any?>, current: Any?): Any? {
         val tag = locals.get(name) ?: return current
-        return StoryValues.decode(serializer, tag)
+        return try {
+            StoryValues.decode(serializer, tag)
+        } catch (missing: StoryEntityMissing) {
+            throw missing
+        } catch (failure: Exception) {
+            startOver("its local '$name' no longer reads as ${serializer.descriptor.serialName}: ${failure.message}")
+            current
+        }
     }
 
-    /** The stage is about to call the stage at [site]. */
+    /** The stage is about to call the stage at [site]; the locals the call needs are saved right after. */
     fun beginCall(site: Int) {
         run.discardPending("'$stage' moved on")
+        previous = CompoundTag().apply {
+            position?.let { putString("position", it) }
+            put("locals", locals.copy())
+            result?.let { put("result", it) }
+        }
         position = CALL + sites[site]
         result = null
         run.lastResult = null
@@ -94,6 +112,7 @@ class StoryFrame internal constructor(
             current = StoryInstances.invoke(tail.instance, tail.stage, tail.args)
         }
         position = AFTER + sites[site]
+        previous = null
         result = run.lastResult
         run.lastResult = null
         segment = CompoundTag()
@@ -115,13 +134,20 @@ class StoryFrame internal constructor(
         resuming = false
         if (serializer == null) return null
         val saved = result ?: throw StoryException("The saved story lost the result of '${sites[site]}' in '$stage'")
-        return StoryValues.decode(serializer, saved)
+        return try {
+            StoryValues.decode(serializer, saved)
+        } catch (missing: StoryEntityMissing) {
+            throw missing
+        } catch (failure: Exception) {
+            throw StoryException("The result of '${sites[site]}' saved in '$stage' no longer reads as ${serializer.descriptor.serialName}", failure)
+        }
     }
 
     /** Ends a segment at the checkpoint at [site]. */
     fun checkpoint(site: Int) {
         run.discardPending("'$stage' moved on")
         position = AFTER + sites[site]
+        previous = null
         result = null
         segment = CompoundTag()
         run.changed()
@@ -156,7 +182,21 @@ class StoryFrame internal constructor(
         failure = null
         if (run.isCancelled || reason is StoryEntityMissing) return
         close()
+        if (reason != null) run.frames.lastOrNull()?.callFailed()
         run.changed()
+    }
+
+    /**
+     * The stage this frame was calling failed, and the stage goes on, catching it or not. Until its next boundary
+     * it is back in the segment it was in before the call, which a restart then repeats.
+     */
+    private fun callFailed() {
+        val before = previous ?: return
+        if (position?.startsWith(CALL) != true) return
+        position = before.getString("position").takeIf { before.contains("position") }
+        locals = before.getCompound("locals")
+        result = before.get("result")
+        previous = null
     }
 
     private fun startOver(reason: String) {
@@ -164,6 +204,7 @@ class StoryFrame internal constructor(
         resuming = false
         target = -1
         position = null
+        previous = null
         locals = CompoundTag()
         result = null
         segment = CompoundTag()
@@ -219,6 +260,7 @@ class StoryFrame internal constructor(
         put("args", args)
         put("locals", locals)
         result?.let { put("result", it) }
+        previous?.let { put("previous", it) }
         put("segment", segment)
         put("children", ListTag().apply { children.forEach { add(StringTag.valueOf(it)) } })
     }
@@ -234,6 +276,7 @@ class StoryFrame internal constructor(
                 args = tag.getCompound("args")
                 locals = tag.getCompound("locals")
                 result = tag.get("result")
+                previous = tag.getCompound("previous").takeIf { tag.contains("previous") }
                 segment = tag.getCompound("segment")
                 tag.getList("children", Tag.TAG_STRING.toInt()).forEach { children += it.asString }
             }

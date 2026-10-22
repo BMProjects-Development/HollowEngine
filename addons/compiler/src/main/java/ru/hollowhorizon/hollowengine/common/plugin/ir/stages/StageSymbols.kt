@@ -33,8 +33,8 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val instances: IrClassSymbol = storyClass("StoryInstances")
     val loops: IrClassSymbol = storyClass("StoryLoops")
     val stageLambda: IrClassSymbol = storyClass("StageLambda")
-    val stageLambdaConstructor: IrConstructorSymbol = stageLambda.constructors.single()
     val stageEntry: IrConstructorSymbol = storyClass("StageEntry").constructors.single()
+    val stageCall: IrConstructorSymbol = storyClass("StageCall").constructors.single()
     val stageScript: IrConstructorSymbol = storyClass("StageScript").constructors.single()
     val stateConstructor: IrConstructorSymbol = state.constructors.single()
     val checkpoint: IrSimpleFunctionSymbol = storyFunction("checkpoint")
@@ -51,6 +51,7 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
             ?: error("kotlinx.serialization is not on the script classpath")
 
     val frameType: IrType get() = frame.owner.defaultType
+    val sequence: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName("kotlin.sequences.Sequence")))
     val compoundTagType: IrType get() = compoundTag.owner.defaultType
     val intProgression: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName("kotlin.ranges.IntProgression")))
 
@@ -63,6 +64,11 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val keyOf: IrSimpleFunctionSymbol = member(instances, "keyOf")
     val loopCount: IrSimpleFunctionSymbol = member(loops, "count")
     val loopElement: IrSimpleFunctionSymbol = member(loops, "element")
+    val loopSnapshot: IrSimpleFunctionSymbol = member(loops, "snapshot")
+
+    /** The constructor of the stage lambda that takes [arity] parameters, or null when there is none so large. */
+    fun stageLambdaConstructor(arity: Int): IrConstructorSymbol? =
+        finder.findClass(ClassId(PACKAGE, Name.identifier("StageLambda$arity")))?.constructors?.single()
 
     fun isCheckpoint(function: IrFunction): Boolean = function.symbol == checkpoint
 

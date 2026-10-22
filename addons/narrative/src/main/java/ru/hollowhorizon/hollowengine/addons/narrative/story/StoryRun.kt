@@ -130,7 +130,7 @@ class StoryRun internal constructor(
     }
 
     /** The branch [name] that the frame on top of the stack starts, or the one it started before a restart. */
-    internal fun branch(name: String, lambda: StageLambda<*>): StoryRun {
+    internal fun branch(name: String, lambda: StageLambda): StoryRun {
         require('/' !in name && name.isNotBlank()) { "A branch name must be non-blank and contain no '/': '$name'" }
         val frame = frames.lastOrNull() ?: throw StoryException("async(\"$name\") must be called from a stage")
         children[name]?.let { return it }

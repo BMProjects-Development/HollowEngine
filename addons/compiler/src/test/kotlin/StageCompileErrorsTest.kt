@@ -99,8 +99,8 @@ class StageCompileErrorsTest {
         """
         )
         assertError(
-            "cannot have a receiver", """
-            @State suspend fun String.shout() {}
+            "'this' cannot be", """
+            @State suspend fun Any.shout() {}
         """
         )
     }
@@ -179,26 +179,23 @@ class StageCompileErrorsTest {
     }
 
     @Test
-    fun `loops that call stages must count with something a frame can save`() {
-        assertError(
-            "can only go over a List or an Int range", """
-            @State suspend fun step(value: Int) {}
+    fun `a loop that calls stages cannot go over a sequence`() = assertError(
+        "it may never end", """
+        @State suspend fun step(value: Int) {}
 
-            @State
-            suspend fun main() {
-                for (value in setOf(1, 2)) step(value)
-            }
-        """
-        )
-        assertError(
-            "A do-while condition cannot call a stage", """
-            @State suspend fun again(): Boolean = false
+        @State
+        suspend fun main() {
+            for (value in generateSequence(1) { it + 1 }) step(value)
+        }
+    """
+    )
 
-            @State
-            suspend fun main() {
-                do { log("x") } while (again())
-            }
-        """
-        )
-    }
+    @Test
+    fun `a stage lambda takes as many parameters as there are lambda classes for`() = assertError(
+        "at most 8 parameters", """
+        fun many(block: @State suspend (Int, Int, Int, Int, Int, Int, Int, Int, Int) -> Unit) = Unit
+
+        fun start() = many { a, b, c, d, e, f, g, h, i -> log("${'$'}a") }
+    """
+    )
 }

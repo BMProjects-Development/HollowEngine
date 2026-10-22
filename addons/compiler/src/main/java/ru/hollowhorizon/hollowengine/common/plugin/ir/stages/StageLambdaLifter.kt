@@ -24,10 +24,10 @@ import java.util.IdentityHashMap
 /**
  * Turns every lambda written for a `@State` function type into a stage of its own.
  *
- * The body moves into a new function of the script, and what the lambda captured becomes its parameters, so the
- * story can start the stage again after a restart with the captured values it saved. In place of the lambda the
- * call gets a `StageLambda` naming that function. The stage is named after where the lambda was written
- * (`onJoin$launchStory#1`), so the name survives edits elsewhere in the script.
+ * The body moves into a new function of the script. What the lambda captured becomes its first parameters, and
+ * the parameters of the lambda, its receiver first, follow; the story saves them all like the arguments of any
+ * stage. In place of the lambda the call gets a `StageLambdaN` naming that function. The stage is named after
+ * where the lambda was written (`onJoin$launchStory#1`), so the name survives edits elsewhere in the script.
  */
 @OptIn(UnsafeDuringIrConstructionAPI::class)
 internal class StageLambdaLifter(private val stages: StageScope) : IrElementTransformerVoid() {
@@ -35,8 +35,8 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
     private val owners = ArrayDeque<String>()
     private val counters = HashMap<String, Int>()
 
-    /** The functions made from lambdas, in the order they were made. */
-    val lifted = ArrayList<IrSimpleFunction>()
+    /** The functions made from lambdas, in the order they were made, with how many captured values they take. */
+    val lifted = LinkedHashMap<IrSimpleFunction, Int>()
 
     override fun visitProperty(declaration: IrProperty): IrStatement {
         owners.addLast(declaration.name.asString())
@@ -69,8 +69,8 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
 
     private fun lift(expression: IrFunctionExpression, callee: String, parameter: IrValueParameter): IrExpression? {
         val lambda = expression.function
-        if (lambda.parameters.isNotEmpty()) {
-            stages.reporter.error(expression, "A @State lambda cannot take parameters or a receiver")
+        val constructor = stages.symbols.stageLambdaConstructor(lambda.parameters.size) ?: run {
+            stages.reporter.error(expression, "A @State lambda takes at most 8 parameters, its receiver included")
             return null
         }
         val captured = captures(lambda) ?: return null
@@ -94,8 +94,8 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
                     )
                 }
                 val key = callObject(stages.symbols.keyOf, irGet(scriptThis))
-                val lambdaValue =
-                    irCallConstructor(stages.symbols.stageLambdaConstructor, listOf(lambda.returnType)).apply {
+                val typeArguments = lambda.parameters.map { it.type } + lambda.returnType
+                val lambdaValue = irCallConstructor(constructor, typeArguments).apply {
                         arguments[0] = key
                         arguments[1] = irString(name)
                         arguments[2] = irGet(tag)
@@ -166,19 +166,22 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         val receiver = stage.buildReceiverParameter { type = script.defaultType }
         stage.parameters = listOf(receiver)
         val names = HashSet<String>()
-        val parameters = captured.associateWith { value ->
-            val base = value.name.asString().takeIf { value.name.isSpecial.not() } ?: "captured"
-            val unique = generateSequence(base) { "${it}_" }.first(names::add)
-            stage.addValueParameter(unique, value.type)
+        fun parameter(value: IrValueDeclaration, fallback: String): IrValueParameter {
+            val base = value.name.asString().takeIf { !value.name.isSpecial } ?: fallback
+            return stage.addValueParameter(generateSequence(base) { "${it}_" }.first(names::add), value.type)
         }
+        val parameters = captured.associateWith { parameter(it, "captured") }
+        val ownParameters = lambda.parameters.mapIndexed { index, value ->
+            value to parameter(value, if (value.kind == IrParameterKind.ExtensionReceiver) "receiver" else "p$index")
+        }.toMap()
         stage.annotations = listOf(stages.stateAnnotation(name))
         val inside = declaredIn(lambda)
         stage.body = lambda.body
         stage.body?.transformChildrenVoid(object : IrElementTransformerVoid() {
             override fun visitGetValue(expression: IrGetValue): IrExpression {
                 val value = expression.symbol.owner
-                val replacement =
-                    parameters[value] ?: receiver.takeIf { stages.isScriptThis(value) && value !in inside }
+                val replacement = parameters[value] ?: ownParameters[value]
+                    ?: receiver.takeIf { stages.isScriptThis(value) && value !in inside }
                     ?: return expression
                 return IrGetValueImpl(
                     expression.startOffset,
@@ -196,7 +199,7 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
             }
         })
         stage.patchDeclarationParents(script)
-        lifted += stage
+        lifted[stage] = parameters.size
         return parameters
     }
 

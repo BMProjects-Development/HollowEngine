@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrVariableSymbolImpl
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.isNothing
 import org.jetbrains.kotlin.ir.types.isUnit
+import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.*
 import org.jetbrains.kotlin.name.Name
@@ -217,6 +218,8 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
     }
 
     private fun whenStatement(expression: IrWhen): IrExpression {
+        // `&&` and `||` lose the shape their origins promise to the backend once their branches become statements.
+        if (expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR) expression.origin = null
         val branches = ArrayList<IrBranch>()
         for ((index, branch) in expression.branches.withIndex()) {
             if (branch !is IrElseBranch && hasSite(branch.condition)) {
@@ -228,8 +231,8 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                     builtIns.unitType,
                     expression.origin
                 ).apply {
-                    branches += IrBranchImpl(branch.startOffset, branch.endOffset, condition.value, branch.result)
-                    branches += expression.branches.drop(index + 1)
+                    this.branches += IrBranchImpl(branch.startOffset, branch.endOffset, condition.value, branch.result)
+                    this.branches += expression.branches.drop(index + 1)
                 }
                 val nested = block(lifted.before + condition.before + whenStatement(rest))
                 branches += IrElseBranchImpl(branch.startOffset, branch.endOffset, constTrue(), nested)
@@ -265,18 +268,35 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         return listOf(loop)
     }
 
+    /**
+     * A condition that calls stages is computed at the end of the body into a value the loop tests. `continue`
+     * has to compute it as well, so the body runs once inside an inner loop that `continue` leaves instead.
+     * The body stays a composite: the condition may read what the body declared.
+     */
     private fun doWhileLoop(loop: IrDoWhileLoop): List<IrStatement> {
-        if (hasSite(loop.condition)) stages.reporter.error(
-            loop.condition,
-            "A do-while condition cannot call a stage; call it at the end of the body"
-        )
-        loop.body = block(normalize(statementsOf(loop.body)))
+        if (!hasSite(loop.condition)) {
+            loop.body = loop.body?.let { composite(normalize(statementsOf(it))) }
+            return listOf(loop)
+        }
+        val inner = IrDoWhileLoopImpl(loop.startOffset, loop.endOffset, builtIns.unitType, null)
+        inner.body = loop.body
+        inner.condition = stages.builder(function.symbol, loop).irFalse()
+        inner.body?.transformChildrenVoid(object : IrElementTransformerVoid() {
+            override fun visitContinue(jump: IrContinue): IrExpression =
+                if (jump.loop == loop) IrBreakImpl(jump.startOffset, jump.endOffset, builtIns.nothingType, inner) else jump
+        })
+        inner.body = inner.body?.let { composite(normalize(statementsOf(it))) }
+        val lifted = value(loop.condition)
+        val condition = variable(builtIns.booleanType, initializer = lifted.value, name = "condition")
+        loop.body = composite(listOf(inner) + lifted.before + condition)
+        loop.condition = get(condition)
         return listOf(loop)
     }
 
     /**
-     * Rewrites `for (x in list/range)` to count with an index the frame can save. Other iterables
-     * keep their iterator, and calling a stage inside them is an error.
+     * Rewrites a `for` that calls stages to count with an index the frame can save. A range of Int is counted as it
+     * is; anything else is copied into a list first (see `StoryLoops.snapshot`), whose elements must then be
+     * serializable. A sequence may never end and is an error.
      */
     private fun forLoop(block: IrBlock): List<IrStatement> {
         val iterator = block.statements.firstOrNull() as? IrVariable
@@ -292,10 +312,21 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         val bound: IrExpression
         val element: (IrType) -> IrExpression
         val progressionClass = stages.symbols.intProgression
+        val sequenceClass = stages.symbols.sequence
+        val elementType = nextCall(loop, iterator)?.type
         when {
-            iterable.type.isSubtypeOfClass(builtIns.listClass) -> {
-                val list = variable(iterable.type, initializer = iterable, name = "list")
+            progressionClass == null || !iterable.type.isSubtypeOfClass(progressionClass) -> {
+                if (sequenceClass != null && iterable.type.isSubtypeOfClass(sequenceClass) || elementType == null) {
+                    stages.reporter.error(
+                        block,
+                        "A for loop that calls stages cannot go over ${iterable.type.render()}: it may never end; call toList() first"
+                    )
+                    return listOf(block)
+                }
                 val listClass = builtIns.listClass.owner
+                val snapshot = with(stages) { builder.callObject(stages.symbols.loopSnapshot, iterable) }
+                val listType = builtIns.listClass.typeWith(elementType)
+                val list = variable(listType, initializer = builder.irImplicitCast(snapshot, listType), name = "list")
                 prologue += list
                 bound = builder.irCall(listClass.getPropertyGetter("size")!!).apply { arguments[0] = get(list) }
                 element = { type ->
@@ -306,7 +337,7 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                 }
             }
 
-            progressionClass != null && iterable.type.isSubtypeOfClass(progressionClass) -> {
+            else -> {
                 val progression = variable(iterable.type, initializer = iterable, name = "range")
                 fun property(name: String) = builder.irCall(progressionClass.owner.getPropertyGetter(name)!!).apply {
                     arguments[0] = get(progression)
@@ -331,14 +362,6 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                         )
                     }
                 }
-            }
-
-            else -> {
-                stages.reporter.error(
-                    block,
-                    "A for loop that calls stages can only go over a List or an Int range, not ${iterable.type.render()}"
-                )
-                return listOf(block)
             }
         }
 
@@ -367,6 +390,23 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         block.statements += prologue + index + loop
         block.origin = null
         return listOf(block)
+    }
+
+    /** The `next()` call of a `for` loop's iterator, which gives the type of its elements. */
+    private fun nextCall(loop: IrWhileLoop, iterator: IrVariable): IrCall? {
+        var found: IrCall? = null
+        loop.body?.acceptVoid(object : IrVisitorVoid() {
+            override fun visitElement(element: IrElement) {
+                if (found == null) element.acceptChildrenVoid(this)
+            }
+
+            override fun visitCall(expression: IrCall) {
+                val receiver = expression.arguments.firstOrNull() as? IrGetValue
+                if (expression.origin == IrStatementOrigin.FOR_LOOP_NEXT && receiver?.symbol == iterator.symbol) found = expression
+                else super.visitCall(expression)
+            }
+        })
+        return found
     }
 
     /** Moves a stage call out of an operand into a temporary; anything else stays where it is. */
@@ -407,6 +447,9 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
 
     private fun block(statements: List<IrStatement>): IrBlock =
         IrBlockImpl(function.startOffset, function.endOffset, builtIns.unitType, null, statements)
+
+    private fun composite(statements: List<IrStatement>): IrComposite =
+        IrCompositeImpl(function.startOffset, function.endOffset, builtIns.unitType).apply { this.statements += statements }
 
     private fun zero(type: IrType): IrExpression =
         IrConstImpl.defaultValueForType(function.startOffset, function.endOffset, type)
