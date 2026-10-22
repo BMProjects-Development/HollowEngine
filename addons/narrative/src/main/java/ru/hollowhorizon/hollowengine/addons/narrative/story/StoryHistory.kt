@@ -22,7 +22,7 @@ internal class StoryHistory(private val root: StoryRun) {
             putString("name", name)
             putString("run", run)
             putLong("mark", mark)
-            put("tree", tree)
+            put("tree", tree.copy())
             if (labels.isNotEmpty()) put("labels", ListTag().apply { labels.forEach { add(it.save()) } })
         }
 
@@ -31,7 +31,7 @@ internal class StoryHistory(private val root: StoryRun) {
                 tag.getString("name"),
                 tag.getString("run"),
                 tag.getLong("mark"),
-                tag.getCompound("tree"),
+                tag.getCompound("tree").copy(),
                 tag.getList("labels", Tag.TAG_COMPOUND.toInt()).map { JournalEntry.load(it as CompoundTag) },
             )
         }
@@ -40,15 +40,15 @@ internal class StoryHistory(private val root: StoryRun) {
     /** What a rewind left behind: the tree, the journal and the checkpoints as they were before it. */
     private class Redo(val tree: CompoundTag, val journal: ListTag, val checkpoints: List<Checkpoint>) {
         fun save(): CompoundTag = CompoundTag().apply {
-            put("tree", tree)
-            put("journal", journal)
+            put("tree", tree.copy())
+            put("journal", journal.copy())
             put("checkpoints", ListTag().apply { checkpoints.forEach { add(it.save()) } })
         }
 
         companion object {
             fun load(tag: CompoundTag) = Redo(
-                tag.getCompound("tree"),
-                tag.getList("journal", Tag.TAG_COMPOUND.toInt()),
+                tag.getCompound("tree").copy(),
+                tag.getList("journal", Tag.TAG_COMPOUND.toInt()).copy(),
                 tag.getList("checkpoints", Tag.TAG_COMPOUND.toInt()).map { Checkpoint.load(it as CompoundTag) },
             )
         }

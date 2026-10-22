@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
 import org.jetbrains.kotlin.name.Name
+import ru.hollowhorizon.hollowengine.common.plugin.stages.StageMessages
 import java.util.Collections
 import java.util.IdentityHashMap
 
@@ -61,7 +62,18 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         val callee = expression.symbol.owner
         callee.parameters.forEach { parameter ->
             if (!stages.types.isStageLambda(parameter.type)) return@forEach
-            val lambda = expression.arguments[parameter] as? IrFunctionExpression ?: return@forEach
+            val argument = expression.arguments[parameter] ?: return@forEach
+            val lambda = argument as? IrFunctionExpression
+            if (lambda == null) {
+                val forwarded = (argument as? IrGetValue)?.symbol?.owner as? IrValueParameter
+                if (forwarded == null || !stages.types.isStageLambda(forwarded.type)) {
+                    stages.reporter.error(
+                        argument,
+                        StageMessages.FUNCTION_VALUE
+                    )
+                }
+                return@forEach
+            }
             lift(lambda, callee.name.asString(), parameter)?.let { expression.arguments[parameter] = it }
         }
         return expression
@@ -114,6 +126,34 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         lambda.acceptChildrenVoid(object : IrVisitorVoid() {
             override fun visitElement(element: IrElement) = element.acceptChildrenVoid(this)
 
+            private fun checkLocal(declaration: IrDeclaration, expression: IrElement, description: String) {
+                val parents = generateSequence(declaration.parent as? IrDeclaration) { it.parent as? IrDeclaration }.toList()
+                if (parents.any { it === lambda } || parents.none { it is IrFunction }) return
+                stages.reporter.error(
+                    expression,
+                    StageMessages.localClosure(description)
+                )
+                valid = false
+            }
+
+            override fun visitCall(expression: IrCall) {
+                super.visitCall(expression)
+                val function = expression.symbol.owner
+                checkLocal(function, expression, "local function '${function.name}'")
+            }
+
+            override fun visitFunctionReference(expression: IrFunctionReference) {
+                super.visitFunctionReference(expression)
+                val function = expression.symbol.owner
+                checkLocal(function, expression, "local function '${function.name}'")
+            }
+
+            override fun visitConstructorCall(expression: IrConstructorCall) {
+                super.visitConstructorCall(expression)
+                val klass = expression.symbol.owner.parent as IrClass
+                checkLocal(klass, expression, "local class '${klass.name}'")
+            }
+
             override fun visitGetValue(expression: IrGetValue) {
                 val value = expression.symbol.owner
                 if (value !in inside && !stages.isScriptThis(value)) captured += value
@@ -124,7 +164,7 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
                 if (expression.symbol.owner !in inside) {
                     stages.reporter.error(
                         expression,
-                        "A @State lambda cannot assign '${expression.symbol.owner.name}': it keeps a saved copy"
+                        StageMessages.assignCapture(expression.symbol.owner.name.asString())
                     )
                     valid = false
                 }
@@ -133,13 +173,13 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         captured.forEach { value ->
             if (value is IrVariable && value.isVar) {
                 stages.reporter.error(
-                    lambda, "A @State lambda cannot capture 'var ${value.name}'; copy it into a val first"
+                    lambda, StageMessages.mutableCapture(value.name.asString())
                 )
                 valid = false
             }
             stages.types.problem(value.type)?.let { problem ->
                 stages.reporter.error(
-                    lambda, "A @State lambda saves what it captures, but '${value.name}' cannot be saved: $problem"
+                    lambda, StageMessages.unsavedCapture(value.name.asString(), problem)
                 )
                 valid = false
             }

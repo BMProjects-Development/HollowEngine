@@ -31,8 +31,8 @@ internal class JournalEntry(
         putString("action", action)
         putString("run", run)
         putString("lifetime", lifetime.name)
-        put("args", args)
-        put("snapshots", snapshots)
+        put("args", args.copy())
+        put("snapshots", snapshots.copy())
         outer?.let { putLong("outer", it) }
         putBoolean("done", done)
         undoneAt?.let { putLong("undone", it) }
@@ -44,8 +44,8 @@ internal class JournalEntry(
             tag.getString("action"),
             tag.getString("run"),
             runCatching { Lifetime.valueOf(tag.getString("lifetime")) }.getOrDefault(Lifetime.RUN),
-            tag.getCompound("args"),
-            tag.getCompound("snapshots"),
+            tag.getCompound("args").copy(),
+            tag.getCompound("snapshots").copy(),
             tag.getLong("outer").takeIf { tag.contains("outer") },
         ).apply {
             done = tag.getBoolean("done")

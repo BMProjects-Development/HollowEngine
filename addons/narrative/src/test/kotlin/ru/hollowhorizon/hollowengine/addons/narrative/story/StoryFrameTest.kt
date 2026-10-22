@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.IntTag
+import net.minecraft.nbt.ListTag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.entity.Entity
 import kotlin.test.Test
@@ -32,7 +33,7 @@ class StoryFrameTest {
             put("locals", CompoundTag().apply { put("map", IntTag.valueOf(5)) })
             configure()
         }
-        val tag = CompoundTag().apply { put("frames", net.minecraft.nbt.ListTag().apply { add(frame) }) }
+        val tag = CompoundTag().apply { put("frames", ListTag().apply { add(frame) }) }
         return StoryRun.load(StoryRuns(Owner), "quest", null, tag)
     }
 
@@ -77,7 +78,7 @@ class StoryFrameTest {
             put("segment", CompoundTag().apply { putBoolean("done", true) })
         }
         val tag = CompoundTag().apply {
-            put("frames", net.minecraft.nbt.ListTag().apply { run.pending.forEach { add(it.save()) } })
+            put("frames", ListTag().apply { run.pending.forEach { add(it.save()) } })
             put("children", CompoundTag().apply { put("merchant", saved(null).save()) })
             put("vars", CompoundTag().apply { putInt("quests/village.kts/trust", 3) })
         }
@@ -88,5 +89,29 @@ class StoryFrameTest {
         assertEquals(3, restored.vars.getInt("quests/village.kts/trust"))
         assertEquals(restored.vars, restored.children.getValue("merchant").vars, "branches share the variables of their story")
         assertTrue(restored.pending.single().segment.getBoolean("done"))
+    }
+
+    @Test
+    fun `a saved tree is a snapshot independent of the working frames`() {
+        val run = saved("after:gate")
+        val frame = run.pending.single()
+        val snapshot = run.saveTree()
+        val expected = snapshot.copy()
+        frame.locals.putInt("map", 99)
+        frame.args.putInt("times", 99)
+        frame.segment.putBoolean("changed", true)
+        assertEquals(expected, snapshot)
+    }
+
+    @Test
+    fun `restoring a tree does not let the run mutate the checkpoint`() {
+        val snapshot = saved("after:gate").saveTree()
+        val expected = snapshot.copy()
+        val run = StoryRun.load(StoryRuns(Owner), "quest", null, snapshot)
+        val frame = run.pending.single()
+        frame.locals.putInt("map", 99)
+        frame.args.putInt("times", 99)
+        frame.segment.putBoolean("changed", true)
+        assertEquals(expected, snapshot)
     }
 }

@@ -299,7 +299,7 @@ class StoryFrame internal constructor(
         putLong("entryMark", entryMark)
         putLong("segmentMark", segmentMark)
         put("children", ListTag().apply { children.forEach { add(StringTag.valueOf(it)) } })
-    }
+    }.copy()
 
     internal companion object {
         private const val CALL = "call:"
@@ -310,11 +310,11 @@ class StoryFrame internal constructor(
             StoryFrame(run, tag.getString("instance"), tag.getString("stage")).apply {
                 hash = tag.getInt("hash")
                 position = tag.getString("position").takeIf { tag.contains("position") }
-                args = tag.getCompound("args")
-                locals = tag.getCompound("locals")
-                result = tag.get("result")
-                previous = tag.getCompound("previous").takeIf { tag.contains("previous") }
-                segment = tag.getCompound("segment")
+                args = tag.getCompound("args").copy()
+                locals = tag.getCompound("locals").copy()
+                result = tag.get("result")?.copy()
+                previous = tag.getCompound("previous").copy().takeIf { tag.contains("previous") }
+                segment = tag.getCompound("segment").copy()
                 entryMark = tag.getLong("entryMark")
                 segmentMark = tag.getLong("segmentMark")
                 tag.getList("children", Tag.TAG_STRING.toInt()).forEach { children += it.asString }
