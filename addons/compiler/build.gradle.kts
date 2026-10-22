@@ -33,7 +33,7 @@ val runtimeProjectPath = ":runtime"
 val minecraftTestClasspath = project(runtimeProjectPath).configurations.named("compileClasspath").map { classpath ->
     classpath.filter { file -> listOf("org.jetbrains", "androidx", "io.insert-koin").none { file.path.contains(it) } }
 }
-val narrativeTestClasses = provider { project(":addons:narrative").layout.buildDirectory.dir("classes/kotlin/main").get() }
+val narrativeTestJar = provider { project(":addons:narrative").tasks.named<Jar>("jar").get().archiveFile.get() }
 val lightTreeClasses = project.projectDir.resolve("lightTree")
 val patchedLightTreeJar = tasks.register<ShadowJar>("patchedLightTreeJar") {
     archiveBaseName.set("hollowengine-light-tree")
@@ -175,7 +175,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("io.insert-koin:koin-core:${rootProject.property("koinVersion")}")
     testImplementation("androidx.compose.runtime:runtime:$composeRuntimeVersion")
-    testImplementation(files(narrativeTestClasses) { builtBy(":addons:narrative:compileKotlin") })
+    testImplementation(files(narrativeTestJar) { builtBy(":addons:narrative:jar") })
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation(files(minecraftTestClasspath))
     testRuntimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
@@ -314,7 +314,7 @@ tasks.withType<Test>().configureEach {
     })
     inputs.files(analysisClasspath).withPropertyName("ideAnalysisClasspath")
     doFirst {
-        val classpath = analysisClasspath.get().files + narrativeTestClasses.get().asFile
+        val classpath = analysisClasspath.get().files + narrativeTestJar.get().asFile
         systemProperty("hollowengine.ide.testClasspath", classpath.joinToString(File.pathSeparator))
     }
     useJUnitPlatform()
