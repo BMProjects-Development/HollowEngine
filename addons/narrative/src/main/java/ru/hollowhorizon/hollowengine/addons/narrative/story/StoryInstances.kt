@@ -26,7 +26,7 @@ object StoryInstances {
 
     private val byKey = HashMap<String, Entry>()
     private val keys = IdentityHashMap<Any, String>()
-    private val entries = HashMap<Class<*>, Map<String, Method>>()
+    private val stages = HashMap<Class<*>, Stages>()
     private val listeners = ArrayList<(String) -> Unit>()
 
     /**
@@ -62,23 +62,29 @@ object StoryInstances {
      * Starts or resumes [stage] of the instance under [key] with the encoded [args] and returns what it
      * returns.
      */
-    suspend fun invoke(key: String, stage: String, args: CompoundTag): Any? {
-        val instance = find(key) ?: throw StoryException("No running script is registered as '$key'")
-        val method = entries.getOrPut(instance.javaClass) { scanEntries(instance.javaClass) }[stage]
-            ?: throw StoryException("Script '$key' has no stage '$stage'")
-        return suspendCoroutineUninterceptedOrReturn { continuation ->
-            try {
-                method.invoke(instance, args, continuation)
-            } catch (failure: InvocationTargetException) {
-                throw failure.targetException
-            }
-        }
-    }
+    suspend fun invoke(key: String, stage: String, args: CompoundTag): Any? =
+        invoke(key, stage, { it.entries }, arrayOf(args))
+
+    /** Calls the stage lambda [stage] of the instance under [key] with its [captured] values and [parameters]. */
+    suspend fun call(key: String, stage: String, captured: CompoundTag, parameters: Array<out Any?>): Any? =
+        invoke(key, stage, { it.calls }, arrayOf(captured, *parameters))
 
     /** Whether the instance under [key] declares [stage]. */
     fun hasStage(key: String, stage: String): Boolean {
         val instance = find(key) ?: return false
-        return stage in entries.getOrPut(instance.javaClass) { scanEntries(instance.javaClass) }
+        return stage in stagesOf(instance.javaClass).entries
+    }
+
+    private suspend fun invoke(key: String, stage: String, pick: (Stages) -> Map<String, Method>, arguments: Array<Any?>): Any? {
+        val instance = find(key) ?: throw StoryException("No running script is registered as '$key'")
+        val method = pick(stagesOf(instance.javaClass))[stage] ?: throw StoryException("Script '$key' has no stage '$stage'")
+        return suspendCoroutineUninterceptedOrReturn { continuation ->
+            try {
+                method.invoke(instance, *arguments, continuation)
+            } catch (failure: InvocationTargetException) {
+                throw failure.targetException
+            }
+        }
     }
 
     /** Forgets everything, for tests and server shutdown. */
@@ -126,8 +132,14 @@ object StoryInstances {
                 .getOrNull()
         }
 
-    private fun scanEntries(type: Class<*>): Map<String, Method> = type.declaredMethods
-        .mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }
-        .onEach { (_, method) -> method.trySetAccessible() }
-        .toMap()
+    private fun stagesOf(type: Class<*>): Stages = stages.getOrPut(type) {
+        val methods = type.declaredMethods.onEach { it.trySetAccessible() }
+        Stages(
+            methods.mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }.toMap(),
+            methods.mapNotNull { method -> method.getAnnotation(StageCall::class.java)?.let { it.name to method } }.toMap(),
+        )
+    }
+
+    /** The generated methods of a script class: entries that start or resume a stage, calls of stage lambdas. */
+    private class Stages(val entries: Map<String, Method>, val calls: Map<String, Method>)
 }

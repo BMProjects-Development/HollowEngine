@@ -36,8 +36,8 @@ internal class StageTypes(context: IrPluginContext) {
         if (isFunction(type)) {
             return "a function value cannot be saved; pass a lambda to a @State parameter instead"
         }
-        if (name == "kotlin.Array" || klass.isPrimitiveArray()) return "arrays cannot be saved; use a List"
-        if (name in CONTAINERS || klass.isSerializable() || name in CONTEXTUAL) {
+        if (klass.isPrimitiveArray()) return null
+        if (name == "kotlin.Array" || name in CONTAINERS || klass.isSerializable() || name in CONTEXTUAL) {
             return simple.arguments.firstNotNullOfOrNull { argument ->
                 (argument as? IrTypeProjection)?.type?.let(::problem)
                     ?: if (argument is IrTypeProjection) null else "a star projection cannot be saved"
@@ -52,17 +52,21 @@ internal class StageTypes(context: IrPluginContext) {
     }
 
     /** Whether [type] is a function type marked `@State`, whose values are stage lambdas. */
-    fun isStageLambda(type: IrType): Boolean =
-        type.annotations.any { it.isAnnotation(StageSymbols.STATE) } || type.classOrNull?.owner?.kotlinFqName == STAGE_LAMBDA
+    fun isStageLambda(type: IrType): Boolean = type.annotations.any { it.isAnnotation(StageSymbols.STATE) } ||
+        type.classOrNull?.owner?.kotlinFqName?.asString().orEmpty().startsWith(STAGE_LAMBDA)
 
     private fun IrClass.isSerializable(): Boolean = kind == ClassKind.ENUM_CLASS || hasAnnotation(SERIALIZABLE)
 
-    private fun IrClass.isPrimitiveArray(): Boolean =
-        kotlinFqName.asString().let { it.startsWith("kotlin.") && it.endsWith("Array") }
+    private fun IrClass.isPrimitiveArray(): Boolean = kotlinFqName.asString() in PRIMITIVE_ARRAYS
 
     private companion object {
         val SERIALIZABLE = FqName("kotlinx.serialization.Serializable")
-        val STAGE_LAMBDA = StageSymbols.PACKAGE.child(Name.identifier("StageLambda"))
+        val STAGE_LAMBDA = StageSymbols.PACKAGE.child(Name.identifier("StageLambda")).asString()
+
+        val PRIMITIVE_ARRAYS = setOf(
+            "kotlin.IntArray", "kotlin.LongArray", "kotlin.ShortArray", "kotlin.ByteArray", "kotlin.FloatArray",
+            "kotlin.DoubleArray", "kotlin.BooleanArray", "kotlin.CharArray",
+        )
 
         val BASIC = setOf(
             "kotlin.Int", "kotlin.Long", "kotlin.Short", "kotlin.Byte", "kotlin.Float", "kotlin.Double",
@@ -73,6 +77,7 @@ internal class StageTypes(context: IrPluginContext) {
             "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Collection",
             "kotlin.collections.Set", "kotlin.collections.MutableSet",
             "kotlin.collections.Map", "kotlin.collections.MutableMap",
+            "kotlin.collections.Map.Entry", "kotlin.collections.MutableMap.MutableEntry",
             "kotlin.Pair", "kotlin.Triple",
         )
 
