@@ -48,9 +48,11 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
         fun compile() {
             script.annotations += stages.scriptAnnotation(file.fileEntry.name)
             StageActions(stages).compile()
+            StageVarBoxes(stages).compile()
             val lifter = StageLambdaLifter(stages)
             script.declarations.toList().forEach { it.transform(lifter, null) }
             script.declarations += lifter.lifted.keys
+            script.declarations += lifter.locals.lifted
             captures = lifter.lifted
 
             val functions = script.declarations.filterIsInstance<IrSimpleFunction>().filter(stages::isSuspendState)

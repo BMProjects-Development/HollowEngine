@@ -141,11 +141,21 @@ object ScriptRegistry {
      */
     fun classLoader(namespace: String): ClassLoader? {
         val source = source(namespace) ?: return null
-        val dependencies = closure(namespace).filter { it !== source }.map(ScriptSource::classLoader).distinct()
-        if (dependencies.isEmpty()) return source.classLoader
         return synchronized(lock) {
             dependencyLoaders.getOrPut(namespace) {
-                HollowAddonClassLoader(emptyArray(), source.classLoader, dependencies)
+                val closure = closure(namespace)
+                closure.forEach { dependent ->
+                    dependent.dependencies.filter { source(it) == null }.forEach { missing ->
+                        HollowEngine.LOGGER.warn(
+                            "Scripts of '{}' depend on '{}', which is not loaded: its classes are not available to them",
+                            dependent.namespace,
+                            missing,
+                        )
+                    }
+                }
+                val dependencies = closure.filter { it !== source }.map(ScriptSource::classLoader).distinct()
+                if (dependencies.isEmpty()) source.classLoader
+                else HollowAddonClassLoader(emptyArray(), source.classLoader, dependencies)
             }
         }
     }

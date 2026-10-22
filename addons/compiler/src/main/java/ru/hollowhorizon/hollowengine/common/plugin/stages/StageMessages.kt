@@ -13,7 +13,13 @@ internal object StageMessages {
     fun localClosure(description: String) =
         "A @State lambda cannot use $description declared outside it: its closure is not saved. Move it to the top level of the script and pass saved values as explicit arguments, or declare it inside the lambda"
 
-    fun mutableCapture(name: String) = "A @State lambda cannot capture 'var $name'; copy it into a val first"
+    fun mutableCapture(name: String) =
+        "A @State lambda can share 'var $name' only with the @State function or lambda that declares it directly; declare it there or copy it into a val"
+
+    fun localFunction(name: String, problem: String) =
+        "A @State lambda calls local function '$name', which is copied out of its scope with what it uses, but $problem"
+
+    fun sharedVar(name: String, problem: String) = "A @State lambda shares 'var $name' with the stage that declares it, but $problem"
 
     fun assignCapture(name: String) = "A @State lambda cannot assign '$name': it keeps a saved copy"
 

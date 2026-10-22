@@ -39,6 +39,9 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
     /** The functions made from lambdas, in the order they were made, with how many captured values they take. */
     val lifted = LinkedHashMap<IrSimpleFunction, Int>()
 
+    /** The local functions lifted lambdas call, copied to the script. */
+    val locals = StageLocalFunctions(stages)
+
     override fun visitProperty(declaration: IrProperty): IrStatement {
         owners.addLast(declaration.name.asString())
         return super.visitProperty(declaration).also { owners.removeLast() }
@@ -86,6 +89,7 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
             return null
         }
         val captured = captures(lambda) ?: return null
+        locals.redirect(lambda, scriptThis())
         val owner = owners.lastOrNull() ?: "script"
         val key = "$owner$$callee"
         val ordinal = counters.merge(key, 1, Int::plus)!!
@@ -139,7 +143,10 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
             override fun visitCall(expression: IrCall) {
                 super.visitCall(expression)
                 val function = expression.symbol.owner
-                checkLocal(function, expression, "local function '${function.name}'")
+                if (function.isLocal() && !function.isInside(lambda) && function.typeParameters.isNotEmpty()) {
+                    stages.reporter.error(expression, StageMessages.localClosure("generic local function '${function.name}'"))
+                    valid = false
+                }
             }
 
             override fun visitFunctionReference(expression: IrFunctionReference) {
@@ -170,6 +177,7 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
                 }
             }
         })
+        locals.reachableFrom(lambda).forEach { function -> captured += locals.freeValues(function) }
         captured.forEach { value ->
             if (value is IrVariable && value.isVar) {
                 stages.reporter.error(

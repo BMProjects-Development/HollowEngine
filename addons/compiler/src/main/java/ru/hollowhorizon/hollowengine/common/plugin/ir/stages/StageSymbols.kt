@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.plugin.ir.stages
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
@@ -34,6 +35,11 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val instances: IrClassSymbol = storyClass("StoryInstances")
     val loops: IrClassSymbol = storyClass("StoryLoops")
     val stageLambda: IrClassSymbol = storyClass("StageLambda")
+    val storyBox: IrClassSymbol = storyClass("StoryBox")
+    val boxes: IrClassSymbol = storyClass("StoryBoxes")
+    val box: IrSimpleFunctionSymbol = member(boxes, "box")
+    val boxGetter: IrSimpleFunctionSymbol = boxValue().getter!!.symbol
+    val boxSetter: IrSimpleFunctionSymbol = boxValue().setter!!.symbol
     val stageEntry: IrConstructorSymbol = storyClass("StageEntry").constructors.single()
     val stageCall: IrConstructorSymbol = storyClass("StageCall").constructors.single()
     val stageResult: IrConstructorSymbol = storyClass("StageResult").constructors.single()
@@ -90,6 +96,8 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
 
     private fun storyFunctions(name: String): Set<IrSimpleFunctionSymbol> =
         finder.findFunctions(CallableId(PACKAGE, Name.identifier(name))).toSet()
+
+    private fun boxValue(): IrProperty = storyBox.owner.declarations.filterIsInstance<IrProperty>().single { it.name.asString() == "value" }
 
     private fun member(owner: IrClassSymbol, name: String): IrSimpleFunctionSymbol =
         owner.getSimpleFunction(name) ?: error("${owner.owner.name}.$name is missing from the story runtime")

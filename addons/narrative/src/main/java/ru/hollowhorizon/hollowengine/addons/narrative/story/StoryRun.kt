@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.StringTag
 import net.minecraft.nbt.Tag
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryRun.Companion.current
@@ -29,6 +30,7 @@ class StoryRun internal constructor(
     internal val pending = ArrayDeque<StoryFrame>()
     internal val children = LinkedHashMap<String, StoryRun>()
     private val ownVars = CompoundTag()
+    private val ownBoxes: StoryBoxTable? = if (parent == null) StoryBoxTable(this) else null
     private val ownRecords = CompoundTag()
     private val ownJournal = StoryJournal()
     private val ownHistory: StoryHistory? = if (parent == null) StoryHistory(this) else null
@@ -50,6 +52,9 @@ class StoryRun internal constructor(
 
     /** Variables declared with [saved], shared by the whole tree of runs. */
     internal val vars: CompoundTag get() = parent?.vars ?: ownVars
+
+    /** The vars stages share with their `@State` lambdas, saved with the tree like locals. */
+    internal val boxes: StoryBoxTable get() = parent?.boxes ?: ownBoxes!!
 
     /** What [once] and [remember] keep: shared by the tree, and left as they are by a rewind. */
     internal val records: CompoundTag get() = parent?.records ?: ownRecords
@@ -298,7 +303,7 @@ class StoryRun internal constructor(
         watched.clear()
     }
 
-    private val root: StoryRun get() = parent?.root ?: this
+    internal val root: StoryRun get() = parent?.root ?: this
 
     /** This run and the runs it is a branch of. */
     private val lineage: Sequence<StoryRun> get() = generateSequence(this) { it.parent }
@@ -323,10 +328,12 @@ class StoryRun internal constructor(
         putString("status", (if (state == Status.RUNNING) Status.SLEEPING else state).name)
         if (stopping) putBoolean("stopping", true)
         put("frames", ListTag().apply { (frames + pending).forEach { add(it.save()) } })
-        if (children.isNotEmpty()) put(
-            "children",
-            CompoundTag().apply { children.forEach { (name, run) -> put(name, run.saveTree()) } })
+        if (children.isNotEmpty()) {
+            put("children", CompoundTag().apply { children.forEach { (name, run) -> put(name, run.saveTree()) } })
+            put("order", ListTag().apply { children.keys.forEach { add(StringTag.valueOf(it)) } })
+        }
         if (parent == null && !ownVars.isEmpty) put("vars", ownVars.copy())
+        if (parent == null) put("boxes", ownBoxes!!.save())
         result?.let { put("result", it.copy()) }
         failure?.let { putString("failure", it) }
     }
@@ -336,10 +343,12 @@ class StoryRun internal constructor(
         stopping = tag.getBoolean("stopping")
         tag.getList("frames", Tag.TAG_COMPOUND.toInt()).forEach { pending += StoryFrame.load(this, it as CompoundTag) }
         val saved = tag.getCompound("children")
-        saved.allKeys.forEach { children[it] = load(runs, it, this, saved.getCompound(it)) }
+        val order = tag.getList("order", Tag.TAG_STRING.toInt()).map { it.asString }.filter(saved::contains)
+        (order + saved.allKeys.filter { it !in order }.sorted()).forEach { children[it] = load(runs, it, this, saved.getCompound(it)) }
         if (parent == null) {
             ownVars.allKeys.toList().forEach(ownVars::remove)
             ownVars.merge(tag.getCompound("vars").copy())
+            ownBoxes!!.load(tag.getCompound("boxes"))
         }
         result = tag.get("result")?.copy()
         failure = tag.getString("failure").takeIf { tag.contains("failure") }

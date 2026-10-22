@@ -10,6 +10,9 @@ internal object StageValueTypes {
     val SERIALIZABLE_ID = ClassId.topLevel(SERIALIZABLE)
     val STAGE_LAMBDA = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StageLambda")).asString()
 
+    /** The box a shared var becomes; it is saved as its value. */
+    val STORY_BOX = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StoryBox")).asString()
+
     val PRIMITIVE_ARRAYS = setOf(
         "kotlin.IntArray", "kotlin.LongArray", "kotlin.ShortArray", "kotlin.ByteArray", "kotlin.FloatArray",
         "kotlin.DoubleArray", "kotlin.BooleanArray", "kotlin.CharArray",

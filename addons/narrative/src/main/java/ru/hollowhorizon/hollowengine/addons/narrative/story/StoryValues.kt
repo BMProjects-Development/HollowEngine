@@ -53,6 +53,7 @@ object StoryValues {
             classifier == Map::class -> MapSerializer(arguments[0], arguments[1])
             classifier == Map.Entry::class -> EntrySerializer(arguments[0], arguments[1])
             classifier.java.isArray && !classifier.java.componentType.isPrimitive -> ArraySerializer(elementClass(type), arguments[0])
+            classifier == StoryBox::class -> StoryBoxSerializer(arguments[0])
             classifier == Pair::class -> PairSerializer(arguments[0], arguments[1])
             classifier == Triple::class -> TripleSerializer(arguments[0], arguments[1], arguments[2])
             else -> runCatching { NBTFormat.serializersModule.serializer(type) }.getOrElse {

@@ -160,7 +160,7 @@ class StageCompileErrorsTest {
     @Test
     fun `a stage lambda saves what it captures so it can capture only values that can be saved`() {
         assertError(
-            "cannot capture 'var counter'", """
+            "can share 'var counter' only with the @State function or lambda that declares it directly", """
             fun start(runs: StoryRuns) {
                 var counter = 1
                 counter++
