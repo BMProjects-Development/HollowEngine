@@ -187,6 +187,7 @@ class StoryFrame internal constructor(
         result = null
         segment = CompoundTag()
         segmentMark = run.journal.next
+        run.journal.checkpointPassed(run.path, sites[site])
         run.history.add(sites[site], run, labels)
         run.changed()
     }
@@ -288,7 +289,6 @@ class StoryFrame internal constructor(
         run.frames.removeAt(run.frames.lastIndex)
         children.forEach { run.closeChild(it) }
         children.clear()
-        run.journal.undoTemporary(run.path, entryMark)
         run.root.boxes.release(boxes)
     }
 

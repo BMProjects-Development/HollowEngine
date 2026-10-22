@@ -19,6 +19,7 @@ import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityLoadedEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
 import ru.hollowhorizon.hollowengine.common.events.server.ServerEvent
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptFailedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeHost
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
@@ -76,9 +77,13 @@ object StoryOwners {
     }
 
     @SubscribeEvent
+    fun onScriptFailed(event: ScriptFailedEvent) = StoryWaits.failed(event.id)
+
+    @SubscribeEvent
     fun onLevelLoad(event: LevelEvent.Load) {
         val server = event.level.server ?: return
         if (event.level.dimension() != Level.OVERWORLD) return
+        StoryDeferredReplays.load(StoryStore(deferredFile(server)).read() ?: CompoundTag())
         StoryStore(serverFile(server)).read()?.let(server(server)::load)
     }
 
@@ -93,6 +98,7 @@ object StoryOwners {
         saveServer(event.server)
         servers.remove(event.server)
         StoryWaits.clear()
+        StoryDeferredReplays.clear()
     }
 
     @SubscribeEvent
@@ -100,6 +106,7 @@ object StoryOwners {
         val entity = event.entity
         if (entity.level().isClientSide) return
         StoryWaits.entityLoaded(entity.uuid)
+        StoryDeferredReplays.entityLoaded(entity)
         entities[entity]?.let { it.wake(); return }
         entity.data[ENTITY_STORIES]?.let(entity(entity)::load)
     }
@@ -118,9 +125,13 @@ object StoryOwners {
     }
 
     private fun saveServer(server: MinecraftServer) {
+        if (StoryDeferredReplays.changed) StoryStore(deferredFile(server)).write(StoryDeferredReplays.save())
         val runs = servers[server] ?: return
         StoryStore(serverFile(server)).write(runs.save())
     }
+
+    private fun deferredFile(server: MinecraftServer): Path =
+        server.getWorldPath(LevelResource.ROOT).resolve("data").resolve("hollowengine-narrative-deferred.dat")
 
     private fun serverFile(server: MinecraftServer): Path =
         server.getWorldPath(LevelResource.ROOT).resolve("data").resolve("hollowengine-narrative-stories.dat")

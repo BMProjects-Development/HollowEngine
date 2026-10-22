@@ -9,7 +9,7 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * A reversible action. Its body is `action { }`: within a story every call is written to the journal, which can undo
- * it on a rewind and fast-forward it on a redo, after a restart too. The journal keeps the receivers and parameters
+ * it on a rewind, after a restart too. The journal keeps the receivers and parameters
  * of the call, so they must be serializable; entities are kept as references.
  *
  * @param id the id the journal and editors know the action by, in the namespace of its script or addon; the
@@ -35,10 +35,10 @@ annotation class SimpleAction(val id: String = "")
 @DslMarker
 annotation class StoryDsl
 
-/** How long the journal keeps an action undoable, see [temporary]. */
+/** How long an action stands in the world, see [temporary]. */
 enum class Lifetime {
-    /** Undone when the stage that performed it exits, or before the segment that performed it repeats. */
-    STAGE,
+    /** Taken back when the story passes its checkpoint or ends, and before the segment that performed it repeats. */
+    TEMPORARY,
 
     /** Undone only by a rewind; left in the world when the story ends. */
     RUN,
@@ -61,8 +61,8 @@ suspend fun <R> action(vararg call: Any?, block: suspend ActionScope<R>.() -> Pe
     val run = context[StoryRun.Element]?.run?.takeIf { context[Replaying] == null }
     val args = action.encode(call)
     val record = run?.let {
-        val lifetime = if (context[Temporary] != null) Lifetime.STAGE else Lifetime.RUN
-        ActionRecord(it, action, args, lifetime, context[ActiveAction]?.seq)
+        val temporary = context[Temporary]
+        ActionRecord(it, action, args, if (temporary != null) Lifetime.TEMPORARY else Lifetime.RUN, temporary?.until, context[ActiveAction]?.seq)
     }
     return ActionScope<R>(record, null).block().value
 }
@@ -81,10 +81,11 @@ suspend fun label(vararg call: Any?, block: suspend LabelScope.() -> Unit) {
 }
 
 /**
- * Runs [block] with every action it performs kept for the current stage only: they are undone when the stage exits
- * and before the segment repeats after a restart, like a barricade that only stands during a fight.
+ * Runs [block] with every action it performs kept until a checkpoint, like a barricade that only stands during a
+ * fight: they are taken back when the story passes the checkpoint [until], or the next one of this run when it is
+ * null, and when the story ends. A segment that repeats after a restart takes them back before it performs them again.
  */
-suspend fun <T> temporary(block: suspend () -> T): T = withContext(Temporary()) { block() }
+suspend fun <T> temporary(until: String? = null, block: suspend () -> T): T = withContext(Temporary(until)) { block() }
 
 /** What a capture block can declare: snapshots taken before the action and how to put them back. */
 @StoryDsl
@@ -129,7 +130,7 @@ class ActionScope<R> internal constructor(
     internal var fastForward: (suspend () -> R)? = null
     internal var perform: (suspend () -> R)? = null
 
-    /** Brings the world to where the action ends, at once; a redo without it performs the action again. */
+    /** Brings the world to where the action ends, at once; without it the action is performed again. */
     fun fastForward(block: suspend () -> R) {
         check(!closed) { "fastForward { } must come before perform { }" }
         fastForward = block
@@ -170,10 +171,11 @@ internal class ActionRecord(
     private val action: StoryAction,
     private val args: CompoundTag,
     private val lifetime: Lifetime,
+    private val until: String?,
     private val outer: Long?,
 ) {
     fun begin(snapshots: CompoundTag): JournalEntry =
-        run.journal.record(action.id, run.path, lifetime, args, snapshots, outer).also { run.recorded() }
+        run.journal.record(action.id, run.path, lifetime, until, args, snapshots, outer).also { run.changed() }
 
     fun done(entry: JournalEntry) {
         entry.done = true
@@ -182,11 +184,11 @@ internal class ActionRecord(
 }
 
 /** Marks actions performed inside [temporary]. */
-internal class Temporary : AbstractCoroutineContextElement(Temporary) {
+internal class Temporary(val until: String?) : AbstractCoroutineContextElement(Temporary) {
     companion object Key : CoroutineContext.Key<Temporary>
 }
 
-/** The action whose perform is running: actions inside it are its parts, which a redo of it repeats. */
+/** The action whose perform is running: actions inside it are its parts, which a fast-forward of it repeats. */
 internal class ActiveAction(val seq: Long) : AbstractCoroutineContextElement(ActiveAction) {
     companion object Key : CoroutineContext.Key<ActiveAction>
 }

@@ -120,7 +120,13 @@ object StoryActions {
 
     /** Undoes what [entry] did; logs why when it cannot. */
     internal fun undo(entry: JournalEntry) {
-        val undo = replay(entry)?.scope?.undo ?: return
+        val replay = try {
+            replay(entry)
+        } catch (missing: StoryEntityMissing) {
+            StoryDeferredReplays.undo(entry, missing.uuid)
+            return
+        }
+        val undo = replay?.scope?.undo ?: return
         try {
             UndoScope().undo()
         } catch (conflict: ActionConflict) {
@@ -133,7 +139,13 @@ object StoryActions {
     /** Brings the world to where [entry] ended: with its fast-forward, or by performing it again. */
     @Suppress("UNCHECKED_CAST")
     internal suspend fun fastForward(entry: JournalEntry) {
-        val scope = replay(entry)?.scope as? ActionScope<Any?> ?: return
+        val replay = try {
+            replay(entry)
+        } catch (missing: StoryEntityMissing) {
+            StoryDeferredReplays.fastForward(entry, missing.uuid)
+            return
+        }
+        val scope = replay?.scope as? ActionScope<Any?> ?: return
         val block = scope.fastForward ?: scope.perform ?: return
         try {
             withContext(Replaying()) { block() }
@@ -144,7 +156,10 @@ object StoryActions {
         }
     }
 
-    /** Calls the action of [entry] again with its saved receivers and parameters, declaring its blocks only. */
+    /**
+     * Calls the action of [entry] again with its saved receivers and parameters, declaring its blocks only. An entity
+     * it needs that is not loaded is thrown as [StoryEntityMissing], so the caller can wait for it.
+     */
     private fun replay(entry: JournalEntry): ActionReplay? {
         val action = byId[entry.action] ?: run {
             HollowEngine.LOGGER.warn(
@@ -157,13 +172,7 @@ object StoryActions {
         return try {
             ActionReplay(entry, action).also(action::replay)
         } catch (missing: StoryEntityMissing) {
-            HollowEngine.LOGGER.warn(
-                "Story '{}' cannot replay '{}': entity {} is not loaded",
-                entry.run,
-                entry.action,
-                missing.uuid
-            )
-            null
+            throw missing
         } catch (failure: Exception) {
             HollowEngine.LOGGER.warn("Story '{}' cannot replay '{}': {}", entry.run, entry.action, failure.message)
             null

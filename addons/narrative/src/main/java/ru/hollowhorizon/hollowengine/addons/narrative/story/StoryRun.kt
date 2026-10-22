@@ -80,7 +80,7 @@ class StoryRun internal constructor(
         }
         val missing = (frames + pending).map { it.instance }.firstOrNull { StoryInstances.find(it) == null }
         if (missing != null) {
-            runs.waitFor(missing, this)
+            if (StoryInstances.isGone(missing)) discard("its script '$missing' no longer exists") else runs.waitFor(missing, this)
             return
         }
         if (parent != null && parent.state != Status.RUNNING) return
@@ -183,6 +183,13 @@ class StoryRun internal constructor(
         children.remove(name)?.stop()
     }
 
+    /** Removes the whole story for good: a script it runs in will not come back, so it would wait forever. */
+    internal fun discard(reason: String) {
+        val root = root
+        HollowEngine.LOGGER.error("Story '{}' is removed: {}", root.path, reason)
+        if (!root.runs.stop(root.name)) root.stop()
+    }
+
     /** Stops the run for good, along with its branches, and takes back their temporary actions at once. */
     internal fun stop() {
         if (state.done) {
@@ -210,29 +217,18 @@ class StoryRun internal constructor(
 
     internal fun changed() = runs.changed()
 
-    /** The run wrote a new action to the journal, so the rewinds before it cannot be redone. */
-    internal fun recorded() {
-        history.recorded()
-        changed()
-    }
-
     /** This run and every branch under it. */
     internal fun tree(): Sequence<StoryRun> = sequenceOf(this) + children.values.asSequence().flatMap { it.tree() }
 
     /**
      * Takes the story back: with [name], the whole tree to the latest checkpoint so named; without it, this run and
-     * its active branches each to the start of the segment it is in. The runs stop, the journal undoes what they
+     * its branches to the latest checkpoint this run passed itself. The runs stop, the journal undoes what they
      * performed since, and they start again from there.
      */
     internal fun rewind(name: String?) {
         if (name != null && !history.has(name)) throw StoryException("Story '${root.path}' has no checkpoint '$name'")
-        if (name == null) move(this) { history.rewindSegments(this) } else move(root) { history.rewind(name) }
-    }
-
-    /** Undoes the latest rewind of the story: back to where it was, with the actions it undid performed again. */
-    internal fun redo() {
-        if (!history.canRedo) throw StoryException("Story '${root.path}' has nothing to redo")
-        move(root) { history.redo() }
+        if (name == null && !history.hasOwn(this)) throw StoryException("Story '$path' has no checkpoint left to rewind to")
+        if (name == null) move(this) { history.rewindOwn(this) } else move(root) { history.rewind(name) }
     }
 
     /** Stops the run with its branches and waits until they have; [start] brings it back. */
@@ -376,6 +372,9 @@ class StoryRun internal constructor(
 
         /** The run whose code is executing on this thread. */
         fun current(): StoryRun? = CURRENT.get()
+
+        /** A run a saved handle names that has ended and left its story: all a handle can still do is report so. */
+        fun ended(runs: StoryRuns, name: String): StoryRun = StoryRun(runs, name, null).apply { status.value = Status.COMPLETED }
 
         fun load(runs: StoryRuns, name: String, parent: StoryRun?, tag: CompoundTag): StoryRun =
             StoryRun(runs, name, parent).apply {
