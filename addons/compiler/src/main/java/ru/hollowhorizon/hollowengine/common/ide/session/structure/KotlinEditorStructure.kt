@@ -151,5 +151,5 @@ internal fun PsiElement.fold(placeholder: String): CodeFold? =
 
 private val AttachClassId =
     ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach"))
-private val StateClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.scripting.annotations.State"))
+private val StateClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.addons.narrative.story.State"))
 private val EventClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.events.SubscribeEvent"))

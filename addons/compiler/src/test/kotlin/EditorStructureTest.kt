@@ -150,7 +150,7 @@ class EditorStructureTest {
         assertTrue(analyzer.structure("example.kt", "fun call() {}").runTargets.isEmpty())
         assertTrue(analyzer.structure("example.ui.kts", "").runTargets.isEmpty())
         val text =
-            "import ru.hollowhorizon.hollowengine.common.scripting.annotations.State as Entry\n" + "object Names { const val ENTRY = \"Begin\" }\n@Entry(Names.ENTRY) suspend fun first() {}\n" + "@Entry suspend fun second() {}\n@Entry fun invalid() {}"
+            "import ru.hollowhorizon.hollowengine.addons.narrative.story.State as Entry\n" + "object Names { const val ENTRY = \"Begin\" }\n@Entry(Names.ENTRY) suspend fun first() {}\n" + "@Entry suspend fun second() {}\n@Entry fun invalid() {}"
         val targets = analyzer.structure("states.node.kts", text).runTargets
         assertEquals(listOf(null, "Begin", "second"), targets.map { it.state })
         assertEquals(0, targets.first().offset)

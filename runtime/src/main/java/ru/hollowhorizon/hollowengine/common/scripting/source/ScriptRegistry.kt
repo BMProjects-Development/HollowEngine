@@ -115,7 +115,7 @@ object ScriptRegistry {
     fun artifacts(raw: String): ScriptArtifacts? = artifacts(parse(raw))
 
     /**
-     * The script a materialised source file belongs to. Addon sources are extracted into the cache
+     * The script a materialized source file belongs to. Addon sources are extracted into the cache
      * directory, so the path alone does not say which namespace owns them.
      */
     fun idOf(file: File): ScriptId? = filesToIds[file.canonicalPath]
