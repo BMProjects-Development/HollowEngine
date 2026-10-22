@@ -178,6 +178,30 @@ class EditorStructureTest {
     }
 
     @Test
+    fun `rewind and temporary take the color of the checkpoint they lead to`() {
+        val source = """
+            import ru.hollowhorizon.hollowengine.addons.narrative.story.*
+            @State suspend fun main() {
+                rewind()
+                checkpoint("arena")
+                temporary { }
+                rewind()
+                temporary(until = "boss") { }
+                rewind("arena")
+                checkpoint("boss")
+            }
+        """.trimIndent()
+        val markers = analyzer.structure("Colors.kts", source).markers
+        fun at(text: String, from: Int = 0) = markers.single { it.offset == source.indexOf(text, from) }
+        assertEquals(GutterMarkerKind.REWIND_START, at("rewind()").kind)
+        assertEquals("arena", at("checkpoint(\"arena").color)
+        assertEquals("boss", at("temporary {").color, "a temporary without until goes at the next checkpoint")
+        assertEquals("arena", at("rewind()", source.indexOf("temporary {")).color, "rewind goes to the checkpoint before it")
+        assertEquals("boss", at("temporary(until").color)
+        assertEquals("arena", at("rewind(\"arena").color)
+    }
+
+    @Test
     fun `attached nodes have no server run targets`() {
         val text =
             "@file:Attached(java.net.URI::class)\n" + "import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach as Attached\n" + "@State suspend fun first() {}"

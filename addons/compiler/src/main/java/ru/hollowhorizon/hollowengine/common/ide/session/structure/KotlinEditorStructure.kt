@@ -92,6 +92,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             }
         }
         val coroutineLines = HashSet<Int>()
+        val story = StoryGutterMarkers(this, file)
         file.collectDescendantsOfType<KtExpression>().forEach { expression ->
             val offset = when (expression) {
                 is KtCallExpression -> expression.calleeExpression?.textOffset
@@ -102,7 +103,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             } ?: return@forEach
             val call = (expression.resolveToCall() as? KaSuccessCallInfo)?.call as? KaFunctionCall<*> ?: return@forEach
             val line = file.text.lastIndexOf('\n', offset) + 1
-            stageMarker(expression, call)?.let { marker ->
+            story.markerFor(expression, call)?.let { marker ->
                 markers += marker.copy(offset = offset)
                 coroutineLines += line
                 return@forEach
@@ -158,24 +159,5 @@ private val AttachClassId =
 private val StoryPackage = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
 private val StateClassId = ClassId(StoryPackage, Name.identifier("State"))
 private val ActionClassId = ClassId(StoryPackage, Name.identifier("Action"))
-private val CheckpointName = Name.identifier("checkpoint")
 
-/**
- * The marker of a boundary of a story stage at [expression]: a named checkpoint, or the call of a stage or a stage
- * lambda, after which a restart and `rewind()` resume. The offset is filled in by the caller.
- */
-private fun KaSession.stageMarker(expression: KtExpression, call: KaFunctionCall<*>): GutterMarker? {
-    val symbol = call.symbol as? KaNamedFunctionSymbol ?: return null
-    if (symbol.callableId?.packageName == StoryPackage && symbol.name == CheckpointName) {
-        val name = (expression as? KtCallExpression)?.valueArguments?.firstOrNull()?.getArgumentExpression()
-            ?.let { (it as? KtStringTemplateExpression)?.entries?.singleOrNull() as? KtLiteralStringTemplateEntry }?.text
-        return GutterMarker(0, GutterMarkerKind.CHECKPOINT, listOf(name ?: "?"))
-    }
-    if (StateClassId in symbol.annotations) return GutterMarker(0, GutterMarkerKind.STAGE, listOf(symbol.name.asString()))
-    val receiver = call.partiallyAppliedSymbol.dispatchReceiver?.type
-    if (symbol.name.asString() == "invoke" && receiver != null && StateClassId in receiver.annotations) {
-        return GutterMarker(0, GutterMarkerKind.STAGE, listOf((expression as? KtCallExpression)?.calleeExpression?.text ?: "invoke"))
-    }
-    return null
-}
 private val EventClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.events.SubscribeEvent"))

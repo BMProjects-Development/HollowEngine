@@ -8,6 +8,7 @@ import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeHost
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
@@ -87,6 +88,18 @@ object StoryInstances {
         val factory = stagesOf(instance.javaClass).results[stage]
             ?: throw StoryException("Script '$key' has no result serializer for stage '$stage'; recompile the script")
         return factory.invoke(instance) as KSerializer<Any?>
+    }
+
+    /** The script an instance [key] belongs to, or null when the key does not name a script. */
+    internal fun scriptOf(key: String): ScriptId? = runCatching { ScriptRegistry.parse(key.substringBefore('@')) }.getOrNull()
+
+    /**
+     * Whether the script of [key] no longer exists, so nothing will run under [key] again. A script of a namespace
+     * that is not installed right now is not gone: turning its addon on brings it back.
+     */
+    internal fun isGone(key: String): Boolean {
+        val id = scriptOf(key) ?: return false
+        return ScriptRegistry.source(id.namespace) != null && ScriptRegistry.artifacts(id) == null
     }
 
     /** The keys of every running instance. */
