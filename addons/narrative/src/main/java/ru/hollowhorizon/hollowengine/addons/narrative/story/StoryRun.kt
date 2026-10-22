@@ -63,6 +63,8 @@ class StoryRun internal constructor(
 
     internal val isCancelled: Boolean get() = job?.isCancelled == true
 
+    internal val isStopped: Boolean get() = stopping || state == Status.STOPPED
+
     /** Starts or wakes the run; does nothing while it runs or once it ended. */
     internal fun start() {
         if (state.done || job?.isActive == true || !isAttached || lineage.any { it.moving }) return
@@ -82,7 +84,14 @@ class StoryRun internal constructor(
         frames.clear()
         status.value = Status.RUNNING
         val parentJob = parent?.job ?: runs.owner.scope.coroutineContext.job
-        job = runs.owner.scope.launch(Element(this) + parentJob) { drive() }
+        val running = runs.owner.scope.launch(Element(this) + parentJob, start = CoroutineStart.LAZY) { drive() }
+        job = running
+        running.invokeOnCompletion {
+            if (job === running && state == Status.RUNNING) {
+                if (stopping) finish(Status.STOPPED, null, null) else pause()
+            }
+        }
+        running.start()
         children.values.forEach { it.start() }
     }
 
@@ -142,10 +151,19 @@ class StoryRun internal constructor(
     }
 
     /** The branch [name] that the frame on top of the stack starts, or the one it started before a restart. */
-    internal fun branch(name: String, lambda: StageLambda): StoryRun {
+    internal suspend fun branch(name: String, lambda: StageLambda): StoryRun {
         require('/' !in name && name.isNotBlank()) { "A branch name must be non-blank and contain no '/': '$name'" }
         val frame = frames.lastOrNull() ?: throw StoryException("async(\"$name\") must be called from a stage")
-        children[name]?.let { return it }
+        children[name]?.let { previous ->
+            if (!previous.isStopped) {
+                if (name !in frame.children) throw StoryException(
+                    "Branch '$path/$name' belongs to another active stage; use a distinct branch name"
+                )
+                return previous
+            }
+            previous.job?.join()
+            frames.forEach { it.children.remove(name) }
+        }
         val child = StoryRun(runs, name, this)
         child.pending += lambda.entry(child)
         children[name] = child
@@ -162,7 +180,13 @@ class StoryRun internal constructor(
 
     /** Stops the run for good, along with its branches, and takes back their temporary actions at once. */
     internal fun stop() {
-        if (state.done) return
+        if (state.done) {
+            if (!stopping) {
+                stopping = true
+                changed()
+            }
+            return
+        }
         stopping = true
         journal.close(path)
         val running = job
@@ -297,25 +321,27 @@ class StoryRun internal constructor(
     /** The runs as they are: stacks, branches, variables. A checkpoint keeps this. */
     internal fun saveTree(): CompoundTag = CompoundTag().apply {
         putString("status", (if (state == Status.RUNNING) Status.SLEEPING else state).name)
+        if (stopping) putBoolean("stopping", true)
         put("frames", ListTag().apply { (frames + pending).forEach { add(it.save()) } })
         if (children.isNotEmpty()) put(
             "children",
             CompoundTag().apply { children.forEach { (name, run) -> put(name, run.saveTree()) } })
         if (parent == null && !ownVars.isEmpty) put("vars", ownVars.copy())
-        result?.let { put("result", it) }
+        result?.let { put("result", it.copy()) }
         failure?.let { putString("failure", it) }
     }
 
     private fun readTree(tag: CompoundTag) {
         status.value = runCatching { Status.valueOf(tag.getString("status")) }.getOrDefault(Status.SLEEPING)
+        stopping = tag.getBoolean("stopping")
         tag.getList("frames", Tag.TAG_COMPOUND.toInt()).forEach { pending += StoryFrame.load(this, it as CompoundTag) }
         val saved = tag.getCompound("children")
         saved.allKeys.forEach { children[it] = load(runs, it, this, saved.getCompound(it)) }
         if (parent == null) {
             ownVars.allKeys.toList().forEach(ownVars::remove)
-            ownVars.merge(tag.getCompound("vars"))
+            ownVars.merge(tag.getCompound("vars").copy())
         }
-        result = tag.get("result")
+        result = tag.get("result")?.copy()
         failure = tag.getString("failure").takeIf { tag.contains("failure") }
     }
 

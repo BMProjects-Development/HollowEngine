@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.name.Name
+import ru.hollowhorizon.hollowengine.common.plugin.stages.StageValueTypes
 
 /**
  * Says which values a story can keep. It mirrors what `StoryValues` writes at runtime: whatever kotlinx
@@ -32,12 +32,12 @@ internal class StageTypes(context: IrPluginContext) {
         if (entity != null && type.isSubtypeOfClass(entity)) return null
         if (tag != null && type.isSubtypeOfClass(tag)) return null
         val name = klass.kotlinFqName.asString()
-        if (name in BASIC) return null
+        if (name in StageValueTypes.BASIC) return null
         if (isFunction(type)) {
             return "a function value cannot be saved; pass a lambda to a @State parameter instead"
         }
         if (klass.isPrimitiveArray()) return null
-        if (name == "kotlin.Array" || name in CONTAINERS || klass.isSerializable() || name in CONTEXTUAL) {
+        if (name == "kotlin.Array" || name in StageValueTypes.CONTAINERS || klass.isSerializable() || name in StageValueTypes.CONTEXTUAL) {
             return simple.arguments.firstNotNullOfOrNull { argument ->
                 (argument as? IrTypeProjection)?.type?.let(::problem)
                     ?: if (argument is IrTypeProjection) null else "a star projection cannot be saved"
@@ -53,46 +53,9 @@ internal class StageTypes(context: IrPluginContext) {
 
     /** Whether [type] is a function type marked `@State`, whose values are stage lambdas. */
     fun isStageLambda(type: IrType): Boolean = type.annotations.any { it.isAnnotation(StageSymbols.STATE) } ||
-        type.classOrNull?.owner?.kotlinFqName?.asString().orEmpty().startsWith(STAGE_LAMBDA)
+        type.classOrNull?.owner?.kotlinFqName?.asString().orEmpty().startsWith(StageValueTypes.STAGE_LAMBDA)
 
-    private fun IrClass.isSerializable(): Boolean = kind == ClassKind.ENUM_CLASS || hasAnnotation(SERIALIZABLE)
+    private fun IrClass.isSerializable(): Boolean = kind == ClassKind.ENUM_CLASS || hasAnnotation(StageValueTypes.SERIALIZABLE)
 
-    private fun IrClass.isPrimitiveArray(): Boolean = kotlinFqName.asString() in PRIMITIVE_ARRAYS
-
-    private companion object {
-        val SERIALIZABLE = FqName("kotlinx.serialization.Serializable")
-        val STAGE_LAMBDA = StageSymbols.PACKAGE.child(Name.identifier("StageLambda")).asString()
-
-        val PRIMITIVE_ARRAYS = setOf(
-            "kotlin.IntArray", "kotlin.LongArray", "kotlin.ShortArray", "kotlin.ByteArray", "kotlin.FloatArray",
-            "kotlin.DoubleArray", "kotlin.BooleanArray", "kotlin.CharArray",
-        )
-
-        val BASIC = setOf(
-            "kotlin.Int", "kotlin.Long", "kotlin.Short", "kotlin.Byte", "kotlin.Float", "kotlin.Double",
-            "kotlin.Boolean", "kotlin.Char", "kotlin.String", "kotlin.Unit",
-        )
-
-        val CONTAINERS = setOf(
-            "kotlin.collections.List", "kotlin.collections.MutableList", "kotlin.collections.Collection",
-            "kotlin.collections.Set", "kotlin.collections.MutableSet",
-            "kotlin.collections.Map", "kotlin.collections.MutableMap",
-            "kotlin.collections.Map.Entry", "kotlin.collections.MutableMap.MutableEntry",
-            "kotlin.Pair", "kotlin.Triple",
-        )
-
-        /** Classes the engine's NBT format writes without them being `@Serializable`. */
-        val CONTEXTUAL = setOf(
-            "java.util.UUID",
-            "net.minecraft.core.BlockPos",
-            "net.minecraft.resources.ResourceLocation",
-            "net.minecraft.world.phys.Vec3",
-            "net.minecraft.network.chat.Component",
-            "net.minecraft.world.item.ItemStack",
-            "org.joml.Matrix4f",
-            "org.joml.Vector3d",
-            "org.joml.Vector3f",
-            "ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef",
-        )
-    }
+    private fun IrClass.isPrimitiveArray(): Boolean = kotlinFqName.asString() in StageValueTypes.PRIMITIVE_ARRAYS
 }

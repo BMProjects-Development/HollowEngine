@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
+import kotlinx.serialization.KSerializer
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeHost
@@ -22,11 +23,23 @@ import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
  * resumes once a script with that key is running again.
  */
 object StoryInstances {
-    private class Entry(val instance: Any, val job: Job?)
+    private class Entry(val instance: Any) {
+        val users = LinkedHashSet<Job>()
+        val lifetime = Job()
+    }
 
     private val byKey = HashMap<String, Entry>()
     private val keys = IdentityHashMap<Any, String>()
-    private val stages = HashMap<Class<*>, Stages>()
+    private val stages = object : ClassValue<Stages>() {
+        override fun computeValue(type: Class<*>): Stages {
+            val methods = type.declaredMethods
+            return Stages(
+                methods.mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }.toMap(),
+                methods.mapNotNull { method -> method.getAnnotation(StageCall::class.java)?.let { it.name to method } }.toMap(),
+                methods.mapNotNull { method -> method.getAnnotation(StageResult::class.java)?.let { it.name to method } }.toMap(),
+            )
+        }
+    }
     private val listeners = ArrayList<(String) -> Unit>()
 
     /**
@@ -35,23 +48,20 @@ object StoryInstances {
      */
     fun register(instance: Any, scope: CoroutineScope) {
         val job = scope.coroutineContext.job
-        val added = ArrayList<String>()
+        val added = LinkedHashMap<String, Entry>()
         register(instance, job, added)
-        job.invokeOnCompletion { added.forEach { key -> remove(key, instance) } }
-        added.forEach { key -> listeners.forEach { it(key) } }
+        job.invokeOnCompletion { added.forEach { (key, entry) -> remove(key, entry, job) } }
+        added.keys.filter(byKey::containsKey).forEach { key -> listeners.forEach { it(key) } }
     }
 
-    /** The key [instance] is addressed by, registering it if it was not. */
-    fun keyOf(instance: Any): String = keys[instance] ?: keyFor(instance).also { key ->
-        keys[instance] = key
-        byKey.putIfAbsent(key, Entry(instance, null))
-    }
+    /** The key [instance] is addressed by; [register] makes it available after construction has finished. */
+    fun keyOf(instance: Any): String = keys.getOrPut(instance) { keyFor(instance) }
 
     /** The running instance registered under [key], if any. */
     fun find(key: String): Any? = byKey[key]?.instance
 
     /** The job of the instance under [key], which ends when the instance stops; null when nothing bounds it. */
-    internal fun jobOf(key: String): Job? = byKey[key]?.job
+    internal fun jobOf(key: String): Job? = byKey[key]?.takeIf { it.users.isNotEmpty() }?.lifetime
 
     /** Calls [listener] with every key that becomes available. */
     internal fun onAvailable(listener: (String) -> Unit) {
@@ -68,6 +78,15 @@ object StoryInstances {
     /** Calls the stage lambda [stage] of the instance under [key] with its [captured] values and [parameters]. */
     suspend fun call(key: String, stage: String, captured: CompoundTag, parameters: Array<out Any?>): Any? =
         invoke(key, stage, { it.calls }, arrayOf(captured, *parameters))
+
+    /** Restores type information generated with the lambda, without serializing serializer implementations. */
+    @Suppress("UNCHECKED_CAST")
+    internal fun resultSerializer(key: String, stage: String): KSerializer<Any?> {
+        val instance = find(key) ?: throw StoryException("No running script is registered as '$key'")
+        val factory = stagesOf(instance.javaClass).results[stage]
+            ?: throw StoryException("Script '$key' has no result serializer for stage '$stage'; recompile the script")
+        return factory.invoke(instance) as KSerializer<Any?>
+    }
 
     /** The keys of every running instance. */
     val registered: Set<String> get() = byKey.keys
@@ -95,24 +114,29 @@ object StoryInstances {
 
     /** Forgets everything, for tests and server shutdown. */
     internal fun clear() {
+        val entries = byKey.values.toList()
         byKey.clear()
         keys.clear()
+        entries.forEach { it.lifetime.cancel() }
     }
 
-    private fun register(instance: Any, job: Job, added: MutableList<String>) {
+    private fun register(instance: Any, job: Job, added: MutableMap<String, Entry>) {
         if (!instance.javaClass.isAnnotationPresent(StageScript::class.java)) return
         val key = keyFor(instance)
-        if (byKey[key]?.let { it.instance === instance && it.job != null } == true) return
+        val entry = byKey[key]?.takeIf { it.instance === instance } ?: Entry(instance).also { byKey[key] = it }
+        if (!entry.users.add(job)) return
         keys[instance] = key
-        byKey[key] = Entry(instance, job)
-        added += key
+        added[key] = entry
         StoryActions.register(instance.javaClass, namespaceOf(instance), job)
         importsOf(instance).forEach { register(it, job, added) }
     }
 
-    private fun remove(key: String, instance: Any) {
-        if (byKey[key]?.instance === instance) byKey.remove(key)
-        keys.remove(instance)
+    private fun remove(key: String, entry: Entry, job: Job) {
+        entry.users.remove(job)
+        if (entry.users.isNotEmpty()) return
+        if (byKey[key] === entry) byKey.remove(key)
+        if (byKey[key]?.instance !== entry.instance) keys.remove(entry.instance)
+        entry.lifetime.cancel()
     }
 
     /**
@@ -145,14 +169,8 @@ object StoryInstances {
                 .getOrNull()
         }
 
-    private fun stagesOf(type: Class<*>): Stages = stages.getOrPut(type) {
-        val methods = type.declaredMethods.onEach { it.trySetAccessible() }
-        Stages(
-            methods.mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }.toMap(),
-            methods.mapNotNull { method -> method.getAnnotation(StageCall::class.java)?.let { it.name to method } }.toMap(),
-        )
-    }
+    private fun stagesOf(type: Class<*>): Stages = stages.get(type)
 
     /** The generated methods of a script class: entries that start or resume a stage, calls of stage lambdas. */
-    private class Stages(val entries: Map<String, Method>, val calls: Map<String, Method>)
+    private class Stages(val entries: Map<String, Method>, val calls: Map<String, Method>, val results: Map<String, Method>)
 }

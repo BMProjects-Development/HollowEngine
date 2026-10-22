@@ -90,6 +90,8 @@ internal class StageScope(
 
     fun callAnnotation(name: String): IrAnnotation = annotation(symbols.stageCall, name)
 
+    fun resultAnnotation(name: String): IrAnnotation = annotation(symbols.stageResult, name)
+
     fun scriptAnnotation(path: String): IrAnnotation = annotation(symbols.stageScript, path)
 
     private fun annotation(constructor: IrConstructorSymbol, value: String): IrAnnotation =
