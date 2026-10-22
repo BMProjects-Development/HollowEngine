@@ -47,6 +47,11 @@ annotation class StageEntry(val name: String)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class StageCall(val name: String)
 
+/** Names a generated serializer factory for the result of a saved stage lambda. */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class StageResult(val name: String)
+
 /** Marks a script class that declares stages with the source [path] its stages are addressed by. */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)

@@ -67,6 +67,7 @@ val context: StoryContext
 /**
  * Starts the branch [name] of the current story and returns its handle. The branch is saved with the story and
  * ends when the stage that started it returns. After a restart the same call returns the branch already running.
+ * Cancel its handle before reusing the name for a new branch; cancellation finishes before the replacement starts.
  */
 suspend fun <T> async(name: String, block: @State suspend () -> T): StoryHandle<T> {
     val run = currentRun("async(\"$name\")")
@@ -76,12 +77,12 @@ suspend fun <T> async(name: String, block: @State suspend () -> T): StoryHandle<
 
 /** A run of a story or of one of its branches. */
 class StoryHandle<T> internal constructor(
-    private val run: StoryRun,
+    internal val run: StoryRun,
     private val result: KSerializer<Any?>?,
 ) {
     val key: String get() = run.path
 
-    val isActive: Boolean get() = !run.state.done
+    val isActive: Boolean get() = !run.state.done && !run.isStopped
 
     /** Where the run is: its stages and their positions. */
     val state: String get() = run.describe()
@@ -102,6 +103,7 @@ class StoryHandle<T> internal constructor(
         run.awaitDone()
     }
 
+    /** Stops this run and releases a branch name for reuse, including when the branch has already completed. */
     fun cancel() = run.stop()
 
     /** Rewinds the run from outside, see [rewind]. */
@@ -118,20 +120,34 @@ class StoryHandle<T> internal constructor(
 suspend fun all(vararg handles: StoryHandle<*>) = handles.forEach { it.join() }
 
 /** Waits for the first of [handles] to end, stops the others and returns the one that ended. */
-suspend fun race(vararg handles: StoryHandle<*>): StoryHandle<*> = coroutineScope {
-    val waits = handles.map { handle -> async { handle.join(); handle } }
-    val winner = select { waits.forEach { wait -> wait.onAwait { it } } }
-    waits.forEach { it.cancel() }
-    handles.filter { it !== winner }.forEach(StoryHandle<*>::cancel)
-    winner
+suspend fun race(vararg handles: StoryHandle<*>): StoryHandle<*> {
+    require(handles.isNotEmpty()) { "race() needs at least one branch" }
+    val winner = awaitFirst(handles.toList())
+    handles.filter { it.run !== winner.run }.forEach(StoryHandle<*>::cancel)
+    return winner
 }
 
-/** Waits for [count] of [handles] to end, stops the rest and returns those that ended. */
+/** Waits without changing the supplied runs; only the temporary waiter coroutines belong to this scope. */
+private suspend fun awaitFirst(handles: List<StoryHandle<*>>): StoryHandle<*> = coroutineScope {
+    val waits = handles.map { handle -> async { handle.join(); handle } }
+    try {
+        select { waits.forEach { wait -> wait.onAwait { it } } }
+    } finally {
+        waits.forEach { it.cancel() }
+    }
+}
+
+/** Waits for [count] distinct runs in [handles] to end, stops the rest and returns those that ended. */
 suspend fun any(count: Int, vararg handles: StoryHandle<*>): List<StoryHandle<*>> {
-    require(count in 0..handles.size) { "Cannot wait for $count of ${handles.size} branches" }
+    val remaining = handles.distinctBy { it.run }.toMutableList()
+    require(count in 0..remaining.size) { "Cannot wait for $count of ${remaining.size} distinct branches" }
     val ended = ArrayList<StoryHandle<*>>()
-    while (ended.size < count) ended += race(*handles.filter { it !in ended && it.isActive }.toTypedArray())
-    handles.filter { it !in ended }.forEach(StoryHandle<*>::cancel)
+    while (ended.size < count) {
+        val winner = awaitFirst(remaining)
+        ended += winner
+        remaining.remove(winner)
+    }
+    remaining.forEach(StoryHandle<*>::cancel)
     return ended
 }
 

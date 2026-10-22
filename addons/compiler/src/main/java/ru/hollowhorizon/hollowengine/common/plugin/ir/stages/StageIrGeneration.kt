@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.ir.util.isAnnotation
 import org.jetbrains.kotlin.ir.visitors.IrVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
+import ru.hollowhorizon.hollowengine.common.plugin.stages.StageMessages
 
 /**
  * Compiles stages of every script in a module: marks script classes so the runtime can find their
@@ -98,14 +99,17 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             StageRewriter(stages, function, layout).apply {
                 rewrite(statements, name, hash)
                 script.declarations += entry(name)
-                captures[function]?.let { script.declarations += lambdaCall(name, it) }
+                captures[function]?.let {
+                    script.declarations += lambdaCall(name, it)
+                    script.declarations += stages.lambdaResult(function, name)
+                }
             }
         }
 
         private fun isValid(function: IrSimpleFunction): Boolean {
             val problem = when {
                 function.parent != script -> "A stage must be declared at the top level of a script"
-                function.typeParameters.isNotEmpty() -> "A stage cannot have type parameters: its arguments are saved by their declared types"
+                function.typeParameters.isNotEmpty() -> StageMessages.TYPE_PARAMETERS
                 else -> null
             }
             problem?.let { reporter.error(function, it); return false }
@@ -166,12 +170,12 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
                     when {
                         nested > 0 -> reporter.error(
                             expression,
-                            "A stage cannot be called from a lambda inside a stage: its place could not be saved. Use async(name) { } or call it directly"
+                            StageMessages.NESTED_CALL
                         )
 
                         handler > 0 -> reporter.error(
                             expression,
-                            "A stage cannot be called in catch or finally: keep what you need in a variable and call it after the try"
+                            StageMessages.HANDLER_CALL
                         )
                     }
                 }
@@ -187,10 +191,10 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
                 override fun visitFunction(declaration: IrFunction) {
                     val marked = declaration.annotations.any { it.isAnnotation(StageSymbols.STATE) }
                     if (marked && declaration.parent != script) reporter.error(
-                        declaration, "A state function must be declared at the top level of a script"
+                        declaration, StageMessages.TOP_LEVEL
                     )
                     else if (marked && !stages.isSuspendState(declaration)) reporter.error(
-                        declaration, "A state function must be a suspend function"
+                        declaration, StageMessages.SUSPEND
                     )
                     super.visitFunction(declaration)
                 }
@@ -198,7 +202,7 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
                 override fun visitCall(expression: IrCall) {
                     super.visitCall(expression)
                     if (stages.symbols.isCheckpoint(expression.symbol.owner)) {
-                        reporter.error(expression, "checkpoint() must be called directly in a @State function")
+                        reporter.error(expression, StageMessages.CHECKPOINT_OUTSIDE)
                     }
                 }
             })

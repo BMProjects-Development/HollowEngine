@@ -24,9 +24,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeHost
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeSection
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
-import ru.hollowhorizon.hollowengine.common.utils.nbt.loadAsNBT
-import ru.hollowhorizon.hollowengine.common.utils.nbt.save
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -82,12 +79,7 @@ object StoryOwners {
     fun onLevelLoad(event: LevelEvent.Load) {
         val server = event.level.server ?: return
         if (event.level.dimension() != Level.OVERWORLD) return
-        val file = serverFile(server)
-        if (!Files.exists(file)) return
-        runCatching {
-            Files.newInputStream(file).use { it.loadAsNBT() } as? CompoundTag
-        }.onFailure { HollowEngine.LOGGER.error("Cannot read the stories of the server from {}", file, it) }.getOrNull()
-            ?.let(server(server)::load)
+        StoryStore(serverFile(server)).read()?.let(server(server)::load)
     }
 
     @SubscribeEvent
@@ -127,11 +119,7 @@ object StoryOwners {
 
     private fun saveServer(server: MinecraftServer) {
         val runs = servers[server] ?: return
-        val file = serverFile(server)
-        runCatching {
-            Files.createDirectories(file.parent)
-            Files.newOutputStream(file).use { runs.save().save(it) }
-        }.onFailure { HollowEngine.LOGGER.error("Cannot save the stories of the server to {}", file, it) }
+        StoryStore(serverFile(server)).write(runs.save())
     }
 
     private fun serverFile(server: MinecraftServer): Path =

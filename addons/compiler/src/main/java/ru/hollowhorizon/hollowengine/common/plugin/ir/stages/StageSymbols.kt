@@ -36,6 +36,7 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val stageLambda: IrClassSymbol = storyClass("StageLambda")
     val stageEntry: IrConstructorSymbol = storyClass("StageEntry").constructors.single()
     val stageCall: IrConstructorSymbol = storyClass("StageCall").constructors.single()
+    val stageResult: IrConstructorSymbol = storyClass("StageResult").constructors.single()
     val stageScript: IrConstructorSymbol = storyClass("StageScript").constructors.single()
     val stateConstructor: IrConstructorSymbol = state.constructors.single()
     val checkpoints: Set<IrSimpleFunctionSymbol> = storyFunctions("checkpoint")

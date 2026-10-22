@@ -16,15 +16,17 @@ import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
  * It is called like the lambda it replaced, and it can be saved like any other value. [StageLambda0] to
  * [StageLambda8] are its forms for each number of parameters.
  *
- * @param result reads the value the stage returns; only known where the lambda was written.
+ * @param resultSerializer reads the stage result; recovered through its generated factory after a restart.
  */
 abstract class StageLambda(
     val instance: String,
     val stage: String,
     val args: CompoundTag,
-    internal val result: KSerializer<Any?>?,
+    private val resultSerializer: KSerializer<Any?>?,
     val arity: Int,
 ) {
+    internal val result: KSerializer<Any?> get() = resultSerializer ?: StoryInstances.resultSerializer(instance, stage)
+
     /** Calls the stage with [parameters] after the captured arguments. */
     protected suspend fun call(vararg parameters: Any?): Any? = StoryInstances.call(instance, stage, args, parameters)
 

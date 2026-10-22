@@ -8,8 +8,12 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 object StoryLoops {
     /** How many values [progression] goes through. */
     @JvmStatic
-    fun count(progression: IntProgression): Int =
-        if (progression.isEmpty()) 0 else (progression.last - progression.first) / progression.step + 1
+    fun count(progression: IntProgression): Int {
+        if (progression.isEmpty()) return 0
+        val size = (progression.last.toLong() - progression.first) / progression.step + 1
+        require(size <= Int.MAX_VALUE) { "A resumable loop cannot index $size elements; split the progression into smaller ranges" }
+        return size.toInt()
+    }
 
     /** The value at [index] of a progression starting at [first] with [step]. */
     @JvmStatic
