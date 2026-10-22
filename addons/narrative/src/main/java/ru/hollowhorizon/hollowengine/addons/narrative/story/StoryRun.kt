@@ -80,7 +80,7 @@ class StoryRun internal constructor(
         }
         val missing = (frames + pending).map { it.instance }.firstOrNull { StoryInstances.find(it) == null }
         if (missing != null) {
-            if (StoryInstances.isGone(missing)) discard("its script '$missing' no longer exists") else runs.waitFor(missing, this)
+            runs.waitFor(missing, this)
             return
         }
         if (parent != null && parent.state != Status.RUNNING) return

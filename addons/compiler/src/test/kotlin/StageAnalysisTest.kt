@@ -25,8 +25,8 @@ class StageAnalysisTest {
         val source = """
             @State
             suspend fun main() {
-                var timer: StoryHandle<*>? = null
-                suspend fun playSing(name: String) { timer?.cancel() }
+                var lock: Any? = null
+                suspend fun playSing(name: String) { lock = name }
                 listOf("left", "right").forEach { direction ->
                     async("input_" + direction) { playSing(direction) }
                 }
@@ -37,7 +37,7 @@ class StageAnalysisTest {
         val error = errors.firstOrNull { it.message.contains("local function 'playSing'") }
         assertTrue(error != null, errors.toString())
         assertEquals(5, error.range.start.line)
-        assertTrue(error.message.contains("'timer', which cannot be saved"), error.message)
+        assertTrue(error.message.contains("'lock', which cannot be saved"), error.message)
     }
 
     @Test

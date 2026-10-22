@@ -11,10 +11,10 @@ class StageLambdaSafetyTest : StageTest() {
         val errors = compiler.errors("""
             @State
             suspend fun main() {
-                var timer: StoryHandle<*>? = null
+                var lock: Any? = null
                 suspend fun playSing(name: String) {
-                    timer?.cancel()
-                    timer = async("resetToIdle") { await(name) }
+                    lock = name
+                    async("resetToIdle") { await(name) }
                 }
                 listOf("left", "right").forEach { direction ->
                     async("input_" + direction) { playSing(direction) }
@@ -23,7 +23,7 @@ class StageLambdaSafetyTest : StageTest() {
             }
         """)
         assertContains(errors, "local function 'playSing'")
-        assertContains(errors, "'timer', which cannot be saved")
+        assertContains(errors, "'lock', which cannot be saved")
         assertFalse(errors.contains("Exception while generating code"), errors)
     }
 
