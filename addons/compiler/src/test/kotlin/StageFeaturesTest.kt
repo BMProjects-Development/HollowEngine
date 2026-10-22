@@ -1,4 +1,6 @@
 import kotlinx.coroutines.test.runTest
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StageEntry
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StageScript
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -194,5 +196,22 @@ class StageFeaturesTest : StageTest() {
         assertEquals(emptyList(), StageTrace.take())
         assertTrue(world.runs.keys.isEmpty(), "the story cannot go on with an argument it cannot read")
         world.stop()
+    }
+
+    @Test
+    fun `stages of a node script compile with the definition nodes have in the game`() {
+        val compiled = compiler.compileAs("arena.node.kts", $$"""
+            @file:Import("./enums/Lane.kts")
+
+            @State("main")
+            suspend fun main() {
+                Lane.entries.forEach { lane ->
+                    async("lane_${lane.name}") { log(lane.name) }
+                }
+            }
+        """, mapOf("enums/Lane.kts" to "enum class Lane { LEFT, RIGHT }")).getOrThrow()
+        val type = compiled.type.java
+        assertTrue(type.isAnnotationPresent(StageScript::class.java))
+        assertEquals(setOf("main", "main\$async#1"), type.declaredMethods.mapNotNull { it.getAnnotation(StageEntry::class.java)?.name }.toSet())
     }
 }

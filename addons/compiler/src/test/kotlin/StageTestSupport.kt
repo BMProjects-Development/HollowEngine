@@ -14,6 +14,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryInstances
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryOwner
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryRuns
 import ru.hollowhorizon.hollowengine.common.ScriptingEnvironmentImpl
+import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
+import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
@@ -75,7 +77,13 @@ object StageTrace {
     }
 }
 
-/** Compiles stage scripts with the real compiler and plugin. */
+/** What the narrative addon adds to node scripts in the game. */
+private val NARRATIVE_IMPORTS = listOf(
+    "ru.hollowhorizon.hollowengine.addons.narrative.story.*",
+    "ru.hollowhorizon.hollowengine.addons.narrative.npcs.*",
+)
+
+/** Compiles stage scripts with the real compiler and plugin, as `.stage.kts` or as a node of the game. */
 class StageCompiler : AutoCloseable {
     val environment = ScriptingEnvironmentImpl(
         javaHome = File(System.getProperty("java.home")),
@@ -91,6 +99,9 @@ class StageCompiler : AutoCloseable {
                     "StageTrace.await"
                 ),
             ),
+            DefaultScriptDefinitions.providerFor("story.$NODE_SCRIPT_EXTENSION")!!.let { node ->
+                node.copy(defaultImports = node.defaultImports + NARRATIVE_IMPORTS + "StageTrace.log" + "StageTrace.await")
+            },
         ),
         mappings = Mappings.EMPTY,
     ).also { ScriptingEnvironment.INSTANCE = it }
@@ -107,8 +118,13 @@ class StageCompiler : AutoCloseable {
         return failure.toString()
     }
 
-    private fun compileFile(name: String, code: String): Result<CompiledScript> =
-        environment.compiler.compile(sources.resolve("$name.stage.kts").apply { writeText(code.trimIndent()) })
+    /** Compiles [code] as the file [fileName], with [others] written beside it for it to import. */
+    fun compileAs(fileName: String, code: String, others: Map<String, String> = emptyMap()): Result<CompiledScript> {
+        others.forEach { (name, text) -> sources.resolve(name).apply { parentFile.mkdirs() }.writeText(text.trimIndent()) }
+        return environment.compiler.compile(sources.resolve(fileName).apply { writeText(code.trimIndent()) })
+    }
+
+    private fun compileFile(name: String, code: String): Result<CompiledScript> = compileAs("$name.stage.kts", code)
 
     override fun close() {
         sources.deleteRecursively()

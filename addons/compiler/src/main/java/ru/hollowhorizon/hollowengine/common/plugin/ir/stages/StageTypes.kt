@@ -37,7 +37,7 @@ internal class StageTypes(context: IrPluginContext) {
             return "a function value cannot be saved; pass a lambda to a @State parameter instead"
         }
         if (klass.isPrimitiveArray()) return null
-        if (name == "kotlin.Array" || name in StageValueTypes.CONTAINERS || klass.isSerializable() || name in StageValueTypes.CONTEXTUAL) {
+        if (name == "kotlin.Array" || name == StageValueTypes.STORY_BOX || name in StageValueTypes.CONTAINERS || klass.isSerializable() || name in StageValueTypes.CONTEXTUAL) {
             return simple.arguments.firstNotNullOfOrNull { argument ->
                 (argument as? IrTypeProjection)?.type?.let(::problem)
                     ?: if (argument is IrTypeProjection) null else "a star projection cannot be saved"
