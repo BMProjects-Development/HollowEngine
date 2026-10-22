@@ -1,0 +1,160 @@
+package ru.hollowhorizon.hollowengine.addons.narrative.story
+
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.Tag
+
+/**
+ * One call of an action a story made: what to call again to undo or fast-forward it.
+ *
+ * @param seq the place of the call in the journal, which only grows; checkpoints and segments mark it.
+ * @param outer the call this one was made from, whose fast-forward repeats it too.
+ */
+internal class JournalEntry(
+    val seq: Long,
+    val action: String,
+    val run: String,
+    val lifetime: Lifetime,
+    val args: CompoundTag,
+    val snapshots: CompoundTag,
+    val outer: Long?,
+) {
+    var done = false
+
+    /** When the effect was taken back: by its stage exiting, for a temporary action. Null while it stands. */
+    var undoneAt: Long? = null
+
+    val active: Boolean get() = undoneAt == null
+
+    fun save(): CompoundTag = CompoundTag().apply {
+        putLong("seq", seq)
+        putString("action", action)
+        putString("run", run)
+        putString("lifetime", lifetime.name)
+        put("args", args)
+        put("snapshots", snapshots)
+        outer?.let { putLong("outer", it) }
+        putBoolean("done", done)
+        undoneAt?.let { putLong("undone", it) }
+    }
+
+    companion object {
+        fun load(tag: CompoundTag) = JournalEntry(
+            tag.getLong("seq"),
+            tag.getString("action"),
+            tag.getString("run"),
+            runCatching { Lifetime.valueOf(tag.getString("lifetime")) }.getOrDefault(Lifetime.RUN),
+            tag.getCompound("args"),
+            tag.getCompound("snapshots"),
+            tag.getLong("outer").takeIf { tag.contains("outer") },
+        ).apply {
+            done = tag.getBoolean("done")
+            undoneAt = tag.getLong("undone").takeIf { tag.contains("undone") }
+        }
+    }
+}
+
+/**
+ * The actions of a story and its branches, in the order they were performed. An entry is written before its action
+ * runs, so a save made in the middle of it still knows how to undo it.
+ *
+ * Entries are kept as long as a rewind may need them: a checkpoint or segment a stage is in marks the journal,
+ * and going back to a mark undoes what was done after it and brings back what was taken back after it.
+ */
+internal class StoryJournal {
+    private val entries = ArrayList<JournalEntry>()
+
+    /** The place the next entry gets: a mark taken now precedes everything performed from here on. */
+    var next = 0L
+        private set
+
+    val isEmpty: Boolean get() = entries.isEmpty()
+
+    fun record(
+        action: String,
+        run: String,
+        lifetime: Lifetime,
+        args: CompoundTag,
+        snapshots: CompoundTag,
+        outer: Long?,
+    ) = JournalEntry(next++, action, run, lifetime, args, snapshots, outer).also { entries += it }
+
+    /**
+     * Takes back the temporary actions [run] performed since [from], in reverse: the stage they belong to exits, or
+     * the segment that performed them repeats. With [branches] the branches of [run] count too.
+     */
+    fun undoTemporary(run: String, from: Long, branches: Boolean = false) {
+        val undone = entries.filter {
+            it.active && it.lifetime == Lifetime.STAGE && it.seq >= from && (it.run == run || branches && it.run.startsWith(
+                "$run/"
+            ))
+        }
+        undone.asReversed().forEach { entry ->
+            StoryActions.undo(entry)
+            entry.undoneAt = next++
+        }
+    }
+
+    /**
+     * Brings the world covered by [scope] back to how it was at [mark] and forgets what was performed after it:
+     * undoes the actions performed since, and fast-forwards the temporary ones taken back since, latest first.
+     */
+    suspend fun rewind(mark: Long, scope: (JournalEntry) -> Boolean = { true }) {
+        val covered = entries.filter(scope)
+        val undo = covered.filter { it.active && it.seq >= mark }.map { it.seq to it }
+        val restore =
+            covered.filter { !it.active && it.seq < mark && it.undoneAt!! >= mark }.map { it.undoneAt!! to it }
+        val restored = restore.map { it.second.seq }.toSet()
+        (undo + restore).sortedByDescending { it.first }.forEach { (_, entry) ->
+            if (entry.active) StoryActions.undo(entry) else {
+                if (entry.outer !in restored) StoryActions.fastForward(entry)
+                entry.undoneAt = null
+            }
+        }
+        entries.removeAll { scope(it) && it.seq >= mark }
+    }
+
+    /** Brings the world to the state [saved] describes and makes it the journal again: what a redo returns to. */
+    suspend fun restore(saved: ListTag) {
+        val target = saved.map { JournalEntry.load(it as CompoundTag) }
+        val standing = target.filter { it.active }.map { it.seq }.toSet()
+        val current = entries.filter { it.active }.map { it.seq }.toSet()
+        entries.filter { it.active && it.seq !in standing }.asReversed().forEach(StoryActions::undo)
+        val repeated = target.filter { it.active && it.seq !in current }
+        val seqs = repeated.map { it.seq }.toSet()
+        repeated.filter { it.outer !in seqs }.forEach { StoryActions.fastForward(it) }
+        entries.clear()
+        entries += target
+        next = maxOf(next, (target.maxOfOrNull { it.seq } ?: -1) + 1)
+    }
+
+    /** Takes back every temporary action left, for a run that ends; permanent ones stay in the world. */
+    fun close(run: String) = undoTemporary(run, 0, branches = true)
+
+    /**
+     * Forgets what no rewind can reach any more: nothing marks the journal before [floor], so an action taken back
+     * before it stays so and a permanent one performed before it stays performed.
+     */
+    fun prune(floor: Long) {
+        entries.removeAll { entry ->
+            val undoneAt = entry.undoneAt
+            if (undoneAt != null) undoneAt < floor else entry.lifetime == Lifetime.RUN && entry.seq < floor
+        }
+    }
+
+    /** What [run] performed, for the inspector and commands. */
+    fun entriesOf(run: String): List<JournalEntry> = entries.filter { it.run == run }
+
+    fun save(): CompoundTag = CompoundTag().apply {
+        putLong("next", next)
+        put("entries", entriesTag())
+    }
+
+    fun entriesTag(): ListTag = ListTag().apply { entries.forEach { add(it.save()) } }
+
+    fun load(tag: CompoundTag) {
+        entries.clear()
+        tag.getList("entries", Tag.TAG_COMPOUND.toInt()).forEach { entries += JournalEntry.load(it as CompoundTag) }
+        next = maxOf(tag.getLong("next"), (entries.maxOfOrNull { it.seq } ?: -1) + 1)
+    }
+}

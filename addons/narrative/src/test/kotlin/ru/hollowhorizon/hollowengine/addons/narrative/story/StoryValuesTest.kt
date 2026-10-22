@@ -5,6 +5,8 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.Zone
 import ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef
 import java.util.UUID
 import kotlin.test.AfterTest
@@ -75,5 +77,11 @@ class StoryValuesTest {
     fun `a value that cannot be saved is reported by its type`() {
         val failure = assertFailsWith<StoryException> { storySerializer<Thread>() }
         assertEquals(true, failure.message?.contains("java.lang.Thread"))
+    }
+
+    @Test
+    fun `zones come back equal to themselves, so an undone avoid finds the zone it added`() {
+        val zones = listOf(Zone.sphere(Vec3(1.0, 2.0, 3.0), 4.0, cost = 5f), Zone.box(Vec3(0.0, 0.0, 0.0), Vec3(2.0, 3.0, 4.0)))
+        assertEquals(zones, roundTrip(zones))
     }
 }
