@@ -142,7 +142,6 @@ object DefaultScriptDefinitions {
                     "ru.hollowhorizon.hollowengine.common.coroutines.*",
                     "ru.hollowhorizon.hollowengine.common.scripting.annotations.*",
                     "ru.hollowhorizon.hollowengine.common.scripting.nodes.*",
-                    "ru.hollowhorizon.hollowengine.common.scripting.state.*",
                     "kotlinx.coroutines.delay",
                     "kotlinx.coroutines.yield",
                     "kotlinx.coroutines.withTimeout",

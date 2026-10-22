@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.scripting.StartupScriptNotice
 import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptEventHandlers
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
@@ -45,6 +46,7 @@ object StartupScripts {
     }.onSuccess { script ->
         SharedScriptClasses.keepInstance(script::class)
         ScriptEventHandlers.subscribe(id, script, scope)
+        ScriptStartedEvent.post(ScriptStartedEvent(id, script, scope))
     }.onFailure { error ->
         HollowEngine.LOGGER.error("Failed to execute startup script: {}", ScriptRegistry.display(id), error)
     }.isSuccess

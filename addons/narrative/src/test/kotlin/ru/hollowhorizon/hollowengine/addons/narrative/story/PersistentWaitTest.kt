@@ -1,4 +1,4 @@
-package ru.hollowhorizon.hollowengine.common.scripting.state
+package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
