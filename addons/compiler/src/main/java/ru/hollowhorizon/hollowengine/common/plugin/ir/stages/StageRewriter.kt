@@ -140,8 +140,7 @@ internal class StageRewriter(
 
             else -> statement.also {
                 stages.reporter.error(
-                    it,
-                    "A stage cannot be called here; move the call into a statement of its own"
+                    it, "A stage cannot be called here; move the call into a statement of its own"
                 )
             }
         }
@@ -152,9 +151,7 @@ internal class StageRewriter(
         val builder = stages.builder(function.symbol, variable)
         val initializer = variable.initializer ?: return builder.irGetObject(builtIns.unitClass)
         return builder.irIfThen(
-            builtIns.unitType,
-            not(builder, frameCall(builder, "isResuming")),
-            builder.irSet(variable, initializer)
+            builtIns.unitType, not(builder, frameCall(builder, "isResuming")), builder.irSet(variable, initializer)
         )
     }
 
@@ -164,10 +161,7 @@ internal class StageRewriter(
         if (statement is IrVariable) {
             val initializer = statement.initializer ?: return statement
             statement.initializer = builder.irIfThenElse(
-                statement.type,
-                frameCall(builder, "isResuming"),
-                zero(statement.type),
-                initializer
+                statement.type, frameCall(builder, "isResuming"), zero(statement.type), initializer
             )
             return statement
         }
@@ -221,7 +215,11 @@ internal class StageRewriter(
     /** The body of a do-while stays a composite: its condition may read what the body declares. */
     private fun rewriteBody(expression: IrExpression?): IrExpression? = expression?.let {
         if (it !is IrComposite) return rewriteBlock(it)
-        IrCompositeImpl(it.startOffset, it.endOffset, builtIns.unitType).apply { statements += statementsOf(it).map(::statement) }
+        IrCompositeImpl(
+            it.startOffset,
+            it.endOffset,
+            builtIns.unitType
+        ).apply { statements += statementsOf(it).map(::statement) }
     }
 
     private fun expandSite(site: StageSite, statement: IrStatement): IrStatement {
@@ -235,7 +233,11 @@ internal class StageRewriter(
                 else variable.also { it.initializer = value }
             }
 
-            SiteForm.ASSIGN -> assignAt(builder, site, (statement as IrSetValue).also { it.value = value(builder, site, used = true) })
+            SiteForm.ASSIGN -> assignAt(
+                builder,
+                site,
+                (statement as IrSetValue).also { it.value = value(builder, site, used = true) })
+
             SiteForm.RETURN -> if (site.tail) tailCall(builder, site) else {
                 (statement as IrReturn).also {
                     it.value = returning(builder, value(builder, site, used = true), site.call.type)
@@ -248,11 +250,12 @@ internal class StageRewriter(
      * Assigns the value of a site only when the stage runs it or resumes to it: resuming elsewhere skips the site,
      * and the variable keeps the value it was restored with.
      */
-    private fun assignAt(builder: IrBuilderWithScope, site: StageSite, assignment: IrExpression): IrExpression = builder.irIfThen(
-        builtIns.unitType,
-        frameCall(builder, "enters", builder.irInt(site.callPosition), builder.irInt(site.afterPosition)),
-        assignment,
-    )
+    private fun assignAt(builder: IrBuilderWithScope, site: StageSite, assignment: IrExpression): IrExpression =
+        builder.irIfThen(
+            builtIns.unitType,
+            frameCall(builder, "enters", builder.irInt(site.callPosition), builder.irInt(site.afterPosition)),
+            assignment,
+        )
 
     /** The value of a site: resumed, taken from the save, or computed by calling. */
     private fun value(builder: IrBuilderWithScope, site: StageSite, used: Boolean): IrExpression {
@@ -261,7 +264,13 @@ internal class StageRewriter(
         val fresh = builder.irBlock(resultType = type) {
             if (site.kind == SiteKind.CHECKPOINT) {
                 saveLocals(site)
-                +frameCall(this, "checkpoint", irInt(site.index))
+                val labels = site.call.arguments.getOrNull(1)
+                +(if (labels == null) frameCall(this, "checkpoint", irInt(site.index)) else frameCall(
+                    this,
+                    "checkpoint",
+                    irInt(site.index),
+                    labels
+                ))
             } else {
                 // The frame remembers where it was before the locals of the call overwrite the saved ones.
                 +frameCall(this, "beginCall", irInt(site.index))
@@ -308,10 +317,8 @@ internal class StageRewriter(
             )
             if (type.isUnit()) {
                 +irWhen(
-                    builtIns.unitType,
-                    listOf(
-                        callBranch,
-                        irElseBranch(frameCall(this, "resumeAfter", irInt(site.index), nullSerializer()))
+                    builtIns.unitType, listOf(
+                        callBranch, irElseBranch(frameCall(this, "resumeAfter", irInt(site.index), nullSerializer()))
                     )
                 )
                 +irReturn(zero(returnType))
@@ -356,10 +363,7 @@ internal class StageRewriter(
             builtIns.unitType, listOf(
                 builder.irBranch(
                     frameCall(
-                        builder,
-                        "resumesInto",
-                        builder.irInt(site.callPosition),
-                        builder.irInt(site.afterPosition)
+                        builder, "resumesInto", builder.irInt(site.callPosition), builder.irInt(site.afterPosition)
                     ), resumed
                 ),
                 builder.irBranch(frameCall(builder, "isResuming"), zero(builtIns.unitType)),
@@ -384,11 +388,7 @@ internal class StageRewriter(
             }
         }
         IrBlockImpl(
-            function.startOffset,
-            function.endOffset,
-            builtIns.unitType,
-            null,
-            statements
+            function.startOffset, function.endOffset, builtIns.unitType, null, statements
         ).transformChildrenVoid(transformer)
     }
 
@@ -399,11 +399,7 @@ internal class StageRewriter(
     private fun IrBlockBuilder.saveLocals(site: StageSite) {
         site.live.forEach { variable ->
             +frameCall(
-                this,
-                "save",
-                irString(layout.keys.getValue(variable)),
-                serializer(this, variable.type),
-                irGet(variable)
+                this, "save", irString(layout.keys.getValue(variable)), serializer(this, variable.type), irGet(variable)
             )
         }
     }
@@ -421,7 +417,7 @@ internal class StageRewriter(
     }
 
     private fun frameCall(builder: IrBuilderWithScope, name: String, vararg arguments: IrExpression): IrCall =
-        builder.irCall(symbols.frameFunction(name)).apply {
+        builder.irCall(symbols.frameFunction(name, arguments.size)).apply {
             this.arguments[0] = builder.irGet(frame)
             arguments.forEachIndexed { index, argument -> this.arguments[index + 1] = argument }
         }
@@ -512,7 +508,12 @@ internal class StageRewriter(
                 arguments.forEachIndexed { index, parameter ->
                     this.arguments[index + 1] = if (index < captures) {
                         val value = with(stages) {
-                            callObject(symbols.get, irGet(captured), irString(stages.argumentName(function, parameter)), serializer(parameter.type))
+                            callObject(
+                                symbols.get,
+                                irGet(captured),
+                                irString(stages.argumentName(function, parameter)),
+                                serializer(parameter.type)
+                            )
                         }
                         irAs(value, parameter.type)
                     } else irGet(parameters[index - captures])

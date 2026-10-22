@@ -198,4 +198,39 @@ class StageCompileErrorsTest {
         fun start() = many { a, b, c, d, e, f, g, h, i -> log("${'$'}a") }
     """
     )
+
+    @Test
+    fun `a loop that calls stages cannot go over values a story cannot keep`() = assertError(
+        "goes over a copy of its elements", """
+        @State suspend fun step() {}
+
+        @State
+        suspend fun main() {
+            for (lock in listOf(Any(), Any())) step()
+        }
+    """
+    )
+
+    @Test
+    fun `action is only written as the body of an action`() = assertError(
+        "must be the body of an @Action function", """
+        suspend fun helper() = action { perform { } }
+    """
+    )
+
+    @Test
+    fun `the arguments of an action must be serializable`() = assertError(
+        "'lock' cannot be saved", """
+        @Action
+        suspend fun hold(lock: Any) = action { perform { } }
+    """
+    )
+
+    @Test
+    fun `an unsaved argument of an action needs a default`() = assertError(
+        "needs one", """
+        @Action
+        suspend fun hold(@Unsaved lock: Any) = action { perform { } }
+    """
+    )
 }

@@ -34,6 +34,9 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
             .single { it.name.asString() == "plus" && it.parameters.size == 2 && it.parameters[1].type == builtIns.intType }.symbol
     private var temporaries = 0
 
+    /** The copies of the elements `for` loops go over, which a story saves while such a loop runs. */
+    val loopCopies = HashSet<IrVariable>()
+
     /** Statements that must run first, then a value that holds no stage call except possibly at its top. */
     private class Lifted(val before: List<IrStatement>, val value: IrExpression)
 
@@ -183,8 +186,7 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
 
     private fun whenValue(expression: IrWhen): Lifted {
         if (expression.type.isUnit() || expression.type.isNothing()) return Lifted(
-            listOf(whenStatement(expression)),
-            unit()
+            listOf(whenStatement(expression)), unit()
         )
         val result = variable(expression.type, isVar = true, initializer = zero(expression.type))
         expression.branches.forEach { branch -> branch.result = assign(result, branch.result) }
@@ -208,28 +210,21 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         }
         if (expression.type.isNothing()) return expression
         return IrSetValueImpl(
-            expression.startOffset,
-            expression.endOffset,
-            builtIns.unitType,
-            target.symbol,
-            expression,
-            null
+            expression.startOffset, expression.endOffset, builtIns.unitType, target.symbol, expression, null
         )
     }
 
     private fun whenStatement(expression: IrWhen): IrExpression {
         // `&&` and `||` lose the shape their origins promise to the backend once their branches become statements.
-        if (expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR) expression.origin = null
+        if (expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR) expression.origin =
+            null
         val branches = ArrayList<IrBranch>()
         for ((index, branch) in expression.branches.withIndex()) {
             if (branch !is IrElseBranch && hasSite(branch.condition)) {
                 val lifted = value(branch.condition)
                 val condition = materialize(lifted.value)
                 val rest = IrWhenImpl(
-                    expression.startOffset,
-                    expression.endOffset,
-                    builtIns.unitType,
-                    expression.origin
+                    expression.startOffset, expression.endOffset, builtIns.unitType, expression.origin
                 ).apply {
                     this.branches += IrBranchImpl(branch.startOffset, branch.endOffset, condition.value, branch.result)
                     this.branches += expression.branches.drop(index + 1)
@@ -282,8 +277,12 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         inner.body = loop.body
         inner.condition = stages.builder(function.symbol, loop).irFalse()
         inner.body?.transformChildrenVoid(object : IrElementTransformerVoid() {
-            override fun visitContinue(jump: IrContinue): IrExpression =
-                if (jump.loop == loop) IrBreakImpl(jump.startOffset, jump.endOffset, builtIns.nothingType, inner) else jump
+            override fun visitContinue(jump: IrContinue): IrExpression = if (jump.loop == loop) IrBreakImpl(
+                jump.startOffset,
+                jump.endOffset,
+                builtIns.nothingType,
+                inner
+            ) else jump
         })
         inner.body = inner.body?.let { composite(normalize(statementsOf(it))) }
         val lifted = value(loop.condition)
@@ -327,6 +326,7 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                 val snapshot = with(stages) { builder.callObject(stages.symbols.loopSnapshot, iterable) }
                 val listType = builtIns.listClass.typeWith(elementType)
                 val list = variable(listType, initializer = builder.irImplicitCast(snapshot, listType), name = "list")
+                loopCopies += list
                 prologue += list
                 bound = builder.irCall(listClass.getPropertyGetter("size")!!).apply { arguments[0] = get(list) }
                 element = { type ->
@@ -355,10 +355,7 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                 element = {
                     with(stages) {
                         builder.callObject(
-                            stages.symbols.loopElement,
-                            get(first),
-                            get(step),
-                            get(index)
+                            stages.symbols.loopElement, get(first), get(step), get(index)
                         )
                     }
                 }
@@ -402,7 +399,8 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
 
             override fun visitCall(expression: IrCall) {
                 val receiver = expression.arguments.firstOrNull() as? IrGetValue
-                if (expression.origin == IrStatementOrigin.FOR_LOOP_NEXT && receiver?.symbol == iterator.symbol) found = expression
+                if (expression.origin == IrStatementOrigin.FOR_LOOP_NEXT && receiver?.symbol == iterator.symbol) found =
+                    expression
                 else super.visitCall(expression)
             }
         })
@@ -448,8 +446,11 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
     private fun block(statements: List<IrStatement>): IrBlock =
         IrBlockImpl(function.startOffset, function.endOffset, builtIns.unitType, null, statements)
 
-    private fun composite(statements: List<IrStatement>): IrComposite =
-        IrCompositeImpl(function.startOffset, function.endOffset, builtIns.unitType).apply { this.statements += statements }
+    private fun composite(statements: List<IrStatement>): IrComposite = IrCompositeImpl(
+        function.startOffset,
+        function.endOffset,
+        builtIns.unitType
+    ).apply { this.statements += statements }
 
     private fun zero(type: IrType): IrExpression =
         IrConstImpl.defaultValueForType(function.startOffset, function.endOffset, type)

@@ -502,6 +502,9 @@ internal class HollowAddonRuntime(
                 HollowAddonEventRegistrar.register(
                     candidate.classesFile, classLoader, descriptor.id, entrypoint, addonScope, embeddedPackage
                 )
+                HollowAddonLoadedEvent.post(
+                    HollowAddonLoadedEvent(descriptor.id, candidate.classesFile, classLoader, addonScope, embeddedPackage)
+                )
             }
             registerScripts(candidate, classLoader, libraries)
             loadedAddons[descriptor.id] = LoadedHollowAddon(

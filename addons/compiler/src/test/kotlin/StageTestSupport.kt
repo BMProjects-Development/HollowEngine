@@ -35,6 +35,10 @@ object StageTrace {
     /** A value scripts read and tests change, to make code behave differently after a restart. */
     @JvmStatic
     var token: String = ""
+
+    /** What actions of test scripts place in the world; like the world, it outlives a restart and is not rewound. */
+    @JvmStatic
+    val blocks = linkedSetOf<String>()
     private val released = HashSet<String>()
     private val waiting = HashMap<String, MutableList<CompletableDeferred<Unit>>>()
 
@@ -55,11 +59,17 @@ object StageTrace {
         waiting.remove(name)?.forEach { it.complete(Unit) }
     }
 
+    /** Makes [await] with [name] wait again, as before it was released. */
+    fun hold(name: String) {
+        released -= name
+    }
+
     fun take(): List<String> = events.toList().also { events.clear() }
 
     fun reset() {
         events.clear()
         token = ""
+        blocks.clear()
         released.clear()
         waiting.clear()
     }

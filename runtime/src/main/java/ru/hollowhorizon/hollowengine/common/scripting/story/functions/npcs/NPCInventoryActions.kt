@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs
 
+import net.minecraft.util.Mth
 import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
@@ -50,3 +52,19 @@ fun NpcEntity.transferItems(target: NpcEntity, filter: ItemFilter, count: Int): 
 
 fun NpcEntity.transferItems(target: Player, filter: ItemFilter, count: Int): Int =
     inventory.slots.transferTo(target.storageSlots(), filter, count)
+
+/**
+ * Forces an NPC to drop an item from its inventory.
+ *
+ * @param item The item to be dropped.
+ */
+fun NpcEntity.dropItem(item: ItemStack) {
+    val p = position()
+    val entityStack = ItemEntity(level(), p.x, p.y + eyeHeight, p.z, item)
+    entityStack.setDefaultPickUpDelay()
+    val f8 = Mth.sin(xRot * Mth.PI / 180f)
+    val f3 = Mth.sin(yHeadRot * Mth.PI / 180f)
+    val f4 = Mth.cos(yHeadRot * Mth.PI / 180f)
+    entityStack.setDeltaMovement(-f3 * 0.3, -f8 * 0.3 + 0.1, f4 * 0.3)
+    level().addFreshEntity(entityStack)
+}

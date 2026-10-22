@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.plugin.ir.stages
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -37,7 +38,9 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val stageCall: IrConstructorSymbol = storyClass("StageCall").constructors.single()
     val stageScript: IrConstructorSymbol = storyClass("StageScript").constructors.single()
     val stateConstructor: IrConstructorSymbol = state.constructors.single()
-    val checkpoint: IrSimpleFunctionSymbol = storyFunction("checkpoint")
+    val checkpoints: Set<IrSimpleFunctionSymbol> = storyFunctions("checkpoint")
+    val actionBodies: Set<IrSimpleFunctionSymbol> = storyFunctions("action") + storyFunctions("label")
+    val checkpointScope: IrClassSymbol = storyClass("CheckpointScope")
     val storySerializer: IrSimpleFunctionSymbol = storyFunction("storySerializer")
 
     val compoundTag: IrClassSymbol = finder.findClass(ClassId.topLevel(FqName("net.minecraft.nbt.CompoundTag")))
@@ -55,8 +58,11 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     val compoundTagType: IrType get() = compoundTag.owner.defaultType
     val intProgression: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName("kotlin.ranges.IntProgression")))
 
-    fun frameFunction(name: String): IrSimpleFunctionSymbol =
-        frame.getSimpleFunction(name) ?: error("StoryFrame.$name is missing from the story runtime")
+    /** The member [name] of the frame that takes [arity] arguments. */
+    fun frameFunction(name: String, arity: Int): IrSimpleFunctionSymbol =
+        frame.owner.declarations.filterIsInstance<IrSimpleFunction>()
+            .firstOrNull { it.name.asString() == name && it.parameters.size == arity + 1 }?.symbol
+            ?: error("StoryFrame.$name with $arity arguments is missing from the story runtime")
 
     val enter: IrSimpleFunctionSymbol = member(frames, "enter")
     val put: IrSimpleFunctionSymbol = member(values, "put")
@@ -70,15 +76,19 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     fun stageLambdaConstructor(arity: Int): IrConstructorSymbol? =
         finder.findClass(ClassId(PACKAGE, Name.identifier("StageLambda$arity")))?.constructors?.single()
 
-    fun isCheckpoint(function: IrFunction): Boolean = function.symbol == checkpoint
+    fun isCheckpoint(function: IrFunction): Boolean = function.symbol in checkpoints
 
+    /** Whether [function] is `action { }` or `label { }`, the body of an action. */
+    fun isActionBody(function: IrFunction): Boolean = function.symbol in actionBodies
 
     private fun storyClass(name: String): IrClassSymbol =
         finder.findClass(ClassId(PACKAGE, Name.identifier(name))) ?: error("$name is missing from the story runtime")
 
     private fun storyFunction(name: String): IrSimpleFunctionSymbol =
-        finder.findFunctions(CallableId(PACKAGE, Name.identifier(name))).firstOrNull()
-            ?: error("$name is missing from the story runtime")
+        storyFunctions(name).firstOrNull() ?: error("$name is missing from the story runtime")
+
+    private fun storyFunctions(name: String): Set<IrSimpleFunctionSymbol> =
+        finder.findFunctions(CallableId(PACKAGE, Name.identifier(name))).toSet()
 
     private fun member(owner: IrClassSymbol, name: String): IrSimpleFunctionSymbol =
         owner.getSimpleFunction(name) ?: error("${owner.owner.name}.$name is missing from the story runtime")
@@ -86,6 +96,8 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
     companion object {
         val PACKAGE = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
         val STATE: FqName = PACKAGE.child(Name.identifier("State"))
+        val ACTION: FqName = PACKAGE.child(Name.identifier("Action"))
+        val UNSAVED: FqName = PACKAGE.child(Name.identifier("Unsaved"))
 
         fun find(context: IrPluginContext): StageSymbols? =
             context.finderForBuiltins().findClass(ClassId(PACKAGE, Name.identifier("State")))

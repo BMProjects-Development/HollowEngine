@@ -49,6 +49,12 @@ object StoryOwners {
 
     fun node(node: NodeScript): StoryRuns = nodes[node] ?: throw StoryException("Node '${node.path}' is not running")
 
+    /** The runs of the node [path] the server runs itself, not one attached to an entity. */
+    fun serverNode(path: String): StoryRuns? = nodes.entries.firstOrNull { (node, _) -> node.path == path && node.host is NodeHost.Server }?.value
+
+    /** The paths of the nodes the server runs itself. */
+    val serverNodes: List<String> get() = nodes.keys.filter { it.host is NodeHost.Server }.map { it.path }
+
     /** Makes every script that starts reachable to stories, and gives nodes their runs and their entry stage. */
     @SubscribeEvent
     fun onScriptStarted(event: ScriptStartedEvent) {

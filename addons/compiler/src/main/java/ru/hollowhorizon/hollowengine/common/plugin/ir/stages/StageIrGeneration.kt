@@ -16,8 +16,9 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 
 /**
  * Compiles stages of every script in a module: marks script classes so the runtime can find their
- * instances, turns `@State` lambdas into stages, rewrites each stage body for saving and resuming, and generates
- * entries, that runtime starts stages through. Does nothing without story runtime on the classpath.
+ * instances, compiles their actions, turns `@State` lambdas into stages, rewrites each stage body for saving and
+ * resuming, and generates entries, that runtime starts stages through. Does nothing without story runtime on the
+ * classpath.
  */
 @OptIn(UnsafeDuringIrConstructionAPI::class)
 internal class StageIrGeneration(private val context: IrPluginContext) {
@@ -45,6 +46,7 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
 
         fun compile() {
             script.annotations += stages.scriptAnnotation(file.fileEntry.name)
+            StageActions(stages).compile()
             val lifter = StageLambdaLifter(stages)
             script.declarations.toList().forEach { it.transform(lifter, null) }
             script.declarations += lifter.lifted.keys
@@ -54,8 +56,7 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             functions.groupBy(stages::stageName).filterValues { it.size > 1 }.forEach { (name, duplicates) ->
                 duplicates.drop(1).forEach {
                     reporter.error(
-                        it,
-                        "Two stages of this script are named '$name'; give one of them different @State(name = ...)"
+                        it, "Two stages of this script are named '$name'; give one of them different @State(name = ...)"
                     )
                 }
             }
@@ -78,6 +79,13 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             layout.saved.forEach { variable ->
                 val site = layout.sites.first { variable in it.live }
                 stages.types.problem(variable.type)?.let { problem ->
+                    if (variable in normalizer.loopCopies) {
+                        reporter.error(
+                            variable,
+                            "A for loop that calls stages goes over a copy of its elements saved with the story, but $problem; loop over values a story can keep, such as ids, and look the rest up inside"
+                        )
+                        return@forEach
+                    }
                     val what =
                         if (variable.origin == IrDeclarationOrigin.IR_TEMPORARY_VARIABLE) "A value computed before" else "'${variable.name}', used after"
                     reporter.error(
@@ -105,7 +113,13 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             stages.arguments(function).forEach { parameter ->
                 stages.types.problem(parameter.type)?.let {
                     reporter.error(
-                        parameter, "The arguments of a stage are saved, but '${stages.argumentName(function, parameter)}' cannot be: $it"
+                        parameter,
+                        "The arguments of a stage are saved, but '${
+                            stages.argumentName(
+                                function,
+                                parameter
+                            )
+                        }' cannot be: $it"
                     )
                     valid = false
                 }

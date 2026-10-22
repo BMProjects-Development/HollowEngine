@@ -4,6 +4,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.addons.narrative.npcs.clearLookTarget
+import ru.hollowhorizon.hollowengine.addons.narrative.npcs.lookAt
+import ru.hollowhorizon.hollowengine.addons.narrative.npcs.move
+import ru.hollowhorizon.hollowengine.addons.narrative.npcs.stopMoving
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
@@ -12,10 +16,6 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.play
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.playAndWait
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.stopAnimation
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.clearLookTarget
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.lookAt
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.move
-import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.stopMoving
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -163,12 +163,4 @@ internal object StoryNpcFunctions {
     /** Kept in step with [MoveOptions] so the editor shows what the NPC API would have used anyway. */
     private val DEFAULT_SPEED = MoveOptions().speed.toFloat()
     private val DEFAULT_DISTANCE = MoveOptions().arrivalDistance.toFloat()
-}
-
-private suspend fun NpcEntity.move(position: Vec3, options: MoveOptions) {
-    move(pos = position, options = options)
-}
-
-private suspend fun NpcEntity.move(target: LivingEntity, options: MoveOptions) {
-    move(entity = target, dist = options.arrivalDistance, speed = options.speed)
 }

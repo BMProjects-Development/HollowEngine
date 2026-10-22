@@ -3,8 +3,6 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import kotlinx.coroutines.delay
 import kotlinx.serialization.KSerializer
 import net.minecraft.nbt.CompoundTag
-import net.minecraft.nbt.StringTag
-import net.minecraft.nbt.Tag
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import java.lang.Math.addExact
 import java.time.Instant
@@ -18,18 +16,23 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 suspend fun segmentTag(): CompoundTag = currentFrame("segmentTag()").segment
 
-/** Runs [block] once per segment: a segment repeated after a restart skips it. */
+/**
+ * Runs [block] once for the whole story: the segment repeated after a restart or a [rewind] skips it, so a reward is
+ * not given twice. [name] belongs to the segment it is called in, of a stage called with these arguments; inside a
+ * loop, put the index into it.
+ */
 suspend fun once(name: String, block: suspend () -> Unit) {
     val frame = currentFrame("once(\"$name\")")
-    val done = frame.segment.getList(ONCE, Tag.TAG_STRING.toInt())
-    if (done.any { it.asString == name }) return
+    val done = frame.run.records.getCompound(ONCE)
+    val key = frame.recordKey(name)
+    if (done.contains(key)) return
     block()
-    done.add(StringTag.valueOf(name))
-    frame.segment.put(ONCE, done)
+    done.putBoolean(key, true)
+    frame.run.records.put(ONCE, done)
     frame.run.changed()
 }
 
-/** Computes a value once per segment: a segment repeated after a restart gets the value computed before. */
+/** Computes a value once for the whole story, like [once]: a repeated segment gets the value computed the first time. */
 suspend inline fun <reified T> remember(name: String, noinline block: suspend () -> T): T =
     remember(name, storySerializer<T>(), block)
 
@@ -37,24 +40,27 @@ suspend inline fun <reified T> remember(name: String, noinline block: suspend ()
 @Suppress("UNCHECKED_CAST")
 internal suspend fun <T> remember(name: String, serializer: KSerializer<Any?>, block: suspend () -> T): T {
     val frame = currentFrame("remember(\"$name\")")
-    frame.segment.get(name)?.let { return StoryValues.decode(serializer, it) as T }
+    val values = frame.run.records.getCompound(REMEMBERED)
+    val key = frame.recordKey(name)
+    values.get(key)?.let { return StoryValues.decode(serializer, it) as T }
     val value = block()
-    StoryValues.put(frame.segment, name, serializer, value)
+    StoryValues.put(values, key, serializer, value)
+    frame.run.records.put(REMEMBERED, values)
     frame.run.changed()
     return value
 }
 
-/** Forgets what [remember] or [once] kept under [name]; returns whether there was something. */
+/** Forgets what [remember] or [once] kept under [name] in this segment; returns whether there was something. */
 suspend fun forget(name: String): Boolean {
     val frame = currentFrame("forget(\"$name\")")
-    val segment = frame.segment
-    val done = segment.getList(ONCE, Tag.TAG_STRING.toInt())
-    val wasDone = done.removeIf { it.asString == name }
-    val existed = segment.contains(name)
-    segment.remove(name)
-    if (wasDone) segment.put(ONCE, done)
-    frame.run.changed()
-    return existed || wasDone
+    val key = frame.recordKey(name)
+    val records = frame.run.records
+    val existed = listOf(ONCE, REMEMBERED).count { kind ->
+        val tag = records.getCompound(kind)
+        tag.contains(key).also { if (it) tag.remove(key) }
+    } > 0
+    if (existed) frame.run.changed()
+    return existed
 }
 
 /** Waits for loaded server ticks; a segment repeated after a restart continues the same countdown. */
@@ -114,7 +120,8 @@ private fun waitKey(kind: String, name: String): String {
     return "wait$.$kind.$name"
 }
 
-private const val ONCE = "once$"
+private const val ONCE = "once"
+private const val REMEMBERED = "remembered"
 private const val GAME_TIME = "game"
 private const val REAL_TIME = "real"
 private const val MAX_REALTIME_SLEEP_MILLIS = 60_000L

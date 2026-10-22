@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.selects.select
@@ -35,6 +36,29 @@ fun MinecraftServer.stopStory(key: String): Boolean = StoryOwners.server(this).s
 fun Entity.stopStory(key: String): Boolean = StoryOwners.entity(this).stop(key)
 
 fun NodeScript.stopStory(key: String): Boolean = StoryOwners.node(this).stop(key)
+
+/**
+ * Rewinds the story [key] of the server, see [rewind]: to the checkpoint [checkpoint], or each of its runs to the
+ * start of its segment when it is null. Returns whether there is such a story.
+ */
+fun MinecraftServer.rewindStory(key: String, checkpoint: String? = null): Boolean =
+    StoryOwners.server(this)[key]?.rewind(checkpoint) != null
+
+fun Entity.rewindStory(key: String, checkpoint: String? = null): Boolean =
+    StoryOwners.entity(this)[key]?.rewind(checkpoint) != null
+
+fun NodeScript.rewindStory(key: String, checkpoint: String? = null): Boolean =
+    StoryOwners.node(this)[key]?.rewind(checkpoint) != null
+
+/**
+ * Takes the story back and does not return. Without [checkpoint] this run and its active branches each repeat the
+ * segment they are in; with it the whole story goes back to the latest checkpoint so named, branches started since
+ * included. The actions performed since are undone. What [once] and [remember] kept stays as it is.
+ */
+suspend fun rewind(checkpoint: String? = null): Nothing {
+    currentRun("rewind()").rewind(checkpoint)
+    awaitCancellation()
+}
 
 /** What the current stage knows about its story: whom it runs for. */
 val context: StoryContext
@@ -79,6 +103,15 @@ class StoryHandle<T> internal constructor(
     }
 
     fun cancel() = run.stop()
+
+    /** Rewinds the run from outside, see [rewind]. */
+    fun rewind(checkpoint: String? = null) = run.rewind(checkpoint)
+
+    /** Undoes the latest rewind of the story, as long as it has not performed an action since. */
+    fun redo() = run.redo()
+
+    /** The checkpoints the story can be rewound to, oldest first, with the run that passed each. */
+    val checkpoints: List<Pair<String, String>> get() = run.history.all.map { it.name to it.run }
 }
 
 /** Waits for every one of [handles]. */
