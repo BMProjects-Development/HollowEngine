@@ -49,7 +49,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.removeNode
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 import ru.hollowhorizon.hollowengine.common.utils.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.Vfx
@@ -316,7 +315,7 @@ private fun CommandExtension.registerScriptingCommands() {
                 }
                 source.server.addNode(
                     ScriptRegistry.display(id),
-                    context = StateContext(nextState = StringArgumentType.getString(this, "state"))
+                    entry = StringArgumentType.getString(this, "state")
                 )
                 SUCCESS
             }
@@ -480,8 +479,7 @@ private fun com.mojang.brigadier.context.CommandContext<CommandSourceStack>.atta
     if (!isNodeScriptPath(id.path)) {
         return sendFailure("hollowengine.commands.scripting_state_requires_node_script".mcTranslate(path))
     }
-    val context = state?.let { StateContext(nextState = it) }
-    return if (EntityNodeRuntime.attach(entity, path, context = context)) {
+    return if (EntityNodeRuntime.attach(entity, path, entry = state)) {
         sendSuccess(true) { "Attached node '$path' to ${entity.name.string}".literal }
     } else {
         sendFailure("Failed to attach node '$path' to ${entity.name.string}".literal)

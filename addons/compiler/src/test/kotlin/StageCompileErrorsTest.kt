@@ -1,0 +1,204 @@
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertContains
+
+/** What a stage cannot do is a compilation error that says why, not a story that breaks after a restart. */
+class StageCompileErrorsTest {
+    private lateinit var compiler: StageCompiler
+
+    @BeforeTest
+    fun setUp() {
+        compiler = StageCompiler()
+    }
+
+    @AfterTest
+    fun tearDown() = compiler.close()
+
+    private fun assertError(expected: String, code: String) = assertContains(compiler.errors(code), expected)
+
+    @Test
+    fun `a stage cannot be called from a lambda inside a stage`() = assertError(
+        "cannot be called from a lambda", """
+        @State suspend fun step() {}
+
+        @State
+        suspend fun main() {
+            listOf(1, 2).forEach { step() }
+        }
+    """
+    )
+
+    @Test
+    fun `a stage cannot be called in catch or finally`() {
+        assertError(
+            "cannot be called in catch or finally", """
+            @State suspend fun step() {}
+
+            @State
+            suspend fun main() {
+                try { log("try") } catch (failure: Exception) { step() }
+            }
+        """
+        )
+        assertError(
+            "cannot be called in catch or finally", """
+            @State suspend fun step() {}
+
+            @State
+            suspend fun main() {
+                try { log("try") } finally { step() }
+            }
+        """
+        )
+    }
+
+    @Test
+    fun `a local that cannot be saved cannot outlive a stage call`() = assertError(
+        "'iterator', used after the stage call 'step#1'", """
+        @State suspend fun step() {}
+
+        @State
+        suspend fun main() {
+            val iterator = listOf(1).iterator()
+            step()
+            log(iterator.next().toString())
+        }
+    """
+    )
+
+    @Test
+    fun `a value computed before a stage call in the same expression must be saveable`() = assertError(
+        "A value computed before the stage call 'name#1'", """
+        @State suspend fun name(): String = "a"
+
+        fun join(first: Any, second: String) = log(first.toString() + second)
+
+        @State
+        suspend fun main() {
+            join(Any(), name())
+        }
+    """
+    )
+
+    @Test
+    fun `arguments and results of stages must be saveable`() {
+        assertError(
+            "'target' cannot be", """
+            @State suspend fun aim(target: Any) {}
+        """
+        )
+        assertError(
+            "The result of a stage is saved", """
+            @State suspend fun make(): Any = Any()
+        """
+        )
+        assertError(
+            "cannot have type parameters", """
+            @State suspend fun <T> pass(value: T) {}
+        """
+        )
+        assertError(
+            "cannot have a receiver", """
+            @State suspend fun String.shout() {}
+        """
+        )
+    }
+
+    @Test
+    fun `a stage must be a top level suspend function of a script`() {
+        assertError(
+            "must be a suspend function", """
+            @State fun plain() {}
+        """
+        )
+        assertError(
+            "must be declared at the top level of a script", """
+            class Holder {
+                @State suspend fun inner() {}
+            }
+        """
+        )
+    }
+
+    @Test
+    fun `two stages cannot share a name`() = assertError(
+        "Two stages of this script are named 'same'", """
+        @State(name = "same") suspend fun one() {}
+
+        @State(name = "same") suspend fun two() {}
+    """
+    )
+
+    @Test
+    fun `checkpoints need a constant unique name inside a stage`() {
+        assertError(
+            "must be called directly in a @State function", """
+            suspend fun helper() = checkpoint("outside")
+        """
+        )
+        assertError(
+            "needs a constant name", """
+            @State
+            suspend fun main() {
+                val name = "dynamic" + log("x")
+                checkpoint(name)
+            }
+        """
+        )
+        assertError(
+            "appears twice", """
+            @State
+            suspend fun main() {
+                checkpoint("gate")
+                checkpoint("gate")
+            }
+        """
+        )
+    }
+
+    @Test
+    fun `a stage lambda saves what it captures so it can capture only values that can be saved`() {
+        assertError(
+            "cannot capture 'var counter'", """
+            fun start(runs: StoryRuns) {
+                var counter = 1
+                counter++
+                runs.launch("story") { log(counter.toString()) }
+            }
+        """
+        )
+        assertError(
+            "'lock' cannot be saved", """
+            fun start(runs: StoryRuns) {
+                val lock = Any()
+                runs.launch("story") { log(lock.toString()) }
+            }
+        """
+        )
+    }
+
+    @Test
+    fun `loops that call stages must count with something a frame can save`() {
+        assertError(
+            "can only go over a List or an Int range", """
+            @State suspend fun step(value: Int) {}
+
+            @State
+            suspend fun main() {
+                for (value in setOf(1, 2)) step(value)
+            }
+        """
+        )
+        assertError(
+            "A do-while condition cannot call a stage", """
+            @State suspend fun again(): Boolean = false
+
+            @State
+            suspend fun main() {
+                do { log("x") } while (again())
+            }
+        """
+        )
+    }
+}

@@ -8,7 +8,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     val serializationVersion = rootProject.property("serializationVersion") as String
-    add("testRuntimeOnly", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
+    add("testImplementation", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
 }
 
 tasks.withType<Test>().configureEach { useJUnitPlatform() }

@@ -12,6 +12,8 @@ import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.RELOAD_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.SERVER_CONSOLE_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptDefaultImportsEvent
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScriptsEvent
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -31,8 +33,9 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
     @SubscribeEvent
     fun addDefaultImports(event: ScriptDefaultImportsEvent) {
         when (event.suffix) {
-            RELOAD_SCRIPT_EXTENSION -> event.defaultImports += RELOAD_IMPORTS
-            NODE_SCRIPT_EXTENSION -> event.defaultImports += NODE_IMPORTS
+            RELOAD_SCRIPT_EXTENSION -> event.defaultImports += RELOAD_IMPORTS + STORY_PACKAGE
+            NODE_SCRIPT_EXTENSION -> event.defaultImports += NODE_IMPORTS + STORY_PACKAGE
+            STARTUP_SCRIPT_EXTENSION, SERVER_CONSOLE_SCRIPT_EXTENSION -> event.defaultImports += STORY_PACKAGE
         }
     }
 
@@ -53,6 +56,7 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
 
     private companion object {
         const val DIALOGUE_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*"
+        const val STORY_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.story.*"
 
         /** Reload scripts register story functions, so they also get the signature helpers. */
         val RELOAD_IMPORTS = listOf(DIALOGUE_PACKAGE) +

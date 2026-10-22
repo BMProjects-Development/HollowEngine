@@ -26,11 +26,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcAction
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
 import ru.hollowhorizon.hollowengine.common.npcs.actions.Preempted
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
-import ru.hollowhorizon.hollowengine.common.scripting.state.waitPersistent
-import ru.hollowhorizon.hollowengine.common.scripting.state.waitRealtime
-import ru.hollowhorizon.hollowengine.common.scripting.state.waitUntil
 import ru.hollowhorizon.hollowengine.common.utils.*
-import java.time.Instant
 import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -391,21 +387,6 @@ fun NpcEntity.dropItem(item: ItemStack) {
  */
 suspend fun wait(time: Int) {
     delay((time * 50L).milliseconds)
-}
-
-/** Waits for loaded server ticks inside `@State` and resumes the same countdown after a restart. */
-suspend fun wait(time: Int, name: String) {
-    waitPersistent(name, time)
-}
-
-/** Waits inside `@State` for wall-clock time, including time for which the game was not running. */
-suspend fun wait(time: Duration, name: String) {
-    waitRealtime(name, time)
-}
-
-/** Waits inside `@State` until an absolute date and resumes the same deadline after a restart. */
-suspend fun wait(time: Instant, name: String) {
-    waitUntil(name, time)
 }
 
 fun uuid(uuid: String): UUID = UUID.fromString(uuid)

@@ -15,11 +15,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.DefaultScriptDefinitions
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeManager
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
-import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
-import ru.hollowhorizon.hollowengine.common.scripting.nodes.nodeStateFunctions
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.nodeSave
+import ru.hollowhorizon.hollowengine.common.scripting.nodes.startNode
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -115,11 +114,8 @@ class ScriptRunService(
                 tracker.markRunning(path)
                 if (node) {
                     require(compiled.implicitReceiverCount == 1) { "An attached node must be started on its entity" }
-                    require(state == null || state in compiled.type.java.nodeStateFunctions()) { "Unknown node state: $state" }
                     if (nodes.contains(path) || nodes.isStopping(path)) return@start
-                    server.addNode(
-                        path, tag = null, context = state?.let { StateContext(nextState = it) }, compiled = compiled
-                    )
+                    server.startNode(path, nodeSave(null), entry = state, compiled = compiled)
                     check(nodes.contains(path)) { "Node initialization failed; see the server log" }
                 } else ScriptLoader.executeCompiled<Any?>(id, precompiled = compiled).getOrThrow()
             } catch (cancelled: CancellationException) {

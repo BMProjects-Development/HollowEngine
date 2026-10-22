@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptEditorInfo
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 
 /**
  * Entry point for the nodes attached to entities via `@file:Attach`.
@@ -22,8 +21,14 @@ import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
  * so cancelling that scope tears its nodes down.
  */
 object EntityNodeRuntime {
-    fun attach(entity: Entity, path: String, tag: CompoundTag? = null, context: StateContext? = null): Boolean =
-        AttachmentRegistry.attachments(entity).nodes.attach(path, tag, context)
+    /**
+     * Attaches the node [path] to [entity].
+     *
+     * @param tag the data its `onLoad` handlers receive.
+     * @param entry what to start with, see [ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent.entry].
+     */
+    fun attach(entity: Entity, path: String, tag: CompoundTag? = null, entry: String? = null): Boolean =
+        AttachmentRegistry.attachments(entity).nodes.attach(path, tag, entry)
 
     fun detach(entity: Entity, path: String): Boolean =
         managerOrNull(entity)?.detach(path) ?: false
@@ -70,56 +75,49 @@ class EntityNodeManager(private val entity: Entity) {
     /** Attached nodes whose namespace is currently unavailable. See [NodeManager] for the rationale. */
     private val dormant = mutableMapOf<String, CompoundTag>()
 
-    fun attach(path: String, tag: CompoundTag?, context: StateContext?): Boolean {
+    fun attach(path: String, tag: CompoundTag?, entry: String?): Boolean {
         val canonicalPath = canonicalNodePath(path)
         if (nodes.containsKey(canonicalPath) || lifecycle.isPending(canonicalPath)) return false
 
-        if (tag == null && context == null) {
+        if (tag == null && entry == null) {
             dormant[canonicalPath]?.let { return attachSaved(canonicalPath, it) }
         }
-        return start(canonicalPath, tag, context)
+        return start(canonicalPath, nodeSave(tag), entry)
     }
 
     /** Attaches a node from the state [serialize] wrote for it. */
-    private fun attachSaved(canonicalPath: String, nodeTag: CompoundTag, compiled: CompiledScript? = null): Boolean = start(
-        canonicalPath,
-        nodeTag.getCompound("extras"),
-        (nodeTag.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) },
-        compiled,
-    )
+    private fun attachSaved(canonicalPath: String, nodeTag: CompoundTag, compiled: CompiledScript? = null): Boolean =
+        start(canonicalPath, nodeTag, entry = null, compiled)
 
-    private fun start(canonicalPath: String, tag: CompoundTag?, context: StateContext?, compiled: CompiledScript? = null): Boolean {
-        dormant[canonicalPath] = CompoundTag().apply {
-            tag?.let { put("extras", it.copy()) }
-            context?.let { put("states", it.serialize().copy()) }
-        }
+    private fun start(canonicalPath: String, saved: CompoundTag, entry: String?, compiled: CompiledScript? = null): Boolean {
+        dormant[canonicalPath] = saved.copy()
         var accepted = true
         lifecycle.start(canonicalPath) {
-            accepted = startNow(canonicalPath, tag, context, compiled)
+            accepted = startNow(canonicalPath, saved, entry, compiled)
         }
         return accepted
     }
 
     private fun startNow(
         canonicalPath: String,
-        tag: CompoundTag?,
-        context: StateContext?,
+        saved: CompoundTag,
+        entry: String?,
         compiled: CompiledScript?,
     ): Boolean {
         val server = entity.server ?: return false
 
-        val (script, executor) = buildNode(
+        val script = buildNode(
             host = NodeHost.OfEntity(entity),
             parentScope = entity.coroutineScope,
             path = canonicalPath,
-            tag = tag,
+            saved = saved,
+            entry = entry,
             receivers = listOf(server, entity),
             compiled = compiled,
         ) ?: return false
 
         dormant.remove(canonicalPath)
-        nodes[canonicalPath] = RunningNode(script, executor, context)
-        context?.let { executor.start(it) }
+        nodes[canonicalPath] = RunningNode(script)
         return true
     }
 
