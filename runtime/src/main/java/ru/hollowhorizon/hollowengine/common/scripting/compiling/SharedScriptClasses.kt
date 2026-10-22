@@ -61,7 +61,9 @@ object SharedScriptClasses {
 
         if (script.compilationConfiguration[ScriptCompilationConfiguration.isSharedScript] != true) return
         val jvmScript = script as? KJvmCompiledScript
-            ?: fail("Shared script '${script.sourceLocationId}' has no JVM class metadata")
+            ?: fail("Shared script '${script.sourceLocationId}' has no runtime-compatible JVM class metadata: " +
+                "actual type=${script.javaClass.name}, actual loader=${script.javaClass.classLoader}, " +
+                "expected loader=${KJvmCompiledScript::class.java.classLoader}")
         val name = jvmScript.scriptClassFQName
         script.otherScripts.forEach { dependency ->
             if (dependency.compilationConfiguration[ScriptCompilationConfiguration.isSharedScript] != true) {
