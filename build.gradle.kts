@@ -116,7 +116,7 @@ fun Project.configureHollowAddon() {
 
     tasks.named<Jar>("jar") {
         archiveClassifier.set("classes-named")
-        include("**/*.class")
+        include("**/*.class", "META-INF/*.kotlin_module")
     }
     tasks.named<RemapJarTask>("remapJar") {
         enabled = false
