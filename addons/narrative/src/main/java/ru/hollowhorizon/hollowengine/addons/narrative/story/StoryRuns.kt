@@ -74,13 +74,17 @@ class StoryRuns(val owner: StoryOwner) {
     /** Everything to save. */
     fun save(): CompoundTag = CompoundTag().apply { runs.forEach { (key, run) -> put(key, run.save()) } }
 
-    /** Restores what [save] wrote and starts it. */
+    /**
+     * Restores what [save] wrote and starts it. A story that runs in a script which no longer exists is removed:
+     * nothing would ever wake it.
+     */
     fun load(tag: CompoundTag) {
         tag.allKeys.filter { it !in runs }.forEach { key ->
             val run = StoryRun.load(this, key, null, tag.getCompound(key))
             if (run.state.done) return@forEach
             runs[key] = run
-            run.start()
+            val gone = run.tree().flatMap { (it.frames + it.pending).asSequence() }.map { it.instance }.firstOrNull(StoryInstances::isGone)
+            if (gone != null) run.discard("its script '$gone' no longer exists") else run.start()
         }
     }
 
