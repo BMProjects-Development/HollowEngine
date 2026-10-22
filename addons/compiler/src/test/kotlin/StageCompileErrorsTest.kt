@@ -233,4 +233,17 @@ class StageCompileErrorsTest {
         suspend fun hold(@Unsaved lock: Any) = action { perform { } }
     """
     )
+
+    @Test
+    fun `a checkpoint cannot share its name with a function of the script`() = assertError(
+        "A checkpoint cannot be named 'arena'", """
+        @State suspend fun arena() {}
+
+        @State
+        suspend fun main() {
+            checkpoint("arena")
+            arena()
+        }
+    """
+    )
 }

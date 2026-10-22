@@ -512,7 +512,7 @@ class AnalysisEnvironment(
             implementationClassName,
             DefaultPluginDescriptor("hollowengine-analysis-api"),
         )
-        point.registerExtension(extension, LoadingOrder.ANY, projectDisposable)
+        point.registerExtension(extension, LoadingOrder.ANY, kotlinCoreProjectEnvironment.environment.parentDisposable)
     }
 
     private fun MockProject.registerFirAnalysisServices() {

@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
@@ -73,6 +74,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             val symbol = declaration.markerSymbol()
             if (symbol is KaNamedFunctionSymbol) {
                 if (EventClassId in symbol.annotations) markers += GutterMarker(offset, GutterMarkerKind.EVENT)
+                if (ActionClassId in symbol.annotations) markers += GutterMarker(offset, GutterMarkerKind.ACTION)
                 if (node && !attached && StateClassId in symbol.annotations && declaration is KtNamedFunction && declaration.parent == file.script?.blockExpression && symbol.isSuspend && symbol.valueParameters.isEmpty() && !symbol.isExtension && symbol.contextParameters.isEmpty() && declaration.bodyExpression != null) {
                     val annotation = symbol.annotations.firstOrNull { it.classId == StateClassId }
                     val value = annotation?.arguments?.firstOrNull { it.name.asString() == "name" }?.expression
@@ -99,11 +101,13 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
                 else -> null
             } ?: return@forEach
             val call = (expression.resolveToCall() as? KaSuccessCallInfo)?.call as? KaFunctionCall<*> ?: return@forEach
-            if ((call.symbol as? KaNamedFunctionSymbol)?.isSuspend == true && coroutineLines.add(
-                    file.text.lastIndexOf(
-                        '\n', offset
-                    ) + 1
-                )
+            val line = file.text.lastIndexOf('\n', offset) + 1
+            stageMarker(expression, call)?.let { marker ->
+                markers += marker.copy(offset = offset)
+                coroutineLines += line
+                return@forEach
+            }
+            if ((call.symbol as? KaNamedFunctionSymbol)?.isSuspend == true && coroutineLines.add(line)
             ) {
                 markers += GutterMarker(offset, GutterMarkerKind.COROUTINE)
             }
@@ -151,5 +155,27 @@ internal fun PsiElement.fold(placeholder: String): CodeFold? =
 
 private val AttachClassId =
     ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach"))
-private val StateClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.addons.narrative.story.State"))
+private val StoryPackage = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
+private val StateClassId = ClassId(StoryPackage, Name.identifier("State"))
+private val ActionClassId = ClassId(StoryPackage, Name.identifier("Action"))
+private val CheckpointName = Name.identifier("checkpoint")
+
+/**
+ * The marker of a boundary of a story stage at [expression]: a named checkpoint, or the call of a stage or a stage
+ * lambda, after which a restart and `rewind()` resume. The offset is filled in by the caller.
+ */
+private fun KaSession.stageMarker(expression: KtExpression, call: KaFunctionCall<*>): GutterMarker? {
+    val symbol = call.symbol as? KaNamedFunctionSymbol ?: return null
+    if (symbol.callableId?.packageName == StoryPackage && symbol.name == CheckpointName) {
+        val name = (expression as? KtCallExpression)?.valueArguments?.firstOrNull()?.getArgumentExpression()
+            ?.let { (it as? KtStringTemplateExpression)?.entries?.singleOrNull() as? KtLiteralStringTemplateEntry }?.text
+        return GutterMarker(0, GutterMarkerKind.CHECKPOINT, listOf(name ?: "?"))
+    }
+    if (StateClassId in symbol.annotations) return GutterMarker(0, GutterMarkerKind.STAGE, listOf(symbol.name.asString()))
+    val receiver = call.partiallyAppliedSymbol.dispatchReceiver?.type
+    if (symbol.name.asString() == "invoke" && receiver != null && StateClassId in receiver.annotations) {
+        return GutterMarker(0, GutterMarkerKind.STAGE, listOf((expression as? KtCallExpression)?.calleeExpression?.text ?: "invoke"))
+    }
+    return null
+}
 private val EventClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.events.SubscribeEvent"))

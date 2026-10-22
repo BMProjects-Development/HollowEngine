@@ -5,7 +5,12 @@ import org.jetbrains.kotlin.diagnostics.reportOn
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
+import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.FirFunction
+import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
+import org.jetbrains.kotlin.fir.declarations.FirScript
+import org.jetbrains.kotlin.fir.declarations.getAnnotationByClassId
+import org.jetbrains.kotlin.fir.declarations.getStringArgument
 import org.jetbrains.kotlin.fir.declarations.hasAnnotation
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
@@ -14,12 +19,26 @@ import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
+import org.jetbrains.kotlin.name.Name
 import ru.hollowhorizon.hollowengine.common.plugin.stages.StageDiagnostics
 import ru.hollowhorizon.hollowengine.common.plugin.stages.StageMessages
 
 /** Structural restrictions are checked on FIR so the editor can report them before the IR rewrite. */
 @OptIn(SymbolInternals::class)
 internal object StageFirBodyChecker {
+    /** The names of the functions of the script being checked, the names their `@State` gives them included. */
+    @OptIn(DirectDeclarationsAccess::class)
+    context(context: CheckerContext)
+    private fun functionNames(): Set<String> {
+        val script = context.containingDeclarations.map { it.fir }.filterIsInstance<FirScript>().firstOrNull() ?: return emptySet()
+        return script.declarations.filterIsInstance<FirNamedFunction>().flatMapTo(HashSet()) { function ->
+            listOfNotNull(
+                function.name.asString(),
+                function.getAnnotationByClassId(StageFirIds.STATE, context.session)?.getStringArgument(Name.identifier("name")),
+            )
+        }
+    }
+
     context(context: CheckerContext, reporter: DiagnosticReporter)
     fun check(function: FirFunction, stage: Boolean) {
         val stageLambdas = HashSet<FirAnonymousFunction>()
@@ -102,6 +121,12 @@ internal object StageFirBodyChecker {
 
                     !checkpoints.add(name) -> reporter.reportOn(
                         call.source, StageDiagnostics.STAGE_ERROR, "Checkpoint '$name' appears twice in this stage"
+                    )
+
+                    name in functionNames() -> reporter.reportOn(
+                        call.source,
+                        StageDiagnostics.STAGE_ERROR,
+                        "A checkpoint cannot be named '$name': the script already has a function with this name, and rewind(\"$name\") would read as either"
                     )
                 }
             }

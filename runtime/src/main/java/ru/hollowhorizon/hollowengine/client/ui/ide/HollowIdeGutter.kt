@@ -23,7 +23,7 @@ internal fun ideGutterMarkers(
             structure.markers.forEach { marker ->
                 val kind = marker.kind.name.lowercase()
                 add(UiGutterMarker("$kind-${marker.offset}", marker.offset,
-                    "hollowengine:textures/gui/icons/gutter/$kind.svg", "hollowengine.gui.ide.gutter.$kind".lang,
+                    "hollowengine:textures/gui/icons/gutter/$kind.svg", "hollowengine.gui.ide.gutter.$kind".lang(*marker.args.toTypedArray()),
                     listOf("gutter-$kind"), onClick = if (!marker.kind.navigable) null else {
                         { if (file.text == analyzedText) navigate(marker.offset) }
                     }))
