@@ -197,6 +197,7 @@ internal object StageFirCallChecker : FirFunctionCallChecker(MppCheckerKind.Comm
                     symbol is FirLocalPropertySymbol && symbol.fir.isVar -> when {
                         !isShareable(symbol) -> StageMessages.mutableCapture(name)
                         startsStory -> StageMessages.sharedVar(name, "a story started here keeps copies of what it captures; pass the value instead")
+                        symbol.fir.initializer == null -> StageMessages.sharedVar(name, "give it a value where it is declared")
                         else -> symbol.resolvedReturnType.stageProblem(context.session)?.let { StageMessages.sharedVar(name, "its value is saved, but $it") }
                     }
 

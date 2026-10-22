@@ -21,11 +21,15 @@ enum class GutterMarkerKind(val navigable: Boolean) {
     OVERRIDE(true),
     COROUTINE(false),
     EVENT(false),
+    STAGE(false),
+    CHECKPOINT(false),
+    ACTION(false),
 }
 
 data class GutterNavigationTarget(val label: String, val location: DefinitionLocation)
 
-data class GutterMarker(val offset: Int, val kind: GutterMarkerKind)
+/** [args] fill in the tooltip of the kind, such as the name of a checkpoint. */
+data class GutterMarker(val offset: Int, val kind: GutterMarkerKind, val args: List<String> = emptyList())
 
 enum class ScriptRunKind { PLAIN, NODE }
 

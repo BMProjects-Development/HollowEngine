@@ -157,6 +157,27 @@ class EditorStructureTest {
     }
 
     @Test
+    fun `story stages mark their boundaries, checkpoints and actions in the gutter`() {
+        val source = """
+            import ru.hollowhorizon.hollowengine.addons.narrative.story.*
+            @Action suspend fun place(name: String) = action { perform { } }
+            @State suspend fun step() {}
+            @State suspend fun main() {
+                step()
+                checkpoint("arena")
+                place("x")
+            }
+        """.trimIndent()
+        val markers = analyzer.structure("Story.kts", source).markers
+        assertEquals(GutterMarkerKind.ACTION, markers.single { it.offset == source.indexOf("place(name") }.kind)
+        val stage = markers.single { it.kind == GutterMarkerKind.STAGE }
+        assertEquals(source.indexOf("    step()") + 4, stage.offset)
+        assertEquals(listOf("step"), stage.args)
+        assertEquals(listOf("arena"), markers.single { it.kind == GutterMarkerKind.CHECKPOINT }.args)
+        assertEquals(GutterMarkerKind.COROUTINE, markers.single { it.offset == source.indexOf("place(\"x") }.kind)
+    }
+
+    @Test
     fun `attached nodes have no server run targets`() {
         val text =
             "@file:Attached(java.net.URI::class)\n" + "import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach as Attached\n" + "@State suspend fun first() {}"
