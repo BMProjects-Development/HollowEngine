@@ -8,6 +8,7 @@ import net.minecraft.nbt.Tag
  * One call of an action a story made: what to call again to undo or fast-forward it.
  *
  * @param seq the place of the call in the journal, which only grows; checkpoints and segments mark it.
+ * @param until the checkpoint that takes a temporary action back; null for the next one its run passes.
  * @param outer the call this one was made from, whose fast-forward repeats it too.
  */
 internal class JournalEntry(
@@ -15,13 +16,14 @@ internal class JournalEntry(
     val action: String,
     val run: String,
     val lifetime: Lifetime,
+    val until: String?,
     val args: CompoundTag,
     val snapshots: CompoundTag,
     val outer: Long?,
 ) {
     var done = false
 
-    /** When the effect was taken back: by its stage exiting, for a temporary action. Null while it stands. */
+    /** When a temporary effect was taken back, by its checkpoint or its run ending. Null while it stands. */
     var undoneAt: Long? = null
 
     val active: Boolean get() = undoneAt == null
@@ -31,6 +33,7 @@ internal class JournalEntry(
         putString("action", action)
         putString("run", run)
         putString("lifetime", lifetime.name)
+        until?.let { putString("until", it) }
         put("args", args.copy())
         put("snapshots", snapshots.copy())
         outer?.let { putLong("outer", it) }
@@ -44,6 +47,7 @@ internal class JournalEntry(
             tag.getString("action"),
             tag.getString("run"),
             runCatching { Lifetime.valueOf(tag.getString("lifetime")) }.getOrDefault(Lifetime.RUN),
+            tag.getString("until").takeIf { tag.contains("until") },
             tag.getCompound("args").copy(),
             tag.getCompound("snapshots").copy(),
             tag.getLong("outer").takeIf { tag.contains("outer") },
@@ -74,22 +78,28 @@ internal class StoryJournal {
         action: String,
         run: String,
         lifetime: Lifetime,
+        until: String?,
         args: CompoundTag,
         snapshots: CompoundTag,
         outer: Long?,
-    ) = JournalEntry(next++, action, run, lifetime, args, snapshots, outer).also { entries += it }
+    ) = JournalEntry(next++, action, run, lifetime, until, args, snapshots, outer).also { entries += it }
 
     /**
-     * Takes back the temporary actions [run] performed since [from], in reverse: the stage they belong to exits, or
-     * the segment that performed them repeats. With [branches] the branches of [run] count too.
+     * Takes back the temporary actions [run] performed since [from], in reverse: the segment that performed them
+     * repeats after a restart, or the run ends. With [branches] the branches of [run] count too.
      */
-    fun undoTemporary(run: String, from: Long, branches: Boolean = false) {
-        val undone = entries.filter {
-            it.active && it.lifetime == Lifetime.STAGE && it.seq >= from && (it.run == run || branches && it.run.startsWith(
-                "$run/"
-            ))
-        }
-        undone.asReversed().forEach { entry ->
+    fun undoTemporary(run: String, from: Long, branches: Boolean = false) = takeBack {
+        it.seq >= from && (it.run == run || branches && it.run.startsWith("$run/"))
+    }
+
+    /**
+     * [run] passed the checkpoint [name]: takes back the temporary actions that last until it, those [run] performed
+     * without naming a checkpoint and those of any run that named this one.
+     */
+    fun checkpointPassed(run: String, name: String) = takeBack { it.until == name || it.until == null && it.run == run }
+
+    private fun takeBack(which: (JournalEntry) -> Boolean) {
+        entries.filter { it.active && it.lifetime == Lifetime.TEMPORARY && which(it) }.asReversed().forEach { entry ->
             StoryActions.undo(entry)
             entry.undoneAt = next++
         }
@@ -114,20 +124,6 @@ internal class StoryJournal {
         entries.removeAll { scope(it) && it.seq >= mark }
     }
 
-    /** Brings the world to the state [saved] describes and makes it the journal again: what a redo returns to. */
-    suspend fun restore(saved: ListTag) {
-        val target = saved.map { JournalEntry.load(it as CompoundTag) }
-        val standing = target.filter { it.active }.map { it.seq }.toSet()
-        val current = entries.filter { it.active }.map { it.seq }.toSet()
-        entries.filter { it.active && it.seq !in standing }.asReversed().forEach(StoryActions::undo)
-        val repeated = target.filter { it.active && it.seq !in current }
-        val seqs = repeated.map { it.seq }.toSet()
-        repeated.filter { it.outer !in seqs }.forEach { StoryActions.fastForward(it) }
-        entries.clear()
-        entries += target
-        next = maxOf(next, (target.maxOfOrNull { it.seq } ?: -1) + 1)
-    }
-
     /** Takes back every temporary action left, for a run that ends; permanent ones stay in the world. */
     fun close(run: String) = undoTemporary(run, 0, branches = true)
 
@@ -147,10 +143,8 @@ internal class StoryJournal {
 
     fun save(): CompoundTag = CompoundTag().apply {
         putLong("next", next)
-        put("entries", entriesTag())
+        put("entries", ListTag().apply { entries.forEach { add(it.save()) } })
     }
-
-    fun entriesTag(): ListTag = ListTag().apply { entries.forEach { add(it.save()) } }
 
     fun load(tag: CompoundTag) {
         entries.clear()

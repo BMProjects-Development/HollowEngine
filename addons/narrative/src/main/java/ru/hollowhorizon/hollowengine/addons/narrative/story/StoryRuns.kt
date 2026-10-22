@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import java.util.UUID
 
 /**
@@ -90,6 +91,12 @@ class StoryRuns(val owner: StoryOwner) {
 
     internal fun holds(run: StoryRun): Boolean = runs[run.name] === run
 
+    /** The run at [path]: a story under its key, then its branches by name. */
+    internal fun find(path: String): StoryRun? {
+        val names = path.split('/')
+        return names.drop(1).fold(runs[names.first()] ?: return null) { run, name -> run.children[name] ?: return null }
+    }
+
     internal fun ended(run: StoryRun) {
         if (runs[run.name] === run) runs.remove(run.name)
         changed()
@@ -127,6 +134,13 @@ internal object StoryWaits {
 
     fun entity(uuid: UUID, run: StoryRun) {
         entities.getOrPut(uuid, ::LinkedHashSet) += run
+    }
+
+    /** The script [id] could not start: the stories waiting for an instance of it go. */
+    fun failed(id: ScriptId) {
+        instances.keys.filter { StoryInstances.scriptOf(it) == id }.forEach { key ->
+            instances.remove(key)?.forEach { it.discard("its script '$key' could not start") }
+        }
     }
 
     fun entityLoaded(uuid: UUID) {

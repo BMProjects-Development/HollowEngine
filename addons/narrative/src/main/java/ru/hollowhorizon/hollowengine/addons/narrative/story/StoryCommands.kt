@@ -12,7 +12,7 @@ import net.minecraft.commands.arguments.EntityArgument
 import ru.hollowhorizon.hollowengine.common.utils.mcTranslate
 
 /**
- * What the stories of an owner do, and starting, stopping, rewinding and redoing
+ * What the stories of an owner do, and starting, stopping and rewinding
  * them by hand, as a game master or an author testing a story does.
  */
 internal object StoryCommands {
@@ -68,7 +68,6 @@ internal object StoryCommands {
                     ),
                 ),
             )
-            .then(Commands.literal("redo").then(key().executes { run(it) { redo(it, owner(it)) } }))
             .then(Commands.literal("checkpoints").then(key().executes { run(it) { checkpoints(it, owner(it)) } }))
     }
 
@@ -103,17 +102,9 @@ internal object StoryCommands {
         val key = key(context)
         val story = runs[key] ?: return missing(context, key)
         story.rewind(checkpoint)
-        val message = if (checkpoint == null) "hollowengine.commands.story.rewound_segments".mcTranslate(key)
+        val message = if (checkpoint == null) "hollowengine.commands.story.rewound_latest".mcTranslate(key)
         else "hollowengine.commands.story.rewound".mcTranslate(key, checkpoint)
         context.source.sendSuccess({ message }, true)
-        return 1
-    }
-
-    private fun redo(context: Context, runs: StoryRuns): Int {
-        val key = key(context)
-        val story = runs[key] ?: return missing(context, key)
-        story.redo()
-        context.source.sendSuccess({ "hollowengine.commands.story.redone".mcTranslate(key) }, true)
         return 1
     }
 

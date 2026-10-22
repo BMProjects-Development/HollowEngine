@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptFailedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
@@ -71,6 +72,17 @@ class NodeManager(val server: MinecraftServer) {
     internal fun register(script: NodeScript) {
         dormant.remove(script.path)
         nodes[script.path] = RunningNode(script)
+        notifyExecutionChanged()
+    }
+
+    /**
+     * Forgets the saved node [path], which could not start: its script is gone or broken. Kept, it would fail
+     * at every start and stay in the world save with nothing to remove it.
+     */
+    internal fun discard(path: String) {
+        val canonicalPath = canonicalNodePath(path)
+        if (dormant.remove(canonicalPath) == null) return
+        HollowEngine.LOGGER.error("Server node '{}' is removed from the world: it could not start", canonicalPath)
         notifyExecutionChanged()
     }
 
@@ -229,6 +241,7 @@ internal fun buildNode(
     val script = ScriptLoader.executeCompiled<NodeScript>(id, validate, compiled, configure).onFailure {
         HollowEngine.LOGGER.error("Error while loading $canonicalPath", it)
         nodeScope.cancel()
+        ScriptFailedEvent.post(ScriptFailedEvent(id))
     }.getOrNull() ?: return null
 
     return runCatching {
@@ -247,6 +260,7 @@ internal fun buildNode(
     }.onFailure {
         HollowEngine.LOGGER.error("Error while initializing $canonicalPath", it)
         nodeScope.cancel()
+        ScriptFailedEvent.post(ScriptFailedEvent(id))
     }.getOrNull()
 }
 
@@ -309,7 +323,7 @@ internal fun MinecraftServer.startNode(
             entry = entry,
             receivers = listOf(this),
             compiled = compiled,
-        ) ?: return@startAfterStop
+        ) ?: return@startAfterStop runtimeContext.nodes.discard(path)
 
         runtimeContext.nodes.register(script)
     }

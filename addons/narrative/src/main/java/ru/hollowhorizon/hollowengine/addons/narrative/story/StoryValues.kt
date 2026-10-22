@@ -48,6 +48,7 @@ object StoryValues {
             Entity::class.java.isAssignableFrom(classifier.java) -> EntityReference(classifier as KClass<out Entity>)
             classifier == NpcRef::class -> NpcReference
             classifier.isFunction() -> StageLambda.Serializer
+            classifier == StoryHandle::class -> StoryHandleSerializer(type.arguments.firstOrNull()?.type?.let(::serializer))
             classifier == List::class || classifier == Collection::class -> ListSerializer(arguments[0])
             classifier == Set::class -> SetSerializer(arguments[0])
             classifier == Map::class -> MapSerializer(arguments[0], arguments[1])
@@ -99,10 +100,11 @@ object StoryValues {
         it.startsWith("kotlin.Function") || it.startsWith("kotlin.coroutines.SuspendFunction")
     } || Function::class.java.isAssignableFrom(java)
 
+    /** A loaded entity, or an NPC without a body: the registry keeps those apart from chunks, so they are always there. */
     private fun findOnServer(uuid: UUID, type: KClass<out Entity>): Entity? {
         val server = currentServerOrNull() ?: return null
         if (NpcEntity::class.java.isAssignableFrom(type.java)) server.npcs.resolve(uuid)?.let { return it }
-        return server.findEntity(uuid)
+        return server.findEntity(uuid) ?: server.npcs.resolve(uuid)
     }
 
     private fun MinecraftServer.findEntity(uuid: UUID): Entity? =

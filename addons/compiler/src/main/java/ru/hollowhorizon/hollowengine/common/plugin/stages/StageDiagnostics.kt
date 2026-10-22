@@ -19,11 +19,20 @@ internal object StageDiagnostics : KtDiagnosticsContainer() {
         Messages,
     )
 
+    val STAGE_WARNING = KtDiagnosticFactory1<String>(
+        "HOLLOWENGINE_STAGE_WARNING",
+        Severity.WARNING,
+        SourceElementPositioningStrategies.DEFAULT,
+        PsiElement::class,
+        Messages,
+    )
+
     override fun getRendererFactory(): BaseDiagnosticRendererFactory = Messages
 
     object Messages : BaseDiagnosticRendererFactory() {
         override val MAP: KtDiagnosticFactoryToRendererMap by KtDiagnosticFactoryToRendererMap("HollowEngineStages") { map ->
             map.put(STAGE_ERROR, "{0}", CommonRenderers.STRING)
+            map.put(STAGE_WARNING, "{0}", CommonRenderers.STRING)
         }
     }
 }
