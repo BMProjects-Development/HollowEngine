@@ -47,6 +47,7 @@ object StoryInstances {
      * every script class with [StageScript]; other instances are ignored.
      */
     fun register(instance: Any, scope: CoroutineScope) {
+        checkStoryClasses(instance.javaClass)
         val job = scope.coroutineContext.job
         val added = LinkedHashMap<String, Entry>()
         register(instance, job, added)
@@ -151,6 +152,21 @@ object StoryInstances {
             is NodeHost.Server -> "$path@server"
             is NodeHost.OfEntity -> "$path@${host.entity.uuid}"
         }
+    }
+
+    /**
+     * Reports a script that was compiled with stages but sees another copy of this addon: its stages and actions
+     * carry annotations stories do not recognize, so they would silently not exist.
+     */
+    private fun checkStoryClasses(type: Class<*>) {
+        if (type.isAnnotationPresent(StageScript::class.java)) return
+        val seen = runCatching { Class.forName(StageScript::class.java.name, false, type.classLoader) }.getOrNull() ?: return
+        if (seen === StageScript::class.java) return
+        HollowEngine.LOGGER.error(
+            "Script {} runs with a copy of the narrative addon of its own, so stories cannot see its stages and actions. " +
+                "List 'hollowengine-narrative' in dependsOn of the project the script belongs to",
+            type.name,
+        )
     }
 
     /** The namespace the actions of a script are registered in: that of the script, or `script` when unknown. */

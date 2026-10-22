@@ -533,9 +533,10 @@ internal class HollowAddonRuntime(
     }
 
     /**
-     * Publishes the addon's `scripts/` directory as a namespace of its own. The addon jar and its
-     * bundled libraries go on the compilation classpath and its classloader becomes the parent of the
-     * compiled scripts, so an addon can move part of its own logic into scripts.
+     * Publishes the addon as a namespace of its own, with its `scripts/` directory if it has one. The addon jar
+     * and its bundled libraries go on the compilation classpath and its classloader becomes the parent of the
+     * compiled scripts, so an addon can move part of its own logic into scripts. An addon without scripts is
+     * published too: projects that list it in `dependsOn` reach its classes through it.
      */
     private fun registerScripts(
         candidate: HollowAddonCandidate,
@@ -552,7 +553,6 @@ internal class HollowAddonRuntime(
             fingerprint = descriptor.version,
             storageKey = candidate.fingerprint,
         )
-        if (source.list().isEmpty()) return
         ScriptSourceLifecycle.install()
         ScriptRegistry.register(source)
     }
