@@ -29,6 +29,10 @@ class StoryRun internal constructor(
     internal val pending = ArrayDeque<StoryFrame>()
     internal val children = LinkedHashMap<String, StoryRun>()
     private val ownVars = CompoundTag()
+    private val ownRecords = CompoundTag()
+    private val ownJournal = StoryJournal()
+    private val ownHistory: StoryHistory? = if (parent == null) StoryHistory(this) else null
+    private var moving = false
     private val status = MutableStateFlow(Status.SLEEPING)
     private var job: Job? = null
     private val watched = HashMap<String, DisposableHandle>()
@@ -47,13 +51,21 @@ class StoryRun internal constructor(
     /** Variables declared with [saved], shared by the whole tree of runs. */
     internal val vars: CompoundTag get() = parent?.vars ?: ownVars
 
+    /** What [once] and [remember] keep: shared by the tree, and left as they are by a rewind. */
+    internal val records: CompoundTag get() = parent?.records ?: ownRecords
+
+    /** The actions the whole tree of runs performed. */
+    internal val journal: StoryJournal get() = parent?.journal ?: ownJournal
+
+    internal val history: StoryHistory get() = parent?.history ?: ownHistory!!
+
     val state: Status get() = status.value
 
     internal val isCancelled: Boolean get() = job?.isCancelled == true
 
     /** Starts or wakes the run; does nothing while it runs or once it ended. */
     internal fun start() {
-        if (state.done || job?.isActive == true) return
+        if (state.done || job?.isActive == true || !isAttached || lineage.any { it.moving }) return
         val previous = job
         if (previous != null && !previous.isCompleted) {
             previous.invokeOnCompletion { start() }
@@ -138,6 +150,7 @@ class StoryRun internal constructor(
         child.pending += lambda.entry(child)
         children[name] = child
         frame.children += name
+        history.add(name, child, emptyList())
         changed()
         child.start()
         return child
@@ -147,10 +160,11 @@ class StoryRun internal constructor(
         children.remove(name)?.stop()
     }
 
-    /** Stops the run for good, along with its branches. */
+    /** Stops the run for good, along with its branches, and takes back their temporary actions at once. */
     internal fun stop() {
         if (state.done) return
         stopping = true
+        journal.close(path)
         val running = job
         if (running?.isActive == true) running.cancel(CancellationException("Story '$path' was stopped"))
         else finish(Status.STOPPED, null, null)
@@ -167,6 +181,67 @@ class StoryRun internal constructor(
 
     internal fun changed() = runs.changed()
 
+    /** The run wrote a new action to the journal, so the rewinds before it cannot be redone. */
+    internal fun recorded() {
+        history.recorded()
+        changed()
+    }
+
+    /** This run and every branch under it. */
+    internal fun tree(): Sequence<StoryRun> = sequenceOf(this) + children.values.asSequence().flatMap { it.tree() }
+
+    /**
+     * Takes the story back: with [name], the whole tree to the latest checkpoint so named; without it, this run and
+     * its active branches each to the start of the segment it is in. The runs stop, the journal undoes what they
+     * performed since, and they start again from there.
+     */
+    internal fun rewind(name: String?) {
+        if (name != null && !history.has(name)) throw StoryException("Story '${root.path}' has no checkpoint '$name'")
+        if (name == null) move(this) { history.rewindSegments(this) } else move(root) { history.rewind(name) }
+    }
+
+    /** Undoes the latest rewind of the story: back to where it was, with the actions it undid performed again. */
+    internal fun redo() {
+        if (!history.canRedo) throw StoryException("Story '${root.path}' has nothing to redo")
+        move(root) { history.redo() }
+    }
+
+    /** Stops the run with its branches and waits until they have; [start] brings it back. */
+    internal suspend fun halt(reason: String) {
+        val running = job ?: return
+        sleep(reason)
+        running.join()
+    }
+
+    /** Puts the whole tree back to what [saveTree] wrote, ready to [start]. */
+    internal fun restoreTree(tag: CompoundTag) {
+        frames.clear()
+        pending.clear()
+        children.clear()
+        tail = null
+        readTree(tag)
+        changed()
+    }
+
+    /** Runs [change] on the stopped story outside of it, then starts [restart] again. */
+    private fun move(restart: StoryRun, change: suspend () -> Unit) {
+        val root = root
+        if (root.tree().any { it.moving }) throw StoryException("Story '${root.path}' is already being rewound")
+        restart.moving = true
+        runs.owner.scope.launch {
+            try {
+                change()
+            } catch (failure: Exception) {
+                if (failure is CancellationException) throw failure
+                HollowEngine.LOGGER.error("Story '{}' failed to rewind", root.path, failure)
+            } finally {
+                restart.moving = false
+                root.changed()
+                restart.start()
+            }
+        }
+    }
+
     private fun pause() {
         status.value = Status.SLEEPING
         pending.addAll(0, frames)
@@ -180,6 +255,7 @@ class StoryRun internal constructor(
         this.failure = failure
         frames.clear()
         pending.clear()
+        journal.close(path)
         this.status.value = status
         if (parent == null) runs.ended(this) else changed()
     }
@@ -200,15 +276,47 @@ class StoryRun internal constructor(
 
     private val root: StoryRun get() = parent?.root ?: this
 
-    internal fun save(): CompoundTag = CompoundTag().apply {
+    /** This run and the runs it is a branch of. */
+    private val lineage: Sequence<StoryRun> get() = generateSequence(this) { it.parent }
+
+    /**
+     * Whether the run is still part of its story. A rewind replaces the branches it restores, and a run that ended
+     * leaves its owner, so a wait that wakes such a run afterwards does nothing.
+     */
+    private val isAttached: Boolean get() = if (parent == null) runs.holds(this) else parent.children[name] === this && parent.isAttached
+
+    /** Everything to save; the root adds what the tree shares over time: records, journal, checkpoints. */
+    internal fun save(): CompoundTag = saveTree().apply {
+        if (parent != null) return@apply
+        journal.prune(history.floor(tree().flatMap { (it.frames + it.pending).asSequence() }.map { it.segmentMark }))
+        if (!ownRecords.isEmpty) put("records", ownRecords.copy())
+        put("journal", journal.save())
+        put("history", history.save())
+    }
+
+    /** The runs as they are: stacks, branches, variables. A checkpoint keeps this. */
+    internal fun saveTree(): CompoundTag = CompoundTag().apply {
         putString("status", (if (state == Status.RUNNING) Status.SLEEPING else state).name)
         put("frames", ListTag().apply { (frames + pending).forEach { add(it.save()) } })
         if (children.isNotEmpty()) put(
             "children",
-            CompoundTag().apply { children.forEach { (name, run) -> put(name, run.save()) } })
+            CompoundTag().apply { children.forEach { (name, run) -> put(name, run.saveTree()) } })
         if (parent == null && !ownVars.isEmpty) put("vars", ownVars.copy())
         result?.let { put("result", it) }
         failure?.let { putString("failure", it) }
+    }
+
+    private fun readTree(tag: CompoundTag) {
+        status.value = runCatching { Status.valueOf(tag.getString("status")) }.getOrDefault(Status.SLEEPING)
+        tag.getList("frames", Tag.TAG_COMPOUND.toInt()).forEach { pending += StoryFrame.load(this, it as CompoundTag) }
+        val saved = tag.getCompound("children")
+        saved.allKeys.forEach { children[it] = load(runs, it, this, saved.getCompound(it)) }
+        if (parent == null) {
+            ownVars.allKeys.toList().forEach(ownVars::remove)
+            ownVars.merge(tag.getCompound("vars"))
+        }
+        result = tag.get("result")
+        failure = tag.getString("failure").takeIf { tag.contains("failure") }
     }
 
     /** What the run is doing, for logs and the inspector. */
@@ -236,14 +344,12 @@ class StoryRun internal constructor(
 
         fun load(runs: StoryRuns, name: String, parent: StoryRun?, tag: CompoundTag): StoryRun =
             StoryRun(runs, name, parent).apply {
-                status.value = runCatching { Status.valueOf(tag.getString("status")) }.getOrDefault(Status.SLEEPING)
-                tag.getList("frames", Tag.TAG_COMPOUND.toInt())
-                    .forEach { pending += StoryFrame.load(this, it as CompoundTag) }
-                val saved = tag.getCompound("children")
-                saved.allKeys.forEach { children[it] = load(runs, it, this, saved.getCompound(it)) }
-                ownVars.merge(tag.getCompound("vars"))
-                result = tag.get("result")
-                failure = tag.getString("failure").takeIf { tag.contains("failure") }
+                readTree(tag)
+                if (parent == null) {
+                    ownRecords.merge(tag.getCompound("records"))
+                    ownJournal.load(tag.getCompound("journal"))
+                    ownHistory!!.load(tag.getCompound("history"))
+                }
             }
     }
 }

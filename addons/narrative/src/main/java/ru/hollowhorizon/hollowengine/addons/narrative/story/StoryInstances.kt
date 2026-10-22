@@ -69,6 +69,12 @@ object StoryInstances {
     suspend fun call(key: String, stage: String, captured: CompoundTag, parameters: Array<out Any?>): Any? =
         invoke(key, stage, { it.calls }, arrayOf(captured, *parameters))
 
+    /** The keys of every running instance. */
+    val registered: Set<String> get() = byKey.keys
+
+    /** The stages the instance under [key] declares, or none when nothing runs under it. */
+    fun stagesOf(key: String): Set<String> = find(key)?.let { stagesOf(it.javaClass).entries.keys }.orEmpty()
+
     /** Whether the instance under [key] declares [stage]. */
     fun hasStage(key: String, stage: String): Boolean {
         val instance = find(key) ?: return false
@@ -100,6 +106,7 @@ object StoryInstances {
         keys[instance] = key
         byKey[key] = Entry(instance, job)
         added += key
+        StoryActions.register(instance.javaClass, namespaceOf(instance), job)
         importsOf(instance).forEach { register(it, job, added) }
     }
 
@@ -120,6 +127,12 @@ object StoryInstances {
             is NodeHost.Server -> "$path@server"
             is NodeHost.OfEntity -> "$path@${host.entity.uuid}"
         }
+    }
+
+    /** The namespace the actions of a script are registered in: that of the script, or `script` when unknown. */
+    private fun namespaceOf(instance: Any): String {
+        val location = instance.javaClass.getAnnotation(StageScript::class.java)?.path ?: return "script"
+        return ScriptRegistry.idOfLocation(location)?.namespace ?: "script"
     }
 
     /** The imported scripts an instance holds: they come in as constructor arguments kept in fields. */

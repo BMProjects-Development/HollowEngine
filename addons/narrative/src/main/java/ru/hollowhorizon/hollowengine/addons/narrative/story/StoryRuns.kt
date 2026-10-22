@@ -88,6 +88,8 @@ class StoryRuns(val owner: StoryOwner) {
 
     internal fun changed() = owner.changed(this)
 
+    internal fun holds(run: StoryRun): Boolean = runs[run.name] === run
+
     internal fun ended(run: StoryRun) {
         if (runs[run.name] === run) runs.remove(run.name)
         changed()
@@ -102,6 +104,7 @@ class StoryRuns(val owner: StoryOwner) {
         runs[key]?.let { return StoryHandle(it, null) }
         val run = StoryRun(this, key, null)
         run.pending += entry(run)
+        run.history.add(key, run, emptyList())
         runs[key] = run
         changed()
         run.start()

@@ -31,6 +31,12 @@ class StoryFrame internal constructor(
     internal var segment = CompoundTag()
     internal val children = LinkedHashSet<String>()
     internal var trampolined = false
+
+    /** The journal mark when the frame was entered: its temporary actions are those after it. */
+    internal var entryMark = 0L
+
+    /** The journal mark when the current segment started, which a repeat of the segment and `rewind()` go back to. */
+    internal var segmentMark = 0L
     private var sites: Array<String> = emptyArray()
     private var resuming = false
     private var target = -1
@@ -61,6 +67,16 @@ class StoryFrame internal constructor(
         val saved = args.get(name)
         if (resuming && saved != null && saved != encoded) startOver("'$stage' was entered with another '$name'")
         args.put(name, encoded)
+    }
+
+    /**
+     * The key [once] and [remember] keep [name] under: the stage with its arguments, the segment it is in, the name.
+     * Long arguments are shortened to their hash.
+     */
+    internal fun recordKey(name: String): String {
+        val arguments = args.toString().removeSurrounding("{", "}")
+        val shown = if (arguments.length <= MAX_ARGUMENTS_IN_KEY) arguments else Integer.toHexString(arguments.hashCode())
+        return "$instance/$stage($shown)/${position ?: "start"}/$name"
     }
 
     /** Reached only if a stage that returns a value ran off its end, which the compiler rules out. */
@@ -116,6 +132,7 @@ class StoryFrame internal constructor(
         result = run.lastResult
         run.lastResult = null
         segment = CompoundTag()
+        segmentMark = run.journal.next
         run.changed()
         return current
     }
@@ -143,13 +160,24 @@ class StoryFrame internal constructor(
         }
     }
 
-    /** Ends a segment at the checkpoint at [site]. */
-    fun checkpoint(site: Int) {
+    /** Ends a segment at the checkpoint at [site], which the story can be rewound to. */
+    fun checkpoint(site: Int) = pass(site, emptyList())
+
+    /** Ends a segment at the checkpoint at [site] after [labels] captured what a rewind to it puts back. */
+    suspend fun checkpoint(site: Int, labels: suspend CheckpointScope.() -> Unit) {
+        val scope = CheckpointScope(run.path)
+        scope.labels()
+        pass(site, scope.labels)
+    }
+
+    private fun pass(site: Int, labels: List<JournalEntry>) {
         run.discardPending("'$stage' moved on")
         position = AFTER + sites[site]
         previous = null
         result = null
         segment = CompoundTag()
+        segmentMark = run.journal.next
+        run.history.add(sites[site], run, labels)
         run.changed()
     }
 
@@ -208,6 +236,8 @@ class StoryFrame internal constructor(
         locals = CompoundTag()
         result = null
         segment = CompoundTag()
+        run.journal.undoTemporary(run.path, entryMark)
+        segmentMark = entryMark
         run.discardPending(reason)
     }
 
@@ -227,12 +257,15 @@ class StoryFrame internal constructor(
         }
         this.hash = hash
         resuming = target >= 0
+        if (target < 0 || target % 2 == 1) run.journal.undoTemporary(run.path, if (target < 0) entryMark else segmentMark)
         return this
     }
 
     internal fun fresh(hash: Int, sites: Array<String>): StoryFrame {
         this.hash = hash
         this.sites = sites
+        entryMark = run.journal.next
+        segmentMark = entryMark
         return this
     }
 
@@ -244,6 +277,7 @@ class StoryFrame internal constructor(
         run.frames.removeAt(run.frames.lastIndex)
         children.forEach { run.closeChild(it) }
         children.clear()
+        run.journal.undoTemporary(run.path, entryMark)
     }
 
     private fun positionOf(saved: String): Int {
@@ -262,12 +296,15 @@ class StoryFrame internal constructor(
         result?.let { put("result", it) }
         previous?.let { put("previous", it) }
         put("segment", segment)
+        putLong("entryMark", entryMark)
+        putLong("segmentMark", segmentMark)
         put("children", ListTag().apply { children.forEach { add(StringTag.valueOf(it)) } })
     }
 
     internal companion object {
         private const val CALL = "call:"
         private const val AFTER = "after:"
+        private const val MAX_ARGUMENTS_IN_KEY = 48
 
         fun load(run: StoryRun, tag: CompoundTag) =
             StoryFrame(run, tag.getString("instance"), tag.getString("stage")).apply {
@@ -278,6 +315,8 @@ class StoryFrame internal constructor(
                 result = tag.get("result")
                 previous = tag.getCompound("previous").takeIf { tag.contains("previous") }
                 segment = tag.getCompound("segment")
+                entryMark = tag.getLong("entryMark")
+                segmentMark = tag.getLong("segmentMark")
                 tag.getList("children", Tag.TAG_STRING.toInt()).forEach { children += it.asString }
             }
     }
