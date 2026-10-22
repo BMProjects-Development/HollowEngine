@@ -29,6 +29,16 @@ class StoryFrame internal constructor(
     internal var locals = CompoundTag()
     internal var result: Tag? = null
     internal var segment = CompoundTag()
+        set(value) {
+            field = value
+            boxOrdinals.clear()
+        }
+
+    /** The boxes of shared vars this frame declared; they go when it returns. */
+    internal val boxes = LinkedHashSet<String>()
+
+    /** How many times each shared var was declared in this segment since the frame last started running it. */
+    private val boxOrdinals = HashMap<String, Int>()
     internal val children = LinkedHashSet<String>()
     internal var trampolined = false
 
@@ -257,6 +267,7 @@ class StoryFrame internal constructor(
         }
         this.hash = hash
         resuming = target >= 0
+        boxOrdinals.clear()
         if (target < 0 || target % 2 == 1) run.journal.undoTemporary(run.path, if (target < 0) entryMark else segmentMark)
         return this
     }
@@ -278,7 +289,11 @@ class StoryFrame internal constructor(
         children.forEach { run.closeChild(it) }
         children.clear()
         run.journal.undoTemporary(run.path, entryMark)
+        run.root.boxes.release(boxes)
     }
+
+    /** The next ordinal of a declaration of the shared var [name], which tells loop iterations apart. */
+    internal fun nextBoxOrdinal(name: String): Int = boxOrdinals.merge(name, 1, Int::plus)!! - 1
 
     private fun positionOf(saved: String): Int {
         val call = saved.startsWith(CALL)
@@ -298,6 +313,7 @@ class StoryFrame internal constructor(
         put("segment", segment)
         putLong("entryMark", entryMark)
         putLong("segmentMark", segmentMark)
+        if (boxes.isNotEmpty()) put("boxes", ListTag().apply { boxes.forEach { add(StringTag.valueOf(it)) } })
         put("children", ListTag().apply { children.forEach { add(StringTag.valueOf(it)) } })
     }.copy()
 
@@ -317,6 +333,7 @@ class StoryFrame internal constructor(
                 segment = tag.getCompound("segment").copy()
                 entryMark = tag.getLong("entryMark")
                 segmentMark = tag.getLong("segmentMark")
+                tag.getList("boxes", Tag.TAG_STRING.toInt()).forEach { boxes += it.asString }
                 tag.getList("children", Tag.TAG_STRING.toInt()).forEach { children += it.asString }
             }
     }

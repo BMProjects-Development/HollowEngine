@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 /** A moved stage must not retain hidden closures into the function that created it. */
 class StageLambdaSafetyTest : StageTest() {
     @Test
-    fun `a branch cannot call an enclosing local function with hidden mutable captures`() {
+    fun `a branch calls an enclosing local function only when what it uses can be saved`() {
         val errors = compiler.errors("""
             @State
             suspend fun main() {
@@ -23,7 +23,7 @@ class StageLambdaSafetyTest : StageTest() {
             }
         """)
         assertContains(errors, "local function 'playSing'")
-        assertContains(errors, "top level")
+        assertContains(errors, "'timer', which cannot be saved")
         assertFalse(errors.contains("Exception while generating code"), errors)
     }
 

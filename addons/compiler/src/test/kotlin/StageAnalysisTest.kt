@@ -36,7 +36,7 @@ class StageAnalysisTest {
         val error = errors.firstOrNull { it.message.contains("local function 'playSing'") }
         assertTrue(error != null, errors.toString())
         assertEquals(5, error.range.start.line)
-        assertTrue(error.message.contains("top level"))
+        assertTrue(error.message.contains("'timer', which cannot be saved"), error.message)
     }
 
     @Test
@@ -48,7 +48,7 @@ class StageAnalysisTest {
                 runs.launch("main") { log(counter.toString()); log(lock.toString()) }
             }
         """)
-        assertTrue(errors.any { it.message.contains("cannot capture 'var counter'") }, errors.toString())
+        assertTrue(errors.any { it.message.contains("can share 'var counter' only with the @State function or lambda that declares it directly") }, errors.toString())
         assertTrue(errors.any { it.message.contains("'lock' cannot be saved") }, errors.toString())
     }
 
