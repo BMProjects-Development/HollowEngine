@@ -40,11 +40,15 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
         private val script = stages.script
         private val reporter = stages.reporter
 
+        /** The stages made from lambdas, with how many of their arguments are captured values. */
+        private var captures: Map<IrSimpleFunction, Int> = emptyMap()
+
         fun compile() {
             script.annotations += stages.scriptAnnotation(file.fileEntry.name)
             val lifter = StageLambdaLifter(stages)
             script.declarations.toList().forEach { it.transform(lifter, null) }
-            script.declarations += lifter.lifted
+            script.declarations += lifter.lifted.keys
+            captures = lifter.lifted
 
             val functions = script.declarations.filterIsInstance<IrSimpleFunction>().filter(stages::isSuspendState)
             functions.groupBy(stages::stageName).filterValues { it.size > 1 }.forEach { (name, duplicates) ->
@@ -86,6 +90,7 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             StageRewriter(stages, function, layout).apply {
                 rewrite(statements, name, hash)
                 script.declarations += entry(name)
+                captures[function]?.let { script.declarations += lambdaCall(name, it) }
             }
         }
 
@@ -93,15 +98,14 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
             val problem = when {
                 function.parent != script -> "A stage must be declared at the top level of a script"
                 function.typeParameters.isNotEmpty() -> "A stage cannot have type parameters: its arguments are saved by their declared types"
-                function.parameters.any { it.kind == IrParameterKind.ExtensionReceiver || it.kind == IrParameterKind.Context } -> "A stage cannot have a receiver or context parameters; pass the value as an argument"
                 else -> null
             }
             problem?.let { reporter.error(function, it); return false }
             var valid = true
-            function.parameters.filter { it.kind == IrParameterKind.Regular }.forEach { parameter ->
+            stages.arguments(function).forEach { parameter ->
                 stages.types.problem(parameter.type)?.let {
                     reporter.error(
-                        parameter, "The arguments of a stage are saved, but '${parameter.name}' cannot be: $it"
+                        parameter, "The arguments of a stage are saved, but '${stages.argumentName(function, parameter)}' cannot be: $it"
                     )
                     valid = false
                 }
@@ -172,7 +176,7 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
                         declaration, "A state function must be declared at the top level of a script"
                     )
                     else if (marked && !stages.isSuspendState(declaration)) reporter.error(
-                        declaration, "A state function must be a suspend"
+                        declaration, "A state function must be a suspend function"
                     )
                     super.visitFunction(declaration)
                 }

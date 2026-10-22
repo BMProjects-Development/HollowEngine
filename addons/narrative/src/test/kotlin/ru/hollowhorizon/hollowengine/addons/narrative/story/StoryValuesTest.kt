@@ -11,6 +11,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class StoryValuesTest {
@@ -45,8 +46,9 @@ class StoryValuesTest {
         val uuid = UUID.randomUUID()
         assertEquals(uuid, roundTrip(NpcRef(uuid)).uuid)
 
-        val lambda = StageLambda<Unit>("quests/village.kts", "script\$launchStory#1", CompoundTag().apply { putString("who", "alex") })
-        val restored = roundTrip<StageLambda<*>>(lambda)
+        val lambda = StageLambda2<String, Int, Unit>("quests/village.kts", "script\$launchStory#1", CompoundTag().apply { putString("who", "alex") })
+        val restored = roundTrip<StageLambda>(lambda)
+        assertIs<StageLambda2<*, *, *>>(restored, "the number of parameters comes back with the lambda")
         assertEquals(lambda.instance, restored.instance)
         assertEquals(lambda.stage, restored.stage)
         assertEquals(lambda.args, restored.args)

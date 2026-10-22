@@ -21,8 +21,8 @@ interface StoryOwner {
     /** The entity the stories are about, if the owner has one. */
     val entity: Entity?
 
-    /** The runs of this owner changed and should be saved. */
-    fun changed()
+    /** [runs], the runs of this owner, changed and should be saved. */
+    fun changed(runs: StoryRuns)
 
     /** The context a stage of the run [path] sees. */
     fun context(path: String): StoryContext = StoryContext(this, path)
@@ -46,7 +46,7 @@ class StoryRuns(val owner: StoryOwner) {
      * is. [block] must be a lambda written at the call, which the compiler turns into a stage.
      */
     fun launch(key: String, block: @State suspend () -> Unit): StoryHandle<Unit> {
-        val lambda = block as? StageLambda<*>
+        val lambda = block as? StageLambda
             ?: throw StoryException("launchStory(\"$key\") takes a lambda written in place, not a function value")
         return start(key) { run -> lambda.entry(run) }
     }
@@ -86,7 +86,7 @@ class StoryRuns(val owner: StoryOwner) {
     /** Wakes every sleeping run. */
     fun wake() = runs.values.toList().forEach(StoryRun::start)
 
-    internal fun changed() = owner.changed()
+    internal fun changed() = owner.changed(this)
 
     internal fun ended(run: StoryRun) {
         if (runs[run.name] === run) runs.remove(run.name)

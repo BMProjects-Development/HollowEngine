@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.*
@@ -15,7 +16,7 @@ import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrNull
-import org.jetbrains.kotlin.ir.types.typeWith
+import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.getValueArgument
 import org.jetbrains.kotlin.ir.util.isAnnotation
 import org.jetbrains.kotlin.ir.util.isSuspend
@@ -53,14 +54,24 @@ internal class StageScope(
         }
     }
 
+    /** The parameters a stage saves as its arguments: all of them but the script it belongs to. */
+    fun arguments(function: IrFunction): List<IrValueParameter> =
+        function.parameters.filter { it.kind != IrParameterKind.DispatchReceiver }
+
+    /** The name [parameter] of [function] is saved under: its own name, `this` for a receiver. */
+    fun argumentName(function: IrFunction, parameter: IrValueParameter): String = when {
+        parameter.kind == IrParameterKind.ExtensionReceiver -> "this"
+        parameter.name.isSpecial -> "argument${function.parameters.indexOf(parameter)}"
+        else -> parameter.name.asString()
+    }
+
     /** Whether [value] is the script instance itself. */
     fun isScriptThis(value: IrValueDeclaration): Boolean =
         value is IrValueParameter && value.type.classOrNull == script.symbol
 
     /** The serializer of [type]; function types are kept as the stage lambdas they must be. */
     fun IrBuilderWithScope.serializer(type: IrType): IrExpression = irCall(symbols.storySerializer).apply {
-        typeArguments[0] =
-            if (types.isStageLambda(type) || types.isFunction(type)) symbols.stageLambda.typeWith(context.irBuiltIns.anyNType) else type
+        typeArguments[0] = if (types.isStageLambda(type) || types.isFunction(type)) symbols.stageLambda.owner.defaultType else type
     }
 
     /** Calls [function] with [arguments] for all its parameters in order, receivers first. */
@@ -76,6 +87,8 @@ internal class StageScope(
     fun stateAnnotation(name: String): IrAnnotation = annotation(symbols.stateConstructor, name)
 
     fun entryAnnotation(name: String): IrAnnotation = annotation(symbols.stageEntry, name)
+
+    fun callAnnotation(name: String): IrAnnotation = annotation(symbols.stageCall, name)
 
     fun scriptAnnotation(path: String): IrAnnotation = annotation(symbols.stageScript, path)
 

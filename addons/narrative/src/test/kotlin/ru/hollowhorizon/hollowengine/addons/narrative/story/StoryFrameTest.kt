@@ -17,7 +17,7 @@ class StoryFrameTest {
         override val scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)
         override val server: MinecraftServer get() = error("no server")
         override val entity: Entity? get() = null
-        override fun changed() = Unit
+        override fun changed(runs: StoryRuns) = Unit
     }
 
     private val sites = arrayOf("intro#1", "if#1.then/trial#1", "gate")
