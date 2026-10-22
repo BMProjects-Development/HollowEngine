@@ -160,12 +160,17 @@ object StoryInstances {
      */
     private fun checkStoryClasses(type: Class<*>) {
         if (type.isAnnotationPresent(StageScript::class.java)) return
-        val seen = runCatching { Class.forName(StageScript::class.java.name, false, type.classLoader) }.getOrNull() ?: return
-        if (seen === StageScript::class.java) return
+        val seen = runCatching { Class.forName(StageScript::class.java.name, false, type.classLoader) }.getOrNull()
+        val problem = when {
+            seen != null && seen !== StageScript::class.java -> "runs with a copy of the narrative addon of its own"
+            seen == null && type.declaredMethods.any { it.name.startsWith(ENTRY_PREFIX) } -> "declares stages but cannot see the narrative addon"
+            else -> return
+        }
         HollowEngine.LOGGER.error(
-            "Script {} runs with a copy of the narrative addon of its own, so stories cannot see its stages and actions. " +
+            "Script {} {}, so stories cannot see its stages and actions. " +
                 "List 'hollowengine-narrative' in dependsOn of the project the script belongs to",
             type.name,
+            problem,
         )
     }
 
@@ -186,6 +191,9 @@ object StoryInstances {
         }
 
     private fun stagesOf(type: Class<*>): Stages = stages.get(type)
+
+    /** How the compiler names the entries it generates for stages. */
+    private const val ENTRY_PREFIX = "stage\$entry\$"
 
     /** The generated methods of a script class: entries that start or resume a stage, calls of stage lambdas. */
     private class Stages(val entries: Map<String, Method>, val calls: Map<String, Method>, val results: Map<String, Method>)
