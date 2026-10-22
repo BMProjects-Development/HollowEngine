@@ -38,8 +38,8 @@ fun Entity.stopStory(key: String): Boolean = StoryOwners.entity(this).stop(key)
 fun NodeScript.stopStory(key: String): Boolean = StoryOwners.node(this).stop(key)
 
 /**
- * Rewinds the story [key] of the server, see [rewind]: to the checkpoint [checkpoint], or each of its runs to the
- * start of its segment when it is null. Returns whether there is such a story.
+ * Rewinds the story [key] of the server, see [rewind]: to the checkpoint [checkpoint], or to the latest checkpoint
+ * the story passed when it is null. Returns whether there is such a story.
  */
 fun MinecraftServer.rewindStory(key: String, checkpoint: String? = null): Boolean =
     StoryOwners.server(this)[key]?.rewind(checkpoint) != null
@@ -51,9 +51,10 @@ fun NodeScript.rewindStory(key: String, checkpoint: String? = null): Boolean =
     StoryOwners.node(this)[key]?.rewind(checkpoint) != null
 
 /**
- * Takes the story back and does not return. Without [checkpoint] this run and its active branches each repeat the
- * segment they are in; with it the whole story goes back to the latest checkpoint so named, branches started since
- * included. The actions performed since are undone. What [once] and [remember] kept stays as it is.
+ * Takes the story back and does not return. Without [checkpoint] this run and its branches go back to the latest
+ * checkpoint this run passed, its start if there was none; with it the whole story goes back to the latest
+ * checkpoint so named, branches started since included. The actions performed since are undone. What [once] and
+ * [remember] kept stays as it is.
  */
 suspend fun rewind(checkpoint: String? = null): Nothing {
     currentRun("rewind()").rewind(checkpoint)
@@ -75,7 +76,10 @@ suspend fun <T> async(name: String, block: @State suspend () -> T): StoryHandle<
     return StoryHandle(run.branch(name, lambda), lambda.result)
 }
 
-/** A run of a story or of one of its branches. */
+/**
+ * A run of a story or of one of its branches. A story can keep it like any other value: it is saved as the path of
+ * the run and found again in the same story when read.
+ */
 class StoryHandle<T> internal constructor(
     internal val run: StoryRun,
     private val result: KSerializer<Any?>?,
@@ -109,8 +113,6 @@ class StoryHandle<T> internal constructor(
     /** Rewinds the run from outside, see [rewind]. */
     fun rewind(checkpoint: String? = null) = run.rewind(checkpoint)
 
-    /** Undoes the latest rewind of the story, as long as it has not performed an action since. */
-    fun redo() = run.redo()
 
     /** The checkpoints the story can be rewound to, oldest first, with the run that passed each. */
     val checkpoints: List<Pair<String, String>> get() = run.history.all.map { it.name to it.run }

@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.expression.FirFunctionCallChecker
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
 import org.jetbrains.kotlin.fir.declarations.FirProperty
@@ -16,6 +17,7 @@ import org.jetbrains.kotlin.fir.declarations.FirScript
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
 import org.jetbrains.kotlin.fir.expressions.FirCallableReferenceAccess
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
@@ -38,6 +40,7 @@ internal object StageFirCallChecker : FirFunctionCallChecker(MppCheckerKind.Comm
     override fun check(expression: FirFunctionCall) {
         if (context.containingDeclarations.none { it.fir is FirScript }) return
         StageFirActions.checkCall(expression)
+        checkCheckpointName(expression)
         val mapping = (expression.argumentList as? FirResolvedArgumentList)?.mapping ?: return
         val startsStory = startsStory(expression)
         mapping.forEach { (argument, parameter) ->
@@ -62,6 +65,48 @@ internal object StageFirCallChecker : FirFunctionCallChecker(MppCheckerKind.Comm
                 }
             }
         }
+    }
+
+    /**
+     * Warns about `rewind("x")` and `temporary(until = "x")` naming no checkpoint of the script. It is no error:
+     * another script whose stages the story calls may pass one under that name.
+     */
+    context(context: CheckerContext, reporter: DiagnosticReporter)
+    private fun checkCheckpointName(call: FirFunctionCall) {
+        val symbol = call.calleeReference.toResolvedCallableSymbol() ?: return
+        if (symbol.callableId?.packageName != StageFirIds.PACKAGE) return
+        val parameter = when (symbol.name.asString()) {
+            "rewind" -> "checkpoint"
+            "temporary" -> "until"
+            else -> return
+        }
+        val argument = (call.argumentList as? FirResolvedArgumentList)?.mapping?.entries
+            ?.firstOrNull { it.value.name.asString() == parameter }?.key as? FirLiteralExpression ?: return
+        val name = argument.value as? String ?: return
+        val file = context.containingDeclarations.map { it.fir }.filterIsInstance<FirFile>().firstOrNull() ?: return
+        if (name in checkpointNames(file)) return
+        reporter.reportOn(
+            argument.source,
+            StageDiagnostics.STAGE_WARNING,
+            "No checkpoint of this script is named '$name': it only works if another script the story runs passes one"
+        )
+    }
+
+    /** The constant names the checkpoints of [file] are given. */
+    private fun checkpointNames(file: FirFile): Set<String> {
+        val names = HashSet<String>()
+        file.accept(object : FirVisitorVoid() {
+            override fun visitElement(element: FirElement) {
+                if (element is FirFunctionCall) {
+                    val symbol = element.calleeReference.toResolvedCallableSymbol()
+                    if (symbol?.callableId?.packageName == StageFirIds.PACKAGE && symbol.name.asString() == "checkpoint") {
+                        ((element.argumentList.arguments.firstOrNull() as? FirLiteralExpression)?.value as? String)?.let(names::add)
+                    }
+                }
+                element.acceptChildren(this)
+            }
+        })
+        return names
     }
 
     /** `launchStory` and `StoryRuns.launch` start a story of their own, which keeps copies of what it captures. */

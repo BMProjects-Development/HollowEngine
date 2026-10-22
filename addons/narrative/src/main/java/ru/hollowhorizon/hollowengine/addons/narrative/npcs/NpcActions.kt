@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.npcs
 
 import kotlinx.serialization.Serializable
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
@@ -14,6 +15,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcAction
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
 import ru.hollowhorizon.hollowengine.common.npcs.actions.Preempted
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
+import ru.hollowhorizon.hollowengine.common.npcs.registry.ref
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -238,8 +240,18 @@ fun NpcEntity.clearLookTarget() {
 /** Puts the NPC at [position] at once, as a fast-forwarded move ends. */
 private fun NpcEntity.arriveAt(position: Vec3): MoveResult {
     navigation.stop()
-    teleportTo(position.x, position.y, position.z)
+    place(position, yRot, xRot)
     return MoveResult.Arrived
+}
+
+/**
+ * Puts the NPC at [position], with a body or without one: an NPC whose chunk is unloaded is moved through the
+ * registry, which keeps it outside chunks, so an undo or a fast-forward need not wait for it.
+ */
+private fun NpcEntity.place(position: Vec3, yaw: Float, pitch: Float) {
+    val level = level() as? ServerLevel
+    if (level == null || ref.isLoaded) teleportTo(position.x, position.y, position.z)
+    else ref.teleportTo(level, position, yaw, pitch)
 }
 
 /** Turns the NPC to face [target] at once. */
@@ -257,7 +269,7 @@ internal class NpcPlacement(val x: Double, val y: Double, val z: Double, val rot
     fun applyTo(npc: NpcEntity) {
         npc.actions.cancel(NpcActionKeys.MOVEMENT)
         npc.navigation.stop()
-        npc.teleportTo(x, y, z)
+        npc.place(Vec3(x, y, z), rotation.body, rotation.pitch)
         rotation.applyTo(npc)
     }
 

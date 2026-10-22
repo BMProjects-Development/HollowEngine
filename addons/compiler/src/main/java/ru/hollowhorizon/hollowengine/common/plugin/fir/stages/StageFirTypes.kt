@@ -34,7 +34,7 @@ internal fun ConeKotlinType.stageProblem(session: FirSession): String? {
     if (this is ConeErrorType || isStageLambda(session)) return null
     val klass = toRegularClassSymbol(session) ?: return "$this is a type parameter, which cannot be saved"
     val name = klass.classId.asSingleFqName().asString()
-    if (name in StageValueTypes.BASIC || name in StageValueTypes.PRIMITIVE_ARRAYS) return null
+    if (name in StageValueTypes.BASIC || name in StageValueTypes.PRIMITIVE_ARRAYS || name == StageValueTypes.STORY_HANDLE) return null
     fun inherits(type: ConeKotlinType, visited: MutableSet<ClassId> = HashSet()): Boolean {
         val symbol = type.toRegularClassSymbol(session) ?: return false
         if (!visited.add(symbol.classId)) return false

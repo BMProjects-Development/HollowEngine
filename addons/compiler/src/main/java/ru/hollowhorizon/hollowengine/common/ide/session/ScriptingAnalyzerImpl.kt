@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
@@ -309,7 +310,10 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
-        createCompletions(getOrCreateFile(name, text), offset, sink)
+        val file = getOrCreateFile(name, text)
+        val checkpoints = checkpointNameCompletions(file, offset)
+        if (checkpoints != null) sink.emit(checkpoints) else createCompletions(file, offset, sink)
+        Unit
     }
 
     override fun definition(name: String, text: String, offset: Int): DefinitionLocation? = synchronized(lock) {

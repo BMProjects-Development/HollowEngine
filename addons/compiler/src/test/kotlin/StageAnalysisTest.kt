@@ -1,3 +1,4 @@
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -164,5 +165,35 @@ class StageAnalysisTest {
             }
         """)
         assertTrue(errors.any { it.severity.isError() }, errors.toString())
+    }
+
+    @Test
+    fun `a rewind to a checkpoint the script does not have is a warning`() {
+        val warnings = diagnostics("""
+            @State
+            suspend fun main() {
+                checkpoint("arena")
+                rewind("arnea")
+            }
+        """).filter { !it.severity.isError() }
+        assertTrue(warnings.any { "No checkpoint of this script is named 'arnea'" in it.message }, warnings.toString())
+    }
+
+    @Test
+    fun `the names of checkpoints are offered inside rewind`() {
+        val source = """
+            @State
+            suspend fun main() {
+                checkpoint("arena")
+                checkpoint("boss")
+                rewind("ar")
+            }
+        """.trimIndent()
+        val items = ArrayList<String>()
+        compiler.environment.analyzer.completions("names.stage.kts", source, source.indexOf("\"ar\")") + 3, CompletionSink { batch ->
+            batch.forEach { items += it.show }
+            true
+        })
+        assertEquals(listOf("arena"), items)
     }
 }

@@ -32,7 +32,7 @@ internal class StageTypes(context: IrPluginContext) {
         if (entity != null && type.isSubtypeOfClass(entity)) return null
         if (tag != null && type.isSubtypeOfClass(tag)) return null
         val name = klass.kotlinFqName.asString()
-        if (name in StageValueTypes.BASIC) return null
+        if (name in StageValueTypes.BASIC || name == StageValueTypes.STORY_HANDLE) return null
         if (isFunction(type)) {
             return "a function value cannot be saved; pass a lambda to a @State parameter instead"
         }

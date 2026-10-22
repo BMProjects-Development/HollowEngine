@@ -5,10 +5,10 @@ import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 
 /**
- * The checkpoints a story passed, oldest first, and the rewinds it can redo.
+ * The checkpoints a story passed, oldest first.
  *
  * A checkpoint keeps the whole tree of runs as it was there and marks the journal, so a rewind to it undoes what was
- * performed since and puts the runs back. A rewind can be redone until the story performs a new action.
+ * performed since and puts the runs back.
  */
 internal class StoryHistory(private val root: StoryRun) {
     class Checkpoint(
@@ -37,40 +37,20 @@ internal class StoryHistory(private val root: StoryRun) {
         }
     }
 
-    /** What a rewind left behind: the tree, the journal and the checkpoints as they were before it. */
-    private class Redo(val tree: CompoundTag, val journal: ListTag, val checkpoints: List<Checkpoint>) {
-        fun save(): CompoundTag = CompoundTag().apply {
-            put("tree", tree.copy())
-            put("journal", journal.copy())
-            put("checkpoints", ListTag().apply { checkpoints.forEach { add(it.save()) } })
-        }
-
-        companion object {
-            fun load(tag: CompoundTag) = Redo(
-                tag.getCompound("tree").copy(),
-                tag.getList("journal", Tag.TAG_COMPOUND.toInt()).copy(),
-                tag.getList("checkpoints", Tag.TAG_COMPOUND.toInt()).map { Checkpoint.load(it as CompoundTag) },
-            )
-        }
-    }
-
     private val checkpoints = ArrayList<Checkpoint>()
-    private val redo = ArrayList<Redo>()
 
     val all: List<Checkpoint> get() = checkpoints
 
-    val canRedo: Boolean get() = redo.isNotEmpty()
-
     fun has(name: String): Boolean = checkpoints.any { it.name == name }
+
+    /** Whether [run] passed a checkpoint of its own that is still kept: its entry at least, unless it was forgotten. */
+    fun hasOwn(run: StoryRun): Boolean = checkpoints.any { it.run == run.path }
 
     /** [run] passed the checkpoint [name]: keeps the tree as it is now with what [labels] captured. */
     fun add(name: String, run: StoryRun, labels: List<JournalEntry>) {
         checkpoints += Checkpoint(name, run.path, root.journal.next, root.saveTree(), labels)
         if (checkpoints.size > MAX_CHECKPOINTS) checkpoints.removeAt(0)
     }
-
-    /** The story performed a new action, so what it rewound past cannot come back. */
-    fun recorded() = redo.clear()
 
     /** The lowest mark a rewind can still go back to: the oldest checkpoint, or the segment a stage is in. */
     fun floor(segments: Sequence<Long>): Long =
@@ -82,57 +62,45 @@ internal class StoryHistory(private val root: StoryRun) {
         if (index < 0) throw StoryException("Story '${root.path}' has no checkpoint '$name'")
         val target = checkpoints[index]
         root.halt("it rewinds to '$name'")
-        val before = Redo(root.saveTree(), root.journal.entriesTag(), checkpoints.toList())
         root.journal.rewind(target.mark)
         target.labels.asReversed().forEach(StoryActions::undo)
         checkpoints.subList(index + 1, checkpoints.size).clear()
-        push(before)
         root.restoreTree(target.tree)
     }
 
-    /** Takes [run] and its active branches each back to the start of the segment it is in. */
-    suspend fun rewindSegments(run: StoryRun) {
-        run.halt("it rewinds")
-        val before = Redo(root.saveTree(), root.journal.entriesTag(), checkpoints.toList())
-        run.tree().filter { !it.state.done }.forEach { branch ->
-            val frame = branch.pending.lastOrNull() ?: return@forEach
-            root.journal.rewind(frame.segmentMark) { it.run == branch.path }
-        }
-        push(before)
+    /**
+     * Takes [run] back to the latest checkpoint it passed itself, its entry at the least: [run] and its branches
+     * as they were there, what they performed since undone. Whatever runs beside it goes on.
+     */
+    suspend fun rewindOwn(run: StoryRun) {
+        val index = checkpoints.indexOfLast { it.run == run.path }
+        if (index < 0) throw StoryException("Story '${run.path}' has no checkpoint left to rewind to")
+        val target = checkpoints[index]
+        run.halt("it rewinds to '${target.name}'")
+        val inside = { path: String -> path == run.path || path.startsWith("${run.path}/") }
+        root.journal.rewind(target.mark) { inside(it.run) }
+        target.labels.asReversed().forEach(StoryActions::undo)
+        checkpoints.subList(index + 1, checkpoints.size).removeAll { inside(it.run) }
+        run.restoreTree(subtree(target.tree, run.path))
     }
 
-    /** Returns to where the latest rewind started from, performing again what it undid. */
-    suspend fun redo() {
-        val record = redo.removeLastOrNull() ?: throw StoryException("Story '${root.path}' has nothing to redo")
-        root.halt("it redoes a rewind")
-        root.journal.restore(record.journal)
-        checkpoints.clear()
-        checkpoints += record.checkpoints
-        root.restoreTree(record.tree)
-    }
-
-    private fun push(record: Redo) {
-        redo += record
-        if (redo.size > MAX_REDO) redo.removeAt(0)
-    }
+    /** What [tree], saved for the root, holds for the run at [path]. */
+    private fun subtree(tree: CompoundTag, path: String): CompoundTag =
+        path.split('/').drop(1).fold(tree) { tag, name -> tag.getCompound("children").getCompound(name) }
 
     fun save(): CompoundTag = CompoundTag().apply {
         put("checkpoints", ListTag().apply { checkpoints.forEach { add(it.save()) } })
-        if (redo.isNotEmpty()) put("redo", ListTag().apply { redo.forEach { add(it.save()) } })
     }
 
     fun load(tag: CompoundTag) {
         checkpoints.clear()
-        redo.clear()
         tag.getList("checkpoints", Tag.TAG_COMPOUND.toInt())
             .forEach { checkpoints += Checkpoint.load(it as CompoundTag) }
-        tag.getList("redo", Tag.TAG_COMPOUND.toInt()).forEach { redo += Redo.load(it as CompoundTag) }
     }
 
     private companion object {
         /** Older checkpoints are forgotten, so a long story does not grow its save without end. */
         const val MAX_CHECKPOINTS = 64
-        const val MAX_REDO = 8
     }
 }
 
@@ -145,7 +113,7 @@ class CheckpointScope internal constructor(private val run: String) {
     internal val labels = ArrayList<JournalEntry>()
 
     internal fun add(action: StoryAction, args: CompoundTag, snapshots: CompoundTag) {
-        labels += JournalEntry(-1, action.id, run, Lifetime.RUN, args, snapshots, null)
+        labels += JournalEntry(-1, action.id, run, Lifetime.RUN, null, args, snapshots, null)
     }
 
     internal companion object {

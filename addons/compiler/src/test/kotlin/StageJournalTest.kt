@@ -1,13 +1,11 @@
 import kotlinx.coroutines.test.runTest
-import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryException
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
-/** Actions in the journal: what is undone when, rewinds to checkpoints and back, labels, a restart in between. */
+/** Actions in the journal: what is undone when, rewinds to checkpoints, labels, a restart in between. */
 class StageJournalTest : StageTest() {
     @Test
-    fun `a temporary action is undone when its stage returns and a permanent one stays`() = runTest {
+    fun `a temporary action stands until the next checkpoint of its run and a permanent one stays`() = runTest {
         val world = world("temporary", PLACE + $$"""
             @State
             suspend fun fight() {
@@ -20,6 +18,8 @@ class StageJournalTest : StageTest() {
             suspend fun main() {
                 fight()
                 log("after ${StageTrace.blocks}")
+                checkpoint("won")
+                log("passed ${StageTrace.blocks}")
             }
         """
         )
@@ -27,7 +27,32 @@ class StageJournalTest : StageTest() {
         assertEquals(listOf("place barricade", "place banner"), StageTrace.take())
 
         world.release("win")
-        assertEquals(listOf("undo barricade", "after [banner]"), StageTrace.take())
+        assertEquals(listOf("after [barricade, banner]", "undo barricade", "passed [banner]"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `a temporary action until a named checkpoint goes when any run of the story passes it`() = runTest {
+        val world = world("until", PLACE + $$"""
+            @State
+            suspend fun main() {
+                temporary(until = "defeated") { place("gate") }
+                checkpoint("arena")
+                log("arena ${StageTrace.blocks}")
+                async("boss") {
+                    await("kill")
+                    checkpoint("defeated")
+                    log("defeated ${StageTrace.blocks}")
+                }
+                await("end")
+            }
+        """
+        )
+        world.launch("main")
+        assertEquals(listOf("place gate", "arena [gate]"), StageTrace.take(), "another checkpoint leaves it standing")
+
+        world.release("kill")
+        assertEquals(listOf("undo gate", "defeated []"), StageTrace.take())
         world.stop()
     }
 
@@ -80,43 +105,36 @@ class StageJournalTest : StageTest() {
     }
 
     @Test
-    fun `a redo brings back what a rewind undid until the story performs something new`() = runTest {
-        val world = world("redo", PLACE + """
+    fun `rewind without a name goes back to the latest checkpoint, past the stage calls after it`() = runTest {
+        val world = world("latest", PLACE + """
+            @State
+            suspend fun step() = log("step")
+
             @State
             suspend fun main() {
                 place("door")
                 checkpoint("gate")
-                await("go")
+                step()
                 place("bridge")
-                await("x")
-                log("end")
+                if (StageTrace.token == "fail") {
+                    StageTrace.token = ""
+                    rewind()
+                }
+                log("done")
             }
         """
         )
-        val story = world.launch("main")
-        world.release("go")
-        StageTrace.hold("go")
-        story.rewind("gate")
-        world.settle()
-        assertEquals(listOf("place door", "place bridge", "undo bridge"), StageTrace.take())
-
-        story.redo()
-        world.settle()
-        assertEquals(listOf("forward bridge"), StageTrace.take())
-        assertEquals("main@after:gate", story.state, "the story is back where the rewind took it from")
-
-        story.rewind("gate")
-        world.release("go")
-        assertEquals(listOf("undo bridge", "place bridge"), StageTrace.take())
-        assertFailsWith<StoryException>("a new action ends what could be redone") { story.redo() }
-
-        world.release("x")
-        assertEquals(listOf("end"), StageTrace.take())
+        StageTrace.token = "fail"
+        world.launch("main")
+        assertEquals(
+            listOf("place door", "step", "place bridge", "undo bridge", "step", "place bridge", "done"),
+            StageTrace.take(),
+        )
         world.stop()
     }
 
     @Test
-    fun `rewind without a checkpoint repeats the segment the stage is in`() = runTest {
+    fun `rewind with no checkpoint before it starts its run over`() = runTest {
         val world = world("segment", PLACE + """
             @State
             suspend fun attempt() {
@@ -289,36 +307,29 @@ class StageJournalTest : StageTest() {
     }
 
     @Test
-    fun `a redo fast-forwards an action as a whole, not the actions it performed again`() = runTest {
-        val world = world("nested", PLACE + """
-            @Action
-            suspend fun build() = action {
-                undo { log("undo build") }
-                perform {
-                    place("left")
-                    place("right")
-                }
-            }
-
+    fun `rewind in a branch takes back the branch alone`() = runTest {
+        val world = world("branchRewind", PLACE + """
             @State
             suspend fun main() {
-                checkpoint("empty")
-                await("go")
-                build()
+                place("wall")
+                async("guard") {
+                    place("tower")
+                    checkpoint("posted")
+                    place("flag")
+                    if (StageTrace.token == "fail") {
+                        StageTrace.token = ""
+                        rewind()
+                    }
+                    await("g")
+                }
                 await("x")
             }
         """
         )
-        val story = world.launch("main")
-        world.release("go")
-        StageTrace.hold("go")
-        story.rewind("empty")
-        world.settle()
-        story.redo()
-        world.settle()
-        val trace = StageTrace.take()
-        assertEquals(listOf("place left", "place right", "undo right", "undo left", "undo build"), trace.take(5))
-        assertEquals(listOf("place left", "place right"), trace.drop(5), "the redo performs build once, its parts with it")
+        StageTrace.token = "fail"
+        world.launch("main")
+        assertEquals(listOf("place wall", "place tower", "place flag", "undo flag", "place flag"), StageTrace.take())
+        assertEquals(setOf("wall", "tower", "flag"), StageTrace.blocks)
         world.stop()
     }
 

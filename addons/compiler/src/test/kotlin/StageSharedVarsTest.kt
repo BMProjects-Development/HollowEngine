@@ -138,6 +138,42 @@ class StageSharedVarsTest : StageTest() {
     }
 
     @Test
+    fun `a shared var can hold the handle of a branch, which a restart finds again`() = runTest {
+        val world = world("sharedHandle", $$"""
+            @State
+            suspend fun main() {
+                var timer: StoryHandle<*>? = null
+                suspend fun sing(name: String) {
+                    timer?.cancel()
+                    timer = async("reset") {
+                        await("r$name")
+                        log("reset $name")
+                    }
+                }
+                async("input") {
+                    sing("left")
+                    await("next")
+                    sing("right")
+                    checkpoint("sung")
+                    await("hold")
+                }
+                checkpoint("listening")
+                await("end")
+                log("timer ${timer?.key}")
+            }
+        """
+        )
+        world.launch("main")
+        world.release("next")
+        world.restart()
+        world.release("rleft")
+        world.release("rright")
+        world.release("end")
+        assertEquals(listOf("reset right", "timer main/input/reset"), StageTrace.take(), "the cancelled timer stays cancelled")
+        world.stop()
+    }
+
+    @Test
     fun `a story started from a stage cannot share its vars`() {
         val errors = compiler.errors("""
             fun start(runs: StoryRuns) {}

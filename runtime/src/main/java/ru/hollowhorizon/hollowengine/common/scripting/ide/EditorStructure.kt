@@ -16,20 +16,30 @@ data class CodeFold(
     val collapsedByDefault: Boolean = false,
 )
 
-/** A [navigable] marker leads somewhere through [ScriptingAnalyzer.gutterTargets]. */
-enum class GutterMarkerKind(val navigable: Boolean) {
+/**
+ * A [navigable] marker leads somewhere through [ScriptingAnalyzer.gutterTargets]; [icon] names its picture when
+ * it shares one with another kind.
+ */
+enum class GutterMarkerKind(val navigable: Boolean, val icon: String? = null) {
     OVERRIDE(true),
     COROUTINE(false),
     EVENT(false),
     STAGE(false),
     CHECKPOINT(false),
     ACTION(false),
+    REWIND(false),
+    REWIND_START(false, "rewind"),
+    TEMPORARY(false),
+    TEMPORARY_OPEN(false, "temporary"),
 }
 
 data class GutterNavigationTarget(val label: String, val location: DefinitionLocation)
 
-/** [args] fill in the tooltip of the kind, such as the name of a checkpoint. */
-data class GutterMarker(val offset: Int, val kind: GutterMarkerKind, val args: List<String> = emptyList())
+/**
+ * [args] fill in the tooltip of the kind, such as the name of a checkpoint. Markers with the same [color] key are
+ * drawn in the same color, which tells apart the checkpoints and the calls that lead to each.
+ */
+data class GutterMarker(val offset: Int, val kind: GutterMarkerKind, val args: List<String> = emptyList(), val color: String? = null)
 
 enum class ScriptRunKind { PLAIN, NODE }
 

@@ -10,6 +10,9 @@ internal object StageValueTypes {
     val SERIALIZABLE_ID = ClassId.topLevel(SERIALIZABLE)
     val STAGE_LAMBDA = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StageLambda")).asString()
 
+    /** A handle of a run, saved as the path of the run whatever its result type. */
+    val STORY_HANDLE = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StoryHandle")).asString()
+
     /** The box a shared var becomes; it is saved as its value. */
     val STORY_BOX = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StoryBox")).asString()
 

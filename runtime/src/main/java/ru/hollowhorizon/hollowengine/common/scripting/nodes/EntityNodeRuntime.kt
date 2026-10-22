@@ -114,7 +114,13 @@ class EntityNodeManager(private val entity: Entity) {
             entry = entry,
             receivers = listOf(server, entity),
             compiled = compiled,
-        ) ?: return false
+        )
+        if (script == null) {
+            if (dormant.remove(canonicalPath) != null) {
+                HollowEngine.LOGGER.error("Node '{}' is removed from {}: it could not start", canonicalPath, entity.uuid)
+            }
+            return false
+        }
 
         dormant.remove(canonicalPath)
         nodes[canonicalPath] = RunningNode(script)
@@ -186,9 +192,8 @@ class EntityNodeManager(private val entity: Entity) {
     }
 
     /**
-     * A node that cannot be attached right now stays dormant rather than being dropped: [serialize]
-     * writes dormant nodes back out, so a script that was briefly unavailable costs the entity a node
-     * until something attaches it again, not forever at the next world save.
+     * A node whose namespace is not installed right now stays dormant: [serialize] writes it back out, so
+     * turning the addon on again brings it back. A node that is installed but cannot start is removed.
      */
     fun deserialize(tag: CompoundTag) {
         tag.allKeys.forEach { path ->
@@ -201,13 +206,8 @@ class EntityNodeManager(private val entity: Entity) {
                 .onFailure { HollowEngine.LOGGER.error("Error while deserializing entity node '$path'", it) }
                 .getOrDefault(false)
 
-            if (attached) return@forEach
+            if (attached || available) return@forEach
             dormant[canonicalPath] = nodeTag
-            // A missing namespace is an ordinary wait. Anything else means the node is not running on an
-            // entity that is saved with it, which is worth hearing about the first time it happens.
-            if (available) {
-                HollowEngine.LOGGER.warn("Entity node '{}' of {} stays dormant: nothing attached it", canonicalPath, entity.uuid)
-            }
         }
     }
 
