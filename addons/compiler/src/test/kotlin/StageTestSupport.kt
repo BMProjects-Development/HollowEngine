@@ -20,6 +20,8 @@ import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import java.io.File
 import kotlin.coroutines.ContinuationInterceptor
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.io.path.createTempDirectory
 import kotlin.test.fail
 
@@ -116,7 +118,7 @@ class StageWorld(private val test: TestScope, private var compiled: CompiledScri
     private class Owner(override val scope: CoroutineScope) : StoryOwner {
         override val server: MinecraftServer get() = error("There is no server in stage tests")
         override val entity: Entity? get() = null
-        override fun changed() = Unit
+        override fun changed(runs: StoryRuns) = Unit
     }
 
     private var scope = newScope()
@@ -181,4 +183,20 @@ class StageWorld(private val test: TestScope, private var compiled: CompiledScri
         StoryInstances.register(instance, scope)
         return instance
     }
+}
+
+/** A test that compiles stage scripts, with a fresh trace and compiler for every test. */
+abstract class StageTest {
+    protected lateinit var compiler: StageCompiler
+
+    @BeforeTest
+    fun setUpStages() {
+        StageTrace.reset()
+        compiler = StageCompiler()
+    }
+
+    @AfterTest
+    fun tearDownStages() = compiler.close()
+
+    protected fun TestScope.world(name: String, code: String) = StageWorld(this, compiler.compile(name, code))
 }
