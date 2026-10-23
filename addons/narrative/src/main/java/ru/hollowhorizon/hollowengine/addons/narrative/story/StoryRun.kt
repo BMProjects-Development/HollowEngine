@@ -30,7 +30,7 @@ class StoryRun internal constructor(
     internal val pending = ArrayDeque<StoryFrame>()
     internal val children = LinkedHashMap<String, StoryRun>()
     private val ownVars = CompoundTag()
-    private val ownBoxes: StoryBoxTable? = if (parent == null) StoryBoxTable(this) else null
+    private val ownBoxes: StoryBoxTable? = if (parent == null) StoryBoxTable() else null
     private val ownRecords = CompoundTag()
     private val ownJournal = StoryJournal()
     private val ownHistory: StoryHistory? = if (parent == null) StoryHistory(this) else null
@@ -144,7 +144,6 @@ class StoryRun internal constructor(
         frame.trampolined = trampolined
         frames += frame
         watch(key)
-        changed()
         return frame
     }
 
@@ -174,7 +173,6 @@ class StoryRun internal constructor(
         children[name] = child
         frame.children += name
         history.add(name, child, emptyList())
-        changed()
         child.start()
         return child
     }
@@ -193,10 +191,7 @@ class StoryRun internal constructor(
     /** Stops the run for good, along with its branches, and takes back their temporary actions at once. */
     internal fun stop() {
         if (state.done) {
-            if (!stopping) {
-                stopping = true
-                changed()
-            }
+            stopping = true
             return
         }
         stopping = true
@@ -214,8 +209,6 @@ class StoryRun internal constructor(
     }
 
     internal suspend fun awaitDone(): Status = status.first { it.done }
-
-    internal fun changed() = runs.changed()
 
     /** This run and every branch under it. */
     internal fun tree(): Sequence<StoryRun> = sequenceOf(this) + children.values.asSequence().flatMap { it.tree() }
@@ -245,7 +238,6 @@ class StoryRun internal constructor(
         children.clear()
         tail = null
         readTree(tag)
-        changed()
     }
 
     /** Runs [change] on the stopped story outside of it, then starts [restart] again. */
@@ -261,7 +253,6 @@ class StoryRun internal constructor(
                 HollowEngine.LOGGER.error("Story '{}' failed to rewind", root.path, failure)
             } finally {
                 restart.moving = false
-                root.changed()
                 restart.start()
             }
         }
@@ -272,7 +263,6 @@ class StoryRun internal constructor(
         pending.addAll(0, frames)
         frames.clear()
         tail = null
-        changed()
     }
 
     private fun finish(status: Status, result: Tag?, failure: String?) {
@@ -282,7 +272,7 @@ class StoryRun internal constructor(
         pending.clear()
         journal.close(path)
         this.status.value = status
-        if (parent == null) runs.ended(this) else changed()
+        if (parent == null) runs.ended(this)
     }
 
     private fun watch(key: String) {

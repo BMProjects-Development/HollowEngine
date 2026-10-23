@@ -170,7 +170,6 @@ internal class SavedVariable<T>(private val default: T, private val serializer: 
     override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
         val run = run(property)
         StoryValues.put(run.vars, name(property), serializer, value)
-        run.changed()
     }
 
     private fun run(property: KProperty<*>) =

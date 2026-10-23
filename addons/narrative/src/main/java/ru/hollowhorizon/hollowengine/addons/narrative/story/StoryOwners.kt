@@ -111,6 +111,14 @@ object StoryOwners {
         entity.data[ENTITY_STORIES]?.let(entity(entity)::load)
     }
 
+    /** An entity keeps its runs in its own data, written as the entity is saved, so the save has them as they are. */
+    @SubscribeEvent
+    fun onEntitySaving(event: EntityEvent.Saving) {
+        val entity = event.entity
+        val runs = entities[entity] ?: return
+        if (runs.keys.isEmpty()) entity.data.remove(ENTITY_STORIES) else entity.data[ENTITY_STORIES] = runs.save()
+    }
+
     /**
      * A player is the same object after a dimension change and keeps its runs; any other entity leaving its level
      * takes them along. Only a destroyed entity ends its stories, and never a player, which is removed when it
@@ -139,24 +147,18 @@ object StoryOwners {
     private class ServerOwner(override val server: MinecraftServer) : StoryOwner {
         override val scope: CoroutineScope get() = server.runtimeContext.scope
         override val entity: Entity? get() = null
-        override fun changed(runs: StoryRuns) = Unit
     }
 
     private class EntityOwner(override val entity: Entity) : StoryOwner {
         override val scope: CoroutineScope get() = entity.coroutineScope
         override val server: MinecraftServer
             get() = entity.server ?: throw StoryException("Entity ${entity.uuid} has no server")
-
-        override fun changed(runs: StoryRuns) {
-            entity.data[ENTITY_STORIES] = runs.save()
-        }
     }
 
     private class NodeOwner(private val node: NodeScript) : StoryOwner {
         override val scope: CoroutineScope get() = node
         override val server: MinecraftServer get() = node.server
         override val entity: Entity? get() = (node.host as? NodeHost.OfEntity)?.entity
-        override fun changed(runs: StoryRuns) = Unit
     }
 
     private const val NODE_SECTION = "hollowengine-narrative:stories"

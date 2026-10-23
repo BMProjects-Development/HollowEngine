@@ -13,13 +13,15 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.psi.psiUtil.parents
+import ru.hollowhorizon.hollowengine.client.HighlightTheme
 import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarker
 import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarkerKind
 
 /**
  * The gutter markers of story code: stage calls, after which a restart continues, and checkpoints with the calls that
- * refer to them. A checkpoint is colored by its name, and `rewind` and `temporary` get the color of the checkpoint
- * they lead to, so a call that names none still shows which one it means.
+ * refer to them. Each checkpoint name of the file gets its own color, in the order the names first appear, and
+ * `rewind` and `temporary` get the color of the checkpoint they lead to, so a call that names none still shows which
+ * one it means.
  */
 internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) {
     private class Checkpoint(val owner: KtFunction?, val offset: Int, val name: String)
@@ -28,6 +30,8 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
         .filter { it.calleeExpression?.text == CheckpointName.asString() && isStory(it, CheckpointName) }
         .mapNotNull { call -> literal(call.valueArguments.firstOrNull())?.let { Checkpoint(owner(call), call.textOffset, it) } }
 
+    private val colors = LinkedHashMap<String, Int>().apply { checkpoints.forEach { getOrPut(it.name) { size } } }
+
     /** The marker of [call] at [expression], at offset 0 for the caller to place, or null when it is no story call. */
     fun markerFor(expression: KtExpression, call: KaFunctionCall<*>): GutterMarker? = with(session) {
         val symbol = call.symbol as? KaNamedFunctionSymbol ?: return null
@@ -35,22 +39,16 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
         if (symbol.callableId?.packageName == StoryPackage) when (symbol.name) {
             CheckpointName -> {
                 val name = literal(callExpression?.valueArguments?.firstOrNull()) ?: "?"
-                return GutterMarker(0, GutterMarkerKind.CHECKPOINT, listOf(name), color = name)
+                return GutterMarker(0, GutterMarkerKind.CHECKPOINT, listOf(name), color = color(name))
             }
 
-            RewindName -> {
-                val target = argument(callExpression, "checkpoint", 0)
-                    ?: checkpoints.lastOrNull { it.owner == owner(expression) && it.offset < expression.textOffset }?.name
-                return target?.let { GutterMarker(0, GutterMarkerKind.REWIND, listOf(it), color = it) }
-                    ?: GutterMarker(0, GutterMarkerKind.REWIND_START)
-            }
+            RewindName -> return rewindTarget(callExpression, expression)
+                ?.let { GutterMarker(0, GutterMarkerKind.REWIND, listOf(it), color = color(it)) }
+                ?: GutterMarker(0, GutterMarkerKind.REWIND_START)
 
-            TemporaryName -> {
-                val target = argument(callExpression, "until", null)
-                    ?: checkpoints.firstOrNull { it.owner == owner(expression) && it.offset > expression.textOffset }?.name
-                return target?.let { GutterMarker(0, GutterMarkerKind.TEMPORARY, listOf(it), color = it) }
-                    ?: GutterMarker(0, GutterMarkerKind.TEMPORARY_OPEN)
-            }
+            TemporaryName -> return temporaryTarget(callExpression, expression)
+                ?.let { GutterMarker(0, GutterMarkerKind.TEMPORARY, listOf(it), color = color(it)) }
+                ?: GutterMarker(0, GutterMarkerKind.TEMPORARY_OPEN)
         }
         if (StateClassId in symbol.annotations) return GutterMarker(0, GutterMarkerKind.STAGE, listOf(symbol.name.asString()))
         val receiver = call.partiallyAppliedSymbol.dispatchReceiver?.type
@@ -59,6 +57,30 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
         }
         return null
     }
+
+    /**
+     * The offsets of the checkpoints the `rewind` or `temporary` call [call] leads to: those of the code it is written
+     * in first, then the checkpoints of the same name elsewhere in the file, which another run of the story may pass.
+     */
+    fun checkpointsOf(call: KtCallExpression): List<Int> {
+        val target = when {
+            isStory(call, RewindName) -> rewindTarget(call, call)
+            isStory(call, TemporaryName) -> temporaryTarget(call, call)
+            else -> null
+        } ?: return emptyList()
+        val owner = owner(call)
+        return checkpoints.filter { it.name == target }.sortedBy { if (it.owner == owner) 0 else 1 }.map { it.offset }
+    }
+
+    /** The checkpoint a `rewind` goes to: the one it names, or the last one before it in the same code. */
+    private fun rewindTarget(call: KtCallExpression?, expression: KtExpression): String? = argument(call, "checkpoint", 0)
+        ?: checkpoints.lastOrNull { it.owner == owner(expression) && it.offset < expression.textOffset }?.name
+
+    /** The checkpoint a `temporary` stands until: the one it names, or the next one after it in the same code. */
+    private fun temporaryTarget(call: KtCallExpression?, expression: KtExpression): String? = argument(call, "until", null)
+        ?: checkpoints.firstOrNull { it.owner == owner(expression) && it.offset > expression.textOffset }?.name
+
+    private fun color(name: String): Int = HighlightTheme.paletteArgb(colors.getOrPut(name) { colors.size })
 
     /** The code a checkpoint belongs to: the function or `@State` lambda it is written in, which is one run's. */
     private fun owner(element: PsiElement): KtFunction? = element.parents.filterIsInstance<KtFunction>()

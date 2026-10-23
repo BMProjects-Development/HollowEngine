@@ -144,7 +144,6 @@ class StageWorld(private val test: TestScope, private var compiled: CompiledScri
     private class Owner(override val scope: CoroutineScope) : StoryOwner {
         override val server: MinecraftServer get() = error("There is no server in stage tests")
         override val entity: Entity? get() = null
-        override fun changed(runs: StoryRuns) = Unit
     }
 
     private var scope = newScope()

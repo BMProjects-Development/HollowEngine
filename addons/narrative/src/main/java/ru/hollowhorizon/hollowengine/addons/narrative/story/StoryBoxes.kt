@@ -12,13 +12,7 @@ import net.minecraft.nbt.CompoundTag
  * A `var` of a stage that `@State` lambdas captured. The compiler turns the var into a box, so the stage and its
  * lambdas read and write one value, and the story saves that value once, with the stage that declared it.
  */
-class StoryBox<T> internal constructor(internal val id: String, private val table: StoryBoxTable, value: T) {
-    var value: T = value
-        set(value) {
-            field = value
-            table.changed()
-        }
-}
+class StoryBox<T> internal constructor(internal val id: String, var value: T)
 
 /** Where the compiler gets the boxes of shared vars from. */
 object StoryBoxes {
@@ -35,7 +29,7 @@ object StoryBoxes {
 }
 
 /** The boxes of shared vars of one story, saved with its tree. */
-internal class StoryBoxTable(private val root: StoryRun) {
+internal class StoryBoxTable {
     private class Live(val box: StoryBox<Any?>, val serializer: KSerializer<Any?>)
 
     private val live = LinkedHashMap<String, Live>()
@@ -51,7 +45,7 @@ internal class StoryBoxTable(private val root: StoryRun) {
                 frame.boxes += id
             }
         }
-        val box = live[id]?.box ?: StoryBox<Any?>(id, this, initial).also { live[id] = Live(it, serializer) }
+        val box = live[id]?.box ?: StoryBox<Any?>(id, initial).also { live[id] = Live(it, serializer) }
         saved.remove(id)
         box.value = initial
         return box as StoryBox<T>
@@ -63,7 +57,7 @@ internal class StoryBoxTable(private val root: StoryRun) {
         val tag = saved.get(id) ?: throw StoryException(
             "A @State lambda refers to a var that is gone: the stage that declared it returned, or it belongs to another story"
         )
-        val box = StoryBox(id, this, StoryValues.decode(serializer, tag))
+        val box = StoryBox(id, StoryValues.decode(serializer, tag))
         live[id] = Live(box, serializer)
         saved.remove(id)
         return box
@@ -76,8 +70,6 @@ internal class StoryBoxTable(private val root: StoryRun) {
             saved.remove(id)
         }
     }
-
-    fun changed() = root.changed()
 
     fun save(): CompoundTag = CompoundTag().apply {
         putLong("next", next)

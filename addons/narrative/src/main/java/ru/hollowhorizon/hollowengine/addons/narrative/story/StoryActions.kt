@@ -121,7 +121,7 @@ object StoryActions {
     /** Undoes what [entry] did; logs why when it cannot. */
     internal fun undo(entry: JournalEntry) {
         val replay = try {
-            replay(entry)
+            StoryValues.withOffWorldNpcs { replay(entry) }
         } catch (missing: StoryEntityMissing) {
             StoryDeferredReplays.undo(entry, missing.uuid)
             return

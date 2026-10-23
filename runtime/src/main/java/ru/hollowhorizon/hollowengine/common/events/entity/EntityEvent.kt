@@ -19,6 +19,11 @@ open class EntityEvent(val entity: Entity) : Event {
         companion object : EventHandler<ChangeDimension>()
     }
 
+    /** The entity is being written to NBT; what goes into its data now is part of this save. */
+    class Saving(entity: Entity) : EntityEvent(entity) {
+        companion object : EventHandler<Saving>()
+    }
+
     /** The entity is leaving its level for [reason]; it is still whole when this is posted. */
     class Removed(entity: Entity, val reason: Entity.RemovalReason) : EntityEvent(entity) {
         companion object : EventHandler<Removed>()
