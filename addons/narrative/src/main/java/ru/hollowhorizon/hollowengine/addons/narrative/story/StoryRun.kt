@@ -7,6 +7,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.nbt.Tag
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryRun.Companion.current
 import kotlin.coroutines.CoroutineContext
@@ -115,8 +116,14 @@ class StoryRun internal constructor(
         } catch (missing: StoryEntityMissing) {
             HollowEngine.LOGGER.debug("Story '{}' waits for entity {}", path, missing.uuid)
             pause()
-            runs.waitFor(missing.uuid, this)
+            if (StoryValues.entities(missing.uuid, Entity::class) != null) job?.invokeOnCompletion { start() }
+            else runs.waitFor(missing.uuid, this)
         } catch (cancelled: CancellationException) {
+            if (currentCoroutineContext().isActive) {
+                HollowEngine.LOGGER.error("Story '{}' failed", path, cancelled)
+                finish(Status.FAILED, null, cancelled.message ?: cancelled.javaClass.simpleName)
+                return
+            }
             if (stopping) finish(Status.STOPPED, null, null) else pause()
             throw cancelled
         } catch (failure: Throwable) {
