@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import ru.hollowhorizon.hollowengine.client.HighlightTheme
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiGutterMarker
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -29,7 +28,7 @@ internal fun ideGutterMarkers(
                     "hollowengine:textures/gui/icons/gutter/$icon.svg", "hollowengine.gui.ide.gutter.$kind".lang(*marker.args.toTypedArray()),
                     listOf("gutter-$kind"), onClick = if (!marker.kind.navigable) null else {
                         { if (file.text == analyzedText) navigate(marker.offset) }
-                    }, tint = marker.color?.let { UiColor.fromArgb(HighlightTheme.dslMarkerArgb(it)) }))
+                    }, tint = marker.color?.let { UiColor.fromArgb(it) }))
             }
             if (canRun) structure.runTargets.forEach { target ->
                 val status = execution?.status ?: ScriptExecutionStatus.IDLE

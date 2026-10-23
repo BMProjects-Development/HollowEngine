@@ -27,19 +27,19 @@ enum class GutterMarkerKind(val navigable: Boolean, val icon: String? = null) {
     STAGE(false),
     CHECKPOINT(false),
     ACTION(false),
-    REWIND(false),
+    REWIND(true),
     REWIND_START(false, "rewind"),
-    TEMPORARY(false),
+    TEMPORARY(true),
     TEMPORARY_OPEN(false, "temporary"),
 }
 
 data class GutterNavigationTarget(val label: String, val location: DefinitionLocation)
 
 /**
- * [args] fill in the tooltip of the kind, such as the name of a checkpoint. Markers with the same [color] key are
- * drawn in the same color, which tells apart the checkpoints and the calls that lead to each.
+ * [args] fill in the tooltip of the kind, such as the name of a checkpoint. [color] tints the icon, as ARGB: the
+ * checkpoints and the calls that lead to each share one.
  */
-data class GutterMarker(val offset: Int, val kind: GutterMarkerKind, val args: List<String> = emptyList(), val color: String? = null)
+data class GutterMarker(val offset: Int, val kind: GutterMarkerKind, val args: List<String> = emptyList(), val color: Int? = null)
 
 enum class ScriptRunKind { PLAIN, NODE }
 

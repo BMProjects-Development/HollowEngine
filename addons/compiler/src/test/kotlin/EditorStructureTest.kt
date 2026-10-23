@@ -193,12 +193,18 @@ class EditorStructureTest {
         """.trimIndent()
         val markers = analyzer.structure("Colors.kts", source).markers
         fun at(text: String, from: Int = 0) = markers.single { it.offset == source.indexOf(text, from) }
+        val arena = at("checkpoint(\"arena").color
+        val boss = at("checkpoint(\"boss").color
         assertEquals(GutterMarkerKind.REWIND_START, at("rewind()").kind)
-        assertEquals("arena", at("checkpoint(\"arena").color)
-        assertEquals("boss", at("temporary {").color, "a temporary without until goes at the next checkpoint")
-        assertEquals("arena", at("rewind()", source.indexOf("temporary {")).color, "rewind goes to the checkpoint before it")
-        assertEquals("boss", at("temporary(until").color)
-        assertEquals("arena", at("rewind(\"arena").color)
+        assertNotEquals(arena, boss)
+        assertEquals(boss, at("temporary {").color, "a temporary without until goes at the next checkpoint")
+        assertEquals(arena, at("rewind()", source.indexOf("temporary {")).color, "rewind goes to the checkpoint before it")
+        assertEquals(boss, at("temporary(until").color)
+        assertEquals(arena, at("rewind(\"arena").color)
+
+        fun target(text: String) = analyzer.gutterTargets("Colors.kts", source, source.indexOf(text)).single().location.offset
+        assertEquals(source.indexOf("checkpoint(\"boss"), target("temporary(until"))
+        assertEquals(source.indexOf("checkpoint(\"arena"), target("rewind(\"arena"))
     }
 
     @Test

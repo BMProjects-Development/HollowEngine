@@ -31,6 +31,7 @@ import net.minecraft.client.sounds.ChannelAccess
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.NonNullList
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.FileToIdConverter
 import net.minecraft.resources.ResourceLocation
@@ -606,11 +607,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         AttachmentRegistry.close(level)
     }
 
-    override fun onEntitySaved(entity: Entity, tag: net.minecraft.nbt.CompoundTag) {
+    override fun onEntitySaved(entity: Entity, tag: CompoundTag) {
+        EntityEvent.Saving.post(EntityEvent.Saving(entity))
         AttachmentRegistry.saveEntity(entity, tag)
     }
 
-    override fun onEntityLoaded(entity: Entity, tag: net.minecraft.nbt.CompoundTag) {
+    override fun onEntityLoaded(entity: Entity, tag: CompoundTag) {
         AttachmentRegistry.loadEntity(entity, tag)
     }
 

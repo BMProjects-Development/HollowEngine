@@ -175,11 +175,10 @@ internal class ActionRecord(
     private val outer: Long?,
 ) {
     fun begin(snapshots: CompoundTag): JournalEntry =
-        run.journal.record(action.id, run.path, lifetime, until, args, snapshots, outer).also { run.changed() }
+        run.journal.record(action.id, run.path, lifetime, until, args, snapshots, outer)
 
     fun done(entry: JournalEntry) {
         entry.done = true
-        run.changed()
     }
 }
 

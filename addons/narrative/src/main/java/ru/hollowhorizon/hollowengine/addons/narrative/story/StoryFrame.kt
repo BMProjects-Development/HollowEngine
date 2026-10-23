@@ -125,7 +125,6 @@ class StoryFrame internal constructor(
         result = null
         run.lastResult = null
         run.enterTrampolined = true
-        run.changed()
     }
 
     /** The call at [site] returned [value]; runs any tail call it left and returns the final value. */
@@ -143,7 +142,6 @@ class StoryFrame internal constructor(
         run.lastResult = null
         segment = CompoundTag()
         segmentMark = run.journal.next
-        run.changed()
         return current
     }
 
@@ -189,7 +187,6 @@ class StoryFrame internal constructor(
         segmentMark = run.journal.next
         run.journal.checkpointPassed(run.path, sites[site])
         run.history.add(sites[site], run, labels)
-        run.changed()
     }
 
     /** Whether the caller runs a tail call this stage leaves, so the stage may give its place away. */
@@ -200,7 +197,6 @@ class StoryFrame internal constructor(
         close()
         replaced = true
         run.tail = StoryRun.Tail(StoryInstances.keyOf(receiver), stage, args)
-        run.changed()
     }
 
     /** The stage returns [value]; the caller reads it back with [serializer] after a restart. */
@@ -222,7 +218,6 @@ class StoryFrame internal constructor(
         if (run.isCancelled || reason is StoryEntityMissing) return
         close()
         if (reason != null) run.frames.lastOrNull()?.callFailed()
-        run.changed()
     }
 
     /**
