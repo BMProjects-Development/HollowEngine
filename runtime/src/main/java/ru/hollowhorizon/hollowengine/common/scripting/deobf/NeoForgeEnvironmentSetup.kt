@@ -7,23 +7,30 @@ import ru.hollowhorizon.hollowengine.common.utils.ModList
 import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
 import java.util.jar.JarFile
+import ru.hollowhorizon.hollowengine.api.ModList as PlatformModList
 
 object NeoForgeEnvironmentSetup : EnvironmentSetup {
     override fun setup(mappings: Mappings, outputDir: File): List<File> {
+        return setup(mappings, outputDir, ModList)
+    }
+
+    internal fun setup(mappings: Mappings, outputDir: File, mods: PlatformModList): List<File> {
         val classpath = runtimeClasspath()
 
-        return if (RuntimeFlags.production && !HollowEngineBuild.MINECRAFT_VERSION.startsWith("1.21")) {
-            val remapped = remapJars(
+        val minecraftClasspath = if (RuntimeFlags.production && !HollowEngineBuild.MINECRAFT_VERSION.startsWith("1.21")) {
+            remapJars(
                 mappings = mappings,
-                inputs = listOf(ModList.getFile("minecraft")),
+                inputs = listOf(mods.getFile("minecraft")),
                 outputDir = outputDir,
                 from = "official",
                 to = "named",
             )
-            classpath + remapped
         } else {
-            classpath + ModList.getFile("minecraft")
-        }.distinctBy { it.absoluteFile.normalize() }
+            listOf(mods.getFile("minecraft"))
+        }
+
+        return (classpath + minecraftClasspath + mods.getFile("neoforge"))
+            .distinctBy { it.absoluteFile.normalize() }
     }
 
     private fun runtimeClasspath(): List<File> {

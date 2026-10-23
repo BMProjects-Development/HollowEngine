@@ -10,6 +10,9 @@ import java.io.File
  * The classpath scripts were last compiled against, kept for the next launch.
  */
 object CompilerClasspathSnapshot {
+    /** Bump when classpath construction changes, so early compilation rebuilds obsolete snapshots. */
+    private const val CLASSPATH_VERSION = 2
+
     private val file: File
         get() = DirectoryManager.HOLLOW_ENGINE.resolve(
             "cache/mixins/compiler-classpath-${ScriptFingerprint.currentRuntimeIdentity.replace('/', '-')}.txt",
@@ -61,6 +64,7 @@ object CompilerClasspathSnapshot {
     private const val RUNTIME = "<runtime>"
 
     private fun header() = listOf(
+        "classpath=$CLASSPATH_VERSION",
         "engine=${HollowEngineBuild.VERSION}",
         "runtime=${ScriptFingerprint.currentRuntimeIdentity}",
     )
