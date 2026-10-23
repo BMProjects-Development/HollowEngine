@@ -44,8 +44,8 @@ import java.util.concurrent.ConcurrentHashMap
 object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation, PreparedModelUpdate<Model>>>() {
     lateinit var lightTexture: AbstractTexture
     private val models = ConcurrentHashMap<ResourceLocation, MutableStateFlow<Model>>()
-    private val indexedModels = ConcurrentHashMap.newKeySet<ResourceLocation>()
-    private val metadata = ConcurrentHashMap<ResourceLocation, ModelMetadata>()
+    @Volatile
+    private var catalog = ModelResourceCatalog.EMPTY
     var glProgramSkinning = -1
     var glProgramMorphing = -1
 
@@ -84,10 +84,10 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         profiler: ProfilerFiller,
     ): Map<ResourceLocation, PreparedModelUpdate<Model>> {
         AnimatorAssets.reload(manager)
-        val indexed = readMetadata(manager)
-        indexedModels.clear()
-        indexedModels.addAll(indexed)
-        val targets = ModelReloadCoordinator.reloadTargets(models.keys, indexed)
+        val nextCatalog = ModelResourceCatalog.read(manager, allSupportedFormats.toSet())
+        catalog = nextCatalog
+        RigAssets.reload(manager, nextCatalog.locations)
+        val targets = ModelReloadCoordinator.reloadTargets(models.keys, nextCatalog.preloaded)
 
         return runBlocking(Dispatchers.IO) {
             targets.map { location ->
@@ -122,7 +122,7 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         flow.value = swap.next
         swap.retired?.let(::destroyLater)
 
-        if (!update.exists && location !in indexedModels) {
+        if (!update.exists && location !in catalog.locations) {
             models.remove(location, flow)
         }
     }
@@ -140,25 +140,8 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         })
     }
 
-    private fun readMetadata(manager: ResourceManager): Set<ResourceLocation> {
-        val supportedFormats = loaders.flatMap { it.supportedFormats }.toSet()
-        metadata.clear()
-
-        val models = manager.listResources("models") { path ->
-            supportedFormats.any { path.path.endsWith(".$it", ignoreCase = true) }
-        }.keys
-        models.forEach { location ->
-            val resource = manager.getResource(location.withSuffix(".hemeta")).orElse(null) ?: return@forEach
-            val source = runCatching { resource.open().use { it.readBytes().decodeToString() } }.getOrDefault("")
-            metadata[location] = ModelMetadata.parse(source, location.toString())
-        }
-        RigAssets.reload(manager, models)
-
-        return metadata.filterValues(ModelMetadata::preload).keys
-    }
-
     /** What the model's `.hemeta` says, or empty metadata when it has none. */
-    fun metadata(location: ResourceLocation?): ModelMetadata = location?.let(metadata::get) ?: ModelMetadata.EMPTY
+    fun metadata(location: ResourceLocation?): ModelMetadata = catalog.metadata(location)
 
     /** The animator this model wears by default, named by its metadata. */
     fun animatorOf(location: ResourceLocation?): Animator? =
@@ -267,7 +250,7 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
     fun supports(location: String): Boolean = loaderFor(location) != null
 
     val allSupportedFormats get() = loaders.flatMap { loader -> loader.supportedFormats }
-    val allModels get() = indexedModels + models.keys
+    val allModels get() = catalog.locations
 
 }
 
