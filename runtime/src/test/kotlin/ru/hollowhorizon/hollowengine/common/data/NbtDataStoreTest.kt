@@ -1,5 +1,10 @@
 package ru.hollowhorizon.hollowengine.common.data
 
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
+import net.minecraft.nbt.StringTag
+import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
+import ru.hollowhorizon.hollowengine.common.utils.nbt.ForTag
 import kotlin.test.*
 
 class NbtDataStoreTest {
@@ -19,6 +24,22 @@ class NbtDataStoreTest {
         assertEquals(1, restored[visits])
         assertEquals("Guide", restored[name])
         assertTrue(visits in restored)
+    }
+
+    @Test
+    fun `a key holding a whole tag reads back what was written`() {
+        val compound = DataKey("hollowengine:stories", ForCompoundNBT, null)
+        val list = DataKey("hollowengine:history", ForTag, null)
+        val stories = CompoundTag().apply { put("quest", CompoundTag().apply { putString("stage", "main") }) }
+        val history = ListTag().apply { add(StringTag.valueOf("gate")) }
+        val data = NbtDataStore()
+
+        data[compound] = stories
+        data[list] = history
+
+        val restored = NbtDataStore().apply { load(data.save()) }
+        assertEquals(stories, restored[compound])
+        assertEquals(history, restored[list])
     }
 
     @Test

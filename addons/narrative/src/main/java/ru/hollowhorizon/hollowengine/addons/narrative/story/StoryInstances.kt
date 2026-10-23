@@ -154,12 +154,16 @@ object StoryInstances {
     }
 
     /**
-     * The script id when the source path belongs to a known script, so a world moved to another directory still
-     * finds its scripts; the path itself otherwise.
+     * The script id of [type] when its source path belongs to a known script, so a world moved to another directory
+     * still finds its scripts; the path itself otherwise, and null for a class that is not a script.
      */
+    internal fun scriptPathOf(type: Class<*>): String? {
+        val location = type.getAnnotation(StageScript::class.java)?.path ?: return null
+        return ScriptRegistry.idOfLocation(location)?.let(ScriptRegistry::display) ?: location
+    }
+
     private fun keyFor(instance: Any): String {
-        val location = instance.javaClass.getAnnotation(StageScript::class.java)?.path ?: return instance.javaClass.name
-        val path = ScriptRegistry.idOfLocation(location)?.let(ScriptRegistry::display) ?: location
+        val path = scriptPathOf(instance.javaClass) ?: return instance.javaClass.name
         if (instance !is NodeScript) return path
         return when (val host = instance.host) {
             is NodeHost.Server -> "$path@server"
