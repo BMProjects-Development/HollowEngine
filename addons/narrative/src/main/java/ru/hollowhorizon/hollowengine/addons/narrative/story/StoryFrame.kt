@@ -56,6 +56,12 @@ class StoryFrame internal constructor(
     /** Where the frame was before the call in progress: a call that fails returns the frame there. */
     private var previous: CompoundTag? = null
 
+    /**
+     * The journal record of the action called at the current position, which a restart in the middle of it finishes;
+     * [NO_RECORD] until the action writes it, null when no action is being called.
+     */
+    internal var action: Long? = null
+
     /** Whether the stage is still finding its way back to the position it was saved at. */
     fun isResuming(): Boolean = resuming
 
@@ -168,6 +174,50 @@ class StoryFrame internal constructor(
         }
     }
 
+    /**
+     * The stage is about to call the action at [site]. The call is a boundary: once it is done a restart does not
+     * perform it again, and a restart in the middle of it finishes it with the record it wrote.
+     */
+    fun beginAction(site: Int) {
+        run.discardPending("'$stage' moved on")
+        previous = CompoundTag().apply {
+            position?.let { putString("position", it) }
+            put("locals", locals.copy())
+            result?.let { put("result", it) }
+        }
+        position = CALL + sites[site]
+        result = null
+        action = NO_RECORD
+    }
+
+    /** The action at [site] returned [value], which the frame keeps with [serializer] for a restart after it. */
+    fun completeAction(site: Int, value: Any?, serializer: KSerializer<Any?>?): Any? {
+        position = AFTER + sites[site]
+        previous = null
+        action = null
+        result = serializer?.let { StoryValues.encode(it, value) }
+        segment = CompoundTag()
+        segmentMark = run.journal.next
+        return value
+    }
+
+    /** Finishes the action at [site] that was in progress when the story was saved, from the record it wrote. */
+    suspend fun resumeAction(site: Int): Any? {
+        resuming = false
+        val entry = action?.let(run.journal::entry)
+            ?: throw StoryException("The saved story lost the record of '${sites[site]}' in '$stage'")
+        return StoryActions.resume(entry)
+    }
+
+    /** Whether the action starting now is the one called at the current position, which records it in [action]. */
+    internal fun claimsAction(): Boolean = action == NO_RECORD
+
+    /** The action called at the current position failed, and the stage goes on in the segment it was in before. */
+    internal fun actionFailed() {
+        action = null
+        callFailed()
+    }
+
     /** Ends a segment at the checkpoint at [site], which the story can be rewound to. */
     fun checkpoint(site: Int) = pass(site, emptyList())
 
@@ -249,6 +299,10 @@ class StoryFrame internal constructor(
 
     internal fun adopt(hash: Int, sites: Array<String>): StoryFrame {
         this.sites = sites
+        if (action == NO_RECORD) {
+            action = null
+            callFailed()
+        }
         val saved = position
         target = saved?.let(::positionOf) ?: -1
         if (saved != null && target < 0) {
@@ -305,6 +359,7 @@ class StoryFrame internal constructor(
         put("locals", locals)
         result?.let { put("result", it) }
         previous?.let { put("previous", it) }
+        action?.let { putLong("action", it) }
         put("segment", segment)
         putLong("entryMark", entryMark)
         putLong("segmentMark", segmentMark)
@@ -315,6 +370,7 @@ class StoryFrame internal constructor(
     internal companion object {
         private const val CALL = "call:"
         private const val AFTER = "after:"
+        const val NO_RECORD = -1L
         private const val MAX_ARGUMENTS_IN_KEY = 48
 
         fun load(run: StoryRun, tag: CompoundTag) =
@@ -325,6 +381,7 @@ class StoryFrame internal constructor(
                 locals = tag.getCompound("locals").copy()
                 result = tag.get("result")?.copy()
                 previous = tag.getCompound("previous").copy().takeIf { tag.contains("previous") }
+                action = tag.getLong("action").takeIf { tag.contains("action") }
                 segment = tag.getCompound("segment").copy()
                 entryMark = tag.getLong("entryMark")
                 segmentMark = tag.getLong("segmentMark")

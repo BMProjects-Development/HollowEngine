@@ -3,6 +3,8 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import io.github.classgraph.ClassGraph
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -154,6 +156,24 @@ object StoryActions {
         } catch (failure: Exception) {
             HollowEngine.LOGGER.error("Story '{}' failed to fast-forward '{}'", entry.run, entry.action, failure)
         }
+    }
+
+    /**
+     * Finishes the action of [entry], which a restart interrupted: performs it again under the same record, with the
+     * snapshots taken before it first started, and returns its result.
+     */
+    @Suppress("UNCHECKED_CAST")
+    internal suspend fun resume(entry: JournalEntry): Any? {
+        val replay = replay(entry) ?: throw StoryException("Story '${entry.run}' cannot finish '${entry.action}'")
+        val perform = (replay.scope as? ActionScope<Any?>)?.perform
+            ?: throw StoryException("Story '${entry.run}' cannot finish '${entry.action}': it performs nothing")
+        val value = try {
+            withContext(ActiveAction(entry.seq)) { perform() }
+        } catch (cancelled: CancellationException) {
+            throw unloaded(replay.call)?.takeIf { currentCoroutineContext().isActive } ?: cancelled
+        }
+        entry.done = true
+        return value
     }
 
     /**
@@ -328,6 +348,9 @@ class StoryAction internal constructor(val id: String, internal val method: Meth
 /** A call of an action made again by the journal: the record it replays and the blocks its body declared. */
 internal class ActionReplay(val entry: JournalEntry, val action: StoryAction) {
     var scope: CaptureScope? = null
+
+    /** The receivers and parameters the call was made with again. */
+    var call: Array<out Any?> = emptyArray()
 
     fun snapshot(index: Int, serializer: KSerializer<Any?>): Any? {
         val tag = entry.snapshots.get(index.toString())

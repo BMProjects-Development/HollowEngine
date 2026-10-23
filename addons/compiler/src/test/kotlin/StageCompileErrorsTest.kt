@@ -235,6 +235,36 @@ class StageCompileErrorsTest {
     )
 
     @Test
+    fun `the result of an action a stage keeps must be saveable`() = assertError(
+        "The result of the action call 'lock#1'", """
+        @Action
+        suspend fun lock(): Any = action { perform { Any() } }
+
+        @State
+        suspend fun main() {
+            val held = lock()
+            log(held.toString())
+        }
+    """
+    )
+
+    @Test
+    fun `an action of an addon is a boundary like an action of the script`() = assertError(
+        "'iterator', used after the action call 'move#1'", """
+        import net.minecraft.world.phys.Vec3
+        import ru.hollowhorizon.hollowengine.addons.narrative.npcs.move
+        import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+
+        @State
+        suspend fun main(guard: NpcEntity) {
+            val iterator = listOf(1).iterator()
+            guard.move(Vec3.ZERO)
+            log(iterator.next().toString())
+        }
+    """
+    )
+
+    @Test
     fun `a checkpoint cannot share its name with a function of the script`() = assertError(
         "A checkpoint cannot be named 'arena'", """
         @State suspend fun arena() {}
