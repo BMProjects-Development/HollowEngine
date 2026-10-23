@@ -138,6 +138,8 @@ internal class StoryJournal {
         }
     }
 
+    fun entry(seq: Long): JournalEntry? = entries.firstOrNull { it.seq == seq }
+
     /** What [run] performed, for the inspector and commands. */
     fun entriesOf(run: String): List<JournalEntry> = entries.filter { it.run == run }
 

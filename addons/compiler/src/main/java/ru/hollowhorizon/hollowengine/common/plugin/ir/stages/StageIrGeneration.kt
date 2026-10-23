@@ -93,7 +93,15 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
                         if (variable.origin == IrDeclarationOrigin.IR_TEMPORARY_VARIABLE) "A value computed before" else "'${variable.name}', used after"
                     reporter.error(
                         variable,
-                        "$what the stage call '${site.name}' is saved there, but $problem; compute it after the call or make it serializable"
+                        "$what the ${if (site.kind == SiteKind.ACTION) "action" else "stage"} call '${site.name}' is saved there, but $problem; compute it after the call or make it serializable"
+                    )
+                }
+            }
+            layout.sites.filter { it.kind == SiteKind.ACTION && it.form != SiteForm.STATEMENT && !it.call.type.isUnit() }.forEach { site ->
+                stages.types.problem(site.call.type)?.let { problem ->
+                    reporter.error(
+                        site.call,
+                        "The result of the action call '${site.name}' is saved for a restart after it, but $problem; use the result in a statement of its own or return a serializable value"
                     )
                 }
             }
@@ -168,7 +176,9 @@ internal class StageIrGeneration(private val context: IrPluginContext) {
 
                 override fun visitCall(expression: IrCall) {
                     super.visitCall(expression)
-                    stages.siteKind(expression) ?: return
+                    // An action elsewhere in a stage is an ordinary call: only one written in the stage itself is a boundary.
+                    val kind = stages.siteKind(expression) ?: return
+                    if (kind == SiteKind.ACTION) return
                     when {
                         nested > 0 -> reporter.error(
                             expression,

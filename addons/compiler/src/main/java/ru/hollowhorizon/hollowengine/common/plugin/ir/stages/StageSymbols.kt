@@ -106,6 +106,7 @@ internal class StageSymbols private constructor(context: IrPluginContext, val st
         val PACKAGE = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
         val STATE: FqName = PACKAGE.child(Name.identifier("State"))
         val ACTION: FqName = PACKAGE.child(Name.identifier("Action"))
+        val ACTION_ALIAS: FqName = PACKAGE.child(Name.identifier("ActionAlias"))
         val UNSAVED: FqName = PACKAGE.child(Name.identifier("Unsaved"))
 
         fun find(context: IrPluginContext): StageSymbols? =

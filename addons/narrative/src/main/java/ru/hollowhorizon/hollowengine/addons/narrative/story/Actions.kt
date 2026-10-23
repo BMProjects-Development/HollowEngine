@@ -30,6 +30,14 @@ annotation class Action(val id: String = "")
 @Retention(AnnotationRetention.RUNTIME)
 annotation class Unsaved
 
+/**
+ * A shortcut that performs exactly one [Action], such as an overload taking other arguments. A stage calls it as it
+ * would call the action itself: the call is a boundary that a restart does not repeat once it is done.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class ActionAlias
+
 /** An action that is not undone: an ordinary function editors and `.story` can call by [id]. */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
@@ -59,18 +67,26 @@ enum class Lifetime {
  */
 suspend fun <R> action(vararg call: Any?, block: suspend ActionScope<R>.() -> Performed<R>): R {
     val action = StoryActions.enclosing(block, "action { }")
-    ActionReplay.take(action)?.let { replay -> return ActionScope<R>(null, replay).also { replay.scope = it }.block().value }
+    ActionReplay.take(action)?.let { replay ->
+        replay.call = call
+        return ActionScope<R>(null, replay).also { replay.scope = it }.block().value
+    }
     val context = currentCoroutineContext()
     val run = context[StoryRun.Element]?.run?.takeIf { context[Replaying] == null }
     val args = action.encode(call)
+    // A stage calling the action directly keeps its record, to finish the action instead of repeating it after a restart.
+    val site = run?.frames?.lastOrNull()?.takeIf { context[ActiveAction] == null && it.claimsAction() }
     val record = run?.let {
         val temporary = context[Temporary]
-        ActionRecord(it, action, args, if (temporary != null) Lifetime.TEMPORARY else Lifetime.RUN, temporary?.until, context[ActiveAction]?.seq)
+        ActionRecord(it, action, args, if (temporary != null) Lifetime.TEMPORARY else Lifetime.RUN, temporary?.until, context[ActiveAction]?.seq, site)
     }
     return try {
         ActionScope<R>(record, null).block().value
-    } catch (cancelled: CancellationException) {
-        throw run?.let { unloaded(call) }?.takeIf { currentCoroutineContext().isActive } ?: cancelled
+    } catch (failure: Throwable) {
+        val unloading = failure is CancellationException && !currentCoroutineContext().isActive || failure is StoryEntityMissing
+        val missing = if (failure is CancellationException && !unloading) run?.let { unloaded(call) } else null
+        if (!unloading && missing == null) site?.actionFailed()
+        throw missing ?: failure
     }
 }
 
@@ -78,7 +94,7 @@ suspend fun <R> action(vararg call: Any?, block: suspend ActionScope<R>.() -> Pe
  * An entity of the call that left the world without being destroyed, like the body of an NPC whose chunk unloaded
  * in the middle of the action, which cancels what the body was doing. The story then waits for the entity to come back.
  */
-private fun unloaded(call: Array<out Any?>): StoryEntityMissing? = call.firstNotNullOfOrNull { value ->
+internal fun unloaded(call: Array<out Any?>): StoryEntityMissing? = call.firstNotNullOfOrNull { value ->
     (value as? Entity)?.takeIf { it.removalReason?.shouldDestroy() == false }
 }?.let { StoryEntityMissing(it.uuid) }
 
@@ -180,7 +196,10 @@ class Performed<R> internal constructor(internal val value: R)
 
 internal class ActionConflict(reason: String) : RuntimeException(reason)
 
-/** Writes a call of [action] made in [run] to the journal around its perform. */
+/**
+ * Writes a call of [action] made in [run] to the journal around its perform; [site] is the frame of the stage that
+ * calls it directly, which keeps the record to finish the action after a restart.
+ */
 internal class ActionRecord(
     private val run: StoryRun,
     private val action: StoryAction,
@@ -188,9 +207,10 @@ internal class ActionRecord(
     private val lifetime: Lifetime,
     private val until: String?,
     private val outer: Long?,
+    private val site: StoryFrame?,
 ) {
     fun begin(snapshots: CompoundTag): JournalEntry =
-        run.journal.record(action.id, run.path, lifetime, until, args, snapshots, outer)
+        run.journal.record(action.id, run.path, lifetime, until, args, snapshots, outer).also { site?.action = it.seq }
 
     fun done(entry: JournalEntry) {
         entry.done = true

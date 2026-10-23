@@ -18,7 +18,7 @@ import java.util.*
 internal enum class SiteForm { STATEMENT, VARIABLE, ASSIGN, RETURN }
 
 /**
- * A stage call or checkpoint inside a stage. Positions in the frame are `index * 2` while the call runs and
+ * A stage call, action call or checkpoint inside a stage. Positions in the frame are `index * 2` while the call runs and
  * `index * 2 + 1` after it; [name] is what the save stores instead.
  */
 internal class StageSite(
@@ -163,6 +163,11 @@ internal class StageLayout(private val stages: StageScope, private val function:
 
             SiteKind.STAGE -> {
                 val callee = stages.stageName(call.symbol.owner)
+                "$path$callee#${counters.next("call:$callee")}"
+            }
+
+            SiteKind.ACTION -> {
+                val callee = call.symbol.owner.name.asString()
                 "$path$callee#${counters.next("call:$callee")}"
             }
 

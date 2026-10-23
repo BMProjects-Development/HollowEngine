@@ -261,6 +261,7 @@ internal class StageRewriter(
     private fun value(builder: IrBuilderWithScope, site: StageSite, used: Boolean): IrExpression {
         val type = if (used) site.call.type else builtIns.unitType
         val keepsResult = !type.isUnit() && !type.isNothing()
+        if (site.kind == SiteKind.ACTION) return action(builder, site, type, keepsResult)
         val fresh = builder.irBlock(resultType = type) {
             if (site.kind == SiteKind.CHECKPOINT) {
                 saveLocals(site)
@@ -300,6 +301,37 @@ internal class StageRewriter(
         branches += builder.irBranch(frameCall(builder, "isResuming"), zero(type))
         branches += builder.irElseBranch(fresh)
         return builder.irWhen(type, branches)
+    }
+
+    /**
+     * The value of an action call: performed, finished from its record when a restart interrupted it, or taken from
+     * the save when it was done before the restart.
+     */
+    private fun action(builder: IrBuilderWithScope, site: StageSite, type: IrType, keepsResult: Boolean): IrExpression {
+        val resultSerializer = { at: IrBuilderWithScope -> if (keepsResult) serializer(at, type) else nullSerializer() }
+        fun completed(at: IrBuilderWithScope, value: IrExpression): IrExpression =
+            frameCall(at, "completeAction", at.irInt(site.index), value, resultSerializer(at)).let { if (keepsResult) at.irAs(it, type) else it }
+
+        val fresh = builder.irBlock(resultType = type) {
+            +frameCall(this, "beginAction", irInt(site.index))
+            saveLocals(site)
+            +completed(this, site.call)
+        }
+        val after = frameCall(builder, "resumeAfter", builder.irInt(site.index), resultSerializer(builder))
+        return builder.irWhen(
+            type, listOf(
+                builder.irBranch(
+                    frameCall(builder, "isResumingAt", builder.irInt(site.callPosition)),
+                    completed(builder, frameCall(builder, "resumeAction", builder.irInt(site.index)))
+                ),
+                builder.irBranch(
+                    frameCall(builder, "isResumingAt", builder.irInt(site.afterPosition)),
+                    if (keepsResult) builder.irAs(after, type) else after
+                ),
+                builder.irBranch(frameCall(builder, "isResuming"), zero(type)),
+                builder.irElseBranch(fresh),
+            )
+        )
     }
 
     /**

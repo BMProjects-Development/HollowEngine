@@ -18,10 +18,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarker
 import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterMarkerKind
 
 /**
- * The gutter markers of story code: stage calls, after which a restart continues, and checkpoints with the calls that
- * refer to them. Each checkpoint name of the file gets its own color, in the order the names first appear, and
- * `rewind` and `temporary` get the color of the checkpoint they lead to, so a call that names none still shows which
- * one it means.
+ * The gutter markers of story code: stage and action calls, after which a restart continues, and checkpoints with the
+ * calls that refer to them. Each checkpoint name of the file gets its own color, in the order the names first appear,
+ * and `rewind` and `temporary` get the color of the checkpoint they lead to, so a call that names none still shows
+ * which one it means.
  */
 internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) {
     private class Checkpoint(val owner: KtFunction?, val offset: Int, val name: String)
@@ -51,6 +51,9 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
                 ?: GutterMarker(0, GutterMarkerKind.TEMPORARY_OPEN)
         }
         if (StateClassId in symbol.annotations) return GutterMarker(0, GutterMarkerKind.STAGE, listOf(symbol.name.asString()))
+        if ((ActionClassId in symbol.annotations || ActionAliasClassId in symbol.annotations) && isBoundary(expression)) {
+            return GutterMarker(0, GutterMarkerKind.ACTION_CALL, listOf(symbol.name.asString()))
+        }
         val receiver = call.partiallyAppliedSymbol.dispatchReceiver?.type
         if (symbol.name.asString() == "invoke" && receiver != null && StateClassId in receiver.annotations) {
             return GutterMarker(0, GutterMarkerKind.STAGE, listOf(callExpression?.calleeExpression?.text ?: "invoke"))
@@ -81,6 +84,20 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
         ?: checkpoints.firstOrNull { it.owner == owner(expression) && it.offset > expression.textOffset }?.name
 
     private fun color(name: String): Int = HighlightTheme.paletteArgb(colors.getOrPut(name) { colors.size })
+
+    /**
+     * Whether an action called at [expression] is a boundary: it is written in a stage or `@State` lambda itself, not
+     * in a lambda inside it or in `catch` and `finally`, where it is an ordinary call.
+     */
+    private fun isBoundary(expression: KtExpression): Boolean = with(session) {
+        val function = expression.parents.filterIsInstance<KtFunction>().firstOrNull() ?: return false
+        val stage = when (function) {
+            is KtNamedFunction -> StateClassId in function.symbol.annotations
+            is KtFunctionLiteral -> isStageLambda(function)
+            else -> false
+        }
+        stage && expression.parents.takeWhile { it != function }.none { it is KtCatchClause || it is KtFinallySection }
+    }
 
     /** The code a checkpoint belongs to: the function or `@State` lambda it is written in, which is one run's. */
     private fun owner(element: PsiElement): KtFunction? = element.parents.filterIsInstance<KtFunction>()
@@ -115,6 +132,8 @@ internal class StoryGutterMarkers(private val session: KaSession, file: KtFile) 
     private companion object {
         val StoryPackage = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
         val StateClassId = ClassId(StoryPackage, Name.identifier("State"))
+        val ActionClassId = ClassId(StoryPackage, Name.identifier("Action"))
+        val ActionAliasClassId = ClassId(StoryPackage, Name.identifier("ActionAlias"))
         val CheckpointName = Name.identifier("checkpoint")
         val RewindName = Name.identifier("rewind")
         val TemporaryName = Name.identifier("temporary")

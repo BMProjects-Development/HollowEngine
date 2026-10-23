@@ -78,6 +78,118 @@ class StageJournalTest : StageTest() {
     }
 
     @Test
+    fun `an action finished before a restart is not performed again, and its one record still undoes it`() = runTest {
+        val world = world("finished", PLACE + """
+            @State
+            suspend fun main() {
+                place("door")
+                await("x")
+                log("done")
+            }
+        """
+        )
+        world.launch("main")
+        world.restart()
+        assertEquals(listOf("place door"), StageTrace.take(), "the restart goes on after the action")
+
+        world.runs["main"]!!.rewind("main")
+        world.settle()
+        assertEquals(listOf("undo door", "place door"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `an action a restart interrupts is finished under its record, with the snapshot it took first`() = runTest {
+        val world = world("interrupted", $$"""
+            @Action
+            suspend fun walk(name: String) = action {
+                val there = capture { log("capture $name"); name in StageTrace.blocks }
+                undo {
+                    if (!there) StageTrace.blocks -= name
+                    log("undo $name")
+                }
+                perform {
+                    log("walk $name")
+                    StageTrace.await(name)
+                    StageTrace.blocks += name
+                }
+            }
+
+            @State
+            suspend fun main() {
+                walk("gate")
+                log("arrived")
+                await("x")
+            }
+        """
+        )
+        world.launch("main")
+        assertEquals(listOf("capture gate", "walk gate"), StageTrace.take())
+
+        world.restart()
+        assertEquals(listOf("walk gate"), StageTrace.take(), "the walk goes on without a new capture")
+
+        world.release("gate")
+        assertEquals(listOf("arrived"), StageTrace.take())
+        StageTrace.hold("gate")
+        world.runs["main"]!!.rewind("main")
+        world.settle()
+        assertEquals(listOf("undo gate", "capture gate", "walk gate"), StageTrace.take(), "one record, undone once")
+        assertEquals(emptySet(), StageTrace.blocks)
+        world.stop()
+    }
+
+    @Test
+    fun `a restart before an action wrote its record repeats the segment before the call`() = runTest {
+        val world = world("unwritten", PLACE + """
+            suspend fun target(): String {
+                StageTrace.await("aim")
+                return "door"
+            }
+
+            @State
+            suspend fun main() {
+                log("start")
+                place(target())
+                await("x")
+            }
+        """
+        )
+        world.launch("main")
+        world.restart()
+        world.release("aim")
+        assertEquals(listOf("start", "start", "place door"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `the result of an action is kept for a restart after it`() = runTest {
+        val world = world("counted", $$"""
+            @Action
+            suspend fun count(name: String): Int = action {
+                undo { }
+                perform {
+                    log("count $name")
+                    42
+                }
+            }
+
+            @State
+            suspend fun main() {
+                val counted = count("sheep")
+                await("x")
+                log("got $counted")
+            }
+        """
+        )
+        world.launch("main")
+        world.restart()
+        world.release("x")
+        assertEquals(listOf("count sheep", "got 42"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
     fun `a rewind to a checkpoint undoes what came after it and keeps what once did`() = runTest {
         val world = world("rewind", PLACE + """
             @State

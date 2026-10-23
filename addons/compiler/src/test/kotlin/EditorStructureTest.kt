@@ -166,6 +166,7 @@ class EditorStructureTest {
                 step()
                 checkpoint("arena")
                 place("x")
+                listOf(1).forEach { place("y") }
             }
         """.trimIndent()
         val markers = analyzer.structure("Story.kts", source).markers
@@ -174,7 +175,8 @@ class EditorStructureTest {
         assertEquals(source.indexOf("    step()") + 4, stage.offset)
         assertEquals(listOf("step"), stage.args)
         assertEquals(listOf("arena"), markers.single { it.kind == GutterMarkerKind.CHECKPOINT }.args)
-        assertEquals(GutterMarkerKind.COROUTINE, markers.single { it.offset == source.indexOf("place(\"x") }.kind)
+        assertEquals(GutterMarkerKind.ACTION_CALL, markers.single { it.offset == source.indexOf("place(\"x") }.kind)
+        assertEquals(GutterMarkerKind.COROUTINE, markers.single { it.offset == source.indexOf("place(\"y") }.kind, "in a lambda it is no boundary")
     }
 
     @Test
