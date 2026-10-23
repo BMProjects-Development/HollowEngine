@@ -14,8 +14,11 @@ internal abstract class NamedValueTagEncoder : NamedValueEncoder(), ICanEncodeTa
 
 @OptIn(InternalSerializationApi::class)
 internal abstract class NamedValueNbtDecoder : NamedValueDecoder(), ICanDecodeTag {
-    final override fun decodeTag(): Tag = decodeTaggedTag(popTag())
+    final override fun decodeTag(): Tag = if (currentTagOrNull == null) rootTag() else decodeTaggedTag(popTag())
     abstract fun decodeTaggedTag(key: String): Tag
+
+    /** The tag being read, for a value read as a whole tag at the top level, where it has no name. */
+    abstract fun rootTag(): Tag
 }
 
 internal interface ICanEncodeTag : ICanEncodeCompoundNBT {

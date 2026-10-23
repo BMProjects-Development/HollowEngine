@@ -95,6 +95,8 @@ private sealed class AbstractNBTReader(val format: NBTFormat, open val map: Tag)
 
     override fun decodeTaggedTag(key: String): Tag = getValue(key)
 
+    override fun rootTag(): Tag = map
+
     private inline fun <T> getNumberValue(
         tag: String,
         getter: NumericTag.() -> T,
