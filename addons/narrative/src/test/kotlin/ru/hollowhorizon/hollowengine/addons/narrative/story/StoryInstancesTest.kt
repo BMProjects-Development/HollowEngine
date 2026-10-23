@@ -89,7 +89,6 @@ class StoryInstancesTest {
             override val scope = scope
             override val server: MinecraftServer get() = error("no server")
             override val entity: Entity? get() = null
-            override fun changed(runs: StoryRuns) = Unit
         }
         val script = StartsDuringConstruction(StoryRuns(owner))
         assertNull(script.observedReady)

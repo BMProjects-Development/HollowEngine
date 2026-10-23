@@ -32,6 +32,14 @@ object HighlightTheme {
         return hsvToArgb(hue, DslMarkerSaturation, DslMarkerValue)
     }
 
+    /**
+     * The color of slot [index] of a set of things told apart by color. Each slot turns the hue by the golden angle,
+     * so neighboring slots are always far apart, however many there are.
+     */
+    fun paletteArgb(index: Int): Int = hsvToArgb((index * GoldenAngle) % 360f, PaletteSaturation, DslMarkerValue)
+
+    private const val GoldenAngle = 137.50776f
+    private const val PaletteSaturation = 0.6f
     private const val DslMarkerSaturation = 0.45f
     private const val DslMarkerValue = 0.88f
 

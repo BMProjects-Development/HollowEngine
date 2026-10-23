@@ -117,8 +117,18 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
     return EditorStructure(folds.distinctBy { it.start to it.end }, markers.distinctBy { it.offset to it.kind }, runs)
 }
 
-/** The declarations an override marker at [offset] leads to; an accessor marker leads to the base accessors. */
-internal fun ScriptingAnalyzerImpl.kotlinGutterTargets(file: KtFile, offset: Int): List<GutterNavigationTarget> {
+/**
+ * Where the marker at [offset] of the file [path] leads: an override marker to the declarations it overrides, an
+ * accessor marker to the base accessors, and a `rewind` or `temporary` marker to its checkpoint.
+ */
+internal fun ScriptingAnalyzerImpl.kotlinGutterTargets(file: KtFile, path: String, offset: Int): List<GutterNavigationTarget> {
+    val story = file.findElementAt(offset)?.parentsWithSelf?.filterIsInstance<KtCallExpression>()
+        ?.firstOrNull { it.calleeExpression?.textOffset == offset }
+    if (story != null) return analyze(file) {
+        StoryGutterMarkers(this, file).checkpointsOf(story).map { checkpoint ->
+            GutterNavigationTarget(file.text.substring(checkpoint).lineSequence().first().trim(), DefinitionLocation(path, checkpoint))
+        }
+    }
     val owner = file.findElementAt(offset)?.parentsWithSelf?.firstOrNull { element ->
         (element is KtPropertyAccessor || element is KtCallableDeclaration) && element.textOffset == offset
     } ?: return emptyList()
