@@ -179,7 +179,7 @@ internal class SavedVariable<T>(private val default: T, private val serializer: 
     /** The property qualified by the script declaring it, which a script property reference knows as its owner. */
     private fun name(property: KProperty<*>): String {
         val owner = ((property as? CallableReference)?.owner as? ClassBasedDeclarationContainer)?.jClass
-        val script = owner?.getAnnotation(StageScript::class.java)?.path ?: owner?.name
+        val script = owner?.let { StoryInstances.scriptPathOf(it) ?: it.name }
         return script?.let { "$it/${property.name}" } ?: property.name
     }
 }
