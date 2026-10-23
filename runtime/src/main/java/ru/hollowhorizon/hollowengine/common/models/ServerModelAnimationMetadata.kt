@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockModelLoader
+import ru.hollowhorizon.hollowengine.client.models.bbmodel.BlockBenchModelLoader
 import ru.hollowhorizon.hollowengine.client.models.fbx.FbxModelLoader
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
@@ -19,6 +20,7 @@ object ServerModelAnimationMetadata {
         ObjModelLoader,
         FbxModelLoader,
         BedrockModelLoader,
+        BlockBenchModelLoader,
     )
     private val modelCache = ConcurrentHashMap<String, Result<Model>>()
 

@@ -28,11 +28,10 @@ fun fillAnimationVariables(
     context.time = (entity?.tickCount?.toFloat() ?: gameTicks.toFloat()) + partialTick
     context.data = entity?.let { AttachmentRegistry.entityDataOrNull(it)?.numericPaths() }.orEmpty()
 
-    if (entity == null) return
-
-    val velocity = entity.deltaMovement
+    val velocity = entity?.deltaMovement ?: Vec3.ZERO
     val movementYaw = when (entity) {
         is LivingEntity -> Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)
+        null -> 0f
         else -> Mth.rotLerp(partialTick, entity.yRotO, entity.yRot)
     }
     context.localForwardSpeed = localForwardSpeed(velocity, movementYaw)
@@ -45,11 +44,9 @@ fun fillAnimationVariables(
         else -> 0f
     }
 
-    if (entity !is LivingEntity) return
-
-    context.bodyYaw = Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)
-    context.headYaw = Mth.rotLerp(partialTick, entity.yHeadRotO, entity.yHeadRot)
-    context.headPitch = Mth.lerp(partialTick, entity.xRotO, entity.xRot)
+    context.bodyYaw = movementYaw
+    context.headYaw = if (entity is LivingEntity) Mth.rotLerp(partialTick, entity.yHeadRotO, entity.yHeadRot) else movementYaw
+    context.headPitch = entity?.let { Mth.lerp(partialTick, it.xRotO, it.xRot) } ?: 0f
     context.headBodyYawDelta = Mth.wrapDegrees(context.headYaw - context.bodyYaw)
 }
 

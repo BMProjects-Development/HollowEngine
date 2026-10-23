@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animations
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec4f
@@ -9,6 +10,7 @@ class AnimationClip(
     val name: String,
     val nodes: Map<Int, AnimationData>,
     val duration: Float = nodes.values.maxOfOrNull { it.duration } ?: 0f,
+    val poseTransform: ((AnimationPose) -> Unit)? = null,
 ) {
     override fun toString() = name
 }

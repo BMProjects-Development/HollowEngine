@@ -24,7 +24,7 @@ class BedrockParticle(
     private val components = emitter.effect.components
     private val curveVariables = CurveVariables({ context }, emitter.effect.curves)
     private val variables = VariablesMap().fallbackBackTo(curveVariables).fallbackBackTo(emitter.context.variables)
-    private val context: BedrockContext = BedrockContext(Query.EMPTY, variables)
+    private val context: BedrockContext = BedrockContext(emitter.context.query, variables)
 
     private var firedCreationEvents = false
     private var firedExpirationEvents = false
@@ -382,7 +382,7 @@ class BedrockParticle(
         cameraUuid: UUID,
         cameraFirstPerson: Boolean,
     ) {
-        if (cameraUuid == (emitter.sourceEntity as? LivingEntityQuery)?.entity?.uuid) {
+        if (cameraUuid == emitter.sourceEntity?.uuid) {
             if (!components.particleVisibility.let { if (cameraFirstPerson) it.firstPerson else it.thirdPerson }) return
         }
 

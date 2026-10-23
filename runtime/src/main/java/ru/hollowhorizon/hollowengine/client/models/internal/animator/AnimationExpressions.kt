@@ -2,15 +2,12 @@ package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.coroutines.scopeAsync
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.expressions.*
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 
 private typealias Ctx = MembersBuilder<AnimatorEvaluationContext>
 
@@ -50,22 +47,30 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         contextFloat("local_side_speed") { it.localSideSpeed }
         contextFloat("signed_horizontal_speed") { it.signedHorizontalSpeed }
         contextFloat("movement_animation_speed") { it.signedHorizontalSpeed }
-        contextFloat("ground_speed") { it.signedHorizontalSpeed }
+        float("ground_speed") { it.ground_speed }
+        float("vertical_speed") { it.vertical_speed }
+        float("modified_distance_moved") { it.modified_distance_moved }
+        float("modified_move_speed") { it.modified_move_speed }
+        float("fall_ticks") { it.fall_ticks }
+        bool("is_jumping") { it.is_jumping }
+        bool("is_in_water_or_rain") { it.is_in_water_or_rain }
+        bool("is_sitting") { it.is_sitting }
+        bool("is_hurt") { it.is_hurt }
 
         entityFloat("entity_id") { it.id.toFloat() }
-        entityBool("is_alive") { it.isAlive }
-        entityBool("is_on_ground") { it.onGround() }
-        entityFloat("velocity_x") { it.deltaMovement.x.toFloat() }
-        entityFloat("velocity_y") { it.deltaMovement.y.toFloat() }
-        entityFloat("velocity_z") { it.deltaMovement.z.toFloat() }
+        bool("is_alive") { it.is_alive }
+        bool("is_on_ground") { it.is_on_ground }
+        float("velocity_x") { it.velocity_x }
+        float("velocity_y") { it.velocity_y }
+        float("velocity_z") { it.velocity_z }
         entityFloat("fall_distance") { it.fallDistance }
-        entityBool("is_in_water") { it.isInWater }
+        bool("is_in_water") { it.is_in_water }
         entityBool("is_under_water") { it.isUnderWater }
         entityBool("is_in_lava") { it.isInLava }
         entityBool("is_on_fire") { it.isOnFire }
         entityFloat("remaining_fire_ticks") { it.remainingFireTicks.toFloat() }
         entityBool("is_crouching") { it.isCrouching }
-        entityBool("is_swimming") { it.isSwimming }
+        bool("is_swimming") { it.is_swimming }
         entityBool("is_visually_swimming") { it.isVisuallySwimming }
         entityBool("is_visually_crawling") { it.isVisuallyCrawling }
         entityBool("is_invisible") { it.isInvisible }
@@ -73,12 +78,12 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityBool("is_passenger") { it.isPassenger }
         entityBool("is_vehicle") { it.isVehicle }
         entityBool("is_no_gravity") { it.isNoGravity }
-        entityBool("is_flying") { if (it is Player) it.abilities.flying else it.isNoGravity && !it.onGround() }
+        bool("is_flying") { it.is_flying }
         contextFloat("flight_pitch") { it.flightPitch }
         contextFloat("flight_bank") { it.flightBank }
         entityBool("is_in_wall") { it.isInWall }
         entityBool("is_shift_key_down") { it.isShiftKeyDown }
-        entityBool("is_sneaking") { it.isShiftKeyDown }
+        bool("is_sneaking") { it.is_sneaking }
         entityFloat("eye_height") { it.eyeHeight }
         entityFloat("bbox_width") { it.bbWidth }
         entityFloat("bbox_height") { it.bbHeight }
@@ -95,14 +100,14 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityFloat("max_air_supply") { it.maxAirSupply.toFloat() }
         entityBool("has_custom_name") { it.hasCustomName() }
 
-        contextFloat("head_y_rotation") { it.headYaw }
-        contextFloat("head_x_rotation") { it.headPitch }
+        float("head_y_rotation") { it.head_y_rotation }
+        float("head_x_rotation") { it.head_x_rotation }
         contextFloat("body_y_rotation") { it.bodyYaw }
         contextFloat("head_body_y_delta") { it.headBodyYawDelta }
         livingFloat("hurt_time") { it.hurtTime.toFloat() }
-        livingBool("is_sprinting") { it.isSprinting }
-        livingFloat("health") { it.health }
-        livingFloat("max_health") { it.maxHealth }
+        bool("is_sprinting") { it.is_sprinting }
+        float("health") { it.health }
+        float("max_health") { it.max_health }
         livingFloat("health_ratio") { it.health / it.maxHealth.coerceAtLeast(1f) }
         livingBool("is_dead_or_dying") { it.isDeadOrDying }
         livingFloat("death_time") { it.deathTime.toFloat() }
@@ -116,28 +121,28 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         livingFloat("ticks_using_item") { it.ticksUsingItem.toFloat() }
         livingBool("is_blocking") { it.isBlocking }
         livingFloat("swing_time") { it.swingTime.toFloat() }
-        livingBool("is_swinging") { it.swinging }
+        bool("is_swinging") { it.is_swinging }
         livingBool("is_fall_flying") { it.isFallFlying }
         livingFloat("fall_flying_ticks") { it.fallFlyingTicks.toFloat() }
         livingBool("is_autospin_attack") { it.isAutoSpinAttack }
         livingBool("is_climbing") { it.onClimbable() }
-        livingBool("is_sleeping") { it.isSleeping }
+        bool("is_sleeping") { it.is_sleeping }
         livingFloat("no_jump_delay") { it.noJumpDelay.toFloat() }
         livingFloat("jump_boost_power") { it.jumpBoostPower }
         livingFloat("speed") { it.speed }
         livingBool("is_sensitive_to_water") { it.isSensitiveToWater }
         livingFloat("walk_animation_speed") { it.walkAnimation.speed() }
         livingFloat("walk_animation_position") { it.walkAnimation.position() }
-        livingBool("is_moving") { abs(it.deltaMovement.horizontalDistance()) > 1.0e-4 }
+        bool("is_moving") { it.is_moving }
     }
 
     val math = mathNamespace()
 
     val variables = dynamic(
         name = "variables",
-        read = { owner, key -> (owner as AnimatorEvaluationContext).variables[key] ?: 0f },
+        read = { owner, key -> (owner as AnimatorEvaluationContext).variable(key) },
         write = { owner, key, value ->
-            (owner as AnimatorEvaluationContext).variables[key] = Coercions.toFloat(value)
+            (owner as AnimatorEvaluationContext).setVariable(key, Coercions.toFloat(value))
         },
     )
 
@@ -172,68 +177,6 @@ val AnimationExpressionLanguage: Expression<AnimatorEvaluationContext> = Express
     }
     declarations(AnimationDeclarations)
 }
-
-class AnimatorEvaluationContext {
-    var entity: Entity? = null
-    val living: LivingEntity? get() = entity as? LivingEntity
-    var modelToWorld: TrsTransformF? = null
-
-    var partialTick: Float = 0f
-
-    var gameTicks: Long = 0L
-    var gameTime: Float = 0f
-    var time: Float = 0f
-    var deltaTime: Float = 0f
-
-    var layerTime: Float = 0f
-    var layerAge: Float = 0f
-    var layerWeight: Float = 0f
-    var stateTime: Float = 0f
-
-    var horizontalSpeed: Float = 0f
-    var localForwardSpeed: Float = 0f
-    var localSideSpeed: Float = 0f
-    var signedHorizontalSpeed: Float = 0f
-
-    var flightPitch: Float = 0f
-    var flightBank: Float = 0f
-
-    var bodyYaw: Float = 0f
-    var headYaw: Float = 0f
-    var headPitch: Float = 0f
-    var headBodyYawDelta: Float = 0f
-
-    val variables = HashMap<String, Float>()
-
-    /** Molang scratch space: `t.` values live for one frame, unlike `v.` which persists. */
-    val temporaries = HashMap<String, Float>()
-
-    /**
-     * The numeric leaves of the entity's data document by path, refilled once per frame. Server-owned
-     * and read-only here; `d.` reads it, `v.` does not.
-     */
-    var data: Map<String, Float> = emptyMap()
-
-    /**
-     * The montages the animator played this frame, in the order it played them, for what they lay over the
-     * model's rig once the pose is done.
-     */
-    val montages = ArrayList<MontageMoment>()
-
-    /** Whether this is the client's copy of the model, which reads its assets from resource packs. */
-    val isClientSide: Boolean get() = entity?.level()?.isClientSide ?: true
-
-    /**
-     * The value of an entity-derived name when there is no entity, as in a model preview: whatever was
-     * put in [variables] under that name, or zero.
-     */
-    internal fun override(name: String): Float = variables[name] ?: 0f
-
-    /** Seconds of game time since [gameTick] on the level clock; negative while it is still ahead. */
-    fun secondsSince(gameTick: Long): Float = ((gameTicks - gameTick).toFloat() + partialTick) / TICKS_PER_SECOND
-}
-
-private const val TICKS_PER_SECOND = 20f
 
 /**
  * Evaluates the expressions of an [Animator].

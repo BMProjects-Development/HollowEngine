@@ -72,7 +72,7 @@ internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
  * puts it, with what the rigs pose on top.
  */
 internal class PosedModel(
-    model: Model,
+    private val model: Model,
     override var rig: ModelRig,
     private val holder: Attachment?,
     assetsOf: (String) -> ColliderPoseAssets?,
@@ -81,6 +81,8 @@ internal class PosedModel(
     override val roots: List<RuntimeNode> =
         addRigBones(model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, holder) }, rig, holder)
     private val nodes = roots.flatMap { it.walk() }
+    private val nodesByIndex = nodes.associateBy { it.definition.index }
+    private var authoredConstraintsApplied = false
 
     /** The models hung on this model itself, which no bone carries. */
     private val onModel = ArrayList<NestHolder>()
@@ -98,6 +100,7 @@ internal class PosedModel(
 
     /** Puts every node of this model and of the models nested in it back at rest. */
     fun resetPose() {
+        authoredConstraintsApplied = false
         nodes.forEach(RuntimeNode::resetPose)
         nested.forEach(PosedModel::resetPose)
     }
@@ -112,10 +115,20 @@ internal class PosedModel(
      * Bends the IK chains of this model. Nested models stand still in their rest pose, so only the outermost
      * one, which the animator moves, has anything to bend.
      */
-    fun applyRigConstraints(context: AnimatorEvaluationContext) = applyRigConstraints(roots, rig, context)
+    fun applyRigConstraints(context: AnimatorEvaluationContext) {
+        applyAuthoredConstraints()
+        applyRigConstraints(roots, rig, context)
+    }
+
+    private fun applyAuthoredConstraints() {
+        if (authoredConstraintsApplied) return
+        model.constraints.forEach { it.apply(nodesByIndex) }
+        authoredConstraintsApplied = true
+    }
 
     /** Turns the posed nodes into matrices, the nested models' with them. */
     fun updateMatrices() {
+        applyAuthoredConstraints()
         roots.forEach(RuntimeNode::updateHierarchyMatrices)
         onModel.forEach(Attachment::updateGlobalMatrix)
     }

@@ -10,16 +10,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.animal.FlyingAnimal
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.MOVEMENT_FACTOR
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.calculateSpeedViaDeltaMovement
 import ru.hollowhorizon.hollowengine.common.utils.expressions.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import kotlin.math.abs
 import kotlin.reflect.KProperty
 
 /**
@@ -67,37 +61,6 @@ interface Query {
     }
 }
 
-class LivingEntityQuery(val entity: LivingEntity) : Query {
-    override val ground_speed: Float get() = calculateSpeedViaDeltaMovement(entity)
-    override val is_moving: Boolean get() = abs(ground_speed) >= MOVEMENT_FACTOR
-    override val is_sneaking: Boolean get() = entity.isShiftKeyDown
-    override val is_sprinting: Boolean get() = entity.isSprinting
-    override val is_jumping: Boolean get() = entity.jumping
-    override val velocity_x: Float get() = entity.deltaMovement.x.toFloat()
-    override val velocity_y: Float get() = entity.deltaMovement.y.toFloat()
-    override val velocity_z: Float get() = entity.deltaMovement.z.toFloat()
-    override val vertical_speed: Float get() = entity.deltaMovement.y.toFloat() * 20f
-    override val health: Float get() = entity.health
-    override val max_health: Float get() = entity.maxHealth
-    override val is_flying: Boolean get() = entity is FlyingAnimal && entity.isFlying
-    override val fall_ticks: Float get() = entity.fallFlyingTicks.toFloat()
-    override val is_swimming: Boolean get() = entity.isSwimming
-    override val is_in_water: Boolean get() = entity.isInWater
-    override val is_in_water_or_rain: Boolean get() = entity.isInWaterOrRain
-    override val is_sitting: Boolean get() = entity.vehicle != null
-    override val is_sleeping: Boolean get() = entity.isSleeping
-    override val is_hurt: Boolean get() = entity.hurtTime > 0
-    override val is_swinging: Boolean get() = entity.swinging
-    override val is_alive: Boolean get() = entity.isAlive
-    override val is_on_ground: Boolean get() = entity.onGround()
-    override val head_x_rotation: Float get() = entity.xRot
-    override val head_y_rotation: Float get() = entity.yHeadRot
-    override val anim_time: Float get() = entity.tickCount + TickHandler.partialTick
-    override val life_time: Float get() = entity.tickCount.toFloat()
-    override val modified_distance_moved: Float get() = 0f
-    override val modified_move_speed: Float get() = ground_speed
-}
-
 /** `v.` storage: named floats a file writes and reads back, and the engine seeds. */
 interface Variables {
     fun getOrNull(name: String): Variable?
@@ -139,9 +102,15 @@ private class VariablesWithFallback(val primary: Variables, val fallback: Variab
 }
 
 /** Everything a Bedrock expression can read: one query and one bag of variables. */
-data class BedrockContext(val query: Query, val variables: Variables = VariablesMap()) {
+data class BedrockContext(
+    val query: Query,
+    val variables: Variables = VariablesMap(),
     /** `t.` scratch space, cleared by whoever owns the frame. */
-    val temporaries = HashMap<String, Float>()
+    val temporaries: MutableMap<String, Float> = HashMap(),
+) {
+    fun atAnimationTime(seconds: Float): BedrockContext = BedrockContext(object : Query by query {
+        override val anim_time: Float = seconds
+    }, variables, temporaries)
 
     companion object {
         val EMPTY = BedrockContext(Query.EMPTY)

@@ -63,7 +63,10 @@ class ModelInstanceMaterials(model: Model) {
         overrides.forEach { (name, source) ->
             val material = names[name] ?: return@forEach
             val resolved = MaterialSources.resolve(source) { apply(wearing) }
-            resolved.texture?.let { material.texture = it }
+            resolved.texture?.let {
+                material.texture = it
+                material.textureContent = null
+            }
             resolved.normal?.let { material.normalTexture = it }
             resolved.specular?.let { material.specularTexture = it }
             resolved.color?.let { hex -> Color.fromHexOrNull(hex)?.let { material.color = it } }
@@ -73,10 +76,12 @@ class ModelInstanceMaterials(model: Model) {
     private fun Material.restoreFrom(source: Material) {
         color = Color(source.color)
         texture = source.texture
+        textureContent = source.textureContent
         normalTexture = source.normalTexture
         specularTexture = source.specularTexture
         doubleSided = source.doubleSided
         blend = source.blend
+        emissive = source.emissive
     }
 
     private fun Material.copyForInstance(): Material = copy(color = Color(color))

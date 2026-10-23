@@ -14,6 +14,7 @@ import kotlin.math.min
 private const val MaxMorphTargets = 64
 
 class GpuDeformer(private val primitive: Primitive) {
+    private val additionalWeights = AdditionalSkinWeights(primitive.additionalSkinWeights)
     private var processingVao = -1
 
     private var srcPosBuffer: VboWrapper? = null
@@ -51,6 +52,7 @@ class GpuDeformer(private val primitive: Primitive) {
         GL30.glBindVertexArray(processingVao)
 
         initSourceAttributes()
+        additionalWeights.init()
 
         if (primitive.morphTargets.isNotEmpty()) {
             initMorphTextures()
@@ -193,6 +195,7 @@ class GpuDeformer(private val primitive: Primitive) {
             GL13.glActiveTexture(GL13.GL_TEXTURE0)
             GL11.glBindTexture(GL31.GL_TEXTURE_BUFFER, jointMatrixTexture)
             GL20.glUniform1i(GL20.glGetUniformLocation(shaderId, "jointMatrices"), 0)
+            additionalWeights.bind(shaderId)
         } else {
             shaderId = HollowModelManager.glProgramMorphing
             GL20.glUseProgram(shaderId)
@@ -265,6 +268,7 @@ class GpuDeformer(private val primitive: Primitive) {
     }
 
     fun destroy() {
+        additionalWeights.destroy()
         GL30.glDeleteVertexArrays(processingVao)
 
         srcPosBuffer?.delete()

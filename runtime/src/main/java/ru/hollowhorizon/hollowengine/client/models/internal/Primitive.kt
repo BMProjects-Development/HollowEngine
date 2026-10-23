@@ -21,6 +21,7 @@ class Primitive(
     val material: Material,
     val morphTargets: List<Map<String, FloatArray>> = listOf(),
     var weights: FloatArray = FloatArray(morphTargets.size) { 0f },
+    var additionalSkinWeights: Array<List<SkinInfluence>>? = null,
 ) {
     val hasSkinning = joints != null && jointWeights != null
     val positionsCount: Int get() = (positions?.size ?: 0) * 3
@@ -82,6 +83,7 @@ class Primitive(
         tangents = null
         joints = null
         jointWeights = null
+        additionalSkinWeights = null
     }
 
     private fun computeBounds(): Pair<Vec3f, Vec3f>? {

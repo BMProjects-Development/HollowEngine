@@ -20,6 +20,7 @@ import org.lwjgl.opengl.GL30
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.HollowEngine.MODID
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockModelLoader
+import ru.hollowhorizon.hollowengine.client.models.bbmodel.BlockBenchModelLoader
 import ru.hollowhorizon.hollowengine.client.models.fbx.FbxModelLoader
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
@@ -72,10 +73,8 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
     }
 
     suspend fun loadModel(location: ResourceLocation): Model {
-        val extension = location.path.substringAfter('.', "")
-
-        val loader = loaders.find { extension in it.supportedFormats }
-            ?: error("No suitable model loader found for format .$extension")
+        val loader = loaderFor(location.path)
+            ?: error("No suitable model loader found for $location")
 
         return loader.load(location).also { it.renameMaterials(metadata(location)) }
     }
@@ -146,7 +145,7 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         metadata.clear()
 
         val models = manager.listResources("models") { path ->
-            path.path.substringAfter('.') in supportedFormats
+            supportedFormats.any { path.path.endsWith(".$it", ignoreCase = true) }
         }.keys
         models.forEach { location ->
             val resource = manager.getResource(location.withSuffix(".hemeta")).orElse(null) ?: return@forEach
@@ -259,17 +258,13 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         createSkinningProgramGL33()
     }
 
-    fun supports(location: ResourceLocation): Boolean {
-        val extension = location.path.substringAfter('.', "")
-
-        return loaders.any { extension in it.supportedFormats }
+    private fun loaderFor(path: String): ModelLoader? = loaders.firstOrNull { loader ->
+        loader.supportedFormats.any { path.endsWith(".$it", ignoreCase = true) }
     }
 
-    fun supports(location: String): Boolean {
-        val extension = location.substringAfter('.', "")
+    fun supports(location: ResourceLocation): Boolean = loaderFor(location.path) != null
 
-        return loaders.any { extension in it.supportedFormats }
-    }
+    fun supports(location: String): Boolean = loaderFor(location) != null
 
     val allSupportedFormats get() = loaders.flatMap { loader -> loader.supportedFormats }
     val allModels get() = indexedModels + models.keys
@@ -313,6 +308,7 @@ fun registerModelLoaders(event: RegisterModelLoaderEvent) {
     event.register(ObjModelLoader)
     event.register(FbxModelLoader)
     event.register(BedrockModelLoader)
+    event.register(BlockBenchModelLoader)
 }
 
 fun create(data: ByteArray) = create(data, 0, data.size)

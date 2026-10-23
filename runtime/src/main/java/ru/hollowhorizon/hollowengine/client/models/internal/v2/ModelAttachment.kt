@@ -93,6 +93,7 @@ class ModelAttachment(
     private var cachedBounds: Pair<Vec3f, Vec3f>? = null
     private var keptCullingBounds: Pair<Vec3f, Vec3f>? = null
     private var posesSinceCullingBounds = 0
+    private var authoredConstraintsApplied = false
 
     /** Changes with every pose, so what is worked out from one can be kept until the next. */
     var poseVersion = 0
@@ -200,11 +201,20 @@ class ModelAttachment(
     /** Puts every node back in "T-pose"; the animator then poses on top. */
     fun beginPose() {
         ensureReady()
+        authoredConstraintsApplied = false
         allNodes.forEach(RuntimeNode::resetPose)
+    }
+
+    /** Resolves the imported rig before gameplay constraints can override it. */
+    fun applyAuthoredConstraints() {
+        if (authoredConstraintsApplied) return
+        model.constraints.forEach { it.apply(nodesByIndex) }
+        authoredConstraintsApplied = true
     }
 
     /** Turns the posed nodes into the matrices the renderer draws from. */
     fun endPose() {
+        applyAuthoredConstraints()
         updateGlobalMatrix()
         runtimeNodes.forEach(RuntimeNode::updateHierarchyMatrices)
         modelRoot?.updateHierarchyMatrices()

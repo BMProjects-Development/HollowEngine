@@ -63,7 +63,7 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
     register(
         HollowIdeFileType.extensions(
             id = "model",
-            extensions = listOf(".gltf", ".glb", ".fbx", ".geo.json"),
+            extensions = listOf(".gltf", ".glb", ".fbx", ".geo.json", ".bbmodel"),
             priority = 200,
             requiresContent = false,
             loader = { _, _ -> HollowIdeReadOnlyDocument },

@@ -1,108 +1,119 @@
 package ru.hollowhorizon.hollowengine.client.models.bbmodel
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
-import ru.hollowhorizon.hollowengine.client.utils.stream
-import ru.hollowhorizon.hollowengine.common.utils.rl
-
-private val json = Json {
-    isLenient = true
-    ignoreUnknownKeys = true
-    allowSpecialFloatingPointValues = true
-    useArrayPolymorphism = true
-}
-
-fun main() {
-    val model: BlockBenchModel = json.decodeFromStream("hollowengine:models/example.bbmodel".rl.stream)
-
-    println(model)
-}
 
 @Serializable
 data class BlockBenchModel(
-    val resolution: Resolution,
-    val elements: List<BBElement>,
-    @SerialName("outliner")
-    val nodes: List<BBNode>,
-    val textures: List<BBTexture>,
+    val meta: BBMeta = BBMeta(),
+    val resolution: Resolution = Resolution(),
+    val elements: List<BBElement> = emptyList(),
+    val groups: List<BBElement> = emptyList(),
+    @SerialName("outliner") val nodes: List<JsonElement> = emptyList(),
+    val textures: List<BBTexture> = emptyList(),
+    val animations: List<BBAnimation> = emptyList(),
 ) {
     @Serializable
-    data class Resolution(val width: Int, val height: Int)
-}
+    data class Resolution(val width: Int = 16, val height: Int = 16)
 
-@Serializable(with = BBNodeSerializer::class)
-sealed class BBNode {
-    @Serializable
-    data class Data(
-        val name: String,
-        val origin: List<Float>,
-        val uuid: String,
-        val children: List<BBNode>,
-        val value: String? = null,
-    ) : BBNode()
-
-    @Serializable
-    data class UUIDData(val value: String) : BBNode()
-}
-
-object BBNodeSerializer : KSerializer<BBNode> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("BBNode")
-
-    override fun deserialize(decoder: Decoder): BBNode {
-        val input = decoder as? JsonDecoder ?: throw SerializationException("Expected JsonDecoder")
-        return when (val element = input.decodeJsonElement()) {
-            is JsonObject -> json.decodeFromJsonElement<BBNode.Data>(element)
-            is JsonPrimitive -> BBNode.UUIDData(element.content)
-            else -> throw SerializationException("Unexpected JSON element")
-        }
-    }
-
-    override fun serialize(encoder: Encoder, value: BBNode) {
-        val output = encoder as? JsonEncoder ?: throw SerializationException("Expected JsonEncoder")
-        when (value) {
-            is BBNode.Data -> output.encodeJsonElement(json.encodeToJsonElement(value))
-            is BBNode.UUIDData -> output.encodeJsonElement(JsonPrimitive(value.value))
-        }
+    companion object {
+        val JSON = Json { ignoreUnknownKeys = true }
+        fun parse(source: String): BlockBenchModel = JSON.decodeFromString(source)
     }
 }
 
 @Serializable
+data class BBMeta(
+    @SerialName("format_version") val version: String = "4.0",
+    @SerialName("model_format") val format: String = "free",
+    @SerialName("box_uv") val boxUv: Boolean = false,
+)
+
+/** Shared outliner properties; faces are named directions for cubes and arbitrary ids for meshes. */
+@Serializable
 data class BBElement(
-    val name: String,
+    val uuid: String,
+    val name: String = "",
+    val type: String = "group",
+    val origin: List<Float> = listOf(0f, 0f, 0f),
+    val position: List<Float>? = null,
+    val rotation: List<Float> = listOf(0f, 0f, 0f),
+    val scale: List<Float> = listOf(1f, 1f, 1f),
     val from: List<Float>? = null,
     val to: List<Float>? = null,
-    val origin: List<Float>,
-    val uuid: String,
-    @SerialName("uv_offset") val uvOffset: List<Float> = listOf(),
-    val faces: BBFaces,
-    val type: String,
+    val inflate: Float = 0f,
+    val export: Boolean = true,
+    val visibility: Boolean = true,
+    @SerialName("box_uv") val boxUv: Boolean? = null,
+    @SerialName("mirror_uv") val mirrorUv: Boolean = false,
+    @SerialName("uv_offset") val uvOffset: List<Float> = listOf(0f, 0f),
+    val faces: Map<String, BBFace> = emptyMap(),
+    val vertices: Map<String, List<Float>> = emptyMap(),
+    val shading: String = "flat",
+    @SerialName("vertex_weights") val vertexWeights: Map<String, Float> = emptyMap(),
+    @SerialName("ik_target") val ikTarget: String = "",
+    @SerialName("ik_source") val ikSource: String = "",
+    @SerialName("ik_pole") val ikPole: String = "",
+    @SerialName("lock_ik_target_rotation") val lockIkTargetRotation: Boolean = false,
 )
 
 @Serializable
-data class BBFaces(
-    val north: BBFace? = null,
-    val south: BBFace? = null,
-    val east: BBFace? = null,
-    val west: BBFace? = null,
-    val up: BBFace? = null,
-    val down: BBFace? = null,
-) {
-    @Serializable
-    data class BBFace(
-        val uv: List<Float>,
-        val texture: Int? = -1,
-    )
-}
+data class BBFace(
+    val uv: JsonElement = JsonNull,
+    val texture: JsonPrimitive? = JsonPrimitive(-1),
+    val rotation: Int = 0,
+    val vertices: List<String> = emptyList(),
+)
 
 @Serializable
 data class BBTexture(
+    val name: String = "texture",
+    val uuid: String = "",
+    val id: String = "",
+    val source: String = "",
+    @SerialName("relative_path") val relativePath: String = "",
+    val path: String = "",
+    val namespace: String = "",
+    val folder: String = "",
+    val width: Int = 0,
+    val height: Int = 0,
+    @SerialName("uv_width") val uvWidth: Int = 0,
+    @SerialName("uv_height") val uvHeight: Int = 0,
+    val fps: Float = 7f,
+    @SerialName("frame_time") val frameTime: Int = 1,
+    @SerialName("frame_order_type") val frameOrderType: String = "loop",
+    @SerialName("frame_order") val frameOrder: String = "",
+    @SerialName("frame_interpolate") val frameInterpolate: Boolean = false,
+    @SerialName("render_mode") val renderMode: String = "default",
+    @SerialName("render_sides") val renderSides: String = "auto",
+    @SerialName("force_translucent") val forceTranslucent: Boolean = false,
+)
+
+@Serializable
+data class BBAnimation(
     val name: String,
-    val source: String,
+    val length: Float = 0f,
+    val loop: String = "once",
+    val animators: Map<String, BBAnimator> = emptyMap(),
+)
+
+@Serializable
+data class BBAnimator(
+    val type: String = "bone",
+    @SerialName("rotation_global") val rotationGlobal: Boolean = false,
+    @SerialName("quaternion_interpolation") val quaternionInterpolation: Boolean = false,
+    val keyframes: List<BBKeyframe> = emptyList(),
+)
+
+@Serializable
+data class BBKeyframe(
+    val channel: String,
+    val time: Float,
+    val interpolation: String = "linear",
+    @SerialName("data_points") val dataPoints: List<JsonObject> = emptyList(),
+    @SerialName("bezier_left_time") val bezierLeftTime: List<Float> = listOf(-0.1f, -0.1f, -0.1f),
+    @SerialName("bezier_right_time") val bezierRightTime: List<Float> = listOf(0.1f, 0.1f, 0.1f),
+    @SerialName("bezier_left_value") val bezierLeftValue: List<Float> = listOf(0f, 0f, 0f),
+    @SerialName("bezier_right_value") val bezierRightValue: List<Float> = listOf(0f, 0f, 0f),
 )

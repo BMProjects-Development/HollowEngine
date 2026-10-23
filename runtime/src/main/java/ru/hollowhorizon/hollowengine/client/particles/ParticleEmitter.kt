@@ -1,9 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.particles
 
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.models.bedrock.VariablesMap
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimationVariables
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
 import ru.hollowhorizon.hollowengine.client.sounds.ClientSounds
 import ru.hollowhorizon.hollowengine.client.sounds.SoundEmitter
@@ -17,7 +20,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 class ParticleEmitter(
     val system: ParticleSystem,
     val effect: ParticleEffect,
-    val sourceEntity: Query,
+    val sourceContext: AnimatorEvaluationContext,
     var position: Vec3f,
     var rotation: QuatF,
     var velocity: Vec3f,
@@ -28,9 +31,14 @@ class ParticleEmitter(
     private val components = effect.components
     private val curveVariables = CurveVariables({ context }, effect.curves)
     private val variables = VariablesMap().fallbackBackTo(curveVariables)
-    val context: BedrockContext = BedrockContext(Query.EMPTY, variables)
+    val context: BedrockContext = BedrockContext(object : Query by sourceContext {
+        // Particle expressions use the host clock, independent of any model clip sampled on the context.
+        override val anim_time: Float get() = sourceContext.life_time
+    }, variables)
+    val sourceEntity get() = sourceContext.entity
 
     init {
+        updateSource(0f)
         variables["entity_scale"] = 1f
         components.emitterInitialization?.creationExpression?.eval(context)
     }
@@ -75,6 +83,8 @@ class ParticleEmitter(
     }
 
     fun update(dt: Float): Boolean {
+        updateSource(dt)
+        context.temporaries.clear()
         val alive = doUpdate(dt)
 
         if (!alive && !firedExpirationEvents) {
@@ -87,6 +97,12 @@ class ParticleEmitter(
         particles.removeAll(expiredParticles.toSet())
 
         return alive
+    }
+
+    private fun updateSource(dt: Float) {
+        val entity = sourceEntity ?: return
+        fillAnimationVariables(sourceContext, entity, TickHandler.partialTick)
+        sourceContext.deltaTime = dt
     }
 
     private fun doUpdate(dt: Float): Boolean {
@@ -217,7 +233,7 @@ class ParticleEmitter(
                 ParticleEmitter(
                     system,
                     targetEffect,
-                    sourceEntity,
+                    sourceContext,
                     particle?.globalPosition ?: position,
                     rotation,
                     particle?.globalVelocity ?: velocity,
@@ -229,7 +245,7 @@ class ParticleEmitter(
                 ParticleEmitter(
                     system,
                     targetEffect,
-                    sourceEntity,
+                    sourceContext,
                     particle?.globalPosition ?: position,
                     QuatF.IDENTITY,
                     particle?.globalVelocity ?: velocity,

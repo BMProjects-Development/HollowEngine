@@ -150,7 +150,7 @@ class ClipState(private var spec: ClipStateSpec) : AnimationState {
         context.stateTime = playback.time
         val speed = evaluator.float(spec.speed, context, 1f)
         val time = playback.advance(animation.duration, spec.playMode, speed, context.deltaTime)
-        return AnimationPose.sample(animation, time, allowed)
+        return AnimationPose.sample(animation, time, allowed, context.molang)
     }
 }
 
