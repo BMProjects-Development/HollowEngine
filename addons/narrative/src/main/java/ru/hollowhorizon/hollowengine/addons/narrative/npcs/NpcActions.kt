@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionAlias
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Unsaved
 import ru.hollowhorizon.hollowengine.addons.narrative.story.action
@@ -45,9 +46,11 @@ suspend fun NpcEntity.move(target: Entity, @Unsaved options: MoveOptions = MoveO
  * @param dist The minimum distance to the entity; movement stops when this distance is reached.
  * @param speed The NPC's movement speed.
  */
+@ActionAlias
 suspend fun NpcEntity.move(entity: Entity, dist: Double = 1.5, speed: Double = 1.0): MoveResult =
     move(entity, MoveOptions(arrivalDistance = dist, speed = speed))
 
+@ActionAlias
 suspend fun NpcEntity.move(target: Ref<out Entity>, options: MoveOptions = MoveOptions()): MoveResult =
     move(target.resolve(), options)
 
@@ -59,6 +62,7 @@ fun NpcEntity.startMove(target: Ref<out Entity>, options: MoveOptions = MoveOpti
  *
  * @param mob The entity to move to.
  */
+@ActionAlias
 suspend infix fun NpcEntity.move(mob: Entity): MoveResult = move(entity = mob)
 
 /**
@@ -81,6 +85,7 @@ suspend fun NpcEntity.move(pos: Vec3, @Unsaved options: MoveOptions = MoveOption
  * @param dist The minimum distance to the position; movement stops when this distance is reached.
  * @param speed The NPC's movement speed.
  */
+@ActionAlias
 suspend fun NpcEntity.move(pos: Vec3, dist: Double = 1.5, speed: Double = 1.0): MoveResult =
     move(pos, MoveOptions(arrivalDistance = dist, speed = speed))
 
@@ -92,6 +97,7 @@ fun NpcEntity.startMove(pos: Vec3, options: MoveOptions = MoveOptions()): NpcAct
  *
  * @param position The position to move to.
  */
+@ActionAlias
 suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = position)
 
 /**
@@ -190,6 +196,7 @@ suspend fun NpcEntity.lookAt(
     }
 }
 
+@ActionAlias
 suspend infix fun NpcEntity.lookAt(position: Vec3) {
     lookAt(position, DEFAULT_LOOK_DURATION)
 }
@@ -226,9 +233,11 @@ suspend fun NpcEntity.lookAt(
     }
 }
 
+@ActionAlias
 suspend fun NpcEntity.lookAt(target: Ref<out Entity>, duration: Duration, maxAngularSpeed: Float = 360f) =
     lookAt(target.resolve(), duration, maxAngularSpeed)
 
+@ActionAlias
 suspend infix fun NpcEntity.lookAt(entity: Entity) {
     lookAt(entity, DEFAULT_LOOK_DURATION)
 }
