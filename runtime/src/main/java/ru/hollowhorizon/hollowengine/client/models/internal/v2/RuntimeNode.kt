@@ -48,7 +48,9 @@ open class RuntimeNode(
 ) : Attachment(parent) {
     /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
     val name: String = definition.name ?: "Node_${definition.index}"
-    var isVisible = true
+    /** Set by a sampled channel and reset at the start of each pose. */
+    var isAnimated: Boolean = false
+    var isVisible: Boolean = definition.visible && ((parent as? RuntimeNode)?.isVisible ?: true)
         set(value) {
             if (field != value) owningModel()?.appearanceChanged()
             field = value
@@ -125,6 +127,7 @@ open class RuntimeNode(
 
     /** Puts the node back at rest; one nothing moved since the last time is left as it is. */
     fun resetPose() {
+        isAnimated = false
         val base = definition.baseTransform
         if (transform.modCount != restTransform || base.modCount != restBase) {
             transform.set(base)

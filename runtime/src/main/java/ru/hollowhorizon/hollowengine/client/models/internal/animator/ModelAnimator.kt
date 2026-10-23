@@ -14,6 +14,7 @@ class ModelAnimator {
     private var model: Animator? = null
     private var animations: AnimationsComponent? = null
     private var lastTicks: Float = Float.NaN
+    private val variables = HashMap<String, Float>()
 
     /**
      * Sets the layers this animator runs.
@@ -64,6 +65,8 @@ class ModelAnimator {
         applyTo(attachment.poseTarget(), context)
 
     fun applyTo(target: PoseTarget, context: AnimatorEvaluationContext) {
+        context.modelVariables = variables
+        context.temporaries.clear()
         context.deltaTime = deltaSeconds(context.time)
         context.montages.clear()
         if (isEmpty) return

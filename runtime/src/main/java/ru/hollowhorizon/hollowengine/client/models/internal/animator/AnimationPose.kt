@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose.Companion.mix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
@@ -21,16 +23,24 @@ class AnimationPose {
     }
 
     companion object {
-        fun sample(animation: AnimationClip, time: Float, allowedNodes: Set<Int>? = null): AnimationPose {
+        fun sample(
+            animation: AnimationClip,
+            time: Float,
+            allowedNodes: Set<Int>? = null,
+            context: BedrockContext = BedrockContext(Query.EMPTY),
+        ): AnimationPose {
             val pose = AnimationPose()
+            val timed = context.atAnimationTime(time)
             animation.nodes.forEach { (node, channels) ->
-                if (allowedNodes != null && node !in allowedNodes) return@forEach
+                if (allowedNodes != null && node !in allowedNodes && animation.poseTransform == null) return@forEach
                 val bone = pose.bone(node)
-                channels.translation?.let { bone.translation = Vec3f(it.compute(time)) }
-                channels.rotation?.let { bone.rotation = QuatF(it.compute(time)) }
-                channels.scale?.let { bone.scale = Vec3f(it.compute(time)) }
-                channels.weights?.let { bone.weights = it.compute(time).copyOf() }
+                channels.translation?.let { bone.translation = Vec3f(it.compute(time, timed)) }
+                channels.rotation?.let { bone.rotation = QuatF(it.compute(time, timed)) }
+                channels.scale?.let { bone.scale = Vec3f(it.compute(time, timed)) }
+                channels.weights?.let { bone.weights = it.compute(time, timed).copyOf() }
             }
+            animation.poseTransform?.invoke(pose)
+            if (allowedNodes != null) pose.bones.keys.retainAll(allowedNodes)
             return pose
         }
 
@@ -143,6 +153,7 @@ fun applyAnimationPose(
 
     pose.entries.forEach { (nodeIndex, bonePose) ->
         val runtimeNode = nodes[nodeIndex] ?: return@forEach
+        runtimeNode.isAnimated = true
         val transform = runtimeNode.transform
         val base = runtimeNode.definition.baseTransform
         val reference = referencePose?.get(nodeIndex)

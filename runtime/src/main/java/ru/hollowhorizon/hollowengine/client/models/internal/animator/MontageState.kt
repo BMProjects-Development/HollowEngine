@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -12,7 +14,13 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExp
  * What a montage poses at one moment of it, whoever plays it.
  */
 object MontageSampler {
-    fun sample(montage: Montage, time: Float, target: PoseTarget, allowed: Set<Int>): AnimationPose {
+    fun sample(
+        montage: Montage,
+        time: Float,
+        target: PoseTarget,
+        allowed: Set<Int>,
+        context: BedrockContext = BedrockContext(Query.EMPTY),
+    ): AnimationPose {
         val pose = AnimationPose()
         montage.clips.sortedBy(MontageClip::start).forEach { clip ->
             val weight = weight(clip, time)
@@ -22,7 +30,8 @@ object MontageSampler {
             AnimationPose.sample(
                 animation,
                 clipTime(clip, time, animation.duration),
-                bones
+                bones,
+                context,
             ).entries.forEach { (node, bone) ->
                 cover(pose[node] ?: pose.bone(node).also { it.cover = 0f }, bone, weight)
             }
@@ -120,7 +129,7 @@ class MontageLayer(montage: MontageLayerSpec) : SpecLayer(montage) {
             return null
         }
         context.montages += MontageMoment(montage, time, (weight * fadeOut).coerceIn(0f, 1f))
-        return LayerPose(MontageSampler.sample(montage, time, target, mask(target)), weightScale = fadeOut)
+        return LayerPose(MontageSampler.sample(montage, time, target, mask(target), context.molang), weightScale = fadeOut)
     }
 
     /** The weight this frame, kept for how much the montage's fields ease in over what the rig authors. */
@@ -172,7 +181,7 @@ class MontageState(private var spec: MontageStateSpec) : AnimationState {
         else playback.advance(montage.duration, spec.playMode, speed, context.deltaTime)
         this.time = if (montage.hasRules) time else playback.time
         context.montages += MontageMoment(montage, time, 1f)
-        return MontageSampler.sample(montage, time, target, allowed)
+        return MontageSampler.sample(montage, time, target, allowed, context.molang)
             .also { pose -> pose.entries.forEach { it.value.cover = 1f } }
     }
 

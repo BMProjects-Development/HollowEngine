@@ -4,6 +4,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 
+data class SkinInfluence(val joint: Int, val weight: Float)
+
 class Skin(
     val jointsIds: List<Int>,
     val inverseBindMatrices: Array<Mat4f>,

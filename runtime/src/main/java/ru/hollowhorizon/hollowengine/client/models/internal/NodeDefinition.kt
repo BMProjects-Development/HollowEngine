@@ -10,6 +10,7 @@ open class NodeDefinition(
     val transform: TrsTransformF,
     val mesh: Mesh? = null,
     val skin: Skin? = null,
+    val visible: Boolean = true,
 ) {
     var parent: NodeDefinition? = null
     val root: NodeDefinition by lazy { parent?.root ?: this }

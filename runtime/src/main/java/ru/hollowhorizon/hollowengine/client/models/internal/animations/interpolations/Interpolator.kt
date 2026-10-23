@@ -1,11 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations
 
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
+import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 
 interface Interpolator<T> {
     val duration: Float
 
-    fun compute(time: Float, context: BedrockContext = BedrockContext.EMPTY): T
+    fun compute(time: Float, context: BedrockContext = BedrockContext(Query.EMPTY)): T
 }
 
 abstract class StaticInterpolator<T>(val keys: FloatArray, val values: Array<T>) : Interpolator<T> {

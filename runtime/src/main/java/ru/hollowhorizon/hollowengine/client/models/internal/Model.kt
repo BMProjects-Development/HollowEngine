@@ -15,6 +15,8 @@ data class Model(
     val scenes: List<Scene>,
     val materials: Set<Material>,
     val animations: List<AnimationClip> = emptyList(),
+    val constraints: List<ModelPoseConstraint> = emptyList(),
+    val textureContents: List<ModelTexture> = emptyList(),
 ) {
     /** Clips by name, which is how a layer names the animation it plays. */
     val animationsByName: Map<String, AnimationClip> by lazy { animations.associateBy { it.name } }
@@ -68,6 +70,7 @@ data class Model(
 
     /** Releases the GPU buffers of the model; called by the manager when a model is replaced. */
     fun destroy() {
+        textureContents.forEach(ModelTexture::close)
         walkNodes().mapNotNull { it.mesh }.flatMap { it.primitives }.forEach(Primitive::destroy)
         geometry?.destroy()
         geometry = null

@@ -60,7 +60,7 @@ object IconHelper {
         listOf(".story") to "story",
         listOf(".hss") to "style",
         listOf(".bc") to "blocks",
-        listOf(".gltf", ".glb", ".fbx", ".geo.json", ".obj") to "model",
+        listOf(".gltf", ".glb", ".fbx", ".geo.json", ".obj", ".bbmodel") to "model",
         listOf(".json", ".json5", ".mcmeta") to "data",
         listOf(".png", ".jpg", ".jpeg", ".gif") to "image",
         listOf(".ogg", ".mp3", ".wav") to "sound",

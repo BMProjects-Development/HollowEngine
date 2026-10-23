@@ -48,7 +48,7 @@ class BlendState(private var spec: BlendStateSpec) : AnimationState {
         clips.forEachIndexed { i, clip ->
             if (clip == null || weights[i] < MIN_WEIGHT) return@forEachIndexed
             val along = if (spec.motions[i].speed < 0f) 1f - phase else phase
-            poses += AnimationPose.sample(clip, along * clip.duration, allowed)
+            poses += AnimationPose.sample(clip, along * clip.duration, allowed, context.molang)
             used += weights[i]
         }
         return AnimationPose.blend(poses, used)

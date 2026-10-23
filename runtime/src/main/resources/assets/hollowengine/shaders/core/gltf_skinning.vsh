@@ -5,8 +5,11 @@ layout (location = 1) in vec4 weight;
 layout (location = 2) in vec3 position;
 layout (location = 3) in vec3 normal;
 layout(location = 4) in vec4 tangent;
+layout(location = 5) in ivec2 additionalWeightRange;
 
 uniform samplerBuffer jointMatrices;
+uniform samplerBuffer additionalWeights;
+uniform int hasAdditionalWeights;
 
 uniform samplerBuffer morphDeltasPosition;
 uniform samplerBuffer morphDeltasNormal;
@@ -72,6 +75,19 @@ void main() {
     texelFetch(jointMatrices, jw + 2),
     texelFetch(jointMatrices, jw + 3)
     );
+
+    if (hasAdditionalWeights != 0) {
+        for (int i = 0; i < additionalWeightRange.y; i++) {
+            vec2 influence = texelFetch(additionalWeights, additionalWeightRange.x + i).rg;
+            int jointIndex = int(influence.x) * 4;
+            skinMatrix += influence.y * mat4(
+                texelFetch(jointMatrices, jointIndex),
+                texelFetch(jointMatrices, jointIndex + 1),
+                texelFetch(jointMatrices, jointIndex + 2),
+                texelFetch(jointMatrices, jointIndex + 3)
+            );
+        }
+    }
 
     vec4 skinnedPos = skinMatrix * vec4(morphedPos, 1.0);
     outPosition = skinnedPos.xyz / skinnedPos.w;

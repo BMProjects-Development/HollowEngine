@@ -34,7 +34,7 @@ object IkSolver {
         val reach = minOf(lengths.sum(), restReach)
         val root = joints.first()
         val distance = root.distance(goal)
-        if (reach < EPSILON || distance < EPSILON) return Solution(joints, 1f)
+        if (reach < EPSILON) return Solution(joints, 1f)
 
         val stretch = if (distance > reach) (distance / reach).coerceAtMost(maxStretch.coerceAtLeast(1f)) else 1f
         for (i in lengths.indices) lengths[i] *= stretch

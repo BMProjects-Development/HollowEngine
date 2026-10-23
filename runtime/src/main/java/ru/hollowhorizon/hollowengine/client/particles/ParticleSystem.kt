@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer
 import net.minecraft.world.level.Level
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.particles.collision.CollisionProvider
 import ru.hollowhorizon.hollowengine.client.particles.collision.WorldCollisionProvider
 import ru.hollowhorizon.hollowengine.client.particles.file.BedrockParticleFile
@@ -21,8 +22,8 @@ class ParticleSystem(
     val random: Random,
     val collisionProvider: CollisionProvider,
     val lightProvider: LightProvider,
+    private val timeSource: Query = Query.GLFW_TIME,
 ) {
-    private val timeSource = Query.GLFW_TIME
     private var lastUpdate = timeSource.anim_time
 
     internal val emitters = mutableListOf<ParticleEmitter>()
@@ -47,17 +48,17 @@ class ParticleSystem(
 
     fun spawn(
         effect: BedrockParticleFile,
-        entity: Query = Query.EMPTY,
+        context: AnimatorEvaluationContext = AnimatorEvaluationContext(),
         transform: Transform = Transform.Zero,
-    ) = spawn(ParticleEffect.fromFile(effect), entity, transform)
+    ) = spawn(ParticleEffect.fromFile(effect), context, transform)
 
     fun spawn(
         effect: ParticleEffect,
-        query: Query = Query.EMPTY,
+        context: AnimatorEvaluationContext = AnimatorEvaluationContext(),
         transform: Transform = Transform.Zero,
     ): ParticleEmitter {
         val emitter =
-            ParticleEmitter(this, effect, query, transform.position, transform.rotation, transform.velocity, transform)
+            ParticleEmitter(this, effect, context, transform.position, transform.rotation, transform.velocity, transform)
         emitters.add(emitter)
 
         val dt = (lastUpdate - timeSource.anim_time).coerceAtLeast(0f)

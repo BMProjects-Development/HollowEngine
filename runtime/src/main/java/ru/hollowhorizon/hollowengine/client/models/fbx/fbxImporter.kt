@@ -4,7 +4,6 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
-import ru.hollowhorizon.hollowengine.client.models.util.startsWith
 import ru.hollowhorizon.hollowengine.client.utils.stream
 import ru.hollowhorizon.hollowengine.common.models.ModelResourceIO
 import java.nio.ByteBuffer
@@ -14,18 +13,18 @@ object FbxModelLoader: ModelLoader {
     override val supportedFormats = setOf("fbx")
 
     override suspend fun load(location: ResourceLocation, side: ModelSide): Model {
-        return import(location, side).convert(location)
+        return import(location, side).convert(location, side)
     }
 
     fun import(location: ResourceLocation, side: ModelSide = ModelSide.CLIENT): Document {
-        val bytes = ByteBuffer.wrap(location.readModelBytes(side)).order(ByteOrder.nativeOrder())
+        return parse(location.readModelBytes(side))
+    }
 
+    fun parse(data: ByteArray): Document {
+        val bytes = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         val tokens = ArrayList<Token>()
-        buffer = bytes
-
-        var isBinary = false
-        if (bytes.startsWith("Kaydara FBX Binary")) {
-            isBinary = true
+        val isBinary = data.size >= 18 && String(data, 0, 18, Charsets.US_ASCII) == "Kaydara FBX Binary"
+        if (isBinary) {
             tokenizeBinary(tokens, bytes)
         } else tokenize(tokens, bytes)
 
@@ -36,9 +35,7 @@ object FbxModelLoader: ModelLoader {
 
     private fun ResourceLocation.readModelBytes(side: ModelSide): ByteArray =
         when (side) {
-            ModelSide.CLIENT -> stream.readBytes()
+            ModelSide.CLIENT -> stream.use { it.readBytes() }
             ModelSide.SERVER -> ModelResourceIO.open(this).use { it.readBytes() }
         }
 }
-
-lateinit var buffer: ByteBuffer

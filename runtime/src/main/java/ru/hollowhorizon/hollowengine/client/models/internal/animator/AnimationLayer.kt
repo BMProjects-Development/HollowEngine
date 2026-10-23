@@ -159,11 +159,11 @@ class ClipLayer(clip: ClipAnimationLayerSpec) : SpecLayer(clip) {
 
         val allowed = mask(target)
         return LayerPose(
-            pose = AnimationPose.sample(animation, sampleTime, allowed),
+            pose = AnimationPose.sample(animation, sampleTime, allowed, context.molang),
             weightScale = fadeOut,
             reference = clip.referencePose
                 ?.let(target.animations::get)
-                ?.let { AnimationPose.sample(it, 0f, allowed) },
+                ?.let { AnimationPose.sample(it, 0f, allowed, context.molang) },
         )
     }
 

@@ -28,10 +28,11 @@ data class Material(
     var doubleSided: Boolean = false,
     var blend: Blend = Blend.OPAQUE,
     var emissive: Boolean = false,
+    var textureContent: ModelTexture? = null,
 ) : RenderMaterial {
-    enum class Blend { OPAQUE, BLEND }
+    enum class Blend { OPAQUE, BLEND, ADDITIVE }
 
-    override val isTranslucent: Boolean get() = blend == Blend.BLEND
+    override val isTranslucent: Boolean get() = blend != Blend.OPAQUE
 
     override fun bind(context: MaterialBindContext) {
         val shader = context.shader
@@ -45,7 +46,8 @@ data class Material(
         }
 
         RenderSystem.activeTexture(COLOR_MAP_INDEX)
-        RenderSystem.bindTexture(Minecraft.getInstance().textureManager.getTexture(texture).id)
+        val content = textureContent.takeIf { texture == MISSING_TEXTURE }
+        RenderSystem.bindTexture(content?.textureId() ?: Minecraft.getInstance().textureManager.getTexture(texture).id)
 
         if (doubleSided) RenderSystem.disableCull() else RenderSystem.enableCull()
 
@@ -54,6 +56,10 @@ data class Material(
             Blend.BLEND -> {
                 RenderSystem.enableBlend()
                 RenderSystem.defaultBlendFunc()
+            }
+            Blend.ADDITIVE -> {
+                RenderSystem.enableBlend()
+                RenderSystem.blendFunc(GL33.GL_SRC_ALPHA, GL33.GL_ONE)
             }
         }
     }

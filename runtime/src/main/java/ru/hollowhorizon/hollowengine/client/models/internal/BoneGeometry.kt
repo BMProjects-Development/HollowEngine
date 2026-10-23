@@ -45,6 +45,9 @@ object BoneGeometry {
             add(influences.y, strengths.y, position, skin, bounds, inBone)
             add(influences.z, strengths.z, position, skin, bounds, inBone)
             add(influences.w, strengths.w, position, skin, bounds, inBone)
+            primitive.additionalSkinWeights?.getOrNull(vertex)?.forEach { extra ->
+                add(extra.joint, extra.weight, position, skin, bounds, inBone)
+            }
         }
     }
 

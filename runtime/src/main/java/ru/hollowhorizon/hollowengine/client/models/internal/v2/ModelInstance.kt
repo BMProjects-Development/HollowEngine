@@ -123,6 +123,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         layMontages(context)
         attachment.evaluateConditions(context)
         applyRigPose(attachment.nodes, attachment.rig)
+        attachment.applyAuthoredConstraints()
         applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
         attachment.endPose()
 

@@ -8,7 +8,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.api.system
-import ru.hollowhorizon.hollowengine.client.models.bedrock.LivingEntityQuery
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.particles.BedrockParticles
 import ru.hollowhorizon.hollowengine.client.particles.ParticleEffect
 import ru.hollowhorizon.hollowengine.client.particles.Transform
@@ -50,7 +50,7 @@ class SpawnParticlesPacket(
         if (entity is LivingEntity) {
             renderer.system.spawn(
                 effect = BedrockParticles.PARTICLES[location.rl] ?: error("Particle $location not found!"),
-                entity = LivingEntityQuery(entity)
+                context = AnimatorEvaluationContext(entity)
             )
         }
     }

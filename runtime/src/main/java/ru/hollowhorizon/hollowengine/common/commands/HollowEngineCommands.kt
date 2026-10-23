@@ -18,7 +18,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.system
-import ru.hollowhorizon.hollowengine.client.models.bedrock.LivingEntityQuery
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.particles.BedrockParticles
 import ru.hollowhorizon.hollowengine.client.particles.ParticleEffect
 import ru.hollowhorizon.hollowengine.client.particles.Transform
@@ -532,7 +532,7 @@ private fun spawnParticleOnEntity(particleName: String, entity: LivingEntity) {
     val particleFile = BedrockParticles.PARTICLES[particleName.rl] ?: error("Particle not found")
     Minecraft.getInstance().level?.system?.spawn(
         ParticleEffect.fromFile(particleFile),
-        query = LivingEntityQuery(entity)
+        context = AnimatorEvaluationContext(entity)
     ) ?: error("Client level is not available")
 }
 
