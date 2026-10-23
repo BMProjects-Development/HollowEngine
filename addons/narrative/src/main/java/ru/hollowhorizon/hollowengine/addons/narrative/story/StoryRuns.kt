@@ -22,9 +22,6 @@ interface StoryOwner {
     /** The entity the stories are about, if the owner has one. */
     val entity: Entity?
 
-    /** [runs], the runs of this owner, changed and should be saved. */
-    fun changed(runs: StoryRuns)
-
     /** The context a stage of the run [path] sees. */
     fun context(path: String): StoryContext = StoryContext(this, path)
 }
@@ -63,7 +60,6 @@ class StoryRuns(val owner: StoryOwner) {
     fun stop(key: String): Boolean {
         val run = runs.remove(key) ?: return false
         run.stop()
-        changed()
         return true
     }
 
@@ -91,8 +87,6 @@ class StoryRuns(val owner: StoryOwner) {
     /** Wakes every sleeping run. */
     fun wake() = runs.values.toList().forEach(StoryRun::start)
 
-    internal fun changed() = owner.changed(this)
-
     internal fun holds(run: StoryRun): Boolean = runs[run.name] === run
 
     /** The run at [path]: a story under its key, then its branches by name. */
@@ -103,7 +97,6 @@ class StoryRuns(val owner: StoryOwner) {
 
     internal fun ended(run: StoryRun) {
         if (runs[run.name] === run) runs.remove(run.name)
-        changed()
     }
 
     internal fun waitFor(instance: String, run: StoryRun) = StoryWaits.instance(instance, run)
@@ -117,7 +110,6 @@ class StoryRuns(val owner: StoryOwner) {
         run.pending += entry(run)
         run.history.add(key, run, emptyList())
         runs[key] = run
-        changed()
         run.start()
         return StoryHandle(run, null)
     }

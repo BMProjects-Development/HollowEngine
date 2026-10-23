@@ -13,7 +13,6 @@ import net.minecraft.nbt.Tag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValues.put
-import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef
 import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
@@ -34,6 +33,22 @@ object StoryValues {
 
     /** Finds the entity a reference names, or null when it is not around right now. */
     var entities: (UUID, KClass<out Entity>) -> Entity? = ::findOnServer
+
+    private val offWorld = ThreadLocal.withInitial { false }
+
+    /**
+     * Runs [block] with a reference to an NPC that has no body read as the NPC kept in the registry. An undo puts such
+     * an NPC back through the registry at once; a stage would act on a copy that never moves, so it waits for the body.
+     */
+    internal fun <T> withOffWorldNpcs(block: () -> T): T {
+        val before = offWorld.get()
+        offWorld.set(true)
+        try {
+            return block()
+        } finally {
+            offWorld.set(before)
+        }
+    }
 
     @Suppress("UNCHECKED_CAST")
     fun serializer(type: KType): KSerializer<Any?> = serializers.getOrPut(type) {
@@ -103,8 +118,7 @@ object StoryValues {
     /** A loaded entity, or an NPC without a body: the registry keeps those apart from chunks, so they are always there. */
     private fun findOnServer(uuid: UUID, type: KClass<out Entity>): Entity? {
         val server = currentServerOrNull() ?: return null
-        if (NpcEntity::class.java.isAssignableFrom(type.java)) server.npcs.resolve(uuid)?.let { return it }
-        return server.findEntity(uuid) ?: server.npcs.resolve(uuid)
+        return server.findEntity(uuid) ?: server.npcs.resolve(uuid)?.takeIf { offWorld.get() }
     }
 
     private fun MinecraftServer.findEntity(uuid: UUID): Entity? =

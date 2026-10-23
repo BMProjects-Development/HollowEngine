@@ -326,7 +326,7 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> =
         synchronized(lock) {
-            kotlinGutterTargets(getOrCreateFile(name, text), offset)
+            kotlinGutterTargets(getOrCreateFile(name, text), name, offset)
         }
 
     override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =

@@ -29,7 +29,6 @@ suspend fun once(name: String, block: suspend () -> Unit) {
     block()
     done.putBoolean(key, true)
     frame.run.records.put(ONCE, done)
-    frame.run.changed()
 }
 
 /** Computes a value once for the whole story, like [once]: a repeated segment gets the value computed the first time. */
@@ -46,7 +45,6 @@ internal suspend fun <T> remember(name: String, serializer: KSerializer<Any?>, b
     val value = block()
     StoryValues.put(values, key, serializer, value)
     frame.run.records.put(REMEMBERED, values)
-    frame.run.changed()
     return value
 }
 
@@ -59,7 +57,6 @@ suspend fun forget(name: String): Boolean {
         val tag = records.getCompound(kind)
         tag.contains(key).also { if (it) tag.remove(key) }
     } > 0
-    if (existed) frame.run.changed()
     return existed
 }
 
