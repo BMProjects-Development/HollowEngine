@@ -1,9 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.entity.Entity
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -64,8 +67,20 @@ suspend fun <R> action(vararg call: Any?, block: suspend ActionScope<R>.() -> Pe
         val temporary = context[Temporary]
         ActionRecord(it, action, args, if (temporary != null) Lifetime.TEMPORARY else Lifetime.RUN, temporary?.until, context[ActiveAction]?.seq)
     }
-    return ActionScope<R>(record, null).block().value
+    return try {
+        ActionScope<R>(record, null).block().value
+    } catch (cancelled: CancellationException) {
+        throw run?.let { unloaded(call) }?.takeIf { currentCoroutineContext().isActive } ?: cancelled
+    }
 }
+
+/**
+ * An entity of the call that left the world without being destroyed, like the body of an NPC whose chunk unloaded
+ * in the middle of the action, which cancels what the body was doing. The story then waits for the entity to come back.
+ */
+private fun unloaded(call: Array<out Any?>): StoryEntityMissing? = call.firstNotNullOfOrNull { value ->
+    (value as? Entity)?.takeIf { it.removalReason?.shouldDestroy() == false }
+}?.let { StoryEntityMissing(it.uuid) }
 
 /**
  * The body of a checkpoint label such as [position]: like [action] without `perform`. A label captures a state
