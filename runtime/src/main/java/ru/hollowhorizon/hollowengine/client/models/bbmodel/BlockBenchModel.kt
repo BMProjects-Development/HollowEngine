@@ -13,6 +13,9 @@ data class BlockBenchModel(
     @SerialName("outliner") val nodes: List<JsonElement> = emptyList(),
     val textures: List<BBTexture> = emptyList(),
     val animations: List<BBAnimation> = emptyList(),
+    @SerialName("variable_placeholders") val variablePlaceholders: String? = null,
+    @SerialName("animation_variable_placeholders") val animationVariablePlaceholders: String = "",
+    @SerialName("variable_placeholder_buttons") val variablePlaceholderButtons: List<BBVariablePlaceholderButton> = emptyList(),
 ) {
     @Serializable
     data class Resolution(val width: Int = 16, val height: Int = 16)
@@ -22,6 +25,9 @@ data class BlockBenchModel(
         fun parse(source: String): BlockBenchModel = JSON.decodeFromString(source)
     }
 }
+
+@Serializable
+data class BBVariablePlaceholderButton(val type: String, val id: String, val value: JsonPrimitive? = null)
 
 @Serializable
 data class BBMeta(

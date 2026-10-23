@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.animal.FlyingAnimal
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
+import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.common.models.MontageMoment
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import kotlin.math.abs
@@ -45,10 +46,16 @@ class AnimatorEvaluationContext() : Query {
     internal var modelVariables: MutableMap<String, Float>? = null
 
     /** Imported animation expressions share this frame's queries and scratch space. */
-    val molang by lazy { animationMolangContext(this) }
+    private val directMolang by lazy { animationMolangContext(this) }
+    val molang get() = directMolang.withDefaults(variableDefaults)
+    internal var variableDefaults: MolangDefaults = MolangDefaults.EMPTY
 
-    internal fun variable(name: String): Float = variables[name] ?: modelVariables?.get(name) ?: 0f
-    internal fun hasVariable(name: String): Boolean = name in variables || modelVariables?.containsKey(name) == true
+    internal fun storedVariable(name: String): Float = variables[name] ?: modelVariables?.get(name) ?: 0f
+    internal fun variable(name: String): Float = molang.variables[name].takeUnless(Float::isNaN) ?: 0f
+    internal fun hasStoredVariable(name: String): Boolean = name in variables || modelVariables?.containsKey(name) == true
+
+    override fun hasValue(name: String): Boolean = name == "anim_time" || name == "life_time" ||
+            hasStoredVariable(name) || if (name in LivingQueries) living != null else entity != null
 
     internal fun setVariable(name: String, value: Float) {
         val storage = modelVariables?.takeUnless { name in variables } ?: variables
@@ -64,14 +71,14 @@ class AnimatorEvaluationContext() : Query {
     val isClientSide: Boolean get() = entity?.level()?.isClientSide ?: true
 
     /** Entity-free previews can supply query values through named variables. */
-    internal fun override(name: String): Float = variable(name)
+    internal fun override(name: String): Float = storedVariable(name)
 
     fun secondsSince(gameTick: Long): Float = ((gameTicks - gameTick).toFloat() + partialTick) / TICKS_PER_SECOND
 
     private fun entityFloat(name: String, read: (Entity) -> Float): Float = entity?.let(read) ?: override(name)
     private fun livingFloat(name: String, read: (LivingEntity) -> Float): Float = living?.let(read) ?: override(name)
     private fun entityBool(name: String, default: Boolean = false, read: (Entity) -> Boolean): Boolean =
-        entity?.let(read) ?: if (hasVariable(name)) override(name) != 0f else default
+        entity?.let(read) ?: if (hasStoredVariable(name)) override(name) != 0f else default
     private fun livingBool(name: String, read: (LivingEntity) -> Boolean): Boolean =
         living?.let(read) ?: (override(name) != 0f)
 
@@ -79,7 +86,7 @@ class AnimatorEvaluationContext() : Query {
     override val anim_time: Float get() = layerTime
     override val life_time: Float get() = time / TICKS_PER_SECOND
     override val ground_speed: Float
-        get() = if (entity == null && hasVariable("ground_speed")) override("ground_speed") else signedHorizontalSpeed
+        get() = if (entity == null && hasStoredVariable("ground_speed")) override("ground_speed") else signedHorizontalSpeed
     override val is_moving: Boolean
         get() = entityBool("is_moving") { abs(ground_speed) >= MOVEMENT_FACTOR }
     override val velocity_x: Float get() = entityFloat("velocity_x") { it.deltaMovement.x.toFloat() }
@@ -109,13 +116,14 @@ class AnimatorEvaluationContext() : Query {
         }
     }
     override val head_x_rotation: Float
-        get() = if (entity == null && hasVariable("head_x_rotation")) override("head_x_rotation") else headPitch
+        get() = if (entity == null && hasStoredVariable("head_x_rotation")) override("head_x_rotation") else headPitch
     override val head_y_rotation: Float
-        get() = if (entity == null && hasVariable("head_y_rotation")) override("head_y_rotation") else headYaw
+        get() = if (entity == null && hasStoredVariable("head_y_rotation")) override("head_y_rotation") else headYaw
     override val modified_distance_moved: Float get() = entityFloat("modified_distance_moved") { it.moveDist }
     override val modified_move_speed: Float get() = ground_speed
 
     private companion object {
+        val LivingQueries = setOf("health", "max_health", "is_jumping", "is_sleeping", "is_hurt", "is_swinging", "fall_ticks")
         const val TICKS_PER_SECOND = 20f
         const val MOVEMENT_FACTOR = 1 / 256f
     }

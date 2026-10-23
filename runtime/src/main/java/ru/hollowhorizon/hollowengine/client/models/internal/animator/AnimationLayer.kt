@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -14,6 +15,7 @@ class PoseTarget(
     val animations: Map<String, AnimationClip>,
     val aliases: Map<String, String> = emptyMap(),
     val rig: ModelRig = ModelRig.EMPTY,
+    val molangDefaults: MolangDefaults = MolangDefaults.EMPTY,
 ) {
     private val masks = HashMap<BoneMask, Set<Int>>()
 

@@ -21,6 +21,7 @@ import kotlin.reflect.KProperty
  * evaluated for.
  */
 interface Query {
+    fun hasValue(name: String): Boolean = true
     val ground_speed: Float get() = 0f
     val is_moving: Boolean get() = false
     val is_sneaking: Boolean get() = false
@@ -53,8 +54,11 @@ interface Query {
     val modified_move_speed: Float get() = 0f
 
     companion object {
-        val EMPTY = object : Query {}
+        val EMPTY = object : Query {
+            override fun hasValue(name: String): Boolean = false
+        }
         val GLFW_TIME = object : Query {
+            override fun hasValue(name: String): Boolean = name == "anim_time"
             override val anim_time: Float
                 get() = GLFW.glfwGetTime().toFloat()
         }
@@ -102,15 +106,32 @@ private class VariablesWithFallback(val primary: Variables, val fallback: Variab
 }
 
 /** Everything a Bedrock expression can read: one query and one bag of variables. */
-data class BedrockContext(
+class BedrockContext(
     val query: Query,
-    val variables: Variables = VariablesMap(),
+    variables: Variables = VariablesMap(),
     /** `t.` scratch space, cleared by whoever owns the frame. */
     val temporaries: MutableMap<String, Float> = HashMap(),
+    val defaults: MolangDefaults = MolangDefaults.EMPTY,
 ) {
+    private val variableStorage = variables
+    val variables: Variables = defaults.bind(variableStorage) { this }
+    internal val resolvingDefaults = LinkedHashSet<String>()
+
     fun atAnimationTime(seconds: Float): BedrockContext = BedrockContext(object : Query by query {
         override val anim_time: Float = seconds
-    }, variables, temporaries)
+        override fun hasValue(name: String): Boolean = name == "anim_time" || query.hasValue(name)
+    }, variableStorage, temporaries, defaults)
+
+    fun withDefaults(defaults: MolangDefaults): BedrockContext =
+        if (this.defaults === defaults) this else BedrockContext(query, variableStorage, temporaries, defaults)
+
+    fun queryFloat(name: String, read: (Query) -> Float): Float =
+        if (query.hasValue(name)) read(query) else defaults.value("query.$name", this) ?: read(query)
+
+    fun queryBool(name: String, read: (Query) -> Boolean): Boolean =
+        if (query.hasValue(name)) read(query) else defaults.value("query.$name", this)?.let { it != 0f } ?: read(query)
+
+    fun temporary(name: String): Float = temporaries[name] ?: defaults.value("temp.$name", this) ?: 0f
 
     companion object {
         val EMPTY = BedrockContext(Query.EMPTY)
@@ -126,48 +147,50 @@ data class BedrockContext(
  */
 val BedrockDeclarations: Declarations<BedrockContext> = Declarations {
     val query = struct<BedrockContext>("query") {
-        float("ground_speed") { it.query.ground_speed }
-        float("velocity_x") { it.query.velocity_x }
-        float("velocity_y") { it.query.velocity_y }
-        float("velocity_z") { it.query.velocity_z }
-        float("vertical_speed") { it.query.vertical_speed }
-        float("health") { it.query.health }
-        float("max_health") { it.query.max_health }
-        float("fall_ticks") { it.query.fall_ticks }
-        float("head_x_rotation") { it.query.head_x_rotation }
-        float("head_y_rotation") { it.query.head_y_rotation }
-        float("anim_time") { it.query.anim_time }
-        float("life_time") { it.query.life_time }
-        float("modified_distance_moved") { it.query.modified_distance_moved }
-        float("modified_move_speed") { it.query.modified_move_speed }
+        float("ground_speed") { it.queryFloat("ground_speed") { it.ground_speed } }
+        float("velocity_x") { it.queryFloat("velocity_x") { it.velocity_x } }
+        float("velocity_y") { it.queryFloat("velocity_y") { it.velocity_y } }
+        float("velocity_z") { it.queryFloat("velocity_z") { it.velocity_z } }
+        float("vertical_speed") { it.queryFloat("vertical_speed") { it.vertical_speed } }
+        float("health") { it.queryFloat("health") { it.health } }
+        float("max_health") { it.queryFloat("max_health") { it.max_health } }
+        float("fall_ticks") { it.queryFloat("fall_ticks") { it.fall_ticks } }
+        float("head_x_rotation") { it.queryFloat("head_x_rotation") { it.head_x_rotation } }
+        float("head_y_rotation") { it.queryFloat("head_y_rotation") { it.head_y_rotation } }
+        float("anim_time") { it.queryFloat("anim_time") { it.anim_time } }
+        float("life_time") { it.queryFloat("life_time") { it.life_time } }
+        float("modified_distance_moved") { it.queryFloat("modified_distance_moved") { it.modified_distance_moved } }
+        float("modified_move_speed") { it.queryFloat("modified_move_speed") { it.modified_move_speed } }
 
-        bool("is_moving") { it.query.is_moving }
-        bool("is_sneaking") { it.query.is_sneaking }
-        bool("is_sprinting") { it.query.is_sprinting }
-        bool("is_jumping") { it.query.is_jumping }
-        bool("is_flying") { it.query.is_flying }
-        bool("is_swimming") { it.query.is_swimming }
-        bool("is_in_water") { it.query.is_in_water }
-        bool("is_in_water_or_rain") { it.query.is_in_water_or_rain }
-        bool("is_sitting") { it.query.is_sitting }
-        bool("is_sleeping") { it.query.is_sleeping }
-        bool("is_hurt") { it.query.is_hurt }
-        bool("is_swinging") { it.query.is_swinging }
-        bool("is_alive") { it.query.is_alive }
-        bool("is_on_ground") { it.query.is_on_ground }
+        bool("is_moving") { it.queryBool("is_moving") { it.is_moving } }
+        bool("is_sneaking") { it.queryBool("is_sneaking") { it.is_sneaking } }
+        bool("is_sprinting") { it.queryBool("is_sprinting") { it.is_sprinting } }
+        bool("is_jumping") { it.queryBool("is_jumping") { it.is_jumping } }
+        bool("is_flying") { it.queryBool("is_flying") { it.is_flying } }
+        bool("is_swimming") { it.queryBool("is_swimming") { it.is_swimming } }
+        bool("is_in_water") { it.queryBool("is_in_water") { it.is_in_water } }
+        bool("is_in_water_or_rain") { it.queryBool("is_in_water_or_rain") { it.is_in_water_or_rain } }
+        bool("is_sitting") { it.queryBool("is_sitting") { it.is_sitting } }
+        bool("is_sleeping") { it.queryBool("is_sleeping") { it.is_sleeping } }
+        bool("is_hurt") { it.queryBool("is_hurt") { it.is_hurt } }
+        bool("is_swinging") { it.queryBool("is_swinging") { it.is_swinging } }
+        bool("is_alive") { it.queryBool("is_alive") { it.is_alive } }
+        bool("is_on_ground") { it.queryBool("is_on_ground") { it.is_on_ground } }
     }
 
     val math = mathNamespace()
 
     val variables = dynamic(
         name = "variables",
+        nested = true,
         read = { owner, key -> (owner as BedrockContext).variables[key].takeUnless(Float::isNaN) ?: 0f },
         write = { owner, key, value -> (owner as BedrockContext).variables[key] = value.asFloat() },
     )
 
     val temporaries = dynamic(
         name = "temporaries",
-        read = { owner, key -> (owner as BedrockContext).temporaries[key] ?: 0f },
+        nested = true,
+        read = { owner, key -> (owner as BedrockContext).temporary(key) },
         write = { owner, key, value -> (owner as BedrockContext).temporaries[key] = value.asFloat() },
     )
 
@@ -177,6 +200,7 @@ val BedrockDeclarations: Declarations<BedrockContext> = Declarations {
     property("temp", temporaries, alias = "t") { it }
     receiver("query")
     receiver("math")
+    receiver("variable")
 }
 
 val BedrockLanguage: Expression<BedrockContext> = Expression {

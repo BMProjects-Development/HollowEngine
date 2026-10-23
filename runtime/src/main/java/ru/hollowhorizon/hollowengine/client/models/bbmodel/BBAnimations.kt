@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockExpressions
 import ru.hollowhorizon.hollowengine.client.models.bedrock.FloatExpr
+import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
@@ -13,7 +14,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 internal object BBAnimations {
-    fun convert(file: BlockBenchModel, nodes: Map<String, BBNode>): List<AnimationClip> =
+    fun convert(file: BlockBenchModel, nodes: Map<String, BBNode>, defaults: MolangDefaults): List<AnimationClip> =
         file.animations.map { animation ->
             require(animation.length.isFinite() && animation.length >= 0f) { "Invalid Blockbench animation length for ${animation.name}" }
             val globalRotations = hashSetOf<Int>()
@@ -30,7 +31,7 @@ internal object BBAnimations {
                 val tracks = animator.keyframes.groupBy { it.channel }
                 val legacy = file.meta.version.substringBefore('.').toInt() < 5
                 fun track(channel: String): BBVectorTrack? = tracks[channel]?.let {
-                    BBVectorTrack(it, legacy, animation.loop == "loop")
+                    BBVectorTrack(it, legacy, animation.loop == "loop", defaults)
                 }
 
                 val translation = track("position")
@@ -69,6 +70,7 @@ internal class BBVectorTrack(
     frames: List<BBKeyframe>,
     private val legacy: Boolean,
     private val loop: Boolean,
+    private val defaults: MolangDefaults = MolangDefaults.EMPTY,
 ) : Interpolator<Vec3f> {
     internal data class Key(val data: BBKeyframe, val points: List<List<FloatExpr>>)
 
@@ -85,6 +87,9 @@ internal class BBVectorTrack(
         }.also { require(it.isNotEmpty()) { "Blockbench keyframe has no data points" } })
     }
     override val duration: Float = keys.lastOrNull()?.data?.time ?: 0f
+
+    internal fun evaluationContext(time: Float, context: BedrockContext): BedrockContext =
+        context.withDefaults(defaults).atAnimationTime(time)
 
     internal fun value(key: Key, after: Boolean, context: BedrockContext): Vec3f {
         val point = if (after) key.points.last() else key.points.first()
@@ -107,7 +112,7 @@ internal class BBVectorTrack(
     }
 
     override fun compute(time: Float, context: BedrockContext): Vec3f {
-        val timed = context.atAnimationTime(time)
+        val timed = evaluationContext(time, context)
         val nextIndex = segment(time)
         if (nextIndex == 0) return value(keys.first(), false, timed)
         if (nextIndex == keys.size) return value(keys.last(), true, timed)
@@ -180,7 +185,7 @@ private class BBRotationTrack(
                 val a = track.keys[next - 1]
                 val b = track.keys[next]
                 val t = (time - a.data.time) / (b.data.time - a.data.time)
-                val timed = context.atAnimationTime(time)
+                val timed = track.evaluationContext(time, context)
                 return inverseRest * bbRotation(
                     restEuler + track.value(
                         a, true, timed
