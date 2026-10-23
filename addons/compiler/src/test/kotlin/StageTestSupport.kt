@@ -1,4 +1,5 @@
 import StageTrace.release
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,6 +60,11 @@ object StageTrace {
     fun release(name: String) {
         released += name
         waiting.remove(name)?.forEach { it.complete(Unit) }
+    }
+
+    /** Cancels what waits in [await] with [name], as an NPC channel that another owner takes cancels its action. */
+    fun cancel(name: String) {
+        waiting.remove(name)?.forEach { it.cancel(CancellationException("'$name' was taken")) }
     }
 
     /** Makes [await] with [name] wait again, as before it was released. */

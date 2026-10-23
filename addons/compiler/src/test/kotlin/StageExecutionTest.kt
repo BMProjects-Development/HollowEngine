@@ -739,4 +739,28 @@ class StageExecutionTest {
         assertTrue(frame.getCompound("locals").contains("items"))
         world.stop()
     }
+
+    @Test
+    fun `a cancellation that is not the story's own fails the story instead of putting it to sleep`() = runTest {
+        val world = world("preempted", """
+            @State
+            suspend fun main() {
+                walk()
+                log("after")
+            }
+
+            @State
+            suspend fun walk() {
+                log("walking")
+                await("path")
+            }
+        """)
+        val handle = world.launch("main")
+        StageTrace.cancel("path")
+        world.settle()
+        assertEquals(listOf("walking"), StageTrace.take())
+        assertFalse(handle.isActive)
+        assertTrue(world.runs.keys.isEmpty(), "a failed story is not saved to wake up with nothing to run")
+        world.stop()
+    }
 }
