@@ -72,7 +72,7 @@ internal class ColliderPoseTrack(
     }
 
     private fun targetOf(posed: PosedModel) =
-        PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig)
+        PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig, assets.model.molangDefaults)
 }
 
 /**

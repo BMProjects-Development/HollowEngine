@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -17,6 +18,7 @@ data class Model(
     val animations: List<AnimationClip> = emptyList(),
     val constraints: List<ModelPoseConstraint> = emptyList(),
     val textureContents: List<ModelTexture> = emptyList(),
+    val molangDefaults: MolangDefaults = MolangDefaults.EMPTY,
 ) {
     /** Clips by name, which is how a layer names the animation it plays. */
     val animationsByName: Map<String, AnimationClip> by lazy { animations.associateBy { it.name } }

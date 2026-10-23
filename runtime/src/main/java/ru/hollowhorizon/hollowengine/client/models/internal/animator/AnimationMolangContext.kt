@@ -13,16 +13,16 @@ internal fun animationMolangContext(context: AnimatorEvaluationContext): Bedrock
 private class AnimationMolangVariables(private val context: AnimatorEvaluationContext) : Variables {
     private val references = HashMap<String, Variables.Variable>()
 
-    override fun getOrNull(name: String): Variables.Variable? = if (context.hasVariable(name)) reference(name) else null
+    override fun getOrNull(name: String): Variables.Variable? = if (context.hasStoredVariable(name)) reference(name) else null
 
     override fun getOrPut(name: String, initialValue: Float): Variables.Variable {
-        if (!context.hasVariable(name)) context.setVariable(name, initialValue)
+        if (!context.hasStoredVariable(name)) context.setVariable(name, initialValue)
         return reference(name)
     }
 
     private fun reference(name: String): Variables.Variable = references.getOrPut(name) {
         object : Variables.Variable {
-            override fun get(): Float = context.variable(name)
+            override fun get(): Float = context.storedVariable(name)
             override fun set(value: Float) = context.setVariable(name, value)
         }
     }

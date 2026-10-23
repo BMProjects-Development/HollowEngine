@@ -47,30 +47,30 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         contextFloat("local_side_speed") { it.localSideSpeed }
         contextFloat("signed_horizontal_speed") { it.signedHorizontalSpeed }
         contextFloat("movement_animation_speed") { it.signedHorizontalSpeed }
-        float("ground_speed") { it.ground_speed }
-        float("vertical_speed") { it.vertical_speed }
-        float("modified_distance_moved") { it.modified_distance_moved }
-        float("modified_move_speed") { it.modified_move_speed }
-        float("fall_ticks") { it.fall_ticks }
-        bool("is_jumping") { it.is_jumping }
-        bool("is_in_water_or_rain") { it.is_in_water_or_rain }
-        bool("is_sitting") { it.is_sitting }
-        bool("is_hurt") { it.is_hurt }
+        float("ground_speed") { it.molang.queryFloat("ground_speed") { it.ground_speed } }
+        float("vertical_speed") { it.molang.queryFloat("vertical_speed") { it.vertical_speed } }
+        float("modified_distance_moved") { it.molang.queryFloat("modified_distance_moved") { it.modified_distance_moved } }
+        float("modified_move_speed") { it.molang.queryFloat("modified_move_speed") { it.modified_move_speed } }
+        float("fall_ticks") { it.molang.queryFloat("fall_ticks") { it.fall_ticks } }
+        bool("is_jumping") { it.molang.queryBool("is_jumping") { it.is_jumping } }
+        bool("is_in_water_or_rain") { it.molang.queryBool("is_in_water_or_rain") { it.is_in_water_or_rain } }
+        bool("is_sitting") { it.molang.queryBool("is_sitting") { it.is_sitting } }
+        bool("is_hurt") { it.molang.queryBool("is_hurt") { it.is_hurt } }
 
         entityFloat("entity_id") { it.id.toFloat() }
-        bool("is_alive") { it.is_alive }
-        bool("is_on_ground") { it.is_on_ground }
-        float("velocity_x") { it.velocity_x }
-        float("velocity_y") { it.velocity_y }
-        float("velocity_z") { it.velocity_z }
+        bool("is_alive") { it.molang.queryBool("is_alive") { it.is_alive } }
+        bool("is_on_ground") { it.molang.queryBool("is_on_ground") { it.is_on_ground } }
+        float("velocity_x") { it.molang.queryFloat("velocity_x") { it.velocity_x } }
+        float("velocity_y") { it.molang.queryFloat("velocity_y") { it.velocity_y } }
+        float("velocity_z") { it.molang.queryFloat("velocity_z") { it.velocity_z } }
         entityFloat("fall_distance") { it.fallDistance }
-        bool("is_in_water") { it.is_in_water }
+        bool("is_in_water") { it.molang.queryBool("is_in_water") { it.is_in_water } }
         entityBool("is_under_water") { it.isUnderWater }
         entityBool("is_in_lava") { it.isInLava }
         entityBool("is_on_fire") { it.isOnFire }
         entityFloat("remaining_fire_ticks") { it.remainingFireTicks.toFloat() }
         entityBool("is_crouching") { it.isCrouching }
-        bool("is_swimming") { it.is_swimming }
+        bool("is_swimming") { it.molang.queryBool("is_swimming") { it.is_swimming } }
         entityBool("is_visually_swimming") { it.isVisuallySwimming }
         entityBool("is_visually_crawling") { it.isVisuallyCrawling }
         entityBool("is_invisible") { it.isInvisible }
@@ -78,12 +78,12 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityBool("is_passenger") { it.isPassenger }
         entityBool("is_vehicle") { it.isVehicle }
         entityBool("is_no_gravity") { it.isNoGravity }
-        bool("is_flying") { it.is_flying }
+        bool("is_flying") { it.molang.queryBool("is_flying") { it.is_flying } }
         contextFloat("flight_pitch") { it.flightPitch }
         contextFloat("flight_bank") { it.flightBank }
         entityBool("is_in_wall") { it.isInWall }
         entityBool("is_shift_key_down") { it.isShiftKeyDown }
-        bool("is_sneaking") { it.is_sneaking }
+        bool("is_sneaking") { it.molang.queryBool("is_sneaking") { it.is_sneaking } }
         entityFloat("eye_height") { it.eyeHeight }
         entityFloat("bbox_width") { it.bbWidth }
         entityFloat("bbox_height") { it.bbHeight }
@@ -100,14 +100,14 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         entityFloat("max_air_supply") { it.maxAirSupply.toFloat() }
         entityBool("has_custom_name") { it.hasCustomName() }
 
-        float("head_y_rotation") { it.head_y_rotation }
-        float("head_x_rotation") { it.head_x_rotation }
+        float("head_y_rotation") { it.molang.queryFloat("head_y_rotation") { it.head_y_rotation } }
+        float("head_x_rotation") { it.molang.queryFloat("head_x_rotation") { it.head_x_rotation } }
         contextFloat("body_y_rotation") { it.bodyYaw }
         contextFloat("head_body_y_delta") { it.headBodyYawDelta }
         livingFloat("hurt_time") { it.hurtTime.toFloat() }
-        bool("is_sprinting") { it.is_sprinting }
-        float("health") { it.health }
-        float("max_health") { it.max_health }
+        bool("is_sprinting") { it.molang.queryBool("is_sprinting") { it.is_sprinting } }
+        float("health") { it.molang.queryFloat("health") { it.health } }
+        float("max_health") { it.molang.queryFloat("max_health") { it.max_health } }
         livingFloat("health_ratio") { it.health / it.maxHealth.coerceAtLeast(1f) }
         livingBool("is_dead_or_dying") { it.isDeadOrDying }
         livingFloat("death_time") { it.deathTime.toFloat() }
@@ -121,25 +121,26 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
         livingFloat("ticks_using_item") { it.ticksUsingItem.toFloat() }
         livingBool("is_blocking") { it.isBlocking }
         livingFloat("swing_time") { it.swingTime.toFloat() }
-        bool("is_swinging") { it.is_swinging }
+        bool("is_swinging") { it.molang.queryBool("is_swinging") { it.is_swinging } }
         livingBool("is_fall_flying") { it.isFallFlying }
         livingFloat("fall_flying_ticks") { it.fallFlyingTicks.toFloat() }
         livingBool("is_autospin_attack") { it.isAutoSpinAttack }
         livingBool("is_climbing") { it.onClimbable() }
-        bool("is_sleeping") { it.is_sleeping }
+        bool("is_sleeping") { it.molang.queryBool("is_sleeping") { it.is_sleeping } }
         livingFloat("no_jump_delay") { it.noJumpDelay.toFloat() }
         livingFloat("jump_boost_power") { it.jumpBoostPower }
         livingFloat("speed") { it.speed }
         livingBool("is_sensitive_to_water") { it.isSensitiveToWater }
         livingFloat("walk_animation_speed") { it.walkAnimation.speed() }
         livingFloat("walk_animation_position") { it.walkAnimation.position() }
-        bool("is_moving") { it.is_moving }
+        bool("is_moving") { it.molang.queryBool("is_moving") { it.is_moving } }
     }
 
     val math = mathNamespace()
 
     val variables = dynamic(
         name = "variables",
+        nested = true,
         read = { owner, key -> (owner as AnimatorEvaluationContext).variable(key) },
         write = { owner, key, value ->
             (owner as AnimatorEvaluationContext).setVariable(key, Coercions.toFloat(value))
@@ -148,7 +149,8 @@ val AnimationDeclarations: Declarations<AnimatorEvaluationContext> = Declaration
 
     val temporaries = dynamic(
         name = "temporaries",
-        read = { owner, key -> (owner as AnimatorEvaluationContext).temporaries[key] ?: 0f },
+        nested = true,
+        read = { owner, key -> (owner as AnimatorEvaluationContext).molang.temporary(key) },
         write = { owner, key, value ->
             (owner as AnimatorEvaluationContext).temporaries[key] = Coercions.toFloat(value)
         },

@@ -34,6 +34,7 @@ class ParticleEmitter(
     val context: BedrockContext = BedrockContext(object : Query by sourceContext {
         // Particle expressions use the host clock, independent of any model clip sampled on the context.
         override val anim_time: Float get() = sourceContext.life_time
+        override fun hasValue(name: String): Boolean = name == "anim_time" || sourceContext.hasValue(name)
     }, variables)
     val sourceEntity get() = sourceContext.entity
 

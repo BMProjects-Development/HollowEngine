@@ -256,6 +256,7 @@ class ModelAttachment(
         animations = model.animationsByName,
         aliases = rig.boneByAlias,
         rig = rig,
+        molangDefaults = model.molangDefaults,
     ).also { target = it }
 
     /**

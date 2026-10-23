@@ -66,6 +66,7 @@ class ModelAnimator {
 
     fun applyTo(target: PoseTarget, context: AnimatorEvaluationContext) {
         context.modelVariables = variables
+        context.variableDefaults = target.molangDefaults
         context.temporaries.clear()
         context.deltaTime = deltaSeconds(context.time)
         context.montages.clear()

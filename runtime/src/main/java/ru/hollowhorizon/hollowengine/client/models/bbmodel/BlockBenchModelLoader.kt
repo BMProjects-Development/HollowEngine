@@ -102,13 +102,18 @@ private class BlockBenchConversion(
         }
 
         val scenes = listOf(Scene(ModelSpace.place(roots.map(::build), facesPositiveZ = false, unitsPerBlock = 16f)))
+        val (defaults, animations) = BedrockExpressions.batch {
+            val defaults = BBVariablePlaceholders.convert(file)
+            defaults to BBAnimations.convert(file, nodes, defaults)
+        }
         return Model(
             scene = 0,
             scenes = scenes,
             materials = (textureMaterials + untextured).toSet(),
-            animations = BedrockExpressions.batch { BBAnimations.convert(file, nodes) },
+            animations = animations,
             constraints = BBConstraints.convert(nodes),
             textureContents = textureMaterials.mapNotNull { it.textureContent },
+            molangDefaults = defaults,
         )
     }
 
