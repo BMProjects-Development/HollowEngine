@@ -30,7 +30,7 @@ writeAssetNodes = { File directory, StringBuilder builder, String indent, String
                 builder.append("${indent}    }\n")
             }
 
-    entries.findAll { it.isFile() && isResourceName(it.name) && !it.name.endsWith(".mcmeta") && !it.name.startsWith(".") }
+    entries.findAll { it.isFile() && isResourceName(it.name) && !it.name.endsWith(".mcmeta") && !it.name.endsWith(".hemeta") && !it.name.startsWith(".") }
             .groupBy { it.name.substring(0, it.name.lastIndexOf('.')) }
             .toSorted()
             .each { baseName, files ->

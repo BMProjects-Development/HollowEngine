@@ -1,340 +1,152 @@
 package ru.hollowhorizon.hollowengine.client.models.fbx
 
-import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec4f
 
 open class Geometry(id: Long, element: Element, name: String, doc: Document) : Object(id, element, name) {
-
-    /** Get the Skin attached to this geometry or NULL */
-    var skin: Skin? = null
-
-    /** Get the BlendShape attached to this geometry or NULL */
-    var blendShape: BlendShape? = null
-
-    init {
-        val conns = doc.getConnectionsByDestinationSequenced(id, "Deformer")
-        for (con in conns) {
-            val sk = processSimpleConnection<Skin>(con, false, "Skin -> Geometry", element)
-            if (sk != null) {
-                skin = sk
-                continue
-            }
-            val bs = processSimpleConnection<BlendShape>(con, false, "BlendShape -> Geometry", element)
-            if (bs != null) {
-                blendShape = bs
-                continue
-            }
-        }
+    private val deformers by lazy {
+        doc.getConnectionsByDestinationSequenced(id, "Deformer").filter { it.prop.isEmpty() }
+            .mapNotNull { it.sourceObject }
     }
+    val skin: Skin?
+        get() {
+            val skins = deformers.filterIsInstance<Skin>()
+            if (skins.size > 1) domError("multiple skins attached to one geometry", element)
+            return skins.singleOrNull()
+        }
+    val blendShapes: List<BlendShape> get() = deformers.filterIsInstance<BlendShape>()
 }
 
-
-const val AI_MAX_NUMBER_OF_TEXTURECOORDS = 0x8
-const val AI_MAX_NUMBER_OF_COLOR_SETS = 0x8
-
-/**
- *  DOM class for FBX geometry of type "Mesh"
- */
 class MeshGeometry(id: Long, element: Element, name: String, doc: Document) : Geometry(id, element, name, doc) {
-    val materials = ArrayList<Int>()
     val vertices = ArrayList<Vec3f>()
+    val normals = ArrayList<Vec3f>()
     val tangents = ArrayList<Vec3f>()
     val binormals = ArrayList<Vec3f>()
-    val normals = ArrayList<Vec3f>()
-
     val indices = ArrayList<Int>()
 
-    val uvNames = Array(AI_MAX_NUMBER_OF_TEXTURECOORDS) { "" }
-    val uvs = Array(AI_MAX_NUMBER_OF_TEXTURECOORDS) { ArrayList<Vec2f>() }
-    val colors = Array(AI_MAX_NUMBER_OF_COLOR_SETS) { ArrayList<Vec4f>() }
-
+    /** One material slot per triangle. All attributes use polygon-corner order. */
+    val materials = ArrayList<Int>()
+    val uvs = Array(8) { ArrayList<Vec2f>() }
+    val uvNames = Array(8) { "" }
+    val colors = Array(8) { ArrayList<Vec4f>() }
+    val controlPoints = ArrayList<Vec3f>()
+    val vertexControlPoints = ArrayList<Int>()
+    private val cornerPolygons = ArrayList<Int>()
+    private val polygons = ArrayList<IntRange>()
+    private val trianglePolygons = ArrayList<Int>()
 
     init {
-        val sc = element.compound ?: domError("failed to read Geometry object (class: Mesh), no data scope found")
-
-        val vertices = getRequiredElement(sc, "Vertices", element)
-        val polygonVertexIndex = getRequiredElement(sc, "PolygonVertexIndex", element)
-
-        val layer = sc.getCollection("Layer")
-
-        vertices.parseVec3DataArray(this.vertices)
-
-        assert(this.vertices.isNotEmpty()) { "Encountered mesh with no vertices" }
-
-        polygonVertexIndex.parseIntsDataArray(this.indices)
-        var step = -1
-        indices.forEachIndexed { index, i ->
-            indices[index] = if(i < 0) -i - 1 else i
-            if(i < 0 && step == -1) step = index+1
-        }
-
-        layer.forEach { readLayer(it.scope) }
-
-        if(step == 4) triangulateIndexes()
-    }
-
-    /** Get a UV coordinate slot, returns an empty array if
-     *  the requested slot does not exist. */
-    fun getTextureCoords(index: Int) = if (index >= AI_MAX_NUMBER_OF_TEXTURECOORDS) arrayListOf() else uvs[index]
-
-    /** Get a UV coordinate slot, returns an empty array if the requested slot does not exist. */
-    fun getTextureCoordChannelName(index: Int) = if (index >= AI_MAX_NUMBER_OF_TEXTURECOORDS) "" else uvNames[index]
-
-    /** Get a vertex color coordinate slot, returns an empty array if the requested slot does not exist. */
-    fun getVertexColors(index: Int) = if (index >= AI_MAX_NUMBER_OF_COLOR_SETS) arrayListOf() else colors[index]
-
-    fun triangulateIndexes() {
-        data class Vertex(val position: Vec3f, val normal: Vec3f, val uv: Vec2f)
-
-        require(indices.size % 4 == 0) { "Quad index list size must be a multiple of 4" }
-
-        val quadUvs = uvs[0]
-
-        val outVertices = mutableListOf<Vertex>()
-        val outIndices = mutableListOf<Int>()
-
-        for (i in indices.indices step 4) {
-            val i0 = indices[i]
-            val i1 = indices[i + 1]
-            val i2 = indices[i + 2]
-            val i3 = indices[i + 3]
-
-            val normal = normals[i / 4]
-
-            val uv0 = quadUvs[i]
-            val uv1 = quadUvs[i + 1]
-            val uv2 = quadUvs[i + 2]
-            val uv3 = quadUvs[i + 3]
-
-            // Первый треугольник (i0, i1, i2)
-            val base = outVertices.size
-            outVertices += Vertex(vertices[i0], normal, uv0)
-            outVertices += Vertex(vertices[i1], normal, uv1)
-            outVertices += Vertex(vertices[i2], normal, uv2)
-            outIndices += listOf(base, base + 1, base + 2)
-
-            // Второй треугольник (i2, i3, i0)
-            val base2 = outVertices.size
-            outVertices += Vertex(vertices[i2], normal, uv2)
-            outVertices += Vertex(vertices[i3], normal, uv3)
-            outVertices += Vertex(vertices[i0], normal, uv0)
-            outIndices += listOf(base2, base2 + 1, base2 + 2)
-        }
-
-        indices.clear()
-        indices.addAll(outIndices)
-
-        vertices.clear()
-        vertices.addAll(outVertices.map { it.position })
-        normals.clear()
-        normals.addAll(outVertices.map { it.normal })
-        uvs[0].clear()
-        uvs[0].addAll(outVertices.map { it.uv })
-    }
-
-    fun readLayer(layer: Scope) {
-        val layerElement = layer.getCollection("LayerElement")
-        for (eit in layerElement)
-            readLayerElement(eit.scope)
-    }
-
-    fun readLayerElement(layerElement: Scope) {
-        val type = getRequiredElement(layerElement, "Type")
-        val typedIndex = getRequiredElement(layerElement, "TypedIndex")
-
-        val type_ = type[0].parseAsString
-        val typedIndex_ = typedIndex[0].parseAsInt
-
-        val top = element.scope
-        val candidates = top.getCollection(type_)
-
-        for (it in candidates) {
-            val index = it[0].parseAsInt
-            if (index == typedIndex_) {
-                readVertexData(type_, typedIndex_, it.scope)
-                return
+        val scope = element.scope
+        getRequiredElement(scope, "Vertices", element).parseVec3DataArray(controlPoints)
+        val encoded = ArrayList<Int>()
+        getRequiredElement(scope, "PolygonVertexIndex", element).parseIntsDataArray(encoded)
+        var start = 0
+        for ((corner, value) in encoded.withIndex()) {
+            val point = if (value < 0) value.inv() else value
+            if (point !in controlPoints.indices) domError("control point $point is out of range", element)
+            vertices += controlPoints[point]
+            vertexControlPoints += point
+            cornerPolygons += polygons.size
+            if (value < 0) {
+                if (corner - start < 2) domError("polygon has fewer than three corners", element)
+                polygons += start..corner
+                val triangles = triangulatePolygon(vertices.subList(start, corner + 1))
+                indices += triangles.map { it + start }
+                repeat(triangles.size / 3) { trianglePolygons += polygons.lastIndex }
+                start = corner + 1
             }
         }
-
-        HollowEngine.LOGGER.error("failed to resolve vertex layer element: $type, index: $typedIndex")
+        if (start != encoded.size) domError("unterminated polygon", element)
+        readLayers(scope)
+        if (materials.isEmpty()) repeat(trianglePolygons.size) { materials += -1 }
     }
 
-    fun readVertexData(type: String, index: Int, source: Scope) {
+    fun getTextureCoords(index: Int) = uvs.getOrNull(index) ?: arrayListOf()
 
-        val mappingInformationType = getRequiredElement(source, "MappingInformationType")[0].parseAsString
-
-        val referenceInformationType = getRequiredElement(source, "ReferenceInformationType")[0].parseAsString
-
-        when (type) {
-            "LayerElementUV" -> {
-                if (index >= AI_MAX_NUMBER_OF_TEXTURECOORDS) {
-                    HollowEngine.LOGGER.error("ignoring UV layer, maximum number of UV channels exceeded: $index (limit is $AI_MAX_NUMBER_OF_TEXTURECOORDS)")
-                    return
-                }
-                source["Name"]?.let { uvNames[index] = it[0].parseAsString }
-
-                readVertexDataUV(uvs[index], source, mappingInformationType, referenceInformationType)
+    private fun readLayers(scope: Scope) {
+        val selected = linkedSetOf<Pair<String, Int>>()
+        for (layer in scope.getCollection("Layer")) {
+            for (entry in layer.scope.getCollection("LayerElement")) {
+                selected += getRequiredElement(entry.scope, "Type")[0].parseAsString to getRequiredElement(
+                    entry.scope,
+                    "TypedIndex"
+                )[0].parseAsInt
             }
-
-            "LayerElementMaterial" -> {
-                if (materials.isNotEmpty()) {
-                    HollowEngine.LOGGER.error("ignoring additional material layer")
-                    return
-                }
-                val tempMaterials = ArrayList<Int>()
-
-                readVertexDataMaterials(tempMaterials, source, mappingInformationType, referenceInformationType)
-
-                /*  sometimes, there will be only negative entries. Drop the material layer in such a case (I guess it
-                    means a default material should be used). This is what the converter would do anyway, and it avoids
-                    losing the material if there are more material layers coming of which at least one contains actual
-                    data (did observe that with one test file). */
-                if (tempMaterials.all { it < 0 }) {
-                    HollowEngine.LOGGER.warn("ignoring dummy material layer (all entries -1)")
-                    return
-                }
-                materials.clear()
-                materials += tempMaterials
+        }
+        // Some exporters omit Layer references while still supplying the attribute arrays.
+        if (selected.isEmpty()) {
+            scope.elements.filterKeys { it.startsWith("LayerElement") }.forEach { (type, entries) ->
+                entries.forEach { selected += type to it[0].parseAsInt }
             }
-
-            "LayerElementNormal" -> {
-                if (normals.isNotEmpty()) {
-                    HollowEngine.LOGGER.error("ignoring additional normal layer")
-                    return
-                }
-                readVertexDataNormals(normals, source, mappingInformationType, referenceInformationType)
-            }
-
-            "LayerElementTangent" -> {
-                if (tangents.isNotEmpty()) {
-                    HollowEngine.LOGGER.error("ignoring additional tangent layer")
-                    return
+        }
+        for ((type, index) in selected) {
+            val source = scope.getCollection(type).firstOrNull { it[0].parseAsInt == index }
+                ?: domError("missing $type layer $index", element)
+            when (type) {
+                "LayerElementUV" -> {
+                    if (index !in uvs.indices) domError("UV channel $index is out of range", source)
+                    uvNames[index] = source.scope["Name"]?.get(0)?.parseAsString.orEmpty()
+                    resolve(uvs[index], source, "UV", "UVIndex")
                 }
 
-                readVertexDataTangents(tangents, source, mappingInformationType, referenceInformationType)
-            }
-
-            "LayerElementBinormal" -> {
-                if (binormals.isNotEmpty()) {
-                    HollowEngine.LOGGER.error("ignoring additional binormal layer")
-                    return
+                "LayerElementColor" -> {
+                    if (index !in colors.indices) domError("color channel $index is out of range", source)
+                    resolve(colors[index], source, "Colors", "ColorIndex")
                 }
 
-                readVertexDataBinormals(binormals, source, mappingInformationType, referenceInformationType)
-            }
-
-            "LayerElementColor" -> {
-                if (index >= AI_MAX_NUMBER_OF_COLOR_SETS) {
-                    HollowEngine.LOGGER.error("ignoring vertex color layer, maximum number of color sets exceeded: $index (limit is $AI_MAX_NUMBER_OF_COLOR_SETS)")
-                    return
+                "LayerElementNormal" -> if (normals.isEmpty()) resolve(normals, source, "Normals", "NormalsIndex")
+                "LayerElementTangent" -> if (tangents.isEmpty()) {
+                    val name = if (source.scope["Tangents"] != null) "Tangents" else "Tangent"
+                    resolve(tangents, source, name, name + "Index")
                 }
 
-                readVertexDataColors(colors[index], source, mappingInformationType, referenceInformationType)
+                "LayerElementBinormal" -> if (binormals.isEmpty()) {
+                    val name = if (source.scope["Binormals"] != null) "Binormals" else "Binormal"
+                    resolve(binormals, source, name, name + "Index")
+                }
+
+                "LayerElementMaterial" -> if (materials.isEmpty()) readMaterials(source)
             }
         }
     }
 
-    fun readVertexDataUV(
-        uvOut: ArrayList<Vec2f>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) =
-        resolveVertexDataArray(
-            uvOut, source, mappingInformationType, referenceInformationType, "UV",
-            "UVIndex", vertices.size
-        )
-
-    fun readVertexDataNormals(
-        normalsOut: ArrayList<Vec3f>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) =
-        resolveVertexDataArray(
-            normalsOut, source, mappingInformationType, referenceInformationType, "Normals",
-            "NormalsIndex", vertices.size
-        )
-
-    fun readVertexDataColors(
-        colorsOut: ArrayList<Vec4f>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) =
-        resolveVertexDataArray(
-            colorsOut, source, mappingInformationType, referenceInformationType, "Colors",
-            "ColorIndex", vertices.size
-        )
-
-    fun readVertexDataTangents(
-        tangentsOut: ArrayList<Vec3f>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) {
-        val any = source.elements["Tangents"]!!.isNotEmpty()
-        resolveVertexDataArray(
-            tangentsOut, source, mappingInformationType, referenceInformationType, if (any) "Tangents" else "Tangent",
-            if (any) "TangentsIndex" else "TangentIndex", vertices.size
-        )
+    private inline fun <reified T : Any> resolve(out: ArrayList<T>, layer: Element, name: String, indexName: String) {
+        val data = ArrayList<T>()
+        getRequiredElement(layer.scope, name).parseVectorDataArray(data)
+        val mapping = getRequiredElement(layer.scope, "MappingInformationType")[0].parseAsString
+        val reference = getRequiredElement(layer.scope, "ReferenceInformationType")[0].parseAsString
+        val lookup = ArrayList<Int>()
+        when (reference) {
+            "IndexToDirect", "Index" -> getRequiredElement(layer.scope, indexName).parseIntsDataArray(lookup)
+            "Direct" -> Unit
+            else -> domError("unsupported reference type $reference", layer)
+        }
+        for (corner in vertices.indices) {
+            val mapped = mappedIndex(mapping, corner, layer)
+            val direct = if (reference == "Direct") mapped else lookup.getOrNull(mapped)
+                ?: domError("$name index array is too short", layer)
+            out += data.getOrNull(direct) ?: domError("$name index $direct is out of range", layer)
+        }
     }
 
-    fun readVertexDataBinormals(
-        binormalsOut: ArrayList<Vec3f>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) {
-        val any = source.elements["Binormals"]!!.isNotEmpty()
-        resolveVertexDataArray(
-            binormalsOut,
-            source,
-            mappingInformationType,
-            referenceInformationType,
-            if (any) "Binormals" else "Binormal",
-            if (any) "BinormalsIndex" else "BinormalIndex",
-            vertices.size
-        )
+    private fun mappedIndex(mapping: String, corner: Int, layer: Element): Int = when (mapping) {
+        "ByVertice", "ByVertex", "ByControlPoint" -> vertexControlPoints[corner]
+        "ByPolygonVertex" -> corner
+        "ByPolygon" -> cornerPolygons[corner]
+        "AllSame" -> 0
+        else -> domError("unsupported mapping type $mapping", layer)
     }
 
-    fun readVertexDataMaterials(
-        materialsOut: ArrayList<Int>,
-        source: Scope,
-        mappingInformationType: String,
-        referenceInformationType: String,
-    ) {
-
-        /*  materials are handled separately. First of all, they are assigned per-face and not per polyvert. Secondly,
-            ReferenceInformationType=IndexToDirect has a slightly different meaning for materials. */
-        getRequiredElement(source, "Materials").parseIntsDataArray(materialsOut)
-
-        if (mappingInformationType == "AllSame") {
-            // easy - same material for all faces
-            if (materialsOut.isEmpty()) {
-                HollowEngine.LOGGER.error("expected material index, ignoring")
-                return
-            } else if (materialsOut.size > 1) {
-                HollowEngine.LOGGER.warn("expected only a single material index, ignoring all except the first one")
-                materialsOut.clear()
-            }
-            for (i in vertices.indices)
-                materials += materialsOut[0]
-        } else
-            HollowEngine.LOGGER.error("ignoring material assignments, access type not implemented: $mappingInformationType, $referenceInformationType")
-    }
-
-    /** Lengthy utility function to read and resolve a FBX vertex data array - that is, the output is in polygon vertex
-     *  order. This logic is used for reading normals, UVs, colors, tangents .. */
-    inline fun <reified T : Any> resolveVertexDataArray(
-        dataOut: ArrayList<T>, source: Scope, mappingInformationType: String,
-        referenceInformationType: String, dataElementName: String,
-        indexDataElementName: String, vertexCount: Int,
-    ) {
-        val tempData = ArrayList<T>()
-        getRequiredElement(source, dataElementName).parseVectorDataArray(tempData)
-        dataOut.addAll(tempData)
+    private fun readMaterials(layer: Element) {
+        val slots = ArrayList<Int>()
+        getRequiredElement(layer.scope, "Materials").parseIntsDataArray(slots)
+        val mapping = getRequiredElement(layer.scope, "MappingInformationType")[0].parseAsString
+        if (mapping == "NoMappingInformation") return
+        if (mapping != "AllSame" && mapping != "ByPolygon") domError("unsupported material mapping $mapping", layer)
+        for (polygon in trianglePolygons) {
+            materials += slots.getOrNull(if (mapping == "AllSame") 0 else polygon)
+                ?: domError("material array is too short", layer)
+        }
     }
 }

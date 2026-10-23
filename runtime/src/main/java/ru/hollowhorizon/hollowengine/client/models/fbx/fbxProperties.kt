@@ -1,91 +1,48 @@
 package ru.hollowhorizon.hollowengine.client.models.fbx
 
 open class Property
+class TypedProperty<T>(val value: T) : Property()
 
-class TypedProperty<T>(var value: T) : Property()
-
-/**
- *  Represents a property table as can be found in the newer FBX files (Properties60, Properties70)
- */
 class PropertyTable(val element: Element? = null, val templateProps: PropertyTable? = null) {
-
-    val lazyProps = HashMap<String, Element>()
-    val props = HashMap<String, Property>()
+    val lazyProps = linkedMapOf<String, Element>()
+    val props = mutableMapOf<String, Property>()
 
     init {
-        element?.let {
-            val scope = it.scope
-            for (e in scope.elements) {
-                val key = e.key
-                for (value in e.value) {
-                    if (key != "P") {
-                        domWarning("expected only P elements in property table", value)
-                        continue
-                    }
-                    val name = value.peekPropertyName
-                    if (name.isEmpty()) {
-                        domWarning("could not read property name", value)
-                        continue
-                    }
-
-                    if (lazyProps.contains(name)) {
-                        domWarning("duplicate property name, will hide previous value: $name", value)
-                        continue
-                    }
-                    lazyProps[name] = value
-                }
-            }
+        element?.scope?.getCollection("P")?.forEach { entry ->
+            val name = entry.peekPropertyName
+            if (name.isNotEmpty()) lazyProps[name] = entry
         }
     }
 
-    /** PropertyGet */
-    operator fun <T> invoke(name: String, defaultValue: T) = (get(name) as? TypedProperty<T>)?.value ?: defaultValue
+    inline operator fun <reified T> invoke(name: String, defaultValue: T): T = value<T>(name) ?: defaultValue
+    inline operator fun <reified T> invoke(name: String): T? = value(name)
 
-    /** PropertyGet */
-    operator fun <T> invoke(name: String, useTemplate: Boolean = false): T? {
-        var prop = get(name)
-        if (null == prop) {
-            if (!useTemplate || null == templateProps) return null
-            prop = templateProps[name]
-            if (null == prop) return null
+    inline fun <reified T> value(name: String): T? {
+        val property = get(name) as? TypedProperty<*> ?: return null
+        val value = property.value
+        if (value is T) return value
+        val converted = when {
+            value is Number -> when (T::class) {
+                Float::class -> value.toFloat()
+                Double::class -> value.toDouble()
+                Long::class -> value.toLong()
+                Int::class -> value.toInt()
+                Boolean::class -> value.toInt() != 0
+                else -> null
+            }
+            value is Boolean && T::class == Int::class -> if (value) 1 else 0
+            else -> null
         }
-        // strong typing, no need to be lenient
-        return (prop as? TypedProperty<T>)?.value
+        return converted as? T ?: domError("property $name has incompatible type", element)
     }
 
     operator fun get(name: String): Property? {
-
-        var it = props[name]
-        if (it == null) {
-            // hasn't been parsed yet?
-            val lit = lazyProps[name]
-            if (lit != null) {
-                it = lit.readTypedProperty()!!  // = assert
-                props[name] = it
-            }
-            if (it == null)
-            // check property template
-                return templateProps?.get(name)
+        props[name]?.let { return it }
+        val parsed = lazyProps[name]?.readTypedProperty()
+        if (parsed != null) {
+            props[name] = parsed
+            return parsed
         }
-        return it
-    }
-
-    fun getUnparsedProperties(): MutableMap<String, Property> {
-
-        val result = mutableMapOf<String, Property>()
-
-        // Loop through all the lazy properties (which is all the properties)
-        for (entry in lazyProps) {
-
-            // Skip parsed properties
-            if (props.contains(entry.key)) continue
-
-            // Read the entry's value.
-            val prop = entry.value.readTypedProperty() ?: continue  // Element could not be read. Skip it.
-
-            // Add to result
-            result[entry.key] = prop
-        }
-        return result
+        return templateProps?.get(name)
     }
 }
