@@ -27,6 +27,7 @@ enum class GutterMarkerKind(val navigable: Boolean, val icon: String? = null) {
     STAGE(false),
     CHECKPOINT(false),
     ACTION(false),
+    ACTION_CALL(false, "action"),
     REWIND(true),
     REWIND_START(false, "rewind"),
     TEMPORARY(true),

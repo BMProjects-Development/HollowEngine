@@ -49,10 +49,19 @@ internal class StageScope(
         return when {
             symbols.isCheckpoint(callee) -> SiteKind.CHECKPOINT
             isSuspendState(callee) -> SiteKind.STAGE
+            isAction(callee) -> SiteKind.ACTION
             callee.name.asString() == "invoke" && call.dispatchReceiver?.type?.let(types::isStageLambda) == true -> SiteKind.LAMBDA
             else -> null
         }
     }
+
+    /**
+     * Whether [function] is an action a stage can call as a boundary: a suspend `@Action` or `@ActionAlias` that is
+     * not a checkpoint label, which only runs inside `checkpoint(name) { }`.
+     */
+    private fun isAction(function: IrFunction): Boolean = function.isSuspend &&
+        function.annotations.any { it.isAnnotation(StageSymbols.ACTION) || it.isAnnotation(StageSymbols.ACTION_ALIAS) } &&
+        function.parameters.none { it.type.classOrNull == symbols.checkpointScope }
 
     /** The parameters a stage saves as its arguments: all of them but the script it belongs to. */
     fun arguments(function: IrFunction): List<IrValueParameter> =
@@ -101,4 +110,8 @@ internal class StageScope(
         function.annotations.firstOrNull { it.isAnnotation(StageSymbols.STATE) }
 }
 
-internal enum class SiteKind { STAGE, LAMBDA, CHECKPOINT }
+/**
+ * The calls a stage is cut at. An [ACTION] call is a boundary too: a restart does not perform a finished action
+ * again, and finishes one it interrupted.
+ */
+internal enum class SiteKind { STAGE, LAMBDA, CHECKPOINT, ACTION }
