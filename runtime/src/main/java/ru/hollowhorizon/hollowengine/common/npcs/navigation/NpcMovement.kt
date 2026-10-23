@@ -7,6 +7,7 @@ import net.minecraft.world.level.pathfinder.Path
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.forceLoad
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -69,7 +70,10 @@ enum class Shortfall {
     BLOCKED,
 }
 
-/** Walks to where [target] says, asked again as the NPC goes; the channel the walk holds is up to the caller. */
+/**
+ * Walks to where [target] says, asked again as the NPC goes; the channel the walk holds is up to the caller. Like
+ * every walk, it keeps the chunks around the NPC loaded until it ends, so it finishes where no player is.
+ */
 suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: MoveOptions): MoveResult =
     moveThrough(listOf(target), options)
 
@@ -77,7 +81,7 @@ suspend fun NpcEntity.moveToPosition(target: () -> Vec3?, options: MoveOptions):
  * Walks through [targets] in turn, stopping only at the last: each one before it counts as passed within
  * [MoveOptions.passDistance], and the NPC plans its pace along the ones still ahead, so it rounds them as turns.
  */
-suspend fun NpcEntity.moveThrough(targets: List<() -> Vec3?>, options: MoveOptions): MoveResult {
+suspend fun NpcEntity.moveThrough(targets: List<() -> Vec3?>, options: MoveOptions): MoveResult = forceLoad {
     npcNavigation.settingsOverride = options.navigation?.let { tune -> (navigationComponent ?: NavigationComponent()).tune() }
     npcNavigation.facing.setMove(options.facing)
     npcNavigation.moveZones = options.avoid
@@ -86,10 +90,10 @@ suspend fun NpcEntity.moveThrough(targets: List<() -> Vec3?>, options: MoveOptio
             val last = index == targets.lastIndex
             val reach = if (last) maxOf(options.arrivalDistance, MIN_ARRIVAL_DISTANCE) else options.passDistance
             val result = walkLeg(target, targets.subList(index + 1, targets.size), options, reach, last)
-            if (result != MoveResult.Arrived) return result
+            if (result != MoveResult.Arrived) return@forceLoad result
         }
         finishFacing(options.facing)
-        return MoveResult.Arrived
+        MoveResult.Arrived
     } finally {
         navigation.stop()
         npcNavigation.settingsOverride = null
@@ -209,7 +213,10 @@ private fun NpcEntity.turnBodyTo(yaw: Float): Boolean {
 }
 
 /** Walks up to [target], following it while it moves and waiting for it as [MoveOptions.unavailableTarget] says. */
-suspend fun NpcEntity.moveToEntity(target: Ref<out Entity>, options: MoveOptions): MoveResult {
+suspend fun NpcEntity.moveToEntity(target: Ref<out Entity>, options: MoveOptions): MoveResult =
+    forceLoad { follow(target, options) }
+
+private suspend fun NpcEntity.follow(target: Ref<out Entity>, options: MoveOptions): MoveResult {
     while (true) {
         if (!target.isLinkAlive && options.unavailableTarget == UnavailableTargetPolicy.FAIL) {
             return MoveResult.TargetUnavailable

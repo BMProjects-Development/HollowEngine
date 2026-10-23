@@ -91,11 +91,15 @@ suspend fun <R> action(vararg call: Any?, block: suspend ActionScope<R>.() -> Pe
 }
 
 /**
- * An entity of the call that left the world without being destroyed, like the body of an NPC whose chunk unloaded
- * in the middle of the action, which cancels what the body was doing. The story then waits for the entity to come back.
+ * An entity of the call that is no longer the one in the world, without having been destroyed: the body of an NPC
+ * whose chunk unloaded, or a copy kept by the registry that a new body replaced. Either cancels what it was doing in
+ * the middle of the action, and the story then waits for the entity to come back.
  */
 internal fun unloaded(call: Array<out Any?>): StoryEntityMissing? = call.firstNotNullOfOrNull { value ->
-    (value as? Entity)?.takeIf { it.removalReason?.shouldDestroy() == false }
+    (value as? Entity)?.takeIf { entity ->
+        val reason = entity.removalReason
+        if (reason != null) !reason.shouldDestroy() else StoryValues.entities(entity.uuid, entity::class) !== entity
+    }
 }?.let { StoryEntityMissing(it.uuid) }
 
 /**
