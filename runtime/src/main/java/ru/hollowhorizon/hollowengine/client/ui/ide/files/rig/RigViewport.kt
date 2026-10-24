@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigPreview
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoPointerWrap
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoRotationHint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.Model
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ViewAxes
@@ -21,10 +22,15 @@ internal fun RigViewport(
     onKey: (UiKeyInput) -> Boolean = { false },
 ) {
     val viewer = state.viewer
-    Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 100.percent)) {
+    val viewportId = "rig-viewport-${System.identityHashCode(state)}"
+    Box(
+        id = "$viewportId-focus",
+        mode = UiBoxMode.STACK,
+        modifier = Modifier.size(100.percent, 100.percent).focusScope(),
+    ) {
         Model(
             state = viewer,
-            id = "rig-viewport",
+            id = viewportId,
             tags = listOf("ide-file-viewport"),
             modifier = Modifier.size(100.percent, 100.percent).clip().input(hoverable = true, clickable = true).focus()
                 .onPlaced { state.viewportBounds = it }
@@ -81,7 +87,8 @@ internal fun RigViewport(
                 if (state.gizmo.capture(viewer)) session.draw(this, state.gizmoTarget())
             },
         )
-        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
+        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px).focusScope())
+        GizmoRotationHint(session, Modifier.align(UiAlign.START, UiAlign.END).margin(8.px))
     }
 }
 

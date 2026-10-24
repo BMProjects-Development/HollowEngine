@@ -70,6 +70,7 @@ object HollowKeys {
     val NEXT_KEY = action("timeline.next_key", TIMELINE, key(GLFW.GLFW_KEY_UP))
     val PREVIOUS_KEY = action("timeline.previous_key", TIMELINE, key(GLFW.GLFW_KEY_DOWN))
     val SMOOTH_KEYS = action("timeline.smooth_keys", TIMELINE)
+    val SELECT_KEY_COLUMNS = action("timeline.select_key_columns", TIMELINE, key(GLFW.GLFW_KEY_K))
     val NUDGE_LEFT = action("timeline.nudge_left", TIMELINE, key(GLFW.GLFW_KEY_LEFT))
     val NUDGE_RIGHT = action("timeline.nudge_right", TIMELINE, key(GLFW.GLFW_KEY_RIGHT))
     val NUDGE_LEFT_FAR = action("timeline.nudge_left_far", TIMELINE, key(GLFW.GLFW_KEY_LEFT, SHIFT))
@@ -105,7 +106,6 @@ object HollowKeys {
     val ORBIT_UP = action("viewport.orbit_up", VIEWPORT, key(GLFW.GLFW_KEY_KP_8))
     val ORBIT_DOWN = action("viewport.orbit_down", VIEWPORT, key(GLFW.GLFW_KEY_KP_2))
     val VIEW_SELECTED = action("viewport.view_selected", VIEWPORT, key(GLFW.GLFW_KEY_KP_DECIMAL))
-    val ORBIT_PIVOT = action("viewport.orbit_pivot", VIEWPORT)
 
     // Node Graphs
     val ADD_NODE = action("graph.add_node", GRAPH, key(GLFW.GLFW_KEY_INSERT), key(GLFW.GLFW_KEY_N, CONTROL))
