@@ -432,10 +432,12 @@ private fun TimelineHeaderRow(
     val isCurveView = controller.viewMode == TimelineViewMode.CURVES
     val rowCurves = if (isCurveView) row.curves.filter { it.spec.supportsCurveEditor } else row.curves
     val isFocused = isCurveView && rowCurves.isNotEmpty() && rowCurves.all { controller.isFocused(it) }
+    val clicks = remember(row.id) { TimelineTrackClicks() }
     val tags = buildList {
         add("timeline-row")
         add(row.kind.name.lowercase())
         if (isFocused) add("focused")
+        if (row.selected) add("scene-selected")
         if (row.locked) add("locked")
         if (!row.visible) add("muted")
     }
@@ -449,6 +451,14 @@ private fun TimelineHeaderRow(
                 event.consume()
                 return@onClick
             }
+            if (!event.isLeftClick()) return@onClick
+            val now = event.frame?.nowMillis ?: return@onClick
+            if (clicks.click(now)) {
+                controller.selectTrackKeys(row.curves, additive = event.isAdditiveSelection())
+                event.consume()
+                refresh()
+                return@onClick
+            }
             // In the graph a click picks what the graph shows; ctrl adds to it. Everywhere else
             // the row list is what it always was.
             if (isCurveView && rowCurves.isNotEmpty()) {
@@ -456,7 +466,7 @@ private fun TimelineHeaderRow(
             }
             when {
                 row.group != null -> row.group.isCollapsed = !row.group.isCollapsed
-                else -> if (!isCurveView) controller.clearSelection()
+                else -> if (!isCurveView && !event.isAdditiveSelection()) controller.clearSelection()
             }
             event.consume()
             refresh()
@@ -633,7 +643,7 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
     buildList {
         val keys = row.curves.flatMap { it.keyframes }
         add(UiDropdownItem(TimelineLang.TRACK_SELECT_KEYS.lang, enabled = keys.isNotEmpty() && !row.locked) {
-            controller.select(keys, additive = false)
+            controller.selectTrackKeys(row.curves)
             refresh()
         })
 

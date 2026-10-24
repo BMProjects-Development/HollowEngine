@@ -87,7 +87,7 @@
   "action.viewport.orbit_up": "Повернуть вид вверх",
   "action.viewport.orbit_down": "Повернуть вид вниз",
   "action.viewport.view_selected": "Центрировать вид на выделенном",
-  "action.viewport.orbit_pivot": "Вращать вид вокруг выделенного или центра",
+  "action.timeline.select_key_columns": "Выделить ключи на курсоре или метках выделенных ключей",
   "action.graph.add_node": "Добавить ноду",
   "action.graph.group": "Сгруппировать выделенное",
   "action.graph.ungroup": "Разгруппировать",

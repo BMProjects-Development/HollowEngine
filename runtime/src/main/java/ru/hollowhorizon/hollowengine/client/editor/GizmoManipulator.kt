@@ -97,6 +97,9 @@ class GizmoManipulator(
     private val projector: GizmoProjector,
     private val snapping: GizmoSnapping = GizmoSnapping.WORLD,
 ) {
+    internal fun trackball(start: GizmoTransformValues, x: Float, y: Float) =
+        GizmoTrackballRotation(projector, start, x, y, snapping)
+
     fun begin(handle: GizmoHandle, values: GizmoTransformValues, pointerX: Float, pointerY: Float): GizmoDrag {
         val axis = handle.worldAxis?.normalize()
         val drag = GizmoDrag(handle.id, handle.worldOrigin, axis, values)
