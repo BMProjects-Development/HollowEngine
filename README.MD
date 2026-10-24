@@ -19,6 +19,13 @@
 
 HollowEngine is a content creation engine for Minecraft. It combines Kotlin scripting, a visual programming, and tools for building NPCs, events, gameplay systems, and interactive experiences.
 
+### Contact & Links
+
+- [Telegram Channel (Ru Only)](https://t.me/hollowengine) - Devlogs and announcements
+- [Discord Community](https://discord.gg/qKpPhkwGCY) - Help and updates
+- [Documentation](https://0mods.team/) - Guides and API reference
+- [AI Wiki Assistant](https://deepwiki.com/HollowHorizon/HollowEngine) - Interactive help
+
 ## What It Provides
 
 - In-game IDE with syntax highlighting, code analysis, dockable tool windows, an embedded game viewport, a console (commands and Kotlin), and file previews
@@ -70,13 +77,6 @@ Use the Gradle wrapper from the repository root:
 `build` also produces the development jar, and `buildAndCollect` copies it into `merged/`. It exposes engine classes (including `common.addons` and UI), the bridge, and bundled libraries directly on the compile classpath. Use it as `compileOnly` with Mojang/Parchment mappings and the Kotlin version used by HE. Install the regular universal jar in the game; the development jar is only for compilation.
 
 For an addon tied to a mod, use the [addon template](addons/template/README.md). Its entrypoint is compiled into the mod jar and HE activates it only when that mod is installed. Independent addons continue to use the separate format-3 jar.
-
-## Links
-
-- [Documentation](https://0mods.team/) - Guides and API reference
-- [Discord Community](https://discord.gg/qKpPhkwGCY) - Help and updates
-- [Telegram Channel](https://t.me/hollowengine) - Devlogs and announcements
-- [AI Wiki Assistant](https://deepwiki.com/HollowHorizon/HollowEngine) - Interactive help
 
 ## License
 
