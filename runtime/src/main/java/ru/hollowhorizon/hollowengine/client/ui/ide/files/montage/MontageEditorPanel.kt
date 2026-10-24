@@ -105,7 +105,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
         state.sceneLane = null
         val part = rigState.selectedPart?.takeIf { state.rigs.rig.holder(bone).attachment(it) != null }
         val attachments = document.montage.attachments.filter { it.bone == bone }.map { it.spec.id }
-        session.select(bone, attachments + listOfNotNull(part))
+        session.select(bone, attachments + listOfNotNull(part), selectedAttachment = part)
     }
 
     val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
@@ -198,7 +198,7 @@ private fun Toolbar(state: MontageEditorState) {
         IconButton(ColliderIcon, "hollowengine.gui.rig_editor.toggle_colliders".lang, iconSize = 12f, active = rigState.showColliders) {
             rigState.showColliders = !rigState.showColliders
         }
-        if (rigState.partSelection != null) GizmoToolbarButtons()
+        if (rigState.partSelection != null) GizmoToolbarButtons("montage-gizmo-${System.identityHashCode(state)}")
     }
 }
 

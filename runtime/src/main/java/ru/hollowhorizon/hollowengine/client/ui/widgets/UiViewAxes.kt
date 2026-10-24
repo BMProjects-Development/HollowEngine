@@ -45,8 +45,8 @@ interface OrbitCamera {
     fun focus(point: Vec3f)
 }
 
-/** Turns [OrbitCamera] to [yaw] and [pitch] about whatever [OrbitPivot] says the previews circle now. */
-fun OrbitCamera.orbitTo(yaw: Float, pitch: Float) = turnTo(yaw, pitch, OrbitPivot.of(this))
+/** Turns the camera about its current view center. */
+fun OrbitCamera.orbitTo(yaw: Float, pitch: Float) = turnTo(yaw, pitch)
 
 /**
  * Yaw and pitch for [back] on a camera whose back direction is (sin y, sin p, cos y) scaled by cos p, with y the yaw
@@ -83,7 +83,6 @@ class OrbitCameraTurn(val camera: OrbitCamera) {
         }
         when {
             HollowKeys.VIEW_SELECTED.matches(key, modifiers) -> camera.focus(camera.selectionCenter ?: return false)
-            HollowKeys.ORBIT_PIVOT.matches(key, modifiers) -> OrbitPivot.aroundSelection = !OrbitPivot.aroundSelection
             HollowKeys.ORBIT_LEFT.matches(key, modifiers) -> orbitBy(-OrbitStep, 0f)
             HollowKeys.ORBIT_RIGHT.matches(key, modifiers) -> orbitBy(OrbitStep, 0f)
             HollowKeys.ORBIT_UP.matches(key, modifiers) -> orbitBy(0f, OrbitStep)

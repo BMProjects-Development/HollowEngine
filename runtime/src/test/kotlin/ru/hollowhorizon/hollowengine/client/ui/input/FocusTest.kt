@@ -1,11 +1,54 @@
 package ru.hollowhorizon.hollowengine.client.ui.input
 
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
 
 class FocusTest {
+    @Test
+    fun `toolbar clicks preserve the viewport focus and an active panel gets first use of keys`() {
+        val log = mutableListOf<String>()
+        val revision = mutableStateOf(0)
+        HollowUiSurface().use { surface ->
+            surface.setContent {
+                Row(modifier = Modifier.focusScope()) {
+                    Box(id = "preview-scope", modifier = Modifier.size(100.px, 100.px).focusScope()) {
+                        key(revision.value) {
+                            Box(id = "viewport", modifier = Modifier.size(100.px, 100.px).focus().onKeyInput {
+                                log += "viewport"
+                                it.consume()
+                            })
+                        }
+                    }
+                    Box(id = "toolbar", modifier = Modifier.size(100.px, 100.px)
+                        .input(clickable = true).onClick { revision.value++; it.consume() })
+                    Box(id = "timeline", modifier = Modifier.size(100.px, 100.px).focusScope()
+                        .input(clickable = true).onKeyInput {
+                            log += "timeline"
+                            it.consume()
+                        })
+                }
+            }
+            val runtime = surface.runtime
+            surface.frame(300f, 100f, -1f, -1f, 0L)
+            runtime.mouseClicked(50f, 50f, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            assertEquals("viewport", runtime.focusedKey)
+            runtime.mouseClicked(150f, 50f, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            surface.frame(300f, 100f, -1f, -1f, 16_000_000L)
+            assertEquals("viewport", runtime.focusedKey)
+            runtime.keyPressed(GLFW.GLFW_KEY_R, 0, 0)
+            assertEquals(listOf("viewport"), log)
+
+            log.clear()
+            runtime.mouseClicked(250f, 50f, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            runtime.keyPressed(GLFW.GLFW_KEY_G, 0, 0)
+            assertEquals(listOf("timeline"), log)
+        }
+    }
+
     private fun keyLoggingBox(id: String, layer: Int, log: MutableList<String>, consume: Boolean): BoxNode {
         // A focus scope is always key-active while composed, so it is a self-contained multi-focus target.
         val mod = Modifier.focusScope().layer(layer).onKeyInput { input ->
