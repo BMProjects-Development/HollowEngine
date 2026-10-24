@@ -5,13 +5,19 @@ order: 15
 
 <center><h1>Keyboard Input</h1></center>
 
+Create `hollowengine/scripts/examples/key_choice.node.kts` and attach it to an NPC. The example waits for a key after a right-click on that character; `player` comes from the interaction event.
+
 ## Waiting for a key
 
 `player.waitKey()` suspends the coroutine until the player releases their next key, then returns its code:
 
 ```kotlin
-@State
-suspend fun onInteract(player: ServerPlayer) {
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+onInteract { event ->
+    val player = event.player as? ServerPlayer ?: return@onInteract
     player.notify("Press Y to accept the quest.")
     if (player.waitKey() == Key.Y) {
         player.giveItem(item("minecraft:emerald"))

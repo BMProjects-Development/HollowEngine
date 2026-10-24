@@ -5,7 +5,7 @@ order: 2
 
 <center><h1>Файлы UI-скриптов</h1></center>
 
-UI-объявления представляют собой Kotlin-скрипты с суффиксом `.ui.kts`. Размещайте их в `hollowengine/scripts`; вложенные папки поддерживаются. Клиент компилирует и выполняет скрипты при перезагрузке ресурсов. На клиенте должен быть установлен аддон Kotlin scripting compiler.
+Создайте файл `.ui.kts` в `hollowengine/scripts`, чтобы добавить экран или оверлей. Вложенные папки тоже подходят. Клиент с установленным [компилятором Kotlin](/docs/hollowengine/addons/compiler) компилирует и запускает эти объявления при перезагрузке ресурсов.
 
 Базовый класс скрипта: `UiScript`. Импорты UI, виджетов, layout, стилей, `DataKey` и HUD API добавляются автоматически.
 
@@ -132,8 +132,8 @@ surface("project:dialogue") {
 
 ```kotlin
 @Composable
-fun UiScope.Action(label: String, action: String) {
-    Box(modifier = Modifier.padding(6.px).onClick { send { putString("action", action) } }) {
+fun UiScope.Action(id: String, label: String, action: String) {
+    Box(id = id, modifier = Modifier.padding(6.px).input(hoverable = true, clickable = true).onClick { send { putString("action", action) } }) {
         Text(label)
     }
 }

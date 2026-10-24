@@ -7,7 +7,9 @@ order: 4
 
 *How an NPC can walk, look around, and use its hands at the same time, without you writing any tricky code for it.*
 
-This page explains how most NPC actions work under the hood. They're used throughout the other NPC pages (movement, inventory, search), so it's worth reading this one first.
+Let the NPC walk to a player while turning its head toward them. Then learn how to wait for movement, cancel it, and resolve conflicting orders. The same rules apply to inventory and search actions.
+
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
 
 ## What this is and why
 

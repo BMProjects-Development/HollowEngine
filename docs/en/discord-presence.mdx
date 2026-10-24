@@ -1,13 +1,18 @@
 ---
 title: Discord Rich Presence
+order: 6
 description: Desktop Discord integration and project-specific presence
 ---
+
+<center><h1>Discord Rich Presence</h1></center>
 
 HollowEngine displays Rich Presence through the locally running Discord desktop client. It shows loading, the main menu, singleplayer, multiplayer, or working in the IDE, together with elapsed engine session time. In a world, the status includes the current dimension and biome, and indicates when the game is paused. The default activity also includes a button linking to the engine's GitHub repository.
 
 Before translations load, the engine uses readable English defaults. Vanilla dimensions have translated names; custom dimensions and biomes use their translation keys when available, otherwise their resource IDs. Long names are shortened to fit Discord's limits. World names, server addresses, player names, and coordinates are not published.
 
-Discord can start before or after Minecraft. HollowEngine reconnects when Discord restarts, waits for `READY`, acknowledges activity updates, answers ping frames, and coalesces changes to at most one activity update every 15 seconds per connection. IPC runs outside the Minecraft thread. Closing the game or disabling presence closes its IPC connection.
+You can start Discord before or after Minecraft. If you restart Discord, the engine reconnects. Status updates are sent at most once every 15 seconds, so a biome change may appear after a short delay.
+
+Communication uses IPC, a local connection between programs. It runs outside the Minecraft thread and closes when you exit the game or disable presence. The engine waits for `READY`, checks update acknowledgements, and responds to ping frames.
 
 ## Configuration
 

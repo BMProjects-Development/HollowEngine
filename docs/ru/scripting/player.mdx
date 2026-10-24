@@ -9,6 +9,8 @@ order: 13
 
 ---
 
+В примерах `player` - серверный игрок из события или `playerRef(...).resolve()` внутри `.node.kts`. Это фрагменты: вставляйте их в обработчик или состояние ноды. Функции работы с предметами в этом типе скриптов импортированы автоматически.
+
 ## Те же функции, другой владелец
 
 Всё на этой странице повторяет [API инвентаря NPC](/docs/hollowengine/scripting/npc/inventory), так что награда и оплата в лавке пишутся одинаково, кто бы ни держал предметы:
@@ -55,6 +57,7 @@ player.unequip(EquipmentSlot.OFFHAND)
 val leftover = player.giveItem(item("minecraft:diamond", 64))
 if (!leftover.isEmpty) player.dropItem(leftover) // под ноги, а не в никуда
 ```
+
 :::
 
 :::warning

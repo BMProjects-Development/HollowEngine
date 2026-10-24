@@ -11,6 +11,8 @@ Every engine NPC finds and walks its paths the same way, whatever moves it: a sc
 
 ---
 
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+
 ## The Navigation component
 
 Open the NPC's components with the NPC wand and add **Navigation** (`hollowengine:entity/navigation`). Its settings come in five groups. The component lives on the server only: clients see the NPC move and need nothing of it.

@@ -5,7 +5,7 @@ order: 4
 
 <center><h1>Colliders and Bodies</h1></center>
 
-*Boxes on a model's bones that take hits, work as buttons, push and block, and the body component that decides what an entity's own box does.*
+Add areas for hits, clicks, and collisions to a model. For example, a player can hit a boss’s arm or stand on its tail. We will also cover the entity’s body component, which controls how its main box pushes and blocks others.
 
 ---
 
@@ -117,7 +117,7 @@ npc.set(BodyComponent(width = 2f, height = 1.5f))
 A [node script](/docs/hollowengine/scripting/node) attached to an entity has these handlers for its colliders. Each takes the names of the colliders to listen to; with none, it hears all of them.
 
 ```kotlin
-@file:Attach(net.minecraft.world.entity.LivingEntity::class)
+@file:Attach(LivingEntity::class)
 
 onColliderHit("head") { event, hit ->
     event.amount *= 2f

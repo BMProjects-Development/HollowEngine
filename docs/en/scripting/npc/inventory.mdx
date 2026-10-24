@@ -5,9 +5,11 @@ order: 7
 
 <center><h1>Inventory and Item Collection</h1></center>
 
-*Every NPC now has its own inventory, a way to describe "which items", and a background job that walks around and gathers them.*
+Give an NPC items, equip it, and ask it to gather loot. Learn how to check its inventory and handle items that do not fit.
 
 ![NPC inventory editor](/hollowengine/pictures/npc/inventory.webp)
+
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
 
 ## The NPC's inventory
 
@@ -48,6 +50,7 @@ npc.unequip(EquipmentSlot.MAINHAND)
 val leftover = npc.giveItem(item("minecraft:apple", 70))
 if (!leftover.isEmpty) npc.dropItem(leftover)
 ```
+
 :::
 
 :::warning
@@ -177,7 +180,7 @@ If two different NPCs both go looking for the same pile of dropped items, they w
 `hasItems`, `takeItems`, and `giveItem` all operate on `npc.inventory`, so a shopkeeper that sells from its own stock only needs functions from this page. A shop needs to react to interactions for as long as the NPC exists, which is exactly what an [entity-attached node script](/docs/hollowengine/scripting/node) is for:
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 // The NPC itself is the implicit receiver here, so no `npc.` prefix is needed.
 giveItem(item("minecraft:bread", 32)) // stock the shop once, when the node starts

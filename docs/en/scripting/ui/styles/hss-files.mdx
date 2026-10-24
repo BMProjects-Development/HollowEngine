@@ -5,7 +5,7 @@ order: 2
 
 <center><h1>HSS Files</h1></center>
 
-HSS is the stylesheet language for shared UI styling. It is still supported, but `.ui` files and their `style` attribute are not: import a stylesheet from Kotlin with `Modifier.style`.
+Define colors, spacing, and element states in an HSS file to reuse the appearance across screens. HSS is HollowEngine’s stylesheet language. Load the file from `.ui.kts` through `Modifier.style`.
 
 ```kotlin
 Column(id = "shop", modifier = Modifier.style("mypack:ui/styles/shop.hss")) {

@@ -5,9 +5,13 @@ order: 3
 
 <center><h1>Blocks</h1></center>
 
-*Actions related to blocks.*
+React to block placement, breaking, or updates. Cancellable events let you prevent an action, for example to protect a building.
 
-![NPC](/docs/title-missing.webp)
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
+```
 
 ## Placement
 
@@ -23,7 +27,7 @@ fun onBlockPlace(event: BlockEvent.Placed) {
 ```
 
 - `event.state` (BlockState) - the current block state.
-- `event.pos` (String) - block coordinates.
+- `event.pos` (`BlockPos`) - block coordinates.
 - `event.player` (Player) - the player who placed the block.
 
 ## Breaking
@@ -40,7 +44,7 @@ fun onBlockBreak(event: BlockEvent.Break) {
 ```
 
 - `event.state` (BlockState) - the current block state.
-- `event.pos` (String) - block coordinates.
+- `event.pos` (`BlockPos`) - block coordinates.
 - `event.player` (Player) - the player who broke the block.
 - `event.level` (Level) - the world where the block was broken.
 
@@ -58,5 +62,5 @@ fun onBlockUpdate(event: BlockEvent.NeighborNotify) {
 ```
 
 - `event.state` (BlockState) - the current block state.
-- `event.pos` (String) - block coordinates.
+- `event.pos` (`BlockPos`) - block coordinates.
 - `event.directions` (`EnumSet<Direction>`) - the sides that were updated.

@@ -5,9 +5,13 @@ order: 3
 
 <center><h1>Блоки</h1></center>
 
-*Действия связанные с блоками.*
+Отреагируйте на установку, разрушение или обновление блока. У отменяемых событий можно запретить действие, например защитить постройки от разрушения.
 
-![NPC](/docs/title-missing.webp)
+Это отдельные примеры обработчиков для `.reload.kts`. Добавьте нужные импорты в начало своего файла. Для событий клиента поставьте `@file:ClientSide` перед импортами; серверные и клиентские обработчики держите в разных файлах.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
+```
 
 ## Размещение
 
@@ -23,7 +27,7 @@ fun onBlockPlace(event: BlockEvent.Placed) {
 ```
 
 - `event.state` (BlockState) - текущее состояние блока.
-- `event.pos` (String) - координаты блока.
+- `event.pos` (`BlockPos`) - координаты блока.
 - `event.player` (Player) - игрок, поставивший блок.
 
 ## Ломание
@@ -40,7 +44,7 @@ fun onBlockBreak(event: BlockEvent.Break) {
 ```
 
 - `event.state` (BlockState) - текущее состояние блока.
-- `event.pos` (String) - координаты блока.
+- `event.pos` (`BlockPos`) - координаты блока.
 - `event.player` (Player) - игрок, сломавший блок.
 - `event.level` (Level) - мир, где был сломан блок.
 
@@ -58,6 +62,6 @@ fun onBlockUpdate(event: BlockEvent.NeighborNotify) {
 ```
 
 - `event.state` (BlockState) - текущее состояние блока.
-- `event.pos` (String) - координаты блока.
+- `event.pos` (`BlockPos`) - координаты блока.
 - `event.directions` (`EnumSet<Direction>`) - список, со сторонами, которые были обновлены.
 

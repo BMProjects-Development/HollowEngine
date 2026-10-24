@@ -5,14 +5,15 @@ order: 11
 
 <center><h1>NPC and Entity Properties</h1></center>
 
-*In v2.3, scripts work with real Kotlin/Minecraft objects, not Katari wrappers.*
+Change an NPC’s name, health, and behavior through Minecraft properties and HollowEngine components. Below, you will find the available settings and ways to keep a reference to your character.
 
 ---
 
 ## Main difference from the old documentation
 
-The old documentation described properties as dynamic fields (`Text`, `Bool`, `Position`, and so on).
-In the v2.3 Kotlin architecture, `npc` is a regular `NpcEntity`, inheriting from `PathfinderMob` / `LivingEntity` / `Entity`.
+The `npc` variable holds an `NpcEntity` object. It inherits the capabilities of a `PathfinderMob`, a `LivingEntity`, and the base `Entity`. For example, use `health` to access its health and `position()` to read its position.
+
+Older examples use dynamic fields such as `Text`, `Bool`, and `Position`. In Kotlin, use the properties and functions listed below.
 
 That means:
 
@@ -88,18 +89,19 @@ val target = npc.target
 
 ## Components instead of old pseudo-properties
 
-In v2.3, model, animation, material, and some visual settings are better configured through components:
+A component groups related entity settings. For example, `Model` selects the model, while `BodyComponent` controls collisions for its main body:
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
-import ru.hollowhorizon.hollowengine.common.entities.setNameplate
-import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 
-npc.set(Model("my_mod:models/entity/guide.gltf"))
+npc.set(Model("hollowengine:models/entity/player_model.gltf"))
 npc.set(BodyComponent(mode = BodyMode.BLOCKING))
-npc.set(StandardPlayerAnimatorPreset.create())
 ```
+
+Set the animator in the selected model’s `.hemeta` using `animation-controller`. The built-in player model already refers to `hollowengine:standard_player`.
 
 For animations, see [Animations](/docs/hollowengine/models/animations).
 

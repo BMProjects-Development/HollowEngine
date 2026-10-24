@@ -5,9 +5,13 @@ order: 5
 
 <center><h1>Worlds</h1></center>
 
-*Actions related to dimensions.*
+Run an action when a dimension is saved or unloaded. For example, save your system’s data before the world stops.
 
-![Level Events](/docs/title-missing.webp)
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
+```
 
 ## Saving
 

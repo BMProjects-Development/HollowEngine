@@ -5,13 +5,13 @@ order: 4
 
 <center><h1>Rig Editor</h1></center>
 
-*The visual editor for `.rig` files: bones, poses, attachments, IK, colliders and physical skeletons.*
+Add colliders, attached effects, or a physics skeleton to a model. These settings live in a rig, a `.rig` file next to the model. Learn how to open it in the editor and check the result.
 
 ---
 
 ## What a rig is
 
-A model file does not contain everything you may need. You might want to add inverse kinematics, a UI panel, an effect or colliders that can take damage. These settings cannot be inferred automatically or exported directly from Blockbench or Blender, so the rig editor provides a place to configure them.
+A rig stores settings the engine adds to a model: attachment positions, colliders, and bone movement rules. For example, inverse kinematics (IK) can place a foot on a surface by adjusting the other leg bones. You can also attach a panel, an effect, or a hit area to a chosen bone.
 
 It lives next to the model as `<model file>.rig` - `player.gltf` gets `player.gltf.rig` - the same way `.hemeta` does. Nothing points at it and nothing has to: one model, one rig.
 

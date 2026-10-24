@@ -5,11 +5,19 @@ order: 1
 
 <center><h1>Event Handling</h1></center>
 
-*Subscribe to events and inject your own logic.*
-
-![NPC](/docs/title-missing.webp)
+Run your logic when a player joins, breaks a block, or interacts with an entity. Subscribe to an event: a message from the engine about that action.
 
 The HollowEngine event system lets you inject custom logic into specific in-game actions, including player actions, entity actions, block updates, and more.
+
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.await
+import ru.hollowhorizon.hollowengine.common.events.server.ServerChatEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+```
 
 ## Which side an event fires on
 
@@ -91,7 +99,7 @@ println(event.message.string)
 Or with a condition:
 
 ```kotlin
-val event = ServerChatEvent.await { it.player.name == "..." }
+val event = ServerChatEvent.await { it.player.name.string == "Steve" }
 ```
 
 :::warning

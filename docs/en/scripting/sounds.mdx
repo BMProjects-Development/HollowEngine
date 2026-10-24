@@ -5,9 +5,13 @@ order: 12
 
 # Sounds
 
-HollowEngine can play both audio files and events from `sounds.json`. The engine supports OGG Vorbis and RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, mono or stereo, including extensible WAV. The [Media addon](/docs/hollowengine/addons/media) provides other codecs and audio tracks from video containers through FFmpeg :)
+Play an NPC’s voice, music in an area, or the hum of a machine. Use an audio file or a sound event from `sounds.json`.
+
+Without extra addons, the engine supports OGG Vorbis and RIFF WAV: PCM 8/16/24/32, IEEE float 32/64, mono or stereo, including extensible WAV. For other codecs and video audio tracks, install the [Media addon](/docs/hollowengine/addons/media), which uses FFmpeg.
 
 ![Sound editor](/hollowengine/pictures/sounds/editor.webp)
+
+The Kotlin examples below are server `.node.kts` fragments. `player` comes from an event, `level` is that player’s world, and `machineEntity` is the entity the sound follows. Place the fragment in a node handler or state; `voice.await()` requires a coroutine. Replace `demo:...` files with your own resources under `hollowengine/assets/demo/sounds/`.
 
 ## Sources
 

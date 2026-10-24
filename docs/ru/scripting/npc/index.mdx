@@ -5,10 +5,9 @@ order: 1
 
 <center><h1>NPC в Kotlin-скриптах</h1></center>
 
-*NpcEntity - основная сущность для персонажей, интерактивных сцен и сюжетной логики.*
+Создавайте персонажей для своей карты: NPC могут разговаривать, ходить к цели, пользоваться предметами и участвовать в сюжетных сценах.
 
-В HollowEngine v2.3 NPC создаются и управляются из Kotlin-скриптов, в первую очередь из `*.node.kts`.
-В таких скриптах доступен implicit receiver `MinecraftServer`, а функции для NPC импортируются по умолчанию из `ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.*`.
+Начните с файла `.node.kts` в `hollowengine/scripts`. В нём уже доступны функции `npc()`, `pos()`, `move()` и другие помощники для NPC. Методы сервера `MinecraftServer` тоже можно вызывать прямо из скрипта.
 
 NPC - это обычная Minecraft-сущность `NpcEntity`, поэтому с ней можно работать и через HollowEngine helpers (`npc()`, `move`, `lookAt`, `say`), и через стандартный API `Entity` / `LivingEntity` / `PathfinderMob`.
 
@@ -72,7 +71,7 @@ NPC переживает чанк, в котором стоит: он остаё
 Для поведения, которое должно жить вместе с самим NPC, а не с сюжетным стейтом, прикрепите [node-скрипт](/docs/hollowengine/scripting/node) прямо к сущности через `@file:Attach`:
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 onInteract { event ->
     event.player.send("Добро пожаловать, путник!")

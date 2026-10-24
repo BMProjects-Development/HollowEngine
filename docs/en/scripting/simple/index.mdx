@@ -82,7 +82,7 @@ scripts/
     └── first_quest.node.kts
 ```
 
-Declare a package and a shared function in `rewards.kts`:
+Declare the shared function in `hollowengine/scripts/common/rewards.kts`:
 
 ```kotlin
 import net.minecraft.world.entity.player.Player
@@ -90,19 +90,23 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 
 fun Player.reward(item: Item, count: Int = 1) {
-    inventory.add(ItemStack(item, count))
+    val stack = ItemStack(item, count)
+    inventory.add(stack)
+    if (!stack.isEmpty) drop(stack, false)
 }
 ```
 
-The function can now be imported into another script:
+Import the function in `hollowengine/scripts/quests/first_quest.node.kts` and reward the player `Steve`. Replace that name with yours. `playerRef` waits for the player to join; start the `main` state with `/he scripting run scripts/quests/first_quest.node.kts main`. Each run gives the reward again.
 
 ```kotlin
-@Import("../common/reward.kts")
+@file:Import("../common/rewards.kts")
 import net.minecraft.world.item.Items
 
+@State
 suspend fun main() {
-    // Obtain the player variable from your script context.
-    player.reward(Items.DIAMOND, 3)
+    playerRef("Steve").update {
+        reward(Items.DIAMOND, 3)
+    }
 }
 ```
 
@@ -119,7 +123,7 @@ val id = ResourceLocation.fromNamespaceAndPath("minecraft", "diamond")
 println("$id: $stack")
 ```
 
-Standard Kotlin imports such as `kotlin.collections.*`, `kotlin.io.*`, and `kotlin.math.*` work as usual.
+Standard Kotlin imports such as `kotlin.collections.*` and `kotlin.io.*` are available as usual. Import functions from `kotlin.math`, such as `sqrt`, explicitly.
 
 The built-in editor can help you find missing imports through diagnostics and code completion suggestions.
 

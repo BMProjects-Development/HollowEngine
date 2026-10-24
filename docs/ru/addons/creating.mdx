@@ -5,7 +5,7 @@ order: 2
 
 <center><h1>Создание аддона</h1></center>
 
-*Подпроект Gradle, `plugin.properties` и точка входа.*
+Создадим отдельный jar-аддон, который можно установить и обновлять вместе с HollowEngine. Для этого настроим Gradle-проект, опишем аддон в `plugin.properties` и добавим класс, с которого начнётся его работа.
 
 Эта страница описывает независимый аддон: свой jar, устанавливаемый и обновляемый отдельно от любого мода. Как поставить интеграцию внутри jar мода, см. в [Аддоны внутри мода](/docs/hollowengine/addons/mod-addons).
 
@@ -21,7 +21,7 @@ order: 2
 
 Чтобы собирать аддон вне репозитория, компилируйте против **development jar**. `./gradlew developmentJar` создаёт `build/development/HollowEngine-<minecraft>-<version>-dev.jar`, а `buildAndCollect` копирует его в `merged/`. Он выставляет классы движка, мост и встроенные библиотеки в compile classpath. Подключайте его как `compileOnly` с маппингами Mojang или Parchment и той версией Kotlin, которую использует HollowEngine. В игру ставьте обычный универсальный jar; development jar нужен только для компиляции.
 
-`build.gradle.kts` аддона содержит только его собственные настройки и библиотеки:
+В `build.gradle.kts` аддона задайте имя архива и собственные зависимости. Ниже показана схема: координаты `com.example:...` замените на нужные вам библиотеки. Если внешних библиотек нет, блок `dependencies` можно убрать.
 
 ```kotlin
 base.archivesName.set("MyAddon")
@@ -91,7 +91,7 @@ class MyAddon : HollowAddonEntrypoint {
 
 ### Общие сервисы
 
-Аддоны могут предлагать API друг другу и движку через host services:
+Аддон может опубликовать объект сервиса, чтобы другой аддон или движок получил его по интерфейсу. Для этого используется `context.hostServices`. В следующем фрагменте `MyService` - ваш интерфейс, а `MyServiceImpl` - его реализация; их нужно определить в своём проекте:
 
 ```kotlin
 override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {

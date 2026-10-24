@@ -5,13 +5,15 @@ order: 10
 
 <center><h1>Utility Methods</h1></center>
 
-*Small helper functions for `NpcEntity` that don't belong to a bigger topic.*
+Have an NPC greet players, drop an item, or sit down. This page collects helpers for these actions and examples of configuring items.
 
 ---
 
 For movement, looking, using blocks, and interacting with entities, see [Movement and Interaction](/docs/hollowengine/scripting/npc/movement).
 For giving, taking, and gathering items, see [Inventory and Item Collection](/docs/hollowengine/scripting/npc/inventory).
 For finding nearby players, NPCs, and items, see [Finding Entities and Items](/docs/hollowengine/scripting/npc/search).
+
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
 
 ## `npc.dropItem(item)`
 

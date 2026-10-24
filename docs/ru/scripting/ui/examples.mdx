@@ -5,6 +5,8 @@ order: 10
 
 <center><h1>Примеры UI</h1></center>
 
+Соберём экран подтверждения, HUD-подсказку и окно с ожиданием ответа. Клиентские объявления храните в `.ui.kts`, серверные действия - в `.node.kts`. В каждом примере указано, какую часть куда вставить.
+
 ## Серверный экран подтверждения
 
 `hollowengine/scripts/confirm.ui.kts`:
@@ -18,28 +20,41 @@ screen("mypack:confirm") {
         Column(modifier = Modifier.padding(16.px).gap(12.px)) {
             Text(data[Message])
             Row(modifier = Modifier.gap(8.px)) {
-                Box(modifier = Modifier.onClick { send { putString("action", "accept") } }) { Text("Да") }
-                Box(modifier = Modifier.onClick { send { putString("action", "cancel") } }) { Text("Нет") }
+                Box(id = "confirm-accept", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "accept") } }) { Text("Да") }
+                Box(id = "confirm-cancel", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "cancel") } }) { Text("Нет") }
             }
         }
     }
 }
 ```
 
-В серверном скрипте:
+Создайте `hollowengine/scripts/confirm.node.kts` и прикрепите его к NPC. На клиенте уже должен быть загружен `confirm.ui.kts` (нажмите `F3 + T`). Ключ `Message` объявляем и на сервере с тем же именем и типом:
 
 ```kotlin
-player.openUi("mypack:confirm") {
-    put(Message, "Удалить этот предмет?")
-    onEvent { payload ->
-        when (payload.getString("action")) {
-            "accept" -> deleteItem(player)
-            "cancel" -> Unit
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+val Message = dataKey<String>("message") { "Вы уверены?" }
+
+onInteract { event ->
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    player.openUi("mypack:confirm") {
+        put(Message, "Удалить один камень из инвентаря?")
+        onEvent { payload ->
+            when (payload.getString("action")) {
+                "accept" -> {
+                    player.takeItems(itemFilter(item("minecraft:stone")), 1)
+                    close()
+                }
+                "cancel" -> close()
+            }
         }
-        close()
     }
 }
 ```
+
+По ПКМ откроется подтверждение. «Да» удаляет до одного камня, если он есть, «Нет» и Escape закрывают экран без удаления. Для другого игрока откроется отдельная сессия. Неизвестное событие игнорируется.
 
 ## Клиентская HUD-подсказка
 
@@ -72,8 +87,8 @@ screen("mypack:quest_choice") {
     content {
         Column(modifier = Modifier.padding(16.px).gap(8.px)) {
             Text("Принять задание?")
-            Box(modifier = Modifier.onClick { send { putString("choice", "accept") } }) { Text("Принять") }
-            Box(modifier = Modifier.onClick { send { putString("choice", "decline") } }) { Text("Отказаться") }
+            Box(id = "choice-accept", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("choice", "accept") } }) { Text("Принять") }
+            Box(id = "choice-decline", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("choice", "decline") } }) { Text("Отказаться") }
         }
     }
 }
@@ -84,6 +99,7 @@ screen("mypack:quest_choice") {
 ```kotlin
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import net.minecraft.server.level.ServerPlayer
 
 private enum class QuestChoice { ACCEPT, DECLINE }
 
@@ -109,13 +125,13 @@ private suspend fun ServerPlayer.chooseQuest(): QuestChoice? = suspendCancellabl
 }
 ```
 
-После этого suspend-функция обрабатывает результат напрямую. Escape, закрытие сервером и отмена корутины возвращают `null`:
+После этого suspend-функция обрабатывает результат напрямую. Escape и закрытие сервером возвращают `null`. Отмена корутины закрывает сессию и прерывает ожидание с отменой:
 
 ```kotlin
 when (player.chooseQuest()) {
-    QuestChoice.ACCEPT -> startQuest(player)
-    QuestChoice.DECLINE -> showDeclinedDialogue(player)
-    null -> logChoiceCancelled(player)
+    QuestChoice.ACCEPT -> println("Игрок принял задание")
+    QuestChoice.DECLINE -> println("Игрок отказался от задания")
+    null -> println("Выбор закрыт без ответа")
 }
 ```
 

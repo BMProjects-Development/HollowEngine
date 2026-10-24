@@ -9,6 +9,8 @@ order: 5
 
 Рекомендуется сначала прочитать [Действия и параллельность](/docs/hollowengine/scripting/npc/actions): каждая функция здесь существует в `suspend`-форме (ждёт действие) и в форме `startX` (работает в фоне и отдаёт контроллер), и каждая использует один из каналов `MOVEMENT`, `LOOK` или `HANDS`.
 
+Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в `onStart`, `onInteract` или `@State suspend fun`.
+
 ## Движение к сущности или позиции
 
 ```kotlin
@@ -116,7 +118,7 @@ when (val result = npc.move(pos(10, 64, 10), MoveOptions(arrivalDistance = 0.0, 
 Если передать в `move` список точек, NPC пройдёт их по очереди и остановится только в последней:
 
 ```kotlin
-val route = [pos(10, 64, 10), pos(20, 64, 10), pos(20, 64, 25)]
+val route = listOf(pos(10, 64, 10), pos(20, 64, 10), pos(20, 64, 25))
 npc.move(route)
 npc.move(route, MoveOptions(passDistance = 2.0, arrivalDistance = 0.5))
 ```

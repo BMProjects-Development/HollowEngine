@@ -5,9 +5,11 @@ order: 6
 
 <center><h1>Controllers and Progress</h1></center>
 
-*Start sessions, bind characters, localise stories, and preserve progress.*
+Start a conversation for one or more players, connect lines to NPCs, and save progress. A `DialogueController` manages one such conversation.
 
 ![Dialogue controllers](/hollowengine/titles/dialogues/control.webp)
+
+The Kotlin fragments below run in a coroutine of a server `.node.kts`. `player` and `companion` are `ServerPlayer` instances, `guard` is an existing NPC, and `persistentTag` is a `CompoundTag` from your storage. See the [getting-started guide](/docs/hollowengine/guide) for a complete example that obtains the player and saves progress. Create the example story files separately.
 
 ## Participants and characters
 

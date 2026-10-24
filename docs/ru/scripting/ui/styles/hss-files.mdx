@@ -5,7 +5,7 @@ order: 2
 
 <center><h1>HSS-файлы</h1></center>
 
-HSS является языком таблиц стилей для общего оформления UI. `.ui`-файлы и атрибут `style` больше не поддерживаются. Подключайте таблицу стилей из Kotlin через `Modifier.style`.
+Опишите цвета, отступы и состояния элементов в одном HSS-файле, чтобы использовать оформление на нескольких экранах. HSS - язык таблиц стилей HollowEngine. Подключите файл из `.ui.kts` через `Modifier.style`.
 
 ```kotlin
 Column(id = "shop", modifier = Modifier.style("mypack:ui/styles/shop.hss")) {

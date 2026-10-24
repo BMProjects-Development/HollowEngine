@@ -5,13 +5,15 @@ order: 2
 
 <center><h1>Creating NPCs</h1></center>
 
-*The current `npc()` signature and behavior in the v2.3 Kotlin architecture.*
+Create an NPC, then choose its name, model, dimension, and other settings.
 
 ---
 
+The examples use a server `.node.kts`: `npc`, `pos`, `rotation`, and `@State` are already imported. For the complete `main` example, create `hollowengine/scripts/examples/create_npc.node.kts` and run `/he scripting run scripts/examples/create_npc.node.kts main`. Choose coordinates with solid ground in a loaded chunk.
+
 ## `npc()`
 
-The `npc()` function creates an `NpcEntity`, adds it to the world, and assigns the base model and animation components.
+The `npc()` function creates an `NpcEntity` in the selected world and assigns its model. If you pass the `id` of an existing living NPC, it returns that NPC and keeps its current settings.
 
 ```kotlin
 val guide = npc(
@@ -46,14 +48,14 @@ fun npc(
 | `rotation` | `Vec2` | `rotation(0, 0)` | Initial yaw/pitch. |
 | `world` | `String` | `"minecraft:overworld"` | Dimension id where the NPC is added. |
 | `attributes` | `Map<String, Float>` | `emptyMap()` | Base attribute values by registry id. |
-| `transform` | `TrsTransformF` | `TrsTransformF()` | Local model transform. Do not rely on it as a stable public customization path yet. |
+| `transform` | `TrsTransformF` | `TrsTransformF()` | Model translation, rotation, and scale relative to the NPC; passed to `TransformComponent`. |
 | `nameplateMode` | `NameplateMode` | `NameplateMode.SHOW` | Initial nameplate visibility mode. |
-| `inverseHeadRotation` | `Boolean` | `false` | Reserved for model/head-rotation specifics. |
+| `inverseHeadRotation` | `Boolean` | `false` | Not applied by the current implementation. Configure head rotation in model metadata. |
 | `inventorySize` | `Int` | `36` | Number of slots in [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Can also be changed later with `npc.inventory.resize(...)`. |
 | `id` | `String?` | `null` | The NPC's own id, such as `"village:blacksmith"`. When a living NPC already has it, `npc()` returns that NPC and ignores the other arguments, see [NPCs Outside the World](/docs/hollowengine/scripting/npc/registry#ids-one-npc-per-name). |
 
-:::caution
-Some parameters are already present in the signature but are not yet a fully stable user-facing API. In v2.3, position, rotation, world, model, name, `nameplateMode`, attributes, and the standard animator are applied reliably. For fine-grained model, texture, and animation setup, assign components explicitly; how the NPC pushes and blocks is set by the [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component.
+:::warning
+The `inverseHeadRotation` parameter is not applied yet. `transform` is passed to `TransformComponent`. The selected model’s metadata defines its animator and head rotation, so configure a custom model separately. The [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component controls how the NPC pushes and blocks others.
 :::
 
 ---
@@ -86,13 +88,15 @@ suspend fun main() {
 
 ### Custom model and world
 
+Prepare `hollowengine/assets/project/models/entity/trader.gltf` and its textures for this example. The identifier `project:models/entity/trader.gltf` refers to that file. Choose an existing dimension; this example uses the Overworld. If you do not have a custom resource yet, keep the default built-in model.
+
 ```kotlin
 @State
 suspend fun main() {
     val trader = npc(
         pos = pos(120.0, 70.0, -32.0),
         name = "Trader",
-        model = "my_mod:models/entity/trader.gltf",
+        model = "project:models/entity/trader.gltf",
         rotation = rotation(180, 0),
         world = "minecraft:overworld",
     )
@@ -124,7 +128,7 @@ Any registered attribute can be added to an individual NPC, including attributes
 After creation, the NPC receives:
 
 - `Model(model)` - the model component;
-- `StandardPlayerAnimatorPreset.create()` - standard player-like locomotion animation;
+- the selected model’s animator from its `.hemeta`; the built-in model uses `hollowengine:standard_player` for idle and walking;
 - `TransformComponent(...)` - base model transform;
 - a nameplate initialized from `name` and `nameplateMode`;
 - a record in the [NPC registry](/docs/hollowengine/scripting/npc/registry), and its body in the selected world.

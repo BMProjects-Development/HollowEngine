@@ -5,9 +5,14 @@ order: 1
 
 <center><h1>Server and Ticks</h1></center>
 
-*Actions related to the server.*
+Start logic when the server starts or stops, or run an action every tick. These handlers suit systems shared by the world.
 
-![NPC](/docs/title-missing.webp)
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.server.ServerEvent
+import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+```
 
 ## Lifecycle
 
@@ -67,6 +72,7 @@ fun onServerTick(event: TickEvent.Server) {
     }
 }
 ```
+
 :::
 
 ### Client tick

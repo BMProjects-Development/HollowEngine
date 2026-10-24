@@ -5,9 +5,20 @@ order: 2
 
 <center><h1>Игроки и взаимодействие с ними</h1></center>
 
-*Действия связанные с игроками и тем, что они делают.*
+Выдайте приветствие при входе игрока, восстановите его данные после смерти или обработайте взаимодействие. Выберите подходящее событие ниже и проверьте, на какой стороне оно приходит.
 
-![NPC](/docs/title-missing.webp)
+Это отдельные примеры обработчиков для `.reload.kts`. Добавьте нужные импорты в начало своего файла. Для событий клиента поставьте `@file:ClientSide` перед импортами; серверные и клиентские обработчики держите в разных файлах.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityTrackingEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.ItemEntityEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.await
+import ru.hollowhorizon.hollowengine.common.events.item.ArrowEvent
+import ru.hollowhorizon.hollowengine.common.events.server.ServerChatEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+```
 
 ## Жизненный цикл игрока
 
@@ -138,11 +149,13 @@ fun onPlayerInteract(event: PlayerInteractEvent.EntityInteract) {
 
 :::advice
 Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
+
 ```kotlin
 if (event.hand == InteractionHand.MAIN_HAND) {
    // Действие, которое сработает 1 раз
 }
 ```
+
 В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
@@ -165,11 +178,13 @@ fun onPlayerInteract(event: PlayerInteractEvent.BlockInteract) {
 
 :::advice
 Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
+
 ```kotlin
 if (event.hand == InteractionHand.MAIN_HAND) {
    // Действие, которое сработает 1 раз
 }
 ```
+
 В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
@@ -192,11 +207,13 @@ fun onPlayerInteract(event: PlayerInteractEvent.ItemInteract) {
 
 :::advice
 Событие срабатывает на обеих сторонах и отдельно для каждой руки. Серверный скрипт получает только серверные вызовы, но по одному на основную и на вторую руку, поэтому обычно достаточно такой проверки:
+
 ```kotlin
 if (event.hand == InteractionHand.MAIN_HAND) {
    // Действие, которое сработает 1 раз
 }
 ```
+
 В `.startup.kts` и аддонах, которые слышат обе стороны, дополнительно проверяйте `!event.player.level().isClientSide`.
 :::
 
@@ -219,12 +236,14 @@ fun onPlayerMessage(event: ServerChatEvent) {
 
 :::advice
 Поскольку это событие можно отменить, оно срабатывает раньше отправки сообщения. Поэтому при ответах лучше добавляйте задержку:
+
 ```kotlin
 npc.say("Что думаешь?")
 val text = ServerChatEvent.await().message.string
 wait(1) // Ждём 1 тик, чтобы сообщение отправилось, иначе далее нпс ответит раньше игрока
 npc.say("Значит твой окончательный выбор - '$text'?")
 ```
+
 :::
 
 ### Выбрасывает предмет

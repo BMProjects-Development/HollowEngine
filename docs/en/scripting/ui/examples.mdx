@@ -5,6 +5,8 @@ order: 10
 
 <center><h1>UI Examples</h1></center>
 
+Build a confirmation screen, a HUD hint, and a window that waits for a reply. Store client declarations in `.ui.kts` and server actions in `.node.kts`. Each example explains where its parts belong.
+
 ## Server-driven confirmation screen
 
 `hollowengine/scripts/confirm.ui.kts`:
@@ -18,28 +20,41 @@ screen("mypack:confirm") {
         Column(modifier = Modifier.padding(16.px).gap(12.px)) {
             Text(data[Message])
             Row(modifier = Modifier.gap(8.px)) {
-                Box(modifier = Modifier.onClick { send { putString("action", "accept") } }) { Text("Yes") }
-                Box(modifier = Modifier.onClick { send { putString("action", "cancel") } }) { Text("No") }
+                Box(id = "confirm-accept", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "accept") } }) { Text("Yes") }
+                Box(id = "confirm-cancel", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "cancel") } }) { Text("No") }
             }
         }
     }
 }
 ```
 
-From a server script:
+Create `hollowengine/scripts/confirm.node.kts` and attach it to an NPC. Load `confirm.ui.kts` on the client first by pressing `F3 + T`. Declare `Message` on the server with the same name and type:
 
 ```kotlin
-player.openUi("mypack:confirm") {
-    put(Message, "Delete this item?")
-    onEvent { payload ->
-        when (payload.getString("action")) {
-            "accept" -> deleteItem(player)
-            "cancel" -> Unit
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+val Message = dataKey<String>("message") { "Are you sure?" }
+
+onInteract { event ->
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    player.openUi("mypack:confirm") {
+        put(Message, "Remove one stone from your inventory?")
+        onEvent { payload ->
+            when (payload.getString("action")) {
+                "accept" -> {
+                    player.takeItems(itemFilter(item("minecraft:stone")), 1)
+                    close()
+                }
+                "cancel" -> close()
+            }
         }
-        close()
     }
 }
 ```
+
+Right-click to open confirmation. “Yes” removes up to one stone if present; “No” and Escape close the screen without removing it. Each player gets a separate session. Unknown events are ignored.
 
 ## Client-owned HUD hint
 
@@ -72,8 +87,8 @@ screen("mypack:quest_choice") {
     content {
         Column(modifier = Modifier.padding(16.px).gap(8.px)) {
             Text("Will you accept the quest?")
-            Box(modifier = Modifier.onClick { send { putString("choice", "accept") } }) { Text("Accept") }
-            Box(modifier = Modifier.onClick { send { putString("choice", "decline") } }) { Text("Decline") }
+            Box(id = "choice-accept", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("choice", "accept") } }) { Text("Accept") }
+            Box(id = "choice-decline", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("choice", "decline") } }) { Text("Decline") }
         }
     }
 }
@@ -84,6 +99,7 @@ In a server script, add these imports and adapter once:
 ```kotlin
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import net.minecraft.server.level.ServerPlayer
 
 private enum class QuestChoice { ACCEPT, DECLINE }
 
@@ -109,13 +125,13 @@ private suspend fun ServerPlayer.chooseQuest(): QuestChoice? = suspendCancellabl
 }
 ```
 
-The calling suspend function can then handle the result directly. Escape, server-side closure, and coroutine cancellation return `null`:
+The calling suspend function can then handle the result directly. Escape and server-side closure return `null`. Cancelling the coroutine closes the session and cancels the wait:
 
 ```kotlin
 when (player.chooseQuest()) {
-    QuestChoice.ACCEPT -> startQuest(player)
-    QuestChoice.DECLINE -> showDeclinedDialogue(player)
-    null -> logChoiceCancelled(player)
+    QuestChoice.ACCEPT -> println("Player accepted the quest")
+    QuestChoice.DECLINE -> println("Player declined the quest")
+    null -> println("Choice closed without a reply")
 }
 ```
 

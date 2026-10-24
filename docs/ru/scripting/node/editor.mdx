@@ -5,7 +5,7 @@ order: 4
 
 <center><h1>Свойства в редакторе</h1></center>
 
-*Добавляем параметры node-скрипту прямо в редакторе сущностей.*
+Добавьте скрипту поля в редакторе сущности: радиус патруля, приветствие или файл диалога. Один и тот же скрипт сможет работать с разными настройками у разных NPC.
 
 ## Зачем
 
@@ -15,16 +15,20 @@ order: 4
 Каждое значение принадлежит одному скрипту: две сущности с одним и тем же скриптом хранят свои собственные значения, они сохраняются вместе с сущностью и восстанавливаются вместе с ней.
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
 
 editor.name("Диалог при взаимодействии")
 editor.description("Запускает диалог для игрока, который взаимодействовал с этой сущностью.")
 editor.icon("hollowengine:textures/gui/dialogues/simple.png")
 
-val dialogue by editor.property<String>("Путь к диалогу", assets = ["story"]) { "stories/example.story" }
+val dialogue by editor.property<String>("Путь к диалогу", assets = listOf("story")) { "stories/example.story" }
 
 onInteract { event ->
-    DialogueController(dialogue).start(event.player as ServerPlayer)
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    val controller = DialogueController(dialogue.removePrefix("scripts/"))
+    controller.start(player)
 }
 ```
 
@@ -109,7 +113,7 @@ val rewards by editor.property<List<Reward>>("Награды за квест") {
 
 ### Ассеты
 
-`assets` перечисляет добавляет иконку папки около строки, добавляя туда все файлы этого типа:
+Укажите в `assets` расширения файлов. Рядом с полем появится кнопка папки: она откроет выбор ресурсов подходящего типа.
 
 ```kotlin
 val model by editor.property<String>("Модель", assets = listOf("gltf", "glb")) { "models/npc.gltf" }
@@ -124,7 +128,7 @@ val script by editor.property<String>("Вложенная нода", assets = li
 ```kotlin
 // После изменения скрипт выполняется заново, поэтому `controller` пересоздаётся
 val dialogue by editor.property<String>("Диалог", restart = true) { "stories/hello.story" }
-val controller = DialogueController(dialogue) // без restart этот объект сам не пересобирётся.
+val controller = DialogueController(dialogue) // без restart этот объект сам не пересоберётся.
 
 // Или оставить ноду работать и отреагировать вручную
 val radius by editor.property<Double>("Радиус", onChange = { rebuildPatrol(it) }) { 8.0 }

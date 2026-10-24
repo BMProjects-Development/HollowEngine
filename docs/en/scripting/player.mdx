@@ -9,6 +9,8 @@ order: 13
 
 ---
 
+In these fragments, `player` is a server player from an event or `playerRef(...).resolve()` inside `.node.kts`. Place them in a node handler or state. Item helpers are imported automatically for this script type.
+
 ## The same functions, a different owner
 
 Everything on this page mirrors [the NPC inventory API](/docs/hollowengine/scripting/npc/inventory), so a reward and a shop payment are written the same way whoever holds the items:
@@ -55,6 +57,7 @@ player.unequip(EquipmentSlot.OFFHAND)
 val leftover = player.giveItem(item("minecraft:diamond", 64))
 if (!leftover.isEmpty) player.dropItem(leftover) // at his feet rather than nowhere
 ```
+
 :::
 
 :::warning

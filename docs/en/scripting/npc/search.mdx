@@ -7,13 +7,15 @@ order: 8
 
 *Ask an NPC what is around it: players, other NPCs, any entity, or dropped items.*
 
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+
 ## Quick helpers
 
 For the common cases, you don't need to build anything, just call one of these:
 
 ```kotlin
 val nearbyPlayers = npc.findPlayers(radius = 10.0)
-val nearbyNpcs = npc.findNpcs(radius = 10.0) { other -> other.name != npc.name }
+val nearbyNpcs = npc.findNpcs(radius = 10.0) { other -> other.uuid != npc.uuid }
 val nearestBread = npc.findNearestItem(itemFilter(item("minecraft:bread")), radius = 8.0)
 ```
 
@@ -36,6 +38,8 @@ val player = playerRef.resolve() // safely get the live entity
 For anything more specific than "nearby players", use `entityQuery<T> { ... }` to describe exactly what you're looking for, then pass it to `findEntities(...)` or `findNearestEntity(...)`:
 
 ```kotlin
+import net.minecraft.world.entity.monster.Zombie
+
 val query = entityQuery<Zombie> {
     radius = 24.0
     aliveOnly = true
@@ -62,4 +66,6 @@ val closest: Ref<Zombie>? = npc.findNearestEntity(query)
 
 ## A note on `Ref<T>` and types
 
-Because `findEntities<T>` and `entityRef<T>(uuid)` always require you to say **what type** you expect (the `<T>` part), a `Ref` you get back is guaranteed to only ever resolve to that type or throw a clear error, it will never silently hand you the wrong kind of entity if a UUID happens to match something else after a reload. If you are new to generics: the `<T>` is simply telling the function "I'm looking for a `Zombie`" (or `ServerPlayer`, `NpcEntity`, and so on), so everything downstream (auto-complete, `resolve()`, `read { ... }`, `update { ... }`) already knows the right type for you. This will also matter later for integrating with entities added by other mods.
+Specify the expected entity type in `findEntities<T>` and `entityRef<T>(uuid)`. For example, `<Zombie>` means “find a zombie,” so editor hints show its properties. If the UUID belongs to a different entity type, `resolve()` fails.
+
+A `Ref` helps find the entity again after a wait or chunk load; it does not revive a removed character. Allow the scenario to be cancelled if its target can no longer appear.

@@ -5,11 +5,11 @@ order: 3
 
 <center><h1>Animations and Transforms</h1></center>
 
-Use modifier APIs and HSS for transitions, keyframes, transforms, and filters. The styling engine is unchanged; only the old XML attribute syntax has been removed.
+Make a button grow smoothly on hover or give a hint a repeating motion. Configure transitions, keyframes, transforms, and filters in HSS or through Kotlin modifiers.
 
 ## Transitions
 
-Transitions interpolate a style property when its resolved value changes, typically between a base selector and `:hover`, `:active`, or `:selected`.
+A transition changes a property smoothly. For example, hovering over a card gradually changes `scale` from its normal value to the value in `:hover`. Transitions also work with `:active` and `:selected`.
 
 ```css
 .card { transitions: background 120ms ease-out, scale 120ms ease-out; }

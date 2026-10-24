@@ -5,7 +5,7 @@ order: 1
 
 <center><h1>UI Scripts</h1></center>
 
-HollowEngine UI uses a Kotlin DSL built on Compose. XML `.ui` files, inline XML, and client `.ktr` handlers are no longer supported. Define interfaces in client-loaded `.ui.kts` scripts. The server opens a declaration by id and synchronizes its typed state.
+Build a quest log screen: the client draws a title and a button, while the server provides the quest text and receives the player’s click. Describe the interface in a Kotlin `.ui.kts` file. The engine uses Compose to update the relevant parts of the screen when data changes.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ screen("mypack:quest_log") {
     content {
         Column(modifier = Modifier.padding(12.px).gap(6.px)) {
             Text(data[Title])
-            Box(modifier = Modifier.onClick { send { putString("action", "accept") } }) {
+            Box(id = "accept-quest", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "accept") } }) {
                 Text("Accept")
             }
         }
@@ -37,7 +37,7 @@ screen("mypack:quest_log") {
 }
 ```
 
-The server opens it from a server-capable script with `player.openUi("mypack:quest_log")`. See [Server UI API](/docs/hollowengine/scripting/ui/server-api).
+Save the file and press `F3 + T` to load the declaration on the client. The server opens the screen with `player.openUi("mypack:quest_log")`, where `player` is a server player. That player sees “No quest” and an “Accept” button. See [Server UI API](/docs/hollowengine/scripting/ui/server-api) for passing quest text and handling the button.
 
 ## Surfaces
 

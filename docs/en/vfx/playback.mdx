@@ -7,6 +7,8 @@ order: 8
 
 *Start an effect from a command, a script, or a model bone, and steer it while it runs.*
 
+The Kotlin examples below are server `.node.kts` fragments. `entity` is the entity the effect follows, `player` is a server player, and `level` is that player’s world (`player.serverLevel()`). Create the `.vfx` first using the [introduction](/docs/hollowengine/vfx).
+
 ## Effect names
 
 An effect name is a resource id. `project:vfx/sparks.vfx` is the file `hollowengine/assets/project/vfx/sparks.vfx`; the short forms `project:sparks` and `project:vfx/sparks` mean the same. Effects from addons and resource packs use their own namespace. The command suggests every loaded effect.

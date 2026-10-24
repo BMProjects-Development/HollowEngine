@@ -5,7 +5,7 @@ order: 3
 
 <center><h1>Редактор аниматоров</h1></center>
 
-*Визуальный редактор `.animator`: стек слоёв, граф состояний и параметры выбранного.*
+Настройте, как модель стоит, идёт и переключается между анимациями. Редактор сохраняет правила в `.animator`: слои задают совместное проигрывание, а граф состояний - переходы между действиями.
 
 ---
 
@@ -81,11 +81,16 @@ animation-controller = "project:models/entity/guide.animator"
 Общий **Инспектор** показывает параметры выбранного слоя, состояния или перехода.
 
 **Слой** - имя, приоритет, вес, появление и затухание, смешивание (перезаписываемое / `override` или добавочное / `additive`). У слоя-клипа дополнительно анимация, режим и скорость.
-![Layer Inspector](/hollowengine/pictures/animation_controller/layer_inspector.webp)
+
+![Настройки слоя](/hollowengine/pictures/animation_controller/layer_inspector.webp)
+
 **Состояние** - имя, анимация, режим проигрывания, скорость. Ниже список его переходов: клик по строке `from → to` выделяет переход на графе. Там же кнопки «Сделать входным» и «Удалить состояние».
-![State Inpector](/hollowengine/pictures/animation_controller/state_inspector.webp)
+
+![Настройки состояния](/hollowengine/pictures/animation_controller/state_inspector.webp)
+
 **Переход** - условие, длительность кроссфейда, приоритет и время завершения.
-![Transition Inpector](/hollowengine/pictures/animation_controller/transition_inspector.webp)
+
+![Настройки перехода](/hollowengine/pictures/animation_controller/transition_inspector.webp)
 
 :::advice
 Появление и затухание есть у слоя, а не у состояния: плавный переход между анимациями делается через изменение длительности перехода.

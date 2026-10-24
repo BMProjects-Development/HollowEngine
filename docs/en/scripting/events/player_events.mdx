@@ -5,9 +5,20 @@ order: 2
 
 <center><h1>Players and Interactions</h1></center>
 
-*Actions related to players and what they do.*
+Greet a player on joining, restore data after death, or handle an interaction. Choose an event below and check which side receives it.
 
-![NPC](/docs/title-missing.webp)
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityTrackingEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.ItemEntityEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.await
+import ru.hollowhorizon.hollowengine.common.events.item.ArrowEvent
+import ru.hollowhorizon.hollowengine.common.events.server.ServerChatEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+```
 
 ## Player lifecycle
 
@@ -232,6 +243,7 @@ val text = ServerChatEvent.await().message.string
 wait(1) // Wait 1 tick so the message is sent; otherwise the NPC may answer before the player
 npc.say("So your final choice is '$text'?")
 ```
+
 :::
 
 ### Dropping an item

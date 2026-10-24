@@ -82,7 +82,7 @@ scripts/
     └── first_quest.node.kts
 ```
 
-В `rewards.kts` объявим пакет и общую функцию:
+В `hollowengine/scripts/common/rewards.kts` объявим общую функцию:
 
 ```kotlin
 import net.minecraft.world.entity.player.Player
@@ -90,19 +90,23 @@ import net.minecraft.world.item.Item
 import net.minecraft.world.item.ItemStack
 
 fun Player.reward(item: Item, count: Int = 1) {
-    inventory.add(ItemStack(item, count))
+    val stack = ItemStack(item, count)
+    inventory.add(stack)
+    if (!stack.isEmpty) drop(stack, false)
 }
 ```
 
-Теперь функцию можно импортировать в другом скрипте:
+В `hollowengine/scripts/quests/first_quest.node.kts` импортируем функцию и выдадим награду игроку `Steve`. Замените это имя своим. `playerRef` дождётся входа игрока; запускайте состояние `main` командой `/he scripting run scripts/quests/first_quest.node.kts main`. Каждый повторный запуск снова выдаст награду.
 
 ```kotlin
-@Import("../common/reward.kts")
+@file:Import("../common/rewards.kts")
 import net.minecraft.world.item.Items
 
+@State
 suspend fun main() {
-    // Переменную игрока получите сами
-    player.reward(Items.DIAMOND, 3)
+    playerRef("Steve").update {
+        reward(Items.DIAMOND, 3)
+    }
 }
 ```
 
@@ -119,7 +123,7 @@ val id = ResourceLocation.fromNamespaceAndPath("minecraft", "diamond")
 println("$id: $stack")
 ```
 
-Стандартные импорты Kotlin, такие как `kotlin.collections.*`, `kotlin.io.*` и `kotlin.math.*`, работают как обычно.
+Стандартные импорты Kotlin, например `kotlin.collections.*` и `kotlin.io.*`, доступны как обычно. Функции из `kotlin.math`, например `sqrt`, импортируйте явно.
 
 Во встроенном редакторе недостающие импорты можно определить по диагностике и предложениям автодополнения.
 

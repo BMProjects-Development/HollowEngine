@@ -5,7 +5,7 @@ order: 1
 
 <center><h1>UI-скрипты</h1></center>
 
-UI HollowEngine использует Kotlin DSL на основе Compose. XML-файлы `.ui`, инлайн-XML и клиентские обработчики `.ktr` больше не поддерживаются. Интерфейсы объявляются в клиентских скриптах `.ui.kts`. Сервер открывает объявление по id и синхронизирует его типизированное состояние.
+Создадим экран журнала заданий: клиент нарисует заголовок и кнопку, а сервер передаст текст задания и получит нажатие игрока. Интерфейс описывается на Kotlin в файле `.ui.kts`. Для построения интерфейса движок использует Compose: при изменении данных он обновляет нужные части экрана.
 
 ## Архитектура
 
@@ -29,7 +29,7 @@ screen("mypack:quest_log") {
     content {
         Column(modifier = Modifier.padding(12.px).gap(6.px)) {
             Text(data[Title])
-            Box(modifier = Modifier.onClick { send { putString("action", "accept") } }) {
+            Box(id = "accept-quest", modifier = Modifier.input(hoverable = true, clickable = true).onClick { send { putString("action", "accept") } }) {
                 Text("Принять")
             }
         }
@@ -37,7 +37,7 @@ screen("mypack:quest_log") {
 }
 ```
 
-Сервер открывает его из серверного скрипта через `player.openUi("mypack:quest_log")`. Подробнее см. в [Server UI API](/docs/hollowengine/scripting/ui/server-api).
+Сохраните файл и нажмите `F3 + T`, чтобы клиент загрузил объявление. Сервер открывает экран через `player.openUi("mypack:quest_log")`, где `player` - серверный игрок. Он увидит заголовок «Нет задания» и кнопку «Принять». Передачу текста задания и обработку кнопки разберём в [Управление UI с сервера](/docs/hollowengine/scripting/ui/server-api).
 
 ## Поверхности
 
@@ -68,6 +68,6 @@ screen("mypack:quest_log") {
 - [Модификаторы](/docs/hollowengine/scripting/ui/modifiers): layout, внешний вид, события и вычисляемые стили
 - [События и состояние](/docs/hollowengine/scripting/ui/events): `UiScope`, `DataKey` и сессии
 - [Форматирование текста](/docs/hollowengine/scripting/ui/text-formatting): форматированные фрагменты, эффекты и динамический текст
-- [Server UI API](/docs/hollowengine/scripting/ui/server-api): открытие, обновление и закрытие UI
+- [Управление UI с сервера](/docs/hollowengine/scripting/ui/server-api): открытие, обновление и закрытие UI
 - [Примеры](/docs/hollowengine/scripting/ui/examples): клиентские и серверные примеры
 - [Стили UI](/docs/hollowengine/scripting/ui/styles): переиспользуемые правила HSS, переходы и анимации

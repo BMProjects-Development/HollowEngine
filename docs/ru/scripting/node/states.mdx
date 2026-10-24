@@ -5,13 +5,13 @@ order: 2
 
 <center><h1>Стейты и корутины</h1></center>
 
-*Определяем разные состояния и переключаемся между ними.*
+Разбейте квест на шаги: разговор, ожидание игрока и выдачу награды. Каждый шаг можно описать состоянием, или стейтом. Скрипт сможет ждать нужного события, пока игра продолжает работать.
 
 ![Состояния node-скрипта в IDE](/hollowengine/pictures/ide/node-script.webp)
 
 ## Что такое стейт и как его создать?
 
-Для создания стейта необходимо добавить к *suspend* функции аннотацию @State
+Создайте `.node.kts` в `hollowengine/scripts`. Добавьте к `suspend`-функции аннотацию `@State`. Такая функция может ждать, не останавливая игру:
 
 ```kotlin
 @State
@@ -25,6 +25,7 @@ suspend fun main() {
 
 Суть в том, что внутри таких функций можно использовать различные таймеры и ожидания.
 Например, можно написать диалог с ожиданиями:
+
 ```kotlin
 @State
 suspend fun main() {
@@ -36,7 +37,8 @@ suspend fun main() {
 }
 ```
 
-Тоже самое можно сделать и через `onUpdate`, но выглядит оно куда более громоздко:
+Для сравнения: те же паузы можно отсчитывать вручную через `onUpdate`:
+
 ```kotlin
 var ticker = 0
 var фраза = 0
@@ -55,7 +57,7 @@ onUpdate {
         }
         фраза++ // Переключаем следующую фразу
     }
-    ticker++ // Обновляем счётчик каждую секунду
+    ticker++ // Обновляем счётчик каждый тик
 }
 ```
 
@@ -67,7 +69,7 @@ onUpdate {
 
 ## Сохраняем данные стейта
 
-В текущей архитектуре движок не сохраняет состояние скрипта автоматически. Вместо этого он сохраняет:
+При сохранении мира движок записывает данные, по которым можно восстановить шаг сценария:
 
 - имя текущего стейта;
 - `stateTag` текущего стейта;
@@ -119,6 +121,8 @@ suspend fun main() {
 Первый уровень - пользовательские данные ноды, сохраняемые через обработчики `onSave` / `onLoad` из [Введения в Node-скрипты](/docs/hollowengine/scripting/node):
 
 ```kotlin
+var reputation = 0
+
 onSave { context ->
     context.tag.putInt("reputation", reputation)
 }
@@ -194,9 +198,8 @@ suspend fun mineQuest() {
 ```kotlin
 @State
 suspend fun main() {
-    runOnce("give_map") {
-        println("Игрок получил карту")
-        // player.update { inventory.add(ItemStack(...)) }
+    runOnce("greeting") {
+        println("Приветствую, путник!")
     }
 
     wait(10.sec)
@@ -219,16 +222,16 @@ suspend fun main() {
 
 `remember` удобно использовать, когда нужно один раз вычислить значение и затем переиспользовать его при повторном запуске стейта.
 
-Например, если стейт создаёт NPC, не стоит создавать его заново после каждой загрузки мира. Лучше запомнить UUID и потом работать через `entityRef`:
+Например, если стейт создаёт NPC, не стоит создавать его заново после каждой загрузки мира. Сохраним UUID как строку (для `String` доступен сериализатор), затем восстановим его через `uuid(...)` и создадим ссылку `entityRef`:
 
 ```kotlin
 @State
 suspend fun main() {
     val traderId = remember("trader_uuid") {
-        spawnTrader().uuid
+        npc(pos(0, 64, 0), name = "Торговец", id = "example:trader").stringUUID
     }
 
-    val trader = entityRef<LivingEntity>(traderId)
+    val trader = entityRef<LivingEntity>(uuid(traderId))
 
     trader.update {
         customName = "Таинственный торговец".literal
@@ -242,15 +245,16 @@ suspend fun main() {
 
 ```kotlin
 @State
-suspend fun resetQuest() {
-    forget("trader_uuid")
-    forget("give_map")
-
-    main() // Учтите, тут имеется ввиду обычная suspend функция, а не State, при переходе в другой State, у него другой stateTag()
+suspend fun main() {
+    val attempt = remember("attempt") { 1 }
+    println(attempt)
+    forget("attempt")
+    val nextAttempt = remember("attempt") { 2 }
+    println(nextAttempt)
 }
 ```
 
-Это полезно для повторяемых сцен, тестирования, отката ветки диалога или перезапуска квеста.
+Пример выведет `1`, затем `2`: после `forget` значение вычисляется заново. Функция удаляет ключ только из текущего `stateTag()`. Она не сбрасывает отметку `runOnce` с таким же именем и не очищает данные другого стейта. Для повторяемого квеста задавайте отдельный прогресс каждой попытки.
 
 ---
 
@@ -272,9 +276,9 @@ suspend fun main() {
 ```kotlin
 @State
 suspend fun main() {
-    npc.say("Возвращайся завтра за наградой!")
+    println("Возвращайся завтра за наградой!")
     wait(1.days, "daily_reward_cooldown") // считает реальное время, даже пока сервер выключен
-    npc.say("Твоя награда готова!")
+    println("Твоя награда готова!")
 }
 ```
 
@@ -282,7 +286,7 @@ suspend fun main() {
 @State
 suspend fun main() {
     wait(Instant.parse("2026-12-25T00:00:00Z"), "christmas_event") // ждёт до конкретной даты
-    npc.say("С праздником!")
+    println("С праздником!")
 }
 ```
 
@@ -300,10 +304,13 @@ suspend fun main() {
 ## Запуск
 
 Запуск также реализуется командой, разница лишь в том, что нужно явно указать имя стейта / функции:
+
 ```mcfunction
 /hollowengine scripting run scripts/your_script.node.kts startQuest
 ```
+
 И чтобы остановить соответственно:
+
 ```mcfunction
 /hollowengine scripting stop scripts/your_script.node.kts
 ```
@@ -315,9 +322,9 @@ suspend fun main() {
 ```kotlin
 @State
 suspend fun main() {
-    val npc = spawnTrader()
+    val npc = npc(pos(0, 64, 0), name = "Торговец")
     wait(60.sec)
-    npc.remove(RemovalReason.DISCARDED)
+    npc.remove(Entity.RemovalReason.DISCARDED)
 }
 ```
 
@@ -336,10 +343,10 @@ suspend fun main() {
 @State
 suspend fun main() {
     val npcId = remember("trader_uuid") {
-        npc(pos(x, y, z), name="Торгаш").uuid
+        npc(pos(0, 64, 0), name = "Торговец", id = "example:trader").stringUUID
     }
 
-    val trader = entityRef<LivingEntity>(npcId)
+    val trader = entityRef<LivingEntity>(uuid(npcId))
 
     wait(60.sec)
 
@@ -365,10 +372,12 @@ suspend fun main() {
 
 Если нужно одновременно получить несколько ссылок и убедиться, что они всё ещё актуальны, можно использовать `borrow`:
 
+Этот фрагмент предполагает, что текущий стейт уже записал UUID в ключи `attacker` и `target`. Проверим оба ключа перед чтением:
+
 ```kotlin
 @State
 suspend fun attackTarget() {
-    val attacker = entityRef<LivingEntity>(stateTag.getUUID("attacker"))
+    val attacker = entityRef<LivingEntity>(stateTag().getUUID("attacker"))
     val target = entityRef<LivingEntity>(stateTag.getUUID("target"))
 
     borrow(attacker, target) { me, them ->

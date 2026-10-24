@@ -5,14 +5,15 @@ order: 11
 
 <center><h1>Свойства NPC и сущностей</h1></center>
 
-*В v2.3 скрипты работают с реальными Kotlin/Minecraft объектами, а не с Katari-обёртками.*
+Меняйте имя, здоровье и поведение NPC через свойства Minecraft и компоненты HollowEngine. Ниже разберём, какие настройки доступны и как сохранять ссылку на персонажа.
 
 ---
 
 ## Главное отличие от старой документации
 
-В старой документации свойства описывались как динамические поля (`Text`, `Bool`, `Position` и т.п.).
-В Kotlin-архитектуре v2.3 `npc` - это обычный `NpcEntity`, наследник `PathfinderMob` / `LivingEntity` / `Entity`.
+Переменная `npc` хранит объект `NpcEntity`. Он наследует возможности моба `PathfinderMob`, живой сущности `LivingEntity` и базовой сущности `Entity`. Например, здоровье доступно через свойство `health`, а положение - через `position()`.
+
+В старых примерах встречаются динамические поля `Text`, `Bool` и `Position`. В Kotlin используйте свойства и функции из таблиц ниже.
 
 Это значит:
 
@@ -38,13 +39,15 @@ val alive = npc.isAlive
 | Свойство | Тип | Чтение | Запись |
 |----------|-----|--------|--------|
 | `npc.pickupDistance` | зависит от `pickupReach` | Радиус подбора предметов. | Только чтение. |
-| `npc.fakePlayer` | `ServerPlayer` | Fake player, используемый для действий вроде ломания блока. | Только чтение. |
-| `npc.goals` | `GoalSelector` | Goal selector NPC. | Менять через API goal selector. |
+| `npc.fakePlayer` | `ServerPlayer` | Служебный игрок, от имени которого NPC, например, ломает блоки. | Только чтение. |
+| `npc.goals` | `GoalSelector` | Набор задач ИИ NPC. | Меняйте задачи через `npc.goals`. |
 | `npc.inventory` | `NpcInventory` | Собственный инвентарь NPC, см. [Инвентарь и сбор предметов](/docs/hollowengine/scripting/npc/inventory). | Только чтение ссылки, менять через её функции. |
 | `npc.data` | `EntityData` | Сохраняемые пользовательские данные, привязанные к NPC, см. [Пользовательские данные](/docs/hollowengine/scripting/npc/data). Доступно на любой `Entity`, не только на `NpcEntity`. | Только чтение ссылки, менять через её функции. |
 | `npc.actions` | `NpcActionController` | Прямой доступ к каналам действий NPC, см. [Действия и параллельность](/docs/hollowengine/scripting/npc/actions). | Только чтение ссылки, менять через её функции. |
 
 ```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
+import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 
 npc.setNameplate("Merchant", NameplateMode.SHOW)
 ```
@@ -86,16 +89,19 @@ val target = npc.target
 
 ## Компоненты вместо старых псевдо-свойств
 
-Модель, анимации, материал и часть визуальных настроек в v2.3 лучше задавать через компоненты:
+Компонент объединяет связанные настройки сущности. Например, `Model` выбирает модель, а `BodyComponent` задаёт столкновения её основного тела:
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
-import ru.hollowhorizon.hollowengine.common.attachments.components.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyComponent
+import ru.hollowhorizon.hollowengine.common.attachments.components.BodyMode
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 
-npc.set(Model("my_mod:models/entity/guide.gltf"))
+npc.set(Model("hollowengine:models/entity/player_model.gltf"))
 npc.set(BodyComponent(mode = BodyMode.BLOCKING))
-npc.set(StandardPlayerAnimatorPreset.create())
 ```
+
+Аниматор задайте в метаданных `.hemeta` выбранной модели через `animation-controller`. Встроенная модель игрока уже ссылается на `hollowengine:standard_player`.
 
 Для анимаций смотрите раздел [Анимации](/docs/hollowengine/models/animations).
 

@@ -5,9 +5,14 @@ order: 1
 
 <center><h1>Сервер и тики</h1></center>
 
-*Действия связанные с сервером.*
+Запустите логику при старте и остановке сервера или выполняйте действие каждый тик. Такие обработчики подходят для общих систем мира.
 
-![NPC](/docs/title-missing.webp)
+Это отдельные примеры обработчиков для `.reload.kts`. Добавьте нужные импорты в начало своего файла. Для событий клиента поставьте `@file:ClientSide` перед импортами; серверные и клиентские обработчики держите в разных файлах.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.server.ServerEvent
+import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+```
 
 ## Жизненный цикл
 
@@ -56,6 +61,7 @@ fun onServerTick(event: TickEvent.Server) {
 
 :::advice
 Если вам нужно выполнять действие каждые `X` тиков вы можете создать простой счётчик:
+
 ```kotlin
 var ticker = 0
 
@@ -66,6 +72,7 @@ fun onServerTick(event: TickEvent.Server) {
     }
 }
 ```
+
 :::
 
 ### Тик клиента

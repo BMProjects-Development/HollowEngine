@@ -5,11 +5,13 @@ order: 9
 
 <center><h1>Custom Data</h1></center>
 
-*Give an NPC, a player, or any entity its own typed, saved data, without touching raw NBT tags.*
+Store player reputation, NPC stock, or whether characters have met directly on an entity. The engine saves this data with its owner and restores it when loaded.
+
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
 
 ## `.data`: data that belongs to the entity itself
 
-Every entity has `.data`, a small typed storage that is saved and restored automatically together with its owner, forever, regardless of which script, state, or handler is currently running. This works on `npc`, on a `player`, and on any other `Entity`. This is the right place for things like reputation, a shop's stock, or "has this NPC met the player before".
+Every entity has `.data`, typed storage saved and restored with its owner. The data is available regardless of which script, state, or handler is currently running. This works on `npc`, on a `player`, and on any other `Entity`. This is the right place for things like reputation, a shop's stock, or "has this NPC met the player before".
 
 First declare a key, once, at the top of your script (or in a separate script you import from several places):
 

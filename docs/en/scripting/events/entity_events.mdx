@@ -5,9 +5,16 @@ order: 4
 
 <center><h1>Entities</h1></center>
 
-*Actions related to entities.*
+Track an entity loading, dying, or moving to another dimension. Events provide the entity so you can check its type and change the relevant settings.
 
-![NPC](/docs/title-missing.webp)
+These are separate handler examples for `.reload.kts`. Add the imports you need at the start of your file. For client events, put `@file:ClientSide` before imports; keep server and client handlers in separate files.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.entity.BabySpawnEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityLoadedEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
+```
 
 ## Spawned in the world
 
@@ -84,8 +91,8 @@ fun onEntityHurt(event: EntityEvent.Hurt) {
 
 ```kotlin
 @SubscribeEvent
-fun onEntityHurt(event: BabySpawnEvent) {
-    val entity = event.entity
+fun onBabySpawn(event: BabySpawnEvent) {
+    val child = event.child
 }
 ```
 

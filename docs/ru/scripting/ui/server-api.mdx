@@ -1,11 +1,13 @@
 ---
-title: Server UI API
+title: Управление UI с сервера
 order: 9
 ---
 
-<center><h1>Server UI API</h1></center>
+<center><h1>Управление UI с сервера</h1></center>
 
-Сервер управляет объявленным UI через `UiSession`: открывает экран или оверлей по id из клиентского `.ui.kts`, передаёт типизированное начальное состояние, получает события и закрывает сессию.
+Откройте игроку экран, передайте ему текст задания и обработайте ответ. Сервер делает это через `UiSession` - объект открытого интерфейса. Сам экран заранее объявляется у клиента в `.ui.kts`; сервер обращается к нему по идентификатору.
+
+Ниже показаны фрагменты серверного `.node.kts`: `player` - `ServerPlayer`, например `event.player as? ServerPlayer` в `onInteract`. Для этого типа добавьте `import net.minecraft.server.level.ServerPlayer`. Ключи данных на клиенте и сервере должны иметь одинаковые имена и типы; переменная из клиентского файла сама по себе серверу недоступна.
 
 ## Открытие экрана
 
@@ -16,11 +18,11 @@ val session = player.openUi("mypack:quest_log") {
     put(Title, "Пропавший груз")
     onEvent { payload ->
         if (payload.getString("action") == "accept") {
-            acceptQuest(player)
+            player.sendSystemMessage("Задание принято".literal)
             close()
         }
     }
-    onClose { clearQuestMarker(player) }
+    onClose { println("Журнал заданий закрыт") }
 }
 ```
 

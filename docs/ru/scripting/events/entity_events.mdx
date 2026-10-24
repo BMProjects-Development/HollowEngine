@@ -5,9 +5,16 @@ order: 4
 
 <center><h1>Сущности</h1></center>
 
-*Действия связанные с сущностями.*
+Отследите появление сущности, её смерть или переход в другое измерение. События передают саму сущность, чтобы вы могли проверить её тип и изменить нужные настройки.
 
-![NPC](/docs/title-missing.webp)
+Это отдельные примеры обработчиков для `.reload.kts`. Добавьте нужные импорты в начало своего файла. Для событий клиента поставьте `@file:ClientSide` перед импортами; серверные и клиентские обработчики держите в разных файлах.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.entity.BabySpawnEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.EntityLoadedEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
+```
 
 ## Спавн в мире
 
@@ -84,8 +91,8 @@ fun onEntityHurt(event: EntityEvent.Hurt) {
 
 ```kotlin
 @SubscribeEvent
-fun onEntityHurt(event: BabySpawnEvent) {
-    val entity = event.entity
+fun onBabySpawn(event: BabySpawnEvent) {
+    val child = event.child
 }
 ```
 

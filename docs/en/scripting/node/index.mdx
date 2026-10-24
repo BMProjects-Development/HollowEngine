@@ -5,7 +5,7 @@ order: 1
 
 <center><h1>Introduction to Node Scripts</h1></center>
 
-*Register handlers on a coroutine scope and attach them to the server or an entity.*
+Attach a script to a server or entity to react to events, run timed actions, and save data. This script is called a node and is stored in a `.node.kts` file.
 
 ![Node script in the IDE](/hollowengine/pictures/ide/node-script.webp)
 
@@ -14,7 +14,7 @@ order: 1
 A node script is a script type that can be bound to a specific object (the server or an entity) and work with that object directly.
 To create one, name the file with the `.node.kts` suffix so the engine can recognize its type.
 
-By default a node script is bound to the server: it receives `MinecraftServer` as an implicit receiver, so all its regular methods and properties are directly available inside the script.
+By default, a node works with the server. You can call `MinecraftServer` methods directly, without a variable before the method name. Kotlin calls this an implicit receiver.
 With `@file:Attach(...)`, described below, a node can be bound to an entity instead.
 
 ## Built-in variables and methods
@@ -63,7 +63,7 @@ onLoad { context ->
 
     // You can check whether it was saved earlier:
     val hasName = context.tag.contains("name")
-    if (hasName) { ... }
+    if (hasName) println("Loaded name: $userName")
 }
 ```
 
@@ -106,7 +106,7 @@ onUpdate(every = 20.ticks) {
 }
 ```
 
-`every` accepts a `Ticks` value produced by the `Int.ticks` extension, so `10.ticks`, `1.sec` * 20, or a plain number of ticks all work the same way.
+`every` takes a `Ticks` value: write `10.ticks` for a ten-tick interval. A plain `Int` is not accepted. The value must be positive. If a handler waits longer than this interval, the next invocation can start before the previous one finishes.
 `onUpdate` replaces the old `@Every` annotation and can be used any number of times inside the same node.
 
 ---
@@ -147,7 +147,7 @@ Add `@file:Attach(EntityType::class)` at the top of the file to bind the node to
 This adds the entity type as an extra implicit receiver, so the script can call its members directly, and it unlocks the entity-specific handlers described below.
 
 ```kotlin
-@file:Attach(net.minecraft.world.entity.LivingEntity::class)
+@file:Attach(LivingEntity::class)
 
 onStart {
     println("Attached to ${name.string}, health = $health")
@@ -198,7 +198,7 @@ These handlers are only available in a script attached to an entity via `@file:A
 Runs when a player interacts with the attached entity. Already filtered to the server side and the main hand, so it runs once per click.
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 onInteract { event ->
     event.player.send("Hello, ${event.player.name.string}!")
@@ -210,7 +210,7 @@ onInteract { event ->
 Runs when the attached entity takes damage.
 
 ```kotlin
-@file:Attach(net.minecraft.world.entity.LivingEntity::class)
+@file:Attach(LivingEntity::class)
 
 onHurt { event ->
     println("Took ${event.amount} damage from ${event.source.msgId}")
@@ -222,7 +222,7 @@ onHurt { event ->
 Runs when the attached entity dies. This is a good place to clean up quest state, drop custom loot, or notify other scripts.
 
 ```kotlin
-@file:Attach(net.minecraft.world.entity.LivingEntity::class)
+@file:Attach(LivingEntity::class)
 
 onDie {
     println("The guard has fallen")
@@ -236,7 +236,7 @@ onDie {
 A small NPC example combining several handlers:
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 var greeted = false
 

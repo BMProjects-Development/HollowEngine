@@ -5,18 +5,20 @@ order: 7
 
 <center><h1>События и состояние</h1></center>
 
-Содержимое UI получает `UiScope`: observable `data`, `isServerBound`, `send` и `close`.
+Свяжите элементы экрана с данными и действиями игрока. Внутри `content` доступен `UiScope`: `data` хранит значения и обновляет экран при их изменении, `send` отправляет событие серверу, а `close` закрывает интерфейс. `isServerBound` показывает, связан ли экран с серверной сессией.
 
 ```kotlin
 val Selected = dataKey<Boolean>("selected") { false }
 
 content {
-    Checkbox(checked = data[Selected], onCheckedChange = { selected ->
+    Checkbox(id = "selected-option", checked = data[Selected], onCheckedChange = { selected ->
         if (isServerBound) send { putBoolean("selected", selected) }
     })
-    Box(modifier = Modifier.onClick { close() }) { Text("Закрыть") }
+    Box(id = "close-screen", modifier = Modifier.input(hoverable = true, clickable = true).onClick { close() }) { Text("Закрыть") }
 }
 ```
+
+Блоки `content` ниже добавляйте внутрь объявления `screen(...)` или `overlay(...)` в `.ui.kts`. Отдельные фрагменты с виджетами и модификаторами вставляйте уже внутри `content`.
 
 ## Модификаторы ввода
 
@@ -44,7 +46,7 @@ Box(
 `send { }` строит NBT `CompoundTag` и отправляет его сессии, открывшей UI. В чисто клиентском оверлее это no-op, поэтому один компонент можно использовать в обоих режимах.
 
 ```kotlin
-Box(modifier = Modifier.onClick {
+Box(id = "buy-item", modifier = Modifier.input(hoverable = true, clickable = true).onClick {
     send {
         putString("action", "buy")
         putInt("slot", 4)

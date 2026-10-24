@@ -5,15 +5,17 @@ order: 7
 
 <center><h1>Инвентарь и сбор предметов</h1></center>
 
-*Теперь у каждого NPC есть собственный инвентарь, способ описать "какие предметы" и фоновая задача, которая сама ходит и их собирает.*
+Выдавайте NPC предметы, надевайте экипировку и поручайте ему собирать добычу. Разберём, как проверить содержимое инвентаря и обработать предметы, для которых не хватило места.
 
 ![Редактор инвентаря NPC](/hollowengine/pictures/npc/inventory.webp)
+
+Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в `onStart`, `onInteract` или `@State suspend fun`.
 
 ## Инвентарь NPC
 
 Каждый `npc()` получает собственный инвентарь, `npc.inventory`, с 36 слотами по умолчанию (можно поменять через параметр `inventorySize` у `npc(...)`, см. [Создание NPC](/docs/hollowengine/scripting/npc/create)). Он автоматически сохраняется и восстанавливается вместе со всеми зачарованиями, кастомными именами и другими компонентами данных каждого предмета.
 
-Корооткие функции для упрощённой работы с инвентарём:
+Для частых операций используйте эти функции:
 
 ```kotlin
 npc.giveItem(item("minecraft:bread", 5))          // положить предметы
@@ -48,6 +50,7 @@ npc.unequip(EquipmentSlot.MAINHAND)
 val leftover = npc.giveItem(item("minecraft:apple", 70))
 if (!leftover.isEmpty) npc.dropItem(leftover)
 ```
+
 :::
 
 :::warning
@@ -177,7 +180,7 @@ suspend fun main() {
 `hasItems`, `takeItems` и `giveItem` работают с `npc.inventory`, поэтому продавцу, торгующему из собственных запасов, хватит функций с этой страницы. Магазину нужно реагировать на взаимодействия всё время, пока NPC существует, а для этого как раз нужен [node-скрипт, прикреплённый к сущности](/docs/hollowengine/scripting/node):
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 // Сама сущность здесь - implicit receiver, поэтому префикс `npc.` не нужен.
 giveItem(item("minecraft:bread", 32)) // завозим товар один раз, когда нода запускается

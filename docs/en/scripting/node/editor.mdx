@@ -5,7 +5,7 @@ order: 4
 
 <center><h1>Editor Properties</h1></center>
 
-*Create properties for node script in the entity editor.*
+Add fields to a script in the entity editor: a patrol radius, greeting, or dialogue file. The same script can then use different settings for each NPC.
 
 ## Why
 
@@ -15,7 +15,9 @@ Hardcoding them means a copy of the script per NPC. `editor` lets the script dec
 Every value belongs to one attachment: two entities running the same script keep their own, saved with the entity and restored with it.
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
 
 editor.name("On Interact Dialogue")
 editor.description("Starts a dialogue for the player who interacted with this entity.")
@@ -24,7 +26,9 @@ editor.icon("hollowengine:textures/gui/icons/file_kts.svg")
 val dialogue by editor.property<String>("Dialogue path", assets = listOf("story")) { "stories/example.story" }
 
 onInteract { event ->
-    DialogueController(dialogue).start(event.player as ServerPlayer)
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    val controller = DialogueController(dialogue.removePrefix("scripts/"))
+    controller.start(player)
 }
 ```
 
@@ -111,7 +115,7 @@ A type the editor cannot draw is still listed, just not editable, so one exotic 
 
 ### Assets
 
-`assets` lists the extensions the value points at, and the editor offers what the pack actually has instead of asking a designer to remember paths:
+List file extensions in `assets`. A folder button appears beside the field and opens a picker for matching resources.
 
 ```kotlin
 val model by editor.property<String>("Model", assets = listOf("gltf", "glb")) { "models/npc.gltf" }

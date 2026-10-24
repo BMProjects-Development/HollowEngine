@@ -9,6 +9,8 @@ order: 5
 
 It's recommended to read [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions) first: every function here comes in a `suspend` form (waits for you) and a `startX` form (runs in the background and gives you a handle), and each one uses one of the `MOVEMENT`, `LOOK`, or `HANDS` channels.
 
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+
 ## Moving to an entity or a position
 
 ```kotlin

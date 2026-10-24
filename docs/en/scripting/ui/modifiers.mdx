@@ -5,7 +5,7 @@ order: 5
 
 <center><h1>Modifiers and Styles</h1></center>
 
-`Modifier` is the local, type-safe way to configure a composable. Calls are chained in declaration order.
+Set an element’s size, padding, and appearance through `Modifier`. Chained calls apply settings in declaration order. Move reusable visual rules into [HSS](/docs/hollowengine/scripting/ui/styles/hss-files). Place the widget fragments below in the `content` of a `.ui.kts` declaration.
 
 ```kotlin
 Box(
@@ -16,7 +16,7 @@ Box(
         .gap(8.px)
         .background(UiColor(0.08f, 0.1f, 0.15f, 0.95f))
         .borderRadius(8f),
-) { /* content */ }
+) { Text("Panel") }
 ```
 
 ## Layout and drawing

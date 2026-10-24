@@ -5,18 +5,20 @@ order: 7
 
 <center><h1>Events and State</h1></center>
 
-UI content receives a `UiScope`. It exposes observable `data`, `isServerBound`, `send`, and `close`.
+Connect screen elements to data and player actions. Inside `content`, `UiScope` provides `data`, which updates the screen when values change, `send` to send an event to the server, and `close` to close the interface. `isServerBound` tells you whether the screen has a server session.
 
 ```kotlin
 val Selected = dataKey<Boolean>("selected") { false }
 
 content {
-    Checkbox(checked = data[Selected], onCheckedChange = { selected ->
+    Checkbox(id = "selected-option", checked = data[Selected], onCheckedChange = { selected ->
         if (isServerBound) send { putBoolean("selected", selected) }
     })
-    Box(modifier = Modifier.onClick { close() }) { Text("Close") }
+    Box(id = "close-screen", modifier = Modifier.input(hoverable = true, clickable = true).onClick { close() }) { Text("Close") }
 }
 ```
+
+Add the `content` blocks below to a `screen(...)` or `overlay(...)` declaration in `.ui.kts`. Place individual widget and modifier fragments inside `content`.
 
 ## Pointer and input modifiers
 
@@ -44,7 +46,7 @@ A draggable node does not emit `onClick`: use `onPress` to select it. In `onDrag
 `send { }` builds an NBT `CompoundTag` and sends it to the session that opened this UI. It is a no-op for a client-only overlay, so the same component can be used in both modes.
 
 ```kotlin
-Box(modifier = Modifier.onClick {
+Box(id = "buy-item", modifier = Modifier.input(hoverable = true, clickable = true).onClick {
     send {
         putString("action", "buy")
         putInt("slot", 4)

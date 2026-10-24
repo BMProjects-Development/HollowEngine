@@ -5,10 +5,9 @@ order: 1
 
 <center><h1>NPCs in Kotlin Scripts</h1></center>
 
-*NpcEntity is the main entity type for characters, interactive scenes, and story logic.*
+Create characters for your map: NPCs can talk, walk to a destination, use items, and take part in story scenes.
 
-In HollowEngine v2.3, NPCs are created and controlled from Kotlin scripts, primarily from `*.node.kts`.
-Those scripts receive `MinecraftServer` as an implicit receiver, and NPC helper functions are imported by default from `ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.*`.
+Start with a `.node.kts` file under `hollowengine/scripts`. It already provides `npc()`, `pos()`, `move()`, and other NPC helpers. You can also call `MinecraftServer` methods directly from the script.
 
 An NPC is a regular Minecraft entity of type `NpcEntity`, so you can work with it through HollowEngine helpers (`npc()`, `move`, `lookAt`, `say`) and through the standard `Entity` / `LivingEntity` / `PathfinderMob` API.
 
@@ -72,7 +71,7 @@ An NPC outlives the chunk it stands in: it stays in the [NPC registry](/docs/hol
 For behavior that should live with the NPC itself instead of a story state, attach a [node script](/docs/hollowengine/scripting/node) directly to the entity with `@file:Attach`:
 
 ```kotlin
-@file:Attach(ru.hollowhorizon.hollowengine.common.entities.NpcEntity::class)
+@file:Attach(NpcEntity::class)
 
 onInteract { event ->
     event.player.send("Welcome, traveler!")

@@ -5,7 +5,9 @@ order: 3
 
 <center><h1>Nodes and Widgets</h1></center>
 
-Interfaces are built from Kotlin composables, not XML elements. Every basic layout composable accepts `id`, `tags`, `modifier`, and `content`; use ids and tags as HSS selectors.
+Build a panel from rows, columns, text, and buttons. Each element is a Kotlin function call, such as `Column { ... }`; Compose calls these functions composables. Use `id` and `tags` to select an element in HSS, and `modifier` to configure it.
+
+Place the fragments below inside `content { ... }` of a screen, overlay, or panel in `.ui.kts`. Core UI classes and size units are imported automatically; see the [introduction](/docs/hollowengine/scripting/ui) for a complete file.
 
 ## Layout
 

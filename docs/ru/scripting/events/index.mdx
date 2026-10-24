@@ -5,11 +5,19 @@ order: 1
 
 <center><h1>Обработка событий</h1></center>
 
-*Подписываемся на события и внедряем свою логику.*
-
-![NPC](/docs/title-missing.webp)
+Запустите свою логику, когда игрок входит в мир, ломает блок или взаимодействует с сущностью. Для этого подпишемся на событие - сообщение движка о таком действии.
 
 Система событий в HollowEngine позволяет вам внедрять собственную логику при определённых действиях в игре, включая действия игроков, сущностей, обновления блоков и т.п.
+
+Это отдельные примеры обработчиков для `.reload.kts`. Добавьте нужные импорты в начало своего файла. Для событий клиента поставьте `@file:ClientSide` перед импортами; серверные и клиентские обработчики держите в разных файлах.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.events.blocks.BlockEvent
+import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.await
+import ru.hollowhorizon.hollowengine.common.events.server.ServerChatEvent
+import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.send
+```
 
 ## На какой стороне срабатывает событие
 
@@ -91,7 +99,7 @@ println(event.message.string)
 Или с условием:
 
 ```kotlin
-val event = ServerChatEvent.await { it.player.name == "..." }
+val event = ServerChatEvent.await { it.player.name.string == "Steve" }
 ```
 
 :::warning

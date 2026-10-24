@@ -5,13 +5,15 @@ order: 2
 
 <center><h1>Создание NPC</h1></center>
 
-*Актуальная сигнатура и поведение функции `npc()` в Kotlin-архитектуре v2.3.*
+Создадим NPC, а затем разберём, как задать ему имя, модель, измерение и другие настройки.
 
 ---
 
+Примеры используют серверный `.node.kts`: функции `npc`, `pos` и `rotation`, а также `@State` уже импортированы. Для полного примера с `main` создайте файл `hollowengine/scripts/examples/create_npc.node.kts` и запустите `/he scripting run scripts/examples/create_npc.node.kts main`. Координаты замените на точку с опорой под ногами в загруженном чанке.
+
 ## `npc()`
 
-Функция `npc()` создаёт `NpcEntity`, добавляет его в мир и сразу назначает базовые компоненты модели и анимаций.
+Функция `npc()` создаёт сущность `NpcEntity` в выбранном мире и назначает ей модель. Если передать `id` уже существующего живого NPC, функция вернёт его, сохранив прежние настройки.
 
 ```kotlin
 val guide = npc(
@@ -46,14 +48,14 @@ fun npc(
 | `rotation`            | `Vec2`               | `rotation(0, 0)`                                 | Начальный yaw/pitch.                                                                                                                       |
 | `world`               | `String`             | `"minecraft:overworld"`                          | ID измерения, куда будет добавлен NPC.                                                                                                     |
 | `attributes`          | `Map<String, Float>` | `emptyMap()`                                     | Базовые значения атрибутов через registry id.                                                                                              |
-| `transform`           | `TrsTransformF`      | `TrsTransformF()`                                | Локальная трансформация модели. В v2.3 не стоит полагаться на него как на стабильный публичный способ настройки.                           |
+| `transform`           | `TrsTransformF`      | `TrsTransformF()`                                | Сдвиг, поворот и масштаб модели относительно NPC; передаются в `TransformComponent`.                           |
 | `nameplateMode`       | `NameplateMode`      | `NameplateMode.SHOW`                             | Начальный режим отображения неймплейта.                                                                                                    |
-| `inverseHeadRotation` | `Boolean`            | `false`                                          | Зарезервировано для особенностей поворота головы/модели.                                                                                   |
+| `inverseHeadRotation` | `Boolean`            | `false`                                          | В текущей реализации не применяется. Настройку поворота головы задавайте в метаданных модели.                                                                                   |
 | `inventorySize`       | `Int`                | `36`                                             | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
 | `id` | `String?` | `null` | Собственный id NPC, например `"village:blacksmith"`. Если живой NPC с таким id уже есть, `npc()` возвращает его и игнорирует остальные аргументы, см. [NPC вне мира](/docs/hollowengine/scripting/npc/registry#ids-one-npc-per-name). |
 
-:::caution
-Часть параметров уже присутствует в сигнатуре, но ещё не является полноценным стабильным пользовательским API. В v2.3 надёжно применяются позиция, поворот, мир, модель, имя, `nameplateMode`, атрибуты и стандартный аниматор. Для тонкой настройки модели, текстур и анимаций лучше явно назначать компоненты; как NPC толкается и не пускает других, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity).
+:::warning
+Параметр `inverseHeadRotation` пока не применяется. `transform` передаётся в компонент `TransformComponent`. Аниматор и поворот головы определяются метаданными выбранной модели, поэтому своя модель должна быть настроена отдельно. То, как NPC толкает и блокирует других, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity).
 :::
 
 ---
@@ -86,13 +88,15 @@ suspend fun main() {
 
 ### Своя модель и мир
 
+Для этого примера подготовьте модель `hollowengine/assets/project/models/entity/trader.gltf` и её текстуры. Идентификатор `project:models/entity/trader.gltf` указывает на этот файл. Выберите существующее измерение; пример использует обычный мир. Если своего ресурса пока нет, оставьте встроенную модель по умолчанию.
+
 ```kotlin
 @State
 suspend fun main() {
     val trader = npc(
         pos = pos(120.0, 70.0, -32.0),
         name = "Trader",
-        model = "my_mod:models/entity/trader.gltf",
+        model = "project:models/entity/trader.gltf",
         rotation = rotation(180, 0),
         world = "minecraft:overworld",
     )
@@ -124,7 +128,7 @@ val guard = npc(
 После создания NPC получает:
 
 - `Model(model)` - компонент модели;
-- `StandardPlayerAnimatorPreset.create()` - стандартную player-like locomotion анимацию;
+- аниматор выбранной модели из её `.hemeta`; у встроенной модели это `hollowengine:standard_player` для покоя и ходьбы;
 - `TransformComponent(...)` - базовую трансформацию модели;
 - `customName` и `isCustomNameVisible`;
 - запись в [реестре NPC](/docs/hollowengine/scripting/npc/registry) и тело в выбранном мире.

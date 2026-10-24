@@ -5,7 +5,9 @@ order: 9
 
 <center><h1>Server UI API</h1></center>
 
-The server controls a declared UI through a `UiSession`. It opens a screen or overlay by the id declared in a client `.ui.kts` file, seeds typed state, receives events, and closes the session when it is no longer needed.
+Open a screen for a player, provide the quest text, and handle the reply. The server uses `UiSession`, an object representing the open interface. Declare the screen on the client in a `.ui.kts` file first; the server refers to it by its identifier.
+
+The examples below are server `.node.kts` fragments. `player` is a `ServerPlayer`, for example `event.player as? ServerPlayer` in `onInteract`. Add `import net.minecraft.server.level.ServerPlayer` for this type. Client and server data keys must use matching names and types; a variable declared in a client file is not automatically available to the server.
 
 ## Open a screen
 
@@ -16,11 +18,11 @@ val session = player.openUi("mypack:quest_log") {
     put(Title, "The Missing Cargo")
     onEvent { payload ->
         if (payload.getString("action") == "accept") {
-            acceptQuest(player)
+            player.sendSystemMessage("Quest accepted".literal)
             close()
         }
     }
-    onClose { clearQuestMarker(player) }
+    onClose { println("Quest log closed") }
 }
 ```
 
