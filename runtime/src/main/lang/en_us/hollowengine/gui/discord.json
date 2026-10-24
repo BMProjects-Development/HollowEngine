@@ -1,0 +1,15 @@
+{
+  "details": "Using HollowEngine",
+  "menu": "In the main menu",
+  "singleplayer": "Playing singleplayer",
+  "multiplayer": "Playing multiplayer",
+  "editor": "Working in IDE",
+  "loading": "Loading Minecraft",
+  "paused": "%s (paused)",
+  "in_world": "Exploring the world",
+  "dimension": "In %s",
+  "location": "%s (%s)",
+  "overworld": "Overworld",
+  "nether": "The Nether",
+  "end": "The End"
+}

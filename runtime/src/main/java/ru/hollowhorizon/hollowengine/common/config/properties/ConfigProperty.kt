@@ -20,7 +20,8 @@ import kotlin.reflect.full.findAnnotation
 class ConfigProperty<T>(
     initialValue: T,
     private val onChange: () -> Unit,
-    private val validator: ((T) -> Boolean)? = null
+    private val validator: ((T) -> Boolean)? = null,
+    private val valueSerializer: KSerializer<T>? = null,
 ) : ReadWriteProperty<Any?, T> {
     private var _value: T = initialValue
     private var cachedElement: TomlElement? = null
@@ -32,7 +33,7 @@ class ConfigProperty<T>(
     var validValues: Set<String>? = null
 
     private val serializer: KSerializer<T> by lazy {
-        when (_value) {
+        valueSerializer ?: when (_value) {
             is SerializerProvider -> (_value as SerializerProvider).serializer() as KSerializer<T>
             else -> toml.serializersModule.serializer(TypeToken.of(_value!!::class.java).type) as KSerializer<T>
         }

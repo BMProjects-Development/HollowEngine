@@ -1,0 +1,74 @@
+---
+title: Discord Rich Presence
+description: Интеграция с Discord и статусы для собственных проектов
+---
+
+HollowEngine показывает Rich Presence через запущенный на компьютере клиент Discord: загрузку, главное меню, одиночную или сетевую игру, работу в развёрнутой IDE и время с начала сессии движка. В мире статус содержит текущее измерение и биом, а при приостановке игры отмечает паузу. В стандартной активности также есть кнопка перехода на GitHub движка.
+
+До загрузки переводов используются обычные английские значения по умолчанию. Для стандартных измерений предусмотрены переведённые названия. Пользовательские измерения и биомы используют перевод при наличии, иначе показывается их ID ресурса. Длинные названия сокращаются по лимитам Discord. Имена игроков, названия миров, адреса серверов и координаты не публикуются.
+
+Discord можно запустить до или после Minecraft. Движок переподключается после перезапуска Discord, дожидается `READY`, проверяет подтверждения обновлений и отвечает на ping. Изменения объединяются: обновление отправляется не чаще одного раза в 15 секунд на соединение. IPC работает вне потока Minecraft. Завершение игры или отключение presence закрывает соединение.
+
+## Настройки
+
+`config/hollowengine-discord.toml`:
+
+```toml
+enabled = true
+application_id = null
+large_image = ""
+```
+
+ID приложения движка хранится в коде и не записывается в конфиг. При `null` используется именно оно. Чтобы выбрать приложение своего проекта, замените `null` на его Application ID **в кавычках**. Изменение приложения автоматически пересоздаёт соединение. Для возврата к приложению движка установите `null`.
+
+`large_image` - необязательный ключ изображения из Rich Presence assets выбранного приложения в Discord Developer Portal. По умолчанию ключ не предполагается. Отображаемое имя приложения берётся из настроек самого приложения Discord независимо от текста статуса.
+
+`enabled = false` отключает соединение, в том числе при собственном провайдере. Видимость статуса для других пользователей зависит от настроек публикации активности в Discord.
+
+## Presence своего проекта
+
+Клиентские аддоны и скрипты могут заменить провайдер. Он получает снимок состояния на клиентском потоке Minecraft и возвращает приложение и активность для публикации. Меняйте провайдер на клиентском потоке и не выполняйте в нём блокирующие операции.
+
+Пример для клиентского перезагружаемого скрипта:
+
+```kotlin
+@file:ClientSide
+
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import ru.hollowhorizon.hollowengine.client.discord.DiscordActivity
+import ru.hollowhorizon.hollowengine.client.discord.DiscordPresence
+import ru.hollowhorizon.hollowengine.client.discord.DiscordPresenceProvider
+import ru.hollowhorizon.hollowengine.client.discord.DiscordRichPresence
+import ru.hollowhorizon.hollowengine.client.discord.EngineDiscordPresenceProvider
+
+val projectApplicationId = "YOUR_PROJECT_APPLICATION_ID"
+
+val projectProvider = DiscordPresenceProvider { context ->
+    DiscordPresence(
+        applicationId = projectApplicationId,
+        activity = DiscordActivity(
+            details = "Мой проект",
+            state = if (context.inWorld) "Исследует мир" else "В главном меню",
+            startTimestamp = context.startedAtSeconds,
+        ),
+    )
+}
+
+launch {
+    DiscordRichPresence.provider = projectProvider
+    try {
+        awaitCancellation()
+    } finally {
+        if (DiscordRichPresence.provider === projectProvider) {
+            DiscordRichPresence.provider = EngineDiscordPresenceProvider
+        }
+    }
+}
+```
+
+Перед запуском укажите настоящий ID приложения проекта. При выгрузке скрипт восстанавливает провайдер движка, если его не заменил другой провайдер. Вне перезагружаемых скриптов возвращайте `DiscordRichPresence.provider = EngineDiscordPresenceProvider` при выгрузке проекта. На клиенте действует один провайдер.
+
+В `DiscordPresenceContext` доступны `inWorld`, `singleplayer`, `editorOpen`, `startedAtSeconds`, nullable-ID измерения и биома типа `ResourceLocation` (`dimension`, `biome`), а также флаги `paused` и `loading`. Снимок обновляется раз в секунду на клиентском потоке. Активность поддерживает details, state, Unix-время в секундах, большое и маленькое изображения с подсказками и до двух HTTP(S)-кнопок. Неиспользуемые поля оставляйте `null`, а не пустыми строками. Недопустимые значения отклоняются до отправки; ошибка провайдера скрывает presence и записывается в лог, не завершая игру.
+
+Возврат `null` из провайдера скрывает presence и закрывает соединение. `DiscordPresence(applicationId, null)` явно очищает активность, сохраняя соединение. При смене приложения старая сессия завершается до создания новой. Приглашения, join secrets и авторизация аккаунта Discord не реализованы.

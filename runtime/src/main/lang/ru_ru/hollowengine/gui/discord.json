@@ -1,0 +1,15 @@
+{
+  "details": "Использует HollowEngine",
+  "menu": "В главном меню",
+  "singleplayer": "В одиночной игре",
+  "multiplayer": "В сетевой игре",
+  "editor": "Работает в IDE",
+  "loading": "Загрузка Minecraft",
+  "paused": "%s (пауза)",
+  "in_world": "Исследует мир",
+  "dimension": "Измерение: %s",
+  "location": "%s (%s)",
+  "overworld": "Обычный мир",
+  "nether": "Незер",
+  "end": "Энд"
+}

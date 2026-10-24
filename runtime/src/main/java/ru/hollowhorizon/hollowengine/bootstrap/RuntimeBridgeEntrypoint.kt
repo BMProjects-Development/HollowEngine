@@ -70,6 +70,7 @@ import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderHooks
 import ru.hollowhorizon.hollowengine.client.colliders.ClientColliderPoses
 import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
+import ru.hollowhorizon.hollowengine.client.discord.DiscordRichPresence
 import ru.hollowhorizon.hollowengine.client.editor.TransformGizmoEditor
 import ru.hollowhorizon.hollowengine.client.editor.WorldInspector
 import ru.hollowhorizon.hollowengine.client.editor.WorldObjectContextMenu
@@ -557,11 +558,13 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onClientCreated(client: Minecraft) {
         RuntimeDispatcherState.createClient(client)
+        DiscordRichPresence.start()
     }
 
     override fun onClientTick(client: Minecraft) {
         HollowIdeGameViewport.beginFrame(client)
         RuntimeDispatcherState.runClientTasks(client)
+        DiscordRichPresence.tick(client)
     }
 
     override fun onClientRenderTickPre(client: Minecraft) {
@@ -574,6 +577,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientStopping(client: Minecraft) {
+        DiscordRichPresence.stop()
         RuntimeDispatcherState.stopClient(client)
     }
 

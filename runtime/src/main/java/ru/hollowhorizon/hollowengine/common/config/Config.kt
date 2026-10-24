@@ -153,6 +153,11 @@ open class Config {
     }
 
     fun <T> property(value: T) = properties.add(value)
+
+    /** An explicit nullable serializer keeps the type known even when the initial value is null. */
+    inline fun <reified T : Any> nullableProperty(value: T? = null): ConfigProperty<T?> =
+        properties.add(value, serializer<T?>())
+
     inline fun <reified T : Any> list(vararg value: T): ConfigProperty<List<T>> =
         properties.add<List<T>>(ObservableList(mutableListOf(*value), onChange = { markDirty() }, T::class.serializer()))
 

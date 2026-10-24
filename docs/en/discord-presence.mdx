@@ -1,0 +1,74 @@
+---
+title: Discord Rich Presence
+description: Desktop Discord integration and project-specific presence
+---
+
+HollowEngine displays Rich Presence through the locally running Discord desktop client. It shows loading, the main menu, singleplayer, multiplayer, or working in the IDE, together with elapsed engine session time. In a world, the status includes the current dimension and biome, and indicates when the game is paused. The default activity also includes a button linking to the engine's GitHub repository.
+
+Before translations load, the engine uses readable English defaults. Vanilla dimensions have translated names; custom dimensions and biomes use their translation keys when available, otherwise their resource IDs. Long names are shortened to fit Discord's limits. World names, server addresses, player names, and coordinates are not published.
+
+Discord can start before or after Minecraft. HollowEngine reconnects when Discord restarts, waits for `READY`, acknowledges activity updates, answers ping frames, and coalesces changes to at most one activity update every 15 seconds per connection. IPC runs outside the Minecraft thread. Closing the game or disabling presence closes its IPC connection.
+
+## Configuration
+
+`config/hollowengine-discord.toml`:
+
+```toml
+enabled = true
+application_id = null
+large_image = ""
+```
+
+The default application ID is built into the engine and is not written into the config. `null` uses that application. To use a project's own Discord application, replace `null` with its Application ID **in quotes**. Changing the application reconnects automatically. To revert to the engine application, set the value back to `null`.
+
+`large_image` is optional. Supply an asset key uploaded to the selected application's Rich Presence assets in the Discord Developer Portal. No image key is assumed by default. Discord determines the displayed application name from that application, independently of activity text.
+
+Set `enabled = false` to disconnect. This also takes precedence over custom providers. Discord's activity-sharing settings determine whether other people see the presence.
+
+## Custom project presence
+
+The provider is the extension point for client addons and scripts. It receives a snapshot on the Minecraft client thread and returns the application and activity to publish. Replace it on the client thread; do not perform blocking work in the provider.
+
+For example, in a client reload script:
+
+```kotlin
+@file:ClientSide
+
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import ru.hollowhorizon.hollowengine.client.discord.DiscordActivity
+import ru.hollowhorizon.hollowengine.client.discord.DiscordPresence
+import ru.hollowhorizon.hollowengine.client.discord.DiscordPresenceProvider
+import ru.hollowhorizon.hollowengine.client.discord.DiscordRichPresence
+import ru.hollowhorizon.hollowengine.client.discord.EngineDiscordPresenceProvider
+
+val projectApplicationId = "YOUR_PROJECT_APPLICATION_ID"
+
+val projectProvider = DiscordPresenceProvider { context ->
+    DiscordPresence(
+        applicationId = projectApplicationId,
+        activity = DiscordActivity(
+            details = "My project",
+            state = if (context.inWorld) "Exploring" else "In the menu",
+            startTimestamp = context.startedAtSeconds,
+        ),
+    )
+}
+
+launch {
+    DiscordRichPresence.provider = projectProvider
+    try {
+        awaitCancellation()
+    } finally {
+        if (DiscordRichPresence.provider === projectProvider) {
+            DiscordRichPresence.provider = EngineDiscordPresenceProvider
+        }
+    }
+}
+```
+
+Use your real Application ID before running the example. The script restores the engine provider when unloaded, unless another provider has replaced it. Outside reload scripts, restore the default with `DiscordRichPresence.provider = EngineDiscordPresenceProvider` when the owning project is unloaded. There is one active provider per client.
+
+`DiscordPresenceContext` exposes `inWorld`, `singleplayer`, `editorOpen`, `startedAtSeconds`, nullable dimension and biome `ResourceLocation` IDs (`dimension`, `biome`), and the `paused` and `loading` flags. The snapshot is sampled once per second on the client thread. Activities support details, state, Unix timestamps in seconds, large/small image assets and tooltips, and up to two HTTP(S) buttons. Optional fields should be `null`, rather than empty strings. Invalid values are rejected before IPC; provider failures hide presence and are logged without crashing the game.
+
+Returning `null` from the provider disconnects and hides presence. Returning `DiscordPresence(applicationId, null)` sends an explicit activity clear while retaining the connection. An application change cancels the old session before opening a new one. The engine does not implement invitations, join secrets, or Discord account authorization.

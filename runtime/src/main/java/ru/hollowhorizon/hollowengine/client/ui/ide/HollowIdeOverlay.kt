@@ -250,6 +250,8 @@ object HollowIdeOverlay {
 
     fun isVisible(): Boolean = useHollowUiOverlay && isAvailable()
 
+    fun isExpanded(): Boolean = isVisible() && !collapsed
+
     fun hasFocusedInput(): Boolean = isVisible() && surface.runtime.isAnyFocused
 
     fun openPath(path: String): Boolean {

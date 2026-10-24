@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.config.properties
 
+import kotlinx.serialization.KSerializer
 import net.peanuuutz.tomlkt.TomlComment
 import net.peanuuutz.tomlkt.TomlElement
 import net.peanuuutz.tomlkt.TomlTable
@@ -12,6 +13,10 @@ class Properties(val onChange: () -> Unit) {
 
     fun <T> add(value: T, validator: ((T) -> Boolean)? = null): ConfigProperty<T> {
         return ConfigProperty(value, onChange, validator).also { properties.add(it) }
+    }
+
+    fun <T> add(value: T, serializer: KSerializer<T>, validator: ((T) -> Boolean)? = null): ConfigProperty<T> {
+        return ConfigProperty(value, onChange, validator, serializer).also { properties.add(it) }
     }
 
     fun serialize(): TomlTable {
