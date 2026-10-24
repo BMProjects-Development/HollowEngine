@@ -4,10 +4,13 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoOrientation
 import ru.hollowhorizon.hollowengine.client.editor.GizmoSettings
+import ru.hollowhorizon.hollowengine.client.editor.GizmoSession
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeyAction
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
+import ru.hollowhorizon.hollowengine.client.ui.Modifier
+import ru.hollowhorizon.hollowengine.client.ui.Text
+import ru.hollowhorizon.hollowengine.client.ui.inputTransparent
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
-import ru.hollowhorizon.hollowengine.client.ui.widgets.OrbitPivot
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** A manipulator of the gizmo as a toolbar shows it: its icon, its name and the key that starts it. */
@@ -40,22 +43,29 @@ internal val gizmoOrientationTooltip: String
  * and the world share them, so switching one switches all.
  */
 @Composable
-internal fun GizmoToolbarButtons(iconSize: Float = 12f) {
+internal fun GizmoToolbarButtons(id: String, iconSize: Float = 12f) {
     GizmoModeButtons.forEach { button ->
-        IconButton(button.icon, button.label, active = button.mode in GizmoSettings.modes, iconSize = iconSize) {
+        IconButton(
+            button.icon, button.label, id = "$id-mode-${button.mode.name.lowercase()}",
+            active = button.mode in GizmoSettings.modes, iconSize = iconSize,
+        ) {
             GizmoSettings.toggle(button.mode)
         }
     }
-    GizmoOrientationButton(iconSize)
-    IconButton(
-        OrbitSelectionIcon,
-        HollowKeys.ORBIT_PIVOT.hint("hollowengine.gui.ide.gizmo.orbit_selection".lang),
-        active = OrbitPivot.aroundSelection,
-        iconSize = iconSize,
-    ) { OrbitPivot.aroundSelection = !OrbitPivot.aroundSelection }
+    GizmoOrientationButton(iconSize, id = "$id-orientation")
 }
 
-private const val OrbitSelectionIcon = "hollowengine:textures/gui/icons/orbit_selection.svg"
+@Composable
+internal fun GizmoRotationHint(session: GizmoSession, modifier: Modifier = Modifier) {
+    val transform = session.keyboard ?: return
+    if (transform.mode != GizmoEditMode.ROTATE || transform.axis != null) return
+    val mode = transform.rotationMode.name.lowercase()
+    Text(
+        HollowKeys.ROTATE.hint("hollowengine.gui.ide.gizmo.rotation.$mode".lang),
+        tags = listOf("viewport-transform-hint"),
+        modifier = modifier.inputTransparent(),
+    )
+}
 
 @Composable
 internal fun GizmoOrientationButton(iconSize: Float = 12f, id: String? = null, tags: List<String> = emptyList()) =

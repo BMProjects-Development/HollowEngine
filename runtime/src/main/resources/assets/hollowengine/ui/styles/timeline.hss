@@ -129,6 +129,10 @@
 
 .timeline-row.muted .timeline-row-label { foreground: $text-faint; }
 
+.timeline-row.scene-selected { background: alpha($accent, 0.18); }
+.timeline-row.scene-selected:hover { background: alpha($accent, 0.28); }
+.timeline-row.scene-selected .timeline-row-label { foreground: $accent; }
+
 /* The strips at the ends of a block that trim it: shown only while the pointer is on one. */
 .timeline-segment-grip {
     background: transparent;

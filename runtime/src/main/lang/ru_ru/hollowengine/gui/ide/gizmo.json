@@ -6,5 +6,6 @@
   "orientation.global": "глобальные",
   "orientation.local": "локальные",
   "orientation.view": "вида",
-  "orbit_selection": "Вращать вид вокруг выделенного, а не вокруг центра"
+  "rotation.view_aligned": "Вращение в плоскости вида | Переключить на трекбол",
+  "rotation.trackball": "Трекбол-вращение | Переключить в плоскость вида"
 }

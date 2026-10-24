@@ -14,6 +14,26 @@ import kotlin.test.assertTrue
 
 class HollowTimelinePointerTest {
     @Test
+    fun `double clicking a channel name selects its keys and scene selection marks its rows`() {
+        val (controller, curve) = timelineWithKeys(1f, 2f)
+        controller.groups.single().isSelected = true
+        HollowUiSurface().use { surface ->
+            surface.setContent { HollowTimelineEditor(controller, refresh = {}) }
+            val frame = surface.frame(800f, 500f, -1f, -1f, 0L)
+            val header = frame.nodes.single { it.id?.startsWith("header-timeline-property-") == true }
+            assertTrue("scene-selected" in header.tags)
+            val rect = frame.layout[header].rect
+            val x = rect.x + 40f
+            val y = rect.y + rect.height * 0.5f
+            surface.runtime.mouseClicked(x, y, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            surface.runtime.mouseReleased(x, y, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            surface.frame(800f, 500f, x, y, 100_000_000L)
+            surface.runtime.mouseClicked(x, y, GLFW.GLFW_MOUSE_BUTTON_LEFT)
+            assertEquals(curve.keyframes.toSet(), controller.selectedKeyframes.toSet())
+        }
+    }
+
+    @Test
     fun `ctrl click on empty lane keeps the keyframe selection`() {
         val (controller, curve) = timelineWithKeys(1f, 2f)
         controller.selectedKeyframes.addAll(curve.keyframes)
