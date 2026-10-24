@@ -46,7 +46,7 @@ class HollowIdeFileType(
     internal fun matchesPath(path: String): Boolean? = pathMatcher?.invoke(path)
 
     fun open(path: String, bytes: ByteArray): HollowIdeOpenFile =
-        HollowIdeOpenFile(path, this, loader(path, bytes))
+        HollowIdeOpenFile(path, this, loader(path, bytes), bytes)
 
     companion object {
         fun extensions(
