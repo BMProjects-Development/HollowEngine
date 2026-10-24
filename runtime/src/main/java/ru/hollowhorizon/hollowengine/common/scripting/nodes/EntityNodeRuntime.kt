@@ -11,7 +11,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.ScriptEditorInfo
 import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 
 /**
  * Entry point for the nodes attached to entities via `@file:Attach`.
@@ -22,8 +21,14 @@ import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
  * so cancelling that scope tears its nodes down.
  */
 object EntityNodeRuntime {
-    fun attach(entity: Entity, path: String, tag: CompoundTag? = null, context: StateContext? = null): Boolean =
-        AttachmentRegistry.attachments(entity).nodes.attach(path, tag, context)
+    /**
+     * Attaches the node [path] to [entity].
+     *
+     * @param tag the data its `onLoad` handlers receive.
+     * @param entry what to start with, see [ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent.entry].
+     */
+    fun attach(entity: Entity, path: String, tag: CompoundTag? = null, entry: String? = null): Boolean =
+        AttachmentRegistry.attachments(entity).nodes.attach(path, tag, entry)
 
     fun detach(entity: Entity, path: String): Boolean =
         managerOrNull(entity)?.detach(path) ?: false
@@ -70,56 +75,55 @@ class EntityNodeManager(private val entity: Entity) {
     /** Attached nodes whose namespace is currently unavailable. See [NodeManager] for the rationale. */
     private val dormant = mutableMapOf<String, CompoundTag>()
 
-    fun attach(path: String, tag: CompoundTag?, context: StateContext?): Boolean {
+    fun attach(path: String, tag: CompoundTag?, entry: String?): Boolean {
         val canonicalPath = canonicalNodePath(path)
         if (nodes.containsKey(canonicalPath) || lifecycle.isPending(canonicalPath)) return false
 
-        if (tag == null && context == null) {
+        if (tag == null && entry == null) {
             dormant[canonicalPath]?.let { return attachSaved(canonicalPath, it) }
         }
-        return start(canonicalPath, tag, context)
+        return start(canonicalPath, nodeSave(tag), entry)
     }
 
     /** Attaches a node from the state [serialize] wrote for it. */
-    private fun attachSaved(canonicalPath: String, nodeTag: CompoundTag, compiled: CompiledScript? = null): Boolean = start(
-        canonicalPath,
-        nodeTag.getCompound("extras"),
-        (nodeTag.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) },
-        compiled,
-    )
+    private fun attachSaved(canonicalPath: String, nodeTag: CompoundTag, compiled: CompiledScript? = null): Boolean =
+        start(canonicalPath, nodeTag, entry = null, compiled)
 
-    private fun start(canonicalPath: String, tag: CompoundTag?, context: StateContext?, compiled: CompiledScript? = null): Boolean {
-        dormant[canonicalPath] = CompoundTag().apply {
-            tag?.let { put("extras", it.copy()) }
-            context?.let { put("states", it.serialize().copy()) }
-        }
+    private fun start(canonicalPath: String, saved: CompoundTag, entry: String?, compiled: CompiledScript? = null): Boolean {
+        dormant[canonicalPath] = saved.copy()
         var accepted = true
         lifecycle.start(canonicalPath) {
-            accepted = startNow(canonicalPath, tag, context, compiled)
+            accepted = startNow(canonicalPath, saved, entry, compiled)
         }
         return accepted
     }
 
     private fun startNow(
         canonicalPath: String,
-        tag: CompoundTag?,
-        context: StateContext?,
+        saved: CompoundTag,
+        entry: String?,
         compiled: CompiledScript?,
     ): Boolean {
         val server = entity.server ?: return false
 
-        val (script, executor) = buildNode(
+        val script = buildNode(
             host = NodeHost.OfEntity(entity),
             parentScope = entity.coroutineScope,
             path = canonicalPath,
-            tag = tag,
+            saved = saved,
+            entry = entry,
             receivers = listOf(server, entity),
             compiled = compiled,
-        ) ?: return false
+        )
+        if (script == null) {
+            if (dormant.remove(canonicalPath) != null) {
+                HollowEngine.LOGGER.error("Node '{}' is removed from {}: it could not start", canonicalPath, entity.uuid)
+            }
+            return false
+        }
 
         dormant.remove(canonicalPath)
-        nodes[canonicalPath] = RunningNode(script, executor, context)
-        context?.let { executor.start(it) }
+        nodes[canonicalPath] = RunningNode(script)
         return true
     }
 
@@ -188,9 +192,8 @@ class EntityNodeManager(private val entity: Entity) {
     }
 
     /**
-     * A node that cannot be attached right now stays dormant rather than being dropped: [serialize]
-     * writes dormant nodes back out, so a script that was briefly unavailable costs the entity a node
-     * until something attaches it again, not forever at the next world save.
+     * A node whose namespace is not installed right now stays dormant: [serialize] writes it back out, so
+     * turning the addon on again brings it back. A node that is installed but cannot start is removed.
      */
     fun deserialize(tag: CompoundTag) {
         tag.allKeys.forEach { path ->
@@ -203,13 +206,8 @@ class EntityNodeManager(private val entity: Entity) {
                 .onFailure { HollowEngine.LOGGER.error("Error while deserializing entity node '$path'", it) }
                 .getOrDefault(false)
 
-            if (attached) return@forEach
+            if (attached || available) return@forEach
             dormant[canonicalPath] = nodeTag
-            // A missing namespace is an ordinary wait. Anything else means the node is not running on an
-            // entity that is saved with it, which is worth hearing about the first time it happens.
-            if (available) {
-                HollowEngine.LOGGER.warn("Entity node '{}' of {} stays dormant: nothing attached it", canonicalPath, entity.uuid)
-            }
         }
     }
 

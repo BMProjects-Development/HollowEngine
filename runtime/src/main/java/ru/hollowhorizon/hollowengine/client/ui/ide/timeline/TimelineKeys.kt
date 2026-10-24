@@ -21,6 +21,8 @@ object TimelineKeys {
 
     /** What each action does to the timeline; false when it had nothing to act on, so the key goes on. */
     private val commands: List<Pair<HollowKeyAction, (TimelineController) -> Boolean>> = listOf(
+        HollowKeys.SELECT_ALL to { it.selectAllKeys().let { true } },
+        HollowKeys.SELECT_KEY_COLUMNS to { it.selectKeyColumns().let { true } },
         HollowKeys.TOGGLE_CURVES to { timeline ->
             if (timeline.viewMode == TimelineViewMode.CURVES) timeline.viewMode = TimelineViewMode.DOPE_SHEET
             else timeline.enterCurveView()

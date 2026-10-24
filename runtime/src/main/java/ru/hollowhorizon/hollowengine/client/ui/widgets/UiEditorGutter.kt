@@ -24,6 +24,7 @@ data class UiGutterMarker(
     val tooltip: String,
     val tags: List<String> = emptyList(),
     val onClick: (() -> Unit)? = null,
+    val tint: UiColor? = null,
 )
 
 internal fun editableFieldActionGutterWidth(folds: List<CodeFold>, markers: List<UiGutterMarker>, lines: List<EditableFieldLine>, fontSize: Float): Float {
@@ -63,7 +64,7 @@ internal fun EditableFieldGutter(
                 Text((index + 1).toString(), modifier = Modifier.position(0.px, y.px).foreground(color).textWrap(false))
                 byLine[index].orEmpty().forEachIndexed { column, marker ->
                     GutterButton("$fieldId-gutter-${marker.id}", marker.icon, marker.tooltip, markerX + column * slot, y,
-                        slot, layout.lineHeight, marker.tags, marker.onClick)
+                        slot, layout.lineHeight, marker.tags, marker.tint, marker.onClick)
                 }
                 foldLines[index]?.maxByOrNull { it.end - it.start }?.let { fold ->
                     val closed = state.folding.isCollapsed(fold)
@@ -83,13 +84,13 @@ internal fun EditableFieldGutter(
 
 @Composable
 private fun GutterButton(id: String, icon: String, tooltip: String, x: Float, y: Float,
-                         width: Float, height: Float, tags: List<String>, action: (() -> Unit)?) {
+                         width: Float, height: Float, tags: List<String>, tint: UiColor? = null, action: (() -> Unit)?) {
     Box(id = id, mode = UiBoxMode.STACK, tags = listOf("gutter-marker") + tags + listOfNotNull("gutter-action".takeIf { action != null }),
         modifier = Modifier.position(x.px, y.px).size(width.px, height.px)
             .input(hoverable = true, clickable = action != null).tooltipOnHover(tooltip)
             .onClick { event -> action?.invoke(); event.consume() }) {
-        Image(icon, tags = listOf("gutter-marker-icon"), modifier = Modifier.size((width - 4f).px, (width - 4f).px)
-            .align(UiAlign.CENTER, UiAlign.CENTER))
+        val size = Modifier.size((width - 4f).px, (width - 4f).px).align(UiAlign.CENTER, UiAlign.CENTER)
+        Image(icon, tags = listOf("gutter-marker-icon"), modifier = tint?.let { size.tint(it) } ?: size)
     }
 }
 

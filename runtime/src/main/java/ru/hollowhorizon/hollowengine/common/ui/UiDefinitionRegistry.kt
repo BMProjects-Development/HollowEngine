@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.common.ui
 
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
+import ru.hollowhorizon.hollowengine.common.utils.rl
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -9,6 +11,12 @@ import java.util.concurrent.ConcurrentHashMap
  * rebuilt from scratch each time rather than merged, a renamed or deleted screen must not linger.
  */
 object UiDefinitionRegistry {
+    /**
+     * Screens addons ship. They outlive script reloads and are used only while no script declares a
+     * screen with the same id, so a project can replace any of them.
+     */
+    val builtInScreens = ExtensionPoints.create("hollowengine:ui/screens".rl, UiScreenDefinition::class)
+
     private val screens = ConcurrentHashMap<ResourceLocation, UiScreenDefinition>()
     private val overlays = ConcurrentHashMap<ResourceLocation, UiOverlayDefinition>()
     private val surfaces = ConcurrentHashMap<ResourceLocation, UiSurfaceDefinition>()
@@ -45,7 +53,8 @@ object UiDefinitionRegistry {
         surfaces[definition.id] = definition
     }
 
-    fun screen(id: ResourceLocation): UiScreenDefinition? = screens[id]
+    fun screen(id: ResourceLocation): UiScreenDefinition? =
+        screens[id] ?: builtInScreens.extensions.firstOrNull { it.id == id }
 
     fun overlay(id: ResourceLocation): UiOverlayDefinition? = overlays[id]
 

@@ -343,6 +343,8 @@ interface TrackListing {
 
 class TrackGroup(name: String) {
     var nameState by mutableStateOf(name)
+    /** Whether the scene object represented by this group is selected. */
+    var isSelected by mutableStateOf(false)
     var isCollapsed by mutableStateOf(false)
     var isLocked by mutableStateOf(false)
     var isVisible by mutableStateOf(true)

@@ -45,6 +45,7 @@ import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 
 /** A file dragged out of the project tree; anything that accepts drops can look for this payload. */
@@ -158,9 +159,9 @@ object HollowIdeOverlay {
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
     private var gutterNavigation by mutableStateOf<List<GutterNavigationTarget>>(emptyList())
     private val dragAndDrop = UiDragAndDropState()
-    private var refreshFilesRequested = false
+    private val refreshFilesRequested = AtomicBoolean()
     private val externalFiles = HollowIdeExternalFiles(
-        onFocusGained = { refreshFilesRequested = true },
+        onFocusGained = { refreshFilesRequested.set(true) },
         onMove = { files, x, y -> updateExternalDrag(files, x, y) },
         onLeave = {
             pipeline.await()
@@ -565,9 +566,8 @@ object HollowIdeOverlay {
         }
         externalFiles.update(event.minecraft.window.window, isVisible() && !collapsed)
         if (!isVisible()) return
-        if (refreshFilesRequested && !externalFiles.active) {
+        if (!externalFiles.active && refreshFilesRequested.getAndSet(false)) {
             pipeline.await()
-            refreshFilesRequested = false
             model.refreshExternalFiles()
         }
         AssetManagerLifecycle.observe(event.minecraft)
@@ -764,6 +764,7 @@ object HollowIdeOverlay {
     private fun Content() {
         RememberLayout()
         TrackActiveEditor()
+        WatchTextFiles()
         Box(
             id = "ide-root",
             modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").style("hollowengine:ui/styles/ide.hss")
@@ -830,6 +831,15 @@ object HollowIdeOverlay {
                     onCancel = { hideToolbarConfirmationVisible = false },
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun WatchTextFiles() {
+        val paths = model.files.values.filter { it.textFileSync != null }
+            .map { it.path.fromReadablePath().toPath() }.sorted()
+        LaunchedEffect(paths) {
+            if (paths.isNotEmpty()) watchIdeFiles(paths) { refreshFilesRequested.set(true) }
         }
     }
 
@@ -1194,6 +1204,9 @@ object HollowIdeOverlay {
     private fun FileEditor(file: HollowIdeOpenFile) {
         val editorSession = remember(file.path) { editorSession(file.path) }
         val editorState = editorState(file)
+        remember(file, file.externalTextRevision) {
+            editorState.setText(file.text, moveCaretToEnd = false)
+        }
         val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
         val diagnostics = editorSession.diagnostics(file.text)
         val inlayHints = editorSession.inlayHints(file.text)

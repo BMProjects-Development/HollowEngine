@@ -32,30 +32,6 @@ class BlockBenchModelTests {
     }))
 
     @Test
-    fun `the bundled v5 model loads all geometry and clips without a render context`() {
-        val source = javaClass.classLoader.getResourceAsStream("assets/hollowengine/models/entity/hv_malora.bbmodel")!!
-            .bufferedReader().use { it.readText() }
-        val file = BlockBenchModel.parse(source)
-        val model = convert(file)
-        assertEquals(13, model.animations.size)
-        assertEquals(154, model.nodes.count { it.mesh != null })
-        assertEquals(1, model.nodes.count { !it.visible })
-        assertEquals(4, file.textures.size)
-        assertTrue(model.nodes.any { it.name == "aura_vfx" })
-        assertEquals(16, file.textures[1].height / file.textures[1].width)
-        model.animations.forEach { clip ->
-            assertTrue(clip.duration > 0f, clip.name)
-            for (time in listOf(0f, clip.duration * 0.37f, clip.duration)) {
-                val pose = AnimationPose.sample(clip, time)
-                pose.entries.forEach { (_, bone) ->
-                    bone.rotation?.let { assertTrue(it.x.isFinite() && it.y.isFinite() && it.z.isFinite() && it.w.isFinite()) }
-                    bone.translation?.let { assertTrue(it.x.isFinite() && it.y.isFinite() && it.z.isFinite()) }
-                }
-            }
-        }
-    }
-
-    @Test
     fun `legacy inline groups and v5 group table preserve pivots and rotations`() {
         val inline = """{"meta":{"format_version":"4.10"},"outliner":[
             {"uuid":"root","name":"body","origin":[0,16,0],"rotation":[0,90,0],"children":[

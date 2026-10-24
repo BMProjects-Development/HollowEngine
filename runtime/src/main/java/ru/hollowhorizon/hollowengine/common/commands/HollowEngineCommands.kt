@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.common.commands
 
 import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.arguments.FloatArgumentType
-import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
@@ -34,7 +33,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComp
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.commands.arguments.ScriptPathArgument
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueInput
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
@@ -51,7 +49,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.removeNode
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
 import ru.hollowhorizon.hollowengine.common.utils.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.Vfx
@@ -286,27 +283,6 @@ private fun CommandExtension.registerUtilityCommands() {
             SUCCESS
         }
     }
-
-    registerDialogueCommands()
-}
-
-private fun CommandExtension.registerDialogueCommands() {
-    "dialogue" {
-        "advance" {
-            executes {
-                if (DialogueInput.advance(source.playerOrException)) SUCCESS
-                else sendFailure("hollowengine.commands.dialogue_not_in_dialogue".mcTranslate())
-            }
-        }
-
-        "choose"(arg("option", IntegerArgumentType.integer(0))) {
-            executes {
-                val option = IntegerArgumentType.getInteger(this, "option")
-                if (DialogueInput.choose(source.playerOrException, option)) SUCCESS
-                else sendFailure("hollowengine.commands.dialogue_no_such_option".mcTranslate(option))
-            }
-        }
-    }
 }
 
 private fun CommandExtension.registerScriptingCommands() {
@@ -339,7 +315,7 @@ private fun CommandExtension.registerScriptingCommands() {
                 }
                 source.server.addNode(
                     ScriptRegistry.display(id),
-                    context = StateContext(nextState = StringArgumentType.getString(this, "state"))
+                    entry = StringArgumentType.getString(this, "state")
                 )
                 SUCCESS
             }
@@ -503,8 +479,7 @@ private fun com.mojang.brigadier.context.CommandContext<CommandSourceStack>.atta
     if (!isNodeScriptPath(id.path)) {
         return sendFailure("hollowengine.commands.scripting_state_requires_node_script".mcTranslate(path))
     }
-    val context = state?.let { StateContext(nextState = it) }
-    return if (EntityNodeRuntime.attach(entity, path, context = context)) {
+    return if (EntityNodeRuntime.attach(entity, path, entry = state)) {
         sendSuccess(true) { "Attached node '$path' to ${entity.name.string}".literal }
     } else {
         sendFailure("Failed to attach node '$path' to ${entity.name.string}".literal)

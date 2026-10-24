@@ -388,6 +388,10 @@ class HollowUiInputController {
      */
     private fun focusTargets(frame: HollowUiFrame): List<UiNode> {
         val set = LinkedHashSet<UiNode>()
+        activeScope?.takeIf { it in frame.nodes }?.let { scope ->
+            focusByScope[scope]?.takeIf { it in frame.nodes }?.let { set += it }
+            set += scope
+        }
         primaryFocus()?.takeIf { it in frame.nodes }?.let { set += it }
         focusByScope.values.forEach { if (it in frame.nodes) set += it }
         frame.nodes.forEach { if (it.resolvedSnapshot.focusScope) set += it }
@@ -442,6 +446,7 @@ class HollowUiInputController {
     private fun updateFocus(frame: HollowUiFrame, node: UiNode, dispatch: (UiEvent) -> Boolean) {
         val scope = node.enclosingFocusScope() ?: return
         setFocus(frame, scope, node.focusTargetWithin(scope), dispatch)
+        activeScope = scope
     }
 
     /** Sets (or clears, when [target] is null) the focused target of [scope]; other scopes untouched. */

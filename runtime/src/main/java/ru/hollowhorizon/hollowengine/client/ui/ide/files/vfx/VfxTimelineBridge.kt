@@ -262,7 +262,8 @@ class VfxTimelineSession(
     fun select(nodeId: String?) {
         selection = nodeId
         selectedLane = null
-        if (nodeId?.let(touched::add) == true || onlySelectedState) applyListing()
+        nodeId?.let(touched::add)
+        applyListing()
     }
 
     /** Opens [lane], picked in the scene in place of a node, as what is selected now. */
@@ -317,6 +318,7 @@ class VfxTimelineSession(
     private fun applyListing(group: TrackGroup) {
         group.children.forEach(::applyListing)
         val node = group.properties.firstOrNull()?.let(::nodeOf)
+        group.isSelected = node != null && node == selection
         val shown = !onlySelectedState || node == selection
         group.properties.forEach { property ->
             val keyed = property.curves.any { it.keyframes.isNotEmpty() }

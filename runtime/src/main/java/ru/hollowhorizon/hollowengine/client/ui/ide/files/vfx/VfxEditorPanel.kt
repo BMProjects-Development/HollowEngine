@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoPointerWrap
+import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoRotationHint
 import ru.hollowhorizon.hollowengine.client.ui.ide.GizmoToolbarButtons
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.PublishScene
@@ -147,7 +148,12 @@ internal fun VfxEditorPanel(file: HollowIdeOpenFile) {
         }
 
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
-            Viewport(document, state, selected)
+            Box(
+                id = "vfx-viewport-focus-${System.identityHashCode(state)}",
+                modifier = Modifier.size(100.percent, 100.percent).focusScope(),
+            ) {
+                Viewport(document, state, selected)
+            }
             Toolbar(state)
             ParticleCounter(state.preview)
         }
@@ -172,7 +178,7 @@ private fun Toolbar(state: VfxEditorState) {
         IconButton(ShapeIcon, vfxText("toggle_shape"), iconSize = 12f, active = preview.showShape) {
             preview.showShape = !preview.showShape
         }
-        GizmoToolbarButtons()
+        GizmoToolbarButtons("vfx-gizmo-${System.identityHashCode(state)}")
     }
 }
 
@@ -291,7 +297,7 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
     }
 
     Box(
-        id = "vfx-viewport",
+        id = "vfx-viewport-${System.identityHashCode(state)}",
         tags = listOf("ide-file-viewport"),
         mode = UiBoxMode.STACK,
         modifier = Modifier.size(100.percent, 100.percent).clip().onPlaced { rect ->
@@ -374,7 +380,8 @@ private fun Viewport(document: HollowIdeVfxDocument, state: VfxEditorState, sele
                     session.draw(this, target())
                 },
         )
-        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px))
+        ViewAxes(state.cameraTurn, Modifier.align(UiAlign.END, UiAlign.START).margin(8.px).focusScope())
+        GizmoRotationHint(session, Modifier.align(UiAlign.START, UiAlign.END).margin(8.px))
         KeyInsertMenu(state.keyMenu, onPick = { parts -> selected?.let { state.session.insertKeys(it, parts) } }) {
             state.keyMenu = null
         }

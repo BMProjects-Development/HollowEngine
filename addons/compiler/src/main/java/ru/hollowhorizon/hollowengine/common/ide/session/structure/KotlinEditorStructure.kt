@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
@@ -73,6 +74,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             val symbol = declaration.markerSymbol()
             if (symbol is KaNamedFunctionSymbol) {
                 if (EventClassId in symbol.annotations) markers += GutterMarker(offset, GutterMarkerKind.EVENT)
+                if (ActionClassId in symbol.annotations) markers += GutterMarker(offset, GutterMarkerKind.ACTION)
                 if (node && !attached && StateClassId in symbol.annotations && declaration is KtNamedFunction && declaration.parent == file.script?.blockExpression && symbol.isSuspend && symbol.valueParameters.isEmpty() && !symbol.isExtension && symbol.contextParameters.isEmpty() && declaration.bodyExpression != null) {
                     val annotation = symbol.annotations.firstOrNull { it.classId == StateClassId }
                     val value = annotation?.arguments?.firstOrNull { it.name.asString() == "name" }?.expression
@@ -90,6 +92,7 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
             }
         }
         val coroutineLines = HashSet<Int>()
+        val story = StoryGutterMarkers(this, file)
         file.collectDescendantsOfType<KtExpression>().forEach { expression ->
             val offset = when (expression) {
                 is KtCallExpression -> expression.calleeExpression?.textOffset
@@ -99,11 +102,13 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
                 else -> null
             } ?: return@forEach
             val call = (expression.resolveToCall() as? KaSuccessCallInfo)?.call as? KaFunctionCall<*> ?: return@forEach
-            if ((call.symbol as? KaNamedFunctionSymbol)?.isSuspend == true && coroutineLines.add(
-                    file.text.lastIndexOf(
-                        '\n', offset
-                    ) + 1
-                )
+            val line = file.text.lastIndexOf('\n', offset) + 1
+            story.markerFor(expression, call)?.let { marker ->
+                markers += marker.copy(offset = offset)
+                coroutineLines += line
+                return@forEach
+            }
+            if ((call.symbol as? KaNamedFunctionSymbol)?.isSuspend == true && coroutineLines.add(line)
             ) {
                 markers += GutterMarker(offset, GutterMarkerKind.COROUTINE)
             }
@@ -112,8 +117,18 @@ internal fun ScriptingAnalyzerImpl.editorStructure(file: KtFile): EditorStructur
     return EditorStructure(folds.distinctBy { it.start to it.end }, markers.distinctBy { it.offset to it.kind }, runs)
 }
 
-/** The declarations an override marker at [offset] leads to; an accessor marker leads to the base accessors. */
-internal fun ScriptingAnalyzerImpl.kotlinGutterTargets(file: KtFile, offset: Int): List<GutterNavigationTarget> {
+/**
+ * Where the marker at [offset] of the file [path] leads: an override marker to the declarations it overrides, an
+ * accessor marker to the base accessors, and a `rewind` or `temporary` marker to its checkpoint.
+ */
+internal fun ScriptingAnalyzerImpl.kotlinGutterTargets(file: KtFile, path: String, offset: Int): List<GutterNavigationTarget> {
+    val story = file.findElementAt(offset)?.parentsWithSelf?.filterIsInstance<KtCallExpression>()
+        ?.firstOrNull { it.calleeExpression?.textOffset == offset }
+    if (story != null) return analyze(file) {
+        StoryGutterMarkers(this, file).checkpointsOf(story).map { checkpoint ->
+            GutterNavigationTarget(file.text.substring(checkpoint).lineSequence().first().trim(), DefinitionLocation(path, checkpoint))
+        }
+    }
     val owner = file.findElementAt(offset)?.parentsWithSelf?.firstOrNull { element ->
         (element is KtPropertyAccessor || element is KtCallableDeclaration) && element.textOffset == offset
     } ?: return emptyList()
@@ -151,5 +166,8 @@ internal fun PsiElement.fold(placeholder: String): CodeFold? =
 
 private val AttachClassId =
     ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach"))
-private val StateClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.scripting.annotations.State"))
+private val StoryPackage = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story")
+private val StateClassId = ClassId(StoryPackage, Name.identifier("State"))
+private val ActionClassId = ClassId(StoryPackage, Name.identifier("Action"))
+
 private val EventClassId = ClassId.topLevel(FqName("ru.hollowhorizon.hollowengine.common.events.SubscribeEvent"))

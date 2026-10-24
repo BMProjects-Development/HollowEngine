@@ -57,7 +57,9 @@ internal class KotlinCompiledScriptJar(
     private val evaluator = HollowEngineScriptEvaluator()
     private val scriptClass = lazy {
         runBlocking {
-            (script.getClass(evaluationConfiguration) as ResultWithDiagnostics.Success).value
+            script.getClass(evaluationConfiguration).valueOr { failure ->
+                throw ScriptEvaluationException(name, failure.reports.map { it.convert() })
+            }
         }
     }
 
@@ -102,6 +104,10 @@ internal val JvmScriptEvaluationConfigurationKeys.actualClassLoader by Propertie
 /** Whether this compiled script opted into instance sharing with `@file:SharedScript`. */
 val ScriptCompilationConfigurationKeys.isSharedScript by PropertiesCollection.key<Boolean>()
 
+/** Frozen at compilation, so editing the sources cannot relabel already compiled bytecode. */
+val ScriptCompilationConfigurationKeys.sharedScriptId by PropertiesCollection.key<String>()
+val ScriptCompilationConfigurationKeys.sharedScriptFingerprint by PropertiesCollection.key<String>()
+
 /** Whether this compiled script declared `@file:ClientSide`. */
 val ScriptCompilationConfigurationKeys.isClientSideScript by PropertiesCollection.key<Boolean>()
 
@@ -132,7 +138,6 @@ open class HollowEngineScriptEvaluator : ScriptEvaluator {
                 compiledScript.compilationConfiguration[ScriptCompilationConfiguration.isSharedScript] == true
 
             if (canShareInstance) {
-                if (!imported) SharedScriptClasses.adopt(compiledScript, scriptClass)
                 SharedScriptClasses.instanceOf(scriptClass)?.asSuccess()?.let { return@evaluation it }
             }
 
@@ -303,7 +308,7 @@ internal class KJvmCompiledScriptFromJar(
         val script = createScriptFromClassLoader(scriptClassName, classLoader)
         classLoader.shareClassesOf(
             SharedScriptClasses.loadersFor(
-                script.otherScripts,
+                listOf(script),
                 entries,
                 baseClassLoader,
                 ScriptCache.sharedScriptsOf(file),
@@ -379,5 +384,5 @@ fun ScriptDiagnostic.convert(): Diagnostic {
         ScriptDiagnostic.Severity.WARNING -> Severity.WARNING
         ScriptDiagnostic.Severity.ERROR -> Severity.ERROR
         ScriptDiagnostic.Severity.FATAL -> Severity.FATAL
-    }, message)
+    }, exception?.message?.takeUnless { it.isBlank() || message.contains(it) }?.let { "$message: $it" } ?: message)
 }
