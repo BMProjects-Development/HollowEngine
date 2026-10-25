@@ -26,6 +26,7 @@ class TextFieldState(
     var filter: UiTextInputFilter = UiTextInputFilter.ANY,
     var indentSize: Int? = 4,
     var autoPairs: Boolean = true,
+    var syntax: UiCodeSyntax? = null,
     var multiCaret: Boolean = true,
     var pasteTransformer: UiTextPasteTransformer? = null,
     fontSize: Float = DefaultUiFontSize,
@@ -146,7 +147,7 @@ class TextFieldState(
             } else {
                 val edit = when {
                     word -> TextFieldCodeEdit(wordLeft(text, position), position, "")
-                    multiline -> indentationBackspaceEdit(text, position, indentSize)
+                    multiline -> indentationBackspaceEdit(text, position, indentSize, syntax)
                     else -> TextFieldCodeEdit(position - 1, position, "")
                 }
                 TextEditRange(folding.visibleOffset(edit.start, position), edit.end)

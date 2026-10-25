@@ -485,6 +485,10 @@ private fun nearestColumn(text: String, x: Float, fontSize: Float, fontFamily: S
  * A text field measured and rendered with one consistent layout ([EditableFieldLayout]): a single
  * sized content box holds only the rows in the scrolled viewport (manual virtualization), each row
  * carrying its own glyphs plus that line's selection and caret(s). Editing lives in [TextFieldState].
+ *
+ * @param insight what the field offers on top of its text.
+ * @param view the gutter and indent guides of a code field; null shows the text alone.
+ * @param search the search hits to mark.
  */
 @Composable
 fun EditableTextField(
@@ -493,42 +497,30 @@ fun EditableTextField(
     id: String? = null,
     tags: Iterable<String> = emptyList(),
     scrollState: UiScrollHandle = state.scroll,
-    syntaxHighlighter: UiSyntaxHighlighter? = null,
-    inlayHints: List<UiInlayHint> = emptyList(),
-    inlayHintsProvider: UiInlayHintsProvider? = null,
-    inlayRevision: Long = 0L,
-    onInlayAction: ((UiInlayAction) -> Unit)? = null,
-    completionContributor: UiCompletionContributor? = null,
-    completionRevision: Long = 0L,
-    signatureHelpProvider: UiSignatureHelpProvider? = null,
-    hoverInfoProvider: UiHoverInfoProvider? = null,
-    codeInsightRevision: Long = completionRevision,
-    diagnostics: List<UiTextDiagnostic> = emptyList(),
-    searchMatches: List<IntRange> = emptyList(),
-    activeSearchMatch: IntRange? = null,
+    insight: UiCodeInsight = UiCodeInsight(),
+    view: UiCodeView? = null,
+    search: UiTextSearch? = null,
     placeholder: String = "",
-    lineNumbers: Boolean = false,
-    folds: List<CodeFold> = emptyList(),
-    gutterMarkers: List<UiGutterMarker> = emptyList(),
-    lineNumberColor: UiColor = EditableFieldLineNumberColor,
-    indentGuides: Boolean = false,
-    indentGuideColor: UiColor = EditableFieldIndentGuideColor,
     attributes: Map<String, String> = emptyMap(),
 ) {
+    val diagnostics = insight.diagnostics
+    val searchMatches = search?.matches.orEmpty()
+    val activeSearchMatch = search?.active
+    val folds = view?.folds.orEmpty()
+    val gutterMarkers = view?.markers.orEmpty()
     val text = state.text
     val fontSize = state.fontSize
     val fontFamily = state.fontFamily
     val wrap = state.wrap
-    // Occurrence highlight follows the caret only while the field is focused.
     val caret = if (state.focused) state.caret else UiNoCaretOffset
     state.caretVisibilityRevision
     val presentation = rememberEditableTextPresentation(
         text = text,
         caret = caret,
-        highlighter = syntaxHighlighter,
-        inlayHints = inlayHints,
-        inlayHintsProvider = inlayHintsProvider,
-        inlayRevision = inlayRevision,
+        highlighter = insight.highlighter,
+        inlayHints = insight.inlayHints,
+        inlayHintsProvider = insight.inlayHintsProvider,
+        inlayRevision = insight.inlayRevision,
     )
     state.folding.update(text, folds)
     val foldProjection = state.folding.projection()
@@ -538,7 +530,7 @@ fun EditableTextField(
     val actionGutterWidth = remember(text, fontSize, folds, gutterMarkers) {
         state.gutter.width(gutterMarkers, foldProjection.lines, fontSize)
     }
-    val gutterPanelWidth = if (lineNumbers && state.multiline) {
+    val gutterPanelWidth = if (view != null && state.multiline) {
         editableFieldGutterWidth(text, fontSize) + actionGutterWidth
     } else {
         0f
@@ -584,8 +576,8 @@ fun EditableTextField(
         }
     }
     SideEffect {
-        completion.contributor = completionContributor
-        completion.onFrame(completionRevision)
+        completion.contributor = insight.completions
+        completion.onFrame(insight.completionRevision)
         state.offsetAtPoint = { rootX, rootY ->
             val viewport = scrollState.viewport
             layout.offsetAt(
@@ -672,7 +664,7 @@ fun EditableTextField(
                         originY = viewport.y - surface.y,
                     )
                 }
-                codeHoverTarget = if (hoverTooltip == null && hoverInfoProvider != null) {
+                codeHoverTarget = if (hoverTooltip == null && insight.hover != null) {
                     EditableFieldHoverTarget(clickHit(event, layout, gutterWidth).offset)
                 } else {
                     null
@@ -718,11 +710,11 @@ fun EditableTextField(
                         layout = layout,
                         rowDiagnostics = diagnosticsByLine.getOrNull(index).orEmpty(),
                         rowSearchMatches = matchesByLine.getOrNull(index).orEmpty(),
-                        indentGuides = indentGuides,
-                        indentGuideColor = indentGuideColor,
+                        indentGuides = view?.indentGuides == true,
+                        indentGuideColor = view?.indentGuideColor ?: EditableFieldIndentGuideColor,
                         inlayMetrics = inlayMetrics,
                         onInlayAction = { action ->
-                            if (!state.folding.activate(action)) onInlayAction?.invoke(action)
+                            if (!state.folding.activate(action)) insight.onInlayAction?.invoke(action)
                         },
                     )
                 }
@@ -733,12 +725,12 @@ fun EditableTextField(
                 layout,
                 visible,
                 gutterPanelWidth,
-                lineNumberColor,
+                view?.lineNumberColor ?: EditableFieldLineNumberColor,
                 state,
                 folds,
                 gutterMarkers,
                 id ?: "text-field-${System.identityHashCode(state)}",
-                indentGuideColor
+                view?.indentGuideColor ?: EditableFieldIndentGuideColor
             )
         }
         if (completion.items.isNotEmpty()) {
@@ -754,9 +746,9 @@ fun EditableTextField(
             focused = state.focused,
             completionVisible = completion.items.isNotEmpty(),
             hoverTarget = codeHoverTarget,
-            signatureProvider = signatureHelpProvider,
-            hoverProvider = hoverInfoProvider,
-            revision = codeInsightRevision,
+            signatureProvider = insight.signatureHelp,
+            hoverProvider = insight.hover,
+            revision = insight.revision,
             layout = layout,
             scrollState = scrollState,
             contentOffsetX = gutterWidth,

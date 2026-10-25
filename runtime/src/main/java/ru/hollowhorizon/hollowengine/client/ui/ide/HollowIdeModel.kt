@@ -350,12 +350,10 @@ internal class HollowIdeModel(
                     if (file.textFileSync != null) refreshExternalTextFile(file)
                     else file.refresh(source.readBytes())
                 }.onFailure {
-                        HollowEngine.LOGGER.warn(
-                            "Could not read '{}' again: {}",
-                            file.path,
-                            it.message
-                        )
-                    }
+                    HollowEngine.LOGGER.warn(
+                        "Could not read '{}' again: {}", file.path, it.message
+                    )
+                }
             }
     }
 
@@ -485,17 +483,25 @@ internal class HollowIdeModel(
                     tree.refresh()
                 }
             }.onFailure { error ->
-                if (error !is CancellationException) HollowEngine.LOGGER.warn("Could not autosave IDE file '{}'", path, error)
+                if (error !is CancellationException) HollowEngine.LOGGER.warn(
+                    "Could not autosave IDE file '{}'",
+                    path,
+                    error
+                )
             }
         }
         pendingSaves[path] = job
         job.start()
     }
 
+    /** Reloads [file] when it changed on disk; the change wins over unsaved edits, and the user is told they went. */
     private fun refreshExternalTextFile(file: HollowIdeOpenFile): Boolean {
+        val unsaved = file.dirty
         val changed = file.reloadExternalText()
-        if (changed) pendingSaves.remove(file.path)?.cancel()
-        return changed
+        if (!changed) return false
+        pendingSaves.remove(file.path)?.cancel()
+        if (unsaved) HollowNotifications.warning("hollowengine.gui.ide.file.external_change_discarded".lang.format(file.title))
+        return true
     }
 
 }

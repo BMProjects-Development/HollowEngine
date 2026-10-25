@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinCodeSyntax
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -119,7 +120,7 @@ class TextFieldStateTest {
     fun `enter does not remove literal or comment whitespace near braces`() {
         for (source in listOf("val text = \"{  }\"", "// comment {  }", "val text = \"\"\"{  }\"\"\"")) {
             val position = source.indexOf("{  }") + 2
-            val state = field(source, caret = position)
+            val state = field(source, caret = position).apply { syntax = KotlinCodeSyntax }
             assertTrue(state.insertNewlineWithIndent())
             assertEquals(source.substring(0, position) + "\n" + source.substring(position), state.text)
         }
