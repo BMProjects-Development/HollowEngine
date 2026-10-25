@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiEvent
@@ -102,9 +103,13 @@ internal class HollowIdeProjectController(
         if (result == HollowIdeFileOperationResult.Success) nameDialog = null
     }
 
-    private fun createScript(dialog: ProjectNameDialog, template: HollowIdeScriptTemplate): HollowIdeFileOperationResult {
+    private fun createScript(
+        dialog: ProjectNameDialog,
+        template: HollowIdeScriptTemplate,
+    ): HollowIdeFileOperationResult {
         val name = template.fileName(dialog.name)
-        val directory = if (dialog.path.fromReadablePath().isDirectory) dialog.path else dialog.path.substringBeforeLast('/', "")
+        val directory =
+            if (dialog.path.fromReadablePath().isDirectory) dialog.path else dialog.path.substringBeforeLast('/', "")
         val path = if (directory.isBlank()) name else "$directory/$name"
         val result = model.createFile(dialog.path, name, template.render(path))
         if (result == HollowIdeFileOperationResult.Success) {
@@ -120,6 +125,11 @@ internal class HollowIdeProjectController(
     fun copy(path: String = model.selectedTreePath, cut: Boolean = false) {
         val paths = model.selectedOr(path)
         setStatus(model.copyToClipboard(paths, cut).statusText())
+        contextMenu = null
+    }
+
+    fun copyPath(path: String = model.selectedTreePath) {
+        Minecraft.getInstance().keyboardHandler.clipboard = path
         contextMenu = null
     }
 
@@ -173,10 +183,12 @@ internal class HollowIdeProjectController(
                 applyNameDialog()
                 true
             }
+
             GLFW.GLFW_KEY_ESCAPE -> {
                 cancelNameDialog()
                 true
             }
+
             else -> false
         }
     }
@@ -188,30 +200,37 @@ internal class HollowIdeProjectController(
                 copy(cut = false)
                 true
             }
+
             ProjectShortcut.Cut -> {
                 copy(cut = true)
                 true
             }
+
             ProjectShortcut.Paste -> {
                 pasteInto()
                 true
             }
+
             ProjectShortcut.Delete -> {
                 delete()
                 true
             }
+
             ProjectShortcut.Rename -> {
                 openRenameDialog(model.selectedTreePath)
                 true
             }
+
             ProjectShortcut.CreateFolder -> {
                 openCreateFolderDialog(model.selectedTreePath)
                 true
             }
+
             ProjectShortcut.CreateFile -> {
                 openCreateFileDialog(model.selectedTreePath)
                 true
             }
+
             null -> false
         }
     }
@@ -287,13 +306,7 @@ internal class HollowIdeProjectController(
 }
 
 internal enum class ProjectShortcut {
-    Copy,
-    Cut,
-    Paste,
-    Delete,
-    Rename,
-    CreateFolder,
-    CreateFile,
+    Copy, Cut, Paste, Delete, Rename, CreateFolder, CreateFile,
 }
 
 internal fun resolveProjectShortcut(

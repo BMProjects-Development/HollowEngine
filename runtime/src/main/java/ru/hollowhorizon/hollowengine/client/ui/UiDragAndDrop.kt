@@ -42,6 +42,7 @@ class UiDragAndDropState {
         private set
 
     private val targets = mutableListOf<UiDropTarget>()
+    private var activeTarget: UiDropTarget? = null
 
     fun begin(item: UiDragItem, x: Float, y: Float) {
         this.item = item
@@ -56,7 +57,13 @@ class UiDragAndDropState {
         val target = targetAt(x, y)
         hoveredTargetId = target?.id
         canDrop = target?.accepts?.invoke(dragged) == true
-        if (canDrop) target?.onDragOver?.invoke(dragged, x, y)
+        val acceptedTarget = target.takeIf { canDrop }
+        if (activeTarget !== acceptedTarget) {
+            val previous = activeTarget
+            activeTarget = acceptedTarget
+            previous?.onDragExit?.invoke()
+        }
+        if (item === dragged && canDrop && activeTarget === acceptedTarget) target?.onDragOver?.invoke(dragged, x, y)
     }
 
     /** Hands the item to the target under the pointer; the drag always ends. */
@@ -68,9 +75,12 @@ class UiDragAndDropState {
     }
 
     fun cancel() {
+        val previous = activeTarget
+        activeTarget = null
         item = null
         hoveredTargetId = null
         canDrop = false
+        previous?.onDragExit?.invoke()
     }
 
     internal fun register(target: UiDropTarget): () -> Unit {
@@ -81,8 +91,7 @@ class UiDragAndDropState {
         }
     }
 
-    private fun targetAt(x: Float, y: Float): UiDropTarget? =
-        targets.lastOrNull { it.contains(x, y) }
+    private fun targetAt(x: Float, y: Float): UiDropTarget? = targets.lastOrNull { it.contains(x, y) }
 }
 
 /** A registered drop area. Bounds and the ancestor clip are updated by the layout pass. */
@@ -92,10 +101,11 @@ internal class UiDropTarget(
     var clip: UiRect? = null,
     var accepts: (UiDragItem) -> Boolean = { true },
     var onDragOver: (UiDragItem, Float, Float) -> Unit = { _, _, _ -> },
+    var onDragExit: () -> Unit = {},
     var onDrop: (UiDragItem, Float, Float) -> Boolean = { _, _, _ -> false },
 ) {
-    fun contains(x: Float, y: Float): Boolean = bounds.width > 0f && bounds.height > 0f &&
-        bounds.contains(x, y) && clip?.contains(x, y) != false
+    fun contains(x: Float, y: Float): Boolean =
+        bounds.width > 0f && bounds.height > 0f && bounds.contains(x, y) && clip?.contains(x, y) != false
 }
 
 internal data class UiDropTargetModifier(val target: UiDropTarget) : Modifier
@@ -108,8 +118,7 @@ val LocalDragAndDrop = staticCompositionLocalOf<UiDragAndDropState?> { null }
  */
 fun Modifier.dragSource(state: UiDragAndDropState?, item: () -> UiDragItem?): Modifier {
     if (state == null) return this
-    return input(draggable = true)
-        .onDrag { event ->
+    return input(draggable = true).onDrag { event ->
             if (!event.isLeftClick()) return@onDrag
             if (state.isDragging) {
                 state.move(event.rootLocalX, event.rootLocalY)
@@ -120,8 +129,7 @@ fun Modifier.dragSource(state: UiDragAndDropState?, item: () -> UiDragItem?): Mo
             val dragged = item() ?: return@onDrag
             state.begin(dragged, event.rootLocalX, event.rootLocalY)
             event.consume()
-        }
-        .onRelease {
+        }.onRelease {
             if (state.isDragging) state.drop()
         }
 }
@@ -138,12 +146,22 @@ fun Modifier.dropTarget(
     accepts: (UiDragItem) -> Boolean = { true },
     onDragOver: (UiDragItem, Float, Float) -> Unit = { _, _, _ -> },
     onDrop: (UiDragItem, Float, Float) -> Boolean,
+): Modifier = dropTarget(id, accepts, onDragOver, onDragExit = {}, onDrop = onDrop)
+
+@Composable
+fun Modifier.dropTarget(
+    id: String? = null,
+    accepts: (UiDragItem) -> Boolean = { true },
+    onDragOver: (UiDragItem, Float, Float) -> Unit = { _, _, _ -> },
+    onDragExit: () -> Unit,
+    onDrop: (UiDragItem, Float, Float) -> Boolean,
 ): Modifier {
     val state = LocalDragAndDrop.current ?: return this
     val target = remember(id) { UiDropTarget(id) }
     SideEffect {
         target.accepts = accepts
         target.onDragOver = onDragOver
+        target.onDragExit = onDragExit
         target.onDrop = onDrop
     }
     DisposableEffect(state, target) {
@@ -160,8 +178,7 @@ fun UiDragGhost(state: UiDragAndDropState, layer: Int = 500) {
     if (item.icon == null && item.label == null) return
     Box(
         tags = listOf("drag-ghost"),
-        modifier = Modifier
-            .position((state.pointerX + DragGhostOffset).px, (state.pointerY + DragGhostOffset).px)
+        modifier = Modifier.position((state.pointerX + DragGhostOffset).px, (state.pointerY + DragGhostOffset).px)
             .layer(layer),
     ) {
         Row(tags = listOf("drag-ghost-content"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
