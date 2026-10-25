@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.analysis.api.scopes.KaTypeScope
 import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -337,30 +338,30 @@ private fun CompletionItemsCollector.completeAfterDot(
         is KaPackageSymbol -> {
             phase(CompletionCloseness.SCOPE)
             completePackage(file, receiverTarget.fqName, nameFilter, onlyPackages)
+            return@with
         }
 
-        else -> {
-            val receiverType = position.receiver.expressionType
+        else -> Unit
+    }
 
-            if (receiverType == null || receiverType is org.jetbrains.kotlin.analysis.api.types.KaErrorType) return@with
+    val receiverType = position.receiver.expressionType
+    if (receiverType == null || receiverType is KaErrorType) return@with
 
-            phase(CompletionCloseness.MEMBER)
-            receiverType.scope?.let { completeTypeScope(it) }
+    phase(CompletionCloseness.MEMBER)
+    receiverType.scope?.let { completeTypeScope(it) }
 
-            if (position.prefix != null) {
-                phase(CompletionCloseness.SCOPE)
-                val scopeContext = file.scopeContext(element)
-                for (scope in scopeContext.scopes) {
-                    add(scope.scope.callables(nameFilter).filterShadowedJavaFields().filter { it.isExtension })
-                }
-            }
-
-            phase(CompletionCloseness.IMPORTED)
-            add(getKotlinDeclarationsFromIndex(file, nameFilter).filter { symbol ->
-                symbol is KaCallableSymbol && symbol.isExtension
-            }) { withImport() }
+    if (position.prefix != null) {
+        phase(CompletionCloseness.SCOPE)
+        val scopeContext = file.scopeContext(element)
+        for (scope in scopeContext.scopes) {
+            add(scope.scope.callables(nameFilter).filterShadowedJavaFields().filter { it.isExtension })
         }
     }
+
+    phase(CompletionCloseness.IMPORTED)
+    add(getKotlinDeclarationsFromIndex(file, nameFilter).filter { symbol ->
+        symbol is KaCallableSymbol && symbol.isExtension
+    }) { withImport() }
 }
 
 context(kaSession: KaSession)
