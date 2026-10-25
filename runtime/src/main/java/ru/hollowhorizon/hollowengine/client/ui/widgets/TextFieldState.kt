@@ -39,6 +39,8 @@ class TextFieldState(
 ) : UndoOwner {
     val scroll: UiScrollHandle = UiScrollHandle()
     internal val autoScroll = TextFieldAutoScroll()
+    internal val dropPreview = TextFieldDropPreview()
+    internal val gutter = TextFieldGutterCapacity()
     val folding = TextFieldFolding()
 
     var fontSize: Float by mutableStateOf(fontSize)
@@ -124,6 +126,12 @@ class TextFieldState(
     }
 
     fun typeCharacter(char: Char): Boolean = typeCodeCharacter(char)
+
+    fun moveSelections(target: Int, copy: Boolean = false): Boolean = transferSelections(target, copy)
+
+    fun previewDropAt(x: Float, y: Float) = dropPreview.track(x, y, offsetAtPoint)
+
+    fun clearDropPreview() = dropPreview.clear()
 
     fun backspace(word: Boolean = false): Boolean {
         if (readOnly) return false

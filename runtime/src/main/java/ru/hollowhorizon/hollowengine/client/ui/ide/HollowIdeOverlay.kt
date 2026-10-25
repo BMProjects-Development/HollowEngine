@@ -838,8 +838,8 @@ object HollowIdeOverlay {
 
     @Composable
     private fun WatchTextFiles() {
-        val paths = model.files.values.filter { it.textFileSync != null }
-            .map { it.path.fromReadablePath().toPath() }.sorted()
+        val paths =
+            model.files.values.filter { it.textFileSync != null }.map { it.path.fromReadablePath().toPath() }.sorted()
         LaunchedEffect(paths) {
             if (paths.isNotEmpty()) watchIdeFiles(paths) { refreshFilesRequested.set(true) }
         }
@@ -1037,10 +1037,7 @@ object HollowIdeOverlay {
             expanded = openDropdown == "windows",
             onExpandedChange = { openDropdown = if (it) "windows" else null },
             items = hollowIdeWindowMenuItems(
-                model,
-                dock,
-                contributions.windowMenu(),
-                ::applyDefaultLayout
+                model, dock, contributions.windowMenu(), ::applyDefaultLayout
             ) + contributions.menuItems(HollowIdeMenu.WINDOW),
         )
         UiDropdown(
@@ -1173,6 +1170,7 @@ object HollowIdeOverlay {
                 onCreateSoundEvents = project::createSoundEvents,
                 onRename = project::openRenameDialog,
                 onCopy = { project.copy(it, cut = false) },
+                onCopyPath = project::copyPath,
                 onCut = { project.copy(it, cut = true) },
                 onPaste = project::pasteInto,
                 onShowInExplorer = project::showInExplorer,
@@ -1180,8 +1178,7 @@ object HollowIdeOverlay {
                 onDismiss = { project.closePopups() },
                 contributedActions = { menu ->
                     contributions.projectActions(
-                        menu.path,
-                        menu.path.fromReadablePath().isDirectory
+                        menu.path, menu.path.fromReadablePath().isDirectory
                     )
                 },
             )
@@ -1236,8 +1233,9 @@ object HollowIdeOverlay {
                 modifier = Modifier.grow(1f).dropTarget(
                     accepts = { !file.readOnly && it.payload is HollowIdeFileDrag },
                     onDragOver = { _, x, y ->
-                        editorState.offsetAtPoint?.invoke(x, y)?.let(editorState::moveCaret)
+                        editorState.previewDropAt(x, y)
                     },
+                    onDragExit = editorState::clearDropPreview,
                     onDrop = { item, x, y ->
                         val dropped = item.payload as? HollowIdeFileDrag ?: return@dropTarget false
                         insertFileReference(file, editorState, dropped.path, x, y)
