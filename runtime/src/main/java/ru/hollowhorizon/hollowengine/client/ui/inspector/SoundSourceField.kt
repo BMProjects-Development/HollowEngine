@@ -68,7 +68,7 @@ fun SoundAuditionButton(value: String, playback: SoundPlayback = SoundPlayback()
             sound = null
             playing = true
             Minecraft.getInstance().execute {
-                sound = ClientSounds.play(source, playback.copy(mode = SoundMode.GLOBAL), id = AUDITION)
+                sound = ClientSounds.play(source, playback.copy(mode = SoundMode.GLOBAL), id = AUDITION, pauseWithGame = false)
             }
         }
     }
