@@ -1,4 +1,5 @@
 {
+  "clear": "Очистить все записи",
   "command_hint": "Введите команду...",
   "kotlin_hint": "Kotlin: player, level, server. Ctrl+Enter - запуск",
   "no_world": "Нет мира: переключитесь на Kotlin, чтобы запускать код",

@@ -110,6 +110,12 @@ private fun ConsoleToolbar(console: HollowIdeConsole) {
             tags = listOf("console-auto-scroll"),
             modifier = Modifier.tooltipOnHover("$LANG.auto_scroll".lang),
         )
+        ConsoleIconButton(
+            id = "console-clear",
+            icon = ClearIcon,
+            tooltip = "$LANG.clear".lang,
+            onClick = console::clearLogView,
+        )
     }
 }
 
@@ -127,8 +133,11 @@ private fun ConsoleLog(console: HollowIdeConsole) {
 
     val filter = remember(console.filterText) { ConsoleLogFilter.compile(console.filterText) }
     val minimumLevel = console.minimumLevel
-    val visibleEntries = remember(snapshot, minimumLevel, filter) {
-        snapshot.entries.filter { entry -> entry.level.ordinal <= minimumLevel.ordinal && filter.matches(entry) }
+    val firstVisibleId = console.firstVisibleLogId
+    val visibleEntries = remember(snapshot, minimumLevel, filter, firstVisibleId) {
+        snapshot.entries.filter { entry ->
+            entry.id >= firstVisibleId && entry.level.ordinal <= minimumLevel.ordinal && filter.matches(entry)
+        }
     }
 
     val document = remember { ConsoleLogDocument() }
@@ -417,3 +426,4 @@ private const val RunIcon = "hollowengine:textures/gui/icons/play.svg"
 private const val StopIcon = "hollowengine:textures/gui/icons/stop.svg"
 private const val MaximizeIcon = "hollowengine:textures/gui/icons/maximize.svg"
 private const val MinimizeIcon = "hollowengine:textures/gui/icons/minimize.svg"
+private const val ClearIcon = "hollowengine:textures/gui/icons/actions/delete.svg"

@@ -123,36 +123,26 @@ class TextFieldState(
         )
     }
 
-    fun typeCharacter(char: Char): Boolean {
-        if (!autoPairs) return insert(char.toString())
-        if (trySkipClosingPair(char)) return true
-
-        val closing = AutoPairClosings[char] ?: return insert(char.toString())
-        if (activeCaretRanges().any { it.hasSelection }) return insert(char.toString())
-
-        val changed = insert("$char$closing")
-        if (changed) moveCarets({ range -> range.position - 1 })
-        return changed
-    }
+    fun typeCharacter(char: Char): Boolean = typeCodeCharacter(char)
 
     fun backspace(word: Boolean = false): Boolean {
         if (readOnly) return false
         if (activeCaretRanges().any { it.hasSelection }) return replaceSelectedRanges("")
-        if (!word && multiline && deleteWhitespaceOnlyLineBeforeCaret()) return true
-        if (!word && autoPairs) {
-            val pairRanges = activeCaretRanges().mapNotNull { range ->
-                val opening = text.getOrNull(range.position - 1) ?: return@mapNotNull null
-                val closing = text.getOrNull(range.position) ?: return@mapNotNull null
-                if (AutoPairClosings[opening] == closing) TextEditRange(range.position - 1, range.position + 1) else null
-            }
-            if (pairRanges.size == activeCaretRanges().size && pairRanges.isNotEmpty()) {
-                return replaceRanges(pairRanges, "")
-            }
-        }
         val ranges = activeCaretRanges().mapNotNull { range ->
-            if (range.position <= 0) null
-            else TextEditRange(folding.visibleOffset(if (word) wordLeft(text, range.position) else range.position - 1,
-                range.position), range.position)
+            val position = range.position
+            if (position <= 0) return@mapNotNull null
+            val opening = text.getOrNull(position - 1)
+            val closing = text.getOrNull(position)
+            if (!word && autoPairs && opening != null && closing != null && EditorPairClosings[opening] == closing) {
+                TextEditRange(position - 1, position + 1)
+            } else {
+                val edit = when {
+                    word -> TextFieldCodeEdit(wordLeft(text, position), position, "")
+                    multiline -> indentationBackspaceEdit(text, position, indentSize)
+                    else -> TextFieldCodeEdit(position - 1, position, "")
+                }
+                TextEditRange(folding.visibleOffset(edit.start, position), edit.end)
+            }
         }
         return replaceRanges(ranges, "")
     }
@@ -168,50 +158,12 @@ class TextFieldState(
         return replaceRanges(ranges, "")
     }
 
-    fun indent(): Boolean {
-        if (readOnly) return false
-        val size = indentSize ?: return false
-        if (!multiline) return false
-        if (activeCaretRanges().all { !it.hasSelection }) return insert(" ".repeat(size))
+    fun indent(): Boolean = indentLines()
 
-        val lineStarts = selectedLineStarts()
-        if (lineStarts.isEmpty()) return false
-        return replaceRanges(lineStarts.map { TextEditRange(it, it) }, " ".repeat(size))
-    }
+    fun unindent(): Boolean = unindentLines()
 
-    fun unindent(): Boolean {
-        if (readOnly) return false
-        val size = indentSize ?: return false
-        if (!multiline) return false
-        val ranges = selectedLineStarts().mapNotNull { start ->
-            val end = (start + size).coerceAtMost(text.length)
-            val removable = text.substring(start, end).takeWhile { it == ' ' }.length
-            removable.takeIf { it > 0 }?.let { TextEditRange(start, start + it) }
-        }
-        return replaceRanges(ranges, "")
-    }
+    fun insertNewlineWithIndent(): Boolean = newlineWithIndent()
 
-    fun insertNewlineWithIndent(): Boolean {
-        if (readOnly || !multiline) return false
-        val size = indentSize ?: return insert("\n")
-        if (activeCaretRanges().any { it.hasSelection }) return insert("\n")
-
-        val edits = activeCaretRanges().map { newlineEdit(text, it.position, size) }
-            .distinctBy { it.start to it.end }.sortedBy { it.start }
-        if (edits.zipWithNext().any { (left, right) -> right.start < left.end }) return false
-        val carets = ArrayList<UiTextCaret>()
-        val next = buildString {
-            var cursor = 0
-            for (edit in edits) {
-                append(text, cursor, edit.start)
-                carets += UiTextCaret(length + edit.caretOffset)
-                append(edit.replacement)
-                cursor = edit.end
-            }
-            append(text, cursor, text.length)
-        }
-        return applyEdit(next, carets)
-    }
     /**
      * Applies a programmatic edit (e.g. accepting a completion item) as a single undoable step:
      * the whole next text plus the carets it should leave behind.
@@ -466,42 +418,6 @@ class TextFieldState(
 
     private fun activeCaretRanges(): List<UiTextCaret> = if (multiCaret) caretRanges else caretRanges.take(1)
 
-    private fun trySkipClosingPair(char: Char): Boolean {
-        if (char !in AutoPairClosings.values) return false
-        if (activeCaretRanges().any { it.hasSelection || text.getOrNull(it.position) != char }) return false
-        moveCarets({ range -> range.position + 1 })
-        return true
-    }
-
-    private fun deleteWhitespaceOnlyLineBeforeCaret(): Boolean {
-        val position = caret.coerceIn(0, text.length)
-        val lineStart = text.lastIndexOf('\n', (position - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
-        val lineEnd = text.indexOf('\n', position).let { if (it < 0) text.length else it }
-        if (lineEnd <= lineStart) return false
-        if (text.substring(lineStart, lineEnd).any { it != ' ' }) return false
-
-        val deleteStart = if (lineStart > 0) lineStart - 1 else 0
-        val deleteEnd = if (lineStart == 0 && lineEnd < text.length) lineEnd + 1 else lineEnd
-        return replaceRanges(listOf(TextEditRange(deleteStart, deleteEnd)), "")
-    }
-
-    private fun selectedLineStarts(): List<Int> {
-        val starts = linkedSetOf<Int>()
-        for (range in activeCaretRanges()) {
-            val from = range.selectionStart.coerceIn(0, text.length)
-            val rawTo = range.selectionEnd.coerceIn(0, text.length)
-            val to = if (rawTo > from && text.getOrNull(rawTo - 1) == '\n') rawTo - 1 else rawTo
-            var lineStart = text.lastIndexOf('\n', (from - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
-            while (lineStart <= to) {
-                starts += lineStart
-                val next = text.indexOf('\n', lineStart)
-                if (next < 0 || next >= to) break
-                lineStart = next + 1
-            }
-        }
-        return starts.toList()
-    }
-
     private fun recordHistorySnapshot() {
         if (restoringHistory) return
         history.record(SnapshotStep(this, TypingLabel, historyEntry(), ::historyEntry, ::restoreHistory), TypingMergeKey)
@@ -534,10 +450,3 @@ private const val TextFieldStateHistoryLimit = 128
 private const val TextFieldStateHistoryMergeWindowNanos = 600_000_000L
 private const val TypingMergeKey = "typing"
 private val TypingLabel = UndoLabel("${UndoLabel.LANG}.typing")
-private val AutoPairClosings = mapOf(
-    '(' to ')',
-    '[' to ']',
-    '{' to '}',
-    '"' to '"',
-    '\'' to '\'',
-)

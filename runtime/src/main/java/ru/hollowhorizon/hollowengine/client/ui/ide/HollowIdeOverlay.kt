@@ -1192,13 +1192,6 @@ object HollowIdeOverlay {
                 onConfirm = project::applyNameDialog,
                 onCancel = project::cancelNameDialog,
             )
-            LaunchedEffect(dialog?.action, dialog?.path) {
-                if (dialog == null) return@LaunchedEffect
-                Minecraft.getInstance().execute {
-                    pipeline.await()
-                    surface.runtime.focus(ProjectNameDialogInputId)
-                }
-            }
         }
     }
 

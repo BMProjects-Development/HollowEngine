@@ -7,7 +7,7 @@ import androidx.compose.runtime.*
  * [OverlayHost] reads [content] (and [layer] for ordering) to compose the popup out-of-line, on top of
  * everything. [key] is a stable identity so the host can `key()` each popup across list changes.
  */
-class PopupEntry(val key: Any) {
+class PopupEntry(val key: Any, val id: String? = null) {
     var layer by mutableStateOf(0)
     var dismissOnOutside by mutableStateOf(true)
 
@@ -45,6 +45,7 @@ class OverlayManager {
      * finishes the exit transition; immediate entries are removed on disposal.
      */
     fun register(entry: PopupEntry): () -> Unit {
+        entry.id?.let { id -> popups.removeAll { it.exiting && it.id == id } }
         entry.exiting = false
         popups += entry
         return {

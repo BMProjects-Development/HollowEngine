@@ -751,8 +751,8 @@ fun Popup(
     }
     val isModal = rememberUpdatedState(modal)
     val parentLayer = LocalPopupLayer.current
-    val entry = remember {
-        PopupEntry(Any()).apply {
+    val entry = remember(id) {
+        PopupEntry(Any(), id).apply {
             this.content = {
                 PopupNodeEmitter(
                     anchorBounds = anchor.value,
