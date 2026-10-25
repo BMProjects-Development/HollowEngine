@@ -105,6 +105,8 @@ internal fun HollowIdeProjectNameDialog(
         tags = listOf("dropdown-popup", "project-name-dialog"),
         modal = true,
     ) {
+        val focus = LocalUiFocusRequester.current
+        LaunchedEffect(Unit) { focus.request(ProjectNameDialogInputId) }
         Text(dialog.title, tags = listOf("project-name-dialog-title"))
         TextField(
             value = dialog.name,

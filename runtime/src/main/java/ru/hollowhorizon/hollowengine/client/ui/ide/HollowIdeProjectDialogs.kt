@@ -40,6 +40,8 @@ internal fun HollowIdeProjectDialogs(packaging: HollowIdeProjectPackaging) {
 @Composable
 private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSettingsForm) {
     ProjectDialog("project-settings", "$LANG.settings.title".lang, packaging::cancelSettings) {
+        val focus = LocalUiFocusRequester.current
+        LaunchedEffect(Unit) { focus.request("project-settings-id") }
         val viewport = LocalUiViewport.current
         Column(
             id = "project-settings-fields",
@@ -190,6 +192,8 @@ private fun ExportDialog(packaging: HollowIdeProjectPackaging, form: ProjectExpo
             val blocked = properties.id == DEFAULT_SANDBOX_NAMESPACE
             Paragraph("${properties.displayName} (${properties.id})")
             Field("$LANG.field.version".lang, form.version, "project-export-version") { form.version = it }
+            val focus = LocalUiFocusRequester.current
+            LaunchedEffect(Unit) { focus.request("project-export-version") }
             Row(
                 tags = listOf("project-dialog-checkbox-row"),
                 modifier = Modifier.alignItems(vertical = UiAlign.CENTER),

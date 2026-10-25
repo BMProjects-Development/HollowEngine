@@ -1,4 +1,5 @@
 {
+  "clear": "Clear all entries",
   "command_hint": "Enter a command...",
   "kotlin_hint": "Kotlin: player, level, server. Ctrl+Enter runs it",
   "no_world": "No world: switch to Kotlin to run code here",

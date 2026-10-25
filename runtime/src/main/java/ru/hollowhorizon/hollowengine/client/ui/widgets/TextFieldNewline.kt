@@ -15,23 +15,20 @@ internal fun newlineEdit(text: String, caret: Int, indentSize: Int): NewlineEdit
     }
     val before = text.substring(lineStart, position).trimEnd(' ', '\t')
     val after = text.substring(position, lineEnd).trimStart(' ', '\t')
-    var baseIndent = line.takeWhile { it == ' ' || it == '\t' }
-    var previousOpens = false
-    if (line.isBlank()) {
-        val previous = text.substring(0, lineStart).lineSequence().lastOrNull { it.isNotBlank() }
-        if (previous != null) {
-            baseIndent = previous.takeWhile { it == ' ' || it == '\t' }
-            previousOpens = previous.trimEnd().lastOrNull()?.let { it in "{([" } == true
-        } else if (indentSize > 0) {
-            baseIndent = " ".repeat((position - lineStart) / indentSize * indentSize)
-        }
-    }
+    val structure = TextFieldCodeStructure(text, position)
+    val structuralIndent = structure.blockIndent(position, indentSize)
+    val currentIndent = line.takeWhile { it == ' ' || it == '\t' }
     val opening = before.lastOrNull()
+    val opens = opening?.let { it in "{([" } == true
+    val baseIndent = when {
+        line.isBlank() -> structuralIndent.orEmpty()
+        !opens && before.trimStart().startsWith('.') -> structuralIndent.orEmpty()
+        else -> currentIndent
+    }
     val closing = after.firstOrNull()
-    val opens = opening?.let { it in "{([" } == true || line.isBlank() && previousOpens
     val closes = closing?.let { it in "})]" } == true
     val pair = when (opening) { '{' -> '}'; '(' -> ')'; '[' -> ']'; else -> null }
-    val splitPair = opens && closes && (pair == closing || line.isBlank())
+    val splitPair = opens && closes && pair == closing
     val indent = if (opens) baseIndent + " ".repeat(indentSize.coerceAtLeast(0)) else baseIndent
     // Whitespace around block delimiters belongs to the old inline layout.
     val start = if (opens && before.isNotEmpty()) lineStart + before.length else position
