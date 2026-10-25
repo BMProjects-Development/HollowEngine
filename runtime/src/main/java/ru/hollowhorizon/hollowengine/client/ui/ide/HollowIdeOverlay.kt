@@ -1196,7 +1196,7 @@ object HollowIdeOverlay {
     private fun FileEditor(file: HollowIdeOpenFile) {
         val editorSession = remember(file.path) { editorSession(file.path) }
         val editorState = editorState(file)
-        remember(file, file.externalTextRevision) {
+        LaunchedEffect(file, file.externalTextRevision) {
             editorState.setText(file.text, moveCaretToEnd = false)
         }
         val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
@@ -1249,18 +1249,20 @@ object HollowIdeOverlay {
                         editorSession.requestAnalysis(text, text.length)
                         dock.updateItem(file.dockItem())
                     },
-                    highlighter = editorSession.highlighter,
-                    completions = if (file.readOnly) null else editorSession.completions,
-                    signatureHelp = editorSession.signatures,
-                    hoverInfo = editorSession.hover,
-                    diagnostics = diagnostics,
-                    folds = structure.folds,
-                    gutterMarkers = gutterMarkers,
-                    searchMatches = matches,
-                    activeSearchMatch = find?.let { matches.getOrNull(it.currentIndex) },
-                    inlayHints = inlayHints,
-                    inlayRevision = analysisRevision,
-                    onInlayAction = { action -> runInlayAction(file, action) },
+                    insight = UiCodeInsight(
+                        highlighter = editorSession.highlighter,
+                        completions = if (file.readOnly) null else editorSession.completions,
+                        signatureHelp = editorSession.signatures,
+                        hover = editorSession.hover,
+                        diagnostics = diagnostics,
+                        inlayHints = inlayHints,
+                        onInlayAction = { action -> runInlayAction(file, action) },
+                        completionRevision = analysisRevision,
+                        inlayRevision = analysisRevision,
+                    ),
+                    view = UiCodeView(folds = structure.folds, markers = gutterMarkers),
+                    search = UiTextSearch(matches, find?.let { matches.getOrNull(it.currentIndex) }),
+                    syntax = KotlinCodeSyntax.takeIf { file.path.isKotlinSource() },
                     readOnly = file.readOnly,
                     fontSize = fontSize,
                     state = editorState,

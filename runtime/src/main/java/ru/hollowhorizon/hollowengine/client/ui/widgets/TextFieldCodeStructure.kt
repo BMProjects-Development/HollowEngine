@@ -1,15 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinLexerMode
-import ru.hollowhorizon.hollowengine.common.scripting.ide.kotlinLexerModeAt
-
-/** Shares the language's lexical rules, so delimiters inside literals and comments never affect edits. */
-internal class TextFieldCodeStructure(private val text: String, limit: Int) {
+/** Reads [text] by the language's [syntax], so delimiters inside literals and comments never affect edits. */
+internal class TextFieldCodeStructure(private val text: String, limit: Int, syntax: UiCodeSyntax) {
     private val code = BooleanArray(limit)
-    private val lineModes = HashMap<Int, KotlinLexerMode>()
+    private val stringLines = HashSet<Int>()
 
     init {
-        text.kotlinLexerModeAt(limit, { code[it] = true }, { offset, mode -> lineModes[offset] = mode })
+        syntax.scan(text, limit, { code[it] = true }, { offset, inString -> if (inString) stringLines += offset })
     }
 
     fun openingsBefore(position: Int): List<Int> {
@@ -29,44 +26,66 @@ internal class TextFieldCodeStructure(private val text: String, limit: Int) {
         text.indentOfLine(it) + " ".repeat(size.coerceAtLeast(0))
     }
 
-    fun preservesLineIndent(position: Int): Boolean = lineModes[position].let {
-        it == KotlinLexerMode.RAW_STRING || it == KotlinLexerMode.REGULAR_STRING
-    }
+    fun preservesLineIndent(position: Int): Boolean = position in stringLines
 
-    /** Only edits line prefixes, allowing all other carets and selections to be mapped exactly. */
+    /** Indents the block that the [char] at [position] closes. */
     fun closingIndents(position: Int, char: Char, size: Int): List<TextFieldIndentEdit> {
         if (char !in "})]") return emptyList()
         val start = lineStart(text, position)
         if (text.substring(start, position).any { it != ' ' && it != '\t' }) return emptyList()
         val opening = openingsBefore(position).lastOrNull() ?: return emptyList()
         if (EditorPairClosings[text[opening]] != char) return emptyList()
+        val step = " ".repeat(size.coerceAtLeast(0))
         val base = text.indentOfLine(opening)
+        val open = arrayListOf(base)
         var offset = text.indexOf('\n', opening).takeIf { it in (opening + 1) until position }?.plus(1) ?: start
-        var depth = 1
+        var previousEnd: Int? = null
         val edits = ArrayList<TextFieldIndentEdit>()
         while (offset <= start) {
             val end = lineEnd(text, offset)
             val first = (offset until end).firstOrNull { text[it] != ' ' && text[it] != '\t' }
+            var indent = first?.let { text.substring(offset, it) }
             if (first != null && !preservesLineIndent(offset)) {
                 val closes = code[first] && text[first] in "})]"
-                val indent = if (offset == start) base
-                else base + " ".repeat((depth - if (closes) 1 else 0).coerceAtLeast(0) * size.coerceAtLeast(0))
+                indent = when {
+                    offset == start -> base
+                    closes -> open.last()
+                    continues(first, previousEnd) -> open.last() + step + step
+                    else -> open.last() + step
+                }
                 edits += TextFieldIndentEdit(offset, first, indent)
             }
+            val depth = open.size
             for (index in offset until end) {
                 if (!code[index]) continue
-                if (text[index] in "{([") depth++
-                else if (text[index] in "})]") depth--
+                if (text[index] in "{([") open += indent.orEmpty()
+                else if (text[index] in "})]" && open.size > 1) open.removeAt(open.lastIndex)
             }
+            if (first != null) previousEnd = lastCodeIndex(offset, end).takeIf { open.size <= depth }
             offset = end + 1
         }
         return edits
+    }
+
+    /** Whether the line starting with code at [first] goes on with the expression that ended at [previousEnd]. */
+    private fun continues(first: Int, previousEnd: Int?): Boolean {
+        if (code[first] && ContinuationStarts.any { text.startsWith(it, first) }) return true
+        val end = previousEnd ?: return false
+        return ContinuationEnds.any { end - it.length + 1 >= 0 && text.startsWith(it, end - it.length + 1) }
+    }
+
+    private fun lastCodeIndex(from: Int, to: Int): Int? =
+        (to - 1 downTo from).firstOrNull { code[it] && !text[it].isWhitespace() }
+
+    private companion object {
+        val ContinuationStarts = listOf(".", "?.", "?:", "&&", "||")
+        val ContinuationEnds = listOf("=", "+", "-", "*", "/", "%", "&&", "||", "?:", "->")
     }
 }
 
 internal data class TextFieldIndentEdit(val start: Int, val end: Int, val replacement: String)
 
-internal fun String.indentOfLine(position: Int): String = substring(lineStart(this, position), lineEnd(this, position))
-    .takeWhile { it == ' ' || it == '\t' }
+internal fun String.indentOfLine(position: Int): String =
+    substring(lineStart(this, position), lineEnd(this, position)).takeWhile { it == ' ' || it == '\t' }
 
 internal val EditorPairClosings = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'')

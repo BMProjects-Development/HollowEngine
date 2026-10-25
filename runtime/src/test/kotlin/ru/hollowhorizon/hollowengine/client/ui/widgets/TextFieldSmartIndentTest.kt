@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinCodeSyntax
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -8,7 +9,7 @@ class TextFieldSmartIndentTest {
     private fun field(source: String, size: Int? = 4, autoPairs: Boolean = true): TextFieldState {
         val position = source.indexOf('|')
         return TextFieldState(source.removeRange(position, position + 1), position,
-            multiline = true, indentSize = size, autoPairs = autoPairs)
+            multiline = true, indentSize = size, autoPairs = autoPairs, syntax = KotlinCodeSyntax)
     }
 
     @Test
@@ -149,7 +150,7 @@ class TextFieldSmartIndentTest {
     @Test
     fun `multiple carets independently join lines and indent continuations`() {
         val source = "foo {\n    bar()\n}\nother {\n    baz()"
-        val state = TextFieldState(source, multiline = true)
+        val state = TextFieldState(source, multiline = true, syntax = KotlinCodeSyntax)
         state.setCarets(listOf(UiTextCaret(source.indexOf("bar()")), UiTextCaret(source.indexOf("baz()"))))
         state.backspace()
         assertEquals("foo {bar()\n}\nother {baz()", state.text)

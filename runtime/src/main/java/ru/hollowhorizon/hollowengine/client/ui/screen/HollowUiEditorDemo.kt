@@ -4,8 +4,11 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeEditorSession
+import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinCodeSyntax
 import ru.hollowhorizon.hollowengine.client.ui.widgets.EditableTextField
 import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeEditing
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiInlayHintsProvider
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 
@@ -44,16 +47,18 @@ internal fun HollowUiEditorDemo(
             TextField(
                 value = codeText,
                 mode = UiTextFieldMode.MULTI_LINE,
-                multiCaret = true,
+                editing = UiCodeEditing(syntax = KotlinCodeSyntax),
                 onChange = { text ->
                     codeText = text
                     textFieldSession.requestAnalysis(text, text.length)
                 },
-                syntaxHighlighter = textFieldSession.highlighter,
-                completionContributor = textFieldSession.completions,
-                diagnostics = diagnostics,
-                inlayHintsProvider = textFieldInlays,
-                inlayRevision = textFieldRevision,
+                insight = UiCodeInsight(
+                    highlighter = textFieldSession.highlighter,
+                    completions = textFieldSession.completions,
+                    diagnostics = diagnostics,
+                    inlayHintsProvider = textFieldInlays,
+                    inlayRevision = textFieldRevision,
+                ),
                 placeholder = "Type code here",
                 tags = listOf("editor-text-field"),
                 modifier = Modifier.size(520.px, 210.px)
@@ -99,6 +104,7 @@ internal fun HollowUiEditorDemo(
                     multiline = true,
                     indentSize = 4,
                     autoPairs = true,
+                    syntax = KotlinCodeSyntax,
                     multiCaret = true,
                 )
             }
@@ -110,9 +116,11 @@ internal fun HollowUiEditorDemo(
             EditableTextField(
                 state = editableState,
                 tags = listOf("editable-text-field"),
-                syntaxHighlighter = editableSession.highlighter,
-                inlayHintsProvider = editableInlays,
-                inlayRevision = editableRevision,
+                insight = UiCodeInsight(
+                    highlighter = editableSession.highlighter,
+                    inlayHintsProvider = editableInlays,
+                    inlayRevision = editableRevision,
+                ),
                 modifier = Modifier.size(500.px, 180.px)
                     .background(UiColor(0.1f, 0.11f, 0.13f, 1f))
                     .padding(6.px),

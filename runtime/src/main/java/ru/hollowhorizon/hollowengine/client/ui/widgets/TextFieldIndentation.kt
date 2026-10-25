@@ -23,7 +23,7 @@ internal fun TextFieldState.newlineWithIndent(): Boolean {
     val size = indentSize ?: return insert("\n")
     if (caretRanges.any { it.hasSelection }) return insert("\n")
     return applyCodeEdits(caretRanges.map {
-        val edit = newlineEdit(text, it.position, size)
+        val edit = newlineEdit(text, it.position, size, syntax)
         TextFieldCodeEdit(edit.start, edit.end, edit.replacement, edit.caretOffset)
     })
 }

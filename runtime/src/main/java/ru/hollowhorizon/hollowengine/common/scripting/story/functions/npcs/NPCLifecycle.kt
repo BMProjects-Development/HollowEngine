@@ -46,7 +46,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
  *
  * @return Созданный экземпляр [NpcEntity], добавленный в мир.
  */
-@Deprecated("Use ServerLevel.spawnNPC(pos, id) { ... } to configure the NPC before spawning.")
+@Deprecated("Use ServerLevel.npc(pos, id) { ... } to configure the NPC before spawning.")
 fun npc(
     pos: Vec3,
     name: String = "NPC",
@@ -88,6 +88,12 @@ fun npc(
     }
 }
 
+/**
+ * Spawns an NPC at [pos] in this level, after [builder] set it up: model, name, attributes and the rest.
+ *
+ * @param id the author's id, such as `"village:blacksmith"`. When a live NPC has it, that NPC is returned and
+ * [builder] does not run, so a scene that starts again makes no twins.
+ */
 fun ServerLevel.npc(
     pos: Vec3,
     id: String? = null,

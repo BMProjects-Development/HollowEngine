@@ -1,13 +1,14 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinCodeSyntax
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TextFieldCodeEditingTest {
     private fun field(text: String, caret: Int = text.length, size: Int? = 4) =
-        TextFieldState(text, caret, multiline = true, indentSize = size)
+        TextFieldState(text, caret, multiline = true, indentSize = size, syntax = KotlinCodeSyntax)
 
     @Test
     fun `every opening delimiter surrounds the selection and undo restores its direction`() {
@@ -176,5 +177,28 @@ class TextFieldCodeEditingTest {
         assertFalse(state.backspace())
         assertFalse(state.insertNewlineWithIndent())
         assertEquals("value", state.text)
+    }
+
+    @Test
+    fun `closing a block keeps call chains and wrapped expressions one step deeper`() {
+        val chain = field("fun f() {\n    list\n        .map {\n            it\n        }\n")
+        chain.typeCharacter('}')
+        assertEquals("fun f() {\n    list\n        .map {\n            it\n        }\n}", chain.text)
+
+        val wrapped = field("fun f() {\nval x = a +\nb\nlist.map { x ->\nx\n}\n")
+        wrapped.typeCharacter('}')
+        assertEquals("fun f() {\n    val x = a +\n        b\n    list.map { x ->\n        x\n    }\n}", wrapped.text)
+    }
+
+    @Test
+    fun `text that is not Kotlin keeps plain indentation and pairs no apostrophe`() {
+        val story = TextFieldState("# Start\nSmith: What now\n", multiline = true, indentSize = 4)
+        repeat(3) { story.typeCharacter('.') }
+        assertEquals("# Start\nSmith: What now\n...", story.text, "a line of dialogue may start with an ellipsis")
+
+        val prose = TextFieldState("don", multiline = true, indentSize = 4)
+        prose.typeCharacter('\'')
+        prose.typeCharacter('(')
+        assertEquals("don'()", prose.text)
     }
 }

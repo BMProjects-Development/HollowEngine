@@ -14,7 +14,7 @@ internal fun TextFieldState.transferSelections(target: Int, copy: Boolean): Bool
         }
     if (ranges.isEmpty()) return false
     val at = target.coerceIn(0, text.length)
-    if (ranges.any { at in it.selectionStart..it.selectionEnd }) return false
+    if (ranges.any { if (copy) at in it.selectionStart + 1 until it.selectionEnd else at in it.selectionStart..it.selectionEnd }) return false
     val selected =
         ranges.joinToString(if (multiline) "\n" else " ") { text.substring(it.selectionStart, it.selectionEnd) }
     val without = if (copy) text else buildString {

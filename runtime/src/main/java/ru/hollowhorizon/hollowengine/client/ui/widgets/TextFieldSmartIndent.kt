@@ -1,18 +1,19 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.common.scripting.ide.isKotlinCodeAt
-import ru.hollowhorizon.hollowengine.common.scripting.ide.kotlinLexerModeAt
-
-internal fun indentationBackspaceEdit(text: String, position: Int, size: Int?): TextFieldCodeEdit {
+/**
+ * Deletes before [position]. With a [syntax], a line indented no deeper than its block joins the line above; otherwise
+ * the indent goes one step at a time.
+ */
+internal fun indentationBackspaceEdit(text: String, position: Int, size: Int?, syntax: UiCodeSyntax?): TextFieldCodeEdit {
     val start = lineStart(text, position)
     val prefix = text.substring(start, position)
     if (size == null || size <= 0 || prefix.any { it != ' ' && it != '\t' }) {
         return TextFieldCodeEdit(position - 1, position, "")
     }
-    if (start > 0 && text.isKotlinCodeAt(position)) {
-        val structure = TextFieldCodeStructure(text, position)
+    if (syntax != null && start > 0 && syntax.isCodeAt(text, position)) {
+        val structure = TextFieldCodeStructure(text, position, syntax)
         val line = text.substring(start, lineEnd(text, position)).trimStart(' ', '\t')
-        val chainIndent = if (line.startsWith('.') || line.startsWith("?.")) continuationIndent(text, start, size) else null
+        val chainIndent = if (line.startsWith('.') || line.startsWith("?.")) continuationIndent(text, start, size, syntax) else null
         val previousIndent = text.substring(0, start).lineSequence().lastOrNull { it.isNotBlank() }
             ?.takeWhile { it == ' ' || it == '\t' }.orEmpty()
         val normalIndent = chainIndent ?: structure.blockIndent(position, size) ?: previousIndent
@@ -37,19 +38,19 @@ private fun indentationBackspaceStart(text: String, position: Int, size: Int): I
 }
 
 /** Adds a continuation level only when the dot actually starts a new call-chain link. */
-internal fun continuationDotEdit(text: String, position: Int, size: Int): TextFieldCodeEdit? {
+internal fun continuationDotEdit(text: String, position: Int, size: Int, syntax: UiCodeSyntax): TextFieldCodeEdit? {
     val start = lineStart(text, position)
     if (start == 0) return null
     val prefix = text.substring(start, position)
     val safeCall = prefix.trimStart(' ', '\t') == "?"
     val indent = if (safeCall) prefix.dropLast(1) else prefix
-    if (indent.any { it != ' ' && it != '\t' } || !text.isKotlinCodeAt(position)) return null
-    val desired = continuationIndent(text, start, size) ?: return null
+    if (indent.any { it != ' ' && it != '\t' } || !syntax.isCodeAt(text, position)) return null
+    val desired = continuationIndent(text, start, size, syntax) ?: return null
     if (indent.indentColumns(size) >= desired.indentColumns(size)) return null
     return TextFieldCodeEdit(start, position, desired + if (safeCall) "?." else ".")
 }
 
-private fun continuationIndent(text: String, start: Int, size: Int): String? {
+private fun continuationIndent(text: String, start: Int, size: Int, syntax: UiCodeSyntax): String? {
     val previousStart = lineStart(text, start - 1)
     val previous = text.substring(previousStart, start - 1).trimEnd(' ', '\t')
     if (previous.isEmpty()) return null
@@ -58,7 +59,7 @@ private fun continuationIndent(text: String, start: Int, size: Int): String? {
     fun recordTokenEnd(index: Int) {
         if (index in previousStart until previousEnd && !text[index].isWhitespace()) lastTokenEnd = index
     }
-    text.kotlinLexerModeAt(previousEnd, onCodeCharacter = ::recordTokenEnd, onLiteralEnd = ::recordTokenEnd)
+    syntax.scan(text, previousEnd, onCode = ::recordTokenEnd, onLiteralEnd = ::recordTokenEnd)
     val ending = text.getOrNull(lastTokenEnd)
     if (ending == null || !(ending.isLetterOrDigit() || ending in "_)}]\"'`")) return null
 

@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
-import ru.hollowhorizon.hollowengine.common.scripting.ide.isKotlinCodeAt
+
 
 internal data class TextFieldCodeEdit(
     val start: Int,
@@ -41,8 +41,9 @@ internal fun TextFieldState.typeCodeCharacter(char: Char): Boolean {
     if (readOnly) return false
     val ranges = if (multiCaret) caretRanges else listOf(primaryCaret)
     val size = indentSize
-    if (char == '.' && multiline && size != null && size > 0) {
-        val continuations = ranges.map { if (it.hasSelection) null else continuationDotEdit(text, it.position, size) }
+    val code = syntax
+    if (char == '.' && code != null && multiline && size != null && size > 0) {
+        val continuations = ranges.map { if (it.hasSelection) null else continuationDotEdit(text, it.position, size, code) }
         if (continuations.any { it != null }) {
             return applyCodeEdits(ranges.zip(continuations) { range, edit ->
                 edit ?: TextFieldCodeEdit(range.selectionStart, range.selectionEnd, ".")
@@ -59,17 +60,17 @@ internal fun TextFieldState.typeCodeCharacter(char: Char): Boolean {
         }
     }
     val typed = codeEditResult(text, edits) ?: return false
-    val result = if (multiline && size != null && char in "})]") typed.reindentClosings(char, size) else typed
+    val result = if (code != null && multiline && size != null && char in "})]") typed.reindentClosings(char, size, code) else typed
     if (!filter.accepts(result.text)) return false
     val moved = result.carets != caretRanges
     return applyEdit(result.text, result.carets) || moved
 }
 
-private fun CodeEditResult.reindentClosings(char: Char, size: Int): CodeEditResult {
-    val structure = TextFieldCodeStructure(text, text.length)
+private fun CodeEditResult.reindentClosings(char: Char, size: Int, syntax: UiCodeSyntax): CodeEditResult {
+    val structure = TextFieldCodeStructure(text, text.length, syntax)
     val changes = carets.sortedByDescending { it.position }.flatMap { range ->
         val position = range.position - 1
-        if (position >= 0 && text.isKotlinCodeAt(position)) structure.closingIndents(position, char, size)
+        if (position >= 0 && syntax.isCodeAt(text, position)) structure.closingIndents(position, char, size)
         else emptyList()
     }.distinctBy { it.start }.sortedBy { it.start }
     if (changes.isEmpty()) return this
@@ -99,20 +100,30 @@ private fun TextFieldState.characterEdit(position: Int, char: Char): TextFieldCo
         return TextFieldCodeEdit(position, position + 1, char.toString())
     }
     val closing = EditorPairClosings[char]
-    return if (closing != null && text.isKotlinCodeAt(position)) {
+    return if (closing != null && pairs(position, char)) {
         TextFieldCodeEdit(position, position, "$char$closing", caretOffset = 1)
     } else TextFieldCodeEdit(position, position, char.toString())
+}
+
+/**
+ * Whether typing [char] at [position] adds its closing pair: with a [syntax], only in code, not in its strings and
+ * comments; in plain text, unless a quote follows a letter, as the apostrophe in "don't" does.
+ */
+private fun TextFieldState.pairs(position: Int, char: Char): Boolean {
+    syntax?.let { return it.isCodeAt(text, position) }
+    return char != '"' && char != '\'' || text.getOrNull(position - 1)?.isLetterOrDigit() != true
 }
 
 private fun TextFieldState.surroundEdit(range: UiTextCaret, opening: Char, closing: Char): TextFieldCodeEdit {
     val selected = text.substring(range.selectionStart, range.selectionEnd)
     val size = indentSize
-    val replacement = if (multiline && size != null && opening in "{([" && '\n' in selected && text.isKotlinCodeAt(range.selectionStart)) {
+    val code = syntax
+    val replacement = if (code != null && multiline && size != null && opening in "{([" && '\n' in selected && code.isCodeAt(text, range.selectionStart)) {
         val base = text.indentOfLine(range.selectionStart)
         val leading = text.substring(lineStart(text, range.selectionStart), range.selectionStart)
             .takeIf { prefix -> prefix.all { it == ' ' || it == '\t' } }.orEmpty()
         val lines = (leading + selected).split('\n')
-        val structure = TextFieldCodeStructure(text, text.length)
+        val structure = TextFieldCodeStructure(text, text.length, code)
         var offset = range.selectionStart - leading.length
         val content = lines.map { line ->
             val preserve = structure.preservesLineIndent(offset)

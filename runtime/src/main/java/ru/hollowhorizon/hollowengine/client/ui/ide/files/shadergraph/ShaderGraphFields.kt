@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraphNode
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderOptionKind
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderOptionSpec
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 
@@ -98,9 +99,11 @@ internal fun OptionField(
             value = current,
             id = id,
             fontSize = 9f,
-            syntaxHighlighter = ShaderExpressionEditing.highlighter,
-            completionContributor = ShaderExpressionEditing.completions,
-            diagnostics = ShaderExpressionEditing.diagnostics(current),
+            insight = UiCodeInsight(
+                highlighter = ShaderExpressionEditing.highlighter,
+                completions = ShaderExpressionEditing.completions,
+                diagnostics = ShaderExpressionEditing.diagnostics(current),
+            ),
             tags = listOf("sg-field", "sg-expression"),
             modifier = Modifier.size(0.px, ExpressionHeight.px).grow(1f),
             onChange = { actions.setOption(node.id, option.name, it) },

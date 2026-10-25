@@ -1,6 +1,7 @@
 {
   "already_exists": "A file by that name is already there",
   "deleted": "Deleted: %s",
+  "external_change_discarded": "%s changed outside the IDE: your unsaved edits were replaced by it",
   "save_failed": "Could not save %s, see the log",
   "invalid_name": "That file name cannot be used",
   "no_permissions_reload_server": "You don't have permissions to reload server resources!",
