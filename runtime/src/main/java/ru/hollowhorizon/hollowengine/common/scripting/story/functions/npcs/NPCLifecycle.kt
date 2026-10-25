@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs
 
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec2
 import net.minecraft.world.phys.Vec3
@@ -14,7 +15,6 @@ import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import kotlin.contracts.ExperimentalContracts
 
 /**
  * Создаёт и возвращает нового NPC (`NpcEntity`) в указанной позиции и с заданными параметрами внешнего вида, поведения и анимации.
@@ -46,7 +46,7 @@ import kotlin.contracts.ExperimentalContracts
  *
  * @return Созданный экземпляр [NpcEntity], добавленный в мир.
  */
-@OptIn(ExperimentalContracts::class)
+@Deprecated("Use ServerLevel.spawnNPC(pos, id) { ... } to configure the NPC before spawning.")
 fun npc(
     pos: Vec3,
     name: String = "NPC",
@@ -71,7 +71,7 @@ fun npc(
         ?: throw IllegalStateException("Dimension $world not found!"))
         ?: throw IllegalStateException("Dimension $world is not loaded!")
 
-    return NpcEntity(level).apply {
+    return level.npc(pos, id) {
         inventory.resize(inventorySize)
         moveTo(pos.x, pos.y, pos.z, rotation.x, rotation.y)
         yHeadRot = rotation.x
@@ -84,10 +84,26 @@ fun npc(
             setAttributes(attributes)
         }
 
-        refreshDimensions()
-
         setNameplate(name, nameplateMode)
+    }
+}
 
+fun ServerLevel.npc(
+    pos: Vec3,
+    id: String? = null,
+    builder: NpcEntity.() -> Unit = {},
+): NpcEntity {
+    val npcs = server.npcs
+    if (id != null) npcs.alive(id)?.let { return it }
+
+    return NpcEntity(this).apply {
+        moveTo(pos.x, pos.y, pos.z, 0f, 0f)
+        set(Model())
+        set(TransformComponent())
+        setNameplate("NPC")
+
+        builder()
+        refreshDimensions()
         npcs.spawn(this, id)
     }
 }
