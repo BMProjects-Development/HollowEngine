@@ -181,7 +181,7 @@ private class AudioFileState(path: String) {
         playing = true
         Minecraft.getInstance().execute {
             if (existing != null && existing.settings.repeat == settings.repeat) existing.resume()
-            else sound = ClientSounds.play(source, settings, id = id, start = from)
+            else sound = ClientSounds.play(source, settings, id = id, start = from, pauseWithGame = false)
         }
     }
 
@@ -209,7 +209,7 @@ private class AudioFileState(path: String) {
             return
         }
         Minecraft.getInstance().execute {
-            sound = ClientSounds.play(source, playingNow.settings, id = id, start = seconds)
+            sound = ClientSounds.play(source, playingNow.settings, id = id, start = seconds, pauseWithGame = false)
         }
     }
 }

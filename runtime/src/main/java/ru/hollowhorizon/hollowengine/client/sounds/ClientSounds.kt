@@ -27,13 +27,14 @@ object ClientSounds {
         val start: Double,
         val timeoutSeconds: Float,
         val paused: Boolean,
+        val pauseWithGame: Boolean,
         val onEnd: ((Boolean) -> Unit)?,
     )
 
     private val replays = LinkedHashMap<String, Replay>()
     private var lastFrame = 0L
 
-    /** Whether the sound engine holds every channel, as under the pause menu; nothing moves on then. */
+    /** Whether Minecraft holds gameplay channels. UI playback may opt out of this pause. */
     private var engineHeld = false
 
     fun enginePaused(paused: Boolean) {
@@ -55,12 +56,25 @@ object ClientSounds {
         timeoutSeconds: Float = DEFAULT_TIMEOUT,
         start: Double = 0.0,
         onEnd: ((playedThrough: Boolean) -> Unit)? = null,
+    ): ManagedSound = play(source, settings, emitter, id, timeoutSeconds, start, pauseWithGame = true, onEnd = onEnd)
+
+    /** [pauseWithGame] is false for UI previews, whose playback must continue under the pause menu. */
+    fun play(
+        source: SoundSource,
+        settings: SoundPlayback = SoundPlayback(),
+        emitter: SoundEmitter = SoundEmitter { SoundEmitterState.Listener },
+        id: String = UUID.randomUUID().toString(),
+        timeoutSeconds: Float = DEFAULT_TIMEOUT,
+        start: Double = 0.0,
+        pauseWithGame: Boolean,
+        onEnd: ((playedThrough: Boolean) -> Unit)? = null,
     ): ManagedSound {
         check(Minecraft.getInstance().isSameThread) { "Play sounds on the client thread" }
         require(timeoutSeconds.isFinite() && timeoutSeconds >= 0f)
         replays.remove(id)
         sounds[id]?.let { playing ->
             if (start == 0.0 && playing.reconfigure(source, settings, emitter)) {
+                playing.configureGamePause(pauseWithGame, engineHeld)
                 onEnd?.let { playing.onEnd = it }
                 return playing
             }
@@ -69,7 +83,7 @@ object ClientSounds {
             replaced.onEnd = null
             replaced.close()
         }
-        val sound = ManagedSound(id, source, settings, emitter, start.coerceAtLeast(0.0))
+        val sound = ManagedSound(id, source, settings, emitter, start.coerceAtLeast(0.0), pauseWithGame)
         sound.timeoutSeconds = timeoutSeconds
         sound.onEnd = onEnd
         sounds[id] = sound
@@ -83,7 +97,17 @@ object ClientSounds {
         emitter: SoundEmitterSpec,
         id: String,
         onEnd: ((playedThrough: Boolean) -> Unit)? = null,
-    ): ManagedSound = play(source, settings, emitter.createEmitter(), id, emitter.timeoutSeconds(), onEnd = onEnd)
+    ): ManagedSound = play(source, settings, emitter, id, pauseWithGame = true, onEnd = onEnd)
+
+    fun play(
+        source: SoundSource,
+        settings: SoundPlayback,
+        emitter: SoundEmitterSpec,
+        id: String,
+        pauseWithGame: Boolean,
+        onEnd: ((playedThrough: Boolean) -> Unit)? = null,
+    ): ManagedSound = play(source, settings, emitter.createEmitter(), id, emitter.timeoutSeconds(),
+        pauseWithGame = pauseWithGame, onEnd = onEnd)
 
     fun find(id: String): ManagedSound? = sounds[id]
 
@@ -105,13 +129,14 @@ object ClientSounds {
         val playing = sounds[id] ?: return
         replays[id] = Replay(
             playing.input, playing.settings, playing.emitterNow(), seconds.coerceAtLeast(0.0), playing.timeoutSeconds,
-            playing.isPaused, playing.onEnd,
+            playing.isPaused, playing.pauseWithGame, playing.onEnd,
         )
         playing.onEnd = null
         playing.close()
     }
 
     private fun start(sound: ManagedSound) {
+        if (!sound.updatesWhile(engineHeld)) return
         try {
             when (sound.refresh()) {
                 SoundEmitterState.Listener, is SoundEmitterState.Available -> {
@@ -128,8 +153,8 @@ object ClientSounds {
 
     /**
      * Called after SoundEngine.tick: native EOF, /stopsound and rejected plays release the same owner. It runs while
-     * the game is paused, as it is under the IDE, whose previews play on; only what waits to start waits for the
-     * sound engine to go on when the pause menu holds it.
+     * the game is paused, as it is under the IDE. Previews may start and seek then; gameplay sounds wait for the
+     * sound engine to resume.
      */
     fun tick(paused: Boolean) {
         SoundAttachments.prune()
@@ -137,15 +162,15 @@ object ClientSounds {
         val iterator = sounds.values.iterator()
         while (iterator.hasNext()) {
             val sound = iterator.next()
-            if (!sound.started && !sound.isStopped && !engineHeld) {
-                if (!paused) sound.waitSeconds += SECONDS_PER_TICK
+            if (!sound.started && !sound.isStopped && sound.updatesWhile(engineHeld)) {
+                if (!paused || !sound.pauseWithGame) sound.waitSeconds += SECONDS_PER_TICK
                 start(sound)
                 if (!sound.started && !sound.isStopped && sound.timeoutSeconds > 0f && sound.waitSeconds >= sound.timeoutSeconds) {
                     sound.failure = TimeoutException("Timed out waiting for the sound emitter")
                     sound.close()
                 }
             }
-            val ended = sound.started && !manager.isActive(sound)
+            val ended = sound.started && (!manager.isActive(sound) || sound.channelStopped)
             if (sound.isStopped || ended) {
                 val playedThrough = !sound.isStopped && sound.failure == null
                 sound.failure?.let { HollowEngine.LOGGER.error("Sound '{}' failed", sound.id, it) }
@@ -154,11 +179,11 @@ object ClientSounds {
                 sound.onEnd?.let { report -> runCatching { report(playedThrough) } }
             }
         }
-        if (engineHeld) return
-        val pending = replays.toMap()
-        replays.clear()
+        val pending = replays.filterValues { !engineHeld || !it.pauseWithGame }
         pending.forEach { (id, replay) ->
-            val sound = play(replay.source, replay.settings, replay.emitter, id, replay.timeoutSeconds, replay.start, replay.onEnd)
+            replays.remove(id)
+            val sound = play(replay.source, replay.settings, replay.emitter, id, replay.timeoutSeconds, replay.start,
+                replay.pauseWithGame, replay.onEnd)
             if (replay.paused) sound.pause()
         }
     }
@@ -176,11 +201,10 @@ object ClientSounds {
         val now = System.nanoTime()
         val seconds = if (lastFrame == 0L) 0f else ((now - lastFrame) / NANOS_PER_SECOND).coerceIn(0f, MAX_FRAME)
         lastFrame = now
-        if (engineHeld) return
-        SoundListener.update(seconds)
+        if (!engineHeld) SoundListener.update(seconds)
         channels.forEach { (instance, channel) ->
             if (instance !is ManagedSound || instance.isStopped) return@forEach
-            instance.frame(channel, executor, seconds)
+            instance.frame(channel, executor, seconds, engineHeld)
         }
     }
 
