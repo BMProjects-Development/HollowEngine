@@ -27,8 +27,6 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     private var pathLook: Vec3? = null
     private var backstepPath: Path? = null
 
-    /** The settings of the move under way, taking the place of the NPC's own for as long as it lasts. */
-    var settingsOverride: NavigationComponent? = null
 
     private var aimedTarget: Vec3? = null
     private var aimedVia: List<Vec3> = emptyList()
@@ -72,7 +70,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
 
     /** What the NPC's path search and its steps go by now. */
     val settings: NavigationComponent
-        get() = settingsOverride ?: mob.navigationComponent ?: DEFAULT_SETTINGS
+        get() = mob.navigationComponent ?: DEFAULT_SETTINGS
 
     override fun createPathFinder(maxVisitedNodes: Int): PathFinder {
         val evaluator = NpcNodeEvaluator({ settings }, ::zones)
@@ -125,7 +123,14 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         val command = if (currentPath == null) {
             pilot.idle(flight, flightSpeed(mob, IDLE_FLIGHT_SPEED))
         } else {
-            pilot.follow(currentPath, flight, flightSpeed(mob, speedModifier), flightEnd(currentPath), stopDistance, held?.yaw)
+            pilot.follow(
+                currentPath,
+                flight,
+                flightSpeed(mob, speedModifier),
+                flightEnd(currentPath),
+                stopDistance,
+                held?.yaw
+            )
         } ?: return null
         steeringTarget = command.aim
         lookAt(held?.look ?: command.aim.add(0.0, mob.eyeHeight * LOOK_HEIGHT, 0.0))
@@ -185,7 +190,8 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
             movement.sidewaysSpeed.toDouble(),
             movement.backwardSpeed.toDouble(),
         )
-        val look = held?.look ?: ahead.pointAt(locomotion.lookDistance(speedModifier)).add(0.0, mob.eyeHeight * LOOK_HEIGHT, 0.0)
+        val look = held?.look ?: ahead.pointAt(locomotion.lookDistance(speedModifier))
+            .add(0.0, mob.eyeHeight * LOOK_HEIGHT, 0.0)
         lookAt(look)
     }
 
@@ -196,8 +202,8 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
     private fun lookAt(look: Vec3) {
         val control = mob.lookControl
         val ours = pathLook
-        val taken = control.isLookingAtTarget &&
-                (ours == null || control.wantedX != ours.x || control.wantedY != ours.y || control.wantedZ != ours.z)
+        val taken =
+            control.isLookingAtTarget && (ours == null || control.wantedX != ours.x || control.wantedY != ours.y || control.wantedZ != ours.z)
         if (taken) return
         control.setLookAt(look.x, look.y, look.z, HEAD_TURN, HEAD_PITCH)
         pathLook = look
@@ -245,8 +251,7 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         }
         if (!canCutCorner(currentPath.nextNode.type) || abs(next.y - start.y) > mob.maxUpStep()) return next
         return NpcNavigationGeometry.findWalkableWaypoint(level, mob, start, next)
-            ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, next)
-            ?: next.also {
+            ?: NpcNavigationGeometry.findSqueezeWaypoint(level, mob, start, next) ?: next.also {
                 recomputePath()
             }
     }
@@ -281,8 +286,8 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         val toEndX = end.x - mob.x
         val toEndZ = end.z - mob.z
         val distance = Mth.length(toEndX, toEndZ)
-        val behind = distance > MIN_BACKSTEP &&
-                (-Mth.sin(forward) * toEndX + Mth.cos(forward) * toEndZ) / distance < BACKSTEP_COS
+        val behind =
+            distance > MIN_BACKSTEP && (-Mth.sin(forward) * toEndX + Mth.cos(forward) * toEndZ) / distance < BACKSTEP_COS
         val reachesEnd = ahead.points.size == currentPath.nodeCount - currentPath.nextNodeIndex + 1
         val flat = ahead.points.all { abs(it.y - mob.y) <= mob.maxUpStep() }
         facing.backstep = if (reachesEnd && flat && ahead.length <= reach && (behind || facing.isBackstepping)) {
@@ -326,7 +331,8 @@ class NpcPathNavigation(level: Level, mob: Mob) : GroundPathNavigation(mob, leve
         }
 
         val node = currentPath.getNextEntityPos(mob)
-        val reached = abs(mob.x - node.x) < TAKEOFF_REACH && abs(mob.z - node.z) < TAKEOFF_REACH && abs(mob.y - node.y) < 1.0
+        val reached =
+            abs(mob.x - node.x) < TAKEOFF_REACH && abs(mob.z - node.z) < TAKEOFF_REACH && abs(mob.y - node.y) < 1.0
         val settled = !landed || mob.onGround() && (isAtRest() || !takesOff && carriesOnToward(currentPath, index + 1))
         if (reached && settled) currentPath.advance()
         doStuckDetection(tempMobPos)

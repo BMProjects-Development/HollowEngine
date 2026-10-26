@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonLoadedEvent
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import java.io.File
 import java.lang.reflect.Method
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
@@ -87,25 +88,26 @@ object StoryActions {
 
     /** Registers the actions of an addon that loaded, found the same way as its event listeners. */
     @SubscribeEvent
-    fun onAddonLoaded(event: HollowAddonLoadedEvent) {
+    fun onAddonLoaded(event: HollowAddonLoadedEvent) =
+        registerFound(event.classes, event.classLoader, event.packagePrefix, event.id, event.scope.coroutineContext.job)
+
+    /**
+     * Registers under [namespace] the actions of every class in [classes] (a jar or a directory) within
+     * [packagePrefix], as an addon's actions are registered when it loads.
+     */
+    fun registerFound(classes: File, classLoader: ClassLoader, packagePrefix: String?, namespace: String, job: Job? = null) {
         val names = ClassGraph()
             .enableClassInfo().enableAnnotationInfo().enableMethodInfo()
             .disableNestedJarScanning().ignoreParentClassLoaders()
-            .overrideClassLoaders(event.classLoader).overrideClasspath(event.classes)
+            .overrideClassLoaders(classLoader).overrideClasspath(classes)
             .scan().use { scan ->
                 (scan.getClassesWithMethodAnnotation(Action::class.java.name).names + scan.getClassesWithMethodAnnotation(
                     SimpleAction::class.java.name
                 ).names).distinct()
             }
-        val prefix = event.packagePrefix
-        names.filter { prefix == null || it.startsWith(prefix) }.forEach { name ->
-            runCatching {
-                register(
-                    Class.forName(name, false, event.classLoader),
-                    event.id,
-                    event.scope.coroutineContext.job
-                )
-            }.onFailure { HollowEngine.LOGGER.error("Cannot register the actions of {}", name, it) }
+        names.filter { packagePrefix == null || it.startsWith(packagePrefix) }.forEach { name ->
+            runCatching { register(Class.forName(name, false, classLoader), namespace, job) }
+                .onFailure { HollowEngine.LOGGER.error("Cannot register the actions of {}", name, it) }
         }
     }
 

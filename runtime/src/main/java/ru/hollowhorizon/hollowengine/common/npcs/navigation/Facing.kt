@@ -1,28 +1,55 @@
 package ru.hollowhorizon.hollowengine.common.npcs.navigation
 
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.Mob
 import net.minecraft.world.phys.Vec3
+import java.util.UUID
 
-/** Which way an NPC faces while it walks. Facing anything but its path, it walks sideways or backward as it has to. */
+/**
+ * Which way an NPC faces while it walks. Facing anything but its path, it walks sideways or backward as it has to.
+ * It is a value, so a move that faces somewhere can be saved and repeated.
+ */
+@Serializable
 sealed interface Facing {
     /** Faces the way it walks. */
+    @Serializable
+    @SerialName("path")
     data object Path : Facing
 
-    /** Keeps facing the point [target] gives, an entity's or a fixed one; null lets it face its path for that tick. */
-    class Toward(internal val target: () -> Vec3?) : Facing
+    /** Keeps facing [position]. */
+    @Serializable
+    @SerialName("point")
+    data class Point(@Contextual val position: Vec3) : Facing
+
+    /** Keeps facing the eyes of the entity [uuid] while it is in the level of the NPC, and its path while it is not. */
+    @Serializable
+    @SerialName("entity")
+    data class Toward(@Contextual val uuid: UUID) : Facing
 
     /** Keeps facing [yaw], in degrees, as vanilla counts yaw. */
-    class Yaw(val yaw: Float) : Facing
+    @Serializable
+    @SerialName("yaw")
+    data class Yaw(val yaw: Float) : Facing
 
     companion object {
         /** Faces [entity] for as long as it is there. */
-        fun at(entity: Entity): Facing = Toward { entity.takeUnless(Entity::isRemoved)?.eyePosition }
+        fun at(entity: Entity): Facing = Toward(entity.uuid)
 
         /** Faces [position]. */
-        fun at(position: Vec3): Facing = Toward { position }
+        fun at(position: Vec3): Facing = Point(position)
     }
+}
+
+/** The point [facing] has [mob] face right now, or null when it faces its path. */
+internal fun Facing.target(mob: Entity): Vec3? = when (this) {
+    is Facing.Point -> position
+    is Facing.Toward -> (mob.level() as? ServerLevel)?.getEntity(uuid)?.takeUnless(Entity::isRemoved)?.eyePosition
+    is Facing.Yaw, Facing.Path -> null
 }
 
 /** A way to face that holds the body: the [yaw] to turn to, how fast in [turnSpeed] degrees a tick, and where the head looks. */
@@ -66,7 +93,7 @@ internal class WalkFacing(private val mob: Mob) {
         val looking = look?.takeIf { lookLast >= now - 1 }
         if (looking != null && lookSince >= moveSince) return HeldFacing(yawTo(looking), lookTurn, looking)
         when (val facing = move) {
-            is Facing.Toward -> facing.target()?.let { return HeldFacing(yawTo(it), FACING_TURN, it) }
+            is Facing.Point, is Facing.Toward -> facing.target(mob)?.let { return HeldFacing(yawTo(it), FACING_TURN, it) }
             is Facing.Yaw -> return HeldFacing(facing.yaw, FACING_TURN, ahead(facing.yaw))
             Facing.Path -> backstep?.let { return HeldFacing(it, FACING_TURN, ahead(it)) }
         }

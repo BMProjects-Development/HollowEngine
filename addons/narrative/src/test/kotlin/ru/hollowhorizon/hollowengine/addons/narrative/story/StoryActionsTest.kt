@@ -22,8 +22,8 @@ class StoryActionsTest {
 
     @Test
     fun `checkpoint labels register as actions of their own`() {
-        StoryActions.register(Class.forName("ru.hollowhorizon.hollowengine.addons.narrative.story.StoryLabelsKt"), "test")
-        assertEquals(listOf("this", "entity"), StoryActions.find("test:position")!!.parameterNames)
-        assertEquals(listOf("this", "player"), StoryActions.find("test:inventory")!!.parameterNames)
+        NarrativeActions.register()
+        assertEquals(listOf("this", "entity"), StoryActions.find("${NarrativeActions.NAMESPACE}:position")!!.parameterNames)
+        assertEquals(listOf("this", "player"), StoryActions.find("${NarrativeActions.NAMESPACE}:inventory")!!.parameterNames)
     }
 }

@@ -1,17 +1,19 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.dialogue
 
+import ru.hollowhorizon.hollowengine.addons.narrative.HollowNarrativeAddon
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActions
+import java.io.File
 
-/** The actions the narrative addon ships, registered for tests as the game registers them when the addon loads. */
+/**
+ * The actions of the narrative addon in tests, which load no addons: found in its classes by the same scan that
+ * registers them when the addon loads in the game.
+ */
 object NarrativeActions {
     const val NAMESPACE = "hollowengine-narrative"
 
-    private val CLASSES = listOf(
-        "ru.hollowhorizon.hollowengine.addons.narrative.scene.SceneActionsKt",
-        "ru.hollowhorizon.hollowengine.addons.narrative.scene.ScreenEffectsKt",
-        "ru.hollowhorizon.hollowengine.addons.narrative.npcs.NpcActionsKt",
-        "ru.hollowhorizon.hollowengine.addons.narrative.npcs.NpcHandsKt",
-    )
-
-    fun register() = CLASSES.forEach { StoryActions.register(Class.forName(it), NAMESPACE) }
+    fun register() {
+        val type = HollowNarrativeAddon::class.java
+        val classes = File(type.protectionDomain.codeSource.location.toURI())
+        StoryActions.registerFound(classes, type.classLoader, type.packageName, NAMESPACE)
+    }
 }

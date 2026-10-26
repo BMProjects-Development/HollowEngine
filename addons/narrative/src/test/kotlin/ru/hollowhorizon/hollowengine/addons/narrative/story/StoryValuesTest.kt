@@ -2,10 +2,13 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import kotlinx.serialization.Serializable
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.LongTag
 import net.minecraft.nbt.StringTag
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.Facing
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.Zone
 import ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef
 import java.util.UUID
@@ -15,6 +18,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class StoryValuesTest {
     @Serializable
@@ -30,6 +35,25 @@ class StoryValuesTest {
         StoryValues.put(tag, "value", storySerializer<T>(), value)
         @Suppress("UNCHECKED_CAST")
         return StoryValues.get(tag, "value", storySerializer<T>()) as T
+    }
+
+    @Test
+    fun `a duration is kept as milliseconds`() {
+        val tag = CompoundTag()
+        StoryValues.put(tag, "value", storySerializer<Duration>(), 1500.milliseconds)
+
+        assertEquals(1500L, (tag.get("value") as LongTag).asLong)
+        assertEquals(1500.milliseconds, roundTrip(1500.milliseconds))
+    }
+
+    @Test
+    fun `move options come back with their facing`() {
+        val toward = MoveOptions(speed = 1.5, facing = Facing.Toward(UUID(1, 2)))
+        val point = MoveOptions(facing = Facing.at(Vec3(1.0, 2.0, 3.0)), avoid = listOf(Zone.Sphere(Vec3.ZERO, 2.0)))
+
+        assertEquals(toward, roundTrip(toward))
+        assertEquals(point, roundTrip(point))
+        assertEquals(MoveOptions(), roundTrip(MoveOptions()))
     }
 
     @Test
