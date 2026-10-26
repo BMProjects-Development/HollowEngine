@@ -6,6 +6,7 @@ import kotlinx.coroutines.job
 import kotlinx.serialization.KSerializer
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryInstances.register
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeHost
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScript
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
@@ -13,7 +14,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import java.util.IdentityHashMap
+import java.util.*
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 
 /**
@@ -31,13 +32,20 @@ object StoryInstances {
 
     private val byKey = HashMap<String, Entry>()
     private val keys = IdentityHashMap<Any, String>()
+
+    /** Stages the addon declares itself, such as [scene]: always there, under keys that never change. */
+    private val builtins = mapOf(SceneStage.KEY to SceneStage)
     private val stages = object : ClassValue<Stages>() {
         override fun computeValue(type: Class<*>): Stages {
             val methods = type.declaredMethods
             return Stages(
-                methods.mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }.toMap(),
-                methods.mapNotNull { method -> method.getAnnotation(StageCall::class.java)?.let { it.name to method } }.toMap(),
-                methods.mapNotNull { method -> method.getAnnotation(StageResult::class.java)?.let { it.name to method } }.toMap(),
+                methods.mapNotNull { method -> method.getAnnotation(StageEntry::class.java)?.let { it.name to method } }
+                    .toMap(),
+                methods.mapNotNull { method -> method.getAnnotation(StageCall::class.java)?.let { it.name to method } }
+                    .toMap(),
+                methods.mapNotNull { method ->
+                    method.getAnnotation(StageResult::class.java)?.let { it.name to method }
+                }.toMap(),
             )
         }
     }
@@ -60,7 +68,7 @@ object StoryInstances {
     fun keyOf(instance: Any): String = keys.getOrPut(instance) { keyFor(instance) }
 
     /** The running instance registered under [key], if any. */
-    fun find(key: String): Any? = byKey[key]?.instance
+    fun find(key: String): Any? = byKey[key]?.instance ?: builtins[key]
 
     /** The job of the instance under [key], which ends when the instance stops; null when nothing bounds it. */
     internal fun jobOf(key: String): Job? = byKey[key]?.takeIf { it.users.isNotEmpty() }?.lifetime
@@ -91,13 +99,15 @@ object StoryInstances {
     }
 
     /** The script an instance [key] belongs to, or null when the key does not name a script. */
-    internal fun scriptOf(key: String): ScriptId? = runCatching { ScriptRegistry.parse(key.substringBefore('@')) }.getOrNull()
+    internal fun scriptOf(key: String): ScriptId? =
+        runCatching { ScriptRegistry.parse(key.substringBefore('@')) }.getOrNull()
 
     /**
      * Whether the script of [key] no longer exists, so nothing will run under [key] again. A script of a namespace
      * that is not installed right now is not gone: turning its addon on brings it back.
      */
     internal fun isGone(key: String): Boolean {
+        if (key in builtins) return false
         val id = scriptOf(key) ?: return false
         return ScriptRegistry.source(id.namespace) != null && ScriptRegistry.artifacts(id) == null
     }
@@ -114,9 +124,15 @@ object StoryInstances {
         return stage in stagesOf(instance.javaClass).entries
     }
 
-    private suspend fun invoke(key: String, stage: String, pick: (Stages) -> Map<String, Method>, arguments: Array<Any?>): Any? {
+    private suspend fun invoke(
+        key: String,
+        stage: String,
+        pick: (Stages) -> Map<String, Method>,
+        arguments: Array<Any?>,
+    ): Any? {
         val instance = find(key) ?: throw StoryException("No running script is registered as '$key'")
-        val method = pick(stagesOf(instance.javaClass))[stage] ?: throw StoryException("Script '$key' has no stage '$stage'")
+        val method =
+            pick(stagesOf(instance.javaClass))[stage] ?: throw StoryException("Script '$key' has no stage '$stage'")
         return suspendCoroutineUninterceptedOrReturn { continuation ->
             try {
                 method.invoke(instance, *arguments, continuation)
@@ -163,6 +179,7 @@ object StoryInstances {
     }
 
     private fun keyFor(instance: Any): String {
+        builtins.entries.firstOrNull { it.value === instance }?.let { return it.key }
         val path = scriptPathOf(instance.javaClass) ?: return instance.javaClass.name
         if (instance !is NodeScript) return path
         return when (val host = instance.host) {
@@ -184,8 +201,7 @@ object StoryInstances {
             else -> return
         }
         HollowEngine.LOGGER.error(
-            "Script {} {}, so stories cannot see its stages and actions. " +
-                "List 'hollowengine-narrative' in dependsOn of the project the script belongs to",
+            "Script {} {}, so stories cannot see its stages and actions. " + "List 'hollowengine-narrative' in dependsOn of the project the script belongs to",
             type.name,
             problem,
         )
@@ -197,21 +213,54 @@ object StoryInstances {
         return ScriptRegistry.idOfLocation(location)?.namespace ?: "script"
     }
 
-    /** The imported scripts an instance holds: they come in as constructor arguments kept in fields. */
-    private fun importsOf(instance: Any): List<Any> = instance.javaClass.declaredFields
-        .filter { !Modifier.isStatic(it.modifiers) && !it.type.isPrimitive }
-        .filter { it.type.isAnnotationPresent(StageScript::class.java) }
-        .mapNotNull { field ->
-            runCatching { field.trySetAccessible(); field.get(instance) }
-                .onFailure { HollowEngine.LOGGER.warn("Cannot read imported script '{}'", field.name, it) }
-                .getOrNull()
+    /**
+     * The [saved] variables the instance under [key] and the scripts it imports declare, by the name a story keeps
+     * them under. A script property `var trust by saved(0)` is kept in the field `trust$delegate`.
+     */
+    internal fun savedVariablesOf(key: String): Map<String, SavedVariable<*>> {
+        val instance = find(key) ?: return emptyMap()
+        val found = LinkedHashMap<String, SavedVariable<*>>()
+        val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
+
+        fun collect(script: Any) {
+            if (!visited.add(script)) return
+            val path = scriptPathOf(script.javaClass) ?: script.javaClass.name
+            script.javaClass.declaredFields.filter { it.name.endsWith(DELEGATE_SUFFIX) }.forEach { field ->
+                val delegate =
+                    runCatching { field.trySetAccessible(); field.get(script) }.getOrNull() as? SavedVariable<*>
+                        ?: return@forEach
+                found["$path/${field.name.removeSuffix(DELEGATE_SUFFIX)}"] = delegate
+            }
+            importsOf(script).forEach(::collect)
         }
+        collect(instance)
+        return found
+    }
+
+    /** The imported scripts an instance holds: they come in as constructor arguments kept in fields. */
+    private fun importsOf(instance: Any): List<Any> =
+        instance.javaClass.declaredFields.filter { !Modifier.isStatic(it.modifiers) && !it.type.isPrimitive }
+            .filter { it.type.isAnnotationPresent(StageScript::class.java) }.mapNotNull { field ->
+                runCatching { field.trySetAccessible(); field.get(instance) }.onFailure {
+                        HollowEngine.LOGGER.warn(
+                            "Cannot read imported script '{}'",
+                            field.name,
+                            it
+                        )
+                    }.getOrNull()
+            }
 
     private fun stagesOf(type: Class<*>): Stages = stages.get(type)
 
     /** How the compiler names the entries it generates for stages. */
     private const val ENTRY_PREFIX = "stage\$entry\$"
 
+    private const val DELEGATE_SUFFIX = "\$delegate"
+
     /** The generated methods of a script class: entries that start or resume a stage, calls of stage lambdas. */
-    private class Stages(val entries: Map<String, Method>, val calls: Map<String, Method>, val results: Map<String, Method>)
+    private class Stages(
+        val entries: Map<String, Method>,
+        val calls: Map<String, Method>,
+        val results: Map<String, Method>,
+    )
 }

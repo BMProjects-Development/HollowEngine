@@ -74,6 +74,12 @@ class DialogueController(
     var isRunning: Boolean = false
         private set
 
+    /** Variables the dialogue shares with whoever plays it, looked up before its own. */
+    internal var outerVariables: StoryVariableSource? = null
+
+    /** Called before every statement, when [checkpoint] holds everything the previous ones did. */
+    internal var onStep: (() -> Unit)? = null
+
     /** Checkpoint restored by [load], consumed by the next [start]. */
     private var restored: StoryCheckpoint? = null
 
@@ -289,6 +295,7 @@ class DialogueController(
             }
             if (frames.isEmpty()) return DialogueResult.Finished
             if (participants.isNotEmpty() && onlineParticipants.isEmpty()) return DialogueResult.AllPlayersLeft
+            onStep?.invoke()
 
             val frame = frames.last()
             val program = programOf(frame.address) ?: return DialogueResult.Finished
@@ -319,7 +326,7 @@ class DialogueController(
             is StoryInstruction.Menu -> return runMenu(frame, instruction)
 
             is StoryInstruction.Set -> {
-                variables[instruction.variable] = evaluate(instruction.value)
+                assign(instruction.variable, evaluate(instruction.value))
                 frame.pc++
             }
 
@@ -550,7 +557,7 @@ class DialogueController(
                     pc = if (evaluate(instruction.condition).isTruthy()) pc + 1 else instruction.target
 
                 is StoryInstruction.Set -> {
-                    variables[instruction.variable] = evaluate(instruction.value)
+                    assign(instruction.variable, evaluate(instruction.value))
                     pc++
                 }
 
@@ -752,7 +759,12 @@ class DialogueController(
         throw StoryRuntimeException("${e.message} (line ${e.span.line + 1})", e)
     }
 
-    private fun lookup(name: String): StoryValue? = variables[name] ?: resolveActor(name)
+    private fun lookup(name: String): StoryValue? = outerVariables?.get(name) ?: variables[name] ?: resolveActor(name)
+
+    /** Writes a variable where it lives: with whoever plays the dialogue when it is theirs, in the dialogue otherwise. */
+    private fun assign(name: String, value: StoryValue) {
+        if (outerVariables?.set(name, value) != true) variables[name] = value
+    }
 
     private fun render(template: TextTemplate): String = buildString {
         for (part in template.parts) {

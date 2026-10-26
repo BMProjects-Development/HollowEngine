@@ -39,6 +39,15 @@ class StoryCompilerTest {
     }
 
     @Test
+    fun `a jump stays within its file`() {
+        val result = compile("@jump test:other.story#Тут\n@call test:other.story#Тут")
+
+        assertNull(result.program)
+        assertEquals(1, result.diagnostics.count { it.severity == StorySeverity.ERROR }, "only the jump is an error")
+        assertEquals(0, result.diagnostics.single().span.line)
+    }
+
+    @Test
     fun `conditional choices keep their condition and id`() {
         val result = compile(
             """
