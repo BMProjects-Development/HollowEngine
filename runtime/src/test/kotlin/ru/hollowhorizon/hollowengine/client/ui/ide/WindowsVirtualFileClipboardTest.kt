@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import com.sun.jna.Native
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -75,6 +77,7 @@ class WindowsVirtualFileClipboardTest {
     }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
     fun `plans nested files under one unique root and rejects unsafe names`() {
         val target = Files.createTempDirectory("hollowengine-virtual-paste-test-")
         try {
