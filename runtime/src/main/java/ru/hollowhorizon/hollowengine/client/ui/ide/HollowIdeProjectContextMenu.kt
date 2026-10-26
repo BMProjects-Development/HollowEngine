@@ -5,6 +5,7 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -144,6 +145,14 @@ internal fun HollowIdeProjectNameDialog(
     onCancel: () -> Unit,
 ) {
     if (dialog == null) return
+    val fieldState = remember(dialog.action, dialog.path) {
+        TextFieldState(initialText = dialog.name).apply {
+            if (dialog.action == ProjectNameAction.Rename) {
+                val extensionStart = dialog.name.lastIndexOf('.').takeIf { !dialog.isDirectory && it > 0 }
+                setSelection(0, extensionStart ?: dialog.name.length)
+            }
+        }
+    }
     Popup(
         anchorBounds = UiRect(dialog.x, dialog.y, 0f, 0f),
         alignment = UiPopupAlignment.Cursor,
@@ -157,6 +166,7 @@ internal fun HollowIdeProjectNameDialog(
         TextField(
             value = dialog.name,
             onChange = onNameChange,
+            state = fieldState,
             id = ProjectNameDialogInputId,
             tags = listOf("project-name-dialog-input"),
             modifier = Modifier.size(180.px, 24.px).onKeyInput { input ->
@@ -223,6 +233,7 @@ internal data class ProjectNameDialog(
     val x: Float,
     val y: Float,
     val template: HollowIdeScriptTemplate? = null,
+    val isDirectory: Boolean = false,
 ) {
     val title: String
         get() = when (action) {

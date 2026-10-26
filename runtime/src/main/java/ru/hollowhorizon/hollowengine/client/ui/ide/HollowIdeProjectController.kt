@@ -284,6 +284,7 @@ internal class HollowIdeProjectController(
             x = menu?.x ?: pointerX(),
             y = menu?.y ?: pointerY(),
             template = template,
+            isDirectory = path.fromReadablePath().isDirectory,
         )
     }
 
