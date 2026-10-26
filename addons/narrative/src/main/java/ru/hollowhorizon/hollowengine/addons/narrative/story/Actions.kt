@@ -9,6 +9,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.Entity
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlin.reflect.KClass
 
 /**
  * A reversible action. Its body is `action { }`: within a story every call is written to the journal, which can undo
@@ -37,6 +38,19 @@ annotation class Unsaved
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class ActionAlias
+
+/**
+ * The values the editor offers for a parameter whose type does not say them, such as a string naming a HUD layer.
+ * [source] is an object; nothing checks the values against it.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Suggestions(val source: KClass<out SuggestionSource>)
+
+/** What [Suggestions] offers. */
+interface SuggestionSource {
+    val values: List<String>
+}
 
 /** An action that is not undone: an ordinary function editors and `.story` can call by [id]. */
 @Target(AnnotationTarget.FUNCTION)

@@ -27,7 +27,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Moves the NPC toward [target] until it is within [MoveOptions.arrivalDistance], following it while it moves.
  * Undone, the NPC is put back where it started; fast-forwarded, it is put next to the target.
  */
-@Action("move_to_entity")
+@Action("move-to-entity")
 suspend fun NpcEntity.move(target: Entity, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
     action(this, target, options) {
         val start = capture { NpcPlacement.of(this@move) }
@@ -69,7 +69,7 @@ suspend infix fun NpcEntity.move(mob: Entity): MoveResult = move(entity = mob)
  * Moves the NPC to [pos] until it is within [MoveOptions.arrivalDistance]. Undone, the NPC is put back where it
  * started; fast-forwarded, it is put at [pos].
  */
-@Action("move_to")
+@Action("move-to")
 suspend fun NpcEntity.move(pos: Vec3, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
     action(this, pos, options) {
         val start = capture { NpcPlacement.of(this@move) }
@@ -104,7 +104,7 @@ suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = positi
  * Moves the NPC through [points] in turn without stopping at any but the last: each one before it counts as
  * passed within [MoveOptions.passDistance], and [MoveOptions.arrivalDistance] is for the last.
  */
-@Action("move_through")
+@Action("move-through")
 suspend fun NpcEntity.move(points: List<Vec3>, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
     action(this, points, options) {
         require(points.isNotEmpty()) { "A move needs at least one point" }
@@ -119,7 +119,7 @@ fun NpcEntity.startMove(points: List<Vec3>, options: MoveOptions = MoveOptions()
     return actions.start(NpcActionKeys.MOVEMENT) { moveThrough(points.map { point -> { point } }, options) }
 }
 
-@SimpleAction("stop_moving")
+@SimpleAction("stop-moving")
 fun NpcEntity.stopMoving() {
     actions.cancel(NpcActionKeys.MOVEMENT)
     navigation.stop()
@@ -176,7 +176,7 @@ fun NpcEntity.startLookingAt(
 }
 
 /** Turns the NPC to [position] over [duration]. Undone, it faces where it did before; fast-forwarded, it faces there at once. */
-@Action("look_at")
+@Action("look-at")
 suspend fun NpcEntity.lookAt(
     position: Vec3,
     @Unsaved duration: Duration = DEFAULT_LOOK_DURATION,
@@ -217,7 +217,7 @@ fun NpcEntity.startLookingAt(
 }
 
 /** Turns the NPC to [target] over [duration], following it as it moves; undone and fast-forwarded like [lookAt] at a position. */
-@Action("look_at_entity")
+@Action("look-at-entity")
 suspend fun NpcEntity.lookAt(
     target: Entity,
     @Unsaved duration: Duration = DEFAULT_LOOK_DURATION,
@@ -242,6 +242,7 @@ suspend infix fun NpcEntity.lookAt(entity: Entity) {
     lookAt(entity, DEFAULT_LOOK_DURATION)
 }
 
+@SimpleAction("stop-looking")
 fun NpcEntity.clearLookTarget() {
     actions.cancel(NpcActionKeys.LOOK)
 }

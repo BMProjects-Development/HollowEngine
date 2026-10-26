@@ -79,6 +79,7 @@ internal object SceneStage {
         controller.outerVariables = RunVariables(frame.run)
         controller.load(CHECKPOINT, frame.locals)
         controller.onStep = { controller.save(CHECKPOINT, frame.locals) }
+        controller.commandRunner = { statement, call -> journaled(frame, statement, call) }
 
         val result = if (players.isEmpty()) controller.startHeadless() else controller.start(*players.toTypedArray())
         when (result) {
@@ -88,6 +89,35 @@ internal object SceneStage {
             else -> Unit
         }
     }
+
+    /**
+     * Calls the action of [statement] with its journal record kept in the frame, as a stage keeps the record of an
+     * action it calls: after a restart an action the scene was in the middle of is finished, and one that was done
+     * is not performed again.
+     */
+    private suspend fun journaled(frame: StoryFrame, statement: String, call: suspend () -> Unit) {
+        val interrupted = frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
+        val entry = interrupted?.let(frame.run.journal::entry)
+        try {
+            when {
+                entry?.done == true -> Unit
+                entry != null -> StoryActions.resume(entry)
+                else -> {
+                    frame.action = StoryFrame.NO_RECORD
+                    frame.locals.putString(ACTION_AT, statement)
+                    call()
+                }
+            }
+        } finally {
+            if (!frame.run.isCancelled) {
+                frame.action = null
+                frame.locals.remove(ACTION_AT)
+            }
+        }
+    }
+
+    /** The statement whose action [StoryFrame.action] records. */
+    private const val ACTION_AT = "action_at"
 
     private fun playerOf(run: StoryRun, address: String): ServerPlayer = run.runs.owner.entity as? ServerPlayer
         ?: throw StoryException("scene(\"$address\") in story '${run.path}' needs with = players: the story does not belong to a player")

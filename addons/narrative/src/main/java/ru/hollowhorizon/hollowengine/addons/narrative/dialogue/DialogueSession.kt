@@ -2,6 +2,8 @@ package ru.hollowhorizon.hollowengine.addons.narrative.dialogue
 
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /**
  * The read-and-input side of a running dialogue, as presenters and story functions see it.
@@ -32,6 +34,14 @@ interface DialogueSession {
 
     /** Cancels a running async track by name. */
     fun cancelTrack(name: String)
+}
+
+/**
+ * The dialogue a command runs in. A command that borrows the screen of the players, a fade or the camera, reads it to
+ * hand the screen back when the dialogue ends.
+ */
+class CurrentDialogue(val session: DialogueSession) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<CurrentDialogue>
 }
 
 /** How a menu decides between several participants. */

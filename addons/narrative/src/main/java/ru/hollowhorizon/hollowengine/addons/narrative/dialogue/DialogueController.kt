@@ -7,6 +7,8 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -16,7 +18,6 @@ import kotlin.time.Duration.Companion.milliseconds
 class DialogueController(
     override val address: String,
     val presentation: DialoguePresenter,
-    val functions: StoryFunctionRegistry,
     val library: StoryLibrary,
     val votePolicy: VotePolicy = VotePolicy(),
     /** Locale to look for; null plays the base story. */
@@ -45,9 +46,6 @@ class DialogueController(
     /** Address and hash of the story that is playing, what a checkpoint records. */
     private var playingAddress: String = address
     private var playingLocale: String? = null
-
-    /** Checkpoint of the function currently running; empty between statements. */
-    private var callState = CompoundTag()
 
     private val tracks = LinkedHashMap<String, TrackHandle>()
     private var trackCounter = 0
@@ -79,6 +77,12 @@ class DialogueController(
 
     /** Called before every statement, when [checkpoint] holds everything the previous ones did. */
     internal var onStep: (() -> Unit)? = null
+
+    /**
+     * Runs a reversible command of the main flow, given the statement it is as `hash#label+offset`; a scene of a
+     * story keeps its journal record through it, to finish the command after a restart instead of repeating it.
+     */
+    internal var commandRunner: (suspend (statement: String, call: suspend () -> Unit) -> Unit)? = null
 
     /** Checkpoint restored by [load], consumed by the next [start]. */
     private var restored: StoryCheckpoint? = null
@@ -189,7 +193,6 @@ class DialogueController(
     private fun clearState() {
         frames.clear()
         variables.clear()
-        callState = CompoundTag()
         tracks.clear()
         restored = null
     }
@@ -220,8 +223,12 @@ class DialogueController(
                 CheckpointFrame(frame.address, frameProgram.anchorOf(frame.pc))
             },
             variables = variables.toMap(),
-            callState = callState.copy(),
-            tracks = tracks.values.map { CheckpointTrack(it.name.takeUnless { n -> n.startsWith(ANONYMOUS_TRACK) }, it.anchor) },
+            tracks = tracks.values.map {
+                CheckpointTrack(
+                    it.name.takeUnless { n -> n.startsWith(ANONYMOUS_TRACK) },
+                    it.anchor
+                )
+            },
         )
     }
 
@@ -238,15 +245,19 @@ class DialogueController(
             return
         }
 
-        val loaded = runCatching { LoadedStory(checkpoint.address, checkpoint.locale, library.loadExact(checkpoint.address)) }
-            .getOrElse { library.load(address, locale) }
+        val loaded = runCatching {
+            LoadedStory(
+                checkpoint.address,
+                checkpoint.locale,
+                library.loadExact(checkpoint.address)
+            )
+        }.getOrElse { library.load(address, locale) }
         playingAddress = loaded.address
         playingLocale = loaded.locale
         programs[loaded.address] = loaded.program
 
         variables.clear()
         variables += checkpoint.variables
-        callState = checkpoint.callState.copy()
         frames.clear()
 
         val exact = loaded.program.sourceHash == checkpoint.sourceHash && loaded.address == checkpoint.address
@@ -266,7 +277,6 @@ class DialogueController(
             }
         }
 
-        callState = CompoundTag()
         val innermost = checkpoint.frames.last()
         val labelStart = loaded.program.resolveLabelStart(innermost.anchor)
         frames.addLast(Frame(loaded.address, labelStart ?: 0))
@@ -351,7 +361,7 @@ class DialogueController(
             is StoryInstruction.Return -> frames.removeLast()
 
             is StoryInstruction.Invoke -> {
-                if (!invoke(instruction.call)) return null // preempted
+                if (!invoke(frame, instruction)) return null // preempted
                 frame.pc++
             }
 
@@ -403,7 +413,12 @@ class DialogueController(
                 is TextPart.Interpolation -> buffer.append(evaluate(part.expr).display())
                 is TextPart.InlineCall -> {
                     if (!flush()) return false
-                    if (!invokeCall(part.call.function, part.call.args.toEvaluated(), null, emptyMap())) return false
+                    val evaluated = part.call.args.toEvaluated()
+                    if (!callCommand(part.call.function, evaluated, null, emptyMap()) { _, perform ->
+                            preemptible(
+                                perform
+                            )
+                        }) return false
                 }
 
                 is TextPart.WaitInput -> {
@@ -473,23 +488,38 @@ class DialogueController(
         return if (leaders.size == 1) leaders.first() else leaders.random()
     }
 
-    private suspend fun invoke(call: StoryCall): Boolean {
+    /** Runs a command of the main flow; returns false when a track preempted it. */
+    private suspend fun invoke(frame: Frame, instruction: StoryInstruction.Invoke): Boolean {
+        val call = instruction.call
         val evaluated = call.args.toEvaluated()
         val metadata = call.metadata.mapValues { (_, expr) -> evaluate(expr) }
-        return invokeCall(call.function, evaluated, call.tag, metadata)
+        val statement =
+            programOf(frame.address)?.let { "${it.sourceHash}#${instruction.anchor.label}+${instruction.anchor.offset}" }
+        return callCommand(call.function, evaluated, call.tag, metadata) { command, perform ->
+            val runner = commandRunner
+            preemptible {
+                if (runner != null && statement != null && command.action.reversible) runner(
+                    statement,
+                    perform
+                ) else perform()
+            }
+        }
     }
 
-    private suspend fun invokeCall(
+    /**
+     * Calls the command [function] with [evaluated] arguments through [run], which returns false when the call was
+     * preempted, and reports a [tag] to the handlers.
+     */
+    private suspend fun callCommand(
         function: String,
         evaluated: EvaluatedArgs,
         tag: String?,
         metadata: Map<String, StoryValue>,
+        run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Boolean,
     ): Boolean {
-        val resolved = functions.resolve(function, evaluated.positional, evaluated.named)
-            ?: throw StoryRuntimeException("No overload of '@$function' accepts these arguments")
-        val bound = bindActors(resolved.signature, evaluated.positional, evaluated.named)
-        val args = StoryArguments.bind(resolved.signature, bound.positional, bound.named, metadata)
-        val context = CallContext(this, callState)
+        val command = ActionCommands.resolve(function, evaluated.positional, evaluated.named)
+        val bound = bindActors(command.signature, evaluated.positional, evaluated.named)
+        val args = StoryArguments.bind(command.signature, bound.positional, bound.named, metadata)
 
         tag?.let { t ->
             startHandlers[t]?.forEach { it(StoryActionEvent(this, t, function, args)) }
@@ -497,7 +527,7 @@ class DialogueController(
         }
         var reason = StoryActionEnd.COMPLETED
         try {
-            val completed = preemptible { resolved.handler.invoke(context, args) }
+            val completed = run(command) { withContext(CurrentDialogue(this)) { command.call(args) } }
             if (!completed) reason = StoryActionEnd.CANCELLED
             return completed
         } catch (e: CancellationException) {
@@ -507,7 +537,6 @@ class DialogueController(
             reason = StoryActionEnd.FAILED
             throw e
         } finally {
-            if (reason == StoryActionEnd.COMPLETED) callState = CompoundTag()
             tag?.let { t ->
                 endHandlers[t]?.forEach { it(StoryActionEndEvent(this, t, function, args, reason)) }
                 DialogueEvent.ActionEnded.post(DialogueEvent.ActionEnded(this, t, function, args, reason))
@@ -519,8 +548,7 @@ class DialogueController(
         server.commands.performPrefixedCommand(commandSource(), command)
     }
 
-    private fun commandSource() =
-        server.createCommandSourceStack().withPermission(4).withSuppressedOutput()
+    private fun commandSource() = server.createCommandSourceStack().withPermission(4).withSuppressedOutput()
 
     private fun spawnTrack(
         scope: CoroutineScope,
@@ -553,8 +581,8 @@ class DialogueController(
                 }
 
                 is StoryInstruction.Goto -> pc = instruction.target
-                is StoryInstruction.GotoIfFalse ->
-                    pc = if (evaluate(instruction.condition).isTruthy()) pc + 1 else instruction.target
+                is StoryInstruction.GotoIfFalse -> pc =
+                    if (evaluate(instruction.condition).isTruthy()) pc + 1 else instruction.target
 
                 is StoryInstruction.Set -> {
                     assign(instruction.variable, evaluate(instruction.value))
@@ -564,7 +592,11 @@ class DialogueController(
                 is StoryInstruction.Invoke -> {
                     val evaluated = instruction.call.args.toEvaluated()
                     val metadata = instruction.call.metadata.mapValues { (_, expr) -> evaluate(expr) }
-                    invokeTracked(instruction.call.function, evaluated, instruction.call.tag, metadata)
+                    // A track cannot preempt itself, so its commands simply run.
+                    callCommand(instruction.call.function, evaluated, instruction.call.tag, metadata) { _, perform ->
+                        perform()
+                        true
+                    }
                     pc++
                 }
 
@@ -574,39 +606,6 @@ class DialogueController(
                 }
 
                 else -> pc++
-            }
-        }
-    }
-
-    /** Same as [invokeCall] but without preemption, a track cannot preempt itself. */
-    private suspend fun invokeTracked(
-        function: String,
-        evaluated: EvaluatedArgs,
-        tag: String?,
-        metadata: Map<String, StoryValue>,
-    ) {
-        val resolved = functions.resolve(function, evaluated.positional, evaluated.named)
-            ?: throw StoryRuntimeException("No overload of '@$function' accepts these arguments")
-        val bound = bindActors(resolved.signature, evaluated.positional, evaluated.named)
-        val args = StoryArguments.bind(resolved.signature, bound.positional, bound.named, metadata)
-        val context = CallContext(this, CompoundTag())
-        tag?.let { t ->
-            startHandlers[t]?.forEach { it(StoryActionEvent(this, t, function, args)) }
-            DialogueEvent.ActionStarted.post(DialogueEvent.ActionStarted(this, t, function, args))
-        }
-        var reason = StoryActionEnd.COMPLETED
-        try {
-            resolved.handler.invoke(context, args)
-        } catch (e: CancellationException) {
-            reason = StoryActionEnd.CANCELLED
-            throw e
-        } catch (e: Throwable) {
-            reason = StoryActionEnd.FAILED
-            throw e
-        } finally {
-            tag?.let { t ->
-                endHandlers[t]?.forEach { it(StoryActionEndEvent(this, t, function, args, reason)) }
-                DialogueEvent.ActionEnded.post(DialogueEvent.ActionEnded(this, t, function, args, reason))
             }
         }
     }
@@ -692,8 +691,7 @@ class DialogueController(
     /** True while a presenter is waiting for the players to move on. */
     val isAwaitingAdvance: Boolean get() = advanceSignal != null
 
-    private fun resolveCharacter(name: String): DialogueCharacter =
-        boundCharacters[name] ?: StringCharacter(name)
+    private fun resolveCharacter(name: String): DialogueCharacter = boundCharacters[name] ?: StringCharacter(name)
 
     /**
      * The speaker a `{...}:` prefix evaluated to. An actor already carries its character, entity and
@@ -742,8 +740,8 @@ class DialogueController(
 
     private fun resolveTarget(target: StoryTarget, currentAddress: String): Frame {
         val destinationAddress = target.address ?: currentAddress
-        val program = programOf(destinationAddress)
-            ?: throw StoryRuntimeException("Story '$destinationAddress' not found")
+        val program =
+            programOf(destinationAddress) ?: throw StoryRuntimeException("Story '$destinationAddress' not found")
         programs[destinationAddress] = program
         val pc = when (val label = target.label) {
             null -> 0
@@ -786,27 +784,6 @@ class DialogueController(
             if (arg.name == null) positional += value else named[arg.name] = value
         }
         return EvaluatedArgs(positional, named)
-    }
-
-    private class CallContext(
-        private val controller: DialogueController,
-        override val state: CompoundTag,
-    ) : StoryCallContext {
-        override val session: DialogueSession get() = controller
-        override val server: MinecraftServer get() = controller.server
-        override val players: List<ServerPlayer> get() = controller.onlineParticipants
-
-        override fun checkpoint() {
-            controller.checkpointRequests.forEach { it(controller) }
-        }
-    }
-
-    /** Callbacks that persist the session on demand, e.g. from a long-running function. */
-    private val checkpointRequests = mutableListOf<(DialogueController) -> Unit>()
-
-    /** Registers what to do when a story function asks for an immediate save. */
-    fun onCheckpointRequest(handler: (DialogueController) -> Unit) {
-        checkpointRequests += handler
     }
 
     companion object {

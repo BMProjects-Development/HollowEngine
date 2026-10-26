@@ -320,13 +320,11 @@ class StoryCompiler(
         for (pc in bodyStart until syncPc) {
             when (instructions[pc]) {
                 is StoryInstruction.Say -> errorAt(
-                    "Dialogue lines are not allowed inside '@async' before '@sync'",
-                    instructions[pc].anchor
+                    "Dialogue lines are not allowed inside '@async' before '@sync'", instructions[pc].anchor
                 )
 
                 is StoryInstruction.Menu -> errorAt(
-                    "Choices are not allowed inside '@async' before '@sync'",
-                    instructions[pc].anchor
+                    "Choices are not allowed inside '@async' before '@sync'", instructions[pc].anchor
                 )
 
                 else -> {}
@@ -366,7 +364,13 @@ class StoryCompiler(
             return StoryCall(kind.function, positional + named.values, tag, metadata, kind.functionSpan)
         }
 
-        if (overloads.isNotEmpty()) {
+        val declaredBy = overloads.map { it.name }.distinct()
+        if (declaredBy.size > 1) {
+            error(
+                "Several namespaces have '@${kind.function}', write ${declaredBy.joinToString(" or ") { "@$it" }}",
+                line
+            )
+        } else if (overloads.isNotEmpty()) {
             val viable = overloads.filter { matches(it, positional, named) }
             if (viable.isEmpty()) {
                 error(

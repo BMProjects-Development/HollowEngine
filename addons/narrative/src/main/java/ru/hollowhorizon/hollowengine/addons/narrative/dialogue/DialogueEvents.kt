@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.addons.narrative.dialogue
 
 import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.common.events.Event
-import ru.hollowhorizon.hollowengine.common.events.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
 /**
@@ -56,18 +55,6 @@ open class DialogueEvent(val session: DialogueSession) : Event {
     ) : DialogueEvent(session) {
         companion object : EventHandler<ActionEnded>()
     }
-}
-
-/**
- * Fires while the engine-wide function registry is being filled, before any story is compiled. This
- * is where an addon, or a `reload.kts` adds commands every dialogue should be able to call.
- *
- * It is posted again on every [StoryEngine.reload], so registrations must be idempotent: register the
- * same overload twice and the registry rejects it. Use event's priority & [StoryFunctionRegistry.unregister] first if a
- * script means to replace a built-in.
- */
-class RegisterStoryFunctionsEvent(val functions: StoryFunctionRegistry) : ServerEvent {
-    companion object : EventHandler<RegisterStoryFunctionsEvent>()
 }
 
 /**

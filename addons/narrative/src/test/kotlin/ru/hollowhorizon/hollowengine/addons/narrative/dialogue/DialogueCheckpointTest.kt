@@ -52,12 +52,10 @@ class DialogueCheckpointTest {
         sources: Map<String, String>,
         presenter: DialoguePresenter,
         locale: String? = null,
-        configure: StoryFunctionRegistry.() -> Unit = {},
     ): DialogueController {
-        val functions = StoryFunctionRegistry().apply(configure)
-        val library = StoryLibrary { functions }
+        val library = StoryLibrary()
         library.addProvider { address -> sources[address] }
-        return DialogueController("test:main.story", presenter, functions, library, locale = locale)
+        return DialogueController("test:main.story", presenter, library, locale = locale)
     }
 
     private val story = """
@@ -199,41 +197,6 @@ class DialogueCheckpointTest {
     }
 
     @Test
-    fun `a function checkpoint lets a long action continue where it stopped`() = runTest {
-        val source = "@count-to-three\nВиталик: Готово."
-        var attempts = 0
-        val configure: StoryFunctionRegistry.() -> Unit = {
-            add("count-to-three") {
-                attempts++
-                var counted = state.getInt("counted")
-                while (counted < 3) {
-                    counted++
-                    state.putInt("counted", counted)
-                    if (counted == 2 && attempts == 1) {
-                        throw InterruptedStatement()
-                    }
-                }
-            }
-        }
-
-        val first = HaltingPresenter(Int.MAX_VALUE)
-        val controller = controller(mapOf("test:main.story" to source), first, configure = configure)
-        val failed = controller.startHeadless()
-        assertTrue(failed is DialogueResult.Failed)
-
-        val tag = CompoundTag()
-        controller.save("dialog", tag)
-
-        val second = HaltingPresenter(Int.MAX_VALUE)
-        val resumed = controller(mapOf("test:main.story" to source), second, configure = configure)
-        resumed.load("dialog", tag)
-        resumed.startHeadless()
-
-        assertEquals(listOf("Готово."), second.lines)
-        assertEquals(2, attempts, "the function is re-entered, not restarted from scratch")
-    }
-
-    @Test
     fun `a localised story is played and recorded instead of the base one`() = runTest {
         val presenter = HaltingPresenter(Int.MAX_VALUE)
         val controller = controller(
@@ -271,6 +234,4 @@ class DialogueCheckpointTest {
             StoryLibrary.localizedAddress("project:stories/example.story", "ru_ru"),
         )
     }
-
-    private class InterruptedStatement : RuntimeException("interrupted")
 }

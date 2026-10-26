@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryEngine
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryFunctionRegistry
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryString
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
 import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
@@ -93,7 +93,7 @@ object StoryScriptingAnalyzer : ScriptingAnalyzer {
     }
 
     private fun catalog(): StoryFunctionCatalog =
-        if (StoryEngine.functions.names.isEmpty()) StoryFunctionCatalog.PERMISSIVE else StoryEngine.functions
+        if (ActionCommands.names.isEmpty()) StoryFunctionCatalog.PERMISSIVE else ActionCommands
 
     private fun storyDefinition(address: String, label: String?): DefinitionLocation? {
         val artifacts = runCatching { ScriptRegistry.artifacts(address) }.getOrNull() ?: return null
@@ -281,7 +281,7 @@ internal fun storyCompletions(
 }
 
 private fun registeredNames(catalog: StoryFunctionCatalog): List<String> =
-    (catalog as? StoryFunctionRegistry)?.names?.sorted().orEmpty()
+    catalog.names.sorted()
 
 private fun labelCompletions(text: String, typed: String): List<CompletionItem> =
     labelsOf(text).filter { completionMatches(typed, it) }.map { label ->
