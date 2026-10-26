@@ -160,7 +160,7 @@ suspend fun any(count: Int, vararg handles: StoryHandle<*>): List<StoryHandle<*>
 inline fun <reified T> saved(default: T): ReadWriteProperty<Any?, T> = SavedVariable(default, storySerializer<T>())
 
 @PublishedApi
-internal class SavedVariable<T>(private val default: T, private val serializer: KSerializer<Any?>) : ReadWriteProperty<Any?, T> {
+internal class SavedVariable<T>(internal val default: T, internal val serializer: KSerializer<Any?>) : ReadWriteProperty<Any?, T> {
     @Suppress("UNCHECKED_CAST")
     override fun getValue(thisRef: Any?, property: KProperty<*>): T {
         val tag = run(property).vars.get(name(property)) ?: return default

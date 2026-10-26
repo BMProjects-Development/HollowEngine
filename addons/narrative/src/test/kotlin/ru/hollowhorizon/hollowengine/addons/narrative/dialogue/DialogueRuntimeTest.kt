@@ -201,20 +201,6 @@ class DialogueRuntimeTest {
     }
 
     @Test
-    fun `jump reaches another story file`() = runTest {
-        val presenter = RecordingPresenter()
-        val controller = controller(
-            "@jump test:other.story#Тут",
-            presenter,
-            extra = mapOf("test:other.story" to "# Тут\nВиталик: Другая история."),
-        )
-
-        controller.startHeadless()
-
-        assertEquals(listOf("Виталик: Другая история."), presenter.lines)
-    }
-
-    @Test
     fun `sync hands the track's remainder to the main flow, interrupting a menu`() = runTest {
         val presenter = object : RecordingPresenter() {
             override suspend fun showChoices(session: DialogueSession, options: List<PresentedChoice>) {

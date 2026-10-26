@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.plugin.ir.stages
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrVariable
@@ -176,7 +177,8 @@ internal class StageLayout(private val stages: StageScope, private val function:
                 "$path$receiver#${counters.next("call:$receiver")}"
             }
         }
-        val isTail = kind == SiteKind.STAGE && !inTry && when (form) {
+        val ofScript = call.symbol.owner.parameters.firstOrNull()?.kind == IrParameterKind.DispatchReceiver
+        val isTail = kind == SiteKind.STAGE && ofScript && !inTry && when (form) {
             SiteForm.RETURN -> true
             SiteForm.STATEMENT -> tail && function.returnType.isUnit() && call.type.isUnit()
             else -> false

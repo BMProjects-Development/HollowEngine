@@ -151,6 +151,9 @@ class StoryCompiler(
             is StoryLineKind.While -> compileWhile(node, kind)
 
             is StoryLineKind.Jump -> {
+                if (kind.target.address != null) {
+                    error("'@jump' stays within its file; '@call' another story to play it and come back", line)
+                }
                 emit(StoryInstruction.Jump(target(kind.target), anchor(line)))
                 requireNoChildren(node)
             }

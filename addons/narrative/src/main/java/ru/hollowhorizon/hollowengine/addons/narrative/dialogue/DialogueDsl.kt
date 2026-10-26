@@ -13,7 +13,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.dialogue
  * function plus whatever it adds itself, without those additions leaking into other dialogues.
  */
 class DialogueControllerBuilder(private val address: String) {
-    var presentation: DialoguePresenter = UiDialoguePresentation()
+    var presentation: DialoguePresenter = StoryEngine.presentation()
 
     /** Functions this dialogue may call, on top of the engine-wide ones. */
     val functions: StoryFunctionRegistry = StoryFunctionRegistry(StoryEngine.functions)
@@ -39,6 +39,9 @@ object StoryEngine {
     val functions = StoryFunctionRegistry()
 
     val library = StoryLibrary { functions }
+
+    /** Makes the presentation of a dialogue that does not choose its own, scenes of stories included. */
+    var presentation: () -> DialoguePresenter = { UiDialoguePresentation() }
 
     init {
         prepareReload()

@@ -133,7 +133,7 @@ class StoryScriptingAnalyzerTest {
         val source = """
             @jump #Конец
             @call #Конец
-            @jump other.story#Конец
+            @call other.story#Конец
             # Конец
             Виталик: Всё.
         """.trimIndent()
