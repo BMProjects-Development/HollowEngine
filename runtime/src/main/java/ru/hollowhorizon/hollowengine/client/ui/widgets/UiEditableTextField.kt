@@ -1130,6 +1130,10 @@ internal fun handleEditableFieldKey(
     }
     if (!state.multiline && !input.shift && (input.key == GLFW.GLFW_KEY_UP || input.key == GLFW.GLFW_KEY_DOWN)) return false
     if (input.key == GLFW.GLFW_KEY_ESCAPE && codeInsight?.dismissSignature() == true) return true
+    if (input.key == GLFW.GLFW_KEY_ESCAPE && state.caretRanges.size > 1) {
+        state.moveCaret(state.caret, inlayAffinity = state.primaryCaret.inlayAffinity)
+        return true
+    }
     if (completion != null && HollowKeys.COMPLETION.matches(input)) {
         completion.open()
         return true
