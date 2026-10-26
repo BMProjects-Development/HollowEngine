@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.NarrativeActions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,14 +10,14 @@ import kotlin.test.assertTrue
 class StoryActionsTest {
     @Test
     fun `npc actions keep their receiver and targets and leave the options to their defaults`() {
-        StoryActions.register(Class.forName("ru.hollowhorizon.hollowengine.addons.narrative.npcs.NpcActionsKt"), "test")
-        val move = StoryActions.find("test:move_to")!!
+        NarrativeActions.register()
+        val move = StoryActions.find("${NarrativeActions.NAMESPACE}:move-to")!!
         assertTrue(move.reversible)
         assertEquals(listOf("this", "pos", "options"), move.parameterNames)
-        listOf("move_to_entity", "move_through", "avoid", "look_at", "look_at_entity").forEach { id ->
-            assertTrue(StoryActions.find("test:$id")?.reversible == true, "$id is undoable")
+        listOf("move-to-entity", "move-through", "avoid", "look-at", "look-at-entity").forEach { id ->
+            assertTrue(StoryActions.find("${NarrativeActions.NAMESPACE}:$id")?.reversible == true, "$id is undoable")
         }
-        assertFalse(StoryActions.find("test:stop_moving")!!.reversible)
+        assertFalse(StoryActions.find("${NarrativeActions.NAMESPACE}:stop-moving")!!.reversible)
     }
 
     @Test

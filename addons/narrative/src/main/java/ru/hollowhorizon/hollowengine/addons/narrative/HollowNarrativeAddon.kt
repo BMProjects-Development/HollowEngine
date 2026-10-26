@@ -40,12 +40,9 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
         }
     }
 
-    /** Engine-owned story functions are reinstalled before reload scripts register theirs. */
+    /** Reloaded scripts registered their actions again, which the stories are checked against. */
     @SubscribeEvent
-    fun beforeReloadScripts(event: ServerReloadScriptsEvent.Pre) = StoryEngine.prepareReload()
-
-    @SubscribeEvent
-    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = StoryEngine.completeReload()
+    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = StoryEngine.reload()
 
     @SubscribeEvent(-1)
     fun registerCommands(event: RegisterCommandsEvent) {
@@ -63,10 +60,7 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
             "ru.hollowhorizon.hollowengine.addons.narrative.npcs.*",
         )
 
-        /** Reload scripts register story functions, so they also get the signature helpers. */
-        val RELOAD_IMPORTS = listOf(DIALOGUE_PACKAGE) +
-            listOf("actor", "any", "boolean", "list", "number", "signature", "string")
-                .map { "ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.$it" }
+        val RELOAD_IMPORTS = listOf(DIALOGUE_PACKAGE)
 
         /** Nodes start dialogues and play cutscenes for players. */
         val NODE_IMPORTS = listOf(DIALOGUE_PACKAGE) +

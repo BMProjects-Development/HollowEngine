@@ -32,6 +32,10 @@ object StoryActions {
     private val byBlock = HashMap<Class<*>, StoryAction>()
     private val users = HashMap<Class<*>, Int>()
 
+    /** What [all] reads: replaced on every change, so the editor may read it off the game thread. */
+    @Volatile
+    private var snapshot: List<StoryAction> = emptyList()
+
     /**
      * Registers the [Action] and [SimpleAction] functions [type] declares under [namespace] until [job] ends; every
      * instance of a script registers its class, which stays registered while one of them runs.
@@ -62,6 +66,7 @@ object StoryActions {
             }
             byMethod[action.method] = action
         }
+        snapshot = byId.values.toList()
     }
 
     private fun release(type: Class<*>) {
@@ -78,7 +83,7 @@ object StoryActions {
     fun find(id: String): StoryAction? = byId[id]
 
     /** Every registered action, for editors and commands. */
-    val all: Collection<StoryAction> get() = byId.values
+    val all: List<StoryAction> get() = snapshot
 
     /** Registers the actions of an addon that loaded, found the same way as its event listeners. */
     @SubscribeEvent
@@ -202,7 +207,9 @@ object StoryActions {
     private fun declare(method: Method, namespace: String): StoryAction? {
         val reversible = method.getAnnotation(Action::class.java)
         val name = reversible?.id ?: method.getAnnotation(SimpleAction::class.java)?.id ?: return null
-        val id = name.ifBlank { method.name }.let { if (':' in it) it else "$namespace:$it" }
+        // The Kotlin name, not the JVM one: a parameter of a value class such as Duration mangles the latter.
+        val id = name.ifBlank { kebabCase(method.kotlinFunction?.name ?: method.name) }
+            .let { if (':' in it) it else "$namespace:$it" }
         return runCatching {
             StoryAction(
                 id,
@@ -223,7 +230,12 @@ object StoryActions {
         if (byId[action.id] === action) byId.remove(action.id)
         byMethod.remove(action.method)
         byBlock.values.removeIf { it === action }
+        snapshot = byId.values.toList()
     }
+
+    /** `placeBlock` as `place-block`, the way scenes name commands. */
+    private fun kebabCase(name: String): String =
+        name.replace(Regex("(?<=[a-z0-9])(?=[A-Z])"), "-").lowercase()
 }
 
 /**
@@ -240,7 +252,7 @@ class StoryAction internal constructor(val id: String, internal val method: Meth
         val serializer: KSerializer<Any?>? = null,
     )
 
-    private val function: KFunction<*> =
+    internal val function: KFunction<*> =
         method.kotlinFunction ?: throw StoryException("'${method.name}' is not a Kotlin function")
     private val parameters: List<Parameter> by lazy { function.parameters.map(::parameter) }
 
@@ -252,6 +264,14 @@ class StoryAction internal constructor(val id: String, internal val method: Meth
 
     /** The parameter names of the function, receivers included, as a record keeps them. */
     val parameterNames: List<String> get() = parameters.map { it.name }
+
+    /** What the function is a member of: its object or a running instance of its script; null at the top level. */
+    internal fun owner(): Any? {
+        val owner = method.declaringClass
+        owner.kotlin.objectInstance?.let { return it }
+        if (!owner.isAnnotationPresent(StageScript::class.java)) return null
+        return StoryInstances.instanceOf(owner) ?: throw StoryException("Action '$id' belongs to a script that is not running")
+    }
 
     internal fun encode(call: Array<out Any?>): CompoundTag {
         if (call.size != parameters.size) throw StoryException(

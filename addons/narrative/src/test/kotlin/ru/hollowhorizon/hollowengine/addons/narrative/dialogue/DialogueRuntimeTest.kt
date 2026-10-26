@@ -6,12 +6,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.actor
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.number
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /** Collects everything a dialogue shows, and answers menus with a scripted list of picks. */
@@ -64,18 +66,30 @@ private open class RecordingPresenter(private val picks: MutableList<Int> = muta
     }
 }
 
+/** The commands the runtime tests call, registered as actions like any other. */
+object DialogueTestCommands {
+    val greeted = mutableListOf<String>()
+
+    @SimpleAction("pause")
+    suspend fun waitFor(time: Duration) = delay(time)
+
+    @SimpleAction("greet")
+    fun greet(who: DialogueCharacter) {
+        greeted += who.name
+    }
+}
+
 class DialogueRuntimeTest {
     private fun controller(
         source: String,
         presenter: DialoguePresenter,
         extra: Map<String, String> = emptyMap(),
-        configure: StoryFunctionRegistry.() -> Unit = {},
     ): DialogueController {
-        val functions = StoryFunctionRegistry().apply(configure)
+        StoryActions.register(DialogueTestCommands::class.java, "test")
         val sources = mapOf("test:main.story" to source) + extra
-        val library = StoryLibrary { functions }
+        val library = StoryLibrary { ActionCommands }
         library.addProvider { address -> sources[address] }
-        return DialogueController("test:main.story", presenter, functions, library)
+        return DialogueController("test:main.story", presenter, library)
     }
 
     @Test
@@ -210,7 +224,7 @@ class DialogueRuntimeTest {
         val controller = controller(
             """
             @async name=timer
-                @wait 50ms
+                @pause 50ms
                 @sync
                 @jump #Поздно
             @choice "Успеть"
@@ -219,9 +233,7 @@ class DialogueRuntimeTest {
             Виталик: Не успел.
             """.trimIndent(),
             presenter,
-        ) {
-            add("wait", number("time")) { args -> delay(args.millis("time")) }
-        }
+        )
 
         val result = controller.startHeadless()
 
@@ -261,7 +273,7 @@ class DialogueRuntimeTest {
         val controller = controller(
             """
             @async name=timer
-                @wait 10s
+                @pause 10s
                 @sync
                 @jump #Поздно
             Виталик: Успел.
@@ -273,9 +285,7 @@ class DialogueRuntimeTest {
             Виталик: Финал.
             """.trimIndent(),
             presenter,
-        ) {
-            add("wait", number("time")) { args -> delay(args.millis("time")) }
-        }
+        )
 
         controller.startHeadless()
 
@@ -285,16 +295,14 @@ class DialogueRuntimeTest {
     @Test
     fun `tagged actions report start and end`() = runTest {
         val presenter = RecordingPresenter()
-        val controller = controller("@wait 1ms tag=timer", presenter) {
-            add("wait", number("time")) { }
-        }
+        val controller = controller("@pause 1ms tag=timer", presenter)
         val events = mutableListOf<String>()
         controller.onStart("timer") { events += "start:${it.function}" }
         controller.onEnd("timer") { events += "end:${it.reason}" }
 
         controller.startHeadless()
 
-        assertEquals(listOf("start:wait", "end:COMPLETED"), events)
+        assertEquals(listOf("start:pause", "end:COMPLETED"), events)
     }
 
     @Test
@@ -320,7 +328,7 @@ class DialogueRuntimeTest {
     @Test
     fun `an actor argument resolves both on the main flow and inside a track`() = runTest {
         val presenter = RecordingPresenter()
-        val seen = mutableListOf<String>()
+        DialogueTestCommands.greeted.clear()
         val controller = controller(
             """
             @greet Сторож
@@ -330,16 +338,14 @@ class DialogueRuntimeTest {
             Сторож: Готово.
             """.trimIndent(),
             presenter,
-        ) {
-            add("greet", actor("who")) { args -> seen += args.actor("who").name }
-        }
+        )
 
         val result = controller.startHeadless {
             character("Сторож", DialogueCharacter.of("Виталик"))
         }
 
         assertEquals(DialogueResult.Finished, result, "the track must not fail: $result")
-        assertEquals(listOf("Виталик", "Виталик"), seen)
+        assertEquals(listOf("Виталик", "Виталик"), DialogueTestCommands.greeted)
     }
 
     @Test
@@ -443,9 +449,7 @@ class DialogueRuntimeTest {
     @Test
     fun `metadata parameters reach the handler untouched`() = runTest {
         val presenter = RecordingPresenter()
-        val controller = controller("@wait 1ms tag=timer overlay=clock", presenter) {
-            add("wait", number("time")) { }
-        }
+        val controller = controller("@pause 1ms tag=timer overlay=clock", presenter)
         var overlay: String? = null
         controller.onStart("timer") { overlay = (it.args.metadata["overlay"] as? StoryString)?.value }
 

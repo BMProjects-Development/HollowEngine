@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 suspend infix fun NpcEntity.useBlock(pos: Vec3): InteractionResult = useBlock(pos, InteractionHand.MAIN_HAND)
 
-@SimpleAction("use_block")
+@SimpleAction("use-block")
 suspend fun NpcEntity.useBlock(
     pos: Vec3,
     hand: InteractionHand = InteractionHand.MAIN_HAND,
@@ -93,7 +93,7 @@ private fun NpcEntity.useBlockAt(target: Vec3, hand: InteractionHand, face: Dire
  */
 suspend infix fun NpcEntity.destroyBlock(pos: Vec3): Boolean = destroyBlock(pos, DEFAULT_INTERACTION_REACH)
 
-@SimpleAction("destroy_block")
+@SimpleAction("destroy-block")
 suspend fun NpcEntity.destroyBlock(
     pos: Vec3,
     reach: Double,

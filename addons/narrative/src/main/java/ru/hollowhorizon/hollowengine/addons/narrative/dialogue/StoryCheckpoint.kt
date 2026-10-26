@@ -21,8 +21,6 @@ data class StoryCheckpoint(
     /** Call stack, outermost first; the last frame is where execution is. */
     val frames: List<CheckpointFrame>,
     val variables: Map<String, StoryValue>,
-    /** Checkpoint written by the function that was running, if any. */
-    val callState: CompoundTag = CompoundTag(),
     /** Async tracks that had not finished; each restarts from its `@async` on resume. */
     val tracks: List<CheckpointTrack> = emptyList(),
 ) {
@@ -32,7 +30,6 @@ data class StoryCheckpoint(
         locale?.let { putString(KEY_LOCALE, it) }
         put(KEY_FRAMES, ListTag().apply { frames.forEach { add(it.save()) } })
         put(KEY_VARIABLES, saveVariables(variables))
-        if (!callState.isEmpty) put(KEY_CALL_STATE, callState)
         if (tracks.isNotEmpty()) put(KEY_TRACKS, ListTag().apply { tracks.forEach { add(it.save()) } })
     }
 
@@ -42,7 +39,6 @@ data class StoryCheckpoint(
         private const val KEY_LOCALE = "locale"
         private const val KEY_FRAMES = "frames"
         private const val KEY_VARIABLES = "variables"
-        private const val KEY_CALL_STATE = "call_state"
         private const val KEY_TRACKS = "tracks"
 
         fun load(tag: CompoundTag): StoryCheckpoint? {
@@ -58,7 +54,6 @@ data class StoryCheckpoint(
                 locale = tag.getString(KEY_LOCALE).takeIf { it.isNotEmpty() },
                 frames = frames,
                 variables = loadVariables(tag.getCompound(KEY_VARIABLES)),
-                callState = tag.getCompound(KEY_CALL_STATE),
                 tracks = tracks,
             )
         }

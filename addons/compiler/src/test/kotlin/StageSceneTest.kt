@@ -110,6 +110,39 @@ class StageSceneTest : StageTest() {
     }
 
     @Test
+    fun `an action of a scene is finished after a restart and not performed again once done`() = runTest {
+        stories["test:build.story"] = """
+            @build house
+            Кузнец: Готово.
+        """.trimIndent()
+        val world = world("build", $$"""
+            @Action
+            suspend fun build(what: String) = action {
+                perform {
+                    log("build $what")
+                    await("built")
+                }
+            }
+
+            @State
+            suspend fun main() {
+                scene("test:build.story", with = emptyList())
+            }
+        """
+        )
+        world.launch("main")
+        world.restart()
+        assertEquals(listOf("build house", "build house"), StageTrace.take(), "the interrupted action is finished")
+
+        world.release("built")
+        assertEquals(listOf("say Готово."), StageTrace.take())
+
+        world.restart()
+        assertEquals(listOf("say Готово."), StageTrace.take(), "the done action is not performed again")
+        world.stop()
+    }
+
+    @Test
     fun `a scene of a story that belongs to no player needs its players`() = runTest {
         stories["test:nobody.story"] = "Кузнец: Никому."
         val world = world("nobody", """

@@ -70,6 +70,9 @@ object StoryInstances {
     /** The running instance registered under [key], if any. */
     fun find(key: String): Any? = byKey[key]?.instance ?: builtins[key]
 
+    /** A running instance of the script class [type]; a node attached to several entities has one for each. */
+    internal fun instanceOf(type: Class<*>): Any? = byKey.values.firstOrNull { it.instance.javaClass == type }?.instance
+
     /** The job of the instance under [key], which ends when the instance stops; null when nothing bounds it. */
     internal fun jobOf(key: String): Job? = byKey[key]?.takeIf { it.users.isNotEmpty() }?.lifetime
 

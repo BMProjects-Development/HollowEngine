@@ -1,6 +1,6 @@
 # Начало
 
-@look-at Виталик player
+@look-at-entity Виталик player
 @play-once Виталик hello
 
 Виталик: Стой где стоишь.
@@ -35,7 +35,7 @@
 
 @set money = money - 20
 @set пропуск = true
-@play-sound minecraft:entity.villager.yes 1.0
+@play-sound player minecraft:entity.villager.yes 1.0
 @play-once Виталик hello
 
 Виталик: Вот теперь другое дело.
@@ -61,9 +61,9 @@
     @jump #Начало
 @choice "Я друг капитана" id=friend
     @cancel терпение
-    @look-at Виталик [100, 65, 100] time=800
+    @look-at Виталик [100, 65, 100] duration=800
     Виталик: ...капитана, значит.
-    @look-at Виталик player
+    @look-at-entity Виталик player
     Виталик: Капитан второй день не выходит из своей каюты, и друзей у него нет.[-] Но десять монет я возьму.
     @jump #Десятка
 @choice "Молча положить руку на кошелёк" id=purse
@@ -76,7 +76,7 @@
 @if money >= 10
     @set money = money - 10
     @set пропуск = true
-    @play-sound minecraft:entity.villager.trade 1.0
+    @play-sound player minecraft:entity.villager.trade 1.0
     Виталик: Проходи, пока я добрый.
     @jump #Пропустил
 
@@ -115,23 +115,23 @@
 
 @set пожитки = пожитки + "пропуск"
 
-@hide-hud
-@fade-in 600ms #000000
+@hide-hud player
+@fade-in player 600ms #000000
 
 @async name=отход
-    @walk-to Виталик [25, 70, -175] speed=1.1 distance=0.6 timeout=6s
-    @look-at Виталик player
+    @move-to Виталик [25, 70, -175] speed=1.1 arrivalDistance=0.6
+    @look-at-entity Виталик player
 
-@camera location=[25, 70, -171] rotation=[-158, 2] time=1500 fov=60
-@fade-out 600ms
+@camera player location=[25, 70, -171] rotation=[-158, 2] time=1500 fov=60
+@fade-out player 600ms
 @wait 900ms
 
 Виталик: Ворота открыты. Не задерживайся на причале.
 Виталик: И если увидишь смотрителя - скажи, что я его жду.
 
 @await отход
-@release-camera 800
-@show-hud
+@release-camera player 800
+@show-hud player
 
 # Конец
 

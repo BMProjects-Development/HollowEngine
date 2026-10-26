@@ -30,10 +30,10 @@ data class StoryParam(
      */
     val suggestions: List<String> = emptyList(),
 ) {
-    /** How the editor writes it: `volume=1.0`, or `except?=null` when there is nothing to default to. */
+    /** How the editor writes it: `volume=1.0`, or `volume?` when the default is not known. */
     fun display(): String = when {
         default != null -> "$name=${default.display()}"
-        optional -> "$name?=null"
+        optional -> "$name?"
         else -> name
     }
 }
@@ -77,6 +77,9 @@ interface StoryFunctionCatalog {
     /** Overloads of [name], or null when the name is unknown (which the compiler reports as an error). */
     fun overloads(name: String): List<StoryFunctionSignature>?
 
+    /** The names the editor offers; empty when the catalog cannot list them. */
+    val names: Collection<String> get() = emptyList()
+
     companion object {
         /** Accepts every call, used when function knowledge is unavailable. */
         val PERMISSIVE = object : StoryFunctionCatalog {
@@ -111,6 +114,8 @@ class StoryCatalogBuilder {
         val snapshot = functions.mapValues { (_, overloads) -> overloads.toList() }
         return object : StoryFunctionCatalog {
             override fun overloads(name: String) = snapshot[name]
+
+            override val names: Collection<String> get() = snapshot.keys
         }
     }
 }

@@ -3,12 +3,17 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItem
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.NarrativeActions
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class StoryScriptingAnalyzerTest {
+    @BeforeTest
+    fun registerActions() = NarrativeActions.register()
+
     private fun styleOf(text: String, fragment: String): TokenType {
         val lines = StoryScriptingAnalyzer.highlight("example.story", text, 0)
         val piece = lines.flatMap { it.spans }.firstOrNull { it.first == fragment }
@@ -199,13 +204,11 @@ class StoryScriptingAnalyzerTest {
     }
 
     @Test
-    fun `each overload is its own entry, with its parameters and their defaults`() {
+    fun `a command is offered with its parameters, the optional ones marked`() {
         val items = StoryScriptingAnalyzer.collectCompletions("example.story", "@", 1)
 
-        val sounds = items.filter { it.show == "@play-sound" }.map { (it as CompletionItem.Declaration).middle }
-        assertEquals(3, sounds.size, "one entry per overload: $sounds")
-        assertTrue(sounds.all { it.orEmpty().startsWith(" ") }, sounds.toString())
-        assertTrue(sounds.any { it == " name volume pitch" }, sounds.toString())
+        val sound = items.single { it.show == "@play-sound" } as CompletionItem.Declaration
+        assertEquals(" who name volume? pitch?", sound.middle)
 
         val wait = items.first { it.show == "@wait" } as CompletionItem.Declaration
         assertEquals(" time", wait.middle)
@@ -216,7 +219,7 @@ class StoryScriptingAnalyzerTest {
 
     @Test
     fun `an actor argument offers the characters the file speaks to`() {
-        val source = "Виталик: Привет.\nСторож: Стой.\n@walk-to "
+        val source = "Виталик: Привет.\nСторож: Стой.\n@move-to "
         val items = StoryScriptingAnalyzer.collectCompletions("example.story", source, source.length)
 
         assertTrue(items.any { it.show == "Виталик" }, items.map { it.show }.toString())
@@ -244,18 +247,18 @@ class StoryScriptingAnalyzerTest {
 
     @Test
     fun `a parameter without a known set still completes parameter names`() {
-        val source = "@play-sound minecraft:x vol"
+        val source = "@play-sound player minecraft:x vol"
         val items = StoryScriptingAnalyzer.collectCompletions("example.story", source, source.length)
 
         assertTrue(items.any { it.show == "volume=" }, items.map { it.show }.toString())
     }
 
     @Test
-    fun `a parameter with a default shows the value it falls back to`() {
+    fun `parameters a scene may leave out are marked`() {
         val items = StoryScriptingAnalyzer.collectCompletions("example.story", "@fade-", 6)
         val fade = items.first { it.show == "@fade-in" } as CompletionItem.Declaration
 
-        assertEquals(" time=500 color=#000000", fade.middle)
+        assertEquals(" who time? color?", fade.middle)
     }
 
     @Test

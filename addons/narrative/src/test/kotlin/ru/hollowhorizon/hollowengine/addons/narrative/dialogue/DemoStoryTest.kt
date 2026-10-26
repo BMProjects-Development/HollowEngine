@@ -2,32 +2,30 @@ package ru.hollowhorizon.hollowengine.addons.narrative.dialogue
 
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryInstruction
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Compiles the demo story that ships in the dev sandbox
- * (`hollowengine/scripts/stories/demo.story`) against the built-in functions.
+ * Compiles the demo story against the actions the narrative addon ships, registered as the game registers them.
  *
- * It is the one test that exercises the language and the engine's own function signatures together,
- * so a `@wait`/`@play-sound` whose parameters changed shape cannot quietly break every example.
+ * It is the one test that exercises the language and the signatures of the addon's own actions together, so an
+ * action whose parameters changed shape cannot quietly break every example.
  */
 class DemoStoryTest {
     private val source: String = requireNotNull(
         javaClass.getResourceAsStream("/dialogue/demo.story")?.bufferedReader()?.readText(),
     ) { "demo.story is missing from the test resources" }
 
-    private val functions = StoryFunctionRegistry().also {
-        StoryBuiltinFunctions.install(it)
-        StoryNpcFunctions.install(it)
-        StoryEffectFunctions.install(it)
-    }
+    @BeforeTest
+    fun registerActions() = NarrativeActions.register()
 
     @Test
     fun `the demo story compiles without a single diagnostic`() {
-        val result = StoryCompiler.compile("hollowengine:stories/demo.story", source, functions)
+        val result = StoryCompiler.compile("hollowengine:stories/demo.story", source, ActionCommands)
 
         assertEquals(emptyList(), result.diagnostics)
         assertNotNull(result.program)
@@ -35,7 +33,7 @@ class DemoStoryTest {
 
     @Test
     fun `every jump and call in the demo points at a label that exists`() {
-        val program = assertNotNull(StoryCompiler.compile("test", source, functions).program)
+        val program = assertNotNull(StoryCompiler.compile("test", source, ActionCommands).program)
 
         val targets = program.instructions.mapNotNull { instruction ->
             when (instruction) {
@@ -52,17 +50,16 @@ class DemoStoryTest {
     }
 
     @Test
-    fun `built-in wait and play-sound accept the calls the demo makes`() {
-        assertNotNull(functions.overloads("wait"))
-        assertEquals(3, functions.overloads("play-sound")?.size, "name, +volume and +pitch forms")
-
+    fun `the commands of the addon take the arguments scenes write`() {
         val calls = """
             @wait 15s
-            @play-sound minecraft:entity.villager.yes
-            @play-sound minecraft:entity.villager.yes 1.0
-            @play-sound minecraft:block.note_block.bell 1.0 0.8
+            @play-sound player minecraft:entity.villager.yes
+            @play-sound player minecraft:block.note_block.bell 1.0 0.8
+            @move-to Виталик [25, 70, -175] speed=1.1 arrivalDistance=0.6
+            @hide-hud player except=[chat, hotbar]
+            @use-block Виталик [1, 64, 1] hand=off-hand
         """.trimIndent()
-        val result = StoryCompiler.compile("test", calls, functions)
+        val result = StoryCompiler.compile("test", calls, ActionCommands)
 
         assertEquals(emptyList(), result.diagnostics)
     }
