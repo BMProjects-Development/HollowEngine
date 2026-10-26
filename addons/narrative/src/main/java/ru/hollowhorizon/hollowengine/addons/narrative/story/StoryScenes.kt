@@ -5,8 +5,10 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCharacter
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueHost
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueResult
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SceneStage.KEY
+import ru.hollowhorizon.hollowengine.addons.narrative.story.temporary as temporaryUntil
 
 /**
  * Plays the scene [address] as a stage of the running story and returns when it ends. After a restart the scene
@@ -50,7 +52,7 @@ internal object SceneStage {
     }
 
     suspend fun play(address: String, with: List<ServerPlayer>?, characters: Map<String, LivingEntity>) {
-        val frame = StoryFrames.enter(this, STAGE, 0, emptyArray())
+        val frame = StoryFrames.enter(this, STAGE, 0, arrayOf(STATEMENT))
         try {
             // Saved as resolved: NBT reads an empty nullable list back as null.
             val players = with ?: listOf(playerOf(frame.run, address))
@@ -78,43 +80,67 @@ internal object SceneStage {
         characters.forEach { (name, entity) -> controller.character(name, DialogueCharacter.of(entity)) }
         controller.outerVariables = RunVariables(frame.run)
         controller.load(CHECKPOINT, frame.locals)
-        controller.onStep = { controller.save(CHECKPOINT, frame.locals) }
-        controller.commandRunner = { statement, call -> journaled(frame, statement, call) }
+        controller.host = SceneHost(frame, controller)
 
         val result = if (players.isEmpty()) controller.startHeadless() else controller.start(*players.toTypedArray())
         when (result) {
             is DialogueResult.Failed -> throw result.error as? StoryEntityMissing
                 ?: StoryException("Scene '$address' failed: ${result.error.message}", result.error)
+
             DialogueResult.AllPlayersLeft -> throw StoryEntityMissing(players.first().uuid)
             else -> Unit
         }
     }
 
     /**
-     * Calls the action of [statement] with its journal record kept in the frame, as a stage keeps the record of an
-     * action it calls: after a restart an action the scene was in the middle of is finished, and one that was done
-     * is not performed again.
+     * The story a scene plays in. Every statement of the scene is a segment of its frame: a restart repeats the
+     * statement it was in, taking back the temporary actions that statement performed.
      */
-    private suspend fun journaled(frame: StoryFrame, statement: String, call: suspend () -> Unit) {
-        val interrupted = frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
-        val entry = interrupted?.let(frame.run.journal::entry)
-        try {
-            when {
-                entry?.done == true -> Unit
-                entry != null -> StoryActions.resume(entry)
-                else -> {
-                    frame.action = StoryFrame.NO_RECORD
-                    frame.locals.putString(ACTION_AT, statement)
-                    call()
+    private class SceneHost(private val frame: StoryFrame, private val controller: DialogueController) : DialogueHost {
+        override fun step() {
+            controller.save(CHECKPOINT, frame.locals)
+            frame.standAt(STATEMENT, calling = false)
+            frame.segmentMark = frame.run.journal.next
+        }
+
+        /**
+         * Calls the action of [statement] with its journal record kept in the frame, as a stage keeps the record of an
+         * action it calls: after a restart an action the scene was in the middle of is finished, and one that was done
+         * is not performed again.
+         */
+        override suspend fun journaled(statement: String, call: suspend () -> Unit) {
+            val interrupted =
+                frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
+            val entry = interrupted?.let(frame.run.journal::entry)
+            frame.standAt(STATEMENT, calling = true)
+            try {
+                when {
+                    entry?.done == true -> Unit
+                    entry != null -> StoryActions.resume(entry)
+                    else -> {
+                        frame.action = StoryFrame.NO_RECORD
+                        frame.locals.putString(ACTION_AT, statement)
+                        call()
+                    }
+                }
+            } finally {
+                if (!frame.run.isCancelled) {
+                    frame.action = null
+                    frame.locals.remove(ACTION_AT)
+                    frame.standAt(STATEMENT, calling = false)
                 }
             }
-        } finally {
-            if (!frame.run.isCancelled) {
-                frame.action = null
-                frame.locals.remove(ACTION_AT)
-            }
         }
+
+        override suspend fun temporary(until: String?, call: suspend () -> Unit) = temporaryUntil(until) { call() }
+
+        override fun checkpoint(name: String) = frame.passCheckpoint(name)
+
+        override fun rewind(name: String?) = frame.run.rewind(name)
     }
+
+    /** The one site of a scene frame: the statement it is at. */
+    private const val STATEMENT = "statement"
 
     /** The statement whose action [StoryFrame.action] records. */
     private const val ACTION_AT = "action_at"

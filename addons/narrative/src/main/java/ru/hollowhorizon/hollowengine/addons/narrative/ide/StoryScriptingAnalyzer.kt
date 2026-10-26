@@ -264,6 +264,7 @@ internal fun storyCompletions(
             .filter { completionMatches(context.typed, it) }.flatMap { command -> commandCompletions(command, catalog) }
 
         is StoryCompletionContext.Label -> labelCompletions(text, context.typed)
+        is StoryCompletionContext.Checkpoint -> checkpointCompletions(text, context.typed)
 
         is StoryCompletionContext.Expression -> if (context.member) memberCompletions(context.typed) else variableCompletions(
             text,
@@ -292,6 +293,19 @@ private fun labelCompletions(text: String, typed: String): List<CompletionItem> 
                 tag = CompletionItemTag.CLASS
                 tail = "label"
                 wordChars = "#"
+            }
+        }
+
+/** The checkpoints this file passes; those a Kotlin stage of the story passes are not known here. */
+private fun checkpointCompletions(text: String, typed: String): List<CompletionItem> =
+    StoryParser.parse(text).cst.lines.mapNotNull { (it.kind as? StoryLineKind.Checkpoint)?.name }.distinct()
+        .filter { completionMatches(typed, it) }.map { checkpoint ->
+            declarationCompletionItem {
+                show = checkpoint
+                name = checkpoint
+                tag = CompletionItemTag.CLASS
+                tail = "checkpoint"
+                wordChars = "-"
             }
         }
 

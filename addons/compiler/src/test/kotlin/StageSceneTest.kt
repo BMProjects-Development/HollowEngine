@@ -143,6 +143,64 @@ class StageSceneTest : StageTest() {
     }
 
     @Test
+    fun `a rewind of a scene goes back to the line after its checkpoint`() = runTest {
+        stories["test:loop.story"] = """
+            Кузнец: Раз.
+            @checkpoint start
+            Кузнец: Два.
+            @rewind start
+        """.trimIndent()
+        val world = world("loop", """
+            @State
+            suspend fun main() {
+                scene("test:loop.story", with = emptyList())
+            }
+        """)
+        world.launch("main")
+        world.release("Раз.")
+        assertEquals(listOf("say Раз.", "say Два."), StageTrace.take())
+
+        StageTrace.release("Два.")
+        StageTrace.hold("Два.")
+        world.settle()
+        assertEquals(listOf("say Два."), StageTrace.take(), "the scene plays on from its checkpoint, not from the start")
+        world.stop()
+    }
+
+    @Test
+    fun `temporary actions of a scene are taken back at its next checkpoint`() = runTest {
+        stories["test:barrier.story"] = """
+            @temporary
+                @place barrier
+            Кузнец: Стой.
+            @checkpoint boss
+            Кузнец: Готово.
+        """.trimIndent()
+        val world = world("barrier", $$"""
+            @Action
+            suspend fun place(name: String) = action {
+                undo { StageTrace.blocks -= name }
+                perform { StageTrace.blocks += name }
+            }
+
+            @State
+            suspend fun main() {
+                scene("test:barrier.story", with = emptyList())
+            }
+        """)
+        world.launch("main")
+        assertEquals(setOf("barrier"), StageTrace.blocks)
+
+        world.restart()
+        assertEquals(setOf("barrier"), StageTrace.blocks, "a restart after the block keeps what it placed")
+
+        world.release("Стой.")
+        assertEquals(emptySet(), StageTrace.blocks, "the checkpoint takes it back")
+        assertEquals(listOf("say Стой.", "say Стой.", "say Готово."), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
     fun `a scene of a story that belongs to no player needs its players`() = runTest {
         stories["test:nobody.story"] = "Кузнец: Никому."
         val world = world("nobody", """

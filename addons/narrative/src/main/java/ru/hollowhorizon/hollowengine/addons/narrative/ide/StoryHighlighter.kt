@@ -20,6 +20,7 @@ internal object StoryHighlighter {
         "if", "else-if", "else", "while", "set",
         "jump", "call", "return",
         "choice", "async", "await", "cancel", "sync",
+        "checkpoint", "rewind", "temporary", "timeout",
         "command",
     )
 
@@ -118,6 +119,26 @@ internal object StoryHighlighter {
                     out += callSpan(call.functionSpan.start, call.functionSpan.end, call.function, catalog)
                     call.args.forEach { argSpans(it, out) }
                 }
+            }
+
+            is StoryLineKind.Checkpoint -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                out += TextSpan(kind.nameSpan.start, kind.nameSpan.end, TokenType.TOP_LEVEL)
+            }
+
+            is StoryLineKind.Rewind -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                kind.nameSpan?.let { out += TextSpan(it.start, it.end, TokenType.TOP_LEVEL) }
+            }
+
+            is StoryLineKind.Temporary -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                kind.untilSpan?.let { out += TextSpan(it.start, it.end, TokenType.TOP_LEVEL) }
+            }
+
+            is StoryLineKind.Timeout -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                exprSpans(kind.duration, out)
             }
 
             is StoryLineKind.Await, is StoryLineKind.Cancel, is StoryLineKind.Sync,

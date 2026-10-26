@@ -23,6 +23,8 @@ data class StoryCheckpoint(
     val variables: Map<String, StoryValue>,
     /** Async tracks that had not finished; each restarts from its `@async` on resume. */
     val tracks: List<CheckpointTrack> = emptyList(),
+    /** When the `@timeout` blocks entered give up, in epoch milliseconds, by `address#pc`; kept on an exact resume only. */
+    val deadlines: Map<String, Long> = emptyMap(),
 ) {
     fun save(): CompoundTag = CompoundTag().apply {
         putString(KEY_ADDRESS, address)
@@ -31,6 +33,7 @@ data class StoryCheckpoint(
         put(KEY_FRAMES, ListTag().apply { frames.forEach { add(it.save()) } })
         put(KEY_VARIABLES, saveVariables(variables))
         if (tracks.isNotEmpty()) put(KEY_TRACKS, ListTag().apply { tracks.forEach { add(it.save()) } })
+        if (deadlines.isNotEmpty()) put(KEY_DEADLINES, CompoundTag().apply { deadlines.forEach(::putLong) })
     }
 
     companion object {
@@ -40,6 +43,7 @@ data class StoryCheckpoint(
         private const val KEY_FRAMES = "frames"
         private const val KEY_VARIABLES = "variables"
         private const val KEY_TRACKS = "tracks"
+        private const val KEY_DEADLINES = "deadlines"
 
         fun load(tag: CompoundTag): StoryCheckpoint? {
             if (!tag.contains(KEY_ADDRESS) || !tag.contains(KEY_FRAMES)) return null
@@ -55,6 +59,7 @@ data class StoryCheckpoint(
                 frames = frames,
                 variables = loadVariables(tag.getCompound(KEY_VARIABLES)),
                 tracks = tracks,
+                deadlines = tag.getCompound(KEY_DEADLINES).let { saved -> saved.allKeys.associateWith(saved::getLong) },
             )
         }
 

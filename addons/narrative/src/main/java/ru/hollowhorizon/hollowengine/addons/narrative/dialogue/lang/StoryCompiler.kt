@@ -28,6 +28,12 @@ class StoryCompiler(
     private var currentLabel: String? = null
     private var sectionStart = 0
 
+    /** The `@temporary` and `@timeout` blocks the instructions being compiled are in, innermost last. */
+    private val temporaries = ArrayDeque<StoryTemporary>()
+    private val timeouts = ArrayDeque<Int>()
+    private var asyncDepth = 0
+    private val checkpoints = HashSet<String>()
+
     companion object {
         /** Universal named parameters every function accepts on top of its own signature. */
         private val RESERVED_PARAMS = setOf("tag")
@@ -175,10 +181,31 @@ class StoryCompiler(
             }
 
             is StoryLineKind.FuncCall -> {
-                val call = resolveCall(kind, line)
-                emit(StoryInstruction.Invoke(call, anchor(line)))
+                emitInvoke(resolveCall(kind, line), line)
                 requireNoChildren(node)
             }
+
+            is StoryLineKind.Checkpoint -> {
+                if (asyncDepth > 0) error("'@checkpoint' belongs to the main flow, not to an '@async' track", line)
+                if (!checkpoints.add(kind.name)) error("Duplicate checkpoint '${kind.name}'", line)
+                emit(StoryInstruction.Checkpoint(kind.name, anchor(line)))
+                requireNoChildren(node)
+            }
+
+            is StoryLineKind.Rewind -> {
+                if (asyncDepth > 0) error("'@rewind' belongs to the main flow, not to an '@async' track", line)
+                emit(StoryInstruction.Rewind(kind.name, anchor(line)))
+                requireNoChildren(node)
+            }
+
+            is StoryLineKind.Temporary -> {
+                if (node.children.isEmpty()) error("'@temporary' expects an indented block", line)
+                temporaries.addLast(StoryTemporary(kind.until))
+                compileNodes(node.children)
+                temporaries.removeLast()
+            }
+
+            is StoryLineKind.Timeout -> compileTimeout(node, kind)
 
             is StoryLineKind.Async -> compileAsync(node, kind)
 
@@ -299,20 +326,47 @@ class StoryCompiler(
         return i
     }
 
+    /**
+     * `@timeout` holds commands and the control flow between them: a line or a menu would wait for the players, who
+     * are not to be hurried, and a track would outlive the block.
+     */
+    private fun compileTimeout(node: Node, kind: StoryLineKind.Timeout) {
+        if (node.children.isEmpty()) error("'@timeout' expects an indented block", node.line)
+        val startPc = emitPlaceholder(node.line)
+        timeouts.addLast(startPc)
+        compileNodes(node.children)
+        timeouts.removeLast()
+        patch(startPc, StoryInstruction.TimeoutStart(kind.duration, instructions.size, instructions[startPc].anchor))
+        for (pc in startPc + 1 until instructions.size) {
+            val what = when (instructions[pc]) {
+                is StoryInstruction.Say -> "Dialogue lines"
+                is StoryInstruction.Menu -> "Choices"
+                is StoryInstruction.AsyncStart -> "'@async' tracks"
+                else -> continue
+            }
+            errorAt("$what are not allowed inside '@timeout'", instructions[pc].anchor)
+        }
+    }
+
+    private fun emitInvoke(call: StoryCall, line: StoryLine) =
+        emit(StoryInstruction.Invoke(call, anchor(line), temporaries.lastOrNull(), timeouts.toList()))
+
     private fun compileAsync(node: Node, kind: StoryLineKind.Async) {
         val startPc = emitPlaceholder(node.line)
         val bodyStart = instructions.size
+        asyncDepth++
         if (kind.inline != null) {
             if (node.children.isNotEmpty()) {
                 error("'@async' with an inline command cannot also open a block", node.line)
             }
-            emit(StoryInstruction.Invoke(resolveCall(kind.inline, node.line), anchor(node.line)))
+            emitInvoke(resolveCall(kind.inline, node.line), node.line)
         } else {
             if (node.children.isEmpty()) {
                 error("'@async' expects an indented block or a command on the same line", node.line)
             }
             compileNodes(node.children)
         }
+        asyncDepth--
         val bodyEnd = instructions.size
         patch(startPc, StoryInstruction.AsyncStart(kind.trackName, bodyStart, bodyEnd, instructions[startPc].anchor))
 

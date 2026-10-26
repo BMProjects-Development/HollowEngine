@@ -79,8 +79,25 @@ sealed interface StoryInstruction {
 
     data class Return(override val anchor: StoryAnchor) : StoryInstruction
 
-    /** A call into the function registry. */
-    data class Invoke(val call: StoryCall, override val anchor: StoryAnchor) : StoryInstruction
+    /**
+     * A command. Inside `@temporary` its actions are [temporary]; inside `@timeout` blocks it gives up when the time
+     * of any of them, the [TimeoutStart]s at [timeouts], is out.
+     */
+    data class Invoke(
+        val call: StoryCall,
+        override val anchor: StoryAnchor,
+        val temporary: StoryTemporary? = null,
+        val timeouts: List<Int> = emptyList(),
+    ) : StoryInstruction
+
+    /** `@checkpoint`: a checkpoint of the story the dialogue plays in. */
+    data class Checkpoint(val name: String, override val anchor: StoryAnchor) : StoryInstruction
+
+    /** `@rewind`: takes the story back to the checkpoint [name], or to its latest one when null. */
+    data class Rewind(val name: String?, override val anchor: StoryAnchor) : StoryInstruction
+
+    /** `@timeout`: starts counting [duration] for the commands up to [end], where the flow goes when it is out. */
+    data class TimeoutStart(val duration: StoryExpression, val end: Int, override val anchor: StoryAnchor) : StoryInstruction
 
     /** A vanilla command, run with server permissions anchored at the dialogue's actor. */
     data class Command(val text: TextTemplate, override val anchor: StoryAnchor) : StoryInstruction
@@ -107,6 +124,9 @@ sealed interface StoryInstruction {
      */
     data class Sync(override val anchor: StoryAnchor) : StoryInstruction
 }
+
+/** A `@temporary` block: its actions are taken back at the checkpoint [until], or at the next one when null. */
+data class StoryTemporary(val until: String?)
 
 /** One button of a menu. [bodyStart] is where the branch begins; it ends by jumping past the group. */
 data class MenuOption(

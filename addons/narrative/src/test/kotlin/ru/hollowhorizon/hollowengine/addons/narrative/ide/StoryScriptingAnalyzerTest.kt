@@ -118,6 +118,17 @@ class StoryScriptingAnalyzerTest {
     }
 
     @Test
+    fun `rewind and until complete the checkpoints of the file`() {
+        val source = "@checkpoint arena\n@checkpoint boss\n@rewind ar"
+        val rewind = StoryScriptingAnalyzer.collectCompletions("example.story", source, source.length)
+        assertEquals(listOf("arena"), rewind.map { it.show })
+
+        val temporary = "@checkpoint arena\n@temporary until=b"
+        val until = StoryScriptingAnalyzer.collectCompletions("example.story", temporary, temporary.length)
+        assertEquals(emptyList(), until.map { it.show })
+    }
+
+    @Test
     fun `jump completes the labels of the file`() {
         val source = "# Начало\n# Торговля\n@jump #"
         val items = StoryScriptingAnalyzer.collectCompletions("example.story", source, source.length)

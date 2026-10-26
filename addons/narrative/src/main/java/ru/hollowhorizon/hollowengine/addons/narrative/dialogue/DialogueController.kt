@@ -6,6 +6,7 @@ import kotlinx.coroutines.selects.select
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
@@ -75,14 +76,11 @@ class DialogueController(
     /** Variables the dialogue shares with whoever plays it, looked up before its own. */
     internal var outerVariables: StoryVariableSource? = null
 
-    /** Called before every statement, when [checkpoint] holds everything the previous ones did. */
-    internal var onStep: (() -> Unit)? = null
+    /** The story the dialogue plays in as a scene, if any. */
+    internal var host: DialogueHost? = null
 
-    /**
-     * Runs a reversible command of the main flow, given the statement it is as `hash#label+offset`; a scene of a
-     * story keeps its journal record through it, to finish the command after a restart instead of repeating it.
-     */
-    internal var commandRunner: (suspend (statement: String, call: suspend () -> Unit) -> Unit)? = null
+    /** When each `@timeout` block entered gives up, by `address#pc` of the block. */
+    private val deadlines = HashMap<String, Long>()
 
     /** Checkpoint restored by [load], consumed by the next [start]. */
     private var restored: StoryCheckpoint? = null
@@ -194,6 +192,7 @@ class DialogueController(
         frames.clear()
         variables.clear()
         tracks.clear()
+        deadlines.clear()
         restored = null
     }
 
@@ -229,6 +228,7 @@ class DialogueController(
                     it.anchor
                 )
             },
+            deadlines = deadlines.toMap(),
         )
     }
 
@@ -259,6 +259,7 @@ class DialogueController(
         variables.clear()
         variables += checkpoint.variables
         frames.clear()
+        deadlines.clear()
 
         val exact = loaded.program.sourceHash == checkpoint.sourceHash && loaded.address == checkpoint.address
         if (exact) {
@@ -268,6 +269,7 @@ class DialogueController(
             }
             if (resolved.all { it != null }) {
                 resolved.forEach { frames.addLast(it!!) }
+                deadlines += checkpoint.deadlines
                 checkpoint.tracks.forEach { track ->
                     loaded.program.resolve(track.anchor)?.let { pc ->
                         pendingTrackRestarts += track.name to pc
@@ -305,7 +307,7 @@ class DialogueController(
             }
             if (frames.isEmpty()) return DialogueResult.Finished
             if (participants.isNotEmpty() && onlineParticipants.isEmpty()) return DialogueResult.AllPlayersLeft
-            onStep?.invoke()
+            host?.step()
 
             val frame = frames.last()
             val program = programOf(frame.address) ?: return DialogueResult.Finished
@@ -360,9 +362,25 @@ class DialogueController(
 
             is StoryInstruction.Return -> frames.removeLast()
 
-            is StoryInstruction.Invoke -> {
-                if (!invoke(frame, instruction)) return null // preempted
+            is StoryInstruction.Invoke -> frame.pc = invoke(frame, instruction) ?: return null // preempted
+
+            is StoryInstruction.TimeoutStart -> {
+                startTimeout(frame.address, frame.pc, instruction)
                 frame.pc++
+            }
+
+            is StoryInstruction.Checkpoint -> {
+                frame.pc++
+                host?.let {
+                    it.step()
+                    it.checkpoint(instruction.name)
+                }
+            }
+
+            is StoryInstruction.Rewind -> {
+                val host = host ?: throw StoryRuntimeException("'@rewind' works only in a scene of a story")
+                host.rewind(instruction.name)
+                awaitCancellation()
             }
 
             is StoryInstruction.Command -> {
@@ -414,7 +432,7 @@ class DialogueController(
                 is TextPart.InlineCall -> {
                     if (!flush()) return false
                     val evaluated = part.call.args.toEvaluated()
-                    if (!callCommand(part.call.function, evaluated, null, emptyMap()) { _, perform ->
+                    if (!callCommand(part.call.function, evaluated, null, emptyMap(), null) { _, perform ->
                             preemptible(
                                 perform
                             )
@@ -488,33 +506,74 @@ class DialogueController(
         return if (leaders.size == 1) leaders.first() else leaders.random()
     }
 
-    /** Runs a command of the main flow; returns false when a track preempted it. */
-    private suspend fun invoke(frame: Frame, instruction: StoryInstruction.Invoke): Boolean {
+    /**
+     * Runs a command of the main flow and returns where the flow goes next: past the command, or past the `@timeout`
+     * block whose time ran out. Null when a track preempted it.
+     */
+    private suspend fun invoke(frame: Frame, instruction: StoryInstruction.Invoke): Int? {
         val call = instruction.call
         val evaluated = call.args.toEvaluated()
         val metadata = call.metadata.mapValues { (_, expr) -> evaluate(expr) }
         val statement =
             programOf(frame.address)?.let { "${it.sourceHash}#${instruction.anchor.label}+${instruction.anchor.offset}" }
-        return callCommand(call.function, evaluated, call.tag, metadata) { command, perform ->
-            val runner = commandRunner
+        val timeout = nearestTimeout(frame.address, instruction)
+        var inTime = true
+        val completed = callCommand(call.function, evaluated, call.tag, metadata, instruction.temporary) { command, perform ->
+            val host = host
             preemptible {
-                if (runner != null && statement != null && command.action.reversible) runner(
-                    statement,
-                    perform
-                ) else perform()
+                inTime = within(timeout, call.function) {
+                    if (host != null && statement != null && command.action.reversible) host.journaled(statement, perform)
+                    else perform()
+                }
             }
         }
+        return when {
+            !completed -> null
+            inTime -> frame.pc + 1
+            else -> timeout!!.end
+        }
+    }
+
+    /** A `@timeout` block a command is in: how much of its time is left, and where it ends. */
+    private class Timeout(val left: Long, val end: Int)
+
+    private fun startTimeout(address: String, pc: Int, instruction: StoryInstruction.TimeoutStart) {
+        val millis = (evaluate(instruction.duration) as? StoryNumber)?.value?.toLong()
+            ?: throw StoryRuntimeException("'@timeout' takes a time like 6s (line ${instruction.anchor.line + 1})")
+        deadlines["$address#$pc"] = System.currentTimeMillis() + millis
+    }
+
+    /** The block of [instruction] whose time runs out first, or null when it is in none. */
+    private fun nearestTimeout(address: String, instruction: StoryInstruction.Invoke): Timeout? {
+        val program = programOf(address) ?: return null
+        return instruction.timeouts.mapNotNull { pc ->
+            val deadline = deadlines["$address#$pc"] ?: return@mapNotNull null
+            val block = program.instructions[pc] as StoryInstruction.TimeoutStart
+            Timeout(deadline - System.currentTimeMillis(), block.end)
+        }.minByOrNull { it.left }
+    }
+
+    /** Runs [block] within the time of [timeout]; returns false when the time ran out and the command was given up. */
+    private suspend fun within(timeout: Timeout?, command: String, block: suspend () -> Unit): Boolean {
+        if (timeout == null) {
+            block()
+            return true
+        }
+        if (timeout.left > 0 && withTimeoutOrNull(timeout.left.milliseconds) { block() } != null) return true
+        HollowEngine.LOGGER.warn("'@{}' of '{}' ran out of the time of its @timeout; the story goes on after the block", command, address)
+        return false
     }
 
     /**
      * Calls the command [function] with [evaluated] arguments through [run], which returns false when the call was
-     * preempted, and reports a [tag] to the handlers.
+     * preempted, and reports a [tag] to the handlers. Inside `@temporary` its actions are [temporary].
      */
     private suspend fun callCommand(
         function: String,
         evaluated: EvaluatedArgs,
         tag: String?,
         metadata: Map<String, StoryValue>,
+        temporary: StoryTemporary?,
         run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Boolean,
     ): Boolean {
         val command = ActionCommands.resolve(function, evaluated.positional, evaluated.named)
@@ -527,7 +586,13 @@ class DialogueController(
         }
         var reason = StoryActionEnd.COMPLETED
         try {
-            val completed = run(command) { withContext(CurrentDialogue(this)) { command.call(args) } }
+            val completed = run(command) {
+                withContext(CurrentDialogue(this)) {
+                    val host = host
+                    if (temporary != null && host != null) host.temporary(temporary.until) { command.call(args) }
+                    else command.call(args)
+                }
+            }
             if (!completed) reason = StoryActionEnd.CANCELLED
             return completed
         } catch (e: CancellationException) {
@@ -590,13 +655,21 @@ class DialogueController(
                 }
 
                 is StoryInstruction.Invoke -> {
-                    val evaluated = instruction.call.args.toEvaluated()
-                    val metadata = instruction.call.metadata.mapValues { (_, expr) -> evaluate(expr) }
+                    val call = instruction.call
+                    val evaluated = call.args.toEvaluated()
+                    val metadata = call.metadata.mapValues { (_, expr) -> evaluate(expr) }
+                    val timeout = nearestTimeout(address, instruction)
+                    var inTime = true
                     // A track cannot preempt itself, so its commands simply run.
-                    callCommand(instruction.call.function, evaluated, instruction.call.tag, metadata) { _, perform ->
-                        perform()
+                    callCommand(call.function, evaluated, call.tag, metadata, instruction.temporary) { _, perform ->
+                        inTime = within(timeout, call.function, perform)
                         true
                     }
+                    pc = if (inTime) pc + 1 else timeout!!.end
+                }
+
+                is StoryInstruction.TimeoutStart -> {
+                    startTimeout(address, pc, instruction)
                     pc++
                 }
 
