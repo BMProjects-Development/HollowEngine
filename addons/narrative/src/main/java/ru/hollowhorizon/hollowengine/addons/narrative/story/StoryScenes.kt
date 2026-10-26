@@ -3,11 +3,11 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.LivingEntity
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCharacter
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueHost
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueResult
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryType
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SceneStage.KEY
+import kotlin.reflect.KParameter
 import ru.hollowhorizon.hollowengine.addons.narrative.story.temporary as temporaryUntil
 
 /**
@@ -82,7 +82,12 @@ internal object SceneStage {
         controller.load(CHECKPOINT, frame.locals)
         controller.host = SceneHost(frame, controller)
 
-        val result = if (players.isEmpty()) controller.startHeadless() else controller.start(*players.toTypedArray())
+        SceneTracks.attach(frame.run, controller)
+        val result = try {
+            if (players.isEmpty()) controller.startHeadless() else controller.start(*players.toTypedArray())
+        } finally {
+            SceneTracks.detach(frame.run)
+        }
         when (result) {
             is DialogueResult.Failed -> throw result.error as? StoryEntityMissing
                 ?: StoryException("Scene '$address' failed: ${result.error.message}", result.error)
@@ -103,44 +108,90 @@ internal object SceneStage {
             frame.segmentMark = frame.run.journal.next
         }
 
-        /**
-         * Calls the action of [statement] with its journal record kept in the frame, as a stage keeps the record of an
-         * action it calls: after a restart an action the scene was in the middle of is finished, and one that was done
-         * is not performed again.
-         */
-        override suspend fun journaled(statement: String, call: suspend () -> Unit) {
-            val interrupted =
-                frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
-            val entry = interrupted?.let(frame.run.journal::entry)
-            frame.standAt(STATEMENT, calling = true)
-            try {
-                when {
-                    entry?.done == true -> Unit
-                    entry != null -> StoryActions.resume(entry)
-                    else -> {
-                        frame.action = StoryFrame.NO_RECORD
-                        frame.locals.putString(ACTION_AT, statement)
-                        call()
-                    }
-                }
-            } finally {
-                if (!frame.run.isCancelled) {
-                    frame.action = null
-                    frame.locals.remove(ACTION_AT)
-                    frame.standAt(STATEMENT, calling = false)
-                }
-            }
-        }
+        override suspend fun journaled(statement: String, call: suspend () -> Unit) = journaled(frame, statement, call)
+
+        override suspend fun startTrack(name: String, address: String, anchor: StoryAnchor) =
+            SceneTracks.start(frame, name, address, anchor)
+
+        override fun tracks(): Map<String, DialogueTrack> = SceneTracks.of(frame)
 
         override suspend fun temporary(until: String?, call: suspend () -> Unit) = temporaryUntil(until) { call() }
 
         override fun checkpoint(name: String) = frame.passCheckpoint(name)
 
+        /**
+         * Calls the stage as a stage calls another, at the one site of the frame: after a restart in the middle the
+         * saved stage goes on, and the scene does not call it again.
+         */
+        override suspend fun stage(
+            script: String,
+            stage: String,
+            positional: List<StoryValue>,
+            named: Map<String, StoryValue>,
+        ): StoryValue? {
+            if (frame.isResumingAt(CALL_POSITION) && frame.run.pending.isNotEmpty()) {
+                return StoryConversions.toStory(frame.resumeCall(0))
+            }
+            val key = StoryInstances.scriptNamed(script)
+            val parameters =
+                StoryInstances.stageFunction(key, stage).parameters.filter { it.kind != KParameter.Kind.INSTANCE }
+            val args = CompoundTag()
+            parameters.forEachIndexed { index, parameter ->
+                val name = if (parameter.kind == KParameter.Kind.EXTENSION_RECEIVER) "this" else parameter.name
+                    ?: "argument$index"
+                val written = named[name] ?: positional.getOrNull(index)
+                ?: throw StoryException("'@stage $script#$stage' needs '$name'")
+                val value =
+                    (written as? StoryString)?.takeIf { StoryConversions.typeOf(parameter.type) == StoryType.ACTOR }
+                        ?.let { controller.resolveActor(it.value) } ?: written
+                StoryValues.put(
+                    args,
+                    name,
+                    StoryValues.serializer(parameter.type),
+                    StoryConversions.convert(value, parameter.type, name)
+                )
+            }
+            frame.beginCall(0)
+            return StoryConversions.toStory(frame.completeCall(0, StoryInstances.invoke(key, stage, args)))
+        }
+
         override fun rewind(name: String?) = frame.run.rewind(name)
     }
 
+    /**
+     * Calls the action of [statement] with its journal record kept in [frame], as a stage keeps the record of an
+     * action it calls: after a restart an action the scene or track was in the middle of is finished, and one that
+     * was done is not performed again.
+     */
+    internal suspend fun journaled(frame: StoryFrame, statement: String, call: suspend () -> Unit) {
+        val interrupted =
+            frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
+        val entry = interrupted?.let(frame.run.journal::entry)
+        frame.standAt(STATEMENT, calling = true)
+        try {
+            when {
+                entry?.done == true -> Unit
+                entry != null -> StoryActions.resume(entry)
+                else -> {
+                    frame.action = StoryFrame.NO_RECORD
+                    frame.locals.putString(ACTION_AT, statement)
+                    call()
+                }
+            }
+        } finally {
+            if (!frame.run.isCancelled) {
+                frame.action = null
+                frame.locals.remove(ACTION_AT)
+                frame.standAt(STATEMENT, calling = false)
+            }
+        }
+    }
+
     /** The one site of a scene frame: the statement it is at. */
-    private const val STATEMENT = "statement"
+    internal const val STATEMENT = "statement"
+
+    /** The position of a frame in the middle of the call at its first site. */
+    private const val CALL_POSITION = 0
 
     /** The statement whose action [StoryFrame.action] records. */
     private const val ACTION_AT = "action_at"

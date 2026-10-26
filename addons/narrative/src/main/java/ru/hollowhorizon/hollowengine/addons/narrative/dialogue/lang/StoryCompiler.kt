@@ -8,6 +8,12 @@ data class StoryCompileResult(
     val diagnostics: List<StoryDiagnostic>,
 )
 
+/** What the compiler learns about the stories a file imports, to check the calls into them. */
+fun interface StoryImports {
+    /** The `@define`s of the story [address], name to parameters, or null when there is no such story. */
+    fun definitions(address: String): Map<String, List<String>>?
+}
+
 /**
  * Turns story text into a [StoryProgram]. Runs off the game thread: the result is cached by address
  * and source hash, so playback never parses anything.
@@ -19,10 +25,21 @@ data class StoryCompileResult(
 class StoryCompiler(
     private val address: String,
     private val catalog: StoryFunctionCatalog = StoryFunctionCatalog.PERMISSIVE,
+    private val imports: StoryImports? = null,
 ) {
     private val diagnostics = StoryDiagnostics()
     private val instructions = mutableListOf<StoryInstruction>()
     private val labels = LinkedHashMap<String, Int>()
+    private val defines = LinkedHashMap<String, StoryDefinition>()
+
+    /** The parameters of every `@define` of the file, known before any call to them is compiled. */
+    private var declared: Map<String, List<String>> = emptyMap()
+
+    /** The stories the file imports, and the `@define`s each of them has, when [imports] can tell. */
+    private val imported = LinkedHashMap<String, Map<String, List<String>>?>()
+
+    /** The `@define` whose body is being compiled. */
+    private var defining: String? = null
 
     /** Section the following instructions belong to, and where it started, the anchor basis. */
     private var currentLabel: String? = null
@@ -38,6 +55,9 @@ class StoryCompiler(
         /** Universal named parameters every function accepts on top of its own signature. */
         private val RESERVED_PARAMS = setOf("tag")
 
+        /** The parameter of `@stage` naming the variable its result goes to. */
+        private const val RESULT = "result"
+
         fun hash(source: String): String {
             val digest = MessageDigest.getInstance("SHA-256").digest(source.toByteArray(Charsets.UTF_8))
             return digest.joinToString("") { "%02x".format(it) }
@@ -47,7 +67,27 @@ class StoryCompiler(
             address: String,
             source: String,
             catalog: StoryFunctionCatalog = StoryFunctionCatalog.PERMISSIVE,
-        ): StoryCompileResult = StoryCompiler(address, catalog).compile(source)
+            imports: StoryImports? = null,
+        ): StoryCompileResult = StoryCompiler(address, catalog, imports).compile(source)
+
+        /**
+         * The address [written] in the story [from] means: as it is with a namespace, `project:stories/a.story`, and
+         * next to [from] without one, so `common/greetings.story` in `project:stories/a.story` is
+         * `project:stories/common/greetings.story`.
+         */
+        fun resolveAddress(from: String, written: String): String {
+            if (':' in written) return written
+            val namespace = from.substringBefore(':', "")
+            val directory = from.substringAfter(':').substringBeforeLast('/', "")
+            val path = if (directory.isEmpty()) written else "$directory/$written"
+            return if (namespace.isEmpty()) path else "$namespace:$path"
+        }
+
+        /** The `@define`s of [source], name to parameters, read without compiling it. */
+        fun definitionsOf(source: String): Map<String, List<String>> =
+            StoryParser.parse(source).cst.lines.mapNotNull { line ->
+                (line.kind as? StoryLineKind.Define)?.takeIf { line.indent.isEmpty() }?.let { it.name to it.params }
+            }.toMap()
     }
 
     fun compile(source: String): StoryCompileResult {
@@ -55,6 +95,14 @@ class StoryCompiler(
         parsed.diagnostics.all.forEach { record(it) }
 
         val roots = buildTree(parsed.cst.lines)
+        declared = roots.mapNotNull { (it.line.kind as? StoryLineKind.Define)?.let { define -> define.name to define.params } }.toMap()
+        roots.forEach { node ->
+            val import = node.line.kind as? StoryLineKind.Import ?: return@forEach
+            val target = resolveAddress(address, import.address)
+            val known = imports?.definitions(target)
+            if (imports != null && known == null) error("Story '$target' not found", node.line)
+            imported[target] = known
+        }
         compileNodes(roots, topLevel = true)
 
         val program = if (diagnostics.hasErrors) null else StoryProgram(
@@ -62,6 +110,8 @@ class StoryCompiler(
             sourceHash = hash(source),
             instructions = instructions.toList(),
             labels = labels.toMap(),
+            defines = defines.toMap(),
+            imports = imported.keys.toList(),
         )
         return StoryCompileResult(program, parsed.cst, diagnostics.all)
     }
@@ -110,6 +160,9 @@ class StoryCompiler(
             if (!topLevel && node.line.kind is StoryLineKind.Label) {
                 error("Labels must be at the top level of the file, not inside a block", node.line)
             }
+            if (!topLevel && (node.line.kind is StoryLineKind.Define || node.line.kind is StoryLineKind.Import)) {
+                error("'@define' and '@import' belong at the top level of the file", node.line)
+            }
             i = when (node.line.kind) {
                 is StoryLineKind.If -> compileIfChain(nodes, i)
                 is StoryLineKind.Choice -> compileChoiceGroup(nodes, i)
@@ -157,8 +210,11 @@ class StoryCompiler(
             is StoryLineKind.While -> compileWhile(node, kind)
 
             is StoryLineKind.Jump -> {
-                if (kind.target.address != null) {
-                    error("'@jump' stays within its file; '@call' another story to play it and come back", line)
+                when {
+                    defining != null -> error("'@jump' cannot leave a '@define'; '@return' from it instead", line)
+                    kind.target.address != null -> error(
+                        "'@jump' stays within its file; '@call' another story to play it and come back", line,
+                    )
                 }
                 emit(StoryInstruction.Jump(target(kind.target), anchor(line)))
                 requireNoChildren(node)
@@ -170,7 +226,33 @@ class StoryCompiler(
             }
 
             is StoryLineKind.Return -> {
-                emit(StoryInstruction.Return(anchor(line)))
+                if (kind.value != null && defining == null) error("Only a '@define' returns a value", line)
+                emit(StoryInstruction.Return(anchor(line), kind.value))
+                requireNoChildren(node)
+            }
+
+            is StoryLineKind.Define -> compileDefine(node, kind)
+
+            is StoryLineKind.CallDefine -> {
+                val params = declared[kind.name] ?: importedParams(kind.name, line)
+                if (params != null && params.size != kind.args.size) {
+                    error("'${kind.name}' takes ${params.size} arguments: ${params.joinToString()}", line)
+                }
+                emit(StoryInstruction.CallDefine(kind.name, kind.args.map { it.expr }, kind.result, anchor(line)))
+                requireNoChildren(node)
+            }
+
+            is StoryLineKind.Import -> requireNoChildren(node)
+
+            is StoryLineKind.Stage -> {
+                val result = kind.args.firstOrNull { it.name == RESULT }
+                val name = result?.let { arg ->
+                    literalString(arg) ?: run {
+                        error("'result' must be a variable name", line)
+                        null
+                    }
+                }
+                emit(StoryInstruction.Stage(kind.script, kind.stage, kind.args - setOfNotNull(result), name, anchor(line)))
                 requireNoChildren(node)
             }
 
@@ -348,10 +430,46 @@ class StoryCompiler(
         }
     }
 
+    /**
+     * A `@define` body is a section of its own, so a save inside it survives edits around it, and the flow reading
+     * the file top-down jumps over it.
+     */
+    private fun compileDefine(node: Node, kind: StoryLineKind.Define) {
+        if (defines.containsKey(kind.name)) error("Duplicate '@define ${kind.name}'", node.line)
+        if (node.children.isEmpty()) error("'@define' expects an indented block", node.line)
+        val skip = emitPlaceholder(node.line)
+        val outerLabel = currentLabel
+        val outerStart = sectionStart
+        val start = instructions.size
+        currentLabel = defineSection(kind.name)
+        sectionStart = start
+        labels[defineSection(kind.name)] = start
+        defines[kind.name] = StoryDefinition(kind.name, kind.params, start)
+        defining = kind.name
+        compileNodes(node.children)
+        emit(StoryInstruction.Return(anchor(node.line)))
+        defining = null
+        currentLabel = outerLabel
+        sectionStart = outerStart
+        patch(skip, StoryInstruction.Goto(instructions.size, instructions[skip].anchor))
+    }
+
+    /** The parameters of the imported `@define` [name], or null when the imports cannot be checked. */
+    private fun importedParams(name: String, line: StoryLine): List<String>? {
+        if (imported.values.any { it == null }) return null
+        val found = imported.filterValues { it!!.containsKey(name) }
+        when {
+            found.isEmpty() -> error("No '@define $name' in this story or the ones it imports", line)
+            found.size > 1 -> error("'$name' is defined by several imports: ${found.keys.joinToString()}", line)
+        }
+        return found.values.firstOrNull()?.get(name)
+    }
+
     private fun emitInvoke(call: StoryCall, line: StoryLine) =
         emit(StoryInstruction.Invoke(call, anchor(line), temporaries.lastOrNull(), timeouts.toList()))
 
     private fun compileAsync(node: Node, kind: StoryLineKind.Async) {
+        if (defining != null) error("'@async' cannot start inside a '@define'", node.line)
         val startPc = emitPlaceholder(node.line)
         val bodyStart = instructions.size
         asyncDepth++

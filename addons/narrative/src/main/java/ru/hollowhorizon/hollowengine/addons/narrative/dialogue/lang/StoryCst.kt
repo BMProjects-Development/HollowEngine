@@ -38,7 +38,7 @@ class StoryLine(
         get() = when (val k = kind) {
             is StoryLineKind.If, is StoryLineKind.ElseIf, is StoryLineKind.Else,
             is StoryLineKind.While, is StoryLineKind.Choice,
-            is StoryLineKind.Temporary, is StoryLineKind.Timeout,
+            is StoryLineKind.Temporary, is StoryLineKind.Timeout, is StoryLineKind.Define,
                 -> true
 
             is StoryLineKind.Async -> k.inline == null
@@ -86,7 +86,32 @@ sealed interface StoryLineKind {
 
     data class Jump(val target: StoryRef) : StoryLineKind
     data class Call(val target: StoryRef) : StoryLineKind
-    data object Return : StoryLineKind
+
+    /** `@return`, or `@return value` from a `@define`. */
+    data class Return(val value: StoryExpression?) : StoryLineKind
+
+    /** `@define name(a, b)` opening the block a `@call name(...)` plays; reading top-down skips it. */
+    data class Define(val name: String, val nameSpan: StorySpan, val params: List<String>) : StoryLineKind
+
+    /** `@call name(args)` of a `@define`, its value put into [result] when it returns one. */
+    data class CallDefine(
+        val name: String,
+        val nameSpan: StorySpan,
+        val args: List<StoryArg>,
+        val result: String?,
+        val resultSpan: StorySpan?,
+    ) : StoryLineKind
+
+    /** `@import other.story`: the definitions of another file, which `@call` can play. */
+    data class Import(val address: String, val addressSpan: StorySpan) : StoryLineKind
+
+    /** `@stage file.kts#name args result=x`: plays the `@State` function [stage] of a script and waits for it. */
+    data class Stage(
+        val script: String,
+        val stage: String,
+        val targetSpan: StorySpan,
+        val args: List<StoryArg>,
+    ) : StoryLineKind
 
     data class Choice(
         val text: TextTemplate,

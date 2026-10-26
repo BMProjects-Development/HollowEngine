@@ -201,6 +201,114 @@ class StageSceneTest : StageTest() {
     }
 
     @Test
+    fun `a stage a scene calls goes on after a restart and its result comes back to the scene`() = runTest {
+        stories["test:gate.story"] = """
+            Кузнец: До.
+            @stage gate.stage.kts#ask 2 result=ответ
+            Кузнец: {ответ}.
+        """.trimIndent()
+        val world = world("gate", """
+            @State
+            suspend fun ask(times: Int): String {
+                log("ask ${'$'}times")
+                await("asked")
+                return "да".repeat(times)
+            }
+
+            @State
+            suspend fun main() {
+                scene("test:gate.story", with = emptyList())
+            }
+        """)
+        world.launch("main")
+        world.release("До.")
+        assertEquals(listOf("say До.", "ask 2"), StageTrace.take())
+
+        world.restart()
+        assertEquals(listOf("ask 2"), StageTrace.take(), "the stage goes on, the scene does not repeat its line")
+
+        world.release("asked")
+        assertEquals(listOf("say дада."), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `a track of a scene is a branch that goes on from its own statement after a restart`() = runTest {
+        stories["test:track.story"] = """
+            @async name=фон
+                @mark один
+                @mark два
+            Кузнец: Ждём.
+            @await фон
+            Кузнец: Готово.
+        """.trimIndent()
+        val world = world("track", $$"""
+            @Action
+            suspend fun mark(what: String) = action {
+                perform {
+                    log("mark $what")
+                    await(what)
+                }
+            }
+
+            @State
+            suspend fun main() {
+                scene("test:track.story", with = emptyList())
+            }
+        """)
+        world.launch("main")
+        world.release("Ждём.")
+        assertEquals(setOf("mark один", "say Ждём."), StageTrace.take().toSet())
+
+        world.restart()
+        assertEquals(listOf("mark один"), StageTrace.take(), "the track finishes its action, the scene waits at @await")
+
+        world.release("один")
+        assertEquals(listOf("mark два"), StageTrace.take())
+
+        world.restart()
+        world.release("два")
+        assertEquals(listOf("mark два", "say Готово."), StageTrace.take(), "the second action was where the track stood")
+        world.stop()
+    }
+
+    @Test
+    fun `a track hands the scene its remainder at sync`() = runTest {
+        stories["test:sync.story"] = """
+            @async name=таймер
+                @mark время
+                @sync
+                Кузнец: Поздно.
+                @jump #Конец
+            Кузнец: Говорим.
+            Кузнец: Ещё.
+            # Конец
+        """.trimIndent()
+        val world = world("sync", $$"""
+            @Action
+            suspend fun mark(what: String) = action {
+                perform {
+                    log("mark $what")
+                    await(what)
+                }
+            }
+
+            @State
+            suspend fun main() {
+                scene("test:sync.story", with = emptyList())
+            }
+        """)
+        world.launch("main")
+        assertEquals(setOf("mark время", "say Говорим."), StageTrace.take().toSet())
+
+        world.release("время")
+        assertEquals(listOf("say Поздно."), StageTrace.take(), "the line being read gives way to the track")
+        world.release("Поздно.")
+        assertEquals(emptyList(), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
     fun `a scene of a story that belongs to no player needs its players`() = runTest {
         stories["test:nobody.story"] = "Кузнец: Никому."
         val world = world("nobody", """

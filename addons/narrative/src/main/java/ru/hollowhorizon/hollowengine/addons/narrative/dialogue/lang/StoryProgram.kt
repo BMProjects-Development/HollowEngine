@@ -12,9 +12,9 @@ class StoryProgram(
     val sourceHash: String,
     val instructions: List<StoryInstruction>,
     val labels: Map<String, Int>,
+    val defines: Map<String, StoryDefinition> = emptyMap(),
+    val imports: List<String> = emptyList(),
 ) {
-    /** Label whose section contains [pc], i.e. the closest label at or before it. */
-    fun labelAt(pc: Int): String? = instructions.getOrNull(pc)?.anchor?.label
 
     fun anchorOf(pc: Int): StoryAnchor =
         instructions.getOrNull(pc)?.anchor ?: StoryAnchor(null, pc, -1)
@@ -39,6 +39,15 @@ class StoryProgram(
  * Position of an instruction, expressed the way a save can survive an edit: the label that opens its section.
  */
 data class StoryAnchor(val label: String?, val offset: Int, val line: Int)
+
+/** A `@define`: its [params] and where its body starts. */
+data class StoryDefinition(val name: String, val params: List<String>, val start: Int)
+
+/** The section name a `@define` body is anchored to, apart from every label, which cannot start with `@`. */
+fun defineSection(name: String) = "@$name"
+
+/** Whether [section] is the body of a `@define`. */
+fun isDefineSection(section: String?) = section?.startsWith('@') == true
 
 /** Target of `@jump`/`@call`: another file, another label, or both. */
 data class StoryTarget(val address: String?, val label: String?, val span: StorySpan)
@@ -77,11 +86,32 @@ sealed interface StoryInstruction {
     /** `@call` pushes a frame that `@return` (or the end of the section) pops. */
     data class Call(val target: StoryTarget, override val anchor: StoryAnchor) : StoryInstruction
 
-    data class Return(override val anchor: StoryAnchor) : StoryInstruction
+    /** `@return`, handing [value] to the caller of a `@define`. */
+    data class Return(override val anchor: StoryAnchor, val value: StoryExpression? = null) : StoryInstruction
+
+    /**
+     * `@call name(args)`: plays the `@define` [name], of this story or of one it imports, with [args] as its
+     * parameters, and puts what it returns into [result].
+     */
+    data class CallDefine(
+        val name: String,
+        val args: List<StoryExpression>,
+        val result: String?,
+        override val anchor: StoryAnchor,
+    ) : StoryInstruction
+
+    /** `@stage`: plays the `@State` function [stage] of the script [script] and waits for it. */
+    data class Stage(
+        val script: String,
+        val stage: String,
+        val args: List<StoryArg>,
+        val result: String?,
+        override val anchor: StoryAnchor,
+    ) : StoryInstruction
 
     /**
      * A command. Inside `@temporary` its actions are [temporary]; inside `@timeout` blocks it gives up when the time
-     * of any of them, the [TimeoutStart]s at [timeouts], is out.
+     * of them, the [TimeoutStart]s at [timeouts], is out.
      */
     data class Invoke(
         val call: StoryCall,

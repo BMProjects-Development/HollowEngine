@@ -21,6 +21,7 @@ internal object StoryHighlighter {
         "jump", "call", "return",
         "choice", "async", "await", "cancel", "sync",
         "checkpoint", "rewind", "temporary", "timeout",
+        "define", "import", "stage",
         "command",
     )
 
@@ -121,6 +122,34 @@ internal object StoryHighlighter {
                 }
             }
 
+            is StoryLineKind.Define -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                out += TextSpan(kind.nameSpan.start, kind.nameSpan.end, TokenType.FUNCTION)
+            }
+
+            is StoryLineKind.CallDefine -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                out += TextSpan(kind.nameSpan.start, kind.nameSpan.end, TokenType.FUNCTION)
+                kind.args.forEach { argSpans(it, out) }
+                kind.resultSpan?.let { out += TextSpan(it.start, it.end, TokenType.VARIABLE) }
+            }
+
+            is StoryLineKind.Import -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                out += TextSpan(kind.addressSpan.start, kind.addressSpan.end, TokenType.STRING)
+            }
+
+            is StoryLineKind.Stage -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                out += TextSpan(kind.targetSpan.start, kind.targetSpan.end, TokenType.STRING)
+                kind.args.forEach { argSpans(it, out) }
+            }
+
+            is StoryLineKind.Return -> {
+                out += commandKeyword(line, contentStart, contentEnd, catalog)
+                kind.value?.let { exprSpans(it, out) }
+            }
+
             is StoryLineKind.Checkpoint -> {
                 out += commandKeyword(line, contentStart, contentEnd, catalog)
                 out += TextSpan(kind.nameSpan.start, kind.nameSpan.end, TokenType.TOP_LEVEL)
@@ -142,7 +171,7 @@ internal object StoryHighlighter {
             }
 
             is StoryLineKind.Await, is StoryLineKind.Cancel, is StoryLineKind.Sync,
-            is StoryLineKind.Return, is StoryLineKind.Else,
+            is StoryLineKind.Else,
                 -> out += commandKeyword(line, contentStart, contentEnd, catalog)
 
             is StoryLineKind.Blank, is StoryLineKind.CommentOnly -> Unit

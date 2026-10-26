@@ -8,22 +8,14 @@ import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
 /**
  * Everything needed to continue a dialogue after a restart. Written after every statement, so the
  * worst case a player can lose is the statement that was running.
- *
- * The position is stored as [StoryAnchor]s, label plus offset inside its section, rather than raw
- * instruction indices, which is what lets a resumed dialogue survive an edited story: an exact
- * [sourceHash] match resumes precisely, a surviving label rolls back to that label, and neither means
- * the story restarts.
  */
 data class StoryCheckpoint(
     val address: String,
     val sourceHash: String,
     val locale: String?,
-    /** Call stack, outermost first; the last frame is where execution is. */
     val frames: List<CheckpointFrame>,
     val variables: Map<String, StoryValue>,
-    /** Async tracks that had not finished; each restarts from its `@async` on resume. */
     val tracks: List<CheckpointTrack> = emptyList(),
-    /** When the `@timeout` blocks entered give up, in epoch milliseconds, by `address#pc`; kept on an exact resume only. */
     val deadlines: Map<String, Long> = emptyMap(),
 ) {
     fun save(): CompoundTag = CompoundTag().apply {
@@ -68,12 +60,7 @@ data class StoryCheckpoint(
         private const val TYPE_BOOL = "b"
         private const val TYPE_LIST = "l"
 
-        /**
-         * Variables are written with an explicit type tag. NBT would happily coerce a `1` written as
-         * a number into an int on the way back, and a story that compares `money == 1` must not start
-         * failing because of a round trip.
-         */
-        private fun saveVariables(variables: Map<String, StoryValue>) = CompoundTag().apply {
+        internal fun saveVariables(variables: Map<String, StoryValue>) = CompoundTag().apply {
             for ((name, value) in variables) {
                 put(name, saveValue(value) ?: continue)
             }
@@ -107,7 +94,7 @@ data class StoryCheckpoint(
             return entry
         }
 
-        private fun loadVariables(tag: CompoundTag): Map<String, StoryValue> =
+        internal fun loadVariables(tag: CompoundTag): Map<String, StoryValue> =
             tag.allKeys.mapNotNull { name -> loadValue(tag.getCompound(name))?.let { name to it } }.toMap()
 
         private fun loadValue(entry: CompoundTag): StoryValue? = when (entry.getString("t")) {
@@ -123,13 +110,23 @@ data class StoryCheckpoint(
     }
 }
 
-/** One entry of the call stack: which story it is in, and where. */
-data class CheckpointFrame(val address: String, val anchor: StoryAnchor) {
+/**
+ * One entry of the call stack: which story it is in, and where. A frame of a `@define` also keeps its [locals] and
+ * the variable of its caller its value goes to, [result].
+ */
+data class CheckpointFrame(
+    val address: String,
+    val anchor: StoryAnchor,
+    val locals: Map<String, StoryValue> = emptyMap(),
+    val result: String? = null,
+) {
     fun save(): CompoundTag = CompoundTag().apply {
         putString("address", address)
         anchor.label?.let { putString("label", it) }
         putInt("offset", anchor.offset)
         putInt("line", anchor.line)
+        if (locals.isNotEmpty()) put("locals", StoryCheckpoint.saveVariables(locals))
+        result?.let { putString("result", it) }
     }
 
     companion object {
@@ -140,6 +137,8 @@ data class CheckpointFrame(val address: String, val anchor: StoryAnchor) {
                 offset = tag.getInt("offset"),
                 line = tag.getInt("line"),
             ),
+            locals = StoryCheckpoint.loadVariables(tag.getCompound("locals")),
+            result = tag.getString("result").takeIf { tag.contains("result") },
         )
     }
 }

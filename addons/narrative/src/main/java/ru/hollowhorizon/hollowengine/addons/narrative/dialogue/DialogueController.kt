@@ -39,7 +39,16 @@ class DialogueController(
     private val boundCharacters = LinkedHashMap<String, DialogueCharacter>()
     override val characters: Map<String, DialogueCharacter> get() = boundCharacters
 
-    private class Frame(val address: String, var pc: Int)
+    /**
+     * A place in the call stack. A frame of a `@define` holds its parameters and the variables it sets as [locals],
+     * and the variable of its caller its value goes to as [result].
+     */
+    private class Frame(
+        val address: String,
+        var pc: Int,
+        val locals: MutableMap<String, StoryValue> = LinkedHashMap(),
+        val result: String? = null,
+    )
 
     private val frames = ArrayDeque<Frame>()
     private val programs = HashMap<String, StoryProgram>()
@@ -219,7 +228,7 @@ class DialogueController(
             locale = playingLocale,
             frames = frames.map { frame ->
                 val frameProgram = programs[frame.address] ?: program
-                CheckpointFrame(frame.address, frameProgram.anchorOf(frame.pc))
+                CheckpointFrame(frame.address, frameProgram.anchorOf(frame.pc), frame.locals.toMap(), frame.result)
             },
             variables = variables.toMap(),
             tracks = tracks.values.map {
@@ -265,7 +274,7 @@ class DialogueController(
         if (exact) {
             val resolved = checkpoint.frames.map { frame ->
                 val program = programOf(frame.address) ?: return@map null
-                program.resolve(frame.anchor)?.let { Frame(frame.address, it) }
+                program.resolve(frame.anchor)?.let { Frame(frame.address, it, LinkedHashMap(frame.locals), frame.result) }
             }
             if (resolved.all { it != null }) {
                 resolved.forEach { frames.addLast(it!!) }
@@ -279,7 +288,8 @@ class DialogueController(
             }
         }
 
-        val innermost = checkpoint.frames.last()
+        // A `@define` cannot be reentered without its caller: the flow goes back to the label of the frame that called it.
+        val innermost = checkpoint.frames.lastOrNull { !isDefineSection(it.anchor.label) } ?: checkpoint.frames.first()
         val labelStart = loaded.program.resolveLabelStart(innermost.anchor)
         frames.addLast(Frame(loaded.address, labelStart ?: 0))
     }
@@ -360,7 +370,26 @@ class DialogueController(
                 frames.addLast(resolveTarget(instruction.target, frame.address))
             }
 
-            is StoryInstruction.Return -> frames.removeLast()
+            is StoryInstruction.Return -> {
+                val value = instruction.value?.let(::evaluate)
+                val returning = frames.removeLast()
+                if (returning.result != null && value != null) assign(returning.result, value)
+            }
+
+            is StoryInstruction.CallDefine -> {
+                val (address, definition) = findDefine(frame.address, instruction.name)
+                val args = instruction.args.map(::evaluate)
+                frame.pc++
+                frames.addLast(Frame(address, definition.start, LinkedHashMap(definition.params.zip(args).toMap()), instruction.result))
+            }
+
+            is StoryInstruction.Stage -> {
+                val host = host ?: throw StoryRuntimeException("'@stage' works only in a scene of a story")
+                val evaluated = instruction.args.toEvaluated()
+                val value = host.stage(instruction.script, instruction.stage, evaluated.positional, evaluated.named)
+                instruction.result?.let { name -> value?.let { assign(name, it) } }
+                frame.pc++
+            }
 
             is StoryInstruction.Invoke -> frame.pc = invoke(frame, instruction) ?: return null // preempted
 
@@ -389,14 +418,24 @@ class DialogueController(
             }
 
             is StoryInstruction.AsyncStart -> {
-                spawnTrack(scope, frame.address, instruction.trackName, instruction)
+                val host = host
+                if (host == null) spawnTrack(scope, frame.address, instruction.trackName, instruction)
+                else host.startTrack(instruction.trackName ?: "track-L${instruction.anchor.line + 1}", frame.address, instruction.anchor)
                 frame.pc = instruction.bodyEnd
             }
 
             is StoryInstruction.Await -> {
-                val jobs = if (instruction.trackNames.isEmpty()) tracks.values.mapNotNull { it.job }
-                else instruction.trackNames.mapNotNull { tracks[it]?.job }
-                if (!preemptible { jobs.joinAll() }) return null
+                val host = host
+                val awaited = if (host == null) {
+                    val jobs = if (instruction.trackNames.isEmpty()) tracks.values.mapNotNull { it.job }
+                    else instruction.trackNames.mapNotNull { tracks[it]?.job }
+                    preemptible { jobs.joinAll() }
+                } else {
+                    val running = host.tracks()
+                    val branches = if (instruction.trackNames.isEmpty()) running.values else instruction.trackNames.mapNotNull(running::get)
+                    preemptible { branches.forEach { it.join() } }
+                }
+                if (!awaited) return null
                 frame.pc++
             }
 
@@ -634,10 +673,37 @@ class DialogueController(
         }
     }
 
-    private suspend fun runTrack(address: String, start: Int, end: Int) {
+    /**
+     * Plays the track of the `@async` at [asyncAnchor] in [address] for a branch of the story: from [saved] when the
+     * story is the same text it was saved from ([savedHash]), from its start otherwise. [step] is told where the
+     * track is before every statement, and [journaled] runs its reversible commands.
+     */
+    internal suspend fun playTrack(
+        address: String,
+        asyncAnchor: StoryAnchor,
+        saved: StoryAnchor?,
+        savedHash: String?,
+        step: (hash: String, anchor: StoryAnchor) -> Unit,
+        journaled: suspend (statement: String, call: suspend () -> Unit) -> Unit,
+    ) {
+        val program = programOf(address) ?: return
+        val async = program.resolve(asyncAnchor)?.let(program.instructions::get) as? StoryInstruction.AsyncStart ?: return
+        val body = async.bodyStart until async.bodyEnd
+        val start = saved?.takeIf { savedHash == program.sourceHash }?.let(program::resolve)?.takeIf { it in body } ?: async.bodyStart
+        runTrack(address, start, async.bodyEnd, { pc -> step(program.sourceHash, program.anchorOf(pc)) }, journaled)
+    }
+
+    private suspend fun runTrack(
+        address: String,
+        start: Int,
+        end: Int,
+        step: ((Int) -> Unit)? = null,
+        journaled: (suspend (statement: String, call: suspend () -> Unit) -> Unit)? = null,
+    ) {
         val program = programOf(address) ?: return
         var pc = start
         while (pc < end) {
+            step?.invoke(pc)
             when (val instruction = program.instructions.getOrNull(pc)) {
                 null -> return
                 is StoryInstruction.Sync -> {
@@ -660,9 +726,12 @@ class DialogueController(
                     val metadata = call.metadata.mapValues { (_, expr) -> evaluate(expr) }
                     val timeout = nearestTimeout(address, instruction)
                     var inTime = true
+                    val statement = "${program.sourceHash}#${instruction.anchor.label}+${instruction.anchor.offset}"
                     // A track cannot preempt itself, so its commands simply run.
-                    callCommand(call.function, evaluated, call.tag, metadata, instruction.temporary) { _, perform ->
-                        inTime = within(timeout, call.function, perform)
+                    callCommand(call.function, evaluated, call.tag, metadata, instruction.temporary) { command, perform ->
+                        inTime = within(timeout, call.function) {
+                            if (journaled != null && command.action.reversible) journaled(statement, perform) else perform()
+                        }
                         true
                     }
                     pc = if (inTime) pc + 1 else timeout!!.end
@@ -684,10 +753,12 @@ class DialogueController(
     }
 
     override fun cancelTrack(name: String) {
+        host?.tracks()?.get(name)?.cancel()
         tracks.remove(name)?.job?.cancel()
     }
 
     private fun cancelTracks() {
+        host?.tracks()?.values?.forEach(DialogueTrack::cancel)
         tracks.values.forEach { it.job?.cancel() }
         tracks.clear()
     }
@@ -830,10 +901,23 @@ class DialogueController(
         throw StoryRuntimeException("${e.message} (line ${e.span.line + 1})", e)
     }
 
-    private fun lookup(name: String): StoryValue? = outerVariables?.get(name) ?: variables[name] ?: resolveActor(name)
+    private fun lookup(name: String): StoryValue? =
+        frames.lastOrNull()?.locals?.get(name) ?: outerVariables?.get(name) ?: variables[name] ?: resolveActor(name)
+
+    /** The `@define` [name] as the story [address] sees it: its own, or that of the first story it imports with one. */
+    private fun findDefine(address: String, name: String): Pair<String, StoryDefinition> {
+        val program = programOf(address) ?: throw StoryRuntimeException("Story '$address' not found")
+        program.defines[name]?.let { return address to it }
+        return program.imports.firstNotNullOfOrNull { imported -> programOf(imported)?.defines?.get(name)?.let { imported to it } }
+            ?: throw StoryRuntimeException("No '@define $name' in '$address' or the stories it imports")
+    }
 
     /** Writes a variable where it lives: with whoever plays the dialogue when it is theirs, in the dialogue otherwise. */
     private fun assign(name: String, value: StoryValue) {
+        frames.lastOrNull()?.locals?.takeIf { name in it }?.let {
+            it[name] = value
+            return
+        }
         if (outerVariables?.set(name, value) != true) variables[name] = value
     }
 
