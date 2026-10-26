@@ -170,6 +170,28 @@ class StoryParser(private val source: String) {
                 StoryLineKind.Sync
             }
 
+            "checkpoint" -> {
+                val (checkpoint, checkpointSpan) = parseName(line, offset, raw, tailStart, end, name)
+                    ?: throw StoryParseException("'@checkpoint' expects a name", nameSpan)
+                StoryLineKind.Checkpoint(checkpoint, checkpointSpan)
+            }
+
+            "rewind" -> parseName(line, offset, raw, tailStart, end, name)
+                .let { StoryLineKind.Rewind(it?.first, it?.second) }
+
+            "temporary" -> parseTemporary(line, offset, raw, tailStart, end)
+
+            "timeout" -> {
+                if (tailStart >= end) {
+                    throw StoryParseException("'@timeout' expects a time like 6s", nameSpan)
+                }
+                val (duration, next) = parseArgValue(line, offset, raw, tailStart, end, isCondition = false)
+                if (next < end) {
+                    throw StoryParseException("'@timeout' takes only the time", span(offset, line, next, end))
+                }
+                StoryLineKind.Timeout(duration)
+            }
+
             "command" -> {
                 if (tailStart >= end) {
                     throw StoryParseException("'@command' expects a vanilla command", nameSpan)
@@ -275,6 +297,28 @@ class StoryParser(private val source: String) {
             while (i < end && (raw[i] == ' ' || raw[i] == '\t')) i++
         }
         return StoryLineKind.Await(names)
+    }
+
+    /** A single word after `@command`, or null when nothing follows. */
+    private fun parseName(line: Int, offset: Int, raw: String, start: Int, end: Int, command: String): Pair<String, StorySpan>? {
+        if (start >= end) return null
+        var i = start
+        while (i < end && raw[i] != ' ' && raw[i] != '\t') i++
+        if (i < end) {
+            throw StoryParseException("'@$command' expects a single name", span(offset, line, i, end))
+        }
+        return raw.substring(start, i) to span(offset, line, start, i)
+    }
+
+    private fun parseTemporary(line: Int, offset: Int, raw: String, start: Int, end: Int): StoryLineKind {
+        if (start >= end) return StoryLineKind.Temporary(null, null)
+        val prefix = "until="
+        if (!raw.startsWith(prefix, start)) {
+            throw StoryParseException("'@temporary' takes only until=checkpoint", span(offset, line, start, end))
+        }
+        val (until, untilSpan) = parseName(line, offset, raw, start + prefix.length, end, "temporary")
+            ?: throw StoryParseException("'until=' expects a checkpoint name", span(offset, line, start, end))
+        return StoryLineKind.Temporary(until, untilSpan)
     }
 
     private fun parseCancel(line: Int, offset: Int, raw: String, start: Int, end: Int, commandSpan: StorySpan): StoryLineKind {

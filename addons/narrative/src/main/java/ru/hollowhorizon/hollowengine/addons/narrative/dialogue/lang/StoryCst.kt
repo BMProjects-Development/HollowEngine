@@ -38,6 +38,7 @@ class StoryLine(
         get() = when (val k = kind) {
             is StoryLineKind.If, is StoryLineKind.ElseIf, is StoryLineKind.Else,
             is StoryLineKind.While, is StoryLineKind.Choice,
+            is StoryLineKind.Temporary, is StoryLineKind.Timeout,
                 -> true
 
             is StoryLineKind.Async -> k.inline == null
@@ -102,6 +103,18 @@ sealed interface StoryLineKind {
     data class Await(val trackNames: List<String>) : StoryLineKind
     data class Cancel(val trackName: String, val nameSpan: StorySpan) : StoryLineKind
     data object Sync : StoryLineKind
+
+    /** `@checkpoint name`: a checkpoint of the story the dialogue plays in, which `@rewind` goes back to. */
+    data class Checkpoint(val name: String, val nameSpan: StorySpan) : StoryLineKind
+
+    /** `@rewind` to the latest checkpoint the story passed, or `@rewind name` to the checkpoint [name]. */
+    data class Rewind(val name: String?, val nameSpan: StorySpan?) : StoryLineKind
+
+    /** `@temporary [until=name]` opening a block whose actions are taken back at a checkpoint. */
+    data class Temporary(val until: String?, val untilSpan: StorySpan?) : StoryLineKind
+
+    /** `@timeout 6s` opening a block whose commands give up when the time is out. */
+    data class Timeout(val duration: StoryExpression) : StoryLineKind
 
     /**
      * `@command <vanilla command>`: the tail goes to the server as-is except for `{var}`

@@ -447,6 +447,36 @@ class DialogueRuntimeTest {
     }
 
     @Test
+    fun `a command out of the time of its timeout is given up and the story goes on after the block`() = runTest {
+        val presenter = RecordingPresenter()
+        val controller = controller(
+            """
+            @timeout 50ms
+                @pause 10s
+                @greet Сторож
+            Виталик: Дальше.
+            """.trimIndent(),
+            presenter,
+        )
+
+        DialogueTestCommands.greeted.clear()
+        val result = controller.startHeadless {
+            character("Сторож", DialogueCharacter.of("Виталик"))
+        }
+
+        assertEquals(DialogueResult.Finished, result)
+        assertEquals(emptyList(), DialogueTestCommands.greeted, "the rest of the block is skipped")
+        assertEquals(listOf("Виталик: Дальше."), presenter.lines)
+    }
+
+    @Test
+    fun `a rewind outside a story fails the dialogue`() = runTest {
+        val result = controller("@rewind", RecordingPresenter()).startHeadless()
+
+        assertTrue(result is DialogueResult.Failed, result.toString())
+    }
+
+    @Test
     fun `metadata parameters reach the handler untouched`() = runTest {
         val presenter = RecordingPresenter()
         val controller = controller("@pause 1ms tag=timer overlay=clock", presenter)

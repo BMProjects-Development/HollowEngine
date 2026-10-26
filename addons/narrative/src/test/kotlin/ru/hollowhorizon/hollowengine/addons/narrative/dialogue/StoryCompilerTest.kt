@@ -39,6 +39,49 @@ class StoryCompilerTest {
     }
 
     @Test
+    fun `commands inside temporary and timeout blocks carry them`() {
+        val result = compile(
+            """
+            @timeout 6s
+                @temporary until=boss
+                    @wait 1s
+                @wait 2s
+            @wait 3s
+            """.trimIndent(),
+        )
+        val program = assertNotNull(result.program, result.diagnostics.toString())
+
+        val timeout = assertIs<StoryInstruction.TimeoutStart>(program.instructions[0])
+        val (inner, outer, after) = program.instructions.filterIsInstance<StoryInstruction.Invoke>()
+        assertEquals(StoryTemporary("boss"), inner.temporary)
+        assertEquals(listOf(0), inner.timeouts)
+        assertNull(outer.temporary)
+        assertEquals(listOf(0), outer.timeouts)
+        assertEquals(emptyList(), after.timeouts)
+        assertEquals(program.instructions.indexOf(after), timeout.end)
+    }
+
+    @Test
+    fun `a timeout holds commands only, and checkpoints belong to the main flow`() {
+        val result = compile(
+            """
+            @checkpoint start
+            @checkpoint start
+            @timeout 6s
+                Виталик: Скорее.
+            @async
+                @checkpoint inside
+            """.trimIndent(),
+        )
+
+        assertNull(result.program)
+        val messages = result.diagnostics.map { it.message }
+        assertTrue(messages.any { "Duplicate checkpoint 'start'" in it }, messages.toString())
+        assertTrue(messages.any { "not allowed inside '@timeout'" in it }, messages.toString())
+        assertTrue(messages.any { "main flow" in it }, messages.toString())
+    }
+
+    @Test
     fun `a jump stays within its file`() {
         val result = compile("@jump test:other.story#Тут\n@call test:other.story#Тут")
 

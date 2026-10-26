@@ -18,6 +18,9 @@ sealed interface StoryCompletionContext {
     /** Label of this file. */
     data class Label(override val typed: String) : StoryCompletionContext
 
+    /** A checkpoint of the story: after `@rewind` and `until=`. */
+    data class Checkpoint(override val typed: String) : StoryCompletionContext
+
     /**
      * An argument of [command]. [parameter] is set once `name=` has been typed; until then the word
      * could still become either a parameter name or the value at [positional], and the caller decides
@@ -114,6 +117,9 @@ fun storyCompletionContext(line: String, caret: Int): StoryCompletionContext {
     val typed = line.substring(typedFrom.coerceAtMost(end), end)
     if (command in LABEL_COMMANDS && (typed.startsWith('#') || parameter == null && positional == 0)) {
         return StoryCompletionContext.Label(typed.removePrefix("#"))
+    }
+    if (command == "rewind" && parameter == null && positional == 0 || command == "temporary" && parameter == "until") {
+        return StoryCompletionContext.Checkpoint(typed)
     }
     if (command in CONDITION_COMMANDS || parameter == "if") return expressionContext(line, end)
     if (command == "set" && line.indexOf('=').let { it in 0 until end }) return expressionContext(line, end)

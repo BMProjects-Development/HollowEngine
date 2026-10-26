@@ -229,14 +229,22 @@ class StoryFrame internal constructor(
     }
 
     private fun pass(site: Int, labels: List<JournalEntry>) {
-        run.discardPending("'$stage' moved on")
         position = AFTER + sites[site]
+        passCheckpoint(sites[site], labels)
+    }
+
+    internal fun passCheckpoint(name: String, labels: List<JournalEntry> = emptyList()) {
+        run.discardPending("'$stage' moved on")
         previous = null
         result = null
         segment = CompoundTag()
         segmentMark = run.journal.next
-        run.journal.checkpointPassed(run.path, sites[site])
-        run.history.add(sites[site], run, labels)
+        run.journal.checkpointPassed(run.path, name)
+        run.history.add(name, run, labels)
+    }
+
+    internal fun standAt(site: String, calling: Boolean) {
+        position = (if (calling) CALL else AFTER) + site
     }
 
     /** Whether the caller runs a tail call this stage leaves, so the stage may give its place away. */
