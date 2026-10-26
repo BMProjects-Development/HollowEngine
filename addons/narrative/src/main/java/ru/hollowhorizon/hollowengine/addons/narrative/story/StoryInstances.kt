@@ -16,6 +16,8 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.*
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
+import kotlin.reflect.KFunction
+import kotlin.reflect.full.declaredFunctions
 
 /**
  * The script instances stages run in, under keys that survive a restart.
@@ -34,7 +36,7 @@ object StoryInstances {
     private val keys = IdentityHashMap<Any, String>()
 
     /** Stages the addon declares itself, such as [scene]: always there, under keys that never change. */
-    private val builtins = mapOf(SceneStage.KEY to SceneStage)
+    private val builtins = mapOf(SceneStage.KEY to SceneStage, SceneTracks.KEY to SceneTracks)
     private val stages = object : ClassValue<Stages>() {
         override fun computeValue(type: Class<*>): Stages {
             val methods = type.declaredMethods
@@ -120,6 +122,33 @@ object StoryInstances {
 
     /** The stages the instance under [key] declares, or none when nothing runs under it. */
     fun stagesOf(key: String): Set<String> = find(key)?.let { stagesOf(it.javaClass).entries.keys }.orEmpty()
+
+    /**
+     * The running script [written] names in a scene: its key, or a path that ends the key, `quests/village.kts` for
+     * `project:scripts/quests/village.kts`. A node attached to entities runs one instance each, so it cannot be named.
+     */
+    internal fun scriptNamed(written: String): String {
+        byKey.keys.firstOrNull { it == written }?.let { return it }
+        val found = byKey.keys.filter { key ->
+            val path = key.substringBefore('@').replace('\\', '/')
+            val single = '@' !in key || key.endsWith("@server")
+            single && (path.substringAfter(':') == written || path.endsWith("/$written"))
+        }
+        return when (found.size) {
+            1 -> found.single()
+            0 -> throw StoryException("No running script is '$written'")
+            else -> throw StoryException("'$written' names several scripts: ${found.joinToString()}")
+        }
+    }
+
+    /** The Kotlin function behind [stage] of the instance under [key], whose parameters its saved arguments are. */
+    internal fun stageFunction(key: String, stage: String): KFunction<*> {
+        val instance = find(key) ?: throw StoryException("No running script is registered as '$key'")
+        val entry = stagesOf(instance.javaClass).entries[stage] ?: throw StoryException("Script '$key' has no stage '$stage'")
+        val name = entry.name.removePrefix(ENTRY_PREFIX)
+        return instance::class.declaredFunctions.firstOrNull { it.name == name && it.isSuspend }
+            ?: throw StoryException("Script '$key' has no function for stage '$stage'")
+    }
 
     /** Whether the instance under [key] declares [stage]. */
     fun hasStage(key: String, stage: String): Boolean {

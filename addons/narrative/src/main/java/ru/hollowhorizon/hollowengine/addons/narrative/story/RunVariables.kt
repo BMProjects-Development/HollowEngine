@@ -24,7 +24,7 @@ internal class RunVariables(private val run: StoryRun) : StoryVariableSource {
         val tag = run.vars.get(variable.key)
         val value =
             if (tag == null) variable.variable.default else StoryValues.decode(variable.variable.serializer, tag)
-        return value?.let(::toStory)
+        return StoryConversions.toStory(value)
     }
 
     override fun set(name: String, value: StoryValue): Boolean {
@@ -47,14 +47,6 @@ internal class RunVariables(private val run: StoryRun) : StoryVariableSource {
             }")
         }
         return found.single()
-    }
-
-    private fun toStory(value: Any): StoryValue = when (value) {
-        is String -> StoryString(value)
-        is Boolean -> StoryBool(value)
-        is Number -> StoryNumber(value.toFloat())
-        is Collection<*> -> StoryList(value.mapNotNull { it?.let(::toStory) })
-        else -> throw StoryRuntimeException("A scene cannot read a ${value.javaClass.simpleName}")
     }
 
     private fun fromStory(name: String, value: StoryValue, descriptor: SerialDescriptor): Any {

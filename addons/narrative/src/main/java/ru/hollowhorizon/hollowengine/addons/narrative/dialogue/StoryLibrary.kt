@@ -64,11 +64,14 @@ class StoryLibrary(
 
     private fun readSource(address: String): String? = providers.asReversed().firstNotNullOfOrNull { it.read(address) }
 
+    /** The `@define`s of the story [address], read without compiling it; what a file importing it checks against. */
+    fun definitions(address: String): Map<String, List<String>>? = readSource(address)?.let(StoryCompiler::definitionsOf)
+
     private fun compile(address: String, source: String): StoryProgram {
         val hash = StoryCompiler.hash(source)
         cache["$address\u0000$hash"]?.let { return it }
 
-        val result: StoryCompileResult = StoryCompiler.compile(address, source, catalog())
+        val result: StoryCompileResult = StoryCompiler.compile(address, source, catalog(), ::definitions)
         val program = result.program ?: throw StoryLoadException(
             "Story '$address' has errors:\n" + result.diagnostics.joinToString("\n") { "  $it" },
         )

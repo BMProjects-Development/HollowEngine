@@ -5,6 +5,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
@@ -63,6 +64,18 @@ private open class RecordingPresenter(private val picks: MutableList<Int> = muta
 
     override suspend fun hideChoices(session: DialogueSession, chosen: Int) {
         decided += chosen
+    }
+}
+
+/** Records lines and stops the dialogue at the second one, the way a shutdown would. */
+private class HaltOnSecondLine : RecordingPresenter() {
+    val halted = CompletableDeferred<Unit>()
+
+    override suspend fun endLine(session: DialogueSession) {
+        super.endLine(session)
+        if (lines.size < 2) return
+        halted.complete(Unit)
+        CompletableDeferred<Unit>().await()
     }
 }
 
@@ -467,6 +480,57 @@ class DialogueRuntimeTest {
         assertEquals(DialogueResult.Finished, result)
         assertEquals(emptyList(), DialogueTestCommands.greeted, "the rest of the block is skipped")
         assertEquals(listOf("Виталик: Дальше."), presenter.lines)
+    }
+
+    @Test
+    fun `a define plays with its parameters and hands its value back`() = runTest {
+        val presenter = RecordingPresenter()
+        val controller = controller(
+            """
+            @import common/greetings.story
+            @set who = "снаружи"
+            @call greet(Виталик)
+            @call twice(ха) result=смех
+            Виталик: {смех}, {who}.
+
+            @define twice(what)
+                @return what + what
+            """.trimIndent(),
+            presenter,
+            extra = mapOf("test:common/greetings.story" to "@define greet(who)\n    {who}: Привет, {who}."),
+        )
+
+        val result = controller.startHeadless()
+
+        assertEquals(DialogueResult.Finished, result, result.toString())
+        assertEquals(listOf("Виталик: Привет, Виталик.", "Виталик: хаха, снаружи."), presenter.lines)
+    }
+
+    @Test
+    fun `a define resumes inside its body with its parameters`() = runTest {
+        val presenter = HaltOnSecondLine()
+        val source = mapOf(
+            "test:main.story" to """
+                @call count(3)
+                Виталик: Конец.
+
+                @define count(n)
+                    Виталик: {n}.
+                    Виталик: {n - 1}.
+            """.trimIndent(),
+        )
+        val first = controller(source.getValue("test:main.story"), presenter)
+        val job = backgroundScope.launch { first.startHeadless() }
+        presenter.halted.await()
+        val tag = CompoundTag().also { first.save("dialog", it) }
+        job.cancel()
+
+        val resumed = RecordingPresenter()
+        val second = controller(source.getValue("test:main.story"), resumed)
+        second.load("dialog", tag)
+        second.startHeadless()
+
+        assertEquals(listOf("Виталик: 2.", "Виталик: Конец."), resumed.lines)
     }
 
     @Test

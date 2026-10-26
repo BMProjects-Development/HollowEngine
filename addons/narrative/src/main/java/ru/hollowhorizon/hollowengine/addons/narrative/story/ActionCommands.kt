@@ -200,6 +200,18 @@ internal object StoryConversions {
         return classifier.java.enumConstants?.map { (it as Enum<*>).name.lowercase().replace('_', '-') }.orEmpty()
     }
 
+    /** A Kotlin value as a value of a scene; null for null and Unit. */
+    fun toStory(value: Any?): StoryValue? = when (value) {
+        null, Unit -> null
+        is String -> StoryString(value)
+        is Boolean -> StoryBool(value)
+        is Number -> StoryNumber(value.toFloat())
+        is Duration -> StoryNumber(value.inWholeMilliseconds.toFloat())
+        is Enum<*> -> StoryString(value.name.lowercase().replace('_', '-'))
+        is Collection<*> -> StoryList(value.mapNotNull(::toStory))
+        else -> throw StoryRuntimeException("A scene cannot keep a ${value.javaClass.simpleName}")
+    }
+
     fun convert(value: StoryValue, type: KType, name: String): Any {
         val classifier = type.classifier as KClass<*>
         fun fail(why: String = "it takes ${classifier.simpleName}"): Nothing =

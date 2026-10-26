@@ -82,6 +82,52 @@ class StoryCompilerTest {
     }
 
     @Test
+    fun `a define is skipped top-down and checked where it is called`() {
+        val result = StoryCompiler.compile(
+            "test:story",
+            """
+            @import common/greetings.story
+            @call greet(Виталик)
+            @define twice(what)
+                @return what + what
+            @call twice(a, b)
+            @call missing()
+            @call wave(Виталик, 3)
+            """.trimIndent(),
+            catalog,
+        ) { address -> if (address == "test:common/greetings.story") mapOf("greet" to listOf("who")) else null }
+
+        val messages = result.diagnostics.map { it.message }
+        assertTrue(messages.any { "'twice' takes 1 arguments" in it }, messages.toString())
+        assertTrue(messages.any { "No '@define missing'" in it }, messages.toString())
+        assertTrue(messages.any { "No '@define wave'" in it }, messages.toString())
+        assertEquals(3, messages.size, messages.toString())
+    }
+
+    @Test
+    fun `a define jumps nowhere and only it returns a value`() {
+        val result = compile(
+            """
+            @return 1
+            @define leave
+                @jump #Конец
+            # Конец
+            """.trimIndent(),
+        )
+
+        val messages = result.diagnostics.map { it.message }
+        assertTrue(messages.any { "Only a '@define' returns a value" in it }, messages.toString())
+        assertTrue(messages.any { "cannot leave a '@define'" in it }, messages.toString())
+    }
+
+    @Test
+    fun `an import is resolved next to the story that imports it`() {
+        assertEquals("p:stories/common/a.story", StoryCompiler.resolveAddress("p:stories/main.story", "common/a.story"))
+        assertEquals("other:a.story", StoryCompiler.resolveAddress("p:stories/main.story", "other:a.story"))
+        assertEquals("p:a.story", StoryCompiler.resolveAddress("p:main.story", "a.story"))
+    }
+
+    @Test
     fun `a jump stays within its file`() {
         val result = compile("@jump test:other.story#Тут\n@call test:other.story#Тут")
 

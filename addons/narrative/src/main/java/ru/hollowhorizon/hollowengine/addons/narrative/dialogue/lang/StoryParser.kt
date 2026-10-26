@@ -110,6 +110,9 @@ class StoryParser(private val source: String) {
         if (name.isEmpty()) {
             throw StoryParseException("Label name is empty", span(offset, line, start, end))
         }
+        if (name.startsWith('@')) {
+            throw StoryParseException("A label name cannot start with '@'", span(offset, line, nameStart, end))
+        }
         if (name.any { it == ' ' || it == '\t' }) {
             throw StoryParseException(
                 "Label name must be a single word (jump targets cannot contain spaces)",
@@ -155,11 +158,18 @@ class StoryParser(private val source: String) {
             "while" -> StoryLineKind.While(expr())
             "set" -> parseSet(line, offset, raw, tailStart, end, nameSpan)
             "jump" -> StoryLineKind.Jump(parseRef(line, offset, raw, tailStart, end, name))
-            "call" -> StoryLineKind.Call(parseRef(line, offset, raw, tailStart, end, name))
-            "return" -> {
-                requireEmptyTail()
-                StoryLineKind.Return
+            "call" -> parseDefineCall(line, offset, raw, tailStart, end)
+                ?: StoryLineKind.Call(parseRef(line, offset, raw, tailStart, end, name))
+
+            "return" -> StoryLineKind.Return(if (tailStart < end) expr() else null)
+            "define" -> parseDefine(line, offset, raw, tailStart, end, nameSpan)
+            "import" -> {
+                val (address, addressSpan) = parseName(line, offset, raw, tailStart, end, name)
+                    ?: throw StoryParseException("'@import' expects a story like common/greetings.story", nameSpan)
+                StoryLineKind.Import(address, addressSpan)
             }
+
+            "stage" -> parseStage(line, offset, raw, tailStart, end, nameSpan)
 
             "choice" -> parseChoice(line, offset, raw, tailStart, end)
             "async" -> parseAsync(line, offset, raw, tailStart, end)
@@ -297,6 +307,80 @@ class StoryParser(private val source: String) {
             while (i < end && (raw[i] == ' ' || raw[i] == '\t')) i++
         }
         return StoryLineKind.Await(names)
+    }
+
+    /** `@define name(a, b)`. */
+    private fun parseDefine(line: Int, offset: Int, raw: String, start: Int, end: Int, commandSpan: StorySpan): StoryLineKind {
+        var i = start
+        while (i < end && isNameChar(raw[i])) i++
+        if (i == start) throw StoryParseException("'@define' expects a name like greet(who)", commandSpan)
+        val name = raw.substring(start, i)
+        val nameSpan = span(offset, line, start, i)
+        val params = if (i < end && raw[i] == '(') {
+            val closing = raw.indexOf(')', i).takeIf { it in i until end }
+                ?: throw StoryParseException("Unterminated '('", span(offset, line, i, end))
+            val names = raw.substring(i + 1, closing).split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            names.firstOrNull { param -> !param.all(StoryExpressions::isIdentPart) }?.let {
+                throw StoryParseException("'$it' is not a parameter name", span(offset, line, i, closing + 1))
+            }
+            i = closing + 1
+            names
+        } else emptyList()
+        if (raw.substring(i, end).isNotBlank()) {
+            throw StoryParseException("'@define' takes only a name and its parameters", span(offset, line, i, end))
+        }
+        return StoryLineKind.Define(name, nameSpan, params)
+    }
+
+    /** `@call name(args) [result=x]`, or null when the target is a label: `#Label`, `file#Label`. */
+    private fun parseDefineCall(line: Int, offset: Int, raw: String, start: Int, end: Int): StoryLineKind? {
+        var i = start
+        while (i < end && isNameChar(raw[i])) i++
+        if (i == start || i >= end || raw[i] != '(') return null
+        val name = raw.substring(start, i)
+        val nameSpan = span(offset, line, start, i)
+        val closing = findClosingBracket(raw, i, end, '(', ')')
+            ?: throw StoryParseException("Unterminated '('", span(offset, line, i, end))
+        val args = mutableListOf<StoryArg>()
+        var k = i + 1
+        while (k < closing) {
+            while (k < closing && (raw[k] == ' ' || raw[k] == '\t' || raw[k] == ',')) k++
+            if (k >= closing) break
+            val (value, next) = parseArgValue(line, offset, raw, k, closing, isCondition = false, insideList = true)
+            args += StoryArg(null, null, value, span(offset, line, k, next))
+            k = next
+        }
+        var result: String? = null
+        var resultSpan: StorySpan? = null
+        var j = closing + 1
+        while (j < end && (raw[j] == ' ' || raw[j] == '\t')) j++
+        if (j < end) {
+            if (!raw.startsWith("result=", j)) {
+                throw StoryParseException("'@call' takes only result= after its arguments", span(offset, line, j, end))
+            }
+            val (variable, variableSpan) = parseName(line, offset, raw, j + "result=".length, end, "call")
+                ?: throw StoryParseException("'result=' expects a variable", span(offset, line, j, end))
+            result = variable
+            resultSpan = variableSpan
+        }
+        return StoryLineKind.CallDefine(name, nameSpan, args, result, resultSpan)
+    }
+
+    /** `@stage quests/village.kts#gate args`. */
+    private fun parseStage(line: Int, offset: Int, raw: String, start: Int, end: Int, commandSpan: StorySpan): StoryLineKind {
+        var i = start
+        while (i < end && raw[i] != ' ' && raw[i] != '\t') i++
+        val target = raw.substring(start, i)
+        val hash = target.lastIndexOf('#')
+        if (hash <= 0 || hash == target.lastIndex) {
+            throw StoryParseException("'@stage' expects a script and its stage like quests/village.kts#gate", commandSpan)
+        }
+        return StoryLineKind.Stage(
+            target.substring(0, hash),
+            target.substring(hash + 1),
+            span(offset, line, start, i),
+            parseArgs(line, offset, raw, i, end),
+        )
     }
 
     /** A single word after `@command`, or null when nothing follows. */
