@@ -7,7 +7,6 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionAlias
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
-import ru.hollowhorizon.hollowengine.addons.narrative.story.Unsaved
 import ru.hollowhorizon.hollowengine.addons.narrative.story.action
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
@@ -28,7 +27,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Undone, the NPC is put back where it started; fast-forwarded, it is put next to the target.
  */
 @Action("move-to-entity")
-suspend fun NpcEntity.move(target: Entity, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
+suspend fun NpcEntity.move(target: Entity, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, target, options) {
         val start = capture { NpcPlacement.of(this@move) }
         undo { start.applyTo(this@move) }
@@ -70,7 +69,7 @@ suspend infix fun NpcEntity.move(mob: Entity): MoveResult = move(entity = mob)
  * started; fast-forwarded, it is put at [pos].
  */
 @Action("move-to")
-suspend fun NpcEntity.move(pos: Vec3, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
+suspend fun NpcEntity.move(pos: Vec3, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, pos, options) {
         val start = capture { NpcPlacement.of(this@move) }
         undo { start.applyTo(this@move) }
@@ -105,7 +104,7 @@ suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = positi
  * passed within [MoveOptions.passDistance], and [MoveOptions.arrivalDistance] is for the last.
  */
 @Action("move-through")
-suspend fun NpcEntity.move(points: List<Vec3>, @Unsaved options: MoveOptions = MoveOptions()): MoveResult =
+suspend fun NpcEntity.move(points: List<Vec3>, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, points, options) {
         require(points.isNotEmpty()) { "A move needs at least one point" }
         val start = capture { NpcPlacement.of(this@move) }
@@ -179,8 +178,8 @@ fun NpcEntity.startLookingAt(
 @Action("look-at")
 suspend fun NpcEntity.lookAt(
     position: Vec3,
-    @Unsaved duration: Duration = DEFAULT_LOOK_DURATION,
-    @Unsaved maxAngularSpeed: Float = 360f,
+    duration: Duration = DEFAULT_LOOK_DURATION,
+    maxAngularSpeed: Float = 360f,
 ) = action(this, position, duration, maxAngularSpeed) {
     val before = capture { NpcRotation.of(this@lookAt) }
     undo { before.applyTo(this@lookAt) }
@@ -220,8 +219,8 @@ fun NpcEntity.startLookingAt(
 @Action("look-at-entity")
 suspend fun NpcEntity.lookAt(
     target: Entity,
-    @Unsaved duration: Duration = DEFAULT_LOOK_DURATION,
-    @Unsaved maxAngularSpeed: Float = 360f,
+    duration: Duration = DEFAULT_LOOK_DURATION,
+    maxAngularSpeed: Float = 360f,
 ) = action(this, target, duration, maxAngularSpeed) {
     val before = capture { NpcRotation.of(this@lookAt) }
     undo { before.applyTo(this@lookAt) }

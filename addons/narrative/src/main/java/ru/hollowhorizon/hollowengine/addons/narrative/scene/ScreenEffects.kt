@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /** `@fade-in player 600ms #000000`: covers the screen of [this] with [color]. Undone, the screen is clear again. */
 @Action("fade-in")
-suspend fun ServerPlayer.fadeIn(@Unsaved time: Duration = DEFAULT_FADE, color: String = BLACK) =
+suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, color: String = BLACK) =
     action(this, time, color) {
         undo { StoryClearFadePacket.send(this@fadeIn) }
         fastForward { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeIn) }
@@ -35,7 +35,7 @@ suspend fun ServerPlayer.fadeIn(@Unsaved time: Duration = DEFAULT_FADE, color: S
 
 /** Uncovers the screen [fadeIn] covered. Undone, it is covered with [color] again. */
 @Action("fade-out")
-suspend fun ServerPlayer.fadeOut(@Unsaved time: Duration = DEFAULT_FADE, color: String = BLACK) =
+suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = BLACK) =
     action(this, time, color) {
         undo { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeOut) }
         fastForward { StoryClearFadePacket.send(this@fadeOut) }
@@ -79,7 +79,7 @@ suspend fun ServerPlayer.showHud() = action(this) {
 suspend fun ServerPlayer.moveCamera(
     location: Vec3,
     rotation: List<Float>,
-    @Unsaved time: Duration = DEFAULT_CAMERA,
+    time: Duration = DEFAULT_CAMERA,
     fov: Float = DEFAULT_FOV,
 ) = action(this, location, rotation, time, fov) {
     require(rotation.size in 2..3) { "camera rotation must be [yaw, pitch] or [yaw, pitch, roll]" }

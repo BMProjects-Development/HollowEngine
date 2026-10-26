@@ -7,7 +7,7 @@ order: 6
 
 *How an NPC finds its way and walks it, and how to tune that for one NPC or one move.*
 
-Every engine NPC finds and walks its paths the same way, whatever moves it: a script's [`move`](/docs/hollowengine/scripting/npc/movement), a goal such as attacking, or the patrol component. The **Navigation** component tunes this for one NPC. Without it the NPC goes by the defaults shown below, and a script can change them for a single move.
+Every engine NPC finds and walks its paths the same way, whatever moves it: a script's [`move`](/docs/hollowengine/scripting/npc/movement), a goal such as attacking, or the patrol component. The **Navigation** component tunes this for one NPC. Without it the NPC goes by the defaults shown below; a script changes them by setting the component.
 
 ---
 
@@ -81,36 +81,34 @@ The **Flight** group lets the same `move`, patrol and pathfinding APIs work in t
 
 The `minecraft:generic.flying_speed` attribute controls full flight speed in blocks per tick. Change it in the entity's attribute editor. A move's speed modifier multiplies this speed. Flight respects obstacles and body size; it cannot pass through walls.
 
-For example, allow flight for a single move:
+For example, let the NPC fly:
 
 ```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightMode
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightStyle
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NavigationComponent
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.navigationComponent
 
-npc.move(
-    pos(40, 80, 12),
-    MoveOptions(navigation = {
-        copy(flight = flight.copy(
-            flies = FlightMode.CAN,
-            style = FlightStyle.HOVER,
-            cruiseHeight = 6f,
-            landAtGoal = true,
-        ))
-    }),
-)
+val settings = npc.navigationComponent ?: NavigationComponent()
+npc.set(settings.copy(flight = settings.flight.copy(
+    flies = FlightMode.CAN,
+    style = FlightStyle.HOVER,
+    cruiseHeight = 6f,
+    landAtGoal = true,
+)))
+npc.move(pos(40, 80, 12))
 ```
 
 Animation expressions expose `q.is_flying`, `q.flight_pitch` and `q.flight_bank`: flight state, trajectory pitch and banking angle. Angles are in degrees. Use them to select a flight clip and tilt the model in its animator.
 
-## Changing the settings for one move
+## Changing the settings from a script
 
-`MoveOptions(navigation = ...)` changes the settings for that move only. It is given the NPC's own settings, or the defaults when it has no component, and returns the ones to use:
+The settings live in the component only, a move takes none of its own. A script sets the component, starting from the NPC's own settings or the defaults when it has none:
 
 ```kotlin
-npc.move(
-    pos(40, 64, 12),
-    MoveOptions(navigation = { copy(jumps = jumps.copy(maxGap = 3, runUp = 2f)) }),
-)
+val settings = npc.navigationComponent ?: NavigationComponent()
+npc.set(settings.copy(jumps = settings.jumps.copy(maxGap = 3, runUp = 2f)))
 ```
 
 Zones to keep out of are set from scripts as well, for one move or for good: see [Keeping out of zones](/docs/hollowengine/scripting/npc/movement#keeping-out-of-zones).

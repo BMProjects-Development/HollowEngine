@@ -21,6 +21,8 @@ import java.util.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Turns the values a story keeps (stage arguments, results, locals, saved variables) into NBT and back.
@@ -62,6 +64,7 @@ object StoryValues {
         val base: KSerializer<*> = when {
             Entity::class.java.isAssignableFrom(classifier.java) -> EntityReference(classifier as KClass<out Entity>)
             classifier == NpcRef::class -> NpcReference
+            classifier == Duration::class -> DurationMillis
             classifier.isFunction() -> StageLambda.Serializer
             classifier == StoryHandle::class -> StoryHandleSerializer(type.arguments.firstOrNull()?.type?.let(::serializer))
             classifier == List::class || classifier == Collection::class -> ListSerializer(arguments[0])
@@ -150,6 +153,15 @@ object StoryValues {
 
         override fun deserialize(decoder: Decoder): Map.Entry<Any?, Any?> =
             decoder.decodeSerializableValue(pair).let { AbstractMap.SimpleImmutableEntry(it.first, it.second) }
+    }
+
+    /** A duration as whole milliseconds, the unit stories count time in. */
+    private object DurationMillis : KSerializer<Duration> {
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("story.duration", PrimitiveKind.LONG)
+
+        override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeLong(value.inWholeMilliseconds)
+
+        override fun deserialize(decoder: Decoder): Duration = decoder.decodeLong().milliseconds
     }
 
     private object NpcReference : KSerializer<NpcRef> {
