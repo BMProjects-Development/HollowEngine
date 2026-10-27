@@ -4,11 +4,11 @@ import net.minecraft.core.BlockPos
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryFunctionCatalog
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryFunctionSignature
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryParam
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryType
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryParam
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryType
 import java.lang.reflect.InvocationTargetException
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction

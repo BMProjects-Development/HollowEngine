@@ -1,15 +1,6 @@
 import kotlinx.coroutines.test.runTest
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCharacter
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialoguePresenter
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueSession
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.PresentedChoice
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryEngine
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StorySourceProvider
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
+import kotlin.test.*
 
 /** A scene is a stage: it resumes at the statement it was at, and it shares the story's saved variables. */
 class StageSceneTest : StageTest() {
@@ -17,24 +8,24 @@ class StageSceneTest : StageTest() {
     private class HoldingPresenter : DialoguePresenter {
         private val text = StringBuilder()
 
-        override suspend fun beginLine(session: DialogueSession, speaker: DialogueCharacter?) {
+        override suspend fun beginLine(session: SceneSession, speaker: DialogueCharacter?) {
             text.clear()
         }
 
-        override suspend fun appendText(session: DialogueSession, text: String) {
+        override suspend fun appendText(session: SceneSession, text: String) {
             this.text.append(text)
         }
 
-        override suspend fun waitForInput(session: DialogueSession) = Unit
+        override suspend fun waitForInput(session: SceneSession) = Unit
 
-        override suspend fun endLine(session: DialogueSession) {
+        override suspend fun endLine(session: SceneSession) {
             val line = text.toString()
             StageTrace.log("say $line")
             StageTrace.await(line)
         }
 
-        override suspend fun showChoices(session: DialogueSession, options: List<PresentedChoice>) = Unit
-        override suspend fun hideChoices(session: DialogueSession, chosen: Int) = Unit
+        override suspend fun showChoices(session: SceneSession, options: List<PresentedChoice>) = Unit
+        override suspend fun hideChoices(session: SceneSession, chosen: Int) = Unit
     }
 
     private val stories = HashMap<String, String>()
@@ -43,15 +34,15 @@ class StageSceneTest : StageTest() {
 
     @BeforeTest
     fun setUpScenes() {
-        StoryEngine.addSource(source)
-        presentation = StoryEngine.presentation
-        StoryEngine.presentation = ::HoldingPresenter
+        Scenes.addSource(source)
+        presentation = Scenes.presentation
+        Scenes.presentation = ::HoldingPresenter
     }
 
     @AfterTest
     fun tearDownScenes() {
-        StoryEngine.library.removeProvider(source)
-        StoryEngine.presentation = presentation
+        Scenes.library.removeProvider(source)
+        Scenes.presentation = presentation
     }
 
     @Test
@@ -62,7 +53,8 @@ class StageSceneTest : StageTest() {
             @set count = 5
             Кузнец: Два {count}.
         """.trimIndent()
-        val world = world("scene", $$"""
+        val world = world(
+            "scene", $$"""
             var trust by saved(1)
 
             @State
@@ -71,12 +63,17 @@ class StageSceneTest : StageTest() {
                 scene("test:smith.story", with = emptyList())
                 log("after $trust")
             }
-        """)
+        """
+        )
         world.launch("main")
         assertEquals(listOf("before", "say Раз."), StageTrace.take())
 
         world.restart()
-        assertEquals(listOf("say Раз."), StageTrace.take(), "the interrupted line is shown again, the caller does not repeat")
+        assertEquals(
+            listOf("say Раз."),
+            StageTrace.take(),
+            "the interrupted line is shown again, the caller does not repeat"
+        )
 
         world.release("Раз.")
         assertEquals(listOf("say Два 5."), StageTrace.take())
@@ -85,20 +82,26 @@ class StageSceneTest : StageTest() {
         assertEquals(listOf("say Два 5."), StageTrace.take(), "a variable of the scene comes back with it")
 
         world.release("Два 5.")
-        assertEquals(listOf("after 2"), StageTrace.take(), "the scene converted its number to the Int the script declared")
+        assertEquals(
+            listOf("after 2"),
+            StageTrace.take(),
+            "the scene converted its number to the Int the script declared"
+        )
         world.stop()
     }
 
     @Test
     fun `a scene as the last call of a stage resumes as well`() = runTest {
         stories["test:last.story"] = "Кузнец: Последняя."
-        val world = world("last", """
+        val world = world(
+            "last", """
             @State
             suspend fun main() {
                 log("before")
                 scene("test:last.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         world.restart()
         assertEquals(listOf("before", "say Последняя.", "say Последняя."), StageTrace.take())
@@ -115,7 +118,8 @@ class StageSceneTest : StageTest() {
             @build house
             Кузнец: Готово.
         """.trimIndent()
-        val world = world("build", $$"""
+        val world = world(
+            "build", $$"""
             @Action
             suspend fun build(what: String) = action {
                 perform {
@@ -150,12 +154,14 @@ class StageSceneTest : StageTest() {
             Кузнец: Два.
             @rewind start
         """.trimIndent()
-        val world = world("loop", """
+        val world = world(
+            "loop", """
             @State
             suspend fun main() {
                 scene("test:loop.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         world.release("Раз.")
         assertEquals(listOf("say Раз.", "say Два."), StageTrace.take())
@@ -163,7 +169,11 @@ class StageSceneTest : StageTest() {
         StageTrace.release("Два.")
         StageTrace.hold("Два.")
         world.settle()
-        assertEquals(listOf("say Два."), StageTrace.take(), "the scene plays on from its checkpoint, not from the start")
+        assertEquals(
+            listOf("say Два."),
+            StageTrace.take(),
+            "the scene plays on from its checkpoint, not from the start"
+        )
         world.stop()
     }
 
@@ -176,7 +186,8 @@ class StageSceneTest : StageTest() {
             @checkpoint boss
             Кузнец: Готово.
         """.trimIndent()
-        val world = world("barrier", $$"""
+        val world = world(
+            "barrier", $$"""
             @Action
             suspend fun place(name: String) = action {
                 undo { StageTrace.blocks -= name }
@@ -187,7 +198,8 @@ class StageSceneTest : StageTest() {
             suspend fun main() {
                 scene("test:barrier.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         assertEquals(setOf("barrier"), StageTrace.blocks)
 
@@ -207,7 +219,8 @@ class StageSceneTest : StageTest() {
             @stage gate.stage.kts#ask 2 result=ответ
             Кузнец: {ответ}.
         """.trimIndent()
-        val world = world("gate", """
+        val world = world(
+            "gate", """
             @State
             suspend fun ask(times: Int): String {
                 log("ask ${'$'}times")
@@ -219,7 +232,8 @@ class StageSceneTest : StageTest() {
             suspend fun main() {
                 scene("test:gate.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         world.release("До.")
         assertEquals(listOf("say До.", "ask 2"), StageTrace.take())
@@ -242,7 +256,8 @@ class StageSceneTest : StageTest() {
             @await фон
             Кузнец: Готово.
         """.trimIndent()
-        val world = world("track", $$"""
+        val world = world(
+            "track", $$"""
             @Action
             suspend fun mark(what: String) = action {
                 perform {
@@ -255,7 +270,8 @@ class StageSceneTest : StageTest() {
             suspend fun main() {
                 scene("test:track.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         world.release("Ждём.")
         assertEquals(setOf("mark один", "say Ждём."), StageTrace.take().toSet())
@@ -268,7 +284,11 @@ class StageSceneTest : StageTest() {
 
         world.restart()
         world.release("два")
-        assertEquals(listOf("mark два", "say Готово."), StageTrace.take(), "the second action was where the track stood")
+        assertEquals(
+            listOf("mark два", "say Готово."),
+            StageTrace.take(),
+            "the second action was where the track stood"
+        )
         world.stop()
     }
 
@@ -284,7 +304,8 @@ class StageSceneTest : StageTest() {
             Кузнец: Ещё.
             # Конец
         """.trimIndent()
-        val world = world("sync", $$"""
+        val world = world(
+            "sync", $$"""
             @Action
             suspend fun mark(what: String) = action {
                 perform {
@@ -297,7 +318,8 @@ class StageSceneTest : StageTest() {
             suspend fun main() {
                 scene("test:sync.story", with = emptyList())
             }
-        """)
+        """
+        )
         world.launch("main")
         assertEquals(setOf("mark время", "say Говорим."), StageTrace.take().toSet())
 
@@ -311,13 +333,15 @@ class StageSceneTest : StageTest() {
     @Test
     fun `a scene of a story that belongs to no player needs its players`() = runTest {
         stories["test:nobody.story"] = "Кузнец: Никому."
-        val world = world("nobody", """
+        val world = world(
+            "nobody", """
             @State
             suspend fun main() {
                 scene("test:nobody.story")
                 log("after")
             }
-        """)
+        """
+        )
         val story = world.launch("main")
         assertFalse(story.isActive)
         assertEquals(emptyList(), StageTrace.take())

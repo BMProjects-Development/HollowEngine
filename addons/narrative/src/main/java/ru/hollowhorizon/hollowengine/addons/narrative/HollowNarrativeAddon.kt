@@ -2,20 +2,16 @@ package ru.hollowhorizon.hollowengine.addons.narrative
 
 import kotlinx.coroutines.CoroutineScope
 import ru.hollowhorizon.hollowengine.addons.narrative.client.NarrativeClient
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCommands
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.ScriptRegistryStorySource
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryEngine
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.Scenes
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.ScriptRegistryStorySource
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommands
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonContext
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEntrypoint
 import ru.hollowhorizon.hollowengine.common.addons.extensions
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
-import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
-import ru.hollowhorizon.hollowengine.common.scripting.RELOAD_SCRIPT_EXTENSION
-import ru.hollowhorizon.hollowengine.common.scripting.SERVER_CONSOLE_SCRIPT_EXTENSION
-import ru.hollowhorizon.hollowengine.common.scripting.STARTUP_SCRIPT_EXTENSION
-import ru.hollowhorizon.hollowengine.common.scripting.ScriptDefaultImportsEvent
+import ru.hollowhorizon.hollowengine.common.scripting.*
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScriptsEvent
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
@@ -42,7 +38,7 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
 
     /** Reloaded scripts registered their actions again, which the stories are checked against. */
     @SubscribeEvent
-    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = StoryEngine.reload()
+    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = Scenes.reload()
 
     @SubscribeEvent(-1)
     fun registerCommands(event: RegisterCommandsEvent) {
@@ -54,7 +50,7 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
     }
 
     private companion object {
-        const val DIALOGUE_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*"
+        const val DIALOGUE_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.scene.*"
         val STORY_PACKAGES = listOf(
             "ru.hollowhorizon.hollowengine.addons.narrative.story.*",
             "ru.hollowhorizon.hollowengine.addons.narrative.npcs.*",
@@ -63,8 +59,12 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
         val RELOAD_IMPORTS = listOf(DIALOGUE_PACKAGE)
 
         /** Nodes start dialogues and play cutscenes for players. */
-        val NODE_IMPORTS = listOf(DIALOGUE_PACKAGE) +
-            listOf("playCutscene", "playCutsceneAt", "playCutsceneNear", "playCutsceneHere", "stopCutscene")
-                .map { "ru.hollowhorizon.hollowengine.addons.narrative.cutscene.$it" }
+        val NODE_IMPORTS = listOf(DIALOGUE_PACKAGE) + listOf(
+            "playCutscene",
+            "playCutsceneAt",
+            "playCutsceneNear",
+            "playCutsceneHere",
+            "stopCutscene"
+        ).map { "ru.hollowhorizon.hollowengine.addons.narrative.cutscene.$it" }
     }
 }

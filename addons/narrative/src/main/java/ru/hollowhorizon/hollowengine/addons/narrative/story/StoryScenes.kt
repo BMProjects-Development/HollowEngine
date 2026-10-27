@@ -3,9 +3,9 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.LivingEntity
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryType
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryType
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SceneStage.KEY
 import kotlin.reflect.KParameter
 import ru.hollowhorizon.hollowengine.addons.narrative.story.temporary as temporaryUntil
@@ -74,25 +74,23 @@ internal object SceneStage {
         players: List<ServerPlayer>,
         characters: Map<String, LivingEntity>,
     ) {
-        val controller = DialogueController(address) {
-            locale = players.firstOrNull()?.clientInformation()?.language()
-        }
-        characters.forEach { (name, entity) -> controller.character(name, DialogueCharacter.of(entity)) }
-        controller.outerVariables = RunVariables(frame.run)
-        controller.load(CHECKPOINT, frame.locals)
-        controller.host = SceneHost(frame, controller)
+        val locale = players.firstOrNull()?.clientInformation()?.language()
+        val player = ScenePlayer(address, Scenes.presentation(), Scenes.library, locale = locale)
+        characters.forEach { (name, entity) -> player.character(name, DialogueCharacter.of(entity)) }
+        player.host = StorySceneHost(frame, player)
+        if (frame.locals.contains(CHECKPOINT)) player.restore(SceneCheckpoint.load(frame.locals.getCompound(CHECKPOINT)))
 
-        SceneTracks.attach(frame.run, controller)
+        SceneTracks.attach(frame.run, player)
         val result = try {
-            if (players.isEmpty()) controller.startHeadless() else controller.start(*players.toTypedArray())
+            player.play(players)
         } finally {
             SceneTracks.detach(frame.run)
         }
         when (result) {
-            is DialogueResult.Failed -> throw result.error as? StoryEntityMissing
+            is SceneResult.Failed -> throw result.error as? StoryEntityMissing
                 ?: StoryException("Scene '$address' failed: ${result.error.message}", result.error)
 
-            DialogueResult.AllPlayersLeft -> throw StoryEntityMissing(players.first().uuid)
+            SceneResult.AllPlayersLeft -> throw StoryEntityMissing(players.first().uuid)
             else -> Unit
         }
     }
@@ -101,9 +99,14 @@ internal object SceneStage {
      * The story a scene plays in. Every statement of the scene is a segment of its frame: a restart repeats the
      * statement it was in, taking back the temporary actions that statement performed.
      */
-    private class SceneHost(private val frame: StoryFrame, private val controller: DialogueController) : DialogueHost {
+    private class StorySceneHost(private val frame: StoryFrame, private val player: ScenePlayer) : SceneHost {
+        override val server get() = frame.run.runs.owner.server
+
+        override val variables = RunVariables(frame.run)
+
         override fun step() {
-            controller.save(CHECKPOINT, frame.locals)
+            val checkpoint = player.checkpoint()
+            if (checkpoint == null) frame.locals.remove(CHECKPOINT) else frame.locals.put(CHECKPOINT, checkpoint.save())
             frame.standAt(STATEMENT, calling = false)
             frame.segmentMark = frame.run.journal.next
         }
@@ -113,7 +116,7 @@ internal object SceneStage {
         override suspend fun startTrack(name: String, address: String, anchor: StoryAnchor) =
             SceneTracks.start(frame, name, address, anchor)
 
-        override fun tracks(): Map<String, DialogueTrack> = SceneTracks.of(frame)
+        override fun tracks(): Map<String, SceneTrack> = SceneTracks.of(frame)
 
         override suspend fun temporary(until: String?, call: suspend () -> Unit) = temporaryUntil(until) { call() }
 
@@ -143,7 +146,7 @@ internal object SceneStage {
                 ?: throw StoryException("'@stage $script#$stage' needs '$name'")
                 val value =
                     (written as? StoryString)?.takeIf { StoryConversions.typeOf(parameter.type) == StoryType.ACTOR }
-                        ?.let { controller.resolveActor(it.value) } ?: written
+                        ?.let { player.resolveActor(it.value) } ?: written
                 StoryValues.put(
                     args,
                     name,
