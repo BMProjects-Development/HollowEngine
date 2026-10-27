@@ -3,10 +3,12 @@ package ru.hollowhorizon.hollowengine.addons.narrative.client
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneTimeline
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryScriptingAnalyzer
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryListFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeLanguage
+import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdePreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
@@ -30,6 +32,7 @@ internal object NarrativeClient {
         extensions.registerIdeLanguage(
             HollowIdeLanguageService.extensions("story", listOf("story")) { StoryScriptingAnalyzer },
         )
+        extensions.registerIdePreview(StoryListFilePreview)
         extensions.registerIdeScriptTemplate(
             HollowIdeScriptTemplate.fromResource(
                 id = "dialogue",

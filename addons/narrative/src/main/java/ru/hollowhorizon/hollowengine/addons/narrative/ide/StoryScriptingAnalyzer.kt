@@ -91,7 +91,7 @@ object StoryScriptingAnalyzer : ScriptingAnalyzer {
         return ResourceLocationTargets.definition(literal)
     }
 
-    private fun catalog(): StoryFunctionCatalog =
+    internal fun catalog(): StoryFunctionCatalog =
         if (ActionCommands.names.isEmpty()) StoryFunctionCatalog.PERMISSIVE else ActionCommands
 
     private fun storyDefinition(address: String, label: String?): DefinitionLocation? {
