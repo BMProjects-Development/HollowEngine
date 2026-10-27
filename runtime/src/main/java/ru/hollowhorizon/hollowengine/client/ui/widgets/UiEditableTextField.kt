@@ -1045,20 +1045,21 @@ internal fun selectionRectsForRow(
     @Suppress("UNUSED_PARAMETER") fullWidth: Float,
 ): List<UiRect> {
     val newlineWidth = UiTextLayouter.measureTextWidth(" ", fontSize, fontFamily).coerceAtLeast(1f)
+    val fontHeight = UiTextFonts.resolve(fontFamily).lineHeight(fontSize)
     if (lineLayout != null) {
         val rects = mergeSelectionRects(
             lineLayout.selectionRects(localStart, localEnd, fontSize, fontFamily, fillLineGaps = false),
         )
         if (!crossesNewline) return rects
         val caret = lineLayout.caretPosition(localEnd, fontSize, fontFamily)
-        val lineHeight = lineLayout.lines.lastOrNull()?.height ?: fontSize
+        val lineHeight = lineLayout.lines.lastOrNull()?.height ?: fontHeight
         return rects + UiRect(caret.x, caret.y, newlineWidth, lineHeight)
     }
     val x1 = UiTextLayouter.measureTextWidth(line.text.take(localStart), fontSize, fontFamily)
     val x2 = UiTextLayouter.measureTextWidth(line.text.take(localEnd), fontSize, fontFamily)
     val right = if (crossesNewline) x2 + newlineWidth else x2
     if (right <= x1) return emptyList()
-    return listOf(UiRect(x1, 0f, right - x1, fontSize))
+    return listOf(UiRect(x1, 0f, right - x1, fontHeight))
 }
 
 private fun mergeSelectionRects(rects: List<UiRect>): List<UiRect> {
