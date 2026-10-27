@@ -47,17 +47,16 @@ $kind-broken: $danger;
 
 .story-guide {
     size: 14px auto;
-    fill: none;
-    stroke: alpha($kind-plain, 0.35);
-    stroke-width: 1.5px;
+    fill: alpha($kind-plain, 0.35);
+    stroke: none;
 }
 
-.story-guide.choice { stroke: alpha($kind-choice, 0.5); }
-.story-guide.condition { stroke: alpha($kind-condition, 0.5); }
+.story-guide.choice { fill: alpha($kind-choice, 0.5); }
+.story-guide.condition { fill: alpha($kind-condition, 0.5); }
 
-.story-guide.line { shape: path("M 6.5 0 L 6.5 32", 14 32); }
-.story-guide.branch { shape: path("M 6.5 0 L 6.5 32 M 6.5 10 Q 6.5 14 10.5 14 L 14 14", 14 32); }
-.story-guide.last { shape: path("M 6.5 0 L 6.5 10 Q 6.5 14 10.5 14 L 14 14", 14 32); }
+.story-guide.line { shape: path("M 5.75 0 H 7.25 V 32 H 5.75 Z", 14 32); }
+.story-guide.branch { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 7.25 V 32 H 5.75 Z", 14 32); }
+.story-guide.last { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 10.5 Q 5.75 14.75 5.75 10 Z", 14 32); }
 
 .story-body {
     margin: 0px 0px 4px 0px;
