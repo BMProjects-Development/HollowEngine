@@ -4,8 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import net.minecraft.server.level.ServerPlayer
 
 /**
- * What the participants answer a scene with: advancing past a line, and their votes in the open menu. Votes and
- * advances come from the network thread, the scene reads them on the server thread.
+ * What the participants answer a scene with: advancing past a line, and their votes in the open menu.
  */
 internal class SceneAnswers(private val session: SceneSession, private val presentation: DialoguePresenter) {
     /** The menu on screen: the votes cast so far and the signal that it is decided. */
@@ -17,14 +16,11 @@ internal class SceneAnswers(private val session: SceneSession, private val prese
         var forced: Int? = null
     }
 
-    @Volatile
     private var advanceSignal: CompletableDeferred<Unit>? = null
 
     /** An advance that arrived while nobody was waiting; consumed by the next wait. */
-    @Volatile
     private var pendingAdvance = false
 
-    @Volatile
     private var menu: Menu? = null
 
     val openMenuSize: Int get() = menu?.optionCount ?: 0

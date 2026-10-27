@@ -16,7 +16,8 @@ import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.hiddenHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.hideHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.showAllHudLayers
-import java.util.*
+import java.util.UUID
+import java.util.WeakHashMap
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -129,7 +130,7 @@ internal object ScreenEffects {
         val hudBefore = HashMap<UUID, Set<ResourceLocation>>()
     }
 
-    private val borrowed = Collections.synchronizedMap(WeakHashMap<SceneSession, Borrowed>())
+    private val borrowed = WeakHashMap<SceneSession, Borrowed>()
 
     /** What the scene the current command runs in borrowed, with [player] noted; null outside a scene. */
     suspend fun borrow(player: ServerPlayer): Borrowed? {
@@ -149,8 +150,7 @@ internal object ScreenEffects {
     @SubscribeEvent
     fun onPlayerDeath(event: LivingEntityDeathEvent) {
         val player = event.entity as? ServerPlayer ?: return
-        val states = synchronized(borrowed) { borrowed.values.toList() }
-        states.filter { player in it.players }.forEach { giveBack(player, it) }
+        borrowed.values.filter { player in it.players }.forEach { giveBack(player, it) }
     }
 
     private fun giveBack(player: ServerPlayer, state: Borrowed) {

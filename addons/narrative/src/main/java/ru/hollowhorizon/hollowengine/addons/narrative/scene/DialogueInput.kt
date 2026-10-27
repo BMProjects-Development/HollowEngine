@@ -1,13 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene
 
 import net.minecraft.server.level.ServerPlayer
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Routes a player's clicks to the scene they are in.
  */
 object DialogueInput {
-    private val running = CopyOnWriteArrayList<ScenePlayer>()
+    private val running = ArrayList<ScenePlayer>()
 
     internal fun register(scene: ScenePlayer) {
         running.remove(scene)
