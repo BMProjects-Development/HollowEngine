@@ -29,7 +29,7 @@ internal class StoryRowScope(
 
 /**
  * One row of the list: the rail with the dot of a top-level card, a guide for each card it is nested in, and the
- * row itself. While a row is dragged, it follows the pointer and the others slide out of its way.
+ * row itself. Cards and their dots move during a drag; the rail and guides stay in the list's layout.
  */
 @Composable
 internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
@@ -37,12 +37,14 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
     val drag = state.drag
     val held = drag?.holds(index) == true
     val offset = drag?.offsetOf(index)
+    val motion = Modifier
+        .let { if (offset != null) it.translate(y = offset) else it }
+        .let { if (held || state.settling) it.transition() else it }
     Row(
         id = "story-row-${row.key}",
         tags = listOfNotNull("story-row", "dragging".takeIf { held }, "rejected".takeIf { held && drag.rejected }),
         modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.STRETCH)
-            .let { if (offset != null) it.translate(y = offset) else it }
-            .let { if (held || state.settling) it.transition() else it }.layer(if (held) 10 else 0),
+            .layer(if (held) 10 else 0),
     ) {
         Box(
             mode = UiBoxMode.STACK,
@@ -51,21 +53,23 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
         ) {
             Box(tags = listOf("story-rail-line"), modifier = Modifier.size(LineWidth.px, 100.percent))
             if (row.dot) Box(
+                id = "story-dot-${row.key}",
                 tags = listOfNotNull(
                     "story-rail-dot",
                     row.kind.tag,
-                    "selected".takeIf { isSelected(scope, row) })
+                    "selected".takeIf { isSelected(scope, row) }),
+                modifier = motion,
             )
         }
         row.guides.forEachIndexed { level, kind ->
             Box(tags = listOfNotNull("story-guide", kind.tag, row.joints.getOrNull(level)?.tag))
         }
-        RowBody(scope, row)
+        RowBody(scope, row, motion)
     }
 }
 
 @Composable
-private fun RowBody(scope: StoryRowScope, row: StoryRow) {
+private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
     val state = scope.state
     val problems = if (row.role == StoryRowRole.MENU) emptyList() else scope.model.problems[row.line].orEmpty()
     Row(
@@ -79,7 +83,7 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow) {
             "current".takeIf { row.selection == scope.current },
             "problem".takeIf { problems.isNotEmpty() },
         ),
-        modifier = Modifier.size(0.px).grow(1f).alignItems(vertical = UiAlign.CENTER)
+        modifier = motion.size(0.px).grow(1f).alignItems(vertical = UiAlign.CENTER)
             .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
                 // A drag whose release never arrived (the window lost focus mid-gesture) ends here.
                 state.drag = null
