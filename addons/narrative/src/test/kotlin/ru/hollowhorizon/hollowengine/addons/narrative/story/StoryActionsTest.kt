@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.NarrativeActions
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.NarrativeActions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

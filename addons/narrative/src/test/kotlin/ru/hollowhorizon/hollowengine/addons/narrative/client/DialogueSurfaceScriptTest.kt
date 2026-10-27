@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.client
 
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueChoiceView
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueChoicesView
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueUiKeys
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueChoiceView
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueChoicesView
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueUiKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.common.scripting.ui.UiScript
 import ru.hollowhorizon.hollowengine.common.ui.UiData

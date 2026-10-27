@@ -2,9 +2,9 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import kotlinx.coroutines.CompletableDeferred
 import net.minecraft.nbt.CompoundTag
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueTrack
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.StoryAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.ScenePlayer
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.SceneTrack
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryAnchor
 
 /**
  * The `@async` tracks of scenes, each a branch of the story the scene plays in: it keeps its place in the track
@@ -18,11 +18,11 @@ internal object SceneTracks {
     private val LABEL = storySerializer<String?>()
     private val INT = storySerializer<Int>()
 
-    /** The dialogues of the scenes playing, by the path of the run whose top frame each is; tracks wait for them. */
-    private val scenes = HashMap<String, CompletableDeferred<DialogueController>>()
+    /** The players of the scenes playing, by the path of the run whose top frame each is; tracks wait for them. */
+    private val scenes = HashMap<String, CompletableDeferred<ScenePlayer>>()
 
-    fun attach(run: StoryRun, controller: DialogueController) {
-        scenes.getOrPut(run.path) { CompletableDeferred() }.complete(controller)
+    fun attach(run: StoryRun, scene: ScenePlayer) {
+        scenes.getOrPut(run.path) { CompletableDeferred() }.complete(scene)
     }
 
     fun detach(run: StoryRun) {
@@ -42,10 +42,10 @@ internal object SceneTracks {
     }
 
     /** The tracks the scene in [frame] started that are still there. */
-    fun of(frame: StoryFrame): Map<String, DialogueTrack> =
+    fun of(frame: StoryFrame): Map<String, SceneTrack> =
         frame.children.mapNotNull { name -> frame.run.children[name]?.let { name to Track(it) } }.toMap()
 
-    private class Track(private val run: StoryRun) : DialogueTrack {
+    private class Track(private val run: StoryRun) : SceneTrack {
         override suspend fun join() {
             run.awaitDone()
         }
@@ -76,7 +76,7 @@ internal object SceneTracks {
             frame.saveArg("offset", INT, anchor.offset)
             frame.saveArg("line", INT, anchor.line)
             val scene = frame.run.parent ?: throw StoryException("Track '$name' runs only as a branch of a scene")
-            val controller = scenes.getOrPut(scene.path) { CompletableDeferred() }.await()
+            val player = scenes.getOrPut(scene.path) { CompletableDeferred() }.await()
             val saved = frame.locals.takeIf { it.contains(HASH) }?.let {
                 StoryAnchor(
                     it.getString(LABEL_KEY).takeIf { _ -> it.contains(LABEL_KEY) },
@@ -84,7 +84,7 @@ internal object SceneTracks {
                     it.getInt(LINE)
                 )
             }
-            controller.playTrack(
+            player.playTrack(
                 address,
                 anchor,
                 saved,

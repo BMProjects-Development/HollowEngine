@@ -3,14 +3,14 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
 
 /**
  * The [saved] variables of a story as a scene sees them: by the bare property name, for every script whose stages
  * the story is in and the scripts those import. Only variables a scene has values for are seen: strings, numbers,
  * booleans and lists of them. A value the scene writes is converted to the type the script declared.
  */
-internal class RunVariables(private val run: StoryRun) : StoryVariableSource {
+internal class RunVariables(private val run: StoryRun) : SceneVariables {
     private class Declared(val key: String, val variable: SavedVariable<*>)
 
     private val declared: Map<String, List<Declared>> =

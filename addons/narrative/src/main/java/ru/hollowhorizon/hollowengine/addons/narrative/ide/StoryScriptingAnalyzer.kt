@@ -1,13 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryEngine
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.ScenePlayer
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryString
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryString
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
-import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
 
 /**
@@ -147,8 +146,7 @@ private fun labelOccurrences(cst: StoryFileCst, label: String): List<OccurrenceR
     for (line in cst.lines) {
         when (val kind = line.kind) {
             is StoryLineKind.Label -> if (kind.name == label) ranges += OccurrenceRange(
-                kind.nameSpan.start,
-                kind.nameSpan.end
+                kind.nameSpan.start, kind.nameSpan.end
             )
 
             is StoryLineKind.Jump -> targetRange(kind.target, label)?.let { ranges += it }
@@ -267,8 +265,7 @@ internal fun storyCompletions(
         is StoryCompletionContext.Checkpoint -> checkpointCompletions(text, context.typed)
 
         is StoryCompletionContext.Expression -> if (context.member) memberCompletions(context.typed) else variableCompletions(
-            text,
-            context.typed
+            text, context.typed
         )
 
         is StoryCompletionContext.Argument -> if (context.command == "set") {
@@ -281,20 +278,19 @@ internal fun storyCompletions(
     }
 }
 
-private fun registeredNames(catalog: StoryFunctionCatalog): List<String> =
-    catalog.names.sorted()
+private fun registeredNames(catalog: StoryFunctionCatalog): List<String> = catalog.names.sorted()
 
 private fun labelCompletions(text: String, typed: String): List<CompletionItem> =
     labelsOf(text).filter { completionMatches(typed, it) }.map { label ->
-            declarationCompletionItem {
-                show = "#$label"
-                insert = "#$label"
-                name = label
-                tag = CompletionItemTag.CLASS
-                tail = "label"
-                wordChars = "#"
-            }
+        declarationCompletionItem {
+            show = "#$label"
+            insert = "#$label"
+            name = label
+            tag = CompletionItemTag.CLASS
+            tail = "label"
+            wordChars = "#"
         }
+    }
 
 /** The checkpoints this file passes; those a Kotlin stage of the story passes are not known here. */
 private fun checkpointCompletions(text: String, typed: String): List<CompletionItem> =
@@ -311,13 +307,13 @@ private fun checkpointCompletions(text: String, typed: String): List<CompletionI
 
 private fun variableCompletions(text: String, typed: String): List<CompletionItem> =
     variablesOf(text).filter { it != typed && completionMatches(typed, it) }.map { variable ->
-            declarationCompletionItem {
-                show = variable
-                name = variable
-                tag = CompletionItemTag.LOCAL_VARIABLE
-                tail = "variable"
-            }
+        declarationCompletionItem {
+            show = variable
+            name = variable
+            tag = CompletionItemTag.LOCAL_VARIABLE
+            tail = "variable"
         }
+    }
 
 private fun memberCompletions(typed: String): List<CompletionItem> =
     StoryDeclarations.types["value"]?.members?.allFields.orEmpty().flatMap { it.names }.distinct()
@@ -366,14 +362,14 @@ private fun valueCompletions(
     }
 
     return values.filter { completionMatches(context.typed, it) }.map { value ->
-            declarationCompletionItem {
-                show = value
-                name = value
-                tag = if (parameter.type == StoryType.ACTOR) CompletionItemTag.CLASS else CompletionItemTag.PROPERTY
-                tail = parameter.name
-                wordChars = "-:"
-            }
+        declarationCompletionItem {
+            show = value
+            name = value
+            tag = if (parameter.type == StoryType.ACTOR) CompletionItemTag.CLASS else CompletionItemTag.PROPERTY
+            tail = parameter.name
+            wordChars = "-:"
         }
+    }
 }
 
 private fun commandCompletions(command: String, catalog: StoryFunctionCatalog): List<CompletionItem> {
@@ -421,7 +417,7 @@ private fun labelsOf(text: String): List<String> =
 private fun actorsOf(text: String): List<String> {
     val speakers =
         StoryParser.parse(text).cst.lines.mapNotNull { (it.kind as? StoryLineKind.Dialogue)?.speaker }.distinct()
-    return (listOf(DialogueController.PLAYER_ACTOR) + speakers).distinct()
+    return (listOf(ScenePlayer.PLAYER_ACTOR) + speakers).distinct()
 }
 
 private fun variablesOf(text: String): List<String> {

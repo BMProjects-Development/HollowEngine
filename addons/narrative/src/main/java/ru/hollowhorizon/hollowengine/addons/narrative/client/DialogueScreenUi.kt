@@ -4,7 +4,7 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.*
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
 import ru.hollowhorizon.hollowengine.common.ui.UiGuiScale
 import ru.hollowhorizon.hollowengine.common.ui.UiScope
 import ru.hollowhorizon.hollowengine.common.ui.UiScreenDefinition

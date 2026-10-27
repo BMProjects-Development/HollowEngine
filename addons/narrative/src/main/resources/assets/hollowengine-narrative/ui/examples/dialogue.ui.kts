@@ -1,8 +1,8 @@
 package assets.hollowengine.ui.examples
 
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueChoicesView
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueLineView
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueUiKeys
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueChoicesView
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueLineView
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueUiKeys
 
 val STYLE = "hollowengine-narrative:ui/examples/dialogue_overlay.hss"
 

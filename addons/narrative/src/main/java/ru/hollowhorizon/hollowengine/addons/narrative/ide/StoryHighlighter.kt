@@ -1,10 +1,10 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryBool
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryNumber
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryString
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.StoryValue
-import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang.*
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryBool
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryNumber
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryString
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryValue
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.TextSpan
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Ast
@@ -248,8 +248,13 @@ internal object StoryHighlighter {
 
     private fun exprSpans(expr: StoryExpression, out: MutableList<TextSpan>) {
         expr.parts.forEach { exprSpans(it, out) }
-        expr.ast?.let { astSpans(it, out) }
-            ?: expr.constant?.let { out += TextSpan(expr.span.start, expr.span.end, it.tokenType()) }
+        expr.ast?.let { astSpans(it, out) } ?: expr.constant?.let {
+            out += TextSpan(
+                expr.span.start,
+                expr.span.end,
+                it.tokenType()
+            )
+        }
     }
 
     /** Colors the tree the language itself parsed. */
