@@ -10,7 +10,7 @@ object Scenes {
     val library = SceneLibrary { ActionCommands }
 
     /** Makes the presentation of a scene. */
-    var presentation: () -> DialoguePresenter = { UiDialoguePresentation() }
+    var presentation: () -> DialoguePresenter = { ChatDialoguePresentation() }
 
     init {
         // Stories live alongside scripts, so every script namespace is a story source too.

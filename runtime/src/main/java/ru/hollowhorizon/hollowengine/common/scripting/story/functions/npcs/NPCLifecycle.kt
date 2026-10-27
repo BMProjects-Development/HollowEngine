@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComp
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
+import ru.hollowhorizon.hollowengine.common.npcs.registry.ServerNpcs
 import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
@@ -101,17 +102,18 @@ fun ServerLevel.npc(
 ): NpcEntity {
     val npcs = server.npcs
     if (id != null) npcs.alive(id)?.let { return it }
+    return buildNpc(pos, builder).also { npcs.spawn(it, id) }
+}
 
-    return NpcEntity(this).apply {
-        moveTo(pos.x, pos.y, pos.z, 0f, 0f)
-        set(Model())
-        set(TransformComponent())
-        setNameplate("NPC")
+/** An NPC at [pos] set up by [builder], not yet in the world: [ServerNpcs.spawn] adds it. */
+fun ServerLevel.buildNpc(pos: Vec3, builder: NpcEntity.() -> Unit = {}): NpcEntity = NpcEntity(this).apply {
+    moveTo(pos.x, pos.y, pos.z, 0f, 0f)
+    set(Model())
+    set(TransformComponent())
+    setNameplate("NPC")
 
-        builder()
-        refreshDimensions()
-        npcs.spawn(this, id)
-    }
+    builder()
+    refreshDimensions()
 }
 
 /**

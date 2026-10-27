@@ -67,10 +67,10 @@ class ServerNpcs internal constructor(private val server: MinecraftServer, file:
     }
 
     /** The living NPC with [id], whether it has a body or not. */
-    internal fun alive(id: String): NpcEntity? = registry[id]?.takeUnless { it.isDead }?.let { resolve(it.uuid) }
+    fun alive(id: String): NpcEntity? = registry[id]?.takeUnless { it.isDead }?.let { resolve(it.uuid) }
 
-    /** Gives a new [body] its record and adds it to its level. */
-    internal fun spawn(body: NpcEntity, id: String?) {
+    /** Gives a new [body] its record under [id] and adds it to its level. */
+    fun spawn(body: NpcEntity, id: String?) {
         registry.put(recordOf(body, id), saveEntity(body))?.let { drop(it.uuid) }
         instances[body.uuid] = body
         bodies += body.uuid

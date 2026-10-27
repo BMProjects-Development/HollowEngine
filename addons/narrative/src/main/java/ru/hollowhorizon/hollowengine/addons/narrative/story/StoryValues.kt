@@ -8,9 +8,13 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
+import net.minecraft.core.registries.Registries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
+import net.minecraft.resources.ResourceKey
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValues.put
 import ru.hollowhorizon.hollowengine.common.npcs.registry.NpcRef
@@ -64,6 +68,7 @@ object StoryValues {
         val base: KSerializer<*> = when {
             Entity::class.java.isAssignableFrom(classifier.java) -> EntityReference(classifier as KClass<out Entity>)
             classifier == NpcRef::class -> NpcReference
+            classifier == ServerLevel::class -> LevelReference
             classifier == Duration::class -> DurationMillis
             classifier.isFunction() -> StageLambda.Serializer
             classifier == StoryHandle::class -> StoryHandleSerializer(type.arguments.firstOrNull()?.type?.let(::serializer))
@@ -162,6 +167,20 @@ object StoryValues {
         override fun serialize(encoder: Encoder, value: Duration) = encoder.encodeLong(value.inWholeMilliseconds)
 
         override fun deserialize(decoder: Decoder): Duration = decoder.decodeLong().milliseconds
+    }
+
+    /** A level by its dimension, which must be loaded to read it back. */
+    private object LevelReference : KSerializer<ServerLevel> {
+        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("story.level", PrimitiveKind.STRING)
+
+        override fun serialize(encoder: Encoder, value: ServerLevel) =
+            encoder.encodeString(value.dimension().location().toString())
+
+        override fun deserialize(decoder: Decoder): ServerLevel {
+            val name = decoder.decodeString()
+            val key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(name))
+            return currentServerOrNull()?.getLevel(key) ?: throw StoryException("Dimension '$name' is not loaded")
+        }
     }
 
     private object NpcReference : KSerializer<NpcRef> {

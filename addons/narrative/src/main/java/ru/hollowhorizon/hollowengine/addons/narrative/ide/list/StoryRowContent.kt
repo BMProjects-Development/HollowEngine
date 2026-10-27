@@ -55,7 +55,6 @@ private fun Wait(scope: StoryRowScope, row: StoryRow, wait: StoryLineKind.FuncCa
     val model = scope.model
     val written = wait.args.firstOrNull()?.let { model.source(it.expr.span) }.orEmpty()
     val seconds = WaitDuration.seconds(written)
-    Text(storyLang("kind.wait"), tags = listOf("story-title"))
     if (seconds == null) {
         Field(scope, row, "arg-0", written, "2s", width = 80f) { StoryEdits.setPositional(model.text, row.line, 0, it) }
         Box(modifier = Modifier.grow(1f))
@@ -80,8 +79,7 @@ private fun Wait(scope: StoryRowScope, row: StoryRow, wait: StoryLineKind.FuncCa
 @Composable
 private fun Command(scope: StoryRowScope, row: StoryRow, call: StoryLineKind.FuncCall) {
     val model = scope.model
-    Text("@${call.function}", tags = listOf("story-chip"))
-    val params = signature(call)
+    val params = signature(call)?.params
     if (params == null) {
         val rest = StoryListModel.statement(row.block.line).removePrefix("@${call.function}").trim()
         Field(scope, row, "arg-0", rest, "", grow = true) {
@@ -113,7 +111,6 @@ private fun Command(scope: StoryRowScope, row: StoryRow, call: StoryLineKind.Fun
 
 @Composable
 private fun Label(scope: StoryRowScope, row: StoryRow, label: StoryLineKind.Label) {
-    Text("#", tags = listOf("story-chip"))
     Field(scope, row, "text", label.name, storyLang("label.name"), grow = true) {
         if (it.isBlank()) null else StoryEdits.renameLabel(scope.model.text, label.name, it.trim())
     }
@@ -122,7 +119,6 @@ private fun Label(scope: StoryRowScope, row: StoryRow, label: StoryLineKind.Labe
 @Composable
 private fun MenuHead(scope: StoryRowScope, row: StoryRow) {
     val options = scope.model.outline.groupOf(row.block)
-    Text(storyLang("kind.choice"), tags = listOf("story-title"))
     Text(storyLang("choice.count").format(options.size), tags = listOf("story-muted"), modifier = Modifier.grow(1f))
     IconButton(
         AddIcon,
@@ -162,12 +158,11 @@ private fun Option(scope: StoryRowScope, row: StoryRow, choice: StoryLineKind.Ch
 @Composable
 private fun Branch(scope: StoryRowScope, row: StoryRow) {
     val model = scope.model
-    val (keyword, condition) = when (val kind = row.block.line.kind) {
-        is StoryLineKind.If -> "if" to kind.condition
-        is StoryLineKind.ElseIf -> "elseif" to kind.condition
-        else -> "else" to null
+    val condition = when (val kind = row.block.line.kind) {
+        is StoryLineKind.If -> kind.condition
+        is StoryLineKind.ElseIf -> kind.condition
+        else -> null
     }
-    Text(storyLang("branch.$keyword"), tags = listOf("story-keyword"))
     if (condition == null) return Box(modifier = Modifier.grow(1f))
     Field(scope, row, "condition", model.source(condition.span), storyLang("branch.placeholder"), grow = true) {
         StoryEdits.replace(model.text, condition.span, it)
@@ -178,8 +173,7 @@ private fun Branch(scope: StoryRowScope, row: StoryRow) {
 @Composable
 private fun Statement(scope: StoryRowScope, row: StoryRow) {
     val statement = StoryListModel.statement(row.block.line)
-    val keyword = statement.substringBefore(' ').takeIf { it.startsWith("@") && row.kind != StoryCardKind.BROKEN }
-    if (keyword != null) Text(keyword, tags = listOf("story-chip"))
+    val keyword = statementKeyword(row)
     val rest = if (keyword != null) statement.removePrefix(keyword).trim() else statement
     Field(scope, row, "arg-0", rest, "", grow = true) {
         StoryEdits.setStatement(scope.model.text, row.line, if (keyword != null) "$keyword $it".trimEnd() else it)
@@ -251,10 +245,10 @@ private fun fieldKey(scope: StoryRowScope, row: StoryRow, input: UiKeyInput, onE
 }
 
 /** The signature of [call] that fits what is written, or null when the function is not known. */
-private fun signature(call: StoryLineKind.FuncCall): List<StoryParam>? {
+internal fun signature(call: StoryLineKind.FuncCall): StoryFunctionSignature? {
     val overloads = StoryScriptingAnalyzer.catalog().overloads(call.function)?.takeIf { it.isNotEmpty() } ?: return null
     val written = call.args.size
-    return (overloads.firstOrNull { it.params.size >= written } ?: overloads.maxBy { it.params.size }).params
+    return overloads.firstOrNull { it.params.size >= written } ?: overloads.maxBy { it.params.size }
 }
 
 /** Text inside the quotes of an option: a quote typed into it is escaped so the quotes still close where they did. */

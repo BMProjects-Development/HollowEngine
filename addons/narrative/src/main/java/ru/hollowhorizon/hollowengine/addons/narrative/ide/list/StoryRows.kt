@@ -1,10 +1,11 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryStatements
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.DisclosureArrow
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import kotlin.math.hypot
@@ -37,14 +38,12 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
     val drag = state.drag
     val held = drag?.holds(index) == true
     val offset = drag?.offsetOf(index)
-    val motion = Modifier
-        .let { if (offset != null) it.translate(y = offset) else it }
+    val motion = Modifier.let { if (offset != null) it.translate(y = offset) else it }
         .let { if (held || state.settling) it.transition() else it }
     Row(
         id = "story-row-${row.key}",
         tags = listOfNotNull("story-row", "dragging".takeIf { held }, "rejected".takeIf { held && drag.rejected }),
-        modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.STRETCH)
-            .layer(if (held) 10 else 0),
+        modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.STRETCH).layer(if (held) 10 else 0),
     ) {
         Box(
             mode = UiBoxMode.STACK,
@@ -55,9 +54,7 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
             if (row.dot) Box(
                 id = "story-dot-${row.key}",
                 tags = listOfNotNull(
-                    "story-rail-dot",
-                    row.kind.tag,
-                    "selected".takeIf { isSelected(scope, row) }),
+                    "story-rail-dot", row.kind.tag, "selected".takeIf { isSelected(scope, row) }),
                 modifier = motion,
             )
         }
@@ -83,7 +80,7 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
             "current".takeIf { row.selection == scope.current },
             "problem".takeIf { problems.isNotEmpty() },
         ),
-        modifier = motion.size(0.px).grow(1f).alignItems(vertical = UiAlign.CENTER)
+        modifier = motion.size(0.px).grow(1f).alignItems(vertical = UiAlign.STRETCH)
             .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
                 // A drag whose release never arrived (the window lost focus mid-gesture) ends here.
                 state.drag = null
@@ -103,15 +100,21 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
                 state.drop(scope.model)
             },
     ) {
-        StoryRowContent(scope, row)
-        problems.firstOrNull()?.let {
-            Image(
-                ProblemIcon,
-                tags = listOf("story-problem"),
-                modifier = Modifier.tooltipOnHover(problems.joinToString("\n") { it.message })
-            )
-        }
-        if (row.role != StoryRowRole.MENU) {
+        StoryHead.of(row)?.let { StoryRowHead(row, it) }
+        Row(
+            tags = listOf("story-body-content"),
+            modifier = Modifier.size(0.px).grow(1f).alignItems(vertical = UiAlign.CENTER),
+        ) {
+            StoryRowContent(scope, row)
+            problems.firstOrNull()?.let {
+                Image(
+                    ProblemIcon,
+                    tags = listOf("story-problem"),
+                    modifier = Modifier.tooltipOnHover(problems.joinToString("\n") { it.message })
+                )
+            }
+            Fold(scope, row)
+            More(state, row)
             IconButton(
                 RemoveIcon,
                 storyLang("remove"),
@@ -121,18 +124,33 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
                 state.remove(scope.model, scope.rows, row.selection)
             }
         }
-        Fold(scope, row)
     }
 }
 
-/** The arrow that folds what is under a row, at its right end so the rows keep their starts in line. */
+/** The button that opens the menu of a row, the same as a right click on it. */
+@Composable
+private fun More(state: StoryListState, row: StoryRow) {
+    var anchor by remember { mutableStateOf(UiRect.Zero) }
+    IconButton(
+        storyIcon("more"),
+        storyLang("more"),
+        id = "story-body-${row.key}-more",
+        tags = listOf("inline", "story-action"),
+        modifier = Modifier.onPlaced { anchor = it },
+    ) {
+        state.select(row.selection)
+        state.menu = StoryRowMenu(row.selection, anchor.x, anchor.y + anchor.height)
+    }
+}
+
+/** The arrow that folds what is under a row, beside its buttons; a row with nothing under it has none. */
 @Composable
 private fun Fold(scope: StoryRowScope, row: StoryRow) {
     val block = row.block
     val key = when {
         row.role == StoryRowRole.MENU -> scope.model.cardKey(block)
         block.children.isNotEmpty() -> scope.model.rowKey(block)
-        else -> return Box(tags = listOf("story-fold", "empty"))
+        else -> return
     }
     val expanded = !scope.state.isFolded(key)
     Box(

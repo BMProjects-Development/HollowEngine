@@ -55,14 +55,14 @@ $kind-broken: $danger;
 .story-guide.condition { fill: alpha($kind-condition, 0.5); }
 
 .story-guide.line { shape: path("M 5.75 0 H 7.25 V 32 H 5.75 Z", 14 32); }
-.story-guide.branch { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 7.25 V 32 H 5.75 Z", 14 32); }
+.story-guide.branch { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 10.5 Q 7.25 14.75 7.25 18 V 32 H 5.75 Z", 14 32); }
 .story-guide.last { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 10.5 Q 5.75 14.75 5.75 10 Z", 14 32); }
 
 .story-body {
     margin: 0px 0px 4px 0px;
     min-height: 28px;
-    padding: 3px 4px 3px 8px;
-    gap: 6px;
+    padding: 2px;
+    gap: 2px;
     background: linear-gradient(to right, alpha($kind-plain, 0.1) 0%, alpha($white, 0.02) 55%);
     border: 1px alpha($kind-plain, 0.35);
     border-radius: $radius-large;
@@ -127,6 +127,44 @@ $kind-broken: $danger;
     shadow: 0px 0px 6px 0px alpha($kind-condition, 0.18);
 }
 
+.story-body-content {
+    padding: 1px 2px 1px 6px;
+    gap: 6px;
+}
+
+.story-head {
+    size: fit auto;
+    min-width: 88px;
+    padding: 0px 8px;
+    gap: 5px;
+    border-radius: $radius;
+    background: alpha($kind-plain, 0.22);
+}
+
+.story-head.phrase { background: alpha($kind-phrase, 0.28); }
+.story-head.wait { background: alpha($kind-wait, 0.28); }
+.story-head.choice { background: alpha($kind-choice, 0.28); }
+.story-head.condition { background: alpha($kind-condition, 0.28); }
+.story-head.broken { background: alpha($kind-broken, 0.28); }
+
+.story-head-icon {
+    size: 12px 12px;
+    tint: $kind-plain;
+}
+
+.story-head.phrase .story-head-icon { tint: $kind-phrase; }
+.story-head.wait .story-head-icon { tint: $kind-wait; }
+.story-head.choice .story-head-icon { tint: $kind-choice; }
+.story-head.condition .story-head-icon { tint: $kind-condition; }
+.story-head.broken .story-head-icon { tint: $kind-broken; }
+
+.story-head-title {
+    height: fit;
+    foreground: $text-strong;
+    font-size: 9px;
+    text-wrap: false;
+}
+
 .story-body.match { background: alpha($warning, 0.08); }
 .story-body.current, .story-body.current:hover { background: alpha($warning, 0.16); }
 
@@ -152,35 +190,10 @@ $kind-broken: $danger;
 
 .story-field.search { background: alpha($bg-window, 0.6); }
 
-.story-title {
-    height: fit;
-    foreground: $text-strong;
-    font-size: 9px;
-    text-wrap: false;
-}
-
 .story-muted {
     height: fit;
     foreground: $text-muted;
     font-size: 8px;
-    text-wrap: false;
-}
-
-.story-chip {
-    height: fit;
-    padding: 2px 5px;
-    background: alpha($white, 0.05);
-    border-radius: $radius-small;
-    foreground: $text-soft;
-    font-family: $font-code;
-    font-size: 9px;
-    text-wrap: false;
-}
-
-.story-keyword {
-    height: fit;
-    foreground: $kind-condition;
-    font-size: 9px;
     text-wrap: false;
 }
 
@@ -203,7 +216,6 @@ $kind-broken: $danger;
 }
 
 .story-fold:hover { background: $bg-hover; }
-.story-fold.empty:hover { background: transparent; }
 
 .story-action {
     size: 16px 16px;

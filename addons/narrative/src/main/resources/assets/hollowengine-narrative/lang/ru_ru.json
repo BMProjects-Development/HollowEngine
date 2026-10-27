@@ -52,6 +52,7 @@
   "hollowengine.gui.ide.story.kind.broken": "Ошибка",
   "hollowengine.gui.ide.story.duplicate": "Дублировать",
   "hollowengine.gui.ide.story.remove": "Удалить",
+  "hollowengine.gui.ide.story.more": "Ещё",
   "hollowengine.gui.ide.story.wait.duration": "Секунды",
   "hollowengine.gui.ide.story.branch.if": "если",
   "hollowengine.gui.ide.story.branch.elseif": "иначе если",
