@@ -10,7 +10,6 @@ import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
 import ru.hollowhorizon.hollowengine.common.ui.net.UiSession
 import ru.hollowhorizon.hollowengine.common.ui.net.UiSessionManager
 import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -30,14 +29,11 @@ class UiDialoguePresentation(
     /** How long the chosen option is left on screen so everyone sees what won. */
     val choiceRevealDelay: Long = 520L,
 ) : DialoguePresenter {
-    /** Concurrent because votes arrive off the story coroutine, on whatever thread read the packet. */
-    private val sessions = ConcurrentHashMap<ServerPlayer, UiSession>()
+    private val sessions = HashMap<ServerPlayer, UiSession>()
 
     private var line = DialogueLineView()
     private var choices = DialogueChoicesView()
 
-    /** Read from the network thread, so a click never races the story's own writes. */
-    @Volatile
     private var phase = DialoguePhase.LINE
 
     override suspend fun onDialogueStart(session: SceneSession) {
