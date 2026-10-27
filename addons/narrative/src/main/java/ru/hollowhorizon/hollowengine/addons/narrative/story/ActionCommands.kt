@@ -1,7 +1,10 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.Registries
+import net.minecraft.resources.ResourceKey
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
@@ -9,9 +12,13 @@ import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionCa
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryType
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.audience
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
+import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import java.lang.reflect.InvocationTargetException
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -101,7 +108,11 @@ class StoryCommand private constructor(
         parameters.forEach { bound ->
             val constructor = bound.constructor
             if (constructor == null) {
-                val value = arguments[bound.name] ?: return@forEach
+                val value = arguments[bound.name]
+                if (value == null) {
+                    if (bound.reflected.isImplicitLevel) values[bound.reflected] = sceneLevel()
+                    return@forEach
+                }
                 values[bound.reflected] = StoryConversions.convert(value, bound.reflected.type, bound.name)
                 return@forEach
             }
@@ -137,11 +148,13 @@ class StoryCommand private constructor(
                 val name = when {
                     parameter.kind != KParameter.Kind.EXTENSION_RECEIVER -> parameter.name ?: return null
                     StoryConversions.typeOf(parameter.type) == StoryType.ACTOR -> RECEIVER_ENTITY
+                    parameter.type.classifier == ServerLevel::class -> RECEIVER_LEVEL
                     else -> RECEIVER
                 }
                 direct += Bound(parameter, name)
             }
-            val params = direct.map { param(it.name, it.reflected, it.reflected.isOptional) }.toMutableList()
+            val params = direct.sortedBy { it.reflected.isImplicitLevel }
+                .map { param(it.name, it.reflected, it.reflected.isOptional || it.reflected.isImplicitLevel) }.toMutableList()
             // A field of an options object named like a parameter of the action is left to the parameter.
             val taken = params.mapTo(HashSet()) { it.name }
             val bound = direct + options.map { bound ->
@@ -156,17 +169,24 @@ class StoryCommand private constructor(
                 title = function.findAnnotation<EditorName>()?.name,
                 description = function.findAnnotation<EditorDescription>()?.description,
                 icon = function.findAnnotation<EditorIcon>()?.icon,
+                category = function.findAnnotation<EditorCategory>()?.category,
+                widget = function.findAnnotation<EditorWidget>()?.id,
             )
             return StoryCommand(action, signature, bound)
         }
 
-        private fun param(name: String, parameter: KParameter, optional: Boolean) = StoryParam(
-            name = name,
-            type = StoryConversions.typeOf(parameter.type)!!,
-            optional = optional,
-            suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values
-                ?: StoryConversions.suggestions(parameter.type),
-        )
+        private fun param(name: String, parameter: KParameter, optional: Boolean): StoryParam {
+            val info = parameter.findAnnotation<Param>()
+            return StoryParam(
+                name = name,
+                type = StoryConversions.typeOf(parameter.type)!!,
+                optional = optional,
+                suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values
+                    ?: StoryConversions.suggestions(parameter.type),
+                title = info?.title?.ifEmpty { null },
+                description = info?.description?.ifEmpty { null },
+            )
+        }
 
         /**
          * An optional parameter whose class can be built from optional constructor parameters alone, such as
@@ -184,8 +204,15 @@ class StoryCommand private constructor(
         /** What a scene calls the receiver: the entity that acts, or the value the action is about. */
         private const val RECEIVER_ENTITY = "who"
         private const val RECEIVER = "this"
+        private const val RECEIVER_LEVEL = "level"
     }
 }
+
+/** A level the scene does not name is the one of its first participant, or the overworld. */
+private val KParameter.isImplicitLevel: Boolean
+    get() = type.classifier == ServerLevel::class && !isOptional
+
+private suspend fun sceneLevel(): ServerLevel = audience()?.firstOrNull()?.serverLevel() ?: currentServer.overworld()
 
 /** How the values of a scene become the arguments of a Kotlin function. */
 internal object StoryConversions {
@@ -193,7 +220,7 @@ internal object StoryConversions {
     fun typeOf(type: KType): StoryType? {
         val classifier = type.classifier as? KClass<*> ?: return null
         return when {
-            classifier == String::class || classifier == ResourceLocation::class -> StoryType.STRING
+            classifier == String::class || classifier == ResourceLocation::class || classifier == ServerLevel::class -> StoryType.STRING
             classifier == Boolean::class -> StoryType.BOOL
             classifier in NUMBERS || classifier == Duration::class -> StoryType.NUMBER
             classifier.isSubclassOf(Entity::class) || classifier.isSubclassOf(DialogueCharacter::class) -> StoryType.ACTOR
@@ -208,6 +235,7 @@ internal object StoryConversions {
     fun suggestions(type: KType): List<String> {
         val classifier = type.classifier as? KClass<*> ?: return emptyList()
         if (classifier in COLLECTIONS) return type.arguments.singleOrNull()?.type?.let(::suggestions).orEmpty()
+        if (classifier == ServerLevel::class) return DIMENSIONS
         return classifier.java.enumConstants?.map { (it as Enum<*>).name.lowercase().replace('_', '-') }.orEmpty()
     }
 
@@ -256,6 +284,10 @@ internal object StoryConversions {
             classifier.isSubclassOf(DialogueCharacter::class) -> (value as? StoryActor)?.character?.takeIf(classifier::isInstance)
                 ?: fail("no character of the scene is named so")
 
+            classifier == ServerLevel::class -> ResourceLocation.tryParse(value.display())
+                ?.let { currentServer.getLevel(ResourceKey.create(Registries.DIMENSION, it)) }
+                ?: fail("no dimension is named so")
+
             classifier == Vec3::class -> numbers(3).let { Vec3(it[0].toDouble(), it[1].toDouble(), it[2].toDouble()) }
             classifier == BlockPos::class -> numbers(3).let { BlockPos(it[0].toInt(), it[1].toInt(), it[2].toInt()) }
             classifier in COLLECTIONS -> {
@@ -283,4 +315,5 @@ internal object StoryConversions {
 
     private val NUMBERS = setOf(Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class)
     private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
+    private val DIMENSIONS = listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")
 }

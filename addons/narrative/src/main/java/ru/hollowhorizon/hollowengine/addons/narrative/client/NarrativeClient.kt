@@ -13,10 +13,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
-import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 
 /**
- * What the addon adds to the client: the dialogue window, the cutscene and dialogue cameras, the cutscene
+ * What the addon adds to the client: the cutscene and dialogue cameras, the cutscene
  * timeline and `.story` support in the IDE.
  */
 @ClientOnly
@@ -25,7 +24,6 @@ internal object NarrativeClient {
     private const val CUTSCENE_CAMERA_PRIORITY = 10
 
     fun register(extensions: HollowAddonExtensions) {
-        extensions.register(UiDefinitionRegistry.builtInScreens, "dialogue", DialogueScreenUi.definition)
         extensions.register(CameraDirector.sources, "cutscene", CutsceneCameraSystem, CUTSCENE_CAMERA_PRIORITY)
         extensions.register(CameraDirector.sources, "story", StoryCameraSystem)
         extensions.register(IdeTimelines.defaults, "cutscene", CutsceneTimeline)

@@ -200,8 +200,7 @@ private fun variableReferences(kind: StoryLineKind): List<Ast.Name> {
         template.parts.forEach { part ->
             when (part) {
                 is TextPart.Interpolation -> collect(part.expr)
-                is TextPart.InlineCall -> part.call.args.forEach { collect(it.expr) }
-                is TextPart.Literal, is TextPart.WaitInput -> Unit
+                is TextPart.Literal -> Unit
             }
         }
     }

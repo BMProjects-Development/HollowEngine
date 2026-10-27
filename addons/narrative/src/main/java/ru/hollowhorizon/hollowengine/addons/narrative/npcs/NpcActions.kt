@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionAlias
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
 import ru.hollowhorizon.hollowengine.addons.narrative.story.action
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
@@ -26,6 +27,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Moves the NPC toward [target] until it is within [MoveOptions.arrivalDistance], following it while it moves.
  * Undone, the NPC is put back where it started; fast-forwarded, it is put next to the target.
  */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("move-to-entity")
 suspend fun NpcEntity.move(target: Entity, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, target, options) {
@@ -68,6 +70,7 @@ suspend infix fun NpcEntity.move(mob: Entity): MoveResult = move(entity = mob)
  * Moves the NPC to [pos] until it is within [MoveOptions.arrivalDistance]. Undone, the NPC is put back where it
  * started; fast-forwarded, it is put at [pos].
  */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("move-to")
 suspend fun NpcEntity.move(pos: Vec3, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, pos, options) {
@@ -103,6 +106,7 @@ suspend infix fun NpcEntity.move(position: Vec3): MoveResult = move(pos = positi
  * Moves the NPC through [points] in turn without stopping at any but the last: each one before it counts as
  * passed within [MoveOptions.passDistance], and [MoveOptions.arrivalDistance] is for the last.
  */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("move-through")
 suspend fun NpcEntity.move(points: List<Vec3>, options: MoveOptions = MoveOptions()): MoveResult =
     action(this, points, options) {
@@ -118,6 +122,7 @@ fun NpcEntity.startMove(points: List<Vec3>, options: MoveOptions = MoveOptions()
     return actions.start(NpcActionKeys.MOVEMENT) { moveThrough(points.map { point -> { point } }, options) }
 }
 
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @SimpleAction("stop-moving")
 fun NpcEntity.stopMoving() {
     actions.cancel(NpcActionKeys.MOVEMENT)
@@ -137,6 +142,7 @@ suspend fun <R> NpcEntity.queue(block: suspend NpcEntity.() -> R): R = actions.q
  * Keeps the NPC out of [zone] on every way it walks, its moves and its goals alike, until [stopAvoiding]. It is
  * not saved with the NPC: a script that needs it after a reload adds it again. Undone, the NPC stops avoiding it.
  */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("avoid")
 suspend fun NpcEntity.avoid(zone: Zone) = action(this, zone) {
     undo { stopAvoiding(zone) }
@@ -175,6 +181,7 @@ fun NpcEntity.startLookingAt(
 }
 
 /** Turns the NPC to [position] over [duration]. Undone, it faces where it did before; fast-forwarded, it faces there at once. */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("look-at")
 suspend fun NpcEntity.lookAt(
     position: Vec3,
@@ -216,6 +223,7 @@ fun NpcEntity.startLookingAt(
 }
 
 /** Turns the NPC to [target] over [duration], following it as it moves; undone and fast-forwarded like [lookAt] at a position. */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("look-at-entity")
 suspend fun NpcEntity.lookAt(
     target: Entity,
@@ -241,6 +249,7 @@ suspend infix fun NpcEntity.lookAt(entity: Entity) {
     lookAt(entity, DEFAULT_LOOK_DURATION)
 }
 
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @SimpleAction("stop-looking")
 fun NpcEntity.clearLookTarget() {
     actions.cancel(NpcActionKeys.LOOK)

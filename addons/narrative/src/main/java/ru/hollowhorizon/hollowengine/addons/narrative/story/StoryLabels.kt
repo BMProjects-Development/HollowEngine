@@ -7,8 +7,10 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 
 /** Where [entity] is when the checkpoint is passed; every rewind to the checkpoint brings it back there. */
+@EditorCategory("hollowengine.gui.ide.story.category.story")
 @Action("position")
 suspend fun CheckpointScope.position(entity: Entity) = label(this, entity) {
     val placement = capture { Placement.of(entity) }
@@ -16,6 +18,7 @@ suspend fun CheckpointScope.position(entity: Entity) = label(this, entity) {
 }
 
 /** What [player] carries when the checkpoint is passed; every rewind to the checkpoint gives back exactly that. */
+@EditorCategory("hollowengine.gui.ide.story.category.story")
 @Action("inventory")
 suspend fun CheckpointScope.inventory(player: ServerPlayer) = label(this, player) {
     val inventory = player.inventory

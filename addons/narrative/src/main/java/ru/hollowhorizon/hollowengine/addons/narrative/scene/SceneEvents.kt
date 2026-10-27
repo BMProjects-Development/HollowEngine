@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene
 
-import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.common.events.Event
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 
@@ -26,8 +25,6 @@ open class SceneEvent(val session: SceneSession) : Event {
         val id: String?,
         val text: String,
         val metadata: Map<String, StoryValue>,
-        /** What each participant voted for; empty when nobody did. */
-        val votes: Map<ServerPlayer, Int>,
     ) : SceneEvent(session) {
         /** Matches [id] when the story declared one, otherwise the text as written. */
         val key: String get() = id ?: text

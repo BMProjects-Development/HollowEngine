@@ -1,11 +1,14 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.Line
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.SayEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -17,42 +20,27 @@ import kotlin.test.assertNull
  * with the variables kept in every case.
  */
 class SceneCheckpointTest {
-    /** Stops the dialogue at a chosen line, the way a server shutdown would. */
-    private class HaltingPresenter(private val haltAfter: Int) : DialoguePresenter {
+    /** Records the text of every line and stops the dialogue at a chosen one, the way a server shutdown would. */
+    private class HaltingPresenter(scope: CoroutineScope, private val haltAfter: Int) {
         val lines = mutableListOf<String>()
-        private val current = StringBuilder()
-        private var speaker: DialogueCharacter? = null
         val halted = CompletableDeferred<Unit>()
 
-        override suspend fun beginLine(session: SceneSession, speaker: DialogueCharacter?) {
-            current.clear()
-            this.speaker = speaker
+        init {
+            SayEvent.subscribe(scope) { event -> event.sendLine { say(it) } }
         }
 
-        override suspend fun appendText(session: SceneSession, text: String) {
-            current.append(text)
+        private suspend fun say(line: Line) {
+            lines += line.markup
+            if (lines.size < haltAfter) return
+            halted.complete(Unit)
+            CompletableDeferred<Unit>().await()
         }
-
-        override suspend fun waitForInput(session: SceneSession) = Unit
-
-        override suspend fun endLine(session: SceneSession) {
-            lines += current.toString()
-            current.clear()
-            if (lines.size >= haltAfter) {
-                halted.complete(Unit)
-                CompletableDeferred<Unit>().await()
-            }
-        }
-
-        override suspend fun showChoices(session: SceneSession, options: List<PresentedChoice>) = Unit
-        override suspend fun hideChoices(session: SceneSession, chosen: Int) = Unit
     }
 
     private fun TestScope.scene(
         sources: Map<String, String>,
-        presenter: DialoguePresenter,
         locale: String? = null,
-    ): ScenePlayer = testScene(backgroundScope, sources, presenter, locale = locale)
+    ): ScenePlayer = testScene(backgroundScope, sources, locale = locale)
 
     private val story = """
         Виталик: Раз.
@@ -68,8 +56,8 @@ class SceneCheckpointTest {
         haltAfter: Int,
         variables: Map<String, StoryValue> = emptyMap(),
     ): Pair<CompoundTag, List<String>> {
-        val presenter = HaltingPresenter(haltAfter)
-        val scene = scene(sources, presenter)
+        val presenter = HaltingPresenter(backgroundScope, haltAfter)
+        val scene = scene(sources)
         scene.variables += variables
         val job = backgroundScope.launch { scene.play(emptyList()) }
         presenter.halted.await()
@@ -83,8 +71,8 @@ class SceneCheckpointTest {
         val (tag, before) = playAndSave(mapOf("test:main.story" to story), haltAfter = 3)
         assertEquals(listOf("Раз.", "Два.", "Три."), before)
 
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
-        val resumed = scene(mapOf("test:main.story" to story), presenter)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
+        val resumed = scene(mapOf("test:main.story" to story))
         resumed.restore(SceneCheckpoint.load(tag))
         val result = resumed.play(emptyList())
 
@@ -105,8 +93,8 @@ class SceneCheckpointTest {
             Виталик: Четыре.
         """.trimIndent()
 
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
-        val resumed = scene(mapOf("test:main.story" to edited), presenter)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
+        val resumed = scene(mapOf("test:main.story" to edited))
         resumed.restore(SceneCheckpoint.load(tag))
         resumed.play(emptyList())
 
@@ -125,8 +113,8 @@ class SceneCheckpointTest {
             Виталик: Совсем другая история, денег {money}.
         """.trimIndent()
 
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
-        val resumed = scene(mapOf("test:main.story" to rewritten), presenter)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
+        val resumed = scene(mapOf("test:main.story" to rewritten))
         resumed.restore(SceneCheckpoint.load(tag))
         resumed.play(emptyList())
 
@@ -158,8 +146,8 @@ class SceneCheckpointTest {
 
     @Test
     fun `finishing clears the checkpoint`() = runTest {
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
-        val scene = scene(mapOf("test:main.story" to story), presenter)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
+        val scene = scene(mapOf("test:main.story" to story))
         scene.play(emptyList())
 
         assertNull(scene.checkpoint(), "a finished scene must not leave a resumable checkpoint")
@@ -182,8 +170,8 @@ class SceneCheckpointTest {
         val (tag, before) = playAndSave(mapOf("test:main.story" to nested), haltAfter = 2)
         assertEquals(listOf("Внутри раз.", "Внутри два."), before)
 
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
-        val resumed = scene(mapOf("test:main.story" to nested), presenter)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
+        val resumed = scene(mapOf("test:main.story" to nested))
         resumed.restore(SceneCheckpoint.load(tag))
         resumed.play(emptyList())
 
@@ -192,13 +180,12 @@ class SceneCheckpointTest {
 
     @Test
     fun `a localised story is played and recorded instead of the base one`() = runTest {
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
         val scene = scene(
             mapOf(
                 "test:main.story" to "Vitalik: Hello!",
                 "test:main.ru_ru.story" to "Виталик: Привет!",
             ),
-            presenter,
             locale = "ru_ru",
         )
 
@@ -209,10 +196,9 @@ class SceneCheckpointTest {
 
     @Test
     fun `a missing translation falls back to the base story`() = runTest {
-        val presenter = HaltingPresenter(Int.MAX_VALUE)
+        val presenter = HaltingPresenter(backgroundScope, Int.MAX_VALUE)
         val scene = scene(
             mapOf("test:main.story" to "Vitalik: Hello!"),
-            presenter,
             locale = "de_de",
         )
 

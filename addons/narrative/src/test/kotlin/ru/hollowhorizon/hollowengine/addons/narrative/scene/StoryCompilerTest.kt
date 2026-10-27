@@ -281,32 +281,6 @@ class StoryCompilerTest {
     }
 
     @Test
-    fun `dialogue lines inside async are rejected before sync`() {
-        val result = compile(
-            """
-            @async
-                Виталик: Нельзя.
-            """.trimIndent(),
-        )
-        assertNull(result.program)
-        assertTrue(result.diagnostics.any { "before '@sync'" in it.message })
-    }
-
-    @Test
-    fun `after sync a track may speak, because it is the main flow by then`() {
-        val result = compile(
-            """
-            @async name=timer
-                @wait 1s
-                @sync
-                Виталик: Время вышло.
-            Виталик: Успел.
-            """.trimIndent(),
-        )
-        assertNotNull(result.program, result.diagnostics.toString())
-    }
-
-    @Test
     fun `indenting under a line that opens nothing is an error`() {
         val result = compile(
             """

@@ -60,12 +60,11 @@ internal class TestSceneHost(private val scope: CoroutineScope, private val play
 internal fun testScene(
     scope: CoroutineScope,
     sources: Map<String, String>,
-    presenter: DialoguePresenter,
     library: SceneLibrary = SceneLibrary(),
     locale: String? = null,
 ): ScenePlayer {
     library.addProvider { address -> sources[address] }
-    val player = ScenePlayer("test:main.story", presenter, library, locale = locale)
+    val player = ScenePlayer("test:main.story", library, locale = locale)
     player.host = TestSceneHost(scope, player)
     return player
 }

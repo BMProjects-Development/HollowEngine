@@ -4,13 +4,10 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 
 /**
  * Engine-wide scene state: the library that loads and caches stories, their commands being the registered actions
- * (see [ActionCommands]), and the presentation scenes are shown with.
+ * (see [ActionCommands]).
  */
 object Scenes {
     val library = SceneLibrary { ActionCommands }
-
-    /** Makes the presentation of a scene. */
-    var presentation: () -> DialoguePresenter = { ChatDialoguePresentation() }
 
     init {
         // Stories live alongside scripts, so every script namespace is a story source too.

@@ -29,6 +29,10 @@ data class StoryParam(
      * legitimately name something the engine only learns about later.
      */
     val suggestions: List<String> = emptyList(),
+    /** What the editor calls it instead of [name], a lang key or plain text. */
+    val title: String? = null,
+    /** What it is for, a lang key or plain text. */
+    val description: String? = null,
 ) {
     /** How the editor writes it: `volume=1.0`, or `volume?` when the default is not known. */
     fun display(): String = when {
@@ -44,6 +48,8 @@ data class StoryParam(
  * @param title what the editor calls it, a lang key or plain text; the editor writes `@name` without it.
  * @param description what it does, a lang key or plain text.
  * @param icon a `namespace:textures/...` icon the editor shows beside it.
+ * @param category the heading the editor lists it under, a lang key or plain text.
+ * @param widget the id of the widget the editor draws its rows with, when not the plain one.
  */
 data class StoryFunctionSignature(
     val name: String,
@@ -51,6 +57,8 @@ data class StoryFunctionSignature(
     val title: String? = null,
     val description: String? = null,
     val icon: String? = null,
+    val category: String? = null,
+    val widget: String? = null,
 ) {
 
     init {

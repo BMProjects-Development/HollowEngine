@@ -22,9 +22,9 @@ annotation class EditorDescription(val description: String)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorIcon(val icon: String)
 
-/** Groups a component under a heading in the "add component" list. */
+/** Groups a component under a heading in the "add component" list, or a story action in the "add command" one. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 annotation class EditorCategory(val category: String)
 
 /** Kept in the data, never shown. For fields gameplay owns and a human should not type into. */
@@ -60,9 +60,12 @@ annotation class EditorDefault(val json: String)
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorBone
 
-/** Edits the field with the editor registered under [id] instead of the one its type would get. */
+/**
+ * Edits the field with the editor registered under [id] instead of the one its type would get; on a story action,
+ * draws its rows with the widget registered under [id].
+ */
 @SerialInfo
-@Target(AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorWidget(val id: String)
 
 /** The field editors the engine registers, by the id [EditorWidget] names them with. */

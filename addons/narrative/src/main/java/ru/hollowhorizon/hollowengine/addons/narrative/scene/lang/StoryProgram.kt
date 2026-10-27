@@ -147,12 +147,6 @@ sealed interface StoryInstruction {
     data class Await(val trackNames: List<String>, override val anchor: StoryAnchor) : StoryInstruction
 
     data class Cancel(val trackName: String, override val anchor: StoryAnchor) : StoryInstruction
-
-    /**
-     * `@sync` is barrier-preempt. The track waits for the parent flow to reach a statement boundary,
-     * then the rest of the track continues *as* the main flow.
-     */
-    data class Sync(override val anchor: StoryAnchor) : StoryInstruction
 }
 
 /** A `@temporary` block: its actions are taken back at the checkpoint [until], or at the next one when null. */

@@ -15,7 +15,7 @@ internal class StoryHead(val icon: String, val title: String, val tooltip: Strin
             StoryRowRole.MENU -> StoryHead(row.kind.icon, row.kind.title)
             StoryRowRole.BRANCH -> StoryHead(row.kind.icon, storyLang("branch.${branchKeyword(row.block.line.kind)}"))
             StoryRowRole.CARD -> when (val kind = row.block.line.kind) {
-                is StoryLineKind.FuncCall -> if (row.kind == StoryCardKind.WAIT) plain(row) else command(kind)
+                is StoryLineKind.FuncCall -> command(kind)
                 is StoryLineKind.Dialogue, is StoryLineKind.Label, is StoryLineKind.Broken -> plain(row)
                 else -> StoryHead(row.kind.icon, statementKeyword(row) ?: row.kind.title)
             }
@@ -41,7 +41,7 @@ internal class StoryHead(val icon: String, val title: String, val tooltip: Strin
 @Composable
 internal fun StoryRowHead(row: StoryRow, head: StoryHead) {
     Row(
-        tags = listOf("story-head", row.kind.tag),
+        tags = listOf("story-head", row.tag),
         modifier = Modifier.alignItems(vertical = UiAlign.CENTER)
             .let { modifier -> head.tooltip?.let { modifier.tooltipOnHover(it) } ?: modifier },
     ) {

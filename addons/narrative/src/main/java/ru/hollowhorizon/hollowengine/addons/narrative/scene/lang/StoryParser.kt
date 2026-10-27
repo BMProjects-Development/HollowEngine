@@ -175,11 +175,6 @@ class StoryParser(private val source: String) {
             "async" -> parseAsync(line, offset, raw, tailStart, end)
             "await" -> parseAwait(line, offset, raw, tailStart, end)
             "cancel" -> parseCancel(line, offset, raw, tailStart, end, nameSpan)
-            "sync" -> {
-                requireEmptyTail()
-                StoryLineKind.Sync
-            }
-
             "checkpoint" -> {
                 val (checkpoint, checkpointSpan) = parseName(line, offset, raw, tailStart, end, name)
                     ?: throw StoryParseException("'@checkpoint' expects a name", nameSpan)
@@ -206,7 +201,7 @@ class StoryParser(private val source: String) {
                 if (tailStart >= end) {
                     throw StoryParseException("'@command' expects a vanilla command", nameSpan)
                 }
-                val template = parseTemplate(line, offset, raw, tailStart, end, allowInline = false)
+                val template = parseTemplate(line, offset, raw, tailStart, end)
                 StoryLineKind.Command(template, span(offset, line, tailStart, end))
             }
 
@@ -261,7 +256,7 @@ class StoryParser(private val source: String) {
         }
         val closing = findClosingQuote(raw, start, end)
             ?: throw StoryParseException("Unterminated choice text", span(offset, line, start, end))
-        val text = parseTemplate(line, offset, raw, start + 1, closing, allowInline = false)
+        val text = parseTemplate(line, offset, raw, start + 1, closing)
         var i = closing + 1
         while (i < end && (raw[i] == ' ' || raw[i] == '\t')) i++
         val args = parseArgs(line, offset, raw, i, end)
@@ -546,7 +541,7 @@ class StoryParser(private val source: String) {
             }
         }
 
-        val text = parseTemplate(line, offset, raw, textStart, end, allowInline = true)
+        val text = parseTemplate(line, offset, raw, textStart, end)
         return StoryLineKind.Dialogue(speaker, speakerSpan, text, speakerExpr)
     }
 
@@ -556,7 +551,6 @@ class StoryParser(private val source: String) {
         raw: String,
         start: Int,
         end: Int,
-        allowInline: Boolean,
     ): TextTemplate {
         val parts = mutableListOf<TextPart>()
         val literal = StringBuilder()
@@ -594,42 +588,6 @@ class StoryParser(private val source: String) {
                     flushLiteral(i)
                     val expr = StoryExpressions.parse(raw, offset, line, i + 1, closing)
                     parts += TextPart.Interpolation(expr, span(offset, line, i, closing + 1))
-                    i = closing + 1
-                    literalStart = i
-                }
-
-                '[' -> {
-                    if (!allowInline) {
-                        literal.append(c)
-                        i++
-                        continue
-                    }
-                    val closing = findClosingBracket(raw, i, end, '[', ']')
-                        ?: throw StoryParseException("Unterminated '[' in text", span(offset, line, i, end))
-                    flushLiteral(i)
-                    val partSpan = span(offset, line, i, closing + 1)
-                    var inner = i + 1
-                    var innerEnd = closing
-                    while (inner < innerEnd && (raw[inner] == ' ' || raw[inner] == '\t')) inner++
-                    while (innerEnd > inner && (raw[innerEnd - 1] == ' ' || raw[innerEnd - 1] == '\t')) innerEnd--
-                    if (innerEnd - inner == 1 && raw[inner] == '-') {
-                        parts += TextPart.WaitInput(partSpan)
-                    } else {
-                        if (inner >= innerEnd) {
-                            throw StoryParseException("Empty inline command", partSpan)
-                        }
-                        if (raw[inner] == '@') inner++
-                        val nameStart = inner
-                        while (inner < innerEnd && isNameChar(raw[inner])) inner++
-                        val function = raw.substring(nameStart, inner)
-                        if (function.isEmpty()) {
-                            throw StoryParseException("Expected an inline command name", partSpan)
-                        }
-                        val functionSpan = span(offset, line, nameStart, inner)
-                        while (inner < innerEnd && (raw[inner] == ' ' || raw[inner] == '\t')) inner++
-                        val call = StoryLineKind.FuncCall(function, functionSpan, parseArgs(line, offset, raw, inner, innerEnd))
-                        parts += TextPart.InlineCall(call, partSpan)
-                    }
                     i = closing + 1
                     literalStart = i
                 }

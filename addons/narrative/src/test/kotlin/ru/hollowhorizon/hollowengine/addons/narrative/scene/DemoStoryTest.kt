@@ -58,6 +58,8 @@ class DemoStoryTest {
             @move-to Виталик [25, 70, -175] speed=1.1 arrivalDistance=0.6
             @hide-hud player except=[chat, hotbar]
             @use-block Виталик [1, 64, 1] hand=off-hand
+            @npc [0, 64, 0] id=village:guard
+            @npc [0, 64, 0] level=minecraft:the_nether
         """.trimIndent()
         val result = StoryCompiler.compile("test", calls, ActionCommands)
 

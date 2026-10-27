@@ -127,7 +127,6 @@ sealed interface StoryLineKind {
     /** `@await` with no names waits for every live track. */
     data class Await(val trackNames: List<String>) : StoryLineKind
     data class Cancel(val trackName: String, val nameSpan: StorySpan) : StoryLineKind
-    data object Sync : StoryLineKind
 
     /** `@checkpoint name`: a checkpoint of the story the dialogue plays in, which `@rewind` goes back to. */
     data class Checkpoint(val name: String, val nameSpan: StorySpan) : StoryLineKind
@@ -168,7 +167,7 @@ sealed interface StoryLineKind {
     ) : StoryLineKind
 }
 
-/** Text with variable expressions, inline commands, etc. */
+/** Text with `{expression}`s in it. */
 data class TextTemplate(val parts: List<TextPart>, val span: StorySpan) {
     fun literalText(): String = parts.filterIsInstance<TextPart.Literal>().joinToString("") { it.text }
 }
@@ -178,6 +177,4 @@ sealed interface TextPart {
 
     data class Literal(val text: String, override val span: StorySpan) : TextPart
     data class Interpolation(val expr: StoryExpression, override val span: StorySpan) : TextPart
-    data class InlineCall(val call: StoryLineKind.FuncCall, override val span: StorySpan) : TextPart
-    data class WaitInput(override val span: StorySpan) : TextPart
 }
