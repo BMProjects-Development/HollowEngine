@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextInputFilter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val AddIcon = "hollowengine:textures/gui/icons/add.svg"
 
@@ -23,11 +24,7 @@ internal fun StoryRowContent(scope: StoryRowScope, row: StoryRow) {
         StoryRowRole.CARD -> when (val kind = block.line.kind) {
             is StoryLineKind.Dialogue -> Phrase(scope, row, kind)
             is StoryLineKind.Label -> Label(scope, row, kind)
-            is StoryLineKind.FuncCall -> if (row.kind == StoryCardKind.WAIT) Wait(scope, row, kind) else Command(
-                scope,
-                row,
-                kind
-            )
+            is StoryLineKind.FuncCall -> StoryCommandWidgets.of(kind)?.row?.invoke(scope, row, kind) ?: Command(scope, row, kind)
 
             else -> Statement(scope, row)
         }
@@ -48,31 +45,6 @@ private fun Phrase(scope: StoryRowScope, row: StoryRow, phrase: StoryLineKind.Di
     }) {
         StoryEdits.setStatement(model.text, row.line, StoryListState.phrase(speaker, it))
     }
-}
-
-@Composable
-private fun Wait(scope: StoryRowScope, row: StoryRow, wait: StoryLineKind.FuncCall) {
-    val model = scope.model
-    val written = wait.args.firstOrNull()?.let { model.source(it.expr.span) }.orEmpty()
-    val seconds = WaitDuration.seconds(written)
-    if (seconds == null) {
-        Field(scope, row, "arg-0", written, "2s", width = 80f) { StoryEdits.setPositional(model.text, row.line, 0, it) }
-        Box(modifier = Modifier.grow(1f))
-        return
-    }
-    Field(
-        scope,
-        row,
-        "arg-0",
-        WaitDuration.write(seconds).removeSuffix("s"),
-        "1",
-        width = 54f,
-        filter = UiTextInputFilter.DECIMAL
-    ) {
-        val value = it.toFloatOrNull() ?: return@Field null
-        StoryEdits.setPositional(model.text, row.line, 0, WaitDuration.write(value))
-    }
-    Text(storyLang("wait.unit"), tags = listOf("story-muted"), modifier = Modifier.grow(1f))
 }
 
 /** A command with a field per parameter of its signature, or one for everything after its name. */
@@ -99,8 +71,9 @@ private fun Command(scope: StoryRowScope, row: StoryRow, call: StoryLineKind.Fun
             row,
             "arg-$index",
             arg?.let { model.source(it.expr.span) }.orEmpty(),
-            param.display(),
-            width = 96f
+            param.title?.lang ?: param.display(),
+            width = 96f,
+            help = param.description?.lang,
         ) {
             if (named != null) StoryEdits.setArgument(model.text, row.line, param.name, it)
             else StoryEdits.setPositional(model.text, row.line, at, it)
@@ -185,7 +158,7 @@ private fun Statement(scope: StoryRowScope, row: StoryRow) {
  * or null to leave the file as it is.
  */
 @Composable
-private fun Field(
+internal fun Field(
     scope: StoryRowScope,
     row: StoryRow,
     name: String,

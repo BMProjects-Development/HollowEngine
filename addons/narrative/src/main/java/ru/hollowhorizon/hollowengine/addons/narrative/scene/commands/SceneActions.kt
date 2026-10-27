@@ -13,8 +13,16 @@ import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.p
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.stopAnimation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 
 /** `@wait 2s`. A restart in the middle waits only for what was left: the deadline is kept with the call. */
+@EditorCategory("hollowengine.gui.ide.story.category.time")
+@EditorName("hollowengine.gui.ide.story.kind.wait")
+@EditorIcon("hollowengine-narrative:textures/gui/icons/story/wait.svg")
+@EditorWidget("hollowengine-narrative:wait")
 @Action("wait")
 suspend fun waitFor(time: Duration) = action(time) {
     val deadline = capture { System.currentTimeMillis() + time.inWholeMilliseconds }
@@ -28,32 +36,38 @@ suspend fun waitFor(time: Duration) = action(time) {
 }
 
 /** `@play-sound player minecraft:block.note_block.bell 1.0`. */
+@EditorCategory("hollowengine.gui.ide.story.category.effects")
 @SimpleAction("play-sound")
 fun ServerPlayer.playSceneSound(name: String, volume: Float = 1f, pitch: Float = 1f) {
     playSound(name, volume, pitch)
 }
 
 /** `@play-once Виталик hello`: plays the animation once and waits for it to end. */
+@EditorCategory("hollowengine.gui.ide.story.category.animation")
 @SimpleAction("play-once")
 suspend fun Entity.animateOnce(animation: String, fade: Duration = DEFAULT_FADE) {
     playAndWait(animation, fade.seconds, fade.seconds)
 }
 
 /** Plays the animation over and over until it is stopped; does not wait. */
+@EditorCategory("hollowengine.gui.ide.story.category.animation")
 @SimpleAction("play-looped")
 fun Entity.animateLooped(animation: String, fade: Duration = DEFAULT_FADE) =
     play(animation, AnimationPlayMode.Loop, fade.seconds, fade.seconds)
 
 /** Plays the animation once and holds its last frame; does not wait. */
+@EditorCategory("hollowengine.gui.ide.story.category.animation")
 @SimpleAction("play-clamped")
 fun Entity.animateClamped(animation: String, fade: Duration = DEFAULT_FADE) =
     play(animation, AnimationPlayMode.ClampForever, fade.seconds, fade.seconds)
 
 /** Plays the animation forward and back until it is stopped; does not wait. */
+@EditorCategory("hollowengine.gui.ide.story.category.animation")
 @SimpleAction("play-ping-pong")
 fun Entity.animatePingPong(animation: String, fade: Duration = DEFAULT_FADE) =
     play(animation, AnimationPlayMode.PingPong, fade.seconds, fade.seconds)
 
+@EditorCategory("hollowengine.gui.ide.story.category.animation")
 @SimpleAction("stop-animation")
 fun Entity.stopAnimating(animation: String, fade: Duration = DEFAULT_FADE) = stopAnimation(animation, fade.seconds)
 

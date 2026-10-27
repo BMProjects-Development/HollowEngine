@@ -71,20 +71,14 @@ class StoryParserTest {
     }
 
     @Test
-    fun `text splits into interpolation, inline calls and wait markers`() {
-        val parsed = StoryParser.parse("Виталик: Баланс {money} монет.[-] Ждём [wait 1s] и дальше.")
+    fun `text splits into interpolation and literals, brackets included`() {
+        val parsed = StoryParser.parse("Виталик: Баланс {money} монет.[-] Ждём [wait 1s].")
         val kind = parsed.cst.lines[0].kind
         assertIs<StoryLineKind.Dialogue>(kind)
         assertEquals("Виталик", kind.speaker)
 
-        val kinds = kind.text.parts.map { it::class.simpleName }
-        assertEquals(
-            listOf("Literal", "Interpolation", "Literal", "WaitInput", "Literal", "InlineCall", "Literal"),
-            kinds,
-        )
-        val call = kind.text.parts.filterIsInstance<TextPart.InlineCall>().single().call
-        assertEquals("wait", call.function)
-        assertEquals(1, call.args.size)
+        assertEquals(listOf("Literal", "Interpolation", "Literal"), kind.text.parts.map { it::class.simpleName })
+        assertEquals(" монет.[-] Ждём [wait 1s].", (kind.text.parts[2] as TextPart.Literal).text)
     }
 
     @Test

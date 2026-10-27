@@ -136,6 +136,9 @@ internal class StoryRow(
     val selection = StorySelection(block.line.index, menu = role == StoryRowRole.MENU)
     val key: String get() = "$line:$role"
 
+    /** The style tag of the row: its kind's, or the one of the widget its command is drawn with. */
+    val tag: String = (block.line.kind as? StoryLineKind.FuncCall)?.let(StoryCommandWidgets::of)?.tag ?: kind.tag
+
     fun withJoints(joints: List<StoryGuideJoint?>) = StoryRow(block, role, kind, guides, dot, joints)
 }
 
@@ -157,7 +160,7 @@ internal enum class StoryGuideJoint(val tag: String) {
 
 /** What a card is about, which decides how it looks and what the inspector edits in it. */
 internal enum class StoryCardKind(val tag: String) {
-    PHRASE("phrase"), WAIT("wait"), CHOICE("choice"), CONDITION("condition"), LABEL("label"), BLOCK("block"), COMMAND("command"), BROKEN(
+    PHRASE("phrase"), CHOICE("choice"), CONDITION("condition"), LABEL("label"), BLOCK("block"), COMMAND("command"), BROKEN(
         "broken"
     );
 
@@ -166,11 +169,8 @@ internal enum class StoryCardKind(val tag: String) {
     val icon: String get() = storyIcon(tag)
 
     companion object {
-        const val WAIT_FUNCTION = "wait"
-
         fun of(block: StoryBlock): StoryCardKind = when (val kind = block.line.kind) {
             is StoryLineKind.Dialogue -> PHRASE
-            is StoryLineKind.FuncCall -> if (kind.function == WAIT_FUNCTION) WAIT else COMMAND
             is StoryLineKind.Choice -> CHOICE
             is StoryLineKind.If, is StoryLineKind.ElseIf, StoryLineKind.Else -> CONDITION
             is StoryLineKind.Label -> LABEL

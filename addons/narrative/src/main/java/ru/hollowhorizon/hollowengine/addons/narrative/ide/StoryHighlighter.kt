@@ -170,7 +170,7 @@ internal object StoryHighlighter {
                 exprSpans(kind.duration, out)
             }
 
-            is StoryLineKind.Await, is StoryLineKind.Cancel, is StoryLineKind.Sync,
+            is StoryLineKind.Await, is StoryLineKind.Cancel,
             is StoryLineKind.Else,
                 -> out += commandKeyword(line, contentStart, contentEnd, catalog)
 
@@ -209,15 +209,9 @@ internal object StoryHighlighter {
         for (part in template.parts) {
             when (part) {
                 is TextPart.Literal -> literalSpans(source, part, out, literalType)
-                is TextPart.WaitInput -> out += TextSpan(part.span.start, part.span.end, TokenType.KEYWORD)
                 is TextPart.Interpolation -> {
                     out += TextSpan(part.span.start, part.span.end, TokenType.VARIABLE)
                     exprSpans(part.expr, out)
-                }
-
-                is TextPart.InlineCall -> {
-                    out += callSpan(part.span.start, part.span.end, part.call.function, catalog)
-                    part.call.args.forEach { argSpans(it, out) }
                 }
             }
         }

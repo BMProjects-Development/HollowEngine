@@ -47,6 +47,11 @@ annotation class ActionAlias
 @Retention(AnnotationRetention.RUNTIME)
 annotation class Suggestions(val source: KClass<out SuggestionSource>)
 
+/** What the editor calls a parameter of an action and says of it; lang keys or plain text. */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Param(val title: String = "", val description: String = "")
+
 /** What [Suggestions] offers. */
 interface SuggestionSource {
     val values: List<String>

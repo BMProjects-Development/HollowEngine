@@ -217,9 +217,24 @@ private fun AddBar(state: StoryListState, model: StoryListModel) {
     }
 }
 
-/** A menu item per function the stories know, for adding a command. */
-internal fun commandItems(add: (String) -> Unit): List<UiDropdownItem> =
-    StoryScriptingAnalyzer.catalog().names.sorted().map { name -> UiDropdownItem("@$name") { add(name) } }
+/**
+ * A menu item per function the stories know, for adding a command: under the heading of its category, or after the
+ * headings when its action names none.
+ */
+internal fun commandItems(add: (String) -> Unit): List<UiDropdownItem> {
+    val catalog = StoryScriptingAnalyzer.catalog()
+    val signatures = catalog.names.associateWith { name -> catalog.overloads(name)?.firstOrNull() }
+    fun item(name: String): UiDropdownItem {
+        val signature = signatures[name]
+        return UiDropdownItem(signature?.title?.lang ?: "@$name", icon = signature?.icon) { add(name) }
+    }
+
+    val byCategory = signatures.keys.sorted().groupBy { signatures[it]?.category?.lang }
+    val headings = byCategory.mapNotNull { (category, names) ->
+        category?.let { UiDropdownItem(it, children = names.map(::item)) }
+    }
+    return headings.sortedBy { it.label } + byCategory[null].orEmpty().map(::item)
+}
 
 private fun onKey(state: StoryListState, model: StoryListModel, rows: List<StoryRow>, input: UiKeyInput): Boolean {
     if (StoryListKeys.isFind(input)) {

@@ -54,7 +54,7 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
             if (row.dot) Box(
                 id = "story-dot-${row.key}",
                 tags = listOfNotNull(
-                    "story-rail-dot", row.kind.tag, "selected".takeIf { isSelected(scope, row) }),
+                    "story-rail-dot", row.tag, "selected".takeIf { isSelected(scope, row) }),
                 modifier = motion,
             )
         }
@@ -73,7 +73,7 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
         id = "story-body-${row.key}",
         tags = listOfNotNull(
             "story-body",
-            row.kind.tag,
+            row.tag,
             row.role.name.lowercase(),
             "selected".takeIf { row.selection == state.selected },
             "match".takeIf { row.role != StoryRowRole.MENU && row.line in scope.matches },
@@ -172,7 +172,7 @@ private fun isSelected(scope: StoryRowScope, row: StoryRow): Boolean {
 
 /** A phrase, a pause, an option and a menu as statements, for the menus and buttons that add them. */
 internal object StoryNewStatements {
-    fun wait() = StoryStatements.command(StoryCardKind.WAIT_FUNCTION, WaitDuration.write(1f))
+    fun wait() = StoryStatements.command("wait", WaitDuration.write(1f))
 
     fun choice() = StoryStatements.choice(storyLang("new.option"))
 

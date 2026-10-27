@@ -197,7 +197,6 @@ class StoryCompiler(
             }
 
             is StoryLineKind.Dialogue -> {
-                validateTemplate(kind.text)
                 emit(StoryInstruction.Say(kind.speaker, kind.text, anchor(line), kind.speakerExpr))
                 requireNoChildren(node)
             }
@@ -257,7 +256,6 @@ class StoryCompiler(
             }
 
             is StoryLineKind.Command -> {
-                validateTemplate(kind.text)
                 emit(StoryInstruction.Command(kind.text, anchor(line)))
                 requireNoChildren(node)
             }
@@ -298,11 +296,6 @@ class StoryCompiler(
 
             is StoryLineKind.Cancel -> {
                 emit(StoryInstruction.Cancel(kind.trackName, anchor(line)))
-                requireNoChildren(node)
-            }
-
-            is StoryLineKind.Sync -> {
-                emit(StoryInstruction.Sync(anchor(line)))
                 requireNoChildren(node)
             }
 
@@ -374,7 +367,6 @@ class StoryCompiler(
 
         for (node in group) {
             val kind = node.line.kind as StoryLineKind.Choice
-            validateTemplate(kind.text)
             val bodyStart = instructions.size
             compileNodes(node.children)
             endJumps += emitPlaceholder(node.line)
@@ -487,21 +479,6 @@ class StoryCompiler(
         asyncDepth--
         val bodyEnd = instructions.size
         patch(startPc, StoryInstruction.AsyncStart(kind.trackName, bodyStart, bodyEnd, instructions[startPc].anchor))
-
-        val syncPc = (bodyStart until bodyEnd).firstOrNull { instructions[it] is StoryInstruction.Sync } ?: bodyEnd
-        for (pc in bodyStart until syncPc) {
-            when (instructions[pc]) {
-                is StoryInstruction.Say -> errorAt(
-                    "Dialogue lines are not allowed inside '@async' before '@sync'", instructions[pc].anchor
-                )
-
-                is StoryInstruction.Menu -> errorAt(
-                    "Choices are not allowed inside '@async' before '@sync'", instructions[pc].anchor
-                )
-
-                else -> {}
-            }
-        }
     }
 
     private fun resolveCall(kind: StoryLineKind.FuncCall, line: StoryLine): StoryCall {
@@ -601,17 +578,6 @@ class StoryCompiler(
 
     private fun literalString(arg: StoryArg): String? =
         (arg.expr.constant as? ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryString)?.value
-
-    private fun validateTemplate(template: TextTemplate) {
-        for (part in template.parts) {
-            if (part is TextPart.InlineCall && catalog.overloads(part.call.function) == null) {
-                diagnostics.warning(
-                    "Unknown inline command '[${part.call.function}]'. It must be registered before the story runs.",
-                    part.span,
-                )
-            }
-        }
-    }
 
     private fun anchor(line: StoryLine) = StoryAnchor(currentLabel, instructions.size - sectionStart, line.index)
 

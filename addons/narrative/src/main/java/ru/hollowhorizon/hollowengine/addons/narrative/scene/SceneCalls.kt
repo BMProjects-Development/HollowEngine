@@ -18,32 +18,10 @@ internal class SceneCalls(private val player: ScenePlayer) {
     val deadlines = HashMap<String, Long>()
 
     /**
-     * Runs a command of the main flow at [pc] and returns where the flow goes next: past the command, or past the
-     * `@timeout` block whose time ran out. Null when a track preempted it.
+     * Runs the command at [pc] and returns where the flow goes next: past the command, or past the `@timeout` block
+     * whose time ran out. Its reversible actions go through [journaled], the journal of the main flow or of a track.
      */
-    suspend fun mainFlow(address: String, pc: Int, instruction: StoryInstruction.Invoke): Int? {
-        val program = player.programOf(address) ?: return pc + 1
-        val timeout = nearestTimeout(address, program, instruction)
-        var inTime = true
-        val completed = call(instruction) { command, perform ->
-            player.preemptible {
-                inTime = within(timeout, instruction.call.function) {
-                    if (command.action.reversible) player.host.journaled(
-                        statementOf(program, instruction),
-                        perform
-                    ) else perform()
-                }
-            }
-        }
-        return when {
-            !completed -> null
-            inTime -> pc + 1
-            else -> timeout!!.end
-        }
-    }
-
-    /** Runs a command of a track at [pc], which cannot be preempted, and returns where the track goes next. */
-    suspend fun track(
+    suspend fun run(
         address: String,
         program: StoryProgram,
         pc: Int,
@@ -56,16 +34,9 @@ internal class SceneCalls(private val player: ScenePlayer) {
             inTime = within(timeout, instruction.call.function) {
                 if (command.action.reversible) journaled(statementOf(program, instruction), perform) else perform()
             }
-            true
         }
         return if (inTime) pc + 1 else timeout!!.end
     }
-
-    /** Runs a `[command]` of a line as typing reaches it; returns false when a track preempted it. */
-    suspend fun inline(call: StoryLineKind.FuncCall): Boolean =
-        call(call.function, player.evaluateArgs(call.args), null, emptyMap(), null) { _, perform ->
-            player.preemptible(perform)
-        }
 
     fun startTimeout(address: String, pc: Int, instruction: StoryInstruction.TimeoutStart) {
         val millis = (player.evaluate(instruction.duration) as? StoryNumber)?.value?.toLong()
@@ -73,43 +44,32 @@ internal class SceneCalls(private val player: ScenePlayer) {
         deadlines["$address#$pc"] = System.currentTimeMillis() + millis
     }
 
-    private suspend fun call(
-        instruction: StoryInstruction.Invoke,
-        run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Boolean,
-    ): Boolean {
-        val call = instruction.call
-        val metadata = call.metadata.mapValues { (_, expr) -> player.evaluate(expr) }
-        return call(call.function, player.evaluateArgs(call.args), call.tag, metadata, instruction.temporary, run)
-    }
-
     /**
-     * Calls the command [function] with [evaluated] arguments through [run], which returns false when the call was
-     * preempted, and reports a [tag] on the event bus. Inside `@temporary` its actions are [temporary].
+     * Calls the command of [instruction] through [run] and reports its `tag=` on the event bus. Inside `@temporary`
+     * its actions are temporary.
      */
     private suspend fun call(
-        function: String,
-        evaluated: EvaluatedArgs,
-        tag: String?,
-        metadata: Map<String, StoryValue>,
-        temporary: StoryTemporary?,
-        run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Boolean,
-    ): Boolean {
+        instruction: StoryInstruction.Invoke,
+        run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Unit,
+    ) {
+        val call = instruction.call
+        val function = call.function
+        val metadata = call.metadata.mapValues { (_, expr) -> player.evaluate(expr) }
+        val evaluated = player.evaluateArgs(call.args)
         val command = ActionCommands.resolve(function, evaluated.positional, evaluated.named)
         val bound = bindActors(command.signature, evaluated)
         val args = StoryArguments.bind(command.signature, bound.positional, bound.named, metadata)
+        val temporary = instruction.temporary
+        val tag = call.tag
 
         tag?.let { SceneEvent.ActionStarted.post(SceneEvent.ActionStarted(player, it, function, args)) }
         var reason = StoryActionEnd.COMPLETED
         try {
-            val completed = run(command) {
+            run(command) {
                 withContext(CurrentScene(player)) {
-                    if (temporary != null) player.host.temporary(temporary.until) { command.call(args) } else command.call(
-                        args
-                    )
+                    if (temporary != null) player.host.temporary(temporary.until) { command.call(args) } else command.call(args)
                 }
             }
-            if (!completed) reason = StoryActionEnd.CANCELLED
-            return completed
         } catch (e: CancellationException) {
             reason = StoryActionEnd.CANCELLED
             throw e

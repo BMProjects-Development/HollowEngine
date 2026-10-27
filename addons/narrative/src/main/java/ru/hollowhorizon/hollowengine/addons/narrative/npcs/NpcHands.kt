@@ -11,6 +11,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.coroutines.Ref
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcAction
@@ -29,6 +30,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 suspend infix fun NpcEntity.useBlock(pos: Vec3): InteractionResult = useBlock(pos, InteractionHand.MAIN_HAND)
 
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @SimpleAction("use-block")
 suspend fun NpcEntity.useBlock(
     pos: Vec3,
@@ -93,6 +95,7 @@ private fun NpcEntity.useBlockAt(target: Vec3, hand: InteractionHand, face: Dire
  */
 suspend infix fun NpcEntity.destroyBlock(pos: Vec3): Boolean = destroyBlock(pos, DEFAULT_INTERACTION_REACH)
 
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @SimpleAction("destroy-block")
 suspend fun NpcEntity.destroyBlock(
     pos: Vec3,
@@ -186,6 +189,7 @@ private suspend fun NpcEntity.interactReaching(
     return interactNow(entity, hand, reach)
 }
 
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @SimpleAction("interact")
 suspend fun NpcEntity.interact(
     target: Ref<out Entity>,

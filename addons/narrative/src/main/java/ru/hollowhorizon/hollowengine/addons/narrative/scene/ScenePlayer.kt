@@ -1,26 +1,22 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.*
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.StoryAudience
 
 /**
  * Plays one scene, a `.story` file, for the story that called [ru.hollowhorizon.hollowengine.addons.narrative.story.scene]:
  * the [host] saves it after every statement, journals its commands and runs its tracks as branches.
  *
- * Lines and menus are [SceneLines], the answers of the participants [SceneAnswers], commands [SceneCalls].
+ * Lines and menus are [SceneLines], commands [SceneCalls].
  */
 internal class ScenePlayer(
     override val address: String,
-    val presentation: DialoguePresenter,
     private val library: SceneLibrary,
-    val votePolicy: VotePolicy = VotePolicy(),
     private val locale: String? = null,
 ) : SceneSession {
     lateinit var host: SceneHost
@@ -56,12 +52,8 @@ internal class ScenePlayer(
     private var playingAddress: String = address
     private var playingLocale: String? = null
 
-    /** A track that hit `@sync` hands its remaining position over through this channel. */
-    private val preemptions = Channel<Int>(Channel.CONFLATED)
-
-    private val answers = SceneAnswers(this, presentation)
     private val calls = SceneCalls(this)
-    private val lines = SceneLines(this, answers, calls)
+    private val lines = SceneLines(this)
 
     var isRunning: Boolean = false
         private set
@@ -86,13 +78,11 @@ internal class ScenePlayer(
         participants = players
         prepare()
         isRunning = true
-        DialogueInput.register(this)
         SceneEvent.Started.post(SceneEvent.Started(this))
 
         var result: SceneResult = SceneResult.Finished
         try {
-            coroutineScope {
-                presentation.onDialogueStart(this@ScenePlayer)
+            withContext(StoryAudience(players)) {
                 result = runLoop()
                 host.tracks().values.forEach(SceneTrack::cancel)
             }
@@ -104,10 +94,7 @@ internal class ScenePlayer(
             result = SceneResult.Failed(e)
         } finally {
             isRunning = false
-            DialogueInput.unregister(this)
-            val ending = result
-            runCatching { presentation.onDialogueEnd(this, ending) }
-            SceneEvent.Ended.post(SceneEvent.Ended(this, ending))
+            SceneEvent.Ended.post(SceneEvent.Ended(this, result))
         }
         return result
     }
@@ -178,10 +165,6 @@ internal class ScenePlayer(
 
     private suspend fun runLoop(): SceneResult {
         while (true) {
-            preemptions.tryReceive().getOrNull()?.let { pc ->
-                frames.clear()
-                frames.addLast(Frame(playingAddress, pc))
-            }
             if (frames.isEmpty()) return SceneResult.Finished
             if (participants.isNotEmpty() && onlineParticipants.isEmpty()) return SceneResult.AllPlayersLeft
             host.step()
@@ -193,21 +176,21 @@ internal class ScenePlayer(
                 frames.removeLast()
                 continue
             }
-            if (!execute(frame, instruction)) continue
+            execute(frame, instruction)
         }
     }
 
-    /** Executes one instruction of the main flow; returns false when a track preempted it, to run what it handed over. */
-    private suspend fun execute(frame: Frame, instruction: StoryInstruction): Boolean {
+    /** Executes one instruction of the main flow. */
+    private suspend fun execute(frame: Frame, instruction: StoryInstruction) {
         when (instruction) {
             is StoryInstruction.Say -> {
                 val speaker = instruction.speakerExpr?.let { characterOf(evaluate(it)) }
                     ?: instruction.speaker?.let(::resolveCharacter)
-                if (!lines.say(speaker, instruction.text)) return false
+                lines.say(speaker, instruction.text)
                 frame.pc++
             }
 
-            is StoryInstruction.Menu -> frame.pc = lines.menu(instruction) ?: return false
+            is StoryInstruction.Menu -> frame.pc = lines.menu(instruction)
 
             is StoryInstruction.Set -> {
                 assign(instruction.variable, evaluate(instruction.value))
@@ -258,8 +241,9 @@ internal class ScenePlayer(
                 frame.pc++
             }
 
-            is StoryInstruction.Invoke -> frame.pc =
-                calls.mainFlow(frame.address, frame.pc, instruction) ?: return false
+            is StoryInstruction.Invoke -> frame.pc = calls.run(
+                frame.address, programOf(frame.address) ?: return, frame.pc, instruction, host::journaled,
+            )
 
             is StoryInstruction.TimeoutStart -> {
                 calls.startTimeout(frame.address, frame.pc, instruction)
@@ -295,7 +279,7 @@ internal class ScenePlayer(
                 val running = host.tracks()
                 val awaited =
                     if (instruction.trackNames.isEmpty()) running.values else instruction.trackNames.mapNotNull(running::get)
-                if (!preemptible { awaited.forEach { it.join() } }) return false
+                awaited.forEach { it.join() }
                 frame.pc++
             }
 
@@ -303,11 +287,7 @@ internal class ScenePlayer(
                 cancelTrack(instruction.trackName)
                 frame.pc++
             }
-
-            // Reaching `@sync` on the main flow means the track already became the main flow.
-            is StoryInstruction.Sync -> frame.pc++
         }
-        return true
     }
 
     /**
@@ -333,11 +313,6 @@ internal class ScenePlayer(
             step(program.sourceHash, program.anchorOf(pc))
             when (val instruction = program.instructions.getOrNull(pc)) {
                 null -> return
-                is StoryInstruction.Sync -> {
-                    preemptions.send(pc + 1)
-                    return
-                }
-
                 is StoryInstruction.Goto -> pc = instruction.target
                 is StoryInstruction.GotoIfFalse -> pc =
                     if (evaluate(instruction.condition).isTruthy()) pc + 1 else instruction.target
@@ -347,7 +322,7 @@ internal class ScenePlayer(
                     pc++
                 }
 
-                is StoryInstruction.Invoke -> pc = calls.track(address, program, pc, instruction, journaled)
+                is StoryInstruction.Invoke -> pc = calls.run(address, program, pc, instruction, journaled)
 
                 is StoryInstruction.TimeoutStart -> {
                     calls.startTimeout(address, pc, instruction)
@@ -367,38 +342,6 @@ internal class ScenePlayer(
     override fun cancelTrack(name: String) {
         host.tracks()[name]?.cancel()
     }
-
-    /**
-     * Runs [block], but gives up the moment a track asks to take over: that is what makes `@sync` able to interrupt a
-     * line the players are still reading or a menu nobody has answered. Returns false when the block was preempted.
-     */
-    suspend fun preemptible(block: suspend () -> Unit): Boolean = coroutineScope {
-        val work = async { block() }
-        val preempted = select {
-            work.onAwait { false }
-            preemptions.onReceive { pc ->
-                work.cancel()
-                preemptions.trySend(pc)
-                true
-            }
-        }
-        !preempted
-    }
-
-    override val openMenuSize: Int get() = answers.openMenuSize
-
-    override fun advance(player: ServerPlayer) {
-        if (player in participants) answers.advance()
-    }
-
-    override fun choose(player: ServerPlayer, index: Int) {
-        if (player in participants) answers.choose(player, index)
-    }
-
-    override suspend fun awaitAdvance() = answers.awaitAdvance()
-
-    /** Decides the open menu for everyone, ignoring votes. */
-    fun forceChoice(index: Int) = answers.forceChoice(index)
 
     /**
      * A character an argument names: one the story bound, a participant by their name, or `player` for the first
@@ -464,7 +407,6 @@ internal class ScenePlayer(
             when (part) {
                 is TextPart.Literal -> append(part.text)
                 is TextPart.Interpolation -> append(evaluate(part.expr).display())
-                is TextPart.InlineCall, is TextPart.WaitInput -> Unit
             }
         }
     }

@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.build
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
 import java.util.*
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 
 /**
  * Spawns an NPC at [pos], set up by [builder]. Undone, the NPC is removed for good, wherever it went since; brought
@@ -26,6 +27,7 @@ import java.util.*
  * @param id the author's id, such as `"village:blacksmith"`. When a live NPC has it, that NPC is returned, [builder]
  * does not run, and undoing the call leaves that NPC where it is.
  */
+@EditorCategory("hollowengine.gui.ide.story.category.npc")
 @Action("npc")
 suspend fun ServerLevel.npc(pos: Vec3, id: String? = null, @Unsaved builder: NpcEntity.() -> Unit = {}): NpcEntity =
     action(this, pos, id, builder) {

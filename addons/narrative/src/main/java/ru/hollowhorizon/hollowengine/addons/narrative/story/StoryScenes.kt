@@ -75,7 +75,7 @@ internal object SceneStage {
         characters: Map<String, LivingEntity>,
     ) {
         val locale = players.firstOrNull()?.clientInformation()?.language()
-        val player = ScenePlayer(address, Scenes.presentation(), Scenes.library, locale = locale)
+        val player = ScenePlayer(address, Scenes.library, locale = locale)
         characters.forEach { (name, entity) -> player.character(name, DialogueCharacter.of(entity)) }
         player.host = StorySceneHost(frame, player)
         if (frame.locals.contains(CHECKPOINT)) player.restore(SceneCheckpoint.load(frame.locals.getCompound(CHECKPOINT)))

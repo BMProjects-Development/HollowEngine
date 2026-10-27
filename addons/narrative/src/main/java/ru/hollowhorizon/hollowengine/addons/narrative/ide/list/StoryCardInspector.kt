@@ -45,12 +45,8 @@ private fun CardInspector(state: StoryListState, selection: StorySelection) {
             if (name.isNotBlank()) state.write(StoryEdits.renameLabel(model.text, kind.name, name.trim()))
         }
 
-        is StoryLineKind.FuncCall -> if (kind.function == StoryCardKind.WAIT_FUNCTION) WaitInspector(
-            state,
-            model,
-            kind,
-            line
-        ) else StatementRow(state, model, line)
+        is StoryLineKind.FuncCall -> StoryCommandWidgets.of(kind)?.inspector?.invoke(state, model, kind, line)
+            ?: StatementRow(state, model, line)
 
         else -> StatementRow(state, model, line)
     }
@@ -71,15 +67,6 @@ private fun PhraseInspector(state: StoryListState, model: StoryListModel, phrase
     }
     TextRow(storyLang("phrase.text"), text, id = "story-inspector-text", help = storyLang("phrase.text.help")) {
         state.write(StoryEdits.setStatement(model.text, line, StoryListState.phrase(speaker, it)))
-    }
-}
-
-@Composable
-private fun WaitInspector(state: StoryListState, model: StoryListModel, wait: StoryLineKind.FuncCall, line: Int) {
-    val written = wait.args.firstOrNull()?.let { model.source(it.expr.span) }.orEmpty()
-    val seconds = WaitDuration.seconds(written) ?: return StatementRow(state, model, line)
-    NumberRow(storyLang("wait.duration"), seconds, id = "story-inspector-wait", min = 0f, step = 0.1f) {
-        state.write(StoryEdits.setPositional(model.text, line, 0, WaitDuration.write(it)))
     }
 }
 
@@ -140,7 +127,7 @@ private fun ConditionInspector(state: StoryListState, model: StoryListModel, bra
 
 /** The statement as written, for what has no fields of its own. */
 @Composable
-private fun StatementRow(state: StoryListState, model: StoryListModel, line: Int) {
+internal fun StatementRow(state: StoryListState, model: StoryListModel, line: Int) {
     val statement = StoryListModel.statement(model.outline.cst.lines[line])
     TextRow(storyLang("statement"), statement, id = "story-inspector-statement") {
         state.write(StoryEdits.setStatement(model.text, line, it))
