@@ -9,17 +9,17 @@ import kotlinx.serialization.SerialInfo
  * What the component editor knows about a component beyond its serial form.
  */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
 annotation class EditorName(val name: String)
 
 /** The line under a field, or under a component's header. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorDescription(val description: String)
 
-/** A `namespace:textures/...` icon shown beside the component or field. */
+/** A `namespace:textures/...` icon shown beside the component, field or story action. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorIcon(val icon: String)
 
 /** Groups a component under a heading in the "add component" list. */

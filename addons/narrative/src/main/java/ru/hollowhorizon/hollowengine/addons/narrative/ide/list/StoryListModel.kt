@@ -163,6 +163,8 @@ internal enum class StoryCardKind(val tag: String) {
 
     val title: String get() = storyLang("kind.$tag")
 
+    val icon: String get() = storyIcon(tag)
+
     companion object {
         const val WAIT_FUNCTION = "wait"
 

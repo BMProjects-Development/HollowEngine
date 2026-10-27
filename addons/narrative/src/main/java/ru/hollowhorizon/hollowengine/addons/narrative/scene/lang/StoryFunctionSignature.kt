@@ -38,10 +38,19 @@ data class StoryParam(
     }
 }
 
-/** One overload of a story function. Overloads of the same name are told apart by arity and types. */
+/**
+ * One overload of a story function. Overloads of the same name are told apart by arity and types.
+ *
+ * @param title what the editor calls it, a lang key or plain text; the editor writes `@name` without it.
+ * @param description what it does, a lang key or plain text.
+ * @param icon a `namespace:textures/...` icon the editor shows beside it.
+ */
 data class StoryFunctionSignature(
     val name: String,
     val params: List<StoryParam>,
+    val title: String? = null,
+    val description: String? = null,
+    val icon: String? = null,
 ) {
 
     init {

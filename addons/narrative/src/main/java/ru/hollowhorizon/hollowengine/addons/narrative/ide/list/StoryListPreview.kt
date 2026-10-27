@@ -28,6 +28,8 @@ private val AboveStart = UiPopupAlignment(anchorVertical = UiAlign.START, popupV
 
 internal fun storyLang(name: String) = "hollowengine.gui.ide.story.$name".lang
 
+internal fun storyIcon(name: String) = "hollowengine-narrative:textures/gui/icons/story/$name.svg"
+
 /** The `.story` file as a list of cards, beside its text. */
 internal val StoryListFilePreview = HollowIdeFilePreview(
     id = "story-list",

@@ -9,6 +9,9 @@ import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionCa
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryType
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import java.lang.reflect.InvocationTargetException
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -146,7 +149,15 @@ class StoryCommand private constructor(
                 params += fields.map { param(it.name!!, it, optional = true) }
                 Bound(bound.reflected, bound.name, bound.constructor, fields)
             }
-            return StoryCommand(action, StoryFunctionSignature(action.id, params), bound)
+            val function = action.function
+            val signature = StoryFunctionSignature(
+                action.id,
+                params,
+                title = function.findAnnotation<EditorName>()?.name,
+                description = function.findAnnotation<EditorDescription>()?.description,
+                icon = function.findAnnotation<EditorIcon>()?.icon,
+            )
+            return StoryCommand(action, signature, bound)
         }
 
         private fun param(name: String, parameter: KParameter, optional: Boolean) = StoryParam(
