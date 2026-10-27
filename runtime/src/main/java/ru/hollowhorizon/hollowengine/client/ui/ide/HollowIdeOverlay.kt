@@ -208,11 +208,18 @@ object HollowIdeOverlay {
             statusText = message
         }
     }
-    private val contributions = HollowIdeContributions(fileTypes, model, dock, ideContext) {
-        editorSessions.values.forEach(HollowIdeEditorSession::close)
-        editorSessions.clear()
-        editorAnalysisRevision++
-    }
+    private val contributions = HollowIdeContributions(
+        fileTypes,
+        model,
+        dock,
+        ideContext,
+        onLanguagesChanged = {
+            editorSessions.values.forEach(HollowIdeEditorSession::close)
+            editorSessions.clear()
+            editorAnalysisRevision++
+        },
+        onPreviewsChanged = fileViews::clear,
+    )
 
     private fun editorState(file: HollowIdeOpenFile): TextFieldState = editorStates.getOrPut(file.path) {
         TextFieldState(
@@ -1288,8 +1295,9 @@ object HollowIdeOverlay {
             file.type.editor(file)
             return
         }
-        val context = remember(file, view) {
-            HollowIdePreviewContext(file, view) { next ->
+        val preview = view.preview
+        val context = remember(file, view, preview) {
+            HollowIdePreviewContext(file, view, preview) { next ->
                 applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length))
             }
         }
@@ -1297,7 +1305,7 @@ object HollowIdeOverlay {
             view = view,
             id = file.id,
             text = { file.type.editor(file) },
-            preview = { view.preview.content(context) },
+            preview = { key(preview.id) { preview.content(context) } },
         )
     }
 
@@ -1306,10 +1314,11 @@ object HollowIdeOverlay {
 
     /** Only text files get a preview: it reads and writes the text, whatever type the file has. */
     private fun fileView(file: HollowIdeOpenFile): HollowIdeFileView? {
+        contributions.revision
         if (file.textOrNull == null) return null
         fileViews[file.path]?.let { return it }
-        val preview = previews.find(file.path) ?: return null
-        return HollowIdeFileView(preview).also { fileViews[file.path] = it }
+        val found = previews.find(file.path).takeIf { it.isNotEmpty() } ?: return null
+        return HollowIdeFileView(found).also { fileViews[file.path] = it }
     }
 
     @Composable

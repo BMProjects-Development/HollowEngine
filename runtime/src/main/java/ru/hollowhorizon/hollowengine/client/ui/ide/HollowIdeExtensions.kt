@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockPlacement
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonRegistration
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -20,6 +21,7 @@ object HollowIdeExtensionPoints {
     val PROJECT_ACTIONS = ExtensionPoints.create("hollowengine:ide/project-actions".rl, HollowIdeProjectActionProvider::class)
     val LANGUAGES = ExtensionPoints.create("hollowengine:ide/languages".rl, HollowIdeLanguageService::class)
     val SCRIPT_TEMPLATES = ExtensionPoints.create("hollowengine:ide/script-templates".rl, HollowIdeScriptTemplate::class)
+    val PREVIEWS = ExtensionPoints.create("hollowengine:ide/previews".rl, HollowIdeFilePreview::class)
 }
 
 /** Operations a contributed panel or menu action may request from the IDE. */
@@ -158,6 +160,12 @@ fun HollowAddonExtensions.registerIdeLanguage(
     language: HollowIdeLanguageService,
     priority: Int = 0,
 ): HollowAddonRegistration = register(HollowIdeExtensionPoints.LANGUAGES, language.id, language, priority)
+
+/** Adds a view of the files [preview] matches, with its own button next to the text in the tab bar. */
+fun HollowAddonExtensions.registerIdePreview(
+    preview: HollowIdeFilePreview,
+    priority: Int = 0,
+): HollowAddonRegistration = register(HollowIdeExtensionPoints.PREVIEWS, preview.id, preview, priority)
 
 /** Adds a kind of script to the "New script" menu of the project tree. */
 fun HollowAddonExtensions.registerIdeScriptTemplate(

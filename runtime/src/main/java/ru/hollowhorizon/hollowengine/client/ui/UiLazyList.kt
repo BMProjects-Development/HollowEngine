@@ -151,7 +151,12 @@ private fun LazyList(
         )
     val body: HollowUiContent = {
         if (leading > 0f) Spacer(horizontal, leading)
-        val windowModifier = Modifier.gap(gap.px).onPlaced { rect ->
+        val across = when {
+            crossAxisScroll -> Modifier
+            horizontal -> Modifier.size(height = 100.percent)
+            else -> Modifier.size(100.percent)
+        }
+        val windowModifier = across.gap(gap.px).onPlaced { rect ->
             state.recordWindow(if (horizontal) rect.width else rect.height, last - first, gap)
         }
         if (horizontal) {
