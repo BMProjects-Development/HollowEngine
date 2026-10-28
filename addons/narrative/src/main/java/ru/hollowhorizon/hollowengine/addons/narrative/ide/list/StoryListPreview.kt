@@ -58,6 +58,7 @@ internal fun StoryListPreview(context: HollowIdePreviewContext) {
     state.context = context
     val parsed = state.model.read(context.text)
     val model = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
+    LaunchedEffect(model.text) { state.follow(model) }
     val rows = model.rows(state::isFolded)
     state.selectIndex?.let { index ->
         state.selectIndex = null
@@ -211,7 +212,7 @@ private fun AddBar(state: StoryListState, model: StoryListModel) {
         ContextMenu(
             id = "story-add-commands",
             anchorBounds = bounds,
-            items = commandItems { name -> state.add(model, StoryNewStatements.command(name)) },
+            items = addableItems { statement -> state.add(model, statement) },
             alignment = AboveStart,
             onExpandedChange = { if (!it) commands = null },
         )
@@ -229,16 +230,33 @@ internal fun commandItems(
     val catalog = StoryScriptingAnalyzer.catalog()
     val signatures = catalog.names.associateWith { name -> catalog.overloads(name)?.firstOrNull() }
         .filterValues(fits)
-    fun item(name: String): UiDropdownItem {
+    return grouped(signatures.keys.sorted().map { name ->
         val signature = signatures[name]
-        return UiDropdownItem(signature?.title?.lang ?: "@$name", icon = signature?.icon) { add(name) }
-    }
+        signature?.category?.lang to UiDropdownItem(StoryTexts.title(name, signature), icon = signature?.icon) { add(name) }
+    })
+}
 
-    val byCategory = signatures.keys.sorted().groupBy { signatures[it]?.category?.lang }
-    val headings = byCategory.mapNotNull { (category, names) ->
-        category?.let { UiDropdownItem(it, children = names.map(::item)) }
+/** What can be added as a statement of its own: the built-in statements and the commands, under shared headings. */
+internal fun addableItems(add: (String) -> Unit): List<UiDropdownItem> {
+    val builtins = StoryBuiltins.all.map { builtin ->
+        storyLang("category.${builtin.category}") to
+            UiDropdownItem(StoryTexts.title(builtin.id, keyword = builtin.keyword), icon = builtin.icon) { add(builtin.template) }
     }
-    return headings.sortedBy { it.label } + byCategory[null].orEmpty().map(::item)
+    val catalog = StoryScriptingAnalyzer.catalog()
+    val commands = catalog.names.sorted().map { name ->
+        val signature = catalog.overloads(name)?.firstOrNull()
+        signature?.category?.lang to UiDropdownItem(StoryTexts.title(name, signature), icon = signature?.icon) {
+            add(StoryNewStatements.command(name))
+        }
+    }
+    return grouped(builtins + commands)
+}
+
+/** [items] under the headings they name, in the order of the headings; those without one go after them. */
+private fun grouped(items: List<Pair<String?, UiDropdownItem>>): List<UiDropdownItem> {
+    val byCategory = items.groupBy({ it.first }, { it.second })
+    val headings = byCategory.mapNotNull { (category, children) -> category?.let { UiDropdownItem(it, children = children) } }
+    return headings.sortedBy { it.label } + byCategory[null].orEmpty()
 }
 
 private fun onKey(state: StoryListState, model: StoryListModel, rows: List<StoryRow>, input: UiKeyInput): Boolean {

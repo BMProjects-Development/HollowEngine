@@ -78,6 +78,9 @@ class TextFieldState(
     override val history = UndoHistory(TextFieldStateHistoryLimit, mergeWindowNanos = historyMergeWindowNanos, nanoTime = nanoTime)
     private var restoringHistory = false
 
+    /** Told the text an undo or redo put back, for an owner that keeps the text elsewhere too. */
+    var onHistoryRestored: ((String) -> Unit)? = null
+
     fun insert(insertion: String): Boolean {
         if (readOnly || insertion.isEmpty()) return false
         val normalized = insertion.normalizeEditorLineEndings()
@@ -176,8 +179,12 @@ class TextFieldState(
     /**
      * Applies a programmatic edit (e.g. accepting a completion item) as a single undoable step:
      * the whole next text plus the carets it should leave behind.
+     *
+     * @param label what the step is called in the history window; typing when null.
+     * @param mergeKey folds the step into the one before when that carries the same key and came shortly before,
+     * as for the letters typed into one field; with none the step stands alone.
      */
-    fun applyEdit(next: String, carets: List<UiTextCaret>): Boolean {
+    fun applyEdit(next: String, carets: List<UiTextCaret>, label: UndoLabel? = null, mergeKey: String? = null): Boolean {
         if (readOnly) return false
         val normalized = next.normalizeEditorLineEndings()
         if (!filter.accepts(normalized)) return false
@@ -185,11 +192,11 @@ class TextFieldState(
             setCarets(carets)
             return false
         }
-        breakHistoryGroup()
-        recordHistorySnapshot()
+        if (mergeKey == null) breakHistoryGroup()
+        recordHistorySnapshot(label ?: TypingLabel, mergeKey)
         text = normalized
         setCaretsAndReveal(carets)
-        breakHistoryGroup()
+        if (mergeKey == null) breakHistoryGroup()
         return true
     }
 
@@ -427,9 +434,9 @@ class TextFieldState(
 
     private fun activeCaretRanges(): List<UiTextCaret> = if (multiCaret) caretRanges else caretRanges.take(1)
 
-    private fun recordHistorySnapshot() {
+    private fun recordHistorySnapshot(label: UndoLabel = TypingLabel, mergeKey: String? = TypingMergeKey) {
         if (restoringHistory) return
-        history.record(SnapshotStep(this, TypingLabel, historyEntry(), ::historyEntry, ::restoreHistory), TypingMergeKey)
+        history.record(SnapshotStep(this, label, historyEntry(), ::historyEntry, ::restoreHistory), mergeKey)
     }
 
     private fun breakHistoryGroup() = history.breakMerge()
@@ -445,6 +452,7 @@ class TextFieldState(
         } finally {
             restoringHistory = false
         }
+        onHistoryRestored?.invoke(text)
     }
 
     private data class TextEditRange(val start: Int, val end: Int)

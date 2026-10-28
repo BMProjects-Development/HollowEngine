@@ -56,6 +56,12 @@ class StoryRuns(val owner: StoryOwner) {
         return start(key) { run -> StoryFrame(run, instance, stage) }
     }
 
+    /** Starts the `.story` [address] played to [with] as the run [key], replacing a run already under [key]. */
+    fun launchScene(key: String, address: String, with: List<ServerPlayer>): StoryHandle<Unit> {
+        stop(key)
+        return start(key) { run -> SceneStage.lambda(address, with).entry(run) }
+    }
+
     /** Stops the run [key]; returns whether there was one. */
     fun stop(key: String): Boolean {
         val run = runs.remove(key) ?: return false

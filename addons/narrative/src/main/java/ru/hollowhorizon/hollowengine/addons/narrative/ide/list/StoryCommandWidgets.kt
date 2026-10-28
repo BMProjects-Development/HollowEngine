@@ -71,6 +71,6 @@ private fun WaitInspector(state: StoryListState, model: StoryListModel, wait: St
     val written = wait.args.firstOrNull()?.let { model.source(it.expr.span) }.orEmpty()
     val seconds = WaitDuration.seconds(written) ?: return StatementRow(state, model, line)
     NumberRow(storyLang("wait.duration"), seconds, id = "story-inspector-wait", min = 0f, step = 0.1f) {
-        state.write(StoryEdits.setPositional(model.text, line, 0, WaitDuration.write(it)))
+        state.write(StoryEdits.setPositional(model.text, line, 0, WaitDuration.write(it)), mergeKey = "story-inspector-wait-$line")
     }
 }

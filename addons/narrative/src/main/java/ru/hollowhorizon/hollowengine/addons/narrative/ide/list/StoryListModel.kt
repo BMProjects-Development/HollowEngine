@@ -25,6 +25,9 @@ internal class StoryListModel(address: String, val text: String) {
         }
     }
 
+    /** What a slot can read besides a command; see [StorySlotValues.of]. */
+    val variables: Map<String, StoryType?> by lazy { StorySlotValues.of(compiled.cst) }
+
     /** [blocks] split into the cards that show them: an `@if` chain and a menu of `@choice` are one card each. */
     fun cards(blocks: List<StoryBlock>): List<List<StoryBlock>> {
         val cards = mutableListOf<List<StoryBlock>>()
