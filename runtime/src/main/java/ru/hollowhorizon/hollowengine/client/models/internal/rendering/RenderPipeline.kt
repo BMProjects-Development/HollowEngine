@@ -120,11 +120,13 @@ class ListRenderPipeline : RenderPipeline {
 
     private fun transformSkinning() {
         if (skinCommands.isNotEmpty()) {
+            val activeTexture = GlStateManager._getActiveTexture()
             GlStateManager._glUseProgram(HollowModelManager.glProgramSkinning)
             GL33.glEnable(GL33.GL_RASTERIZER_DISCARD)
             for (skinCommand in skinCommands) skinCommand()
             GL33.glBindBuffer(GL33.GL_TEXTURE_BUFFER, 0)
             GL33.glDisable(GL33.GL_RASTERIZER_DISCARD)
+            GL33.glActiveTexture(activeTexture)
         }
     }
 

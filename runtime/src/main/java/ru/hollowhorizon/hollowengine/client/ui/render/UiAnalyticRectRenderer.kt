@@ -74,6 +74,7 @@ internal class UiAnalyticRectRenderer : UiSdfRenderer(
         val previousArrayBuffer = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING)
         val previousActiveTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE)
         val previousTextureBuffers = captureTextureBufferBindings()
+        val previousGlyphAtlases = captureGlyphAtlasBindings(batch.glyphPageCount)
         try {
             upload(batch)
             withCullStatePreserved {
@@ -87,10 +88,7 @@ internal class UiAnalyticRectRenderer : UiSdfRenderer(
                 GL31.glDrawArraysInstanced(GL11.GL_TRIANGLES, 0, 6, batch.instanceCount)
             }
         } finally {
-            for (page in 0 until batch.glyphPageCount) {
-                GL13.glActiveTexture(GL13.GL_TEXTURE0 + GlyphAtlasUnit + page)
-                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-            }
+            restoreGlyphAtlasBindings(previousGlyphAtlases)
             restoreTextureBufferBindings(previousTextureBuffers, previousActiveTexture)
             GL30.glBindVertexArray(previousVertexArray)
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, previousArrayBuffer)
@@ -106,6 +104,18 @@ internal class UiAnalyticRectRenderer : UiSdfRenderer(
         }
         GL20.glUniform1fv(glyphDistanceRangeLocation, batch.glyphPageDistanceRanges())
         GL20.glUniform2fv(glyphAtlasSizeLocation, batch.glyphPageSizes())
+    }
+
+    private fun captureGlyphAtlasBindings(pageCount: Int): IntArray = IntArray(pageCount) { page ->
+        GL13.glActiveTexture(GL13.GL_TEXTURE0 + GlyphAtlasUnit + page)
+        GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D)
+    }
+
+    private fun restoreGlyphAtlasBindings(bindings: IntArray) {
+        bindings.forEachIndexed { page, texture ->
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + GlyphAtlasUnit + page)
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture)
+        }
     }
 
     override fun onClose() {
