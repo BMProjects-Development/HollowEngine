@@ -201,6 +201,7 @@ object StoryEdits {
         is StoryLineKind.Choice -> kind.args
         is StoryLineKind.Stage -> kind.args
         is StoryLineKind.CallDefine -> kind.args
+        is StoryLineKind.Async -> kind.inline?.args.orEmpty()
         else -> emptyList()
     }
 

@@ -138,7 +138,7 @@ class StoryParser(private val source: String) {
             if (tailStart >= end) {
                 throw StoryParseException("'@$name' expects a condition", nameSpan)
             }
-            return StoryExpressions.parse(raw, offset, line, tailStart, end)
+            return expression(line, offset, raw, tailStart, end)
         }
 
         fun requireEmptyTail() {
@@ -223,8 +223,19 @@ class StoryParser(private val source: String) {
             throw StoryParseException("'@set' expects '=' after the variable name", variableSpan)
         }
         i++
-        val value = StoryExpressions.parse(raw, offset, line, i, end)
+        val value = expression(line, offset, raw, i, end)
         return StoryLineKind.Set(variable, variableSpan, value)
+    }
+
+    /**
+     * The expression `raw[from, to)`, or one that fails when evaluated if it does not read, so the statement keeps its
+     * form in the editor while its value is being typed.
+     */
+    private fun expression(line: Int, offset: Int, raw: String, from: Int, to: Int): StoryExpression = try {
+        StoryExpressions.parse(raw, offset, line, from, to)
+    } catch (e: StoryParseException) {
+        diagnostics.error(e.message ?: "Parse error", e.span)
+        StoryExpressions.broken(raw.substring(from, to), span(offset, line, from, to), e.message ?: "Parse error")
     }
 
     private fun parseRef(line: Int, offset: Int, raw: String, start: Int, end: Int, command: String): StoryRef {

@@ -149,6 +149,15 @@ class StoryParserTest {
     }
 
     @Test
+    fun `a value being typed keeps the line what it is`() {
+        val parsed = StoryParser.parse("@set x = 1 +\n@while счёт <")
+
+        assertIs<StoryLineKind.Set>(parsed.cst.lines[0].kind)
+        assertIs<StoryLineKind.While>(parsed.cst.lines[1].kind)
+        assertEquals(2, parsed.diagnostics.all.size)
+    }
+
+    @Test
     fun `negative numbers are numbers, not strings`() {
         val parsed = StoryParser.parse("@camera location=[25, 70, -171] rotation=[-158, 2] fov=-1.5")
         val kind = parsed.cst.lines[0].kind

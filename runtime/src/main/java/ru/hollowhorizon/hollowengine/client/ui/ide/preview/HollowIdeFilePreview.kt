@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeExtensionPoints
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 
@@ -76,14 +78,21 @@ class HollowIdePreviewContext internal constructor(
     val file: HollowIdeOpenFile,
     val view: HollowIdeFileView,
     private val preview: HollowIdeFilePreview,
-    private val write: (String) -> Unit,
+    /** The history of the file's text, which the preview's edits go into. */
+    val history: UndoHistory,
+    private val write: (next: String, label: UndoLabel?, mergeKey: String?) -> Unit,
 ) {
     val text: String get() = file.text
     val readOnly: Boolean get() = file.readOnly
 
-    /** Replaces the whole text; the editor diffs it into one undoable step. */
-    fun edit(next: String) {
-        if (!readOnly && next != text) write(next)
+    /**
+     * Replaces the whole text as one undoable step.
+     *
+     * @param label what the step is called in the history window.
+     * @param mergeKey folds the step into the one just before with the same key, as for typing into one field.
+     */
+    fun edit(next: String, label: UndoLabel? = null, mergeKey: String? = null) {
+        if (!readOnly && next != text) write(next, label, mergeKey)
     }
 
     fun <T : Any> state(create: () -> T): T = view.state(preview, create)

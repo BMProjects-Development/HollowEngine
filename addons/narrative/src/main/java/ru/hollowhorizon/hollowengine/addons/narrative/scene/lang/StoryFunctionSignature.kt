@@ -14,9 +14,11 @@ enum class StoryType {
         ACTOR -> value is StoryActor || value is StoryEntity || value is StoryString
     }
 
-    /** Whether a call that gives back [type] can fill a parameter of this type. */
-    fun takes(type: StoryType): Boolean =
-        this == ANY || type == ANY || this == type || (this == STRING && (type == NUMBER || type == BOOL))
+    /**
+     * Whether a value of [type] is what a parameter of this type means, which is what the editor offers for it. A
+     * number written into a string parameter still runs, but a slot for a name offers no counts and no yes-or-no.
+     */
+    fun takes(type: StoryType): Boolean = this == ANY || type == ANY || this == type
 }
 
 /**
@@ -55,6 +57,7 @@ data class StoryParam(
  * @param category the heading the editor lists it under, a lang key or plain text.
  * @param widget the id of the widget the editor draws its rows with, when not the plain one.
  * @param returns what a call gives back to an expression, or null when it gives nothing.
+ * @param returnValues the values a call gives back when they are a known set, such as the constants of an enum.
  */
 data class StoryFunctionSignature(
     val name: String,
@@ -65,7 +68,17 @@ data class StoryFunctionSignature(
     val category: String? = null,
     val widget: String? = null,
     val returns: StoryType? = null,
+    val returnValues: List<String> = emptyList(),
 ) {
+    /**
+     * Whether a call can fill [param] in the editor: its value is of the type, and a value out of a known set goes
+     * only where that same set is expected, so a result such as `success` is not offered as a dimension or a name.
+     */
+    fun fills(param: StoryParam): Boolean {
+        val type = returns ?: return false
+        if (!param.type.takes(type)) return false
+        return param.type == StoryType.ANY || returnValues.isEmpty() || returnValues.toSet() == param.suggestions.toSet()
+    }
 
     init {
         require(params.map { it.name }.toSet().size == params.size) {

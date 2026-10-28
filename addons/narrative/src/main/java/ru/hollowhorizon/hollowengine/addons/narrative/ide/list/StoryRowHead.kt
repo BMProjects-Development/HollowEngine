@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryLineKind
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** The band at the start of a row that says what the row is: an icon and a name, and for a command what it does. */
 internal class StoryHead(val icon: String, val title: String, val tooltip: String? = null) {
@@ -17,7 +16,8 @@ internal class StoryHead(val icon: String, val title: String, val tooltip: Strin
             StoryRowRole.CARD -> when (val kind = row.block.line.kind) {
                 is StoryLineKind.FuncCall -> command(kind)
                 is StoryLineKind.Dialogue, is StoryLineKind.Label, is StoryLineKind.Broken -> plain(row)
-                else -> StoryHead(row.kind.icon, statementKeyword(row) ?: row.kind.title)
+                else -> StoryBuiltins.of(kind)?.let(::builtin)
+                    ?: StoryHead(row.kind.icon, statementKeyword(row) ?: row.kind.title)
             }
         }
 
@@ -26,14 +26,25 @@ internal class StoryHead(val icon: String, val title: String, val tooltip: Strin
         /** A command by what its action says of itself, or by its name where the action says nothing. */
         private fun command(call: StoryLineKind.FuncCall): StoryHead {
             val signature = signature(call)
-            val name = "@${call.function}"
-            val title = signature?.title?.lang
-            val tooltip = listOfNotNull(name.takeIf { title != null }, signature?.description?.lang)
-            return StoryHead(
+            return named(
                 signature?.icon ?: StoryCardKind.COMMAND.icon,
-                title ?: name,
-                tooltip.joinToString("\n").ifEmpty { null },
+                "@${call.function}",
+                StoryTexts.title(call.function, signature),
+                StoryTexts.description(call.function, signature),
             )
+        }
+
+        private fun builtin(builtin: StoryBuiltin) = named(
+            builtin.icon,
+            "@${builtin.keyword}",
+            StoryTexts.title(builtin.id, keyword = builtin.keyword),
+            StoryTexts.description(builtin.id),
+        )
+
+        /** A head titled [title], whose tooltip says how it is written, unless the title already does, and what it does. */
+        private fun named(icon: String, written: String, title: String, description: String?): StoryHead {
+            val tooltip = listOfNotNull(written.takeIf { it != title }, description)
+            return StoryHead(icon, title, tooltip.joinToString("\n").ifEmpty { null })
         }
     }
 }

@@ -19,6 +19,7 @@ internal fun storyCardInspector(state: StoryListState, selection: StorySelection
         title = kind.title,
         subtitle = storyLang("line").format(selection.line + 1),
         styles = listOf(StoryListStylesheet),
+        history = state.context?.history,
         content = { CardInspector(state, selection) },
     )
 
@@ -48,7 +49,8 @@ private fun CardInspector(state: StoryListState, selection: StorySelection) {
         is StoryLineKind.FuncCall -> StoryCommandWidgets.of(kind)?.inspector?.invoke(state, model, kind, line)
             ?: StatementRow(state, model, line)
 
-        else -> StatementRow(state, model, line)
+        else -> StoryBuiltins.of(kind)?.let { BuiltinInspector(state, model, it, kind, line) }
+            ?: StatementRow(state, model, line)
     }
     model.problems[line]?.forEach { Text(it.message, tags = listOf("story-inspector-problem")) }
 }

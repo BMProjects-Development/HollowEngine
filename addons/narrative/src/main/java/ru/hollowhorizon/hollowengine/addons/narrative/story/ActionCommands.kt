@@ -172,6 +172,7 @@ class StoryCommand private constructor(
                 category = function.findAnnotation<EditorCategory>()?.category,
                 widget = function.findAnnotation<EditorWidget>()?.id,
                 returns = StoryConversions.typeOf(function.returnType),
+                returnValues = StoryConversions.suggestions(function.returnType),
             )
             return StoryCommand(action, signature, bound)
         }

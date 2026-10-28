@@ -8,9 +8,24 @@ import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryEdit
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryEdits
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryLineKind
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryStatements
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.LazyListState
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
+
+/** What the list's edits are called in the history window. */
+internal object StoryUndo {
+    private const val LANG = "hollowengine.gui.history.story"
+
+    val EDIT = UndoLabel("$LANG.edit")
+    val ADD = UndoLabel("$LANG.add")
+    val REMOVE = UndoLabel("$LANG.remove")
+    val MOVE = UndoLabel("$LANG.move")
+    val INDENT = UndoLabel("$LANG.indent")
+    val OUTDENT = UndoLabel("$LANG.outdent")
+    val DUPLICATE = UndoLabel("$LANG.duplicate")
+    val CALL = UndoLabel("$LANG.call")
+}
 
 /** The context menu of a row, open at the pointer. */
 internal class StoryRowMenu(val selection: StorySelection, val x: Float, val y: Float)
@@ -46,6 +61,10 @@ internal class StoryListState {
 
     private val folded = mutableStateMapOf<String, Boolean>()
 
+    /** The text this list wrote last, and the one it was drawn for last: a change that is neither came from elsewhere. */
+    private var written: String? = null
+    private var seen: String? = null
+
     fun read(): StoryListModel? = context?.let { model.read(it.text).getOrNull() }
 
     /** Whether what is under [key] is hidden: as the writer left it, or else hidden for an option and open for the rest. */
@@ -60,16 +79,24 @@ internal class StoryListState {
         if (scroll) reveal = selection
     }
 
-    /** Writes [text], keeping the selection where it is. */
-    fun write(text: String) {
-        context?.takeUnless { it.readOnly }?.edit(text)
+    /**
+     * Writes [text], keeping the selection where it is.
+     *
+     * @param label what the step is called in the history window.
+     * @param mergeKey folds the step into the one just before with the same key, as for the letters typed into a field.
+     */
+    fun write(text: String, label: UndoLabel = StoryUndo.EDIT, mergeKey: String? = null) {
+        val context = context?.takeUnless { it.readOnly } ?: return
+        written = text
+        context.edit(text, label, mergeKey)
     }
 
     /** Writes [edit], selects the statement it ended on and, with [field], puts the caret into that field of it. */
-    fun write(edit: StoryEdit?, menu: Boolean = false, field: String? = null) {
+    fun write(edit: StoryEdit?, label: UndoLabel, menu: Boolean = false, field: String? = null) {
         val context = context?.takeUnless { it.readOnly } ?: return
         edit ?: return
-        context.edit(edit.text)
+        written = edit.text
+        context.edit(edit.text, label)
         val selection = StorySelection(edit.line, menu)
         read()?.foldsOver(selection)?.forEach { folded[it] = false }
         select(selection, scroll = true)
@@ -88,13 +115,17 @@ internal class StoryListState {
     /** Moves the selected statement: an option inside its menu, anything else as the whole card. */
     fun move(model: StoryListModel, up: Boolean) {
         val selection = selected ?: return
-        write(StoryEdits.move(model.text, selection.line, up, whole(model, selection)), selection.menu)
+        write(StoryEdits.move(model.text, selection.line, up, whole(model, selection)), StoryUndo.MOVE, selection.menu)
     }
 
     fun indent(model: StoryListModel, out: Boolean) {
         val selection = selected ?: return
         val line = selection.line
-        write(if (out) StoryEdits.outdent(model.text, line) else StoryEdits.indent(model.text, line), selection.menu)
+        write(
+            if (out) StoryEdits.outdent(model.text, line) else StoryEdits.indent(model.text, line),
+            if (out) StoryUndo.OUTDENT else StoryUndo.INDENT,
+            selection.menu,
+        )
     }
 
     /** Adds [statement] after what is selected, or at the end of the story when nothing is. */
@@ -104,7 +135,7 @@ internal class StoryListState {
 
     /** Adds [statement] at the end of the story. */
     fun append(model: StoryListModel, statement: String) {
-        write(StoryEdits.insertAfter(model.text, null, listOf(statement)), field = fieldOf(statement))
+        write(StoryEdits.insertAfter(model.text, null, listOf(statement)), StoryUndo.ADD, field = fieldOf(statement))
     }
 
     /**
@@ -115,12 +146,12 @@ internal class StoryListState {
         val block = model.outline.blockAt(selection.line) ?: return append(model, statement)
         val option = !selection.menu && block.line.kind is StoryLineKind.Choice
         val anchor = if (option && isChoice(statement)) block else model.outline.groupOf(block).last()
-        write(StoryEdits.insertAfter(model.text, anchor.line.index, listOf(statement)), field = fieldOf(statement))
+        write(StoryEdits.insertAfter(model.text, anchor.line.index, listOf(statement)), StoryUndo.ADD, field = fieldOf(statement))
     }
 
     /** Adds [statement] as the last one under [line]. */
     fun insertInto(model: StoryListModel, line: Int, statement: String) {
-        write(StoryEdits.insertInto(model.text, line, listOf(statement)), field = fieldOf(statement))
+        write(StoryEdits.insertInto(model.text, line, listOf(statement)), StoryUndo.ADD, field = fieldOf(statement))
     }
 
     /** A new phrase, said by whoever the selected one or the last one before it is said by. */
@@ -136,13 +167,13 @@ internal class StoryListState {
     fun remove(model: StoryListModel, rows: List<StoryRow>, selection: StorySelection) {
         val whole = selection.menu || !isRow(model, selection.line)
         val index = rows.indexOfFirst { it.selection == selection }
-        write(StoryEdits.remove(model.text, selection.line, whole))
+        write(StoryEdits.remove(model.text, selection.line, whole), StoryUndo.REMOVE)
         selected = null
         selectIndex = index.takeIf { it >= 0 }
     }
 
     fun duplicate(model: StoryListModel, selection: StorySelection) {
-        write(StoryEdits.duplicate(model.text, selection.line, whole(model, selection)), selection.menu)
+        write(StoryEdits.duplicate(model.text, selection.line, whole(model, selection)), StoryUndo.DUPLICATE, selection.menu)
     }
 
     /** Ends the drag, moving its rows where it landed. */
@@ -154,8 +185,23 @@ internal class StoryListState {
         val selection = drag.selection
         write(
             StoryEdits.relocate(model.text, selection.line, drag.whole, target.line, target.placement),
-            selection.menu
+            StoryUndo.MOVE,
+            selection.menu,
         )
+    }
+
+    /**
+     * Selects in view the card that a change made elsewhere touched first, as an undo or redo does, so the writer sees
+     * what was taken back. The list's own edits select what they ended on themselves.
+     */
+    fun follow(model: StoryListModel) {
+        val before = seen
+        seen = model.text
+        if (before == null || before == model.text || model.text == written) return
+        val prefix = before.commonPrefixWith(model.text)
+        val line = prefix.count { it == '\n' }
+        val block = (line downTo 0).firstNotNullOfOrNull(model.outline::blockAt) ?: return
+        reveal(model, StorySelection(block.line.index))
     }
 
     /** Opens what hides [selection] and selects it in view. */

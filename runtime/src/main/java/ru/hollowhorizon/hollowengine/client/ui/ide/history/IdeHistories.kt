@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.ide.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -53,13 +54,16 @@ internal class IdeHistories(
         val history = when (focused) {
             null -> null
             TimelineId -> timelineHistory()
-            SceneId, InspectorId, GameViewportId ->
-                IdeScenes.current?.history ?: WorldHistory.history.takeIf { EditorMode.isAvailable() }
+            InspectorId -> InspectorSelection.current?.history ?: sceneHistory()
+            SceneId, GameViewportId -> sceneHistory()
 
             else -> model.files.values.firstOrNull { it.id == focused }?.let(::historyOf)
         } ?: return null
         return contexts.firstOrNull { it.history === history }
     }
+
+    private fun sceneHistory(): UndoHistory? =
+        IdeScenes.current?.history ?: WorldHistory.history.takeIf { EditorMode.isAvailable() }
 
     private fun historyOf(file: HollowIdeOpenFile): UndoHistory? = (file.document as? UndoOwner)?.history ?: textHistory(file)
 

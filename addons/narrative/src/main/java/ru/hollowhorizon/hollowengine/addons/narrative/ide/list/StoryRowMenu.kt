@@ -50,5 +50,5 @@ private fun statementItems(state: StoryListState, model: StoryListModel, add: (S
     UiDropdownItem(storyLang("add.phrase")) { add(state.newPhrase(model)) },
     UiDropdownItem(storyLang("add.wait")) { add(StoryNewStatements.wait()) },
     UiDropdownItem(storyLang("add.choice")) { add(StoryNewStatements.choice()) },
-    UiDropdownItem(storyLang("add.command"), children = commandItems { add(StoryNewStatements.command(it)) }),
+    UiDropdownItem(storyLang("add.command"), children = addableItems(add)),
 )

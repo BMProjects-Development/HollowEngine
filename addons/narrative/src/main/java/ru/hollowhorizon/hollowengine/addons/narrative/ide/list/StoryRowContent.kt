@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryScriptingAnalyzer
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.*
+import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
@@ -26,7 +27,7 @@ internal fun StoryRowContent(scope: StoryRowScope, row: StoryRow) {
             is StoryLineKind.Label -> Label(scope, row, kind)
             is StoryLineKind.FuncCall -> StoryCommandWidgets.of(kind)?.row?.invoke(scope, row, kind) ?: Command(scope, row, kind)
 
-            else -> Statement(scope, row)
+            else -> StoryBuiltins.of(kind)?.let { BuiltinRow(scope, row, it, kind) } ?: Statement(scope, row)
         }
     }
 }
@@ -121,9 +122,18 @@ private fun Branch(scope: StoryRowScope, row: StoryRow) {
         else -> null
     }
     if (condition == null) return Box(modifier = Modifier.grow(1f))
-    Field(scope, row, "condition", model.source(condition.span), storyLang("branch.placeholder"), grow = true) {
-        StoryEdits.replace(model.text, condition.span, it)
-    }
+    ValueSlot(
+        scope,
+        row,
+        "condition",
+        StoryParam("condition", StoryType.BOOL),
+        condition,
+        model.source(condition.span),
+        storyLang("branch.placeholder"),
+        help = null,
+        width = null,
+        inExpression = true,
+    ) { if (it.isBlank()) null else StoryEdits.replace(model.text, condition.span, it) }
 }
 
 /** Anything else, as its keyword and the rest of the statement. */
@@ -158,7 +168,7 @@ internal fun Field(
     val size = if (width != null) Modifier.size(width.px, 20.px) else Modifier.size(0.px, 20.px)
     TextField(
         value = value,
-        onChange = { typed -> write(typed)?.let(scope.state::write) },
+        onChange = { typed -> write(typed)?.let { scope.state.write(it, mergeKey = StoryListState.fieldId(row.line, name)) } },
         filter = filter,
         readOnly = scope.state.context?.readOnly == true,
         placeholder = placeholder,
@@ -190,6 +200,10 @@ private fun fieldKey(scope: StoryRowScope, row: StoryRow, input: UiKeyInput, onE
             onEnter?.invoke() ?: state.insertAfter(scope.model, row.selection, state.newPhrase(scope.model))
             true
         }
+
+        // A field writes the file as it is typed into, so its undo is the file's, not a copy of its own.
+        HollowKeys.UNDO.matches(input) -> state.context?.history?.undo().let { true }
+        HollowKeys.REDO.matches(input) -> state.context?.history?.redo().let { true }
 
         input.key == GLFW.GLFW_KEY_ESCAPE -> {
             state.select(row.selection)

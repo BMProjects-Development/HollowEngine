@@ -51,6 +51,15 @@ internal object SceneStage {
         return Unit
     }
 
+    /** The scene [address] played to [with], as a stage a run can start with. */
+    fun lambda(address: String, with: List<ServerPlayer>): StageLambda0<Unit> {
+        val args = CompoundTag()
+        StoryValues.put(args, "address", ADDRESS, address)
+        StoryValues.put(args, "with", PLAYERS, with)
+        StoryValues.put(args, "characters", CHARACTERS, emptyMap<String, LivingEntity>())
+        return StageLambda0(KEY, STAGE, args)
+    }
+
     suspend fun play(address: String, with: List<ServerPlayer>?, characters: Map<String, LivingEntity>) {
         val frame = StoryFrames.enter(this, STAGE, 0, arrayOf(STATEMENT))
         try {

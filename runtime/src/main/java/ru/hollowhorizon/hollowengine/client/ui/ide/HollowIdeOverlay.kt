@@ -8,6 +8,7 @@ import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
@@ -226,7 +227,13 @@ object HollowIdeOverlay {
             initialText = file.text,
             multiline = true,
             pasteTransformer = KotlinStringPasteTransformer.takeIf { file.path.isKotlinSource() },
-        )
+        ).also { state ->
+            // An undo made away from the text editor, from a preview or the history window, still reaches the file.
+            state.onHistoryRestored = { text ->
+                model.updateText(file.path, text)
+                model.files[file.path]?.let { dock.updateItem(it.dockItem()) }
+            }
+        }
     }
 
     private fun editorSession(path: String): HollowIdeEditorSession = editorSessions.getOrPut(path) {
@@ -1297,8 +1304,8 @@ object HollowIdeOverlay {
         }
         val preview = view.preview
         val context = remember(file, view, preview) {
-            HollowIdePreviewContext(file, view, preview) { next ->
-                applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length))
+            HollowIdePreviewContext(file, view, preview, editorState(file).history) { next, label, mergeKey ->
+                applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length), label, mergeKey)
             }
         }
         HollowIdeFileViewBody(
@@ -1563,9 +1570,15 @@ object HollowIdeOverlay {
     }
 
     /** Writes [next] into the editor as one undoable edit and keeps the model and tab in step. */
-    private fun applyEditorText(file: HollowIdeOpenFile, next: String, caret: Int) {
+    private fun applyEditorText(
+        file: HollowIdeOpenFile,
+        next: String,
+        caret: Int,
+        label: UndoLabel? = null,
+        mergeKey: String? = null,
+    ) {
         val editor = editorState(file)
-        if (!editor.applyEdit(next, listOf(UiTextCaret(caret.coerceIn(0, next.length))))) return
+        if (!editor.applyEdit(next, listOf(UiTextCaret(caret.coerceIn(0, next.length))), label, mergeKey)) return
         model.updateText(file.path, editor.text)
         dock.updateItem(file.dockItem())
     }
