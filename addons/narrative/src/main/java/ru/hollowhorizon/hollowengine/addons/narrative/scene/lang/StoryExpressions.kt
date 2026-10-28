@@ -50,9 +50,11 @@ val StoryDeclarations: Declarations<StoryVariables> = Declarations {
         }
         field("name", self) { value ->
             (value as? StoryActor)?.let { StoryString(it.character.name) }
+                ?: (value as? StoryEntity)?.let { StoryString(it.name) }
                 ?: throw StoryValueError("A ${value.typeName()} has no 'name'")
         }
         field("uuid", self) { value ->
+            if (value is StoryEntity) return@field StoryString(value.uuid.toString())
             val actor = value as? StoryActor ?: throw StoryValueError("A ${value.typeName()} has no 'uuid'")
             (actor.character as? EntityCharacter)?.let { StoryString(it.entity.uuid.toString()) }
                 ?: throw StoryValueError("'${actor.character.name}' is a name without an entity, so it has no uuid")
@@ -109,6 +111,8 @@ class StoryExpression internal constructor(
     val parts: List<StoryExpression>,
     private val value: ObjectExpression<StoryVariables>,
     val constant: StoryValue?,
+    val calls: List<StoryNestedCall> = emptyList(),
+    val problem: String? = null,
 ) {
     fun names(): List<Ast.Name> {
         val found = ArrayList<Ast.Name>()
@@ -117,7 +121,12 @@ class StoryExpression internal constructor(
         return found
     }
 
+    /** The call this expression is, when it is nothing but one, such as `npc([0, 64, 0])`. */
+    fun wholeCall(): StoryNestedCall? =
+        calls.singleOrNull()?.takeIf { it.span.end - it.span.start == source.trim().length }
+
     fun evaluate(variables: StoryVariables): StoryValue = try {
+        problem?.let { throw StoryEvalException(it, span) }
         value.eval(variables) as? StoryValue
             ?: throw StoryEvalException("Expression produced no value", span)
     } catch (e: StoryValueError) {
@@ -135,7 +144,9 @@ object StoryExpressions {
      */
     fun parse(text: String, offset: Int, line: Int, from: Int, to: Int): StoryExpression {
         val fragment = text.substring(from, to)
-        val baked = StoryLanguage.bake(fragment, offset + from)
+        val written = StoryNestedCalls.ast(fragment, offset + from)
+        val calls = written?.let { StoryNestedCalls.extract(it, text, offset, line) }.orEmpty()
+        val baked = StoryLanguage.bake(StoryNestedCalls.replace(fragment, offset + from, calls), offset + from)
         val span = StorySpan(offset + from, offset + to, line)
 
         baked.diagnostics.firstOrNull { it.severity == Severity.ERROR }?.let { diagnostic ->
@@ -148,12 +159,24 @@ object StoryExpressions {
         return StoryExpression(
             source = fragment,
             span = span,
-            ast = baked.ast,
+            ast = written ?: baked.ast,
             parts = emptyList(),
             value = baked.asObject(StoryDeclarations.literals),
-            constant = baked.constant as? StoryValue,
+            constant = if (calls.isEmpty()) baked.constant as? StoryValue else null,
+            calls = calls,
         )
     }
+
+    /** An argument that could not be read, kept so the rest of its line still is; evaluating it fails with [problem]. */
+    fun broken(source: String, span: StorySpan, problem: String): StoryExpression = StoryExpression(
+        source = source,
+        span = span,
+        ast = null,
+        parts = emptyList(),
+        value = { throw StoryValueError(problem) },
+        constant = null,
+        problem = problem,
+    )
 
     /** Parses string as one expression, for a fragment that is already on its own. */
     fun parse(text: String, offset: Int, line: Int): StoryExpression = parse(text, offset, line, 0, text.length)
@@ -168,6 +191,7 @@ object StoryExpressions {
             parts = items,
             value = { variables -> StoryList(items.map { it.evaluate(variables) }) },
             constant = if (constants.all { it != null }) StoryList(constants.filterNotNull()) else null,
+            calls = items.flatMap { it.calls },
         )
     }
 
@@ -218,4 +242,5 @@ internal fun StoryValue.typeName(): String = when (this) {
     is StoryBool -> "bool"
     is StoryList -> "list"
     is StoryActor -> "character"
+    is StoryEntity -> "entity"
 }

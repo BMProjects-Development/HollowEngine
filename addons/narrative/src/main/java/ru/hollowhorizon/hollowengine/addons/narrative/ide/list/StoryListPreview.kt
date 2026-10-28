@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryScriptingAnalyzer
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
@@ -221,9 +222,13 @@ private fun AddBar(state: StoryListState, model: StoryListModel) {
  * A menu item per function the stories know, for adding a command: under the heading of its category, or after the
  * headings when its action names none.
  */
-internal fun commandItems(add: (String) -> Unit): List<UiDropdownItem> {
+internal fun commandItems(
+    fits: (StoryFunctionSignature?) -> Boolean = { true },
+    add: (String) -> Unit,
+): List<UiDropdownItem> {
     val catalog = StoryScriptingAnalyzer.catalog()
     val signatures = catalog.names.associateWith { name -> catalog.overloads(name)?.firstOrNull() }
+        .filterValues(fits)
     fun item(name: String): UiDropdownItem {
         val signature = signatures[name]
         return UiDropdownItem(signature?.title?.lang ?: "@$name", icon = signature?.icon) { add(name) }

@@ -59,25 +59,9 @@ private fun Command(scope: StoryRowScope, row: StoryRow, call: StoryLineKind.Fun
         }
         return
     }
-    val positional = call.args.filter { it.name == null }
-    var position = 0
-    params.forEachIndexed { index, param ->
-        val named = call.args.firstOrNull { it.name == param.name }
-        val at = position
-        if (named == null) position++
-        val arg: StoryArg? = named ?: positional.getOrNull(at)
-        Field(
-            scope,
-            row,
-            "arg-$index",
-            arg?.let { model.source(it.expr.span) }.orEmpty(),
-            param.title?.lang ?: param.display(),
-            width = 96f,
-            help = param.description?.lang,
-        ) {
-            if (named != null) StoryEdits.setArgument(model.text, row.line, param.name, it)
-            else StoryEdits.setPositional(model.text, row.line, at, it)
-        }
+    CallSlots(scope, row, "arg", call, params) { param, named, at, value ->
+        if (named != null) StoryEdits.setArgument(model.text, row.line, param.name, value)
+        else StoryEdits.setPositional(model.text, row.line, at, value)
     }
     Box(modifier = Modifier.grow(1f))
 }
@@ -217,9 +201,14 @@ private fun fieldKey(scope: StoryRowScope, row: StoryRow, input: UiKeyInput, onE
     }
 }
 
-/** The signature of [call] that fits what is written, or null when the function is not known. */
+/**
+ * The signature of [call] that fits what is written, or null when the function is not known. A call inside an
+ * expression writes `add_one` for `@add-one`.
+ */
 internal fun signature(call: StoryLineKind.FuncCall): StoryFunctionSignature? {
-    val overloads = StoryScriptingAnalyzer.catalog().overloads(call.function)?.takeIf { it.isNotEmpty() } ?: return null
+    val catalog = StoryScriptingAnalyzer.catalog()
+    val overloads = (catalog.overloads(call.function) ?: catalog.overloads(call.function.replace('_', '-')))
+        ?.takeIf { it.isNotEmpty() } ?: return null
     val written = call.args.size
     return overloads.firstOrNull { it.params.size >= written } ?: overloads.maxBy { it.params.size }
 }

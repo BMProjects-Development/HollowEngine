@@ -301,7 +301,7 @@ internal class ScenePlayer(
         saved: StoryAnchor?,
         savedHash: String?,
         step: (hash: String, anchor: StoryAnchor) -> Unit,
-        journaled: suspend (statement: String, call: suspend () -> Unit) -> Unit,
+        journaled: suspend (statement: String, call: suspend () -> Any?) -> Any?,
     ) {
         val program = programOf(address) ?: return
         val async =
@@ -363,7 +363,11 @@ internal class ScenePlayer(
      * else speaks under its displayed value, which is what lets `{player}: ...` work with a plain string variable.
      */
     private fun characterOf(value: StoryValue): DialogueCharacter =
-        (value as? StoryActor)?.character ?: resolveCharacter(value.display())
+        when (value) {
+            is StoryActor -> value.character
+            is StoryEntity -> value.character()
+            else -> resolveCharacter(value.display())
+        }
 
     private fun resolveTarget(target: StoryTarget, currentAddress: String): Frame {
         val destination = target.address ?: currentAddress
@@ -394,7 +398,7 @@ internal class ScenePlayer(
         frames.lastOrNull()?.locals?.get(name) ?: host.variables.get(name) ?: variables[name] ?: resolveActor(name)
 
     /** Writes a variable where it lives: in the `@define` being played, in the story, or in the scene. */
-    private fun assign(name: String, value: StoryValue) {
+    internal fun assign(name: String, value: StoryValue) {
         frames.lastOrNull()?.locals?.takeIf { name in it }?.let {
             it[name] = value
             return

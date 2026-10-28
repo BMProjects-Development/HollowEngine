@@ -23,9 +23,9 @@ internal class TestSceneHost(private val scope: CoroutineScope, private val play
 
     override fun step() = Unit
 
-    override suspend fun journaled(statement: String, call: suspend () -> Unit) = call()
+    override suspend fun journaled(statement: String, call: suspend () -> Any?) = call()
 
-    override suspend fun temporary(until: String?, call: suspend () -> Unit) = call()
+    override suspend fun <T> temporary(until: String?, call: suspend () -> T): T = call()
 
     override fun checkpoint(name: String) = Unit
 

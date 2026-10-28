@@ -10,11 +10,13 @@ import ru.hollowhorizon.hollowengine.addons.narrative.poll.ChoiceEvent
 import ru.hollowhorizon.hollowengine.addons.narrative.poll.Poll
 import ru.hollowhorizon.hollowengine.addons.narrative.poll.PollProvider
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryAnchor
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.Line
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.SayEvent
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActions
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -73,6 +75,17 @@ object DialogueTestCommands {
     fun greet(who: DialogueCharacter) {
         greeted += who.name
     }
+
+    val counted = mutableListOf<Float>()
+
+    @SimpleAction("double")
+    fun double(value: Float): Float {
+        counted += value
+        return value * 2
+    }
+
+    @SimpleAction("add-one")
+    fun addOne(value: Float): Float = value + 1
 }
 
 class ScenePlayerTest {
@@ -349,6 +362,66 @@ class ScenePlayerTest {
             listOf("3 Items: first - sword, last - potion.", "Vitalik: That weights..."),
             presenter.lines,
         )
+    }
+
+    @Test
+    fun `a command gives its value to an expression, nested calls first`() = runTest {
+        val presenter = Recorder(backgroundScope)
+        DialogueTestCommands.counted.clear()
+        val scene = scene(
+            """
+            @set a = double(3)
+            @set b = double(double(1)) + 1
+            Итог {a}, {b}, {double(5)}, {add_one(1)}.
+            """.trimIndent(),
+        )
+
+        val result = scene.play(emptyList())
+
+        assertEquals(SceneResult.Finished, result, result.toString())
+        assertEquals(listOf("Итог 6, 5, 10, 2."), presenter.lines)
+        assertEquals(listOf(3f, 1f, 2f, 5f), DialogueTestCommands.counted, "inner calls run before outer ones")
+    }
+
+    @Test
+    fun `a call in a loop condition runs on every pass`() = runTest {
+        val presenter = Recorder(backgroundScope)
+        DialogueTestCommands.counted.clear()
+        val scene = scene(
+            """
+            @set n = 0
+            @while double(n) < 6
+                @set n = n + 1
+            Готово: {n}.
+            """.trimIndent(),
+        )
+
+        scene.play(emptyList())
+
+        assertEquals(listOf("Готово: 3."), presenter.lines)
+        assertEquals(listOf(0f, 1f, 2f, 3f), DialogueTestCommands.counted)
+    }
+
+    @Test
+    fun `a command that gives nothing back cannot be a value`() {
+        StoryActions.register(DialogueTestCommands::class.java, "test")
+        val result = StoryCompiler.compile("test", "@set x = pause(1s)", ActionCommands)
+
+        assertTrue(result.diagnostics.any { "gives nothing back" in it.message }, result.diagnostics.toString())
+    }
+
+    @Test
+    fun `an entity survives a save and load by its uuid`() {
+        val entity = StoryEntity(UUID.randomUUID(), "Стражник")
+        val checkpoint = SceneCheckpoint(
+            address = "test:main.story",
+            sourceHash = "hash",
+            locale = null,
+            frames = listOf(CheckpointFrame("test:main.story", StoryAnchor(null, 0, 0))),
+            variables = mapOf("guard" to entity),
+        )
+
+        assertEquals(entity, assertNotNull(SceneCheckpoint.load(checkpoint.save())).variables["guard"])
     }
 
     @Test

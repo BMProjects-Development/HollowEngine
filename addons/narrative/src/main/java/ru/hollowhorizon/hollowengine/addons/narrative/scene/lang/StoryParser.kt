@@ -432,7 +432,15 @@ class StoryParser(private val source: String) {
                 }
             }
 
-            val (expr, next) = parseArgValue(line, offset, raw, i, end, isCondition = name == "if")
+            val valueStart = i
+            val (expr, next) = try {
+                parseArgValue(line, offset, raw, i, end, isCondition = name == "if")
+            } catch (e: StoryParseException) {
+                diagnostics.error(e.message ?: "Parse error", e.span)
+                val valueEnd = valueEnd(raw, valueStart, end)
+                val source = raw.substring(valueStart, valueEnd)
+                StoryExpressions.broken(source, span(offset, line, valueStart, valueEnd), e.message ?: "Parse error") to valueEnd
+            }
             i = next
             args += StoryArg(name, nameSpan, expr, span(offset, line, argStart, i))
         }
@@ -494,6 +502,10 @@ class StoryParser(private val source: String) {
                 }
                 return parseArgList(line, offset, raw, start, closing) to closing + 1
             }
+        }
+
+        callEnd(line, offset, raw, start, end)?.let { closing ->
+            return StoryExpressions.parse(raw, offset, line, start, closing + 1) to closing + 1
         }
 
         var i = start
@@ -600,6 +612,34 @@ class StoryParser(private val source: String) {
         }
         flushLiteral(end)
         return TextTemplate(parts, span(offset, line, start, end))
+    }
+
+    /** Where a call such as `npc([0, 64, 0])` starting at [start] closes, or null when no call starts there. */
+    private fun callEnd(line: Int, offset: Int, raw: String, start: Int, end: Int): Int? {
+        if (!StoryExpressions.isIdentStart(raw[start])) return null
+        var i = start
+        while (i < end && StoryExpressions.isIdentPart(raw[i])) i++
+        if (i >= end || raw[i] != '(') return null
+        return findClosingBracket(raw, i, end, '(', ')')
+            ?: throw StoryParseException("Unterminated '('", span(offset, line, i, end))
+    }
+
+    /** Where an argument value starting at [start] ends: at the first space outside brackets and quotes. */
+    private fun valueEnd(raw: String, start: Int, end: Int): Int {
+        var depth = 0
+        var inQuotes = false
+        var i = start
+        while (i < end) {
+            when (raw[i]) {
+                '\\' -> i++
+                '"' -> inQuotes = !inQuotes
+                '(', '[', '{' -> if (!inQuotes) depth++
+                ')', ']', '}' -> if (!inQuotes) depth--
+                ' ', '\t' -> if (!inQuotes && depth <= 0) return i
+            }
+            i++
+        }
+        return minOf(i, end)
     }
 
     private fun findClosingQuote(raw: String, opening: Int, end: Int): Int? {

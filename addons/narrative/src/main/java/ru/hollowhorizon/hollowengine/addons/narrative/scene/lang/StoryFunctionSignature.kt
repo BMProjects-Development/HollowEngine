@@ -11,8 +11,12 @@ enum class StoryType {
         NUMBER -> value is StoryNumber || (value is StoryString && value.value.toFloatOrNull() != null)
         BOOL -> value is StoryBool
         LIST -> value is StoryList
-        ACTOR -> value is StoryActor || value is StoryString
+        ACTOR -> value is StoryActor || value is StoryEntity || value is StoryString
     }
+
+    /** Whether a call that gives back [type] can fill a parameter of this type. */
+    fun takes(type: StoryType): Boolean =
+        this == ANY || type == ANY || this == type || (this == STRING && (type == NUMBER || type == BOOL))
 }
 
 /**
@@ -50,6 +54,7 @@ data class StoryParam(
  * @param icon a `namespace:textures/...` icon the editor shows beside it.
  * @param category the heading the editor lists it under, a lang key or plain text.
  * @param widget the id of the widget the editor draws its rows with, when not the plain one.
+ * @param returns what a call gives back to an expression, or null when it gives nothing.
  */
 data class StoryFunctionSignature(
     val name: String,
@@ -59,6 +64,7 @@ data class StoryFunctionSignature(
     val icon: String? = null,
     val category: String? = null,
     val widget: String? = null,
+    val returns: StoryType? = null,
 ) {
 
     init {

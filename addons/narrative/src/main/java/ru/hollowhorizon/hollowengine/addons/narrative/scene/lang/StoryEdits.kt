@@ -176,6 +176,26 @@ object StoryEdits {
         return if (named != null) insertAt(text, named.span.start, "$value ") else insertAt(text, statementEnd(parsed), " $value")
     }
 
+    /** The nested [call] as it is written in [text], with the argument of the parameter [param] set to [value]. */
+    fun setCallArgument(text: String, call: StoryLineKind.FuncCall, params: List<String>, param: String, value: String): String {
+        val positional = call.args.filter { it.name == null }
+        var named = false
+        var found = false
+        val written = call.args.mapNotNull { arg ->
+            val name = arg.name ?: params.getOrNull(positional.indexOf(arg))
+            val source = text.substring(arg.expr.span.start, arg.expr.span.end)
+            if (name == param) found = true
+            val kept = if (name == param) value.takeIf { it.isNotBlank() } else source
+            when {
+                kept == null -> null.also { named = true }
+                name == null || (arg.name == null && !named) -> kept
+                else -> "$name=$kept"
+            }
+        }
+        val added = if (!found && value.isNotBlank()) listOf("$param=$value") else emptyList()
+        return "${call.function}(${(written + added).joinToString(", ")})"
+    }
+
     private fun arguments(kind: StoryLineKind): List<StoryArg> = when (kind) {
         is StoryLineKind.FuncCall -> kind.args
         is StoryLineKind.Choice -> kind.args

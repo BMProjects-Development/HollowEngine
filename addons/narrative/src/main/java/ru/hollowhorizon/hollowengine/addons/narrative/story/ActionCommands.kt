@@ -171,6 +171,7 @@ class StoryCommand private constructor(
                 icon = function.findAnnotation<EditorIcon>()?.icon,
                 category = function.findAnnotation<EditorCategory>()?.category,
                 widget = function.findAnnotation<EditorWidget>()?.id,
+                returns = StoryConversions.typeOf(function.returnType),
             )
             return StoryCommand(action, signature, bound)
         }
@@ -248,6 +249,8 @@ internal object StoryConversions {
         is Duration -> StoryNumber(value.inWholeMilliseconds.toFloat())
         is Enum<*> -> StoryString(value.name.lowercase().replace('_', '-'))
         is Collection<*> -> StoryList(value.mapNotNull(::toStory))
+        is Entity -> StoryEntity.of(value)
+        is EntityCharacter -> StoryEntity.of(value.entity)
         else -> throw StoryRuntimeException("A scene cannot keep a ${value.javaClass.simpleName}")
     }
 
@@ -281,7 +284,7 @@ internal object StoryConversions {
             classifier == Byte::class -> number().toInt().toByte()
             classifier == Duration::class -> number().toDouble().milliseconds
             classifier.isSubclassOf(Entity::class) -> entity(value, classifier, ::fail)
-            classifier.isSubclassOf(DialogueCharacter::class) -> (value as? StoryActor)?.character?.takeIf(classifier::isInstance)
+            classifier.isSubclassOf(DialogueCharacter::class) -> characterOf(value)?.takeIf(classifier::isInstance)
                 ?: fail("no character of the scene is named so")
 
             classifier == ServerLevel::class -> ResourceLocation.tryParse(value.display())
@@ -306,11 +309,19 @@ internal object StoryConversions {
     }
 
     private fun entity(value: StoryValue, type: KClass<*>, fail: (String) -> Nothing): Entity {
-        val actor = value as? StoryActor ?: fail("no character of the scene is named so")
-        val entity =
-            (actor.character as? EntityCharacter)?.entity ?: fail("'${actor.name}' is a name without an entity")
-        if (!type.isInstance(entity)) fail("'${actor.name}' is a ${entity.type.description.string}, not a ${type.simpleName}")
+        val entity = when (value) {
+            is StoryEntity -> value.find() ?: fail("'${value.name}' is not loaded")
+            is StoryActor -> (value.character as? EntityCharacter)?.entity ?: fail("'${value.name}' is a name without an entity")
+            else -> fail("no character of the scene is named so")
+        }
+        if (!type.isInstance(entity)) fail("'${value.display()}' is a ${entity.type.description.string}, not a ${type.simpleName}")
         return entity
+    }
+
+    private fun characterOf(value: StoryValue): DialogueCharacter? = when (value) {
+        is StoryActor -> value.character
+        is StoryEntity -> value.character()
+        else -> null
     }
 
     private val NUMBERS = setOf(Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class)
