@@ -20,8 +20,9 @@ object HollowAddonManager : AutoCloseable {
     val restartRequired: List<HollowAddonDescriptor>
         get() = runtime?.restartRequiredSnapshot.orEmpty()
 
+    /** The state after the last finished change; never waits for a load that is still running. */
     val statuses: List<HollowAddonStatus>
-        get() = runtime?.let { addonRuntime -> runBlocking { addonRuntime.statuses() } }.orEmpty()
+        get() = runtime?.statusSnapshot.orEmpty()
 
     /**
      * Loaded addons that carry assets or data, highest priority first. Addons in `mods` are left out:

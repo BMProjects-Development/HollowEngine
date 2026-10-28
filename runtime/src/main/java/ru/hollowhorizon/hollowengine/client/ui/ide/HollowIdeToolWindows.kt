@@ -4,6 +4,8 @@ import ru.hollowhorizon.hollowengine.client.ui.docking.DockItem
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockPlacement
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockTarget
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockingState
+import ru.hollowhorizon.hollowengine.client.ui.ide.addons.AddonManagerIcon
+import ru.hollowhorizon.hollowengine.client.ui.ide.addons.AddonManagerLang
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.AssetManagerLang
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -120,15 +122,27 @@ internal object HollowIdeToolWindows {
         minHeight = 130f,
     )
 
+    val AddonManager = HollowIdeToolWindow(
+        id = AddonManagerId,
+        titleKey = "$AddonManagerLang.title",
+        icon = AddonManagerIcon,
+        placement = DockPlacement.CENTER,
+        anchors = listOf(HollowIdePanelAnchor.EDITORS),
+        minWidth = 220f,
+        minHeight = 160f,
+    )
+
     val menu: List<HollowIdeToolWindow?> = listOf(
         Project, Scene, Inspector, AssetManager, Console, History,
         null,
         Timeline, GameViewport,
+        null,
+        AddonManager,
     )
 
     /** Every window the editor knows how to open, for turning a remembered id back into one. */
     val all: List<HollowIdeToolWindow> = listOf(
-        Project, Scene, AssetManager, Console, Timeline, Inspector, GameViewport, History, UiProfiler,
+        Project, Scene, AssetManager, Console, Timeline, Inspector, GameViewport, History, UiProfiler, AddonManager,
     )
 
     fun byId(id: String): HollowIdeToolWindow? = all.firstOrNull { it.id == id }

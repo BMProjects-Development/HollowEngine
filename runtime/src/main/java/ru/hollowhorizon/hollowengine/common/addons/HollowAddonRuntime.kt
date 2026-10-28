@@ -59,6 +59,14 @@ internal class HollowAddonRuntime(
     var enabledSnapshot: List<HollowAddonInstallation> = emptyList()
         private set
 
+    /**
+     * The statuses as they were when the last change finished. Readable without the lock, so a screen listing
+     * the addons does not wait while a load holds it.
+     */
+    @Volatile
+    var statusSnapshot: List<HollowAddonStatus> = emptyList()
+        private set
+
     @Volatile
     private var started = false
 
@@ -199,9 +207,10 @@ internal class HollowAddonRuntime(
         drainPending()
     }
 
-    suspend fun statuses(): List<HollowAddonStatus> = locked {
+    suspend fun statuses(): List<HollowAddonStatus> = locked { currentStatuses() }
+
+    private fun currentStatuses(): List<HollowAddonStatus> =
         knownCandidates.values.sortedWith(compareBy({ it.descriptor.id }, { it.sourceFile.name })).map(::statusOf)
-    }
 
     suspend fun setEnabled(id: String, enabled: Boolean): HollowAddonOperationResult = locked {
         val candidates = knownCandidates.values.filter { candidate -> candidate.descriptor.id == id }
@@ -646,6 +655,7 @@ internal class HollowAddonRuntime(
             block()
         } finally {
             refreshEnabledSnapshot()
+            statusSnapshot = currentStatuses()
             mutex.unlock()
             if (loadedSnapshot !== loadedBefore) {
                 runCatching { HollowAddonsChangedEvent.post(HollowAddonsChangedEvent()) }

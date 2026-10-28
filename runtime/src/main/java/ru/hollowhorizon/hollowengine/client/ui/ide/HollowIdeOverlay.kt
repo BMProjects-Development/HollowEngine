@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.addons.AddonManagerPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
@@ -73,6 +74,7 @@ internal const val InspectorId = "ide-inspector"
 internal const val GameViewportId = "ide-game-viewport"
 internal const val GameViewportNodeId = "game-viewport"
 internal const val HistoryId = "ide-history"
+internal const val AddonManagerId = "ide-addon-manager"
 
 private const val LayoutSaveDelayMillis = 600L
 
@@ -1101,6 +1103,7 @@ object HollowIdeOverlay {
             )
 
             UiProfilerId -> HollowIdeUiProfilerPanel(surface.runtime.profiler)
+            AddonManagerId -> AddonManagerPanel(onFocusSearch = ::requestSurfaceFocus)
             in contributions -> contributions.PanelContent(item.id)
             else -> model.files.values.firstOrNull { it.id == item.id }?.let { file ->
                 FileTabBody(file)

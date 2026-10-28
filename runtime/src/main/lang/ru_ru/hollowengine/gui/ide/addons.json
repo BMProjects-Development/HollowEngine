@@ -1,0 +1,17 @@
+{
+  "title": "Менеджер аддонов",
+  "search": "Поиск по аддонам",
+  "installed": "Установленные",
+  "loading": "Загрузка списка аддонов…",
+  "empty": "Аддоны не установлены.",
+  "nothing_found": "Ничего не найдено.",
+  "no_description": "Без описания.",
+  "enabling": "Включается…",
+  "disabling": "Выключается…",
+  "state.loaded": "Загружен",
+  "state.disabled": "Выключен",
+  "state.restart_required": "Нужен перезапуск",
+  "state.waiting_for_dependencies": "Ждёт зависимости",
+  "state.rejected": "Отклонён",
+  "state.inactive": "Не активен"
+}

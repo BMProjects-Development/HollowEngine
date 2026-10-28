@@ -29,7 +29,11 @@ internal object HollowAddonDescriptorReader {
                 .uppercase()
                 .let(HollowAddonEnvironment::valueOf),
             requiredClasses = properties.list("requiredClasses"),
-            hostModId = properties.getProperty("hostModId")?.trim()?.takeIf(String::isNotEmpty),
+            hostModId = properties.optional("hostModId"),
+            description = properties.optional("description"),
+            authors = properties.list("authors"),
+            category = properties.optional("category"),
+            icon = properties.optional("icon"),
         ).also(::validate)
     }
 
@@ -50,6 +54,8 @@ internal object HollowAddonDescriptorReader {
 
     private fun Properties.required(name: String): String = getProperty(name)?.trim()?.takeIf(String::isNotEmpty)
         ?: throw IllegalArgumentException("Missing '$name' in $DESCRIPTOR_PATH")
+
+    private fun Properties.optional(name: String): String? = getProperty(name)?.trim()?.takeIf(String::isNotEmpty)
 
     private fun Properties.list(name: String): List<String> = getProperty(name, "")
         .split(',')

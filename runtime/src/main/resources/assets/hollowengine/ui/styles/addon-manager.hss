@@ -1,0 +1,282 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+$addon-accent: #FEAE3F;
+$addon-orange: #FEAE3F;
+$addon-green: #1DB07D;
+$addon-blue: #58B2EA;
+$addon-tile-orange: alpha(#F39C12, 0.19);
+$addon-tile-green: alpha(#1ABC9C, 0.14);
+$addon-tile-blue: alpha(#3498DB, 0.19);
+
+.ide-panel.addon-manager {
+    padding: 12px;
+    gap: 14px;
+    background: $bg-panel;
+    @apply $thin-scroll;
+}
+
+.addon-search {
+    size: 100% 20px;
+    padding: 0px 10px;
+    gap: 7px;
+    align-items: start center;
+    border-radius: 10px;
+    background: $bg-raised;
+}
+
+.addon-search-icon {
+    size: 11px 11px;
+}
+
+.addon-search-input {
+    height: 100%;
+    padding: 0px;
+    background: transparent;
+    border: 1px transparent;
+    foreground: $text;
+    font-size: $font-size;
+    @apply $field-text;
+}
+
+.addon-section-header {
+    size: 100% 16px;
+    padding: 0px 0px 0px 6px;
+    gap: 6px;
+    align-items: start center;
+}
+
+.addon-section-icon {
+    size: 10px 10px;
+}
+
+.addon-section-title {
+    size: fit fit;
+    foreground: $text-strong;
+    font-size: $font-size-title;
+    wrap: false;
+}
+
+.addon-message {
+    size: 100% fit;
+    padding: 6px;
+    foreground: $text-faint;
+}
+
+.addon-card {
+    height: fit;
+    padding: 12px 12px 16px 12px;
+    gap: 12px;
+    border-radius: $radius-large;
+    background: linear-gradient(168deg, $bg-hover, $bg-raised);
+    border: 1px $border;
+    transition: border 120ms ease-out;
+}
+
+.addon-card:hover {
+    border: 1px $border-strong;
+}
+
+.addon-card.enabled {
+    background: linear-gradient(168deg, #403830, $bg-raised);
+    border: 1px $addon-accent;
+    shadow: 0px 0px 6px 0px alpha($addon-accent, 0.15);
+}
+
+.addon-card.enabled.library,
+.addon-card.enabled.other {
+    background: linear-gradient(168deg, #253837, $bg-raised);
+    border: 1px $addon-green;
+    shadow: 0px 0px 6px 0px alpha(#46FFD4, 0.1);
+}
+
+.addon-card.enabled.instrument {
+    background: linear-gradient(168deg, #2C3945, $bg-raised);
+    border: 1px $addon-blue;
+    shadow: 0px 0px 6px 0px alpha(#3F8BFE, 0.15);
+}
+
+.addon-card-header {
+    size: 100% fit;
+    gap: 8px;
+    align-items: start center;
+}
+
+.addon-icon-tile {
+    size: 34px 34px;
+    align-items: center center;
+    border-radius: $radius-large;
+    background: $addon-tile-green;
+}
+
+.addon-icon-tile.performance,
+.addon-icon-tile.visual {
+    background: $addon-tile-orange;
+}
+
+.addon-icon-tile.instrument {
+    background: $addon-tile-blue;
+}
+
+.addon-icon {
+    size: 19px 19px;
+}
+
+.addon-heading {
+    width: 0px;
+    height: fit;
+    grow: 1;
+    gap: 4px;
+}
+
+.addon-name {
+    size: 100% fit;
+    foreground: $text;
+    font-size: $font-size;
+}
+
+.addon-meta {
+    size: 100% fit;
+    gap: 6px;
+    align-items: start center;
+}
+
+.addon-category {
+    size: fit fit;
+    padding: 1px 4px;
+    border-radius: $radius-small;
+    background: $border;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+    wrap: false;
+}
+
+.addon-author {
+    width: 0px;
+    height: fit;
+    grow: 1;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+}
+
+.addon-card-footer {
+    size: 100% fit;
+    padding: 2px 0px 0px 0px;
+    gap: 6px;
+}
+
+.addon-description {
+    size: 100% fit;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+    line-spacing: 2px;
+}
+
+.addon-version {
+    size: 100% fit;
+    foreground: $text-faint;
+    font-size: $font-size-small;
+    text-align: right;
+    wrap: false;
+}
+
+.addon-switch {
+    size: 26px 14px;
+    padding: 2px;
+    align-items: start center;
+    border-radius: 7px;
+    background: $border;
+    transition: background 120ms ease-out;
+}
+
+.addon-switch.on {
+    align-items: end center;
+    background: $addon-accent;
+}
+
+.addon-switch-knob {
+    size: 10px 10px;
+    border-radius: 5px;
+    background: $white;
+}
+
+.addon-failure {
+    size: 100% fit;
+    padding: 6px 8px;
+    border-radius: $radius;
+    background: $danger-soft;
+    foreground: $danger;
+    font-size: $font-size-small;
+}
+
+.addon-failure:hover {
+    background: alpha(#C25757, 0.3);
+}
+
+.addon-section-count {
+    size: fit fit;
+    padding: 0px 6px;
+    border-radius: $radius-small;
+    background: $bg-raised;
+    foreground: $text-muted;
+    font-size: $font-size-small;
+    wrap: false;
+}
+
+.addon-progress {
+    size: 100% 2px;
+    background: $divider;
+}
+
+.addon-progress-bar {
+    size: 56px 2px;
+    background: $accent;
+    border-radius: 1px;
+}
+
+.addon-skeleton-list {
+    size: 100% fit;
+    gap: 10px;
+}
+
+.addon-skeleton {
+    size: 100% 84px;
+    padding: 14px;
+    gap: 12px;
+    border-radius: $radius-large;
+    background: $bg-field;
+    border: 1px $divider;
+}
+
+.addon-skeleton-line {
+    size: 45% 9px;
+    border-radius: $radius-small;
+    background: $bg-hover;
+}
+
+.addon-skeleton-line.wide {
+    size: 70% 9px;
+}
+
+.addon-card.pending {
+    border: 1px $border-strong;
+}
+
+.addon-pending {
+    size: 100% fit;
+    foreground: $accent;
+    font-size: $font-size-small;
+    text-align: right;
+    wrap: false;
+}
+
+.addon-switch:hover {
+    background: $bg-pressed;
+}
+
+.addon-switch.on:hover {
+    background: alpha($addon-accent, 0.8);
+}
+
+.addon-switch.pending .addon-switch-knob {
+    background: $text-muted;
+}

@@ -321,12 +321,14 @@ private fun UiLayoutPipeline.intrinsicSize(
             if (layoutChildren(node).isEmpty()) return replacedIntrinsicSize(style)
 
             if (node.measurePolicy !is UiBuiltInMeasurePolicy) {
+                val policyHeight =
+                    if (style.size.height is UiLength.Fit) Float.POSITIVE_INFINITY else availableHeight
                 measureCustomContainer(
                     node,
                     resolved,
                     node.measurePolicy,
                     availableWidth,
-                    availableHeight,
+                    policyHeight,
                     scrollbarReserves,
                 )
             } else {
@@ -444,4 +446,3 @@ internal fun UiComputedStyle.verticalGutter(reserve: UiScrollbarReserve, referen
 
 internal fun UiComputedStyle.horizontalGutter(reserve: UiScrollbarReserve, reference: Float): Float =
     if (reserve.horizontal) scrollbar.resolved(reference).gutter else 0f
-

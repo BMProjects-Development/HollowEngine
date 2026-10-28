@@ -1,0 +1,17 @@
+{
+  "title": "Addon Manager",
+  "search": "Search addons",
+  "installed": "Installed",
+  "loading": "Loading addons…",
+  "empty": "No addons are installed.",
+  "nothing_found": "Nothing found.",
+  "no_description": "No description.",
+  "enabling": "Enabling…",
+  "disabling": "Disabling…",
+  "state.loaded": "Loaded",
+  "state.disabled": "Disabled",
+  "state.restart_required": "Restart required",
+  "state.waiting_for_dependencies": "Waiting for dependencies",
+  "state.rejected": "Rejected",
+  "state.inactive": "Inactive"
+}
