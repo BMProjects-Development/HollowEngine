@@ -267,3 +267,27 @@ $kind-broken: $danger;
     font-size: 8px;
     text-wrap: true;
 }
+
+.story-call-slot {
+    padding: 0px 2px 0px 4px;
+    gap: 2px;
+    background: alpha($kind-plain, 0.12);
+    border: 1px alpha($kind-plain, 0.35);
+    border-radius: $radius;
+}
+
+.story-call-icon {
+    size: 10px 10px;
+}
+
+.story-call-title {
+    height: fit;
+    foreground: $text-muted;
+    font-family: $font-code;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-slot-call {
+    size: 12px 12px;
+}

@@ -197,12 +197,17 @@ class StoryCompiler(
             }
 
             is StoryLineKind.Dialogue -> {
+                lower(line, kind.text.expressions() + kind.speakerExpr)
                 emit(StoryInstruction.Say(kind.speaker, kind.text, anchor(line), kind.speakerExpr))
                 requireNoChildren(node)
             }
 
             is StoryLineKind.Set -> {
-                emit(StoryInstruction.Set(kind.variable, kind.value, anchor(line)))
+                val whole = kind.value.wholeCall()
+                if (whole != null) invokeInto(whole.call, kind.variable, line) else {
+                    lower(line, kind.value)
+                    emit(StoryInstruction.Set(kind.variable, kind.value, anchor(line)))
+                }
                 requireNoChildren(node)
             }
 
@@ -226,6 +231,7 @@ class StoryCompiler(
 
             is StoryLineKind.Return -> {
                 if (kind.value != null && defining == null) error("Only a '@define' returns a value", line)
+                lower(line, kind.value)
                 emit(StoryInstruction.Return(anchor(line), kind.value))
                 requireNoChildren(node)
             }
@@ -237,6 +243,7 @@ class StoryCompiler(
                 if (params != null && params.size != kind.args.size) {
                     error("'${kind.name}' takes ${params.size} arguments: ${params.joinToString()}", line)
                 }
+                lower(line, kind.args.map { it.expr })
                 emit(StoryInstruction.CallDefine(kind.name, kind.args.map { it.expr }, kind.result, anchor(line)))
                 requireNoChildren(node)
             }
@@ -251,16 +258,19 @@ class StoryCompiler(
                         null
                     }
                 }
+                lower(line, kind.args.map { it.expr })
                 emit(StoryInstruction.Stage(kind.script, kind.stage, kind.args - setOfNotNull(result), name, anchor(line)))
                 requireNoChildren(node)
             }
 
             is StoryLineKind.Command -> {
+                lower(line, kind.text.expressions())
                 emit(StoryInstruction.Command(kind.text, anchor(line)))
                 requireNoChildren(node)
             }
 
             is StoryLineKind.FuncCall -> {
+                lower(line, kind.args.map { it.expr })
                 emitInvoke(resolveCall(kind, line), line)
                 requireNoChildren(node)
             }
@@ -326,6 +336,7 @@ class StoryCompiler(
             }
 
             if (condition != null) {
+                lower(node.line, condition)
                 val branchJump = emitPlaceholder(node.line)
                 compileNodes(node.children)
                 val skip = emitPlaceholder(node.line)
@@ -346,6 +357,7 @@ class StoryCompiler(
 
     private fun compileWhile(node: Node, kind: StoryLineKind.While) {
         val conditionPc = instructions.size
+        lower(node.line, kind.condition)
         val exitJump = emitPlaceholder(node.line)
         compileNodes(node.children)
         emit(StoryInstruction.Goto(conditionPc, anchor(node.line)))
@@ -361,6 +373,10 @@ class StoryCompiler(
             i++
         }
 
+        group.forEach { node ->
+            val choice = node.line.kind as StoryLineKind.Choice
+            lower(node.line, choice.text.expressions() + choice.args.map { it.expr })
+        }
         val menuPc = emitPlaceholder(group.first().line)
         val options = mutableListOf<MenuOption>()
         val endJumps = mutableListOf<Int>()
@@ -406,6 +422,7 @@ class StoryCompiler(
      */
     private fun compileTimeout(node: Node, kind: StoryLineKind.Timeout) {
         if (node.children.isEmpty()) error("'@timeout' expects an indented block", node.line)
+        lower(node.line, kind.duration)
         val startPc = emitPlaceholder(node.line)
         timeouts.addLast(startPc)
         compileNodes(node.children)
@@ -457,8 +474,34 @@ class StoryCompiler(
         return found.values.firstOrNull()?.get(name)
     }
 
-    private fun emitInvoke(call: StoryCall, line: StoryLine) =
-        emit(StoryInstruction.Invoke(call, anchor(line), temporaries.lastOrNull(), timeouts.toList()))
+    private fun emitInvoke(call: StoryCall, line: StoryLine, result: String? = null) =
+        emit(StoryInstruction.Invoke(call, anchor(line), temporaries.lastOrNull(), timeouts.toList(), result))
+
+    /** Runs the calls inside [expressions] ahead of the instruction that reads them, each into its variable. */
+    private fun lower(line: StoryLine, vararg expressions: StoryExpression?) = lower(line, expressions.asList())
+
+    private fun lower(line: StoryLine, expressions: List<StoryExpression?>) {
+        expressions.forEach { expression -> expression?.calls?.forEach { invokeInto(it.call, it.variable, line) } }
+    }
+
+    /**
+     * Calls [written] for its value, which goes into [variable]; the calls in its arguments run first. A name written
+     * `look_at` in an expression, where `-` is a minus, finds the command `look-at`.
+     */
+    private fun invokeInto(written: StoryLineKind.FuncCall, variable: String, line: StoryLine) {
+        lower(line, written.args.map { it.expr })
+        val hyphenated = written.function.replace('_', '-')
+        val kind = if (catalog.overloads(written.function) == null && catalog.overloads(hyphenated) != null) {
+            written.copy(function = hyphenated)
+        } else written
+        val overloads = catalog.overloads(kind.function).orEmpty()
+        if (overloads.isNotEmpty() && overloads.all { it.returns == null }) {
+            error("'@${kind.function}' gives nothing back, so it cannot be used as a value", line)
+        }
+        emitInvoke(resolveCall(kind, line), line, variable)
+    }
+
+    private fun TextTemplate.expressions() = parts.mapNotNull { (it as? TextPart.Interpolation)?.expr }
 
     private fun compileAsync(node: Node, kind: StoryLineKind.Async) {
         if (defining != null) error("'@async' cannot start inside a '@define'", node.line)
@@ -469,6 +512,7 @@ class StoryCompiler(
             if (node.children.isNotEmpty()) {
                 error("'@async' with an inline command cannot also open a block", node.line)
             }
+            lower(node.line, kind.inline.args.map { it.expr })
             emitInvoke(resolveCall(kind.inline, node.line), node.line)
         } else {
             if (node.children.isEmpty()) {

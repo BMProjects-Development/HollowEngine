@@ -18,12 +18,12 @@ internal interface SceneHost {
 
     /**
      * Runs a reversible command of the main flow, given the statement it is as `hash#label+offset`: its journal record
-     * is kept to finish the command after a restart instead of repeating it.
+     * is kept to finish the command after a restart instead of repeating it. Returns what the command gave back.
      */
-    suspend fun journaled(statement: String, call: suspend () -> Unit)
+    suspend fun journaled(statement: String, call: suspend () -> Any?): Any?
 
     /** Runs [call] with the actions it performs taken back at the checkpoint [until], or at the next one when null. */
-    suspend fun temporary(until: String?, call: suspend () -> Unit)
+    suspend fun <T> temporary(until: String?, call: suspend () -> T): T
 
     /** Passes the checkpoint [name] of the story, with the dialogue standing after it. */
     fun checkpoint(name: String)

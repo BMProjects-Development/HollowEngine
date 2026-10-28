@@ -111,14 +111,14 @@ internal object SceneStage {
             frame.segmentMark = frame.run.journal.next
         }
 
-        override suspend fun journaled(statement: String, call: suspend () -> Unit) = journaled(frame, statement, call)
+        override suspend fun journaled(statement: String, call: suspend () -> Any?) = journaled(frame, statement, call)
 
         override suspend fun startTrack(name: String, address: String, anchor: StoryAnchor) =
             SceneTracks.start(frame, name, address, anchor)
 
         override fun tracks(): Map<String, SceneTrack> = SceneTracks.of(frame)
 
-        override suspend fun temporary(until: String?, call: suspend () -> Unit) = temporaryUntil(until) { call() }
+        override suspend fun <T> temporary(until: String?, call: suspend () -> T): T = temporaryUntil(until) { call() }
 
         override fun checkpoint(name: String) = frame.passCheckpoint(name)
 
@@ -166,14 +166,14 @@ internal object SceneStage {
      * action it calls: after a restart an action the scene or track was in the middle of is finished, and one that
      * was done is not performed again.
      */
-    internal suspend fun journaled(frame: StoryFrame, statement: String, call: suspend () -> Unit) {
+    internal suspend fun journaled(frame: StoryFrame, statement: String, call: suspend () -> Any?): Any? {
         val interrupted =
             frame.action?.takeIf { it != StoryFrame.NO_RECORD && frame.locals.getString(ACTION_AT) == statement }
         val entry = interrupted?.let(frame.run.journal::entry)
         frame.standAt(STATEMENT, calling = true)
-        try {
+        return try {
             when {
-                entry?.done == true -> Unit
+                entry?.done == true -> null
                 entry != null -> StoryActions.resume(entry)
                 else -> {
                     frame.action = StoryFrame.NO_RECORD

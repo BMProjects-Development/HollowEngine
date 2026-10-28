@@ -52,12 +52,17 @@ class StoryArguments(
     /** The character bound to an actor argument. */
     fun actor(name: String): DialogueCharacter = when (val value = require(name)) {
         is StoryActor -> value.character
+        is StoryEntity -> value.character()
         else -> throw IllegalArgumentException(
             "Argument '$name' is not a character: no actor named '${value.display()}' is bound to this dialogue",
         )
     }
 
-    fun actorOrNull(name: String): DialogueCharacter? = (byName[name] as? StoryActor)?.character
+    fun actorOrNull(name: String): DialogueCharacter? = when (val value = byName[name]) {
+        is StoryActor -> value.character
+        is StoryEntity -> value.character()
+        else -> null
+    }
 
     /**
      * The entity behind an actor argument.

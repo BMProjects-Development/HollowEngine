@@ -111,13 +111,14 @@ sealed interface StoryInstruction {
 
     /**
      * A command. Inside `@temporary` its actions are [temporary]; inside `@timeout` blocks it gives up when the time
-     * of them, the [TimeoutStart]s at [timeouts], is out.
+     * of them, the [TimeoutStart]s at [timeouts], is out. A command called for its value puts it into [result].
      */
     data class Invoke(
         val call: StoryCall,
         override val anchor: StoryAnchor,
         val temporary: StoryTemporary? = null,
         val timeouts: List<Int> = emptyList(),
+        val result: String? = null,
     ) : StoryInstruction
 
     /** `@checkpoint`: a checkpoint of the story the dialogue plays in. */

@@ -53,6 +53,7 @@ data class SceneCheckpoint(
         private const val TYPE_NUMBER = "n"
         private const val TYPE_BOOL = "b"
         private const val TYPE_LIST = "l"
+        private const val TYPE_ENTITY = "e"
 
         internal fun saveVariables(variables: Map<String, StoryValue>) = CompoundTag().apply {
             for ((name, value) in variables) {
@@ -83,6 +84,12 @@ data class SceneCheckpoint(
                     entry.put("v", ListTag().apply { value.values.forEach { item -> saveValue(item)?.let(::add) } })
                 }
 
+                is StoryEntity -> {
+                    entry.putString("t", TYPE_ENTITY)
+                    entry.putUUID("v", value.uuid)
+                    entry.putString("n", value.name)
+                }
+
                 is StoryActor -> return null
             }
             return entry
@@ -98,6 +105,8 @@ data class SceneCheckpoint(
             TYPE_LIST -> StoryList(
                 entry.getList("v", Tag.TAG_COMPOUND.toInt()).mapNotNull { loadValue(it as CompoundTag) },
             )
+
+            TYPE_ENTITY -> StoryEntity(entry.getUUID("v"), entry.getString("n"))
 
             else -> null
         }

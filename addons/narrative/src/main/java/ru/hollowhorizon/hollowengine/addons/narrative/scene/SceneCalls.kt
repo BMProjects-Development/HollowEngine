@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryConversions
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -26,16 +27,23 @@ internal class SceneCalls(private val player: ScenePlayer) {
         program: StoryProgram,
         pc: Int,
         instruction: StoryInstruction.Invoke,
-        journaled: suspend (statement: String, call: suspend () -> Unit) -> Unit,
+        journaled: suspend (statement: String, call: suspend () -> Any?) -> Any?,
     ): Int {
         val timeout = nearestTimeout(address, program, instruction)
         var inTime = true
+        var value: Any? = null
         call(instruction) { command, perform ->
             inTime = within(timeout, instruction.call.function) {
-                if (command.action.reversible) journaled(statementOf(program, instruction), perform) else perform()
+                value = if (command.action.reversible) journaled(statementOf(program, instruction), perform) else perform()
             }
         }
-        return if (inTime) pc + 1 else timeout!!.end
+        if (!inTime) return timeout!!.end
+        instruction.result?.let { variable ->
+            val kept = StoryConversions.toStory(value)
+                ?: throw StoryRuntimeException("'@${instruction.call.function}' gave nothing back (line ${instruction.anchor.line + 1})")
+            player.assign(variable, kept)
+        }
+        return pc + 1
     }
 
     fun startTimeout(address: String, pc: Int, instruction: StoryInstruction.TimeoutStart) {
@@ -50,7 +58,7 @@ internal class SceneCalls(private val player: ScenePlayer) {
      */
     private suspend fun call(
         instruction: StoryInstruction.Invoke,
-        run: suspend (command: StoryCommand, perform: suspend () -> Unit) -> Unit,
+        run: suspend (command: StoryCommand, perform: suspend () -> Any?) -> Unit,
     ) {
         val call = instruction.call
         val function = call.function

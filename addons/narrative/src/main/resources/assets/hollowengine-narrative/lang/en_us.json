@@ -59,6 +59,8 @@
   "hollowengine.gui.ide.story.duplicate": "Duplicate",
   "hollowengine.gui.ide.story.remove": "Remove",
   "hollowengine.gui.ide.story.more": "More",
+  "hollowengine.gui.ide.story.slot.call": "Take the value from a command",
+  "hollowengine.gui.ide.story.slot.remove": "Remove the command",
   "hollowengine.gui.ide.story.wait.duration": "Seconds",
   "hollowengine.gui.ide.story.branch.if": "if",
   "hollowengine.gui.ide.story.branch.elseif": "else if",

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene
 
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryExpression
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryEdits
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryLineKind
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryParser
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.TextPart
@@ -111,6 +112,40 @@ class StoryParserTest {
             listOf(10f, 2.5f),
             numbers.map { (it.constant as StoryNumber).value },
         )
+    }
+
+    @Test
+    fun `a call is an argument whose spaces and commas stay inside it`() {
+        val parsed = StoryParser.parse("""@look-at-entity Виталик npc([0, 64, 0], id="guard") speed=2""")
+        val kind = parsed.cst.lines[0].kind
+        assertIs<StoryLineKind.FuncCall>(kind)
+
+        assertEquals(listOf(null, null, "speed"), kind.args.map { it.name })
+        val call = kind.args[1].expr.calls.single().call
+        assertEquals("npc", call.function)
+        assertEquals(listOf(null, "id"), call.args.map { it.name })
+    }
+
+    @Test
+    fun `clearing an argument of a nested call keeps the ones after it on their parameters`() {
+        val source = "@look-at-entity npc([0, 64, 0], guard, \"minecraft:overworld\")"
+        val kind = StoryParser.parse(source).cst.lines[0].kind
+        assertIs<StoryLineKind.FuncCall>(kind)
+        val call = kind.args.single().expr.calls.single().call
+        val params = listOf("pos", "id", "level")
+
+        assertEquals("npc([0, 64, 0], level=\"minecraft:overworld\")", StoryEdits.setCallArgument(source, call, params, "id", ""))
+        assertEquals("npc([0, 64, 0], guard, \"minecraft:overworld\")", StoryEdits.setCallArgument(source, call, params, "id", "guard"))
+    }
+
+    @Test
+    fun `a bad argument keeps the line a command`() {
+        val parsed = StoryParser.parse("@move-to Виталик [25, 70 speed=1.1")
+        val kind = parsed.cst.lines[0].kind
+
+        assertIs<StoryLineKind.FuncCall>(kind, "the card must still know its command")
+        assertEquals("move-to", kind.function)
+        assertTrue(parsed.diagnostics.all.isNotEmpty())
     }
 
     @Test
