@@ -81,8 +81,7 @@ The replaced screen has already been detached by the time the swap happens, so c
 
 ```kotlin
 overlay("mypack:stamina") {
-    anchor = "experience_bar"
-    placement = HudPlacement.BEFORE
+    anchor(before("experience_bar"))
     autoShow = true
     content {
         val value = data[Stamina].coerceIn(0f, 1f)
@@ -93,14 +92,41 @@ overlay("mypack:stamina") {
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `anchor` | `hotbar` | Vanilla HUD layer to draw next to; bare names such as `crosshair` and `experience_bar` are accepted |
-| `placement` | `HudPlacement.AFTER` | Draw before or after the anchor |
+| `anchor(...)` | `after("hotbar")` | Where the overlay is drawn, see below |
 | `autoShow` | `false` | Show immediately after the script reloads; use for client-only HUD |
 | `input` | `OverlayInput.NONE` | `NONE` for draw-only HUD, `INTERACTIVE` to receive input |
-| `aboveScreens` | `false` | Also draw over an open screen |
 | `rebuildEveryFrame` | `false` | Recompose each frame; enable only when necessary |
 
 `interactive()` is shorthand for `input = OverlayInput.INTERACTIVE`. During gameplay, an interactive overlay uses the screen centre until it receives a pointer event.
+
+### Where the overlay is drawn
+
+`anchor(...)` takes one or more places, in order of priority:
+
+| Place | Meaning |
+| --- | --- |
+| `after("layer")`, `before("layer")` | In the HUD, after or before a vanilla layer. Bare names such as `crosshair`, `chat` and `experience_bar` are accepted |
+| `over(ScreenClass::class)` | On top of an open screen of this class or of its subclasses. Pass `subclasses = false` to match the class only |
+| `over("binary.class.Name")` | The same for a screen class the script cannot import |
+| `over()` | On top of any open screen |
+
+Every `over` also takes a level: `ScreenLevel.BACKGROUND` draws over the dimmed world but under the screen itself, `ScreenLevel.CONTENT` (the default) draws over the screen but under its tooltips, and `ScreenLevel.TOP` draws over everything.
+
+Here is a dialogue line that sits above the chat messages and stays clickable while the chat is open:
+
+```kotlin
+import net.minecraft.client.gui.screens.ChatScreen
+
+overlay("mypack:line") {
+    anchor(after("chat"), over(ChatScreen::class))
+    interactive()
+    content { Text("Click me in the chat") }
+}
+```
+
+With no screen open, the overlay sits in the HUD at its `after` or `before`. When a screen opens, the first `over` that matches it wins: the overlay is drawn on top of that screen and gets the real cursor. If none matches, the overlay stays in the HUD under the screen and receives no input. An overlay may have only one HUD place; an overlay with only `over` places is hidden while no matching screen is open.
+
+At the `BACKGROUND` level the screen keeps the keyboard, and the overlay is clicked only where the screen has no widget or container panel of its own.
 
 ## Adaptive surfaces
 
@@ -112,7 +138,7 @@ import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
 val Choosing = dataKey<Boolean>("choosing") { false }
 
 surface("project:dialogue") {
-    anchor = "hotbar"
+    anchor(after("hotbar"))
     mode { state ->
         if (state[Choosing]) UiSurfaceKind.SCREEN else UiSurfaceKind.OVERLAY
     }

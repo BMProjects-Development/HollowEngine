@@ -150,6 +150,18 @@ public interface RuntimeBridge extends AutoCloseable {
 
     void onScreenRenderPost(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick);
 
+    /** Before the screen draws anything this frame. */
+    void onScreenFrameStart(Screen screen);
+
+    /** After the screen drew its background, before what it draws on it. */
+    void onScreenBackgroundRendered(Screen screen, GuiGraphics guiGraphics);
+
+    /** Before a container screen draws the tooltip of the slot under the cursor. */
+    void onContainerTooltipPre(Screen screen, GuiGraphics guiGraphics);
+
+    /** After the screen drew everything this frame, tooltips included. */
+    void onScreenFrameEnd(Screen screen, GuiGraphics guiGraphics);
+
     boolean onRenderArm(PoseStack stack, MultiBufferSource multiBufferSource, int packedLight, AbstractClientPlayer player, HumanoidArm arm);
 
     boolean onRenderItemInHand(Camera camera, float partialTick, Matrix4f projectionMatrix);

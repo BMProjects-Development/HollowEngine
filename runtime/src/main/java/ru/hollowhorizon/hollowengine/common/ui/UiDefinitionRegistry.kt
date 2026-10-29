@@ -17,6 +17,9 @@ object UiDefinitionRegistry {
      */
     val builtInScreens = ExtensionPoints.create("hollowengine:ui/screens".rl, UiScreenDefinition::class)
 
+    /** HUD layers addons ship; like [builtInScreens], a script declaring the same id replaces one. */
+    val builtInOverlays = ExtensionPoints.create("hollowengine:ui/overlays".rl, UiOverlayDefinition::class)
+
     private val screens = ConcurrentHashMap<ResourceLocation, UiScreenDefinition>()
     private val overlays = ConcurrentHashMap<ResourceLocation, UiOverlayDefinition>()
     private val surfaces = ConcurrentHashMap<ResourceLocation, UiSurfaceDefinition>()
@@ -56,7 +59,8 @@ object UiDefinitionRegistry {
     fun screen(id: ResourceLocation): UiScreenDefinition? =
         screens[id] ?: builtInScreens.extensions.firstOrNull { it.id == id }
 
-    fun overlay(id: ResourceLocation): UiOverlayDefinition? = overlays[id]
+    fun overlay(id: ResourceLocation): UiOverlayDefinition? =
+        overlays[id] ?: builtInOverlays.extensions.firstOrNull { it.id == id }
 
     fun surface(id: ResourceLocation): UiSurfaceDefinition? = surfaces[id]
 

@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
+import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 
 /**
  * What the addon adds to the client: the cutscene and dialogue cameras, the cutscene
@@ -27,6 +28,8 @@ internal object NarrativeClient {
         extensions.register(CameraDirector.sources, "cutscene", CutsceneCameraSystem, CUTSCENE_CAMERA_PRIORITY)
         extensions.register(CameraDirector.sources, "story", StoryCameraSystem)
         extensions.register(IdeTimelines.defaults, "cutscene", CutsceneTimeline)
+        extensions.register(UiDefinitionRegistry.builtInOverlays, "speech", DialogueOverlays.speech)
+        extensions.register(UiDefinitionRegistry.builtInOverlays, "choice", DialogueOverlays.choice)
         extensions.registerIdeLanguage(
             HollowIdeLanguageService.extensions("story", listOf("story")) { StoryScriptingAnalyzer },
         )

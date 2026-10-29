@@ -33,10 +33,10 @@ fun interface LineProvider {
 
 /**
  * A line is about to be shown. A listener may change [line], or take the showing over with [sendLine]: the line is
- * then shown by that provider instead of in chat.
+ * then shown by that provider instead of [SpeechOverlay]; [ChatLineProvider] shows it in chat.
  */
 class SayEvent(var line: Line) : Event {
-    var provider: LineProvider = ChatLineProvider
+    var provider: LineProvider = SpeechOverlay
         private set
 
     fun sendLine(provider: LineProvider) {

@@ -53,8 +53,7 @@ class UiScriptContentTest {
         object : UiScript() {
             init {
                 overlay("mypack:block_hint") {
-                    anchor = "crosshair"
-                    placement = HudPlacement.AFTER
+                    anchor(after("crosshair"))
                     autoShow = true
                     content {
                         // A purely client-side overlay never calls send(); nothing forces a round trip.

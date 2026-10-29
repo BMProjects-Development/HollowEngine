@@ -71,10 +71,11 @@ interface PollProvider {
 
 /**
  * Players are about to choose between [options]. A listener may add, remove or change options, or take the showing
- * over with [sendPoll]: the poll is then shown by that provider instead of in chat.
+ * over with [sendPoll]: the poll is then shown by that provider instead of [ChoiceOverlay]; [ChatPollProvider] shows it
+ * in chat.
  */
 class ChoiceEvent(val players: List<ServerPlayer>, val options: MutableList<PollOption>) : Event {
-    var provider: PollProvider = ChatPollProvider
+    var provider: PollProvider = ChoiceOverlay
         private set
 
     fun sendPoll(provider: PollProvider) {

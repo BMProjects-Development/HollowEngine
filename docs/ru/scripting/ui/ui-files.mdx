@@ -81,8 +81,7 @@ screen("mypack:menus") {
 
 ```kotlin
 overlay("mypack:stamina") {
-    anchor = "experience_bar"
-    placement = HudPlacement.BEFORE
+    anchor(before("experience_bar"))
     autoShow = true
     content {
         val value = data[Stamina].coerceIn(0f, 1f)
@@ -91,16 +90,43 @@ overlay("mypack:stamina") {
 }
 ```
 
-| Параметр            | По умолчанию         | Значение                                                                            |
-|---------------------|----------------------|-------------------------------------------------------------------------------------|
-| `anchor`            | `hotbar`             | Слой vanilla HUD; допустимы короткие имена, например `crosshair` и `experience_bar` |
-| `placement`         | `HudPlacement.AFTER` | Рисовать до или после anchor                                                        |
-| `autoShow`          | `false`              | Показывать сразу после перезагрузки; для клиентского HUD                            |
-| `input`             | `OverlayInput.NONE`  | `NONE` для HUD без ввода, `INTERACTIVE` для получения ввода                         |
-| `aboveScreens`      | `false`              | Также рисовать поверх открытого экрана                                              |
-| `rebuildEveryFrame` | `false`              | Перекомпоновывать каждый кадр; только когда это необходимо                          |
+| Параметр            | По умолчанию        | Значение                                                   |
+|---------------------|---------------------|------------------------------------------------------------|
+| `anchor(...)`       | `after("hotbar")`   | Где рисуется оверлей, подробнее ниже                       |
+| `autoShow`          | `false`             | Показывать сразу после перезагрузки; для клиентского HUD   |
+| `input`             | `OverlayInput.NONE` | `NONE` для HUD без ввода, `INTERACTIVE` для получения ввода |
+| `rebuildEveryFrame` | `false`             | Перекомпоновывать каждый кадр; только когда это необходимо |
 
 `interactive()` сокращает запись `input = OverlayInput.INTERACTIVE`. Во время игры интерактивный оверлей использует центр экрана, пока не получит событие указателя.
+
+### Где рисуется оверлей
+
+`anchor(...)` принимает одно или несколько мест в порядке приоритета:
+
+| Место                               | Значение                                                                                                         |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `after("слой")`, `before("слой")`   | В HUD после или до слоя vanilla. Допустимы короткие имена, например `crosshair`, `chat` и `experience_bar`       |
+| `over(КлассЭкрана::class)`          | Поверх открытого экрана этого класса или его наследников. С `subclasses = false` подойдёт только сам класс       |
+| `over("binary.class.Name")`         | То же для класса экрана, который скрипт не может импортировать                                                   |
+| `over()`                            | Поверх любого открытого экрана                                                                                   |
+
+Каждому `over` можно передать уровень. `ScreenLevel.BACKGROUND` рисует поверх затемнённого мира, но под самим экраном. `ScreenLevel.CONTENT` (по умолчанию) рисует поверх экрана, но под его подсказками. `ScreenLevel.TOP` рисует поверх всего.
+
+Например, реплика диалога над сообщениями чата, по которой можно кликнуть в открытом чате:
+
+```kotlin
+import net.minecraft.client.gui.screens.ChatScreen
+
+overlay("mypack:line") {
+    anchor(after("chat"), over(ChatScreen::class))
+    interactive()
+    content { Text("Кликните по мне в чате") }
+}
+```
+
+Пока экран закрыт, оверлей стоит в HUD на месте `after` или `before`. Когда открывается экран, срабатывает первый подходящий `over`: оверлей рисуется поверх этого экрана и получает настоящий курсор. Если ни один `over` не подошёл, оверлей остаётся в HUD под экраном и ввода не получает. Место в HUD у оверлея может быть только одно. Оверлей только с `over` скрыт, пока не открыт подходящий экран.
+
+На уровне `BACKGROUND` клавиатура остаётся у экрана. Кликнуть по оверлею можно только там, где у экрана нет своего виджета или панели контейнера.
 
 ## Адаптивная поверхность
 
@@ -112,7 +138,7 @@ import ru.hollowhorizon.hollowengine.common.ui.net.UiSurfaceKind
 val Choosing = dataKey<Boolean>("choosing") { false }
 
 surface("project:dialogue") {
-    anchor = "hotbar"
+    anchor(after("hotbar"))
     mode { state ->
         if (state[Choosing]) UiSurfaceKind.SCREEN else UiSurfaceKind.OVERLAY
     }
