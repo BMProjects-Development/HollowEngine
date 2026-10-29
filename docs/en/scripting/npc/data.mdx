@@ -71,7 +71,7 @@ import net.minecraft.client.Minecraft
 val QUEST_GIVER = dataKey<Boolean>("quest_giver", sync = Sync.TRACKING) { false }
 
 overlay("mypack:interact_hint") {
-    anchor = "crosshair"
+    anchor(after("crosshair"))
     autoShow = true
     rebuildEveryFrame = true // the crosshair target changes every frame, not per packet
     content {

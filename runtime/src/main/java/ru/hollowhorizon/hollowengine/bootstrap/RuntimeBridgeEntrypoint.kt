@@ -132,6 +132,7 @@ import ru.hollowhorizon.hollowengine.common.runtime.RuntimeAnnotationEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeScriptReload
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScripts
 import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
+import ru.hollowhorizon.hollowengine.common.ui.ScreenLevel
 import ru.hollowhorizon.hollowengine.common.ui.hud.HudLayerRegistry
 import ru.hollowhorizon.hollowengine.common.utils.*
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
@@ -384,6 +385,23 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         partialTick: Float,
     ) {
         ScreenEvent.Render.Post.post(ScreenEvent.Render.Post(screen, guiGraphics, mouseX, mouseY, partialTick))
+        UiScriptHudHost.renderOnScreen(screen, ScreenLevel.CONTENT, guiGraphics, System.nanoTime())
+    }
+
+    override fun onScreenFrameStart(screen: Screen) {
+        UiScriptHudHost.beginScreenFrame()
+    }
+
+    override fun onScreenBackgroundRendered(screen: Screen, guiGraphics: GuiGraphics) {
+        UiScriptHudHost.renderOnScreen(screen, ScreenLevel.BACKGROUND, guiGraphics, System.nanoTime())
+    }
+
+    override fun onContainerTooltipPre(screen: Screen, guiGraphics: GuiGraphics) {
+        UiScriptHudHost.renderOnScreen(screen, ScreenLevel.CONTENT, guiGraphics, System.nanoTime())
+    }
+
+    override fun onScreenFrameEnd(screen: Screen, guiGraphics: GuiGraphics) {
+        UiScriptHudHost.renderOnScreen(screen, ScreenLevel.TOP, guiGraphics, System.nanoTime())
     }
 
     override fun onRenderArm(
