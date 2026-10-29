@@ -1,0 +1,293 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+$kind-phrase: #6FBF8A;
+$kind-wait: #6E9BDC;
+$kind-choice: #E8915A;
+$kind-condition: #B48EE0;
+$kind-plain: #8F9BAD;
+$kind-broken: $danger;
+
+.story-list-root {
+    padding: 0px;
+}
+
+.story-list-scroll {
+    padding: 12px 12px 8px 8px;
+    @apply $thin-scroll;
+}
+
+.story-rail {
+    size: 18px auto;
+    margin: 0px 6px 0px 0px;
+}
+
+.story-rail-line {
+    background: $divider;
+}
+
+.story-rail-dot {
+    size: 8px 8px;
+    margin: 10px 0px 0px 0px;
+    border-radius: 4px;
+    background: $kind-plain;
+    transition: shadow 150ms ease-out;
+}
+
+.story-rail-dot.phrase { background: $kind-phrase; }
+.story-rail-dot.wait { background: $kind-wait; }
+.story-rail-dot.choice { background: $kind-choice; }
+.story-rail-dot.condition { background: $kind-condition; }
+.story-rail-dot.broken { background: $kind-broken; }
+
+.story-rail-dot.selected { shadow: 0px 0px 5px 0px alpha($kind-plain, 0.45); }
+.story-rail-dot.phrase.selected { shadow: 0px 0px 5px 0px alpha($kind-phrase, 0.45); }
+.story-rail-dot.wait.selected { shadow: 0px 0px 5px 0px alpha($kind-wait, 0.45); }
+.story-rail-dot.choice.selected { shadow: 0px 0px 5px 0px alpha($kind-choice, 0.45); }
+.story-rail-dot.condition.selected { shadow: 0px 0px 5px 0px alpha($kind-condition, 0.45); }
+
+.story-guide {
+    size: 14px auto;
+    fill: alpha($kind-plain, 0.35);
+    stroke: none;
+}
+
+.story-guide.choice { fill: alpha($kind-choice, 0.5); }
+.story-guide.condition { fill: alpha($kind-condition, 0.5); }
+
+.story-guide.line { shape: path("M 5.75 0 H 7.25 V 32 H 5.75 Z", 14 32); }
+.story-guide.branch { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 10.5 Q 7.25 14.75 7.25 18 V 32 H 5.75 Z", 14 32); }
+.story-guide.last { shape: path("M 5.75 0 H 7.25 V 10 Q 7.25 13.25 10.5 13.25 H 14 V 14.75 H 10.5 Q 5.75 14.75 5.75 10 Z", 14 32); }
+
+.story-body {
+    margin: 0px 0px 4px 0px;
+    min-height: 28px;
+    padding: 2px;
+    gap: 2px;
+    background: linear-gradient(to right, alpha($kind-plain, 0.1) 0%, alpha($white, 0.02) 55%);
+    border: 1px alpha($kind-plain, 0.35);
+    border-radius: $radius-large;
+    transition: border 120ms ease-out, shadow 150ms ease-out;
+}
+
+.story-body.phrase {
+    background: linear-gradient(to right, alpha($kind-phrase, 0.12) 0%, alpha($white, 0.02) 55%);
+    border-color: alpha($kind-phrase, 0.45);
+}
+
+.story-body.wait {
+    background: linear-gradient(to right, alpha($kind-wait, 0.12) 0%, alpha($white, 0.02) 55%);
+    border-color: alpha($kind-wait, 0.45);
+}
+
+.story-body.choice {
+    background: linear-gradient(to right, alpha($kind-choice, 0.12) 0%, alpha($white, 0.02) 55%);
+    border-color: alpha($kind-choice, 0.45);
+}
+
+.story-body.condition {
+    background: linear-gradient(to right, alpha($kind-condition, 0.12) 0%, alpha($white, 0.02) 55%);
+    border-color: alpha($kind-condition, 0.45);
+}
+
+.story-body.option {
+    background: alpha($white, 0.025);
+    border-color: alpha($kind-choice, 0.2);
+}
+
+.story-body.problem, .story-body.broken { border-color: alpha($kind-broken, 0.6); }
+
+.story-body:hover { border-color: alpha($kind-plain, 0.6); }
+.story-body.phrase:hover { border-color: alpha($kind-phrase, 0.7); }
+.story-body.wait:hover { border-color: alpha($kind-wait, 0.7); }
+.story-body.choice:hover { border-color: alpha($kind-choice, 0.7); }
+.story-body.condition:hover { border-color: alpha($kind-condition, 0.7); }
+
+.story-body.selected, .story-body.selected:hover {
+    border-color: $border-strong;
+    shadow: 0px 0px 6px 0px alpha($kind-plain, 0.18);
+}
+
+.story-body.phrase.selected, .story-body.phrase.selected:hover {
+    border-color: $kind-phrase;
+    shadow: 0px 0px 6px 0px alpha($kind-phrase, 0.18);
+}
+
+.story-body.wait.selected, .story-body.wait.selected:hover {
+    border-color: $kind-wait;
+    shadow: 0px 0px 6px 0px alpha($kind-wait, 0.18);
+}
+
+.story-body.choice.selected, .story-body.choice.selected:hover {
+    border-color: $kind-choice;
+    shadow: 0px 0px 6px 0px alpha($kind-choice, 0.18);
+}
+
+.story-body.condition.selected, .story-body.condition.selected:hover {
+    border-color: $kind-condition;
+    shadow: 0px 0px 6px 0px alpha($kind-condition, 0.18);
+}
+
+.story-body-content {
+    padding: 1px 2px 1px 6px;
+    gap: 6px;
+}
+
+.story-head {
+    size: fit auto;
+    min-width: 88px;
+    padding: 0px 8px;
+    gap: 5px;
+    border-radius: $radius;
+    background: alpha($kind-plain, 0.22);
+}
+
+.story-head.phrase { background: alpha($kind-phrase, 0.28); }
+.story-head.wait { background: alpha($kind-wait, 0.28); }
+.story-head.choice { background: alpha($kind-choice, 0.28); }
+.story-head.condition { background: alpha($kind-condition, 0.28); }
+.story-head.broken { background: alpha($kind-broken, 0.28); }
+
+.story-head-icon {
+    size: 12px 12px;
+    tint: $kind-plain;
+}
+
+.story-head.phrase .story-head-icon { tint: $kind-phrase; }
+.story-head.wait .story-head-icon { tint: $kind-wait; }
+.story-head.choice .story-head-icon { tint: $kind-choice; }
+.story-head.condition .story-head-icon { tint: $kind-condition; }
+.story-head.broken .story-head-icon { tint: $kind-broken; }
+
+.story-head-title {
+    height: fit;
+    foreground: $text-strong;
+    font-size: 9px;
+    text-wrap: false;
+}
+
+.story-body.match { background: alpha($warning, 0.08); }
+.story-body.current, .story-body.current:hover { background: alpha($warning, 0.16); }
+
+.story-row.dragging .story-body { shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.45); }
+.story-row.rejected .story-body { border-color: alpha($danger, 0.7); }
+
+.story-field {
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px transparent;
+    border-radius: $radius;
+    foreground: $text;
+    font-size: 9px;
+    transition: background 110ms ease-out, border 110ms ease-out;
+}
+
+.story-field:hover { background: alpha($white, 0.04); }
+.story-field:focus { background: alpha($bg-window, 0.6); border-color: alpha($accent, 0.7); }
+.story-field.speaker { foreground: $text-soft; }
+.story-field.condition, .story-field.arg-0, .story-field.arg-1, .story-field.arg-2, .story-field.arg-3, .story-field.id {
+    font-family: $font-code;
+}
+
+.story-field.search { background: alpha($bg-window, 0.6); }
+
+.story-muted {
+    height: fit;
+    foreground: $text-muted;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-badge {
+    size: 16px 16px;
+    border-radius: 8px;
+    background: alpha($kind-choice, 0.25);
+}
+
+.story-badge-text {
+    size: fit fit;
+    foreground: $kind-choice;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-fold {
+    size: 16px 16px;
+    border-radius: $radius-small;
+}
+
+.story-fold:hover { background: $bg-hover; }
+
+.story-action {
+    size: 16px 16px;
+    opacity: 0.55;
+}
+
+.story-action:hover { opacity: 1; }
+
+.story-problem {
+    size: 12px 12px;
+}
+
+.story-search {
+    padding: 6px 12px;
+    gap: 6px;
+    background: $bg-panel;
+}
+
+.story-search-icon {
+    size: 12px 12px;
+    opacity: 0.6;
+}
+
+.story-add-bar {
+    padding: 8px 12px;
+    gap: 8px;
+    background: $bg-panel;
+}
+
+.story-add {
+    size: fit 22px;
+    padding: 0px 10px;
+    gap: 5px;
+    background: transparent;
+    border: 1px $border;
+    border-radius: $radius;
+}
+
+.story-add.phrase { border-color: alpha($kind-phrase, 0.6); foreground: $kind-phrase; }
+.story-add.wait { border-color: alpha($kind-wait, 0.6); foreground: $kind-wait; }
+.story-add.choice { border-color: alpha($kind-choice, 0.6); foreground: $kind-choice; }
+.story-add.command { border-color: alpha($kind-plain, 0.6); foreground: $text-soft; }
+
+.story-add:hover { background: $bg-hover; }
+
+.story-inspector-problem {
+    size: 100% fit;
+    foreground: $danger;
+    font-size: 8px;
+    text-wrap: true;
+}
+
+.story-call-slot {
+    padding: 0px 2px 0px 4px;
+    gap: 2px;
+    background: alpha($kind-plain, 0.12);
+    border: 1px alpha($kind-plain, 0.35);
+    border-radius: $radius;
+}
+
+.story-call-icon {
+    size: 10px 10px;
+}
+
+.story-call-title {
+    height: fit;
+    foreground: $text-muted;
+    font-family: $font-code;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-slot-call {
+    size: 12px 12px;
+}

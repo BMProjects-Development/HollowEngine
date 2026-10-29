@@ -2,7 +2,12 @@ package ru.hollowhorizon.hollowengine.common.scripting.ide
 
 internal fun String.isKotlinCodeAt(offset: Int): Boolean = kotlinLexerModeAt(offset) == KotlinLexerMode.CODE
 
-internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
+internal fun String.kotlinLexerModeAt(
+    offset: Int,
+    onCodeCharacter: ((Int) -> Unit)? = null,
+    onLineStart: ((Int, KotlinLexerMode) -> Unit)? = null,
+    onLiteralEnd: ((Int) -> Unit)? = null,
+): KotlinLexerMode {
     val limit = offset.coerceIn(0, length)
     var index = 0
     var mode = KotlinLexerMode.CODE
@@ -11,6 +16,7 @@ internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
     val templates = ArrayDeque<KotlinTemplateContext>()
 
     while (index < limit) {
+        if (index == 0 || this[index - 1] == '\n') onLineStart?.invoke(index, mode)
         when (mode) {
             KotlinLexerMode.CODE -> when {
                 startsWith("//", index) -> {
@@ -40,12 +46,14 @@ internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
                 }
 
                 this[index] == '{' && templates.isNotEmpty() -> {
+                    onCodeCharacter?.invoke(index)
                     templates.last().braceDepth++
                     index++
                 }
 
                 this[index] == '}' && templates.isNotEmpty() -> {
                     val template = templates.last()
+                    if (template.braceDepth > 1) onCodeCharacter?.invoke(index)
                     template.braceDepth--
                     index++
                     if (template.braceDepth == 0) {
@@ -54,12 +62,16 @@ internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
                     }
                 }
 
-                else -> index++
+                else -> {
+                    onCodeCharacter?.invoke(index)
+                    index++
+                }
             }
 
             KotlinLexerMode.REGULAR_STRING -> when {
                 this[index] == '\\' -> index = (index + 2).coerceAtMost(limit)
                 this[index] == '"' -> {
+                    onLiteralEnd?.invoke(index)
                     mode = KotlinLexerMode.CODE
                     index++
                 }
@@ -86,6 +98,7 @@ internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
 
             KotlinLexerMode.RAW_STRING -> when {
                 startsWith("\"\"\"", index) -> {
+                    onLiteralEnd?.invoke(index + 2)
                     mode = KotlinLexerMode.CODE
                     index += 3
                 }
@@ -108,6 +121,7 @@ internal fun String.kotlinLexerModeAt(offset: Int): KotlinLexerMode {
             KotlinLexerMode.CHARACTER -> when {
                 this[index] == '\\' -> index = (index + 2).coerceAtMost(limit)
                 this[index] == '\'' || this[index] == '\n' || this[index] == '\r' -> {
+                    if (this[index] == '\'') onLiteralEnd?.invoke(index)
                     mode = KotlinLexerMode.CODE
                     index++
                 }

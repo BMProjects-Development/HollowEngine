@@ -14,7 +14,7 @@ object ScriptSides {
         artifacts.sourceFile?.let { source -> return declaresClientSide(source.readText()) }
         val jar = artifacts.precompiled ?: return false
         return runCatching {
-            jar.loadKotlinCompiledScriptFromJar(ScriptRegistry.source(id.namespace)?.classLoader).isClientSide
+            jar.loadKotlinCompiledScriptFromJar(ScriptRegistry.classLoader(id.namespace)).isClientSide
         }.onFailure { error ->
             HollowEngine.LOGGER.error("Cannot tell the side of '{}' from its compiled artifact", ScriptRegistry.display(id), error)
         }.getOrDefault(false)

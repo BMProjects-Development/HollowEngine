@@ -34,12 +34,16 @@ class ManagedSound internal constructor(
     settings: SoundPlayback,
     private var emitter: SoundEmitter,
     internal val start: Double = 0.0,
+    pauseWithGame: Boolean = true,
 ) : AbstractTickableSoundInstance(
     SoundEvent.createVariableRangeEvent(input.eventLocation()),
     settings.category,
     SoundInstance.createUnseededRandom(),
 ), AutoCloseable {
     var settings: SoundPlayback = settings
+        private set
+
+    internal var pauseWithGame: Boolean = pauseWithGame
         private set
 
     private val streamId = "hollowengine:playback/${ClientSounds.nextToken()}".rl
@@ -84,6 +88,9 @@ class ManagedSound internal constructor(
     private var appliedFilters: List<SoundFilterSpec>? = null
     private var channel: ChannelAccess.ChannelHandle? = null
     private var executor: Executor? = null
+
+    /** Native channels finish even while paused game ticks leave SoundEngine's instance map unchanged. */
+    internal val channelStopped: Boolean get() = channel?.isStopped == true
 
     init {
         relative = true
@@ -146,6 +153,13 @@ class ManagedSound internal constructor(
 
     fun resume() {
         isPaused = false
+    }
+
+    internal fun configureGamePause(value: Boolean, enginePaused: Boolean) {
+        if (pauseWithGame == value) return
+        pauseWithGame = value
+        val paused = isPaused || enginePaused && value
+        channel?.execute { if (paused) it.pause() else it.unpause() }
     }
 
     /**
@@ -239,13 +253,14 @@ class ManagedSound internal constructor(
      * Sets everything about [handle]'s channel this sound decides, once a frame and [seconds] after the last one,
      * on Minecraft's sound [executor].
      */
-    internal fun frame(handle: ChannelAccess.ChannelHandle, executor: Executor, seconds: Float) {
+    internal fun frame(handle: ChannelAccess.ChannelHandle, executor: Executor, seconds: Float, enginePaused: Boolean) {
+        if (!updatesWhile(enginePaused)) return
         channel = handle
         this.executor = executor
         refresh()
         if (disposed) return
         if (fadeGain() <= 0f) return close()
-        if (started && !isPaused) position += seconds * pitchPlayed()
+        advance(seconds, enginePaused)
 
         val volume = Mth.clamp(getVolume() * categoryVolume(), 0f, 1f)
         val pitch = pitchPlayed()
@@ -272,6 +287,13 @@ class ManagedSound internal constructor(
             if (stages != null) chain.apply(source, stages)
             if (paused) playing.pause() else playing.unpause()
         }
+    }
+
+    internal fun updatesWhile(enginePaused: Boolean): Boolean = !disposed && (!enginePaused || !pauseWithGame)
+
+    /** The preview cursor follows this clock, independently of simulation ticks and the world's pause. */
+    internal fun advance(seconds: Float, enginePaused: Boolean) {
+        if (started && !isPaused && updatesWhile(enginePaused)) position += seconds * pitchPlayed()
     }
 
     private fun pitchPlayed(): Float = Mth.clamp(getPitch(), MIN_PITCH, MAX_PITCH)

@@ -52,10 +52,14 @@ class VfxDrivenValue(
  * expression one wide field, and a curve, the only one that cannot be typed, shows its shape.
  */
 private enum class VfxValueKind(val key: String, val icon: String) {
-    CONST("kind_const", "hollowengine:textures/gui/icons/vfx/value_const.svg"),
-    RANGE("kind_range", "hollowengine:textures/gui/icons/vfx/value_range.svg"),
-    CURVE("kind_curve", "hollowengine:textures/gui/icons/vfx/value_curve.svg"),
-    EXPR("kind_expr", "hollowengine:textures/gui/icons/vfx/value_expr.svg");
+    CONST("kind_const", "hollowengine:textures/gui/icons/vfx/value_const.svg"), RANGE(
+        "kind_range",
+        "hollowengine:textures/gui/icons/vfx/value_range.svg"
+    ),
+    CURVE("kind_curve", "hollowengine:textures/gui/icons/vfx/value_curve.svg"), EXPR(
+        "kind_expr",
+        "hollowengine:textures/gui/icons/vfx/value_expr.svg"
+    );
 }
 
 private fun VfxValue.kind(): VfxValueKind = when (this) {
@@ -152,8 +156,7 @@ fun VfxVec3Row(
         Column(modifier = Modifier.size(100.percent).gap(2.px)) {
             Row(modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.CENTER)) {
                 VfxFieldLabel(
-                    label,
-                    hint
+                    label, hint
                 )
             }
             VfxValueRow("    X", value.x, property, channel = 0) { onChange(value.copy(x = it)) }
@@ -167,25 +170,13 @@ fun VfxVec3Row(
     Row(modifier = Modifier.size(100.percent).gap(3.px).alignItems(vertical = UiAlign.CENTER)) {
         VfxFieldLabel(label, hint, VectorLabelWidth)
         AxisNumber(
-            "X",
-            value.x.value,
-            property,
-            driven,
-            0
+            "X", value.x.value, property, driven, 0
         ) { onChange(value.copy(x = VfxValue.of(it))) }
         AxisNumber(
-            "Y",
-            value.y.value,
-            property,
-            driven,
-            1
+            "Y", value.y.value, property, driven, 1
         ) { onChange(value.copy(y = VfxValue.of(it))) }
         AxisNumber(
-            "Z",
-            value.z.value,
-            property,
-            driven,
-            2
+            "Z", value.z.value, property, driven, 2
         ) { onChange(value.copy(z = VfxValue.of(it))) }
         if (driven != null) {
             DrivenMark(property)
@@ -287,11 +278,21 @@ private fun DrivenCell(driven: VfxDrivenValue, property: VfxProperty?, channel: 
 @Composable
 private fun DrivenMark(property: VfxProperty?) {
     val focus = LocalVfxFieldFocus.current
-    InspectorIconButton(KeyframeIcon, vfxText("driven_show"), tags = listOf("insp-inline-icon")) { if (property != null) focus(property) }
+    InspectorIconButton(
+        KeyframeIcon,
+        vfxText("driven_show"),
+        tags = listOf("insp-inline-icon")
+    ) { if (property != null) focus(property) }
 }
 
 @Composable
-private fun NumberCell(value: Float, property: VfxProperty?, whole: Boolean, step: Double? = null, onChange: (Float) -> Unit) {
+private fun NumberCell(
+    value: Float,
+    property: VfxProperty?,
+    whole: Boolean,
+    step: Double? = null,
+    onChange: (Float) -> Unit,
+) {
     val focus = LocalVfxFieldFocus.current
     NumberField(
         value = value.toDouble(),
@@ -310,9 +311,11 @@ private fun TextCell(text: String, property: VfxProperty?, onChange: (String) ->
         value = text,
         fontSize = 9f,
         placeholder = vfxText("expression_placeholder"),
-        completionContributor = VfxExpressionEditing.completions,
-        syntaxHighlighter = VfxExpressionEditing.highlighter,
-        diagnostics = diagnostics,
+        insight = UiCodeInsight(
+            completions = VfxExpressionEditing.completions,
+            highlighter = VfxExpressionEditing.highlighter,
+            diagnostics = diagnostics,
+        ),
         tags = listOf("insp-input", "insp-inline-input", "vfx-expression"),
         modifier = Modifier.size(0.px, UiLength.Fit).grow(1f).onFocus { if (property != null) focus(property) }
             .then(if (diagnostics.isEmpty()) Modifier.tooltipOnHover(vfxText("expression_hint")) else Modifier),

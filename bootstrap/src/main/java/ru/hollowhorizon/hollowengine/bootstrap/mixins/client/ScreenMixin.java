@@ -32,6 +32,16 @@ public class ScreenMixin {
         }
     }
 
+    @Inject(method = "renderWithTooltip", at = @At("HEAD"))
+    private void hollowengine$onFrameStart(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onScreenFrameStart((Screen) (Object) this);
+    }
+
+    @Inject(method = "renderBackground", at = @At("TAIL"))
+    private void hollowengine$onBackgroundRendered(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onScreenBackgroundRendered((Screen) (Object) this, guiGraphics);
+    }
+
     @Inject(
             method = "renderWithTooltip",
             at = @At(
@@ -42,5 +52,10 @@ public class ScreenMixin {
     )
     private void hollowengine$onRenderPost(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         BootstrapRuntimeManager.bridge().onScreenRenderPost((Screen) (Object) this, guiGraphics, mouseX, mouseY, partialTick);
+    }
+
+    @Inject(method = "renderWithTooltip", at = @At("TAIL"))
+    private void hollowengine$onFrameEnd(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onScreenFrameEnd((Screen) (Object) this, guiGraphics);
     }
 }

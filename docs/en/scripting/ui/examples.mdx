@@ -62,8 +62,7 @@ Right-click to open confirmation. “Yes” removes up to one stone if present; 
 val Hint = dataKey<String>("hint") { "" }
 
 overlay("mypack:block_hint") {
-    anchor = "crosshair"
-    placement = HudPlacement.AFTER
+    anchor(after("crosshair"))
     autoShow = true
     content {
         data.find(Hint)?.takeIf(String::isNotBlank)?.let { hint ->

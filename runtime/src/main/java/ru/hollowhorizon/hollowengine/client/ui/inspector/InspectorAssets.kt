@@ -114,8 +114,10 @@ fun AssetPathField(
             id = id,
             fontSize = 9f,
             placeholder = placeholder,
-            completionContributor = if (listed.isEmpty()) null else assetCompletions(listed),
-            diagnostics = diagnostics,
+            insight = UiCodeInsight(
+                completions = if (listed.isEmpty()) null else assetCompletions(listed),
+                diagnostics = diagnostics,
+            ),
             onChange = onChange,
             tags = listOf("insp-input", "insp-inline-input"),
             modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),

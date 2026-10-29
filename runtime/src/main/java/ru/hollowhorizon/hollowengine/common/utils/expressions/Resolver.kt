@@ -24,11 +24,15 @@ internal class Resolver(
         is Ast.Sequence -> resolveSequence(ast)
     }
 
-    private fun resolveList(ast: Ast.ListLit): Ir? = Ir.ListOf(
-        ast.items.map { resolve(it) ?: return null },
-        literals?.type ?: LIST,
-        literals?.let { { items: List<Any?> -> it.list(items) } },
-    )
+    /** A list; under [literals] an item worked out as a primitive, such as `-60`, is wrapped like a literal. */
+    private fun resolveList(ast: Ast.ListLit): Ir? {
+        val items = ast.items.map { resolve(it) ?: return null }
+        val literals = literals ?: return Ir.ListOf(items, LIST)
+        val types = items.map { it.type }
+        return Ir.ListOf(items, literals.type) { values ->
+            literals.list(values.mapIndexed { index, value -> literals.wrap(types[index], value) })
+        }
+    }
 
     private fun resolveName(ast: Ast.Name): Ir? {
         declarations.root(ast.name)?.let { return Ir.FieldRead(null, it) }

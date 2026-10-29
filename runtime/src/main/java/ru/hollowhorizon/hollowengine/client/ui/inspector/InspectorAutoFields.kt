@@ -318,7 +318,9 @@ private fun StringField(
                 id = "insp-input$path",
                 mode = if (hints.multiline) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
                 fontSize = 9f,
-                completionContributor = if (candidates.isEmpty()) null else assetCompletions(candidates),
+                insight = UiCodeInsight(
+                    completions = if (candidates.isEmpty()) null else assetCompletions(candidates),
+                ),
                 onChange = { typed ->
                     onChange(JsonPrimitive(if (hints.asset.isEmpty()) typed else sanitizeAssetPath(typed)))
                 },

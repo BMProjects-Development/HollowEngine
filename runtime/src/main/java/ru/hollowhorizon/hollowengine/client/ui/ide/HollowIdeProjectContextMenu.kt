@@ -5,6 +5,7 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -13,10 +14,11 @@ internal fun HollowIdeProjectContextMenu(
     menu: ProjectContextMenu?,
     onCreateFile: (String) -> Unit,
     onCreateFolder: (String) -> Unit,
-    onCreateScript: (String, ScriptTemplate) -> Unit,
+    onCreateScript: (String, HollowIdeScriptTemplate) -> Unit,
     onCreateSoundEvents: (String) -> Unit,
     onRename: (String) -> Unit,
     onCopy: (String) -> Unit,
+    onCopyPath: (String) -> Unit,
     onCut: (String) -> Unit,
     onPaste: (String) -> Unit,
     onShowInExplorer: (String) -> Unit,
@@ -36,7 +38,11 @@ internal fun HollowIdeProjectContextMenu(
         onDismiss = onDismiss,
     ) {
         ProjectMenuItem("New File", "Alt+Insert", ProjectMenuIcons.NEW_FILE, closeScripts) { onCreateFile(menu.path) }
-        ProjectMenuItem("New Folder", "Alt+Shift+Insert", ProjectMenuIcons.NEW_FOLDER, closeScripts) { onCreateFolder(menu.path) }
+        ProjectMenuItem("New Folder", "Alt+Shift+Insert", ProjectMenuIcons.NEW_FOLDER, closeScripts) {
+            onCreateFolder(
+                menu.path
+            )
+        }
         if (menu.canCreateScripts) {
             ProjectMenuItem(
                 label = "New Script",
@@ -47,14 +53,50 @@ internal fun HollowIdeProjectContextMenu(
             ) { scriptsOpen = !scriptsOpen }
         }
         if (menu.canCreateSoundEvents) {
-            ProjectMenuItem("New Sound Events", "", IconHelper.forFile("sounds.ogg").toString(), closeScripts) { onCreateSoundEvents(menu.path) }
+            ProjectMenuItem(
+                "New Sound Events",
+                "",
+                IconHelper.forFile("sounds.ogg").toString(),
+                closeScripts
+            ) { onCreateSoundEvents(menu.path) }
         }
-        ProjectMenuItem("Rename", HollowKeys.RENAME.shortcut.orEmpty(), ProjectMenuIcons.RENAME, closeScripts) { onRename(menu.path) }
-        ProjectMenuItem("Copy", HollowKeys.COPY.shortcut.orEmpty(), ProjectMenuIcons.COPY, closeScripts) { onCopy(menu.path) }
-        ProjectMenuItem("Cut", HollowKeys.CUT.shortcut.orEmpty(), ProjectMenuIcons.CUT, closeScripts) { onCut(menu.path) }
-        ProjectMenuItem("Paste", HollowKeys.PASTE.shortcut.orEmpty(), ProjectMenuIcons.PASTE, closeScripts) { onPaste(menu.path) }
+        ProjectMenuItem(
+            "Rename",
+            HollowKeys.RENAME.shortcut.orEmpty(),
+            ProjectMenuIcons.RENAME,
+            closeScripts
+        ) { onRename(menu.path) }
+        ProjectMenuItem(
+            "Copy",
+            HollowKeys.COPY.shortcut.orEmpty(),
+            ProjectMenuIcons.COPY,
+            closeScripts
+        ) { onCopy(menu.path) }
+        ProjectMenuItem(
+            "hollowengine.gui.ide.project.copy_path".lang,
+            "",
+            ProjectMenuIcons.COPY,
+            closeScripts,
+            id = "project-copy-path"
+        ) { onCopyPath(menu.path) }
+        ProjectMenuItem(
+            "Cut",
+            HollowKeys.CUT.shortcut.orEmpty(),
+            ProjectMenuIcons.CUT,
+            closeScripts
+        ) { onCut(menu.path) }
+        ProjectMenuItem("Paste", HollowKeys.PASTE.shortcut.orEmpty(), ProjectMenuIcons.PASTE, closeScripts) {
+            onPaste(
+                menu.path
+            )
+        }
         ProjectMenuItem("Show in Explorer", "", ProjectMenuIcons.REVEAL, closeScripts) { onShowInExplorer(menu.path) }
-        ProjectMenuItem("Delete", HollowKeys.DELETE.shortcut.orEmpty(), ProjectMenuIcons.DELETE, closeScripts) { onDelete(menu.path) }
+        ProjectMenuItem(
+            "Delete",
+            HollowKeys.DELETE.shortcut.orEmpty(),
+            ProjectMenuIcons.DELETE,
+            closeScripts
+        ) { onDelete(menu.path) }
         contributedActions(menu).forEach { action ->
             ProjectMenuItem(action.label, "", action.icon, closeScripts) {
                 onDismiss()
@@ -73,8 +115,13 @@ internal fun HollowIdeProjectContextMenu(
             tags = listOf("dropdown-popup", "project-context-menu"),
             onDismiss = onDismiss,
         ) {
-            ScriptTemplate.entries.forEach { template ->
-                ProjectMenuItem(template.label, template.extension, template.icon) { onCreateScript(menu.path, template) }
+            scriptTemplates().forEach { template ->
+                ProjectMenuItem(template.label, template.extension, template.icon) {
+                    onCreateScript(
+                        menu.path,
+                        template
+                    )
+                }
             }
         }
     }
@@ -98,6 +145,14 @@ internal fun HollowIdeProjectNameDialog(
     onCancel: () -> Unit,
 ) {
     if (dialog == null) return
+    val fieldState = remember(dialog.action, dialog.path) {
+        TextFieldState(initialText = dialog.name).apply {
+            if (dialog.action == ProjectNameAction.Rename) {
+                val extensionStart = dialog.name.lastIndexOf('.').takeIf { !dialog.isDirectory && it > 0 }
+                setSelection(0, extensionStart ?: dialog.name.length)
+            }
+        }
+    }
     Popup(
         anchorBounds = UiRect(dialog.x, dialog.y, 0f, 0f),
         alignment = UiPopupAlignment.Cursor,
@@ -105,10 +160,13 @@ internal fun HollowIdeProjectNameDialog(
         tags = listOf("dropdown-popup", "project-name-dialog"),
         modal = true,
     ) {
+        val focus = LocalUiFocusRequester.current
+        LaunchedEffect(Unit) { focus.request(ProjectNameDialogInputId) }
         Text(dialog.title, tags = listOf("project-name-dialog-title"))
         TextField(
             value = dialog.name,
             onChange = onNameChange,
+            state = fieldState,
             id = ProjectNameDialogInputId,
             tags = listOf("project-name-dialog-input"),
             modifier = Modifier.size(180.px, 24.px).onKeyInput { input ->
@@ -139,23 +197,24 @@ private fun ProjectMenuItem(
     icon: String? = null,
     onEnter: () -> Unit = {},
     onPlaced: ((UiRect) -> Unit)? = null,
+    id: String? = null,
     action: () -> Unit,
 ) {
     Row(
+        id = id,
         tags = listOf("dropdown-item", "project-context-menu-item"),
-        modifier = Modifier.input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND)
-            .alignItems(vertical = UiAlign.CENTER)
-            .onEnter { onEnter() }
-            .let { if (onPlaced != null) it.onPlaced(onPlaced) else it }
-            .onClick { event ->
+        modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
+            .alignItems(vertical = UiAlign.CENTER).onEnter { onEnter() }
+            .let { if (onPlaced != null) it.onPlaced(onPlaced) else it }.onClick { event ->
                 action()
                 event.consume()
-            }
-    ) {
+            }) {
         if (icon != null) Image(icon, tags = listOf("dropdown-item-icon", "project-context-menu-icon"))
         Text(label, tags = listOf("dropdown-item-label", "project-context-menu-label"))
-        if (shortcut.isNotBlank()) Text(shortcut, tags = listOf("dropdown-item-shortcut", "project-context-menu-shortcut"))
+        if (shortcut.isNotBlank()) Text(
+            shortcut,
+            tags = listOf("dropdown-item-shortcut", "project-context-menu-shortcut")
+        )
     }
 }
 
@@ -173,7 +232,8 @@ internal data class ProjectNameDialog(
     val name: String,
     val x: Float,
     val y: Float,
-    val template: ScriptTemplate? = null,
+    val template: HollowIdeScriptTemplate? = null,
+    val isDirectory: Boolean = false,
 ) {
     val title: String
         get() = when (action) {
@@ -184,9 +244,7 @@ internal data class ProjectNameDialog(
 }
 
 internal enum class ProjectNameAction {
-    CreateFile,
-    CreateFolder,
-    Rename,
+    CreateFile, CreateFolder, Rename,
 }
 
 internal fun HollowIdeFileOperationResult.statusText(): String {

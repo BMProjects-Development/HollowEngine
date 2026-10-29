@@ -196,7 +196,7 @@ internal class HollowIdeEditorSession(
         val current = snapshot
         if (current.matchesText(text, analyzer)) return current.structure
         requestAnalysis(text, analyzer)
-        return EditorStructure(folds = shiftCodeFoldsThroughEdit(current.text, text, current.structure.folds))
+        return shiftEditorStructureThroughEdit(current.text, text, current.structure)
     }
 
     val canFormat: Boolean get() = currentAnalyzer().canFormat
@@ -341,6 +341,14 @@ internal class HollowIdeEditorSession(
         val requestRevision = completionRevision.incrementAndGet()
         completionJob?.cancel()
         completionJob = scope.launch {
+            val acceptedTypes = runCatching {
+                analyzer.acceptedExpressionTypes(path, text, key.caret, ContextSnippetTypes)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("expected types", failure)
+                null
+            }
+            requestContextCompletions(text, key, analyzer, requestRevision, acceptedTypes)
+
             val collected = ArrayList<UiTextCompletion>()
             var publishedAt = 0L
             var publishedSize = -1
@@ -366,11 +374,20 @@ internal class HollowIdeEditorSession(
             }
             if (publishedSize != collected.size) publish()
         }
+    }
+
+    private fun requestContextCompletions(
+        text: String,
+        key: CompletionKey,
+        analyzer: ScriptingAnalyzer,
+        requestRevision: Long,
+        acceptedTypes: List<String>?,
+    ) {
         contextCompletionJob?.cancel()
         contextCompletionJob = scope.launch(Minecraft.getInstance().dispatcher) {
             val context = UiCompletionContext(text, key.caret)
             val items = runCatching {
-                val candidates = ideContextCompletions(path, context).toMutableList()
+                val candidates = ideContextCompletions(path, context, acceptedTypes).toMutableList()
                 IdeCompletionEvent.post(IdeCompletionEvent(path, text, key.caret, candidates)).items.toList()
             }.getOrElse { failure ->
                 HollowEngine.LOGGER.error("Context completions failed for '{}'", path, failure)
@@ -636,6 +653,25 @@ private fun occurrenceBackground(style: UiInlineStyle): UiColor {
 private const val OccurrenceBackgroundAlpha = 0.24f
 private val OccurrenceFallbackBackground = UiColor(0.66f, 0.72f, 0.78f, OccurrenceBackgroundAlpha)
 private val OccurrenceFallbackStyle = UiInlineStyle().withBackground(OccurrenceFallbackBackground)
+
+/**
+ * [structure] of [originalText] as it applies to [editedText]: what lies before or after the edit moves with the
+ * text, and what the edit touched waits for the next analysis.
+ */
+internal fun shiftEditorStructureThroughEdit(originalText: String, editedText: String, structure: EditorStructure): EditorStructure {
+    if (originalText == editedText) return structure
+    val edit = uiTextEditSpan(originalText, editedText)
+    fun shifted(offset: Int): Int? = when {
+        offset < edit.oldStart -> offset
+        offset >= edit.oldEnd -> offset + edit.delta
+        else -> null
+    }
+    return EditorStructure(
+        folds = shiftCodeFoldsThroughEdit(originalText, editedText, structure.folds),
+        markers = structure.markers.mapNotNull { marker -> shifted(marker.offset)?.let { marker.copy(offset = it) } },
+        runTargets = structure.runTargets.mapNotNull { target -> shifted(target.offset)?.let { target.copy(offset = it) } },
+    )
+}
 
 internal fun shiftDiagnosticsForEditedText(
     originalText: String,

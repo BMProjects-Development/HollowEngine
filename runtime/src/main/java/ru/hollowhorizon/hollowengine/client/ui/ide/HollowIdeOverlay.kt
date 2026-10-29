@@ -8,6 +8,7 @@ import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
@@ -45,6 +46,7 @@ import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 
 /** A file dragged out of the project tree; anything that accepts drops can look for this payload. */
@@ -158,9 +160,9 @@ object HollowIdeOverlay {
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
     private var gutterNavigation by mutableStateOf<List<GutterNavigationTarget>>(emptyList())
     private val dragAndDrop = UiDragAndDropState()
-    private var refreshFilesRequested = false
+    private val refreshFilesRequested = AtomicBoolean()
     private val externalFiles = HollowIdeExternalFiles(
-        onFocusGained = { refreshFilesRequested = true },
+        onFocusGained = { refreshFilesRequested.set(true) },
         onMove = { files, x, y -> updateExternalDrag(files, x, y) },
         onLeave = {
             pipeline.await()
@@ -207,18 +209,31 @@ object HollowIdeOverlay {
             statusText = message
         }
     }
-    private val contributions = HollowIdeContributions(fileTypes, model, dock, ideContext) {
-        editorSessions.values.forEach(HollowIdeEditorSession::close)
-        editorSessions.clear()
-        editorAnalysisRevision++
-    }
+    private val contributions = HollowIdeContributions(
+        fileTypes,
+        model,
+        dock,
+        ideContext,
+        onLanguagesChanged = {
+            editorSessions.values.forEach(HollowIdeEditorSession::close)
+            editorSessions.clear()
+            editorAnalysisRevision++
+        },
+        onPreviewsChanged = fileViews::clear,
+    )
 
     private fun editorState(file: HollowIdeOpenFile): TextFieldState = editorStates.getOrPut(file.path) {
         TextFieldState(
             initialText = file.text,
             multiline = true,
             pasteTransformer = KotlinStringPasteTransformer.takeIf { file.path.isKotlinSource() },
-        )
+        ).also { state ->
+            // An undo made away from the text editor, from a preview or the history window, still reaches the file.
+            state.onHistoryRestored = { text ->
+                model.updateText(file.path, text)
+                model.files[file.path]?.let { dock.updateItem(it.dockItem()) }
+            }
+        }
     }
 
     private fun editorSession(path: String): HollowIdeEditorSession = editorSessions.getOrPut(path) {
@@ -567,9 +582,8 @@ object HollowIdeOverlay {
         }
         externalFiles.update(event.minecraft.window.window, isVisible() && !collapsed)
         if (!isVisible()) return
-        if (refreshFilesRequested && !externalFiles.active) {
+        if (!externalFiles.active && refreshFilesRequested.getAndSet(false)) {
             pipeline.await()
-            refreshFilesRequested = false
             model.refreshExternalFiles()
         }
         AssetManagerLifecycle.observe(event.minecraft)
@@ -766,6 +780,7 @@ object HollowIdeOverlay {
     private fun Content() {
         RememberLayout()
         TrackActiveEditor()
+        WatchTextFiles()
         Box(
             id = "ide-root",
             modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").style("hollowengine:ui/styles/ide.hss")
@@ -832,6 +847,15 @@ object HollowIdeOverlay {
                     onCancel = { hideToolbarConfirmationVisible = false },
                 )
             }
+        }
+    }
+
+    @Composable
+    private fun WatchTextFiles() {
+        val paths =
+            model.files.values.filter { it.textFileSync != null }.map { it.path.fromReadablePath().toPath() }.sorted()
+        LaunchedEffect(paths) {
+            if (paths.isNotEmpty()) watchIdeFiles(paths) { refreshFilesRequested.set(true) }
         }
     }
 
@@ -1027,10 +1051,7 @@ object HollowIdeOverlay {
             expanded = openDropdown == "windows",
             onExpandedChange = { openDropdown = if (it) "windows" else null },
             items = hollowIdeWindowMenuItems(
-                model,
-                dock,
-                contributions.windowMenu(),
-                ::applyDefaultLayout
+                model, dock, contributions.windowMenu(), ::applyDefaultLayout
             ) + contributions.menuItems(HollowIdeMenu.WINDOW),
         )
         UiDropdown(
@@ -1163,6 +1184,7 @@ object HollowIdeOverlay {
                 onCreateSoundEvents = project::createSoundEvents,
                 onRename = project::openRenameDialog,
                 onCopy = { project.copy(it, cut = false) },
+                onCopyPath = project::copyPath,
                 onCut = { project.copy(it, cut = true) },
                 onPaste = project::pasteInto,
                 onShowInExplorer = project::showInExplorer,
@@ -1170,8 +1192,7 @@ object HollowIdeOverlay {
                 onDismiss = { project.closePopups() },
                 contributedActions = { menu ->
                     contributions.projectActions(
-                        menu.path,
-                        menu.path.fromReadablePath().isDirectory
+                        menu.path, menu.path.fromReadablePath().isDirectory
                     )
                 },
             )
@@ -1182,13 +1203,6 @@ object HollowIdeOverlay {
                 onConfirm = project::applyNameDialog,
                 onCancel = project::cancelNameDialog,
             )
-            LaunchedEffect(dialog?.action, dialog?.path) {
-                if (dialog == null) return@LaunchedEffect
-                Minecraft.getInstance().execute {
-                    pipeline.await()
-                    surface.runtime.focus(ProjectNameDialogInputId)
-                }
-            }
         }
     }
 
@@ -1196,6 +1210,9 @@ object HollowIdeOverlay {
     private fun FileEditor(file: HollowIdeOpenFile) {
         val editorSession = remember(file.path) { editorSession(file.path) }
         val editorState = editorState(file)
+        LaunchedEffect(file, file.externalTextRevision) {
+            editorState.setText(file.text, moveCaretToEnd = false)
+        }
         val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
         val diagnostics = editorSession.diagnostics(file.text)
         val inlayHints = editorSession.inlayHints(file.text)
@@ -1230,8 +1247,9 @@ object HollowIdeOverlay {
                 modifier = Modifier.grow(1f).dropTarget(
                     accepts = { !file.readOnly && it.payload is HollowIdeFileDrag },
                     onDragOver = { _, x, y ->
-                        editorState.offsetAtPoint?.invoke(x, y)?.let(editorState::moveCaret)
+                        editorState.previewDropAt(x, y)
                     },
+                    onDragExit = editorState::clearDropPreview,
                     onDrop = { item, x, y ->
                         val dropped = item.payload as? HollowIdeFileDrag ?: return@dropTarget false
                         insertFileReference(file, editorState, dropped.path, x, y)
@@ -1245,18 +1263,20 @@ object HollowIdeOverlay {
                         editorSession.requestAnalysis(text, text.length)
                         dock.updateItem(file.dockItem())
                     },
-                    highlighter = editorSession.highlighter,
-                    completions = if (file.readOnly) null else editorSession.completions,
-                    signatureHelp = editorSession.signatures,
-                    hoverInfo = editorSession.hover,
-                    diagnostics = diagnostics,
-                    folds = structure.folds,
-                    gutterMarkers = gutterMarkers,
-                    searchMatches = matches,
-                    activeSearchMatch = find?.let { matches.getOrNull(it.currentIndex) },
-                    inlayHints = inlayHints,
-                    inlayRevision = analysisRevision,
-                    onInlayAction = { action -> runInlayAction(file, action) },
+                    insight = UiCodeInsight(
+                        highlighter = editorSession.highlighter,
+                        completions = if (file.readOnly) null else editorSession.completions,
+                        signatureHelp = editorSession.signatures,
+                        hover = editorSession.hover,
+                        diagnostics = diagnostics,
+                        inlayHints = inlayHints,
+                        onInlayAction = { action -> runInlayAction(file, action) },
+                        completionRevision = analysisRevision,
+                        inlayRevision = analysisRevision,
+                    ),
+                    view = UiCodeView(folds = structure.folds, markers = gutterMarkers),
+                    search = UiTextSearch(matches, find?.let { matches.getOrNull(it.currentIndex) }),
+                    syntax = KotlinCodeSyntax.takeIf { file.path.isKotlinSource() },
                     readOnly = file.readOnly,
                     fontSize = fontSize,
                     state = editorState,
@@ -1282,16 +1302,17 @@ object HollowIdeOverlay {
             file.type.editor(file)
             return
         }
-        val context = remember(file, view) {
-            HollowIdePreviewContext(file, view) { next ->
-                applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length))
+        val preview = view.preview
+        val context = remember(file, view, preview) {
+            HollowIdePreviewContext(file, view, preview, editorState(file).history) { next, label, mergeKey ->
+                applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length), label, mergeKey)
             }
         }
         HollowIdeFileViewBody(
             view = view,
             id = file.id,
             text = { file.type.editor(file) },
-            preview = { view.preview.content(context) },
+            preview = { key(preview.id) { preview.content(context) } },
         )
     }
 
@@ -1300,10 +1321,11 @@ object HollowIdeOverlay {
 
     /** Only text files get a preview: it reads and writes the text, whatever type the file has. */
     private fun fileView(file: HollowIdeOpenFile): HollowIdeFileView? {
+        contributions.revision
         if (file.textOrNull == null) return null
         fileViews[file.path]?.let { return it }
-        val preview = previews.find(file.path) ?: return null
-        return HollowIdeFileView(preview).also { fileViews[file.path] = it }
+        val found = previews.find(file.path).takeIf { it.isNotEmpty() } ?: return null
+        return HollowIdeFileView(found).also { fileViews[file.path] = it }
     }
 
     @Composable
@@ -1548,9 +1570,15 @@ object HollowIdeOverlay {
     }
 
     /** Writes [next] into the editor as one undoable edit and keeps the model and tab in step. */
-    private fun applyEditorText(file: HollowIdeOpenFile, next: String, caret: Int) {
+    private fun applyEditorText(
+        file: HollowIdeOpenFile,
+        next: String,
+        caret: Int,
+        label: UndoLabel? = null,
+        mergeKey: String? = null,
+    ) {
         val editor = editorState(file)
-        if (!editor.applyEdit(next, listOf(UiTextCaret(caret.coerceIn(0, next.length))))) return
+        if (!editor.applyEdit(next, listOf(UiTextCaret(caret.coerceIn(0, next.length))), label, mergeKey)) return
         model.updateText(file.path, editor.text)
         dock.updateItem(file.dockItem())
     }

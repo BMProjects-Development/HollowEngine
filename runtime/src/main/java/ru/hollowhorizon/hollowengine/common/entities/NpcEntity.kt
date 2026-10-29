@@ -11,6 +11,7 @@ import net.minecraft.world.entity.PathfinderMob
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier
 import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.ai.goal.FloatGoal
+import net.minecraft.world.entity.ai.goal.GoalSelector
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.GameType
@@ -34,7 +35,7 @@ class NpcEntity : PathfinderMob {
         moveControl = NpcMoveControl(this)
     }
 
-    val goals get() = goalSelector
+    val goals: GoalSelector get() = goalSelector
 
     val actions by lazy { NpcActionController(coroutineScope) }
     val inventory = NpcInventory()

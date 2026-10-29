@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.HollowEngineBuild
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonClassLoader
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry.parse
 import java.io.File
+import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -114,10 +115,17 @@ object ScriptRegistry {
     fun artifacts(raw: String): ScriptArtifacts? = artifacts(parse(raw))
 
     /**
-     * The script a materialised source file belongs to. Addon sources are extracted into the cache
+     * The script a materialized source file belongs to. Addon sources are extracted into the cache
      * directory, so the path alone does not say which namespace owns them.
      */
     fun idOf(file: File): ScriptId? = filesToIds[file.canonicalPath]
+
+    /** Physical paths, file URIs and portable namespace IDs used by Kotlin script metadata. */
+    fun idOfLocation(location: String): ScriptId? {
+        val file = runCatching { if (location.startsWith("file:")) File(URI(location)) else File(location) }.getOrNull()
+        file?.let { runCatching { idOf(it) }.getOrNull() }?.let { return it }
+        return runCatching { parse(location) }.getOrNull()?.takeIf { artifacts(it) != null }
+    }
 
     /**
      * Classpath the scripts of [namespace] compile against: its own, plus that of every namespace it
@@ -133,11 +141,21 @@ object ScriptRegistry {
      */
     fun classLoader(namespace: String): ClassLoader? {
         val source = source(namespace) ?: return null
-        val dependencies = closure(namespace).filter { it !== source }.map(ScriptSource::classLoader).distinct()
-        if (dependencies.isEmpty()) return source.classLoader
         return synchronized(lock) {
             dependencyLoaders.getOrPut(namespace) {
-                HollowAddonClassLoader(emptyArray(), source.classLoader, dependencies)
+                val closure = closure(namespace)
+                closure.forEach { dependent ->
+                    dependent.dependencies.filter { source(it) == null }.forEach { missing ->
+                        HollowEngine.LOGGER.warn(
+                            "Scripts of '{}' depend on '{}', which is not loaded: its classes are not available to them",
+                            dependent.namespace,
+                            missing,
+                        )
+                    }
+                }
+                val dependencies = closure.filter { it !== source }.map(ScriptSource::classLoader).distinct()
+                if (dependencies.isEmpty()) source.classLoader
+                else HollowAddonClassLoader(emptyArray(), source.classLoader, dependencies)
             }
         }
     }

@@ -45,11 +45,7 @@ class Baked<C> internal constructor(
         val value = ir?.let(Interpreter::objects) ?: return ObjectExpression { null }
         val type = ir.type
         if (literals == null || !type.isPrimitive) return value
-        return if (type === ExprType.Primitive.BOOL) {
-            ObjectExpression { literals.bool(Coercions.toBool(value.eval(it))) }
-        } else {
-            ObjectExpression { literals.number(Coercions.toFloat(value.eval(it))) }
-        }
+        return ObjectExpression { literals.wrap(type, value.eval(it)) }
     }
 
     /** Throws with every diagnostic attached; for callers that treat a bad expression as fatal. */

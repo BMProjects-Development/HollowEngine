@@ -485,6 +485,10 @@ private fun nearestColumn(text: String, x: Float, fontSize: Float, fontFamily: S
  * A text field measured and rendered with one consistent layout ([EditableFieldLayout]): a single
  * sized content box holds only the rows in the scrolled viewport (manual virtualization), each row
  * carrying its own glyphs plus that line's selection and caret(s). Editing lives in [TextFieldState].
+ *
+ * @param insight what the field offers on top of its text.
+ * @param view the gutter and indent guides of a code field; null shows the text alone.
+ * @param search the search hits to mark.
  */
 @Composable
 fun EditableTextField(
@@ -493,42 +497,30 @@ fun EditableTextField(
     id: String? = null,
     tags: Iterable<String> = emptyList(),
     scrollState: UiScrollHandle = state.scroll,
-    syntaxHighlighter: UiSyntaxHighlighter? = null,
-    inlayHints: List<UiInlayHint> = emptyList(),
-    inlayHintsProvider: UiInlayHintsProvider? = null,
-    inlayRevision: Long = 0L,
-    onInlayAction: ((UiInlayAction) -> Unit)? = null,
-    completionContributor: UiCompletionContributor? = null,
-    completionRevision: Long = 0L,
-    signatureHelpProvider: UiSignatureHelpProvider? = null,
-    hoverInfoProvider: UiHoverInfoProvider? = null,
-    codeInsightRevision: Long = completionRevision,
-    diagnostics: List<UiTextDiagnostic> = emptyList(),
-    searchMatches: List<IntRange> = emptyList(),
-    activeSearchMatch: IntRange? = null,
+    insight: UiCodeInsight = UiCodeInsight(),
+    view: UiCodeView? = null,
+    search: UiTextSearch? = null,
     placeholder: String = "",
-    lineNumbers: Boolean = false,
-    folds: List<CodeFold> = emptyList(),
-    gutterMarkers: List<UiGutterMarker> = emptyList(),
-    lineNumberColor: UiColor = EditableFieldLineNumberColor,
-    indentGuides: Boolean = false,
-    indentGuideColor: UiColor = EditableFieldIndentGuideColor,
     attributes: Map<String, String> = emptyMap(),
 ) {
+    val diagnostics = insight.diagnostics
+    val searchMatches = search?.matches.orEmpty()
+    val activeSearchMatch = search?.active
+    val folds = view?.folds.orEmpty()
+    val gutterMarkers = view?.markers.orEmpty()
     val text = state.text
     val fontSize = state.fontSize
     val fontFamily = state.fontFamily
     val wrap = state.wrap
-    // Occurrence highlight follows the caret only while the field is focused.
     val caret = if (state.focused) state.caret else UiNoCaretOffset
     state.caretVisibilityRevision
     val presentation = rememberEditableTextPresentation(
         text = text,
         caret = caret,
-        highlighter = syntaxHighlighter,
-        inlayHints = inlayHints,
-        inlayHintsProvider = inlayHintsProvider,
-        inlayRevision = inlayRevision,
+        highlighter = insight.highlighter,
+        inlayHints = insight.inlayHints,
+        inlayHintsProvider = insight.inlayHintsProvider,
+        inlayRevision = insight.inlayRevision,
     )
     state.folding.update(text, folds)
     val foldProjection = state.folding.projection()
@@ -536,9 +528,9 @@ fun EditableTextField(
     val displayedHints = presentation.inlayHints + foldProjection.placeholders
     val uiViewport = LocalUiViewport.current
     val actionGutterWidth = remember(text, fontSize, folds, gutterMarkers) {
-        editableFieldActionGutterWidth(folds, gutterMarkers, foldProjection.lines, fontSize)
+        state.gutter.width(gutterMarkers, foldProjection.lines, fontSize)
     }
-    val gutterPanelWidth = if (lineNumbers && state.multiline) {
+    val gutterPanelWidth = if (view != null && state.multiline) {
         editableFieldGutterWidth(text, fontSize) + actionGutterWidth
     } else {
         0f
@@ -576,10 +568,16 @@ fun EditableTextField(
     var hoverTooltip by remember { mutableStateOf<EditableFieldDiagnosticTooltip?>(null) }
     var codeHoverTarget by remember { mutableStateOf<EditableFieldHoverTarget?>(null) }
     val pointerState = remember { EditableFieldPointerState() }
+    DisposableEffect(state) {
+        onDispose {
+            state.offsetAtPoint = null
+            state.clearDropPreview()
+            pointerState.cancelDrag()
+        }
+    }
     SideEffect {
-        completion.contributor = completionContributor
-        state.autoScroll.follow(state, layout, scrollState, gutterWidth)
-        completion.onFrame(completionRevision)
+        completion.contributor = insight.completions
+        completion.onFrame(insight.completionRevision)
         state.offsetAtPoint = { rootX, rootY ->
             val viewport = scrollState.viewport
             layout.offsetAt(
@@ -587,6 +585,8 @@ fun EditableTextField(
                 rootY - viewport.y + scrollState.offsetY,
             )
         }
+        state.dropPreview.refresh(state.offsetAtPoint)
+        state.autoScroll.follow(state, layout, scrollState, gutterWidth)
     }
 
     val visible = layout.visibleRange(scrollState.offsetY, scrollState.viewport.height, overscan = fontSize * 4f)
@@ -596,11 +596,14 @@ fun EditableTextField(
         tags = listOf("text-field", "editable-text-field") + tags,
         mode = UiBoxMode.STACK,
         attributes = attributes,
-        modifier = Modifier.focus().cursor(UiCursorShape.TEXT).whitespace(UiWhitespace.PRESERVE).fontSize(fontSize)
+        modifier = Modifier.focus().input(hoverable = true, clickable = true, draggable = true)
+            .cursor(UiCursorShape.TEXT).whitespace(UiWhitespace.PRESERVE).fontSize(fontSize)
             .let { if (fontFamily != null) it.fontFamily(fontFamily) else it }.onFocus { state.focus() }.onUnfocus {
                 state.unfocus()
                 completion.close()
                 codeInsight.clearSignature()
+                pointerState.cancelDrag()
+                state.clearDropPreview()
             }.onCharTyped { event ->
                 val char = event.codePoint.toChar()
                 if (event.codePoint != 0 && !char.isISOControl() && state.typeCharacter(char)) {
@@ -610,16 +613,19 @@ fun EditableTextField(
             }
             // Low priority: user onKeyInput handlers (default priority 0) get first refusal.
             .onKeyInput(TextFieldDefaultKeyPriority) { input ->
+                if (input.key == GLFW.GLFW_KEY_ESCAPE && pointerState.movingSelection) {
+                    pointerState.cancelDrag()
+                    state.clearDropPreview()
+                    input.consume()
+                    return@onKeyInput
+                }
                 val handled =
                     handleEditableFieldIntentionKey(state, input, completion, diagnostics) || handleEditableFieldKey(
-                        state,
-                        input,
-                        layout,
-                        completion,
-                        codeInsight
+                        state, input, layout, completion, codeInsight
                     )
                 if (handled || !state.readOnly && input.typesCharacter()) input.consume()
             }.onPress { event ->
+                state.clearDropPreview()
                 state.focus()
                 val hit = clickHit(event, layout, gutterWidth)
                 val clickCount = pointerState.clickCount(hit.offset)
@@ -627,9 +633,19 @@ fun EditableTextField(
                 pointerState.beginPress(state.text, hit.offset, clickCount, altPressed)
                 handleEditableFieldPress(
                     state, hit.offset, clickCount, event.modifiers, pointerState, hit.inlayAffinity,
+                    allowSelectionMove = event.isLeftClick(),
                 )
             }.onDrag { event ->
+                if (!event.isLeftClick()) return@onDrag
+                if (pointerState.movingSelection && abs(event.dragTotalX) < 3f && abs(event.dragTotalY) < 3f) return@onDrag
                 handleEditableFieldDrag(state, clickOffset(event, layout, gutterWidth), pointerState)
+                if (pointerState.movingSelection) state.previewDropAt(event.rootLocalX, event.rootLocalY)
+            }.onRelease { event ->
+                if (!event.isLeftClick()) return@onRelease
+                val offset = state.offsetAtPoint?.invoke(event.rootLocalX, event.rootLocalY) ?: state.caret
+                val hit = event.frame?.hitTest(event.x, event.y)?.node
+                val inside = generateSequence(hit) { it.layoutState.parentNode }.any { it === event.node }
+                if (handleEditableFieldRelease(state, offset, event.modifiers, pointerState, inside)) event.consume()
             }.onHover { event ->
                 hoverTooltip = if (diagnostics.isEmpty()) null else {
                     val viewport = scrollState.viewport
@@ -648,7 +664,7 @@ fun EditableTextField(
                         originY = viewport.y - surface.y,
                     )
                 }
-                codeHoverTarget = if (hoverTooltip == null && hoverInfoProvider != null) {
+                codeHoverTarget = if (hoverTooltip == null && insight.hover != null) {
                     EditableFieldHoverTarget(clickHit(event, layout, gutterWidth).offset)
                 } else {
                     null
@@ -694,11 +710,11 @@ fun EditableTextField(
                         layout = layout,
                         rowDiagnostics = diagnosticsByLine.getOrNull(index).orEmpty(),
                         rowSearchMatches = matchesByLine.getOrNull(index).orEmpty(),
-                        indentGuides = indentGuides,
-                        indentGuideColor = indentGuideColor,
+                        indentGuides = view?.indentGuides == true,
+                        indentGuideColor = view?.indentGuideColor ?: EditableFieldIndentGuideColor,
                         inlayMetrics = inlayMetrics,
                         onInlayAction = { action ->
-                            if (!state.folding.activate(action)) onInlayAction?.invoke(action)
+                            if (!state.folding.activate(action)) insight.onInlayAction?.invoke(action)
                         },
                     )
                 }
@@ -709,12 +725,12 @@ fun EditableTextField(
                 layout,
                 visible,
                 gutterPanelWidth,
-                lineNumberColor,
+                view?.lineNumberColor ?: EditableFieldLineNumberColor,
                 state,
                 folds,
                 gutterMarkers,
                 id ?: "text-field-${System.identityHashCode(state)}",
-                indentGuideColor
+                view?.indentGuideColor ?: EditableFieldIndentGuideColor
             )
         }
         if (completion.items.isNotEmpty()) {
@@ -730,9 +746,9 @@ fun EditableTextField(
             focused = state.focused,
             completionVisible = completion.items.isNotEmpty(),
             hoverTarget = codeHoverTarget,
-            signatureProvider = signatureHelpProvider,
-            hoverProvider = hoverInfoProvider,
-            revision = codeInsightRevision,
+            signatureProvider = insight.signatureHelp,
+            hoverProvider = insight.hover,
+            revision = insight.revision,
             layout = layout,
             scrollState = scrollState,
             contentOffsetX = gutterWidth,
@@ -746,155 +762,6 @@ internal fun editableFieldGutterWidth(text: String, fontSize: Float): Float {
     return digits * fontSize * 0.62f + EditableFieldLineNumberGap
 }
 
-internal fun handleEditableFieldPress(
-    state: TextFieldState,
-    offset: Int,
-    clickCount: Int,
-    modifiers: Int,
-    pointerState: EditableFieldPointerState = EditableFieldPointerState().also {
-        it.beginPress(state.text, offset, clickCount, modifiers and GLFW.GLFW_MOD_ALT != 0)
-    },
-    inlayAffinity: UiInlayCaretAffinity = UiInlayCaretAffinity.AFTER,
-) {
-    val altPressed = modifiers and GLFW.GLFW_MOD_ALT != 0
-    when {
-        clickCount >= 3 -> toggleOrAddPointerSelection(state, pointerState, offset, altPressed)
-        clickCount == 2 -> toggleOrAddPointerSelection(state, pointerState, offset, altPressed)
-        altPressed && state.removeCaretRangeAt(offset) -> pointerState.cancelDrag()
-        altPressed -> state.addCaret(offset, inlayAffinity)
-        else -> state.moveCaret(offset, inlayAffinity = inlayAffinity)
-    }
-}
-
-internal fun handleEditableFieldDrag(state: TextFieldState, offset: Int, pointerState: EditableFieldPointerState) {
-    val selection = pointerState.dragSelection(state.text, offset) ?: return
-    applyPointerSelection(state, selection, pointerState.altPressed)
-}
-
-private fun toggleOrAddPointerSelection(
-    state: TextFieldState,
-    pointerState: EditableFieldPointerState,
-    offset: Int,
-    altPressed: Boolean,
-) {
-    val selection = pointerState.dragSelection(state.text, offset) ?: return
-    if (altPressed && state.removeCaretRange(selection)) {
-        pointerState.cancelDrag()
-        return
-    }
-    addPointerSelection(state, selection, altPressed)
-}
-
-private fun addPointerSelection(state: TextFieldState, selection: UiTextCaret?, altPressed: Boolean) {
-    selection ?: return
-    val anchor = selection.selectionAnchor ?: selection.position
-    if (altPressed) state.addCaretRange(UiTextCaret(selection.position, anchor))
-    else state.setSelection(anchor, selection.position)
-}
-
-private fun applyPointerSelection(state: TextFieldState, selection: UiTextCaret?, altPressed: Boolean) {
-    selection ?: return
-    val anchor = selection.selectionAnchor ?: selection.position
-    if (altPressed) state.updateLastCaretRange(anchor, selection.position)
-    else state.setSelection(anchor, selection.position)
-}
-
-internal class EditableFieldPointerState {
-    var altPressed = false
-        private set
-
-    private var anchor = 0
-    private var mode = EditableFieldSelectionMode.CHARACTER
-    private var anchorRange = EditableTextRange(0, 0)
-    private var dragEnabled = false
-    private var lastClickAtMillis = 0L
-    private var lastClickOffset = -1
-    private var lastClickCount = 0
-
-    fun beginPress(text: String, offset: Int, clickCount: Int, altPressed: Boolean) {
-        this.altPressed = altPressed
-        anchor = offset.coerceIn(0, text.length)
-        mode = when {
-            clickCount >= 3 -> EditableFieldSelectionMode.LINE
-            clickCount == 2 -> EditableFieldSelectionMode.WORD
-            else -> EditableFieldSelectionMode.CHARACTER
-        }
-        anchorRange = selectionUnitAt(text, anchor, mode)
-        dragEnabled = true
-    }
-
-    fun cancelDrag() {
-        dragEnabled = false
-    }
-
-    fun dragSelection(text: String, offset: Int): UiTextCaret? {
-        if (!dragEnabled) return null
-        val active = offset.coerceIn(0, text.length)
-        if (mode == EditableFieldSelectionMode.CHARACTER) return UiTextCaret(active, anchor)
-
-        val activeRange = selectionUnitAt(text, active, mode)
-        return if (active < anchorRange.start) {
-            UiTextCaret(activeRange.start, anchorRange.end)
-        } else {
-            UiTextCaret(activeRange.end, anchorRange.start)
-        }
-    }
-
-    fun clickCount(offset: Int): Int {
-        val now = System.currentTimeMillis()
-        val continues = now - lastClickAtMillis <= EditableFieldDoubleClickMillis && abs(lastClickOffset - offset) <= 1
-        val count = if (continues) (lastClickCount + 1).coerceAtMost(3) else 1
-        lastClickAtMillis = now
-        lastClickOffset = offset
-        lastClickCount = count
-        return count
-    }
-}
-
-private enum class EditableFieldSelectionMode {
-    CHARACTER, WORD, LINE,
-}
-
-internal data class EditableTextRange(val start: Int, val end: Int)
-
-private fun selectionUnitAt(text: String, offset: Int, mode: EditableFieldSelectionMode): EditableTextRange {
-    return when (mode) {
-        EditableFieldSelectionMode.CHARACTER -> {
-            val index = offset.coerceIn(0, text.length)
-            EditableTextRange(index, index)
-        }
-
-        EditableFieldSelectionMode.WORD -> wordRangeAt(text, offset)
-        EditableFieldSelectionMode.LINE -> realLineRangeAt(text, offset)
-    }
-}
-
-private fun wordRangeAt(text: String, offset: Int): EditableTextRange {
-    if (text.isEmpty()) return EditableTextRange(0, 0)
-    val index = offset.coerceIn(0, text.length)
-    val characterIndex = if (index < text.length) index else text.lastIndex
-    val character = text[characterIndex]
-    val predicate: (Char) -> Boolean = when {
-        character.isEditableFieldWordChar() -> Char::isEditableFieldWordChar
-        character.isWhitespace() -> Char::isWhitespace
-        else -> { candidate -> candidate == character }
-    }
-    var start = characterIndex
-    var end = characterIndex + 1
-    while (start > 0 && predicate(text[start - 1])) start--
-    while (end < text.length && predicate(text[end])) end++
-    return EditableTextRange(start, end)
-}
-
-private fun realLineRangeAt(text: String, offset: Int): EditableTextRange {
-    if (text.isEmpty()) return EditableTextRange(0, 0)
-    val index = offset.coerceIn(0, text.length)
-    val start = text.lastIndexOf('\n', (index - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
-    val end = text.indexOf('\n', index).let { if (it < 0) text.length else it }
-    return EditableTextRange(start, end)
-}
-
-private fun Char.isEditableFieldWordChar(): Boolean = this == '_' || isLetterOrDigit()
 
 @Composable
 private fun EditableFieldRow(
@@ -988,7 +855,16 @@ private fun EditableFieldRow(
         EditableFieldRowDiagnostics(line, lineLayout, rowDiagnostics, top, fontSize, fontFamily, layout.contentWidth)
     }
 
-    if (state.focused) key(state.caretVisibilityRevision) {
+    state.dropPreview.offset?.takeIf { it in line.start..line.end }?.let { offset ->
+        val dropCaret = layout.caretAt(offset)
+        Box(
+            tags = listOf("editable-text-field-drop-caret"),
+            modifier = Modifier.position(dropCaret.x.px, dropCaret.y.px)
+                .size(TextFieldCaretWidth.px, layout.lineHeight.px).background(state.caretColor).layer(1)
+                .inputTransparent()
+        )
+    }
+    if (state.focused && state.dropPreview.offset == null) key(state.caretVisibilityRevision) {
         ranges.filter { it.position in line.start..line.end }.forEachIndexed { caretIndex, range ->
             val caret = layout.caretAt(range.position, range.inlayAffinity)
             key("caret", caretIndex) {
@@ -1169,20 +1045,21 @@ internal fun selectionRectsForRow(
     @Suppress("UNUSED_PARAMETER") fullWidth: Float,
 ): List<UiRect> {
     val newlineWidth = UiTextLayouter.measureTextWidth(" ", fontSize, fontFamily).coerceAtLeast(1f)
+    val fontHeight = UiTextFonts.resolve(fontFamily).lineHeight(fontSize)
     if (lineLayout != null) {
         val rects = mergeSelectionRects(
             lineLayout.selectionRects(localStart, localEnd, fontSize, fontFamily, fillLineGaps = false),
         )
         if (!crossesNewline) return rects
         val caret = lineLayout.caretPosition(localEnd, fontSize, fontFamily)
-        val lineHeight = lineLayout.lines.lastOrNull()?.height ?: fontSize
+        val lineHeight = lineLayout.lines.lastOrNull()?.height ?: fontHeight
         return rects + UiRect(caret.x, caret.y, newlineWidth, lineHeight)
     }
     val x1 = UiTextLayouter.measureTextWidth(line.text.take(localStart), fontSize, fontFamily)
     val x2 = UiTextLayouter.measureTextWidth(line.text.take(localEnd), fontSize, fontFamily)
     val right = if (crossesNewline) x2 + newlineWidth else x2
     if (right <= x1) return emptyList()
-    return listOf(UiRect(x1, 0f, right - x1, fontSize))
+    return listOf(UiRect(x1, 0f, right - x1, fontHeight))
 }
 
 private fun mergeSelectionRects(rects: List<UiRect>): List<UiRect> {
@@ -1254,6 +1131,10 @@ internal fun handleEditableFieldKey(
     }
     if (!state.multiline && !input.shift && (input.key == GLFW.GLFW_KEY_UP || input.key == GLFW.GLFW_KEY_DOWN)) return false
     if (input.key == GLFW.GLFW_KEY_ESCAPE && codeInsight?.dismissSignature() == true) return true
+    if (input.key == GLFW.GLFW_KEY_ESCAPE && state.caretRanges.size > 1) {
+        state.moveCaret(state.caret, inlayAffinity = state.primaryCaret.inlayAffinity)
+        return true
+    }
     if (completion != null && HollowKeys.COMPLETION.matches(input)) {
         completion.open()
         return true
@@ -1414,7 +1295,6 @@ private fun String.leadingSpaceCount(): Int = indexOfFirst { it != ' ' }.let { i
 internal const val TextFieldCaretWidth = 1f
 
 private const val EditableFieldRowBlock = 16
-private const val EditableFieldDoubleClickMillis = 350L
 internal const val EditableFieldLineNumberGap = 8f
 
 /** A find-in-file match on one row, in that row's own column offsets. */

@@ -7,7 +7,5 @@
   "model_no_animation": "Model %s has no animation '%s'. Its animations: %s",
   "tags": "§6[§bHollow Engine§6] §7Item tags: ",
   "scripting_state_requires_node_script": "Cannot use an initial state with '%s': states are supported only by .node.kts scripts. Use a .node.kts script or run the .kts script without the state argument.",
-  "expected_script_path": "Expected a script path, for example scripts/nodes/example.node.kts or my-addon:nodes/example.node.kts",
-  "dialogue_not_in_dialogue": "You are not taking part in a dialogue right now.",
-  "dialogue_no_such_option": "There is no option %s in the dialogue you are in."
+  "expected_script_path": "Expected a script path, for example scripts/nodes/example.node.kts or my-addon:nodes/example.node.kts"
 }

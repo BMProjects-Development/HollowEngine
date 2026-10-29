@@ -13,7 +13,9 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
@@ -32,6 +34,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.structure.kotlinGutterTa
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptImportError
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -231,7 +234,11 @@ class ScriptingAnalyzerImpl internal constructor(
                     )
                     return@argumentLoop
                 }
-                importedFiles += createPsiFile(importedName, importedText, files, activeFiles)
+                val importedFile = createPsiFile(importedName, importedText, files, activeFiles)
+                if (file.isSharedScript() && !importedFile.isSharedScript()) {
+                    diagnostics += importDiagnostic(file, expression, sharedScriptImportError(file.name, importedName))
+                }
+                importedFiles += importedFile
             }
         }
         return ImportResolution(importedFiles, diagnostics)
@@ -254,6 +261,7 @@ class ScriptingAnalyzerImpl internal constructor(
 
     /** The path [HollowIdeModel][ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel] opens files by. */
     private fun editorPathOf(file: File): String {
+        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }?.let { return it.qualified }
         val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
         val path = file.toPath().toAbsolutePath().normalize()
         if (!path.startsWith(root)) return file.name
@@ -302,7 +310,10 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
-        createCompletions(getOrCreateFile(name, text), offset, sink)
+        val file = getOrCreateFile(name, text)
+        val checkpoints = checkpointNameCompletions(file, offset)
+        if (checkpoints != null) sink.emit(checkpoints) else createCompletions(file, offset, sink)
+        Unit
     }
 
     override fun definition(name: String, text: String, offset: Int): DefinitionLocation? = synchronized(lock) {
@@ -315,8 +326,11 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> =
         synchronized(lock) {
-            kotlinGutterTargets(getOrCreateFile(name, text), offset)
+            kotlinGutterTargets(getOrCreateFile(name, text), name, offset)
         }
+
+    override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =
+        synchronized(lock) { findAcceptedExpressionTypes(getOrCreateFile(name, text), offset, types) }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)

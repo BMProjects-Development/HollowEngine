@@ -25,6 +25,7 @@ internal class HollowIdeContributions(
     private val dock: DockingState,
     private val context: HollowIdeContext,
     private val onLanguagesChanged: () -> Unit,
+    private val onPreviewsChanged: () -> Unit,
 ) {
     /** Read by compositions that list contributions, so they are rebuilt when an addon comes or goes. */
     var revision by mutableIntStateOf(0)
@@ -46,6 +47,7 @@ internal class HollowIdeContributions(
         HollowIdeExtensionPoints.MENU_ITEMS.observeOnClient {}
         HollowIdeExtensionPoints.PROJECT_ACTIONS.observeOnClient {}
         HollowIdeExtensionPoints.LANGUAGES.observeOnClient { onLanguagesChanged() }
+        HollowIdeExtensionPoints.PREVIEWS.observeOnClient { onPreviewsChanged() }
         HollowIdeExtensionPoints.FILE_TYPES.registrations.forEach(::installFileType)
     }
 

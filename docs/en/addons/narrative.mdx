@@ -1,0 +1,39 @@
+---
+title: Narrative addon
+order: 9
+---
+
+<center><h1>Narrative addon</h1></center>
+
+*Dialogues, the `.story` language, and cutscenes.*
+
+The narrative addon (id `hollowengine-narrative`) holds everything that tells a story on top of the engine. NPCs, their actions, and the node scripts that drive them stay in HollowEngine itself, so a world with NPCs still loads without the addon.
+
+## What it adds
+
+- The [dialogue system](/docs/hollowengine/dialogues): `.story` files, `DialogueController`, the dialogue window, and the `/he dialogue advance` and `/he dialogue choose <n>` commands for playing a dialogue from chat.
+- The built-in [story commands](/docs/hollowengine/dialogues/commands) for timing, sound, NPCs, cameras, the HUD, and cutscenes, and `RegisterStoryFunctionsEvent` for [your own](/docs/hollowengine/dialogues/custom-commands).
+- `.story` support in the IDE: highlighting, diagnostics, completion, navigation, and a **Dialogue** entry in the project tree's **New script** menu.
+- [Cutscenes](/docs/hollowengine/world/cutscenes): the cutscene timeline, `playCutscene` and its variants, and the camera that plays them.
+
+## Using it from your scripts
+
+Scripts in the `hollowengine` folder see an addon's classes only when the project depends on it. Add the addon to `dependsOn` in `hollowengine/META-INF/plugin.properties`, or in the IDE's project settings:
+
+```properties
+dependsOn=hollowengine-narrative
+```
+
+With the dependency in place, node scripts can use `DialogueController`, `DialogueCharacter`, and `playCutscene` without imports, and reload scripts also get the signature helpers (`string`, `number`, `actor`, and the rest) for registering story commands. Without it, those names are unresolved, and the rest of the project compiles as before.
+
+An addon that uses dialogues or cutscenes declares `dependsOn=hollowengine-narrative` in its own `plugin.properties` in the same way.
+
+## Packages
+
+| What | Package |
+| --- | --- |
+| Dialogues, story functions, events | `ru.hollowhorizon.hollowengine.addons.narrative.dialogue` |
+| Signature helpers for story commands | `ru.hollowhorizon.hollowengine.addons.narrative.dialogue.lang` |
+| Cutscenes | `ru.hollowhorizon.hollowengine.addons.narrative.cutscene` |
+
+Scripts written for earlier versions imported these classes from `ru.hollowhorizon.hollowengine.common.dialogue`. Replace that prefix with `ru.hollowhorizon.hollowengine.addons.narrative.dialogue`; cutscene functions used to come from `ru.hollowhorizon.hollowengine.common.scripting.story.functions.player`.

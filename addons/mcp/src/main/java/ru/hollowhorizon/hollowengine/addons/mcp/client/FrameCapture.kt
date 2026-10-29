@@ -6,8 +6,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CameraPose
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneCameraSystem
+import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
+import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.client.ui.screen.HollowWaitScreen
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.coroutines.dispatcher
@@ -47,13 +47,13 @@ object FrameCapture {
             val waitScreen = pose?.let {
                 HollowWaitScreen(WAIT_HEADING.lang, WAIT_MESSAGE.lang).also(minecraft::setScreen)
             }
-            CutsceneCameraSystem.heldPose = pose
+            CameraDirector.heldPose = pose
             pending = request
             try {
                 withTimeoutOrNull(CAPTURE_TIMEOUT) { request.image.await() }
             } finally {
                 pending = null
-                CutsceneCameraSystem.heldPose = null
+                CameraDirector.heldPose = null
                 if (waitScreen != null && minecraft.screen === waitScreen) minecraft.setScreen(previousScreen)
             }
         }

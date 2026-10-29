@@ -50,6 +50,13 @@ interface Literals {
     fun list(items: List<Any?>): Any?
 }
 
+/** A [value] of [type] as the dialect writes it: a primitive the way its literal would be, anything else as it is. */
+internal fun Literals.wrap(type: ExprType, value: Any?): Any? = when (type) {
+    ExprType.Primitive.BOOL -> bool(Coercions.toBool(value))
+    ExprType.Primitive.FLOAT -> number(Coercions.toFloat(value))
+    else -> value
+}
+
 @DslMarker
 annotation class ExpressionDsl
 

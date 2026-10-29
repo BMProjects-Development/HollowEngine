@@ -36,6 +36,7 @@
     "client.ChannelAccessor",
     "LevelRendererMixin",
     "client.AbstractClientPlayerMixin",
+    "client.AbstractContainerScreenMixin",
     "client.DebugMainMixin",
     "client.EntityRenderDispatcherMixin",
     "client.EntityRendererMixin",
