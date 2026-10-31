@@ -3,9 +3,8 @@ package ru.hollowhorizon.hollowengine.addons.narrative
 import kotlinx.coroutines.CoroutineScope
 import ru.hollowhorizon.hollowengine.addons.narrative.client.NarrativeClient
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCommands
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.Scenes
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.ScriptRegistryStorySource
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryScripts
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonContext
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEntrypoint
 import ru.hollowhorizon.hollowengine.common.addons.extensions
@@ -13,17 +12,20 @@ import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEvent
 import ru.hollowhorizon.hollowengine.common.scripting.*
 import ru.hollowhorizon.hollowengine.common.scripting.reload.ServerReloadScriptsEvent
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 /**
- * Dialogues, the `.story` language and cutscenes. NPCs and their action channels stay in the engine;
+ * Dialogues, stories and cutscenes. NPCs and their action channels stay in the engine;
  * this addon builds stories on top of them.
  */
 class HollowNarrativeAddon : HollowAddonEntrypoint {
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
-        ScriptRegistry.addListener(ScriptRegistryStorySource)
-        context.extensions.onUnload { ScriptRegistry.removeListener(ScriptRegistryStorySource) }
+        ScriptTranslators.register(StoryScripts.EXTENSION, StoryScripts)
+        context.extensions.onUnload {
+            ScriptTranslators.unregister(StoryScripts.EXTENSION)
+            StoryScripts.stop()
+        }
         if (isPhysicalClient) NarrativeClient.register(context.extensions)
     }
 
@@ -36,9 +38,9 @@ class HollowNarrativeAddon : HollowAddonEntrypoint {
         }
     }
 
-    /** Reloaded scripts registered their actions again, which the stories are checked against. */
+    /** Stories call what scripts declare, so they load after the scripts of this reload. */
     @SubscribeEvent
-    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = Scenes.reload()
+    fun afterReloadScripts(event: ServerReloadScriptsEvent.Post) = StoryScripts.reload()
 
     @SubscribeEvent(-1)
     fun registerCommands(event: RegisterCommandsEvent) {

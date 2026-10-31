@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.ChatText
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.audience
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionAlias
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryException
 import ru.hollowhorizon.hollowengine.addons.narrative.story.action
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
@@ -31,6 +32,17 @@ suspend fun choose(options: List<String>, to: List<ServerPlayer>? = null): Int =
         val asked = options.mapIndexed { index, text -> PollOption(index.toString(), text) }
         asked.indexOf(Polls.ask(players, asked))
     }
+}
+
+/**
+ * [choose] among the [options] whose flag is set. Gives the index in [options], so that an option hidden this time
+ * does not shift the others; -1 when none is offered.
+ */
+@ActionAlias
+suspend fun chooseIf(options: List<Pair<String, Boolean>>, to: List<ServerPlayer>? = null): Int {
+    val offered = options.indices.filter { options[it].second }
+    if (offered.isEmpty()) return -1
+    return offered.getOrElse(choose(offered.map { options[it].first }, to)) { -1 }
 }
 
 /** Shows a poll as numbered options in chat; a click votes, and the chosen one is repeated once it is decided. */

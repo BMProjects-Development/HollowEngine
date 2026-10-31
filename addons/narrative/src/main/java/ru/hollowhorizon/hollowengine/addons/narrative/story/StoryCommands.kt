@@ -89,17 +89,16 @@ internal object StoryCommands {
     }
 
     /**
-     * Starts a `.story` as a scene, played to the player the stories belong to or else to whoever runs the command,
-     * or a stage of a running script: [stage], or the only one it declares.
+     * Starts a `.story` from its `main` or [stage], played to the player the stories belong to or else to whoever runs
+     * the command, or a stage of a running script: [stage], or the only one it declares.
      */
     private fun start(context: Context, runs: StoryRuns, stage: String?): Int {
         val key = key(context)
         val story = StringArgumentType.getString(context, "story")
         if (story.endsWith(STORY_EXTENSION)) {
-            if (stage != null) throw StoryException("A .story has no stages; it starts from its beginning")
             val player = runs.owner.entity as? ServerPlayer ?: context.source.player
                 ?: throw StoryException("A scene is played to a player: start it for one or as one")
-            runs.launchScene(key, story, listOf(player))
+            runs.launchScene(key, if (stage == null) story else "$story#$stage", listOf(player))
             context.source.sendSuccess({ "hollowengine.commands.story.started_scene".mcTranslate(key, story) }, true)
             return 1
         }
@@ -154,15 +153,12 @@ internal object StoryCommands {
 
     private fun quoted(value: String): String = StringArgumentType.escapeIfRequired(value)
 
-    private const val STORY_EXTENSION = ".story"
-
-    /** The suffix of a translation of a story, `intro.ru_ru.story`, which is played in place of it and not alone. */
-    private val TRANSLATION = Regex("""\.[a-z]{2}_[a-z]{2}\.story$""")
+    private const val STORY_EXTENSION = StoryScripts.EXTENSION
 
     /** The running scripts and the `.story` files. */
     private val stories = SuggestionProvider<CommandSourceStack> { _, suggestions ->
-        val files = ScriptRegistry.list(STORY_EXTENSION).map(ScriptRegistry::display).filterNot(TRANSLATION::containsMatchIn)
-        SharedSuggestionProvider.suggest((StoryInstances.registered + files).map(::quoted), suggestions)
+        val files = ScriptRegistry.list(STORY_EXTENSION).map(ScriptRegistry::display)
+        SharedSuggestionProvider.suggest((StoryInstances.registered + files).distinct().map(::quoted), suggestions)
     }
 
     private val stages = SuggestionProvider<CommandSourceStack> { context, suggestions ->

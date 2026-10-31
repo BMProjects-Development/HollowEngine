@@ -3,16 +3,12 @@ package ru.hollowhorizon.hollowengine.addons.narrative.poll
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import net.minecraft.server.level.ServerPlayer
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.StoryValue
 import ru.hollowhorizon.hollowengine.common.events.Event
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
 import kotlin.time.Duration
 
-/**
- * One option of a poll. [key] tells it apart from the others, [text] is markup, and [metadata] holds what a story
- * wrote beside it, such as `icon=`.
- */
-class PollOption(val key: String, val text: String, val metadata: Map<String, StoryValue> = emptyMap())
+/** One option of a poll. [key] tells it apart from the others and [text] is markup. */
+class PollOption(val key: String, val text: String)
 
 /** A vote of [players] between [options], shown by its [PollProvider]. */
 class Poll internal constructor(

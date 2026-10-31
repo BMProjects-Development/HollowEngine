@@ -23,7 +23,7 @@ private const val HEARING_DISTANCE = 24.0
  * tags of [FormattedTextParser].
  */
 class Line(val speaker: DialogueCharacter?, val markup: String, val audience: List<ServerPlayer>) {
-    val text: FormattedTextDocument by lazy(LazyThreadSafetyMode.NONE) { FormattedTextParser.parse(markup) }
+    val text: FormattedTextDocument by lazy(LazyThreadSafetyMode.NONE) { FormattedTextParser.parse(StoryText.localized(markup)) }
 }
 
 /** Shows a line and returns once its audience has read it. */
@@ -66,6 +66,13 @@ suspend fun say(speaker: DialogueCharacter?, text: String, to: List<ServerPlayer
 /** [text] said by [speaker], see [say]. */
 suspend fun say(speaker: LivingEntity, text: String, to: List<ServerPlayer>? = null) =
     say(DialogueCharacter.of(speaker), text, to)
+
+/** [text] said under the name [speaker], narration when it is null, see [say]. */
+suspend fun say(speaker: String?, text: String, to: List<ServerPlayer>? = null) =
+    say(speaker?.let(DialogueCharacter::of), text, to)
+
+/** The name of the first player of the scene the caller runs in. */
+suspend fun playerName(): String = audience()?.firstOrNull()?.scoreboardName.orEmpty()
 
 /** The players of the scene the caller runs in, or null outside one. */
 internal suspend fun audience(): List<ServerPlayer>? = currentCoroutineContext()[StoryAudience]?.players

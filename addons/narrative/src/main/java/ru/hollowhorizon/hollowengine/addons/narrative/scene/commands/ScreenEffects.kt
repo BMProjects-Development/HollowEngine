@@ -7,7 +7,7 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.playCutscene
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.stopCutscene
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.StoryAudience
 import ru.hollowhorizon.hollowengine.addons.narrative.story.*
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
@@ -138,20 +138,20 @@ internal object ScreenEffects {
         val hudBefore = HashMap<UUID, Set<ResourceLocation>>()
     }
 
-    private val borrowed = WeakHashMap<SceneSession, Borrowed>()
+    private val borrowed = WeakHashMap<StoryAudience, Borrowed>()
 
     /** What the scene the current command runs in borrowed, with [player] noted; null outside a scene. */
     suspend fun borrow(player: ServerPlayer): Borrowed? {
-        val session = currentCoroutineContext()[CurrentScene]?.session ?: return null
-        return borrowed.getOrPut(session) { Borrowed() }.also { it.players += player }
+        val audience = currentCoroutineContext()[StoryAudience] ?: return null
+        return borrowed.getOrPut(audience) { Borrowed() }.also { it.players += player }
     }
 
     suspend fun borrowed(player: ServerPlayer): Borrowed? =
-        currentCoroutineContext()[CurrentScene]?.session?.let(borrowed::get)?.takeIf { player in it.players }
+        currentCoroutineContext()[StoryAudience]?.let(borrowed::get)?.takeIf { player in it.players }
 
-    @SubscribeEvent
-    fun onDialogueEnded(event: SceneEvent.Ended) {
-        val state = borrowed.remove(event.session) ?: return
+    /** Gives back what the scene of [audience] borrowed, as it ends. */
+    fun giveBack(audience: StoryAudience) {
+        val state = borrowed.remove(audience) ?: return
         state.players.forEach { giveBack(it, state) }
     }
 

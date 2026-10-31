@@ -1,48 +1,35 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import net.minecraft.core.BlockPos
-import net.minecraft.core.registries.Registries
-import net.minecraft.resources.ResourceKey
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.*
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionCatalog
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryParam
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryType
-import ru.hollowhorizon.hollowengine.addons.narrative.speech.audience
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
+import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
-import ru.hollowhorizon.hollowengine.common.utils.currentServer
-import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.KType
-import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.primaryConstructor
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * The actions as the commands of `.story`. `@move-to Кузнец [10, 64, 3]` calls the action `move-to` of whichever
- * namespace has one, `@hollowengine-narrative:move-to` that of the narrative addon. The receiver comes first, the
- * parameters follow in order or by name, and those the scene leaves out keep their defaults.
- */
-object ActionCommands : StoryFunctionCatalog {
+/** The actions as the commands of a story: `move-to` of whichever namespace has one, or `ns:move-to` of that one. */
+object ActionCommands {
     private class Built(val actions: List<StoryAction>, val commands: List<StoryCommand>)
 
     @Volatile
     private var built = Built(emptyList(), emptyList())
 
-    /** Every action a scene can call: one whose required parameters all take values a scene has. */
+    /** Every action a story can call: one whose required parameters all take values a field can hold. */
     val commands: List<StoryCommand>
         get() {
             val actions = StoryActions.all
@@ -52,280 +39,113 @@ object ActionCommands : StoryFunctionCatalog {
 
     /** The commands [name] may mean: one, unless several namespaces declare it. */
     fun find(name: String): List<StoryCommand> = commands.filter { it.answersTo(name) }
-
-    override fun overloads(name: String): List<StoryFunctionSignature>? =
-        find(name).map { it.signature }.ifEmpty { null }
-
-    override val names: Collection<String> get() = commands.map { it.name }.distinct()
-
-    /** The command a call of [name] with these values goes to. */
-    fun resolve(name: String, positional: List<StoryValue>, named: Map<String, StoryValue>): StoryCommand {
-        val found = find(name)
-        if (found.isEmpty()) throw StoryRuntimeException("There is no command '@$name'")
-        if (found.size > 1) {
-            throw StoryRuntimeException("'@$name' is ambiguous, write ${found.joinToString(" or ") { "@${it.id}" }}")
-        }
-        val command = found.single()
-        if (!StoryArguments.fits(command.signature, positional, named)) {
-            throw StoryRuntimeException("'@$name' does not take these arguments; it takes ${command.describe()}")
-        }
-        return command
-    }
 }
 
-/** An action as a scene calls it. */
-class StoryCommand private constructor(
-    val action: StoryAction,
-    val signature: StoryFunctionSignature,
-    private val parameters: List<Bound>,
-) {
-    /**
-     * A parameter of the function as the scene fills it: from the argument [name], or, for an options object such as
-     * `MoveOptions`, through its [constructor] from the arguments named after the [fields] it has (`speed=1.2`).
-     */
-    private class Bound(
-        val reflected: KParameter,
-        val name: String,
-        val constructor: KFunction<*>? = null,
-        val fields: List<KParameter> = emptyList(),
-    )
-
+/** An action as a story calls it. */
+class StoryCommand private constructor(val action: StoryAction, val signature: StoryFunctionSignature) {
     val id: String get() = action.id
 
-    /** The id without its namespace, which a scene writes when no other namespace has it. */
-    val name: String get() = id.substringAfter(':')
-
-    internal fun answersTo(written: String): Boolean = if (':' in written) id == written else name == written
-
-    internal fun describe(): String =
-        signature.params.joinToString(" ") { if (it.optional) "[${it.name}]" else it.name }
-
-    /** Calls the action with [arguments] bound to [signature]; values left out keep their defaults. */
-    suspend fun call(arguments: StoryArguments): Any? {
-        val function = action.function
-        val values = HashMap<KParameter, Any?>()
-        function.parameters.firstOrNull { it.kind == KParameter.Kind.INSTANCE }?.let { values[it] = action.owner() }
-        parameters.forEach { bound ->
-            val constructor = bound.constructor
-            if (constructor == null) {
-                val value = arguments[bound.name]
-                if (value == null) {
-                    if (bound.reflected.isImplicitLevel) values[bound.reflected] = sceneLevel()
-                    return@forEach
-                }
-                values[bound.reflected] = StoryConversions.convert(value, bound.reflected.type, bound.name)
-                return@forEach
-            }
-            val given = bound.fields.mapNotNull { field ->
-                arguments[field.name!!]?.let { field to StoryConversions.convert(it, field.type, field.name!!) }
-            }
-            if (given.isNotEmpty()) values[bound.reflected] = constructor.callBy(given.toMap())
-        }
-        return try {
-            function.callSuspendBy(values)
-        } catch (failure: InvocationTargetException) {
-            throw failure.targetException
-        }
-    }
+    internal fun answersTo(written: String): Boolean = if (':' in written) id == written else id.substringAfter(':') == written
 
     internal companion object {
-        /** The command [action] is, or null when a scene cannot call it. */
+        /** The command [action] is, or null when a story cannot call it: one of a script is not reachable by name. */
         fun of(action: StoryAction): StoryCommand? {
-            val direct = ArrayList<Bound>()
-            val options = ArrayList<Bound>()
+            if (!Modifier.isStatic(action.method.modifiers)) return null
+            val direct = ArrayList<StoryParam>()
+            val options = ArrayList<StoryParam>()
             for (parameter in action.function.parameters) {
                 when (parameter.kind) {
-                    KParameter.Kind.INSTANCE -> continue
-                    KParameter.Kind.EXTENSION_RECEIVER, KParameter.Kind.VALUE -> Unit
+                    KParameter.Kind.VALUE, KParameter.Kind.EXTENSION_RECEIVER -> Unit
                     else -> return null
                 }
                 if (parameter.type.classifier == CheckpointScope::class) return null
-                if (StoryConversions.typeOf(parameter.type) == null) {
+                if (!isValue(parameter.type)) {
                     val fields = optionsOf(parameter)
                     if (fields != null) options += fields else if (!parameter.isOptional) return null
                     continue
                 }
-                val name = when {
-                    parameter.kind != KParameter.Kind.EXTENSION_RECEIVER -> parameter.name ?: return null
-                    StoryConversions.typeOf(parameter.type) == StoryType.ACTOR -> RECEIVER_ENTITY
-                    parameter.type.classifier == ServerLevel::class -> RECEIVER_LEVEL
-                    else -> RECEIVER
-                }
-                direct += Bound(parameter, name)
+                direct += param(parameter)
             }
-            val params = direct.sortedBy { it.reflected.isImplicitLevel }
-                .map { param(it.name, it.reflected, it.reflected.isOptional || it.reflected.isImplicitLevel) }.toMutableList()
             // A field of an options object named like a parameter of the action is left to the parameter.
-            val taken = params.mapTo(HashSet()) { it.name }
-            val bound = direct + options.map { bound ->
-                val fields = bound.fields.filter { taken.add(it.name!!) }
-                params += fields.map { param(it.name!!, it, optional = true) }
-                Bound(bound.reflected, bound.name, bound.constructor, fields)
-            }
+            val taken = direct.mapTo(HashSet()) { it.name }
             val function = action.function
             val signature = StoryFunctionSignature(
                 action.id,
-                params,
+                "${action.method.declaringClass.packageName}.${function.name}",
+                direct + options.filter { taken.add(it.name) },
                 title = function.findAnnotation<EditorName>()?.name,
                 description = function.findAnnotation<EditorDescription>()?.description,
                 icon = function.findAnnotation<EditorIcon>()?.icon,
                 category = function.findAnnotation<EditorCategory>()?.category,
-                widget = function.findAnnotation<EditorWidget>()?.id,
-                returns = StoryConversions.typeOf(function.returnType),
-                returnValues = StoryConversions.suggestions(function.returnType),
+                returns = (function.returnType.classifier as? KClass<*>)?.takeIf { it != Unit::class }?.qualifiedName,
             )
-            return StoryCommand(action, signature, bound)
+            return StoryCommand(action, signature)
         }
 
-        private fun param(name: String, parameter: KParameter, optional: Boolean): StoryParam {
+        private fun param(parameter: KParameter): StoryParam {
             val info = parameter.findAnnotation<Param>()
+            val receiver = parameter.kind == KParameter.Kind.EXTENSION_RECEIVER
+            val implicit = parameter.type.classifier == ServerLevel::class && !parameter.isOptional
             return StoryParam(
-                name = name,
-                type = StoryConversions.typeOf(parameter.type)!!,
-                optional = optional,
+                name = if (receiver) receiverName(parameter) else parameter.name.orEmpty(),
+                type = parameter.type,
+                optional = parameter.isOptional || implicit,
                 suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values
-                    ?: StoryConversions.suggestions(parameter.type),
+                    ?: suggestions(parameter.type),
                 title = info?.title?.ifEmpty { null },
                 description = info?.description?.ifEmpty { null },
+                receiver = receiver,
+                implicit = if (implicit) "storyLevel()" else null,
             )
+        }
+
+        private fun receiverName(parameter: KParameter): String {
+            val classifier = parameter.type.classifier as KClass<*>
+            return when {
+                classifier == ServerLevel::class -> "level"
+                classifier.isSubclassOf(Entity::class) -> "who"
+                else -> "this"
+            }
         }
 
         /**
          * An optional parameter whose class can be built from optional constructor parameters alone, such as
-         * `MoveOptions`: a scene sets those of them it has values for, by name.
+         * `MoveOptions`: a story sets those of them it has values for, by name.
          */
-        private fun optionsOf(parameter: KParameter): Bound? {
+        private fun optionsOf(parameter: KParameter): List<StoryParam>? {
             if (!parameter.isOptional) return null
-            val constructor = (parameter.type.classifier as? KClass<*>)?.primaryConstructor ?: return null
+            val type = parameter.type.classifier as? KClass<*> ?: return null
+            val constructor = type.primaryConstructor ?: return null
             if (constructor.parameters.any { !it.isOptional }) return null
-            val fields = constructor.parameters.filter { it.name != null && StoryConversions.typeOf(it.type) != null }
-            if (fields.isEmpty()) return null
-            return Bound(parameter, parameter.name ?: return null, constructor, fields)
+            val group = StoryParamGroup(parameter.name ?: return null, type.qualifiedName ?: return null)
+            return constructor.parameters.filter { it.name != null && isValue(it.type) }
+                .map { param(it).copy(optional = true, group = group) }.ifEmpty { null }
         }
 
-        /** What a scene calls the receiver: the entity that acts, or the value the action is about. */
-        private const val RECEIVER_ENTITY = "who"
-        private const val RECEIVER = "this"
-        private const val RECEIVER_LEVEL = "level"
-    }
-}
-
-/** A level the scene does not name is the one of its first participant, or the overworld. */
-private val KParameter.isImplicitLevel: Boolean
-    get() = type.classifier == ServerLevel::class && !isOptional
-
-private suspend fun sceneLevel(): ServerLevel = audience()?.firstOrNull()?.serverLevel() ?: currentServer.overworld()
-
-/** How the values of a scene become the arguments of a Kotlin function. */
-internal object StoryConversions {
-    /** How a scene writes a value of [type], or null when it has none. */
-    fun typeOf(type: KType): StoryType? {
-        val classifier = type.classifier as? KClass<*> ?: return null
-        return when {
-            classifier == String::class || classifier == ResourceLocation::class || classifier == ServerLevel::class -> StoryType.STRING
-            classifier == Boolean::class -> StoryType.BOOL
-            classifier in NUMBERS || classifier == Duration::class -> StoryType.NUMBER
-            classifier.isSubclassOf(Entity::class) || classifier.isSubclassOf(DialogueCharacter::class) -> StoryType.ACTOR
-            classifier == Vec3::class || classifier == BlockPos::class -> StoryType.LIST
-            classifier in COLLECTIONS -> type.arguments.singleOrNull()?.type?.let(::typeOf)?.let { StoryType.LIST }
-            classifier.java.isEnum -> StoryType.STRING
-            else -> null
-        }
-    }
-
-    /** The values the editor offers for [type]: the constants of an enum, of a list of them too. */
-    fun suggestions(type: KType): List<String> {
-        val classifier = type.classifier as? KClass<*> ?: return emptyList()
-        if (classifier in COLLECTIONS) return type.arguments.singleOrNull()?.type?.let(::suggestions).orEmpty()
-        if (classifier == ServerLevel::class) return DIMENSIONS
-        return classifier.java.enumConstants?.map { (it as Enum<*>).name.lowercase().replace('_', '-') }.orEmpty()
-    }
-
-    /** A Kotlin value as a value of a scene; null for null and Unit. */
-    fun toStory(value: Any?): StoryValue? = when (value) {
-        null, Unit -> null
-        is String -> StoryString(value)
-        is Boolean -> StoryBool(value)
-        is Number -> StoryNumber(value.toFloat())
-        is Duration -> StoryNumber(value.inWholeMilliseconds.toFloat())
-        is Enum<*> -> StoryString(value.name.lowercase().replace('_', '-'))
-        is Collection<*> -> StoryList(value.mapNotNull(::toStory))
-        is Entity -> StoryEntity.of(value)
-        is EntityCharacter -> StoryEntity.of(value.entity)
-        else -> throw StoryRuntimeException("A scene cannot keep a ${value.javaClass.simpleName}")
-    }
-
-    fun convert(value: StoryValue, type: KType, name: String): Any {
-        val classifier = type.classifier as KClass<*>
-        fun fail(why: String = "it takes ${classifier.simpleName}"): Nothing =
-            throw StoryRuntimeException("'$name' cannot be ${value.display()}: $why")
-
-        fun number(): Float = when (value) {
-            is StoryNumber -> value.value
-            is StoryString -> value.value.toFloatOrNull() ?: fail()
-            else -> fail()
-        }
-
-        fun numbers(count: Int): List<Float> {
-            val items = (value as? StoryList)?.values ?: fail("it takes a position like [10, 64, 20]")
-            if (items.size != count) fail("it takes $count numbers")
-            return items.map { (it as? StoryNumber)?.value ?: fail("it takes $count numbers") }
-        }
-        return when {
-            classifier == String::class -> (value as? StoryString)?.value ?: value.display()
-            classifier == ResourceLocation::class -> ResourceLocation.tryParse(value.display())
-                ?: fail("it takes an id like minecraft:stone")
-
-            classifier == Boolean::class -> (value as? StoryBool)?.value ?: fail()
-            classifier == Float::class -> number()
-            classifier == Double::class -> number().toDouble()
-            classifier == Int::class -> number().toInt()
-            classifier == Long::class -> number().toLong()
-            classifier == Short::class -> number().toInt().toShort()
-            classifier == Byte::class -> number().toInt().toByte()
-            classifier == Duration::class -> number().toDouble().milliseconds
-            classifier.isSubclassOf(Entity::class) -> entity(value, classifier, ::fail)
-            classifier.isSubclassOf(DialogueCharacter::class) -> characterOf(value)?.takeIf(classifier::isInstance)
-                ?: fail("no character of the scene is named so")
-
-            classifier == ServerLevel::class -> ResourceLocation.tryParse(value.display())
-                ?.let { currentServer.getLevel(ResourceKey.create(Registries.DIMENSION, it)) }
-                ?: fail("no dimension is named so")
-
-            classifier == Vec3::class -> numbers(3).let { Vec3(it[0].toDouble(), it[1].toDouble(), it[2].toDouble()) }
-            classifier == BlockPos::class -> numbers(3).let { BlockPos(it[0].toInt(), it[1].toInt(), it[2].toInt()) }
-            classifier in COLLECTIONS -> {
-                val element = type.arguments.single().type!!
-                val items = (value as? StoryList)?.values ?: listOf(value)
-                val converted = items.map { convert(it, element, name) }
-                if (classifier == Set::class) converted.toSet() else converted
+        /** Whether a field can hold a value of [type]. */
+        private fun isValue(type: KType): Boolean {
+            val classifier = type.classifier as? KClass<*> ?: return false
+            return when {
+                classifier in VALUES || classifier.java.isEnum -> true
+                classifier.isSubclassOf(Entity::class) || classifier.isSubclassOf(DialogueCharacter::class) -> true
+                classifier in COLLECTIONS -> type.arguments.singleOrNull()?.type?.let(::isValue) == true
+                else -> false
             }
-
-            classifier.java.isEnum -> classifier.java.enumConstants.firstOrNull {
-                (it as Enum<*>).name.equals(value.display().replace('-', '_'), ignoreCase = true)
-            } ?: fail("it takes one of ${suggestions(type).joinToString()}")
-
-            else -> fail("a scene cannot pass a ${classifier.simpleName}")
         }
-    }
 
-    private fun entity(value: StoryValue, type: KClass<*>, fail: (String) -> Nothing): Entity {
-        val entity = when (value) {
-            is StoryEntity -> value.find() ?: fail("'${value.name}' is not loaded")
-            is StoryActor -> (value.character as? EntityCharacter)?.entity ?: fail("'${value.name}' is a name without an entity")
-            else -> fail("no character of the scene is named so")
+        /** The values the editor offers for [type]: the constants of an enum, of a list of them too. */
+        private fun suggestions(type: KType): List<String> {
+            val classifier = type.classifier as? KClass<*> ?: return emptyList()
+            if (classifier in COLLECTIONS) return type.arguments.singleOrNull()?.type?.let(::suggestions).orEmpty()
+            if (classifier == ServerLevel::class) return DIMENSIONS
+            return classifier.java.enumConstants?.map { (it as Enum<*>).name.lowercase().replace('_', '-') }.orEmpty()
         }
-        if (!type.isInstance(entity)) fail("'${value.display()}' is a ${entity.type.description.string}, not a ${type.simpleName}")
-        return entity
-    }
 
-    private fun characterOf(value: StoryValue): DialogueCharacter? = when (value) {
-        is StoryActor -> value.character
-        is StoryEntity -> value.character()
-        else -> null
+        private val VALUES = setOf(
+            String::class, Boolean::class, Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class,
+            Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class,
+        )
+        private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
+        private val DIMENSIONS = listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")
     }
-
-    private val NUMBERS = setOf(Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class)
-    private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
-    private val DIMENSIONS = listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")
 }

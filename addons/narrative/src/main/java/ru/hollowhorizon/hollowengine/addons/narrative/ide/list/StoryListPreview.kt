@@ -2,8 +2,15 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryScriptingAnalyzer
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryFunctionSignature
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFlow
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.addStart
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorStylesheet
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryUndo
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
@@ -14,9 +21,6 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
-import ru.hollowhorizon.hollowengine.client.utils.lang
-
-internal const val StoryListStylesheet = "hollowengine-narrative:ui/styles/story-list.hss"
 
 private const val AddIcon = "hollowengine:textures/gui/icons/add.svg"
 private const val SearchIcon = "hollowengine:textures/gui/icons/search.svg"
@@ -27,14 +31,10 @@ private const val CloseIcon = "hollowengine:textures/gui/icons/cross.svg"
 /** A menu that opens upward, for the buttons at the bottom of the list. */
 private val AboveStart = UiPopupAlignment(anchorVertical = UiAlign.START, popupVertical = UiAlign.END)
 
-internal fun storyLang(name: String) = "hollowengine.gui.ide.story.$name".lang
-
-internal fun storyIcon(name: String) = "hollowengine-narrative:textures/gui/icons/story/$name.svg"
-
-/** The `.story` file as a list of cards, beside its text. */
+/** The `.story` file as a list of cards. */
 internal val StoryListFilePreview = HollowIdeFilePreview(
     id = "story-list",
-    defaultMode = HollowIdeViewMode.TEXT,
+    defaultMode = HollowIdeViewMode.PREVIEW,
     icon = "hollowengine:textures/gui/icons/files/story.svg",
     title = "hollowengine.gui.ide.story.list",
     matcher = { it.endsWith(".story") },
@@ -48,39 +48,30 @@ internal object StoryListKeys {
 }
 
 /**
- * The statements of a story as rows, the way a writer reads it: phrases, pauses, menus of options, conditions. The
- * key parts are typed right in a row; the selected one is also in the inspector. The list composes only the rows
- * in view, so a long story stays light.
+ * A story as rows, the way a writer reads it: lines, pauses, menus of options, conditions. The list composes only the
+ * rows in view, so a long story stays light.
  */
 @Composable
 internal fun StoryListPreview(context: HollowIdePreviewContext) {
     val state = context.state { StoryListState() }
     state.context = context
     val parsed = state.model.read(context.text)
-    val model = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
-    LaunchedEffect(model.text) { state.follow(model) }
-    val rows = model.rows(state::isFolded)
-    state.selectIndex?.let { index ->
-        state.selectIndex = null
-        state.select(rows.getOrNull(index.coerceAtMost(rows.lastIndex))?.selection, scroll = true)
-    }
-    val selected =
-        state.selected?.takeIf { selection -> rows.any { it.selection == selection } || model.outline.blockAt(selection.line) != null }
-    val matches = state.search?.let(model::matches).orEmpty()
-    val scope = StoryRowScope(state, model, rows, matches.mapTo(HashSet()) { it.line }, matches.getOrNull(state.match))
+    val graph = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
+    val flow = remember(graph) { StoryFlow(graph) }
+    val rows = storyRows(flow, state::isFolded)
+    val matches = state.search?.let { storyMatches(flow, it) }.orEmpty()
+    val scope = StoryRowScope(state, graph, rows, matches.mapTo(HashSet()) { it.node }, matches.getOrNull(state.match))
 
-    PublishInspector(
-        source = "story-list:${context.file.path}",
-        key = selected?.let { it to StoryCardKind.of(model.outline.blockAt(it.line)!!) }) {
-        selected?.let { storyCardInspector(state, it, StoryCardKind.of(model.outline.blockAt(it.line)!!)) }
+    PublishInspector(source = "story-list:${context.file.path}", key = state.selected) {
+        storyInspector(state, state.selected)
     }
     Reveal(state, rows)
 
     Column(
         tags = listOf("ide-file-panel", "story-list-root"),
-        modifier = Modifier.style(InspectorStylesheet).style(StoryListStylesheet).focusScope(),
+        modifier = Modifier.style(InspectorStylesheet).style(StoryEditorStylesheet).focusScope(),
     ) {
-        state.search?.let { SearchBar(state, model, it, matches.size) }
+        state.search?.let { SearchBar(state, flow, it, matches.size) }
         LazyColumn(
             id = StoryListKeys.ListField,
             tags = listOf("story-list-scroll"),
@@ -88,13 +79,13 @@ internal fun StoryListPreview(context: HollowIdePreviewContext) {
             modifier = Modifier.size(100.percent, 0.px).grow(1f).focus()
                 // A press here is a press past the rows, which clears the selection.
                 .input(clickable = true).onPress { state.select(null) }
-                .onKeyInput { input -> if (onKey(state, model, rows, input)) input.consume() },
+                .onKeyInput { input -> if (onKey(state, graph, rows, input)) input.consume() },
         ) {
             items(rows.size, key = { rows[it].key }) { index -> StoryRowView(scope, rows[index], index) }
         }
-        AddBar(state, model)
+        AddBar(state, graph)
     }
-    state.menu?.let { StoryRowContextMenu(state, model, rows, it) }
+    state.menu?.let { StoryRowContextMenu(state, graph, rows, it) }
 }
 
 /** Scrolls what [StoryListState.reveal] asks for into view and focuses [StoryListState.focus] once it is drawn. */
@@ -102,6 +93,7 @@ internal fun StoryListPreview(context: HollowIdePreviewContext) {
 private fun Reveal(state: StoryListState, rows: List<StoryRow>) {
     val requester = LocalUiFocusRequester.current
     LaunchedEffect(state.focus) {
+        withFrameNanos { }
         state.focus?.let(requester::request)
         state.focus = null
     }
@@ -126,7 +118,7 @@ private fun Reveal(state: StoryListState, rows: List<StoryRow>) {
 }
 
 @Composable
-private fun SearchBar(state: StoryListState, model: StoryListModel, query: String, found: Int) {
+private fun SearchBar(state: StoryListState, flow: StoryFlow, query: String, found: Int) {
     Row(tags = listOf("story-search"), modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.CENTER)) {
         Image(SearchIcon, tags = listOf("story-search-icon"))
         TextField(
@@ -140,7 +132,7 @@ private fun SearchBar(state: StoryListState, model: StoryListModel, query: Strin
             tags = listOf("story-field", "search"),
             modifier = Modifier.size(0.px, 20.px).grow(1f).onKeyInput { input ->
                 when (input.key) {
-                    GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> state.findNext(model, if (input.shift) -1 else 1)
+                    GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> state.findNext(flow, if (input.shift) -1 else 1)
                     GLFW.GLFW_KEY_ESCAPE -> closeSearch(state)
                     else -> return@onKeyInput
                 }
@@ -148,8 +140,11 @@ private fun SearchBar(state: StoryListState, model: StoryListModel, query: Strin
             },
         )
         Text(
-            if (found == 0) storyLang("search.none") else storyLang("search.count")
-                .format((state.match + 1).coerceAtLeast(0), found),
+            if (found == 0) storyLang("search.none") else storyLang("search.count").format(
+                    (state.match + 1).coerceAtLeast(
+                        0
+                    ), found
+                ),
             tags = listOf("story-muted"),
         )
         IconButton(
@@ -158,7 +153,7 @@ private fun SearchBar(state: StoryListState, model: StoryListModel, query: Strin
             id = "story-search-previous",
             tags = listOf("inline", "story-action")
         ) {
-            state.findNext(model, -1)
+            state.findNext(flow, -1)
         }
         IconButton(
             NextIcon,
@@ -166,7 +161,7 @@ private fun SearchBar(state: StoryListState, model: StoryListModel, query: Strin
             id = "story-search-next",
             tags = listOf("inline", "story-action")
         ) {
-            state.findNext(model, 1)
+            state.findNext(flow, 1)
         }
         IconButton(
             CloseIcon,
@@ -187,18 +182,23 @@ private fun closeSearch(state: StoryListState) {
 
 /** The bar under the list, which adds after what is selected, or at the end when nothing is. */
 @Composable
-private fun AddBar(state: StoryListState, model: StoryListModel) {
+private fun AddBar(state: StoryListState, graph: StoryGraph) {
     var commands by remember { mutableStateOf<UiRect?>(null) }
     var anchor by remember { mutableStateOf(UiRect.Zero) }
     Row(tags = listOf("story-add-bar"), modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.CENTER)) {
         Button(storyLang("add.phrase"), id = "story-add-phrase", icon = AddIcon, tags = listOf("story-add", "phrase")) {
-            state.add(model, state.newPhrase(model))
-        }
-        Button(storyLang("add.wait"), id = "story-add-wait", icon = AddIcon, tags = listOf("story-add", "wait")) {
-            state.add(model, StoryNewStatements.wait())
+            state.addPhrase(graph)
         }
         Button(storyLang("add.choice"), id = "story-add-choice", icon = AddIcon, tags = listOf("story-add", "choice")) {
-            state.add(model, StoryNewStatements.choice())
+            state.add(StoryNode.Choose(StoryGraph.newId(), listOf(StoryOption(storyLang("new.option")))))
+        }
+        Button(
+            storyLang("add.condition"),
+            id = "story-add-condition",
+            icon = AddIcon,
+            tags = listOf("story-add", "condition")
+        ) {
+            state.add(StoryNode.Branch(StoryGraph.newId()))
         }
         Button(
             storyLang("add.command"),
@@ -207,81 +207,72 @@ private fun AddBar(state: StoryListState, model: StoryListModel) {
             tags = listOf("story-add", "command"),
             modifier = Modifier.onPlaced { anchor = it },
         ) { commands = anchor }
+        Button(storyLang("add.start"), id = "story-add-start", icon = AddIcon, tags = listOf("story-add", "command")) {
+            state.change(StoryUndo.ADD) { addStart(storyLang("new.start")).first }
+        }
     }
     commands?.let { bounds ->
         ContextMenu(
             id = "story-add-commands",
             anchorBounds = bounds,
-            items = addableItems { statement -> state.add(model, statement) },
+            items = StoryCatalog.items(state::add),
             alignment = AboveStart,
             onExpandedChange = { if (!it) commands = null },
         )
     }
 }
 
-/**
- * A menu item per function the stories know, for adding a command: under the heading of its category, or after the
- * headings when its action names none.
- */
-internal fun commandItems(
-    fits: (StoryFunctionSignature?) -> Boolean = { true },
-    add: (String) -> Unit,
-): List<UiDropdownItem> {
-    val catalog = StoryScriptingAnalyzer.catalog()
-    val signatures = catalog.names.associateWith { name -> catalog.overloads(name)?.firstOrNull() }
-        .filterValues(fits)
-    return grouped(signatures.keys.sorted().map { name ->
-        val signature = signatures[name]
-        signature?.category?.lang to UiDropdownItem(StoryTexts.title(name, signature), icon = signature?.icon) { add(name) }
-    })
-}
-
-/** What can be added as a statement of its own: the built-in statements and the commands, under shared headings. */
-internal fun addableItems(add: (String) -> Unit): List<UiDropdownItem> {
-    val builtins = StoryBuiltins.all.map { builtin ->
-        storyLang("category.${builtin.category}") to
-            UiDropdownItem(StoryTexts.title(builtin.id, keyword = builtin.keyword), icon = builtin.icon) { add(builtin.template) }
-    }
-    val catalog = StoryScriptingAnalyzer.catalog()
-    val commands = catalog.names.sorted().map { name ->
-        val signature = catalog.overloads(name)?.firstOrNull()
-        signature?.category?.lang to UiDropdownItem(StoryTexts.title(name, signature), icon = signature?.icon) {
-            add(StoryNewStatements.command(name))
-        }
-    }
-    return grouped(builtins + commands)
-}
-
-/** [items] under the headings they name, in the order of the headings; those without one go after them. */
-private fun grouped(items: List<Pair<String?, UiDropdownItem>>): List<UiDropdownItem> {
-    val byCategory = items.groupBy({ it.first }, { it.second })
-    val headings = byCategory.mapNotNull { (category, children) -> category?.let { UiDropdownItem(it, children = children) } }
-    return headings.sortedBy { it.label } + byCategory[null].orEmpty()
-}
-
-private fun onKey(state: StoryListState, model: StoryListModel, rows: List<StoryRow>, input: UiKeyInput): Boolean {
+private fun onKey(state: StoryListState, graph: StoryGraph, rows: List<StoryRow>, input: UiKeyInput): Boolean {
     if (StoryListKeys.isFind(input)) {
         state.search = state.search.orEmpty()
         state.focus = StoryListKeys.SearchField
         return true
     }
-    val selected = state.selected
+    val at = rows.indexOfFirst { it.selection == state.selected }
+    val row = rows.getOrNull(at)
     when (input.key) {
         GLFW.GLFW_KEY_UP, GLFW.GLFW_KEY_DOWN -> {
             val up = input.key == GLFW.GLFW_KEY_UP
-            if (input.alt) state.move(model, up) else state.selectNext(rows, if (up) -1 else 1)
+            when {
+                input.alt -> row?.let { state.move(rows, it, up) }
+                rows.isNotEmpty() -> {
+                    val next = if (at < 0) 0 else (at + if (up) -1 else 1).coerceIn(0, rows.lastIndex)
+                    state.select(rows[next].selection, scroll = true)
+                }
+            }
         }
 
-        GLFW.GLFW_KEY_TAB -> state.indent(model, out = input.shift)
-        GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
-            if (selected == null) state.append(model, state.newPhrase(model))
-            else state.insertAfter(model, selected, state.newPhrase(model))
-        }
-
-        GLFW.GLFW_KEY_DELETE -> selected?.let { state.remove(model, rows, it) }
-        GLFW.GLFW_KEY_D -> if (input.command && selected != null) state.duplicate(model, selected) else return false
+        GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> state.addPhrase(graph)
+        GLFW.GLFW_KEY_DELETE -> row?.let(state::remove)
+        GLFW.GLFW_KEY_D -> if (input.command && row != null) state.duplicate(row) else return false
         GLFW.GLFW_KEY_ESCAPE -> state.select(null)
         else -> return false
     }
     return true
+}
+
+/** The menu of a row: adding after it and the same moves the keys make. */
+@Composable
+internal fun StoryRowContextMenu(state: StoryListState, graph: StoryGraph, rows: List<StoryRow>, menu: StoryRowMenu) {
+    val row = menu.row
+    val items = buildList {
+        add(UiDropdownItem(storyLang("add.phrase")) { state.addPhrase(graph) })
+        add(UiDropdownItem(storyLang("add.command"), children = StoryCatalog.items(state::add)))
+        if (row.moves) {
+            add(UiDropdownItem(storyLang("duplicate"), shortcut = "Ctrl+D", separatorBefore = true) {
+                state.duplicate(
+                    row
+                )
+            })
+            add(UiDropdownItem(storyLang("menu.up"), shortcut = "Alt+↑") { state.move(rows, row, up = true) })
+            add(UiDropdownItem(storyLang("menu.down"), shortcut = "Alt+↓") { state.move(rows, row, up = false) })
+        }
+        add(UiDropdownItem(storyLang("remove"), shortcut = "Delete", separatorBefore = true) { state.remove(row) })
+    }
+    ContextMenu(
+        id = "story-row-menu",
+        anchorBounds = UiRect(menu.x, menu.y, 0f, 0f),
+        items = items,
+        onExpandedChange = { if (!it) state.menu = null },
+    )
 }

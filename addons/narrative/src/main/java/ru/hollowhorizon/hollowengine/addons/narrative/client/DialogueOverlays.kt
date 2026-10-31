@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.poll.ChoiceUiKeys
 import ru.hollowhorizon.hollowengine.addons.narrative.poll.ChoiceView
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.SpeechOverlay
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.SpeechUiKeys
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.StoryText
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
@@ -16,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.ScreenEvent
 import ru.hollowhorizon.hollowengine.common.ui.*
 import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
+import ru.hollowhorizon.hollowengine.common.ui.text.FormattedTextParser
 
 @ClientOnly
 internal object DialogueOverlays {
@@ -64,22 +66,24 @@ internal object DialogueOverlays {
 @Composable
 private fun UiScope.Speech() {
     val line = data[SpeechUiKeys.Line]
-    var shown by remember(line.id) { mutableStateOf(if (line.charMillis <= 0) line.visibleLength else 0) }
-    val typed = shown >= line.visibleLength
+    val text = remember(line.id) { StoryText.localized(line.text) }
+    val length = remember(text) { FormattedTextParser.parse(text).visibleLength }
+    var shown by remember(line.id) { mutableStateOf(if (line.charMillis <= 0) length else 0) }
+    val typed = shown >= length
     LaunchedEffect(line.id) {
         var start = -1L
-        while (shown < line.visibleLength) {
+        while (shown < length) {
             withFrameNanos { now ->
                 if (start < 0L) start = now
                 val typing = ((now - start) / 1_000_000L / line.charMillis).toInt()
-                shown = typing.coerceIn(shown, line.visibleLength)
+                shown = typing.coerceIn(shown, length)
             }
         }
     }
     DisposableEffect(Unit) { onDispose { DialogueOverlays.speechBounds = null } }
 
     fun skip() {
-        if (typed) send { putString(SpeechUiKeys.Action, SpeechUiKeys.Advance) } else shown = line.visibleLength
+        if (typed) send { putString(SpeechUiKeys.Action, SpeechUiKeys.Advance) } else shown = length
     }
 
     val screenOpen = DialogueOverlays.screenOpen
@@ -101,9 +105,9 @@ private fun UiScope.Speech() {
             tags = if (line.speaker.isEmpty()) listOf("narration") else emptyList(),
             modifier = box,
         ) {
-            if (line.speaker.isNotEmpty()) Text(line.speaker, id = "speech-name")
+            if (line.speaker.isNotEmpty()) Text(StoryText.localized(line.speaker), id = "speech-name")
             Text(id = "speech-text") {
-                FormattedTextSpans(line.text, shown, listOf("speech-pending"))
+                FormattedTextSpans(text, shown, listOf("speech-pending"))
                 if (typed) Span(" »", id = "speech-next")
             }
         }
@@ -169,7 +173,7 @@ private fun Option(index: Int, text: String, choice: ChoiceView, highlighted: In
     if (choice.decided < 0) modifier = modifier.input(hoverable = true, clickable = true).onClick { vote() }
     Row(id = "choice-option-$index", tags = listOf("choice-option"), modifier = modifier) {
         Text("${index + 1}", tags = listOf("choice-number"))
-        FormattedText(text, tags = listOf("choice-text"))
+        FormattedText(StoryText.localized(text), tags = listOf("choice-text"))
     }
 }
 
