@@ -1,0 +1,275 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+$node-bg: #252525;
+$node-field: #212121;
+$node-line: alpha(#FFFFFF, 0.1);
+$node-divider: alpha(#000000, 0.2);
+$node-radius: 8px;
+$node-field-radius: 5px;
+
+$head-light: alpha(#FFFFFF, 0.14);
+$head-dark: alpha(#000000, 0.28);
+
+$category-input: #BF8246;
+$category-math: #3B8950;
+$category-vector: #3B8950;
+$category-uv: #3E86C4;
+$category-normal: #3E86C4;
+$category-texture: #C067A4;
+$category-procedural: #5F59B1;
+$category-output: #CF5E54;
+
+.graph-node.gn-node {
+    background: $node-bg;
+    border: 0px $node-line;
+    border-radius: $node-radius;
+    shadow: 0px 3px 10px 0px $shadow;
+}
+
+.graph-node.gn-node.selected {
+    shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 1.5px $accent;
+}
+
+.graph-node.gn-node.error {
+    shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 1.5px $danger;
+}
+
+.graph-node.gn-node.warning {
+    shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 1.5px $warning;
+}
+
+.gn-node-problem {
+    size: 13px 13px;
+    margin: 0px 5px 0px 0px;
+}
+
+.graph-node.gn-node.collapsed {
+    opacity: 0.65;
+}
+
+.gn-node-head {
+    padding: 0px 10px;
+    gap: 5px;
+    background: $category-math;
+    border: 1px linear-gradient(to bottom, $head-light 0%, $head-light 96.875%, $head-dark 96.875%, $head-dark 100%);
+    border-radius: $node-radius;
+}
+
+.gn-node-head-flat {
+    background: $category-math;
+}
+
+.gn-node-head-edge {
+    background: $head-light;
+}
+
+.gn-input .gn-node-head, .gn-input .gn-node-head-flat { background: $category-input; }
+.gn-vector .gn-node-head, .gn-vector .gn-node-head-flat { background: $category-vector; }
+.gn-uv .gn-node-head, .gn-uv .gn-node-head-flat { background: $category-uv; }
+.gn-normal .gn-node-head, .gn-normal .gn-node-head-flat { background: $category-normal; }
+.gn-texture .gn-node-head, .gn-texture .gn-node-head-flat { background: $category-texture; }
+.gn-procedural .gn-node-head, .gn-procedural .gn-node-head-flat { background: $category-procedural; }
+.gn-output .gn-node-head, .gn-output .gn-node-head-flat { background: $category-output; }
+
+.gn-node-divider {
+    background: $node-divider;
+}
+
+.gn-node-icon {
+    size: 15px 15px;
+}
+
+.gn-node-head .gn-node-title {
+    font-size: 12px;
+    foreground: $white;
+    text-wrap: false;
+    text-overflow: dots;
+}
+
+.gn-node-toggle {
+    size: 16px 16px;
+    align-items: center center;
+    border-radius: $radius;
+    cursor: hand;
+    transition: background 110ms ease-out;
+}
+
+.gn-node-toggle:hover {
+    background: alpha(#FFFFFF, 0.16);
+}
+
+.gn-node-arrow {
+    size: 7px 5px;
+    transform: rotate(180deg);
+}
+
+.collapsed .gn-node-arrow {
+    transform: rotate(0deg);
+}
+
+.gn-node-row {
+    gap: 6px;
+}
+
+.gn-pin-label {
+    font-size: 11px;
+    foreground: $white;
+    text-wrap: false;
+    text-overflow: dots;
+}
+
+.gn-pin-hint {
+    font-size: 9px;
+    foreground: $text-faint;
+    text-wrap: false;
+}
+
+.gn-fields {
+    gap: 4px;
+}
+
+.gn-field {
+    padding: 3px 6px;
+    background: $node-field;
+    border: 1px $node-line;
+    border-radius: $node-field-radius;
+    foreground: #E9E9E9;
+    font-family: $font;
+    font-size: 9px;
+    caret-color: $caret;
+    selection-color: $selection;
+    text-shadow: none;
+    transition: border 110ms ease-out;
+}
+
+.gn-field:hover {
+    border-color: $border;
+}
+
+.gn-field:focus {
+    border-color: $accent;
+}
+
+.gn-expression {
+    font-family: $font-code;
+    font-size: 9px;
+}
+
+.gn-chip {
+    padding: 3px 6px;
+    background: $node-field;
+    border: 1px $node-line;
+    border-radius: $node-field-radius;
+    foreground: $white;
+    font-family: $font;
+    font-size: 9px;
+    text-wrap: false;
+    text-overflow: dots;
+    cursor: hand;
+    transition: border 110ms ease-out, background 110ms ease-out;
+}
+
+.gn-chip:hover {
+    background: $bg-hover;
+    border-color: $border;
+}
+
+.gn-toggle {
+    gap: 6px;
+    cursor: hand;
+}
+
+.gn-checkbox {
+    size: 10px 10px;
+    checkbox-active: $accent;
+    checkbox-mark: $white;
+}
+
+.gn-node-preview {
+    background: $bg-window;
+    border-radius: $node-field-radius;
+}
+
+.gn-pin {
+    background: $node-bg;
+    border: 1.5px #A5ABC0;
+    border-radius: 4.5px;
+    shadow: 0px 1px 3px 0px alpha(#000000, 0.55);
+    cursor: hand;
+    transition: background 150ms ease-out;
+}
+
+.gn-pin:hover {
+    background: $white;
+}
+
+.gn-pin.gn-type-float { border-color: #A5ABC0; }
+.gn-pin.gn-type-vec2 { border-color: #44BC74; }
+.gn-pin.gn-type-vec3 { border-color: #F0CF60; }
+.gn-pin.gn-type-vec4 { border-color: #C774AA; }
+.gn-pin.gn-type-texture { border-color: #C9874A; }
+
+.gn-pin.connected.gn-type-float { background: #A5ABC0; }
+.gn-pin.connected.gn-type-vec2 { background: #44BC74; }
+.gn-pin.connected.gn-type-vec3 { background: #F0CF60; }
+.gn-pin.connected.gn-type-vec4 { background: #C774AA; }
+.gn-pin.connected.gn-type-texture { background: #C9874A; }
+
+.gn-pin.gn-type-texture {
+    border-radius: 2px;
+}
+
+.number-field.gn-field { padding: 0px; }
+
+.number-field.gn-field .number-field-frame { size: 100% 100%; }
+
+.number-field.gn-field.editing { padding: 1px 4px; }
+
+.gn-swatch {
+    border: 1px alpha(#FFFFFF, 0.28);
+    border-radius: $node-field-radius;
+    cursor: hand;
+    transition: border 110ms ease-out;
+}
+
+.gn-swatch:hover {
+    border-color: $border-strong;
+}
+
+.gn-color-popup {
+    padding: 8px;
+    background: $bg-raised;
+    border: 1px $border;
+    border-radius: $radius;
+    shadow: 1px 1px 3px 0px $shadow;
+    font-family: $font;
+    font-size: $font-size;
+}
+
+.gn-color-popup-body {
+    gap: 6px;
+}
+
+.graph-node.gn-reroute {
+    background: #A5ABC0;
+    border: 1.5px alpha(#000000, 0.35);
+    border-radius: 6px;
+    shadow: 0px 1px 3px 0px alpha(#000000, 0.55);
+}
+
+.graph-node.gn-reroute:hover {
+    border-color: $white;
+}
+
+.graph-node.gn-reroute.selected {
+    shadow: 0px 1px 3px 0px alpha(#000000, 0.55), 0px 0px 0px 1.5px $accent;
+}
+
+.graph-node.gn-reroute.gn-type-vec2 { background: #44BC74; }
+.graph-node.gn-reroute.gn-type-vec3 { background: #F0CF60; }
+.graph-node.gn-reroute.gn-type-vec4 { background: #C774AA; }
+.graph-node.gn-reroute.gn-type-texture { background: #C9874A; border-radius: 2px; }
+
+.graph-node.gn-group-card .gn-node-title {
+    foreground: $white;
+}

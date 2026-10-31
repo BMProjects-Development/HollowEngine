@@ -9,8 +9,10 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignatu
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import java.lang.reflect.Modifier
@@ -18,6 +20,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KType
 import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.hasAnnotation
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.primaryConstructor
 import kotlin.time.Duration
@@ -77,7 +80,9 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 description = function.findAnnotation<EditorDescription>()?.description,
                 icon = function.findAnnotation<EditorIcon>()?.icon,
                 category = function.findAnnotation<EditorCategory>()?.category,
+                categoryColor = function.findAnnotation<EditorCategory>()?.color?.ifEmpty { null },
                 returns = (function.returnType.classifier as? KClass<*>)?.takeIf { it != Unit::class }?.qualifiedName,
+                hidden = function.hasAnnotation<EditorHidden>(),
             )
             return StoryCommand(action, signature)
         }
@@ -96,6 +101,7 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 description = info?.description?.ifEmpty { null },
                 receiver = receiver,
                 implicit = if (implicit) "storyLevel()" else null,
+                assets = parameter.findAnnotation<EditorAsset>()?.extensions?.toList().orEmpty(),
             )
         }
 

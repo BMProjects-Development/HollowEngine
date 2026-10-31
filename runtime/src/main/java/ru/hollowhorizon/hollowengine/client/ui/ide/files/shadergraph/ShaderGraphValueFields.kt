@@ -30,17 +30,17 @@ internal fun ValueFields(
         actions.setValue(node.id, pin.name, shown.toMutableList().also { it[component] = value })
 
     if (components == 1 && !pin.color) {
-        GraphNumber("sg-field-${node.id}-${pin.name}-0", shown[0], actions, label = pin.name) { set(0, it) }
+        GraphNumber("gn-field-${node.id}-${pin.name}-0", shown[0], actions, label = pin.name) { set(0, it) }
         return
     }
-    Text(pin.name, tags = listOf("sg-pin-label"), modifier = Modifier.size(0.px, UiLength.Auto).grow(1f))
+    Text(pin.name, tags = listOf("gn-pin-label"), modifier = Modifier.size(0.px, UiLength.Auto).grow(1f))
     if (pin.color && components >= 3) {
-        ColorSwatch("sg-color-${node.id}-${pin.name}", shown, actions) { actions.setValue(node.id, pin.name, it) }
+        ColorSwatch("gn-color-${node.id}-${pin.name}", shown, actions) { actions.setValue(node.id, pin.name, it) }
         return
     }
-    Row(tags = listOf("sg-fields"), modifier = Modifier.size(FieldsWidth.px, UiLength.Auto)) {
+    Row(tags = listOf("gn-fields"), modifier = Modifier.size(FieldsWidth.px, UiLength.Auto)) {
         shown.forEachIndexed { component, value ->
-            GraphNumber("sg-field-${node.id}-${pin.name}-$component", value, actions) { set(component, it) }
+            GraphNumber("gn-field-${node.id}-${pin.name}-$component", value, actions) { set(component, it) }
         }
     }
 }
@@ -63,7 +63,7 @@ internal fun GraphNumber(
         id = id,
         label = label,
         format = { formatValue(it.toFloat()) },
-        tags = listOf("sg-field"),
+        tags = listOf("gn-field"),
         modifier = Modifier.size(0.px, FieldHeight.px).grow(1f),
         onGestureStart = { if (gestures) actions.beginGesture() },
         onGestureEnd = { if (gestures) actions.endGesture() },
@@ -80,7 +80,7 @@ private fun ColorSwatch(id: String, values: List<Float>, actions: ShaderFieldAct
     val color = UiColor(values[0], values[1], values[2], values.getOrElse(3) { 1f })
     Box(
         id = id,
-        tags = listOf("sg-swatch"),
+        tags = listOf("gn-swatch"),
         modifier = Modifier.size(FieldsWidth.px, FieldHeight.px)
             .drawBehind(key = color) {
                 val inner = UiRect(bounds.x + 1f, bounds.y + 1f, bounds.width - 2f, bounds.height - 2f)
@@ -98,13 +98,13 @@ private fun ColorSwatch(id: String, values: List<Float>, actions: ShaderFieldAct
     Popup(
         anchorBounds = open,
         id = "$id-popup",
-        tags = listOf("sg-color-popup"),
+        tags = listOf("gn-color-popup"),
         onDismiss = {
             anchor = null
             actions.endGesture()
         },
     ) {
-        Column(tags = listOf("sg-color-popup-body")) {
+        Column(tags = listOf("gn-color-popup-body")) {
             ColorPicker(
                 value = color.clamped(),
                 showAlpha = values.size == 4,
@@ -114,7 +114,7 @@ private fun ColorSwatch(id: String, values: List<Float>, actions: ShaderFieldAct
                     )
                 },
             )
-            Row(tags = listOf("sg-fields"), modifier = Modifier.size(ColorPickerWidth.px, UiLength.Auto)) {
+            Row(tags = listOf("gn-fields"), modifier = Modifier.size(ColorPickerWidth.px, UiLength.Auto)) {
                 values.forEachIndexed { channel, value ->
                     GraphNumber("$id-channel-$channel", value, actions, gestures = false) { typed ->
                         onChange(values.toMutableList().also { it[channel] = typed })

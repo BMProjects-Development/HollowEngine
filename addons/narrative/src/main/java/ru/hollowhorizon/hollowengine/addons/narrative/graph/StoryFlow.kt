@@ -9,8 +9,8 @@ sealed interface StoryStep {
         override val id: String get() = node.id
     }
 
-    /** A call with the steps of its block under it. */
-    class Scoped(val node: StoryNode.Call, val body: List<StoryStep>) : StoryStep {
+    /** A call or a loop with the steps of its block under it. */
+    class Scoped(val node: StoryNode, val body: List<StoryStep>) : StoryStep {
         override val id: String get() = node.id
     }
 
@@ -32,7 +32,9 @@ class StorySection(val start: StoryNode.Start?, val steps: List<StoryStep>)
  * The flow of a [StoryGraph] as nested steps, which is how the list shows it. Branches that meet again end where they
  * meet and the steps go on at the level of the split. Anything else reached twice is a [StoryStep.Jump].
  */
-class StoryFlow(val graph: StoryGraph) {
+class StoryFlow(source: StoryGraph) {
+    val graph: StoryGraph = source.dissolved()
+
     private val next = HashMap<Pair<String, String>, String>()
     private val into = HashMap<String, MutableList<StoryLink>>()
     private val visited = HashSet<String>()
@@ -54,7 +56,7 @@ class StoryFlow(val graph: StoryGraph) {
         }
         val values = graph.links.filter { !it.isFlow }.mapTo(HashSet()) { it.from }
         val loose = graph.nodes.filter { node ->
-            node !is StoryNode.Expression && node.id !in visited && node.id !in into && node.id !in values
+            node !is StoryNode.Expression && node !is StoryNode.Pure && node.id !in visited && node.id !in into && node.id !in values
         }
         sections = found + loose.sortedBy { it.id }.mapNotNull { node ->
             sequence(node.id, node.id, StoryPins.IN, emptySet()).takeIf { it.isNotEmpty() }?.let { StorySection(null, it) }
@@ -107,8 +109,8 @@ class StoryFlow(val graph: StoryGraph) {
             val step = when (node) {
                 is StoryNode.Branch -> split(node, listOf(StoryPins.THEN, StoryPins.ELSE), stops)
                 is StoryNode.Choose -> split(node, node.options.indices.map(StoryPins::option), stops)
-                is StoryNode.Call if node.block ->
-                    StoryStep.Scoped(node, sequence(next[node.id to StoryPins.BODY], node.id, StoryPins.BODY, stops))
+                is StoryNode.Call if node.block -> scoped(node, stops)
+                is StoryNode.Loop -> scoped(node, stops)
 
                 else -> StoryStep.Plain(node)
             }
@@ -126,6 +128,9 @@ class StoryFlow(val graph: StoryGraph) {
         }
         return result
     }
+
+    private fun scoped(node: StoryNode, stops: Set<String>) =
+        StoryStep.Scoped(node, sequence(next[node.id to StoryPins.BODY], node.id, StoryPins.BODY, stops))
 
     private fun split(node: StoryNode, pins: List<String>, stops: Set<String>): StoryStep.Split {
         val targets = pins.map { next[node.id to it] }

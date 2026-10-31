@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.layer
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
 import java.util.*
+import kotlin.math.abs
 
 data class UiRect(
     val x: Float,
@@ -115,4 +116,11 @@ internal data class ResolvedUiInsets(
 ) {
     val horizontal: Float get() = left + right
     val vertical: Float get() = top + bottom
+}
+
+/** Where the node is on the screen. */
+internal fun UiLayoutNode.shownRect(): UiRect {
+    val from = inputTransform.transform(0f, 0f)
+    val to = inputTransform.transform(rect.width, rect.height)
+    return UiRect(minOf(from.x, to.x), minOf(from.y, to.y), abs(to.x - from.x), abs(to.y - from.y))
 }

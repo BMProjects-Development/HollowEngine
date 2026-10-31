@@ -8,6 +8,9 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.addS
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.PublishStoryProblems
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorStylesheet
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryUndo
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
@@ -21,6 +24,9 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
 import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+
+/** What the padding of `.story-list-scroll` leaves of the width of the list. */
+private const val ListPadding = 20f
 
 private const val AddIcon = "hollowengine:textures/gui/icons/add.svg"
 private const val SearchIcon = "hollowengine:textures/gui/icons/search.svg"
@@ -60,8 +66,11 @@ internal fun StoryListPreview(context: HollowIdePreviewContext) {
     val flow = remember(graph) { StoryFlow(graph) }
     val rows = storyRows(flow, state::isFolded)
     val matches = state.search?.let { storyMatches(flow, it) }.orEmpty()
-    val scope = StoryRowScope(state, graph, rows, matches.mapTo(HashSet()) { it.node }, matches.getOrNull(state.match))
+    val rowWidth = maxOf(state.listWidth - ListPadding, rows.maxOfOrNull(::rowFit) ?: 0f)
+    val scope = StoryRowScope(state, graph, rows, matches.mapTo(HashSet()) { it.node }, matches.getOrNull(state.match), rowWidth)
 
+    val checks = remember(graph) { StoryChecks.all(graph) }
+    PublishStoryProblems(context, graph, checks) { state.reveal(flow, StorySelection(it)) }
     PublishInspector(source = "story-list:${context.file.path}", key = state.selected) {
         storyInspector(state, state.selected)
     }
@@ -76,7 +85,8 @@ internal fun StoryListPreview(context: HollowIdePreviewContext) {
             id = StoryListKeys.ListField,
             tags = listOf("story-list-scroll"),
             state = state.list,
-            modifier = Modifier.size(100.percent, 0.px).grow(1f).focus()
+            crossAxisScroll = true,
+            modifier = Modifier.size(100.percent, 0.px).grow(1f).focus().onPlaced { state.listWidth = it.width }
                 // A press here is a press past the rows, which clears the selection.
                 .input(clickable = true).onPress { state.select(null) }
                 .onKeyInput { input -> if (onKey(state, graph, rows, input)) input.consume() },

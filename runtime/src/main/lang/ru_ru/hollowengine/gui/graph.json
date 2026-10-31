@@ -8,5 +8,16 @@
   "align.center_y": "По центру по вертикали",
   "align.bottom": "По нижнему краю",
   "distribute.horizontal": "Равномерно по горизонтали",
-  "distribute.vertical": "Равномерно по вертикали"
+  "distribute.vertical": "Равномерно по вертикали",
+  "editor.duplicate": "Дублировать",
+  "editor.delete_node": "Удалить узел",
+  "editor.delete_link": "Удалить связь",
+  "editor.reroute": "Точка перенаправления",
+  "editor.group": "Группа",
+  "editor.group_nodes": "Сгруппировать",
+  "editor.ungroup": "Разгруппировать",
+  "editor.leave_group": "Убрать из группы",
+  "editor.collapse_group": "Свернуть в одну ноду",
+  "editor.expand_group": "Развернуть",
+  "editor.delete_group_nodes": "Удалить вместе с нодами"
 }

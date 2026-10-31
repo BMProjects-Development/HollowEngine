@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.client.StoryFadeOverlay
+import ru.hollowhorizon.hollowengine.api.VideoApi
 import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.common.network.HollowAddonPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
@@ -17,6 +18,14 @@ class StoryFadePacket(
     private val color: Int,
 ) : HollowAddonPacket {
     override fun handle(player: Player) = StoryFadeOverlay.fadeTo(alpha, durationMillis, color)
+}
+
+@HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
+@Serializable
+class PlayVideoPacket(private val source: String) : HollowAddonPacket {
+    override fun handle(player: Player) {
+        VideoApi.find()?.play(source)
+    }
 }
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)

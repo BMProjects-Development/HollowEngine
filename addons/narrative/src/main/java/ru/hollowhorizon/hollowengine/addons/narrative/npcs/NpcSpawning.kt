@@ -19,6 +19,7 @@ import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
 import java.util.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 
 /**
  * Spawns an NPC at [pos], set up by [builder]. Undone, the NPC is removed for good, wherever it went since; brought
@@ -28,6 +29,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
  * does not run, and undoing the call leaves that NPC where it is.
  */
 @EditorCategory("hollowengine.gui.ide.story.category.npc")
+@EditorHidden
 @Action("npc")
 suspend fun ServerLevel.npc(pos: Vec3, id: String? = null, @Unsaved builder: NpcEntity.() -> Unit = {}): NpcEntity =
     action(this, pos, id, builder) {

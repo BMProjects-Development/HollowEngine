@@ -1,0 +1,22 @@
+{
+  "hollowengine.commands.dialogue_no_such_option": "There is no option %s in the dialogue you are in.",
+  "hollowengine.commands.dialogue_not_in_dialogue": "You are not taking part in a dialogue right now.",
+  "hollowengine.commands.story.checkpoint": "%s. %s (%s)",
+  "hollowengine.commands.story.entry": "%s: %s",
+  "hollowengine.commands.story.failed": "The story refused: %s",
+  "hollowengine.commands.story.missing": "There is no story %s here.",
+  "hollowengine.commands.story.none": "There are no stories here.",
+  "hollowengine.commands.story.rewound": "Story %s is going back to checkpoint %s.",
+  "hollowengine.commands.story.rewound_latest": "Story %s is going back to the latest checkpoint it passed.",
+  "hollowengine.commands.story.started": "Story %s started at stage %s.",
+  "hollowengine.commands.story.started_scene": "Story %s started: %s.",
+  "hollowengine.commands.story.stopped": "Story %s stopped.",
+  "hollowengine.gui.history.story.add": "Add card",
+  "hollowengine.gui.history.story.duplicate": "Duplicate card",
+  "hollowengine.gui.history.story.edit": "Edit card",
+  "hollowengine.gui.history.story.link": "Link change",
+  "hollowengine.gui.history.story.move": "Move card",
+  "hollowengine.gui.history.story.remove": "Remove card",
+  "hollowengine.gui.history.timeline.move_cutscene": "Move cutscene",
+  "hollowengine.gui.history.timeline.reanchor_cutscene": "Re-anchor cutscene"
+}

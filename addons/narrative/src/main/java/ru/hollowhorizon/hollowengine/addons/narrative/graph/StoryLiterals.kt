@@ -18,6 +18,10 @@ import kotlin.time.Duration
 object StoryLiterals {
     private val CALL = Regex("""^(\w+)\((.*)\)$""")
     private const val SECONDS = "s"
+    private const val VECTOR = "vec"
+    private const val BLOCK = "blockPos"
+    private const val ZERO = "Vec3.ZERO"
+    private const val AXES = 3
 
     /** What is typed into a field of [type] as Kotlin. */
     fun expression(text: String, type: KType?): String {
@@ -26,12 +30,12 @@ object StoryLiterals {
         if (typed.startsWith("{") && typed.endsWith("}")) return typed.substring(1, typed.length - 1)
         val kind = type?.classifier as? KClass<*> ?: return StoryGraphCompiler.literal(text)
         return when {
-            kind == Boolean::class -> typed
-            kind == Int::class || kind == Double::class -> typed
-            kind == Long::class -> "${typed}L"
-            kind == Float::class -> "${typed}f"
-            kind == Short::class -> "$typed.toShort()"
-            kind == Byte::class -> "$typed.toByte()"
+            kind == Boolean::class || kind == Int::class -> typed
+            kind == Double::class -> if (typed.toIntOrNull() != null) "$typed.toDouble()" else typed
+            kind == Long::class -> numeric(typed, "L")
+            kind == Float::class -> numeric(typed, "f")
+            kind == Short::class -> numeric(typed, ".toShort()")
+            kind == Byte::class -> numeric(typed, ".toByte()")
             kind == Duration::class -> call("duration", typed)
             kind == ResourceLocation::class -> call("location", typed)
             kind == ServerLevel::class -> call("dimension", typed)
@@ -55,13 +59,12 @@ object StoryLiterals {
         val kind = type?.classifier as? KClass<*>
         val plain = when {
             kind == null || kind == String::class -> string(written)
-            kind == Boolean::class || kind == Int::class || kind == Double::class ->
-                written.takeIf { it == "true" || it == "false" || it.toDoubleOrNull() != null }
-
-            kind == Long::class -> written.removeSuffix("L").takeIf { it.toLongOrNull() != null }
-            kind == Float::class -> written.removeSuffix("f").takeIf { it.toFloatOrNull() != null }
-            kind == Short::class -> written.removeSuffix(".toShort()").takeIf { it.toIntOrNull() != null }
-            kind == Byte::class -> written.removeSuffix(".toByte()").takeIf { it.toIntOrNull() != null }
+            kind == Boolean::class || kind == Int::class -> written
+            kind == Double::class -> written.removeSuffix(".toDouble()")
+            kind == Long::class -> written.removeSuffix("L")
+            kind == Float::class -> written.removeSuffix("f")
+            kind == Short::class -> written.removeSuffix(".toShort()")
+            kind == Byte::class -> written.removeSuffix(".toByte()")
             kind.java.isEnum -> written.substringAfterLast('.').takeIf { written.endsWith(it) && it.uppercase() == it }
                 ?.lowercase()?.replace('_', '-')
 
@@ -71,6 +74,54 @@ object StoryLiterals {
             else -> helperArguments(written)
         }
         return plain ?: "{$written}"
+    }
+
+    /** [typed] with [suffix] when it is a number; anything else is an expression and stays as it was typed. */
+    private fun numeric(typed: String, suffix: String) = if (typed.toDoubleOrNull() != null) "$typed$suffix" else typed
+
+    /** The function that writes a value of [type] from its coordinates, or null when it is no vector. */
+    fun vectorHelper(type: KType?): String? = when (type?.classifier) {
+        Vec3::class -> VECTOR
+        BlockPos::class -> BLOCK
+        else -> null
+    }
+
+    /**
+     * The coordinates of the Kotlin [expression], written by [helper], or null when it is some other expression.
+     * Nothing written yet is three empty coordinates.
+     */
+    fun vectorParts(expression: String, helper: String): List<String>? {
+        val written = expression.trim()
+        if (written.isEmpty()) return List(AXES) { "" }
+        if (written == ZERO) return List(AXES) { "0" }
+        if (!written.startsWith("$helper(") || !written.endsWith(")")) return null
+        return parts(written.substring(helper.length + 1, written.length - 1)).takeIf { it.size == AXES }
+    }
+
+    /** The Kotlin of a vector out of its coordinates; with none of them typed it is left out. */
+    fun vector(parts: List<String>, helper: String): String =
+        if (parts.all(String::isBlank)) "" else parts.joinToString(prefix = "$helper(", postfix = ")") { it.trim() }
+
+    /** [text] split at its commas, those inside brackets and strings aside. */
+    fun parts(text: String): List<String> {
+        val parts = ArrayList<String>()
+        val part = StringBuilder()
+        var depth = 0
+        var quoted = false
+        text.forEachIndexed { index, char ->
+            when {
+                char == '"' && text.getOrNull(index - 1) != '\\' -> quoted = !quoted
+                quoted -> Unit
+                char in "([{" -> depth++
+                char in ")]}" -> depth--
+            }
+            if (char == ',' && depth == 0 && !quoted) {
+                parts += part.toString().trim()
+                part.clear()
+            } else part.append(char)
+        }
+        parts += part.toString().trim()
+        return parts
     }
 
     private fun helperArguments(written: String): String? {

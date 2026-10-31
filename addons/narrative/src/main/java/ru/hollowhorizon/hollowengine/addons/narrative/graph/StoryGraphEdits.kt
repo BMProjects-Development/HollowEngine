@@ -12,12 +12,48 @@ sealed interface StoryPlace {
     data class Into(val id: String, val pin: String) : StoryPlace
 }
 
-/** The changes editors make to a story. Each returns the graph with the change, or the same one if it cannot be made. */
+/**
+ * The changes editors make to a story. Each returns the graph with the change, or the same one if it cannot be made.
+ * Those that go by the steps of the list join reroutes back up, since the list has no place for them.
+ */
 object StoryGraphEdits {
     /** [node] placed at [place], its way out leading to what followed that place. */
     fun StoryGraph.insert(node: StoryNode, place: StoryPlace): StoryGraph {
-        val added = copy(nodes = nodes + node)
+        val plain = dissolved()
+        val added = plain.copy(nodes = plain.nodes + node)
         return added.attach(node.id, exitsOf(node), place)
+    }
+
+    /** The story with the variable [old] called [name], in everything that reads or writes it. */
+    fun StoryGraph.renameVariable(old: String, name: String): StoryGraph {
+        val word = Regex("\"(?:[^\"\\\\]|\\\\.)*\"|(?<![\\w.])${Regex.escape(old)}(?!\\w)")
+        fun code(text: String) = word.replace(text) { if (it.value == old) name else it.value }
+        fun line(text: String) = text.replace("{$old}", "{$name}")
+        fun Map<String, String>.renamed() = mapValues { code(it.value) }
+        return copy(
+            variables = variables.map { it.copy(name = if (it.name == old) name else it.name, initial = code(it.initial)) },
+            nodes = nodes.map { node ->
+                when (node) {
+                    is StoryNode.Say -> node.copy(speaker = line(node.speaker), text = line(node.text))
+                    is StoryNode.Call -> node.copy(
+                        arguments = node.arguments.renamed(),
+                        groups = node.groups.mapValues { (_, group) -> group.copy(arguments = group.arguments.renamed()) },
+                    )
+
+                    is StoryNode.Choose -> node.copy(
+                        options = node.options.map { it.copy(text = line(it.text), condition = it.condition?.let(::code)) },
+                    )
+
+                    is StoryNode.Branch -> node.copy(condition = code(node.condition))
+                    is StoryNode.Assign -> node.copy(variable = if (node.variable == old) name else node.variable, value = code(node.value))
+                    is StoryNode.Code -> node.copy(code = code(node.code), inputs = node.inputs.renamed())
+                    is StoryNode.Expression -> node.copy(code = code(node.code))
+                    is StoryNode.Pure -> node.copy(arguments = node.arguments.renamed())
+                    is StoryNode.Loop -> node.copy(items = code(node.items))
+                    is StoryNode.Start, is StoryNode.Reroute -> node
+                }
+            },
+        )
     }
 
     /** A new story that starts at [name] and says nothing yet. */
@@ -32,7 +68,7 @@ object StoryGraphEdits {
         val step = flow.step(id) ?: return without(setOf(id))
         val after = flow.after(step)
         val removed = flow.nodesOf(step).toSet()
-        val kept = links.flatMap { link ->
+        val kept = flow.graph.links.flatMap { link ->
             when {
                 link.isFlow && link.to == id && link.from !in removed ->
                     if (after != null) listOf(link.copy(to = after)) else emptyList()
@@ -40,11 +76,55 @@ object StoryGraphEdits {
                 else -> listOf(link)
             }
         }
-        return copy(links = kept).without(removed)
+        return flow.graph.copy(links = kept).without(removed)
     }
 
     /** The node [id] alone gone, with its links: what the graph view removes, where nothing is nested. */
     fun StoryGraph.removeNode(id: String): StoryGraph = without(setOf(id))
+
+    /** The nodes [ids] gone with their links; a link through a reroute among them joins back up. */
+    fun StoryGraph.removeNodes(ids: Set<String>): StoryGraph =
+        ids.mapNotNull { node(it) as? StoryNode.Reroute }.fold(this) { graph, reroute -> graph.bridge(reroute) }.without(ids)
+
+    private fun StoryGraph.bridge(reroute: StoryNode.Reroute): StoryGraph {
+        val into = links.filter { it.to == reroute.id }
+        val out = links.filter { it.from == reroute.id }
+        val joined = into.flatMap { before -> out.map { after -> before.copy(to = after.to, toPin = after.toPin) } }
+        return copy(links = links - (into + out).toSet() + joined)
+    }
+
+    /** Copies of [ids], [offset] away, linked as they were among themselves; a value they read they keep reading. */
+    fun StoryGraph.copyNodes(ids: Set<String>, offset: StoryPoint): Pair<StoryGraph, Map<String, String>> {
+        val fresh = ids.associateWith { StoryGraph.newId() }
+        val copies = fresh.mapNotNull { (old, new) -> node(old)?.withId(new) }
+        val kept = links.filter { it.to in ids && (it.from in ids || !it.isFlow) }
+            .map { it.copy(from = fresh[it.from] ?: it.from, to = fresh.getValue(it.to)) }
+        val places = fresh.mapNotNull { (old, new) ->
+            layout[old]?.let { new to StoryPoint(it.x + offset.x, it.y + offset.y) }
+        }
+        return copy(nodes = nodes + copies, links = links + kept, layout = layout + places) to fresh
+    }
+
+    /** A new group of [ids], taken out of the groups they were in. */
+    fun StoryGraph.withGroup(ids: Set<String>, title: String): Pair<StoryGraph, String> {
+        val id = StoryGraph.newId()
+        val out = withMembership(ids, null)
+        return out.copy(groups = out.groups + StoryNodeGroup(id, title, nodes = ids.toList())) to id
+    }
+
+    /** [ids] in [group], or in no group when it is null; a group left empty is gone. */
+    fun StoryGraph.withMembership(ids: Set<String>, group: String?): StoryGraph = copy(
+        groups = groups.map { each ->
+            val kept = each.nodes.filter { it !in ids }
+            each.copy(nodes = if (each.id == group) kept + ids else kept)
+        }.filter { it.nodes.isNotEmpty() },
+    )
+
+    fun StoryGraph.withGroupChanged(id: String, change: (StoryNodeGroup) -> StoryNodeGroup): StoryGraph =
+        copy(groups = groups.map { if (it.id == id) change(it) else it })
+
+    /** The group [id] gone; its nodes stay. */
+    fun StoryGraph.withoutGroup(id: String): StoryGraph = copy(groups = groups.filter { it.id != id })
 
     /** The link out of [pin] of [from] gone: a jump taken out of the story. */
     fun StoryGraph.unlink(from: String, pin: String): StoryGraph =
@@ -75,7 +155,7 @@ object StoryGraphEdits {
         val after = flow.after(step)
         val moved = flow.nodesOf(step).toSet()
         val exits = flow.exits(step)
-        val detached = links.mapNotNull { link ->
+        val detached = flow.graph.links.mapNotNull { link ->
             when {
                 link.isFlow && link.to == id && link.from !in moved ->
                     after?.let { link.copy(to = it) }
@@ -84,7 +164,7 @@ object StoryGraphEdits {
                 else -> link
             }
         }
-        return copy(links = detached).attach(id, exits, place)
+        return flow.graph.copy(links = detached).attach(id, exits, place)
     }
 
     /** Whether the step [id] can go to [place]. */
@@ -104,12 +184,13 @@ object StoryGraphEdits {
         val flow = StoryFlow(this)
         val step = flow.step(id) ?: return this
         val ids = flow.nodesOf(step).associateWith { StoryGraph.newId() }
-        val copies = ids.mapNotNull { (old, new) -> node(old)?.withId(new) }
-        val inner = links.filter { it.from in ids && (it.to in ids || !it.isFlow) }
+        val plain = flow.graph
+        val copies = ids.mapNotNull { (old, new) -> plain.node(old)?.withId(new) }
+        val inner = plain.links.filter { it.from in ids && (it.to in ids || !it.isFlow) }
             .map { it.copy(from = ids.getValue(it.from), to = ids[it.to] ?: it.to) }
-        val outer = links.filter { !it.isFlow && it.to in ids && it.from !in ids }
+        val outer = plain.links.filter { !it.isFlow && it.to in ids && it.from !in ids }
             .map { it.copy(to = ids.getValue(it.to)) }
-        val copied = copy(nodes = nodes + copies, links = links + inner + outer)
+        val copied = plain.copy(nodes = plain.nodes + copies, links = plain.links + inner + outer)
         val exits = flow.exits(step).mapNotNull { (node, pin) -> ids[node]?.let { it to pin } }
         return copied.attach(ids.getValue(id), exits, StoryPlace.After(id))
     }
@@ -125,11 +206,11 @@ object StoryGraphEdits {
         val branch = (flow.step(id) as? StoryStep.Split)?.branches?.getOrNull(index).orEmpty()
         val removed = branch.flatMap(flow::nodesOf).toSet()
         val pin = StoryPins.option(index)
-        val shifted = links.filterNot { it.from == id && it.fromPin == pin }.map { link ->
+        val shifted = flow.graph.links.filterNot { it.from == id && it.fromPin == pin }.map { link ->
             val at = if (link.from == id) StoryPins.optionIndex(link.fromPin) else null
             if (at != null && at > index) link.copy(fromPin = StoryPins.option(at - 1)) else link
         }
-        return copy(links = shifted).without(removed)
+        return flow.graph.copy(links = shifted).without(removed)
             .edit(id) { menu.copy(options = menu.options.filterIndexed { at, _ -> at != index }) }
     }
 
@@ -172,7 +253,8 @@ object StoryGraphEdits {
         nodes = nodes.filterNot { it.id in ids },
         links = links.filterNot { it.from in ids || it.to in ids },
         layout = layout - ids,
-    )
+        collapsed = collapsed - ids,
+    ).withMembership(ids, null)
 
     private fun StoryNode.withId(id: String): StoryNode = when (this) {
         is StoryNode.Start -> copy(id = id)
@@ -183,5 +265,8 @@ object StoryGraphEdits {
         is StoryNode.Assign -> copy(id = id)
         is StoryNode.Code -> copy(id = id)
         is StoryNode.Expression -> copy(id = id)
+        is StoryNode.Pure -> copy(id = id)
+        is StoryNode.Loop -> copy(id = id)
+        is StoryNode.Reroute -> copy(id = id)
     }
 }

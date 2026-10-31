@@ -29,6 +29,7 @@ internal class StoryListState : StoryEditorState() {
     var reveal by mutableStateOf<StorySelection?>(null)
     var focus by mutableStateOf<String?>(null)
 
+    var listWidth by mutableStateOf(0f)
     var search by mutableStateOf<String?>(null)
     var match by mutableStateOf(0)
 
@@ -41,8 +42,8 @@ internal class StoryListState : StoryEditorState() {
 
     private val folded = mutableStateMapOf<String, Boolean>()
 
-    /** Whether what is under [key] is hidden: as the writer left it, or else open. */
-    fun isFolded(key: String) = folded[key] ?: false
+    /** Whether what is under [key] is hidden: as the writer left it, or else open, the parameters of a card aside. */
+    fun isFolded(key: String) = folded[key] ?: (key == paramsKey(key.substringAfter('/')))
 
     fun toggleFold(key: String) {
         folded[key] = !isFolded(key)

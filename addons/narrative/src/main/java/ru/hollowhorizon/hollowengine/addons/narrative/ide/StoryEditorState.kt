@@ -40,6 +40,9 @@ internal open class StoryEditorState {
     val model = HollowIdeTextModel(StoryGraph::decode)
     var selected by mutableStateOf<StorySelection?>(null)
 
+    /** Whether the inspector shows the Kotlin of the story. */
+    var showsKotlin by mutableStateOf(false)
+
     fun read(): StoryGraph? = context?.let { model.read(it.text).getOrNull() }
 
     /**

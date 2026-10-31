@@ -22,14 +22,18 @@ annotation class EditorDescription(val description: String)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorIcon(val icon: String)
 
-/** Groups a component under a heading in the "add component" list, or a story action in the "add command" one. */
+/**
+ * Groups a component under a heading in the "add component" list, or a story action in the "add command" one.
+ *
+ * @param color the `#RRGGBB` the things of the category are told apart by; left empty, the category is given one.
+ */
 @SerialInfo
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
-annotation class EditorCategory(val category: String)
+annotation class EditorCategory(val category: String, val color: String = "")
 
-/** Kept in the data, never shown. For fields gameplay owns and a human should not type into. */
+/** Kept in the data, never shown. For fields gameplay owns and a human should not type into, or actions nothing offers. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorHidden
 
 /**
@@ -89,9 +93,9 @@ object EditorWidgets {
 annotation class EditorMultiline
 
 /**
- * A string field holding a path to an asset, so the editor can offer what exists instead of asking the
- * user to remember it. [extensions] is matched against the end of the path (`gltf`, `node.kts`, `png`).
+ * A string field, or parameter of a story action, holding a path to an asset, so the editor can offer what exists instead
+ * of asking the user to remember it. [extensions] is matched against the end of the path (`gltf`, `node.kts`, `png`).
  */
 @SerialInfo
-@Target(AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorAsset(vararg val extensions: String)

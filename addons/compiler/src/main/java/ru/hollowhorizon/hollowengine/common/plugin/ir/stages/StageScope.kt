@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.plugin.ir.stages
 
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
+import org.jetbrains.kotlin.descriptors.InlineClassRepresentation
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -10,13 +11,18 @@ import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrTypeOperatorCallImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classOrNull
+import org.jetbrains.kotlin.ir.types.getClass
+import org.jetbrains.kotlin.ir.types.isNullable
 import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.defaultValueForType
 import org.jetbrains.kotlin.ir.util.getValueArgument
 import org.jetbrains.kotlin.ir.util.isAnnotation
 import org.jetbrains.kotlin.ir.util.isSuspend
@@ -31,6 +37,17 @@ internal class StageScope(
     val reporter: StageReporter,
     val script: IrClass,
 ) {
+    /**
+     * What stands for a value of [type] that does not exist yet. A value class is its underlying value to the JVM, so
+     * null would not fit where it goes, and building one would run its checks.
+     */
+    fun blank(type: IrType, start: Int, end: Int): IrExpression {
+        val kind = type.takeUnless { it.isNullable() }?.getClass()?.valueClassRepresentation
+        val underlying = (kind as? InlineClassRepresentation)?.underlyingType
+            ?: return IrConstImpl.defaultValueForType(start, end, type)
+        return IrTypeOperatorCallImpl(start, end, type, IrTypeOperator.IMPLICIT_CAST, type, blank(underlying, start, end))
+    }
+
     fun builder(symbol: IrSymbol, at: IrElement): DeclarationIrBuilder =
         DeclarationIrBuilder(context, symbol, at.startOffset, at.endOffset)
 

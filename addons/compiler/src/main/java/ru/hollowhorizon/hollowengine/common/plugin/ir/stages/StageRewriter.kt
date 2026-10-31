@@ -471,7 +471,7 @@ internal class StageRewriter(
 
     private fun zero(type: IrType): IrExpression =
         if (type.isUnit()) stages.builder(function.symbol, function).irGetObject(builtIns.unitClass)
-        else IrConstImpl.defaultValueForType(function.startOffset, function.endOffset, type)
+        else stages.blank(type, function.startOffset, function.endOffset)
 
     /** Generates the entry the runtime calls to start or resume the stage with saved arguments. */
     fun entry(name: String): IrSimpleFunction {

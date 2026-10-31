@@ -1,5 +1,10 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
+import net.minecraft.world.entity.Entity
+import kotlin.reflect.KClass
+import kotlin.reflect.KType
+import kotlin.reflect.full.isSubclassOf
+
 /** What is wrong with the node [node], or with the graph as a whole when it is null. */
 data class StoryGraphProblem(val node: String?, val message: String)
 
@@ -29,9 +34,11 @@ enum class StoryCallKind {
  * never counts twice.
  */
 class StoryGraphCompiler private constructor(
-    private val graph: StoryGraph,
+    source: StoryGraph,
     private val kindOf: (StoryNode.Call) -> StoryCallKind,
+    private val paramType: (StoryNode.Call, String) -> KType?,
 ) {
+    private val graph = source.dissolved()
     private val problems = ArrayList<StoryGraphProblem>()
     private val nodes = HashMap<String, StoryNode>()
     private val flow = HashMap<Pair<String, String>, String>()
@@ -122,8 +129,8 @@ class StoryGraphCompiler private constructor(
 
     private fun step(id: String, depth: Int) {
         when (val node = nodes.getValue(id)) {
-            is StoryNode.Start -> Unit
-            is StoryNode.Expression -> problem(id, "An expression has no place in the flow")
+            is StoryNode.Start, is StoryNode.Reroute -> Unit
+            is StoryNode.Expression, is StoryNode.Pure -> problem(id, "A value has no place in the flow")
             is StoryNode.Say -> {
                 boundary(id, depth) { emit(sayOf(node), id, it) }
                 chain(flow[id to StoryPins.NEXT], depth)
@@ -139,6 +146,11 @@ class StoryGraphCompiler private constructor(
             }
 
             is StoryNode.Assign -> instantRun(node, depth)
+
+            is StoryNode.Loop -> {
+                boundary(id, depth) { at -> loop(node, at) }
+                chain(flow[id to StoryPins.NEXT], depth)
+            }
 
             is StoryNode.Code -> {
                 boundary(id, depth) { code(node, it) }
@@ -202,8 +214,40 @@ class StoryGraphCompiler private constructor(
     private fun instant(node: StoryNode, depth: Int) {
         if (node is StoryNode.Call) return call(node, depth)
         node as StoryNode.Assign
+        emit("${node.variable} = ${assigned(node)}", node.id, depth)
+    }
+
+    /** What the variable of [node] is set to. */
+    private fun assigned(node: StoryNode.Assign): String {
         if (node.variable !in variables) problem(node.id, "There is no variable '${node.variable}'")
-        emit("${node.variable} = ${argument(node.id, StoryPins.VALUE, node.value)}", node.id, depth)
+        val type = graph.variables.firstOrNull { it.name == node.variable }?.type
+        val value = argument(node.id, StoryPins.VALUE, node.value)
+        return if ((node.id to StoryPins.VALUE) in values) coerced(value, type) else value
+    }
+
+    /** The body of a loop is one lambda to the stages around it, so its steps stay in place. */
+    private fun loop(node: StoryNode.Loop, depth: Int) {
+        emit("for (${loopName(node.id)} in ${argument(node.id, StoryPins.ITEMS, node.items)}) {", node.id, depth)
+        blocks++
+        chain(flow[node.id to StoryPins.BODY], depth + 1)
+        blocks--
+        emit("}", node.id, depth)
+    }
+
+    /** [code], asserted to be there when it reads a variable that starts empty, since whatever reads it takes a value. */
+    private fun read(code: String): String =
+        if (graph.variables.any { it.name == code.trim() && it.type?.endsWith("?") == true }) "$code!!" else code
+
+    /** [value] converted to [type], since a linked number or text is whatever the node before it gives. */
+    private fun coerced(value: String, type: String?): String = when (type?.removeSuffix("?")?.substringAfterLast('.')) {
+        "Int" -> "($value).toInt()"
+        "Long" -> "($value).toLong()"
+        "Short" -> "($value).toShort()"
+        "Byte" -> "($value).toByte()"
+        "Float" -> "($value).toFloat()"
+        "Double" -> "($value).toDouble()"
+        "String" -> "($value).toString()"
+        else -> value
     }
 
     private fun call(node: StoryNode.Call, depth: Int) {
@@ -234,10 +278,11 @@ class StoryGraphCompiler private constructor(
         val speaker = when {
             link != null -> value(link)
             written.isEmpty() -> "null as String?"
-            written.startsWith("{") && written.endsWith("}") -> written.substring(1, written.length - 1)
+            written.startsWith("{") && written.endsWith("}") -> read(written.substring(1, written.length - 1))
             else -> template(written)
         }
-        return "say($speaker, ${template(node.text)})"
+        val text = values[node.id to StoryPins.TEXT]?.let { coerced(value(it), "String") } ?: template(node.text)
+        return "say($speaker, $text)"
     }
 
     private fun chooseOf(node: StoryNode.Choose): String {
@@ -255,7 +300,7 @@ class StoryGraphCompiler private constructor(
         val receiverPin = node.receiver ?: StoryPins.RECEIVER
         val parameters = (node.arguments.keys + values.keys.filter { it.first == node.id }.map { it.second })
             .filter { it != receiverPin }.distinct()
-        val direct = parameters.map { "$it = ${argument(node.id, it, node.arguments[it].orEmpty())}" }
+        val direct = parameters.map { "$it = ${parameter(node, it)}" }
         val groups = node.groups.filterValues { it.arguments.isNotEmpty() }.map { (parameter, group) ->
             val fields = group.arguments.entries.joinToString { (field, value) -> "$field = $value" }
             "$parameter = ${group.constructor}($fields)"
@@ -263,6 +308,14 @@ class StoryGraphCompiler private constructor(
         val arguments = (direct + groups).joinToString()
         val receiver = node.arguments[receiverPin] ?: values[node.id to receiverPin]?.let(::value)
         return if (receiver == null) "$name($arguments)" else "($receiver).$name($arguments)"
+    }
+
+    private fun parameter(node: StoryNode.Call, name: String): String {
+        val value = argument(node.id, name, node.arguments[name].orEmpty())
+        if ((node.id to name) !in values) return value
+        val kind = paramType(node, name)?.classifier as? KClass<*>
+        if (kind != null && kind != Entity::class && kind.isSubclassOf(Entity::class)) return "($value as ${kind.qualifiedName})"
+        return coerced(value, kind?.simpleName)
     }
 
     private fun argument(node: String, pin: String, written: String): String {
@@ -280,7 +333,10 @@ class StoryGraphCompiler private constructor(
         }
         try {
             return when (val node = nodes.getValue(id)) {
-                is StoryNode.Expression -> "(${node.code})"
+                is StoryNode.Expression -> "(${read(node.code)})"
+                is StoryNode.Pure -> pure(node, link.fromPin)
+                is StoryNode.Loop -> loopName(id)
+                is StoryNode.Assign -> if (isInFlow(id)) read(node.variable) else "(${assigned(node)}).also { ${node.variable} = it }"
                 is StoryNode.Call -> if (isInFlow(id)) "${outputName(id, StoryPins.VALUE)}!!" else callOf(node)
                 is StoryNode.Code -> {
                     if (link.fromPin !in node.outputs) problem(id, "There is no output '${link.fromPin}'")
@@ -294,6 +350,21 @@ class StoryGraphCompiler private constructor(
             }
         } finally {
             evaluating -= id
+        }
+    }
+
+    /** The output [pin] of [node]: its template with what each input reads put in. */
+    private fun pure(node: StoryNode.Pure, pin: String): String {
+        val operator = StoryOperators.find(node.operator)
+        val output = operator?.outputs?.firstOrNull { it.name == pin }
+        if (output == null) {
+            problem(node.id, "There is no value '$pin' of '${node.operator}'")
+            return "error(\"no value\")"
+        }
+        return OPERATOR_INPUT.replace(output.template) { match ->
+            val name = match.groupValues[1]
+            val input = operator.inputs.first { it.name == name }
+            "(${argument(node.id, name, node.arguments[name] ?: input.default)})"
         }
     }
 
@@ -342,6 +413,8 @@ class StoryGraphCompiler private constructor(
 
     private fun outputName(node: String, pin: String) = "out_${node}_$pin"
 
+    private fun loopName(node: String) = "item_$node"
+
     private fun emit(line: String, node: String?, depth: Int = 0) {
         lines += if (line.isEmpty()) "" else "    ".repeat(depth) + line
         origins += node
@@ -360,16 +433,25 @@ class StoryGraphCompiler private constructor(
             "$NARRATIVE.speech.*",
             "$NARRATIVE.poll.*",
             "$NARRATIVE.scene.commands.*",
+            "net.minecraft.server.level.ServerPlayer",
+            "net.minecraft.world.entity.Entity",
+            "net.minecraft.world.phys.Vec3",
+            "ru.hollowhorizon.hollowengine.common.entities.NpcEntity",
         )
         private val IDENTIFIER_PART = Regex("[\\p{L}\\p{N}_]+")
         private val IDENTIFIER = Regex("[\\p{L}_][\\p{L}\\p{N}_]*")
         private val NAME_IN_BRACES = Regex("\\{([\\p{L}_][\\p{L}\\p{N}_]*)}")
+        private val OPERATOR_INPUT = Regex("\\$(\\w+)")
 
-        /** @param kindOf what is known of a call; one nothing is known of is treated as able to suspend. */
+        /**
+         * @param kindOf what is known of a call; one nothing is known of is treated as able to suspend.
+         * @param paramType the type a parameter of a call takes, which a linked value is converted to.
+         */
         fun compile(
             graph: StoryGraph,
             kindOf: (StoryNode.Call) -> StoryCallKind = { StoryCallKind.SUSPENDING },
-        ): GeneratedStory = StoryGraphCompiler(graph, kindOf).generate()
+            paramType: (StoryNode.Call, String) -> KType? = { _, _ -> null },
+        ): GeneratedStory = StoryGraphCompiler(graph, kindOf, paramType).generate()
 
         /** [text] as a Kotlin string literal. */
         fun literal(text: String): String = "\"${escape(text)}\""
