@@ -13,7 +13,7 @@ internal object ChatText {
     /** The command chat buttons of lines and choices run. */
     const val COMMAND = "/hollowengine dialogue"
 
-    fun of(markup: String): MutableComponent = of(FormattedTextParser.parse(markup))
+    fun of(markup: String): MutableComponent = of(FormattedTextParser.parse(StoryText.localized(markup)))
 
     fun of(document: FormattedTextDocument): MutableComponent {
         val result = Component.empty()

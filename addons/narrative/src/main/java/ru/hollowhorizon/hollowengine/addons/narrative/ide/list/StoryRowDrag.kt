@@ -3,35 +3,22 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryEdits
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryPlacement
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPlace
 import kotlin.math.roundToInt
 
-/** How far right the pointer goes for a dragged row to go into the row above rather than beside it. */
-private const val NestOffset = 24f
-
-/** Where dragged rows land: [placement] of the statement on [line]. */
-internal data class StoryDrop(val line: Int, val placement: StoryPlacement)
-
 /**
- * Rows being dragged: [count] rows of the list from [from], which are the statement of [selection] with all that
- * goes with it. They follow the pointer and the rest make room at [slot]; the text changes once, on release.
+ * A card being dragged: [count] rows of the list from [from], the card with all that is nested in it. They follow the
+ * pointer and the rest make room at [slot]; the file changes once, on release.
  */
-internal class StoryRowDrag(
-    val selection: StorySelection,
-    val whole: Boolean,
-    val from: Int,
-    val count: Int,
-    private val pitch: Float,
-) {
+internal class StoryRowDrag(val row: StoryRow, val from: Int, val count: Int, private val pitch: Float) {
     var dy by mutableStateOf(0f)
         private set
     var slot by mutableStateOf(from)
         private set
-    var target by mutableStateOf<StoryDrop?>(null)
+    var target by mutableStateOf<StoryPlace?>(null)
         private set
 
-    /** Whether the rows were taken somewhere they cannot go. */
+    /** Whether the card was taken somewhere it cannot go. */
     val rejected: Boolean
         get() = target == null && slot != from
 
@@ -45,50 +32,33 @@ internal class StoryRowDrag(
         else -> null
     }
 
-    /** Follows the pointer, [dx] and [dy] from where the drag started, and finds where the rows would land. */
-    fun moveTo(model: StoryListModel, rows: List<StoryRow>, dx: Float, dy: Float) {
+    /** Follows the pointer, [dy] from where the drag started, and finds where the card would land. */
+    fun moveTo(rows: List<StoryRow>, dy: Float, allowed: (StoryPlace) -> Boolean) {
         this.dy = dy
         slot = (from + (dy / pitch).roundToInt()).coerceIn(0, rows.size - count)
-        val nest = dx > NestOffset
-        target = if (slot == from && !nest) null else landing(model, rows, nest)
+        target = if (slot == from) null else landing(rows, allowed)
     }
 
-    /**
-     * The first allowed place for the gap at [slot]: before the row under it, or, at the end, after the card of
-     * the row above; with [nest], into or after the row above first.
-     */
-    private fun landing(model: StoryListModel, rows: List<StoryRow>, nest: Boolean): StoryDrop? {
+    /** The first allowed place for the gap at [slot]: before the row under it, or first on the branch above it. */
+    private fun landing(rows: List<StoryRow>, allowed: (StoryPlace) -> Boolean): StoryPlace? {
         val others = rows.filterIndexed { index, _ -> !holds(index) }
-        val above = others.getOrNull(slot - 1)?.takeIf { it.role != StoryRowRole.MENU }
+        val above = others.getOrNull(slot - 1)
         val below = others.getOrNull(slot)
-        val into = above?.takeIf { it.block.line.opensBlock }?.let { StoryDrop(it.line, StoryPlacement.INTO) }
-        val after = above?.let { StoryDrop(it.line, StoryPlacement.AFTER) }
-        val before = below?.let { StoryDrop(it.line, StoryPlacement.BEFORE) }
-        val end = above?.takeIf { below == null }?.let {
-            val root = generateSequence(it.block) { block -> block.parent }.last()
-            StoryDrop(model.outline.groupOf(root).last().line.index, StoryPlacement.AFTER)
-        }
-        val candidates = if (nest) listOf(into, after, before) else listOf(before, end, after, into)
-        return candidates.filterNotNull().firstOrNull {
-            StoryEdits.canRelocate(model.outline, selection.line, whole, it.line, it.placement)
-        }
+        val candidates = listOfNotNull(
+            above?.takeIf { it.role == StoryRowRole.PIN }?.let { StoryPlace.Into(it.node.id, it.pin.orEmpty()) },
+            below?.takeIf { it.moves }?.let { StoryPlace.Before(it.node.id) },
+            above?.takeIf { it.moves || it.role == StoryRowRole.START }?.let { StoryPlace.After(it.node.id) },
+        )
+        return candidates.firstOrNull(allowed)
     }
 
     companion object {
-        /** A drag of [row] with everything that moves with it: the whole card, or an option with its branch. */
-        fun of(state: StoryListState, model: StoryListModel, rows: List<StoryRow>, row: StoryRow): StoryRowDrag? {
-            val selection = row.selection
-            val whole = state.whole(model, selection)
-            val lines = if (whole) {
-                val card = model.outline.groupOf(row.block)
-                card.first().line.index..card.last().last
-            } else {
-                row.block.line.index..row.block.last
-            }
-            val moves = { it: StoryRow -> it.line in lines && (whole || it.role != StoryRowRole.MENU) }
-            val from = rows.indexOfFirst(moves).takeIf { it >= 0 } ?: return null
-            val count = rows.subList(from, rows.size).takeWhile(moves).size
-            return StoryRowDrag(selection, whole, from, count, state.list.averageItemSize)
+        /** A drag of [row] with the rows nested in it. */
+        fun of(rows: List<StoryRow>, row: StoryRow, pitch: Float): StoryRowDrag? {
+            val from = rows.indexOfFirst { it.key == row.key }.takeIf { it >= 0 && row.moves } ?: return null
+            val depth = row.guides.size
+            val count = 1 + rows.subList(from + 1, rows.size).takeWhile { it.guides.size > depth }.size
+            return StoryRowDrag(row, from, count, pitch)
         }
     }
 }

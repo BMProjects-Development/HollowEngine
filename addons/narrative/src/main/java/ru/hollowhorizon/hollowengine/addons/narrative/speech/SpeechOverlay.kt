@@ -31,8 +31,7 @@ object SpeechUiKeys {
  *
  * @param id bumped for every line; a change restarts the typing.
  * @param speaker the name shown above the text, empty for narration.
- * @param text story markup.
- * @param visibleLength the characters of [text] without its markup.
+ * @param text story markup, translated where it is shown.
  * @param charMillis milliseconds the typing spends on a character, 0 to show the line at once.
  * @param readMillis how long the line stays before the story moves on.
  */
@@ -41,7 +40,6 @@ data class SpeechLineView(
     val id: Int = 0,
     val speaker: String = "",
     val text: String = "",
-    val visibleLength: Int = 0,
     val charMillis: Int = 0,
     val readMillis: Long = 0,
 )
@@ -53,6 +51,9 @@ data class SpeechLineView(
 object SpeechOverlay : LineProvider {
     val ID: ResourceLocation = "hollowengine-narrative:speech".rl
 
+    /** How long a line stays when its length is unknown here: the server lacks the translation its players read. */
+    private const val UNTRANSLATED_READ_MILLIS = 8000L
+
     private class Shown(val session: UiSession, var line: Int) {
         var hideAt = Long.MAX_VALUE
     }
@@ -63,9 +64,8 @@ object SpeechOverlay : LineProvider {
     override suspend fun show(line: Line) {
         if (line.text.plainText.isBlank()) return
         val id = ++nextId
-        val length = line.text.visibleLength
-        val read = maxOf(1500L, length * 50L)
-        val view = SpeechLineView(id, line.speaker?.name.orEmpty(), line.markup, length, 18, read)
+        val read = maxOf(if (StoryText.hasKeys(line.text.plainText)) UNTRANSLATED_READ_MILLIS else 1500L, line.text.visibleLength * 50L)
+        val view = SpeechLineView(id, line.speaker?.name.orEmpty(), line.markup, 18, read)
         line.audience.forEach { player ->
             val overlay = shown[player.uuid] ?: open(player)
             overlay.session.put(SpeechUiKeys.Line, view)

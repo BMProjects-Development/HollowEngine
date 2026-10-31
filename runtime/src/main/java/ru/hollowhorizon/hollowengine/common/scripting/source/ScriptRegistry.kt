@@ -120,6 +120,11 @@ object ScriptRegistry {
      */
     fun idOf(file: File): ScriptId? = filesToIds[file.canonicalPath]
 
+    /** Makes [file], generated from the script [id], belong to it. */
+    internal fun bind(file: File, id: ScriptId) {
+        filesToIds[file.canonicalPath] = id
+    }
+
     /** Physical paths, file URIs and portable namespace IDs used by Kotlin script metadata. */
     fun idOfLocation(location: String): ScriptId? {
         val file = runCatching { if (location.startsWith("file:")) File(URI(location)) else File(location) }.getOrNull()

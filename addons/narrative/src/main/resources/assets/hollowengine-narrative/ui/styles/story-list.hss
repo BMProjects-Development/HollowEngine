@@ -291,3 +291,19 @@ $kind-broken: $danger;
 .story-slot-call {
     size: 12px 12px;
 }
+
+.story-node {
+    padding: 4px 8px;
+}
+
+.story-node-title {
+    foreground: $text-soft;
+}
+
+.story-pin {
+    background: $kind-plain;
+    radius: 5px;
+}
+
+.story-pin.flow { background: $accent; }
+.story-pin:hover { background: $white; }

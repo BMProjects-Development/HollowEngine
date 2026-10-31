@@ -36,7 +36,7 @@ object StoryInstances {
     private val keys = IdentityHashMap<Any, String>()
 
     /** Stages the addon declares itself, such as [scene]: always there, under keys that never change. */
-    private val builtins = mapOf(SceneStage.KEY to SceneStage, SceneTracks.KEY to SceneTracks)
+    private val builtins = mapOf(SceneStage.KEY to SceneStage)
     private val stages = object : ClassValue<Stages>() {
         override fun computeValue(type: Class<*>): Stages {
             val methods = type.declaredMethods

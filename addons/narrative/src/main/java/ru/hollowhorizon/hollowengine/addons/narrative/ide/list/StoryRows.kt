@@ -1,180 +1,126 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 
-import androidx.compose.runtime.*
-import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.addons.narrative.scene.lang.StoryStatements
-import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.inspector.DisclosureArrow
-import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
-import kotlin.math.hypot
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFlow
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryStep
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 
-private const val RemoveIcon = "hollowengine:textures/gui/icons/remove.svg"
-private const val ProblemIcon = "hollowengine:textures/gui/icons/failure.svg"
+/** What a row of the list looks like. [tag] is its style, and a card of no color of its own has none. */
+internal enum class StoryCardKind(val tag: String, icon: String, name: String) {
+    PHRASE("phrase", "phrase", "phrase"),
+    WAIT("wait", "wait", "wait"),
+    CHOICE("choice", "choice", "choice"),
+    CONDITION("condition", "condition", "condition"),
+    START("start", "label", "start"),
+    SET("command", "command", "set"),
+    CODE("block", "block", "code"),
+    BLOCK("block", "block", "block"),
+    COMMAND("command", "command", "command"),
+    JUMP("label", "label", "jump");
 
-/** How far the pointer goes before a press on a row becomes a drag. */
-private const val DragThreshold = 4f
+    val icon = storyIcon(icon)
+    val title: String by lazy { storyLang("kind.$name") }
 
-/** The width of the rail line. */
-private const val LineWidth = 2f
+    companion object {
+        private const val WAIT_ACTION = "hollowengine-narrative:wait"
 
-/** What every row of one composition needs. */
-internal class StoryRowScope(
-    val state: StoryListState,
-    val model: StoryListModel,
-    val rows: List<StoryRow>,
-    val matches: Set<Int>,
-    val current: StorySelection?,
-)
+        fun of(node: StoryNode): StoryCardKind = when (node) {
+            is StoryNode.Start -> START
+            is StoryNode.Say -> PHRASE
+            is StoryNode.Choose -> CHOICE
+            is StoryNode.Branch -> CONDITION
+            is StoryNode.Assign -> SET
+            is StoryNode.Code, is StoryNode.Expression -> CODE
+            is StoryNode.Call -> when {
+                node.block -> BLOCK
+                node.action == WAIT_ACTION -> WAIT
+                else -> COMMAND
+            }
+        }
+    }
+}
+
+internal enum class StoryRowRole { START, CARD, PIN, JUMP }
 
 /**
- * One row of the list: the rail with the dot of a top-level card, a guide for each card it is nested in, and the
- * row itself. Cards and their dots move during a drag; the rail and guides stay in the list's layout.
+ * One row of the list.
+ *
+ * @param node the node it shows; of a [StoryRowRole.JUMP], the one the jump leads to.
+ * @param pin the pin it stands for, on a [StoryRowRole.PIN] or a [StoryRowRole.JUMP].
+ * @param from the node a [StoryRowRole.JUMP] leaves.
+ * @param guides the kinds of what it is nested in.
  */
-@Composable
-internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
-    val state = scope.state
-    val drag = state.drag
-    val held = drag?.holds(index) == true
-    val offset = drag?.offsetOf(index)
-    val motion = Modifier.let { if (offset != null) it.translate(y = offset) else it }
-        .let { if (held || state.settling) it.transition() else it }
-    Row(
-        id = "story-row-${row.key}",
-        tags = listOfNotNull("story-row", "dragging".takeIf { held }, "rejected".takeIf { held && drag.rejected }),
-        modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.STRETCH).layer(if (held) 10 else 0),
-    ) {
-        Box(
-            mode = UiBoxMode.STACK,
-            tags = listOf("story-rail"),
-            modifier = Modifier.alignItems(horizontal = UiAlign.CENTER)
-        ) {
-            Box(tags = listOf("story-rail-line"), modifier = Modifier.size(LineWidth.px, 100.percent))
-            if (row.dot) Box(
-                id = "story-dot-${row.key}",
-                tags = listOfNotNull(
-                    "story-rail-dot", row.tag, "selected".takeIf { isSelected(scope, row) }),
-                modifier = motion,
-            )
-        }
-        row.guides.forEachIndexed { level, kind ->
-            Box(tags = listOfNotNull("story-guide", kind.tag, row.joints.getOrNull(level)?.tag))
-        }
-        RowBody(scope, row, motion)
-    }
+internal class StoryRow(
+    val role: StoryRowRole,
+    val kind: StoryCardKind,
+    val node: StoryNode,
+    val pin: String? = null,
+    val from: String? = null,
+    val guides: List<StoryCardKind> = emptyList(),
+) {
+    val key: String = listOfNotNull(from, node.id, pin).joinToString("/")
+    val selection = StorySelection(from ?: node.id, pin)
+    val tag: String get() = kind.tag
+
+    /** Whether it can be dragged and moved: what is a place in the flow rather than a part of a card. */
+    val moves: Boolean get() = role == StoryRowRole.CARD
 }
 
-@Composable
-private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
-    val state = scope.state
-    val problems = if (row.role == StoryRowRole.MENU) emptyList() else scope.model.problems[row.line].orEmpty()
-    Row(
-        id = "story-body-${row.key}",
-        tags = listOfNotNull(
-            "story-body",
-            row.tag,
-            row.role.name.lowercase(),
-            "selected".takeIf { row.selection == state.selected },
-            "match".takeIf { row.role != StoryRowRole.MENU && row.line in scope.matches },
-            "current".takeIf { row.selection == scope.current },
-            "problem".takeIf { problems.isNotEmpty() },
-        ),
-        modifier = motion.size(0.px).grow(1f).alignItems(vertical = UiAlign.STRETCH)
-            .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
-                // A drag whose release never arrived (the window lost focus mid-gesture) ends here.
-                state.drag = null
-                state.select(row.selection)
-                if (event.isRightClick()) state.menu = StoryRowMenu(row.selection, event.x, event.y)
-            }.onDrag { event ->
-                if (event.isRightClick()) return@onDrag
-                val drag = state.drag ?: run {
-                    if (hypot(event.dragTotalX, event.dragTotalY) < DragThreshold) return@onDrag
-                    StoryRowDrag.of(state, scope.model, scope.rows, row)?.also { state.drag = it } ?: return@onDrag
-                }
-                event.consume()
-                drag.moveTo(scope.model, scope.rows, event.dragTotalX, event.dragTotalY)
-            }.onRelease { event ->
-                if (state.drag == null) return@onRelease
-                event.consume()
-                state.drop(scope.model)
-            },
-    ) {
-        StoryHead.of(row)?.let { StoryRowHead(row, it) }
-        Row(
-            tags = listOf("story-body-content"),
-            modifier = Modifier.size(0.px).grow(1f).alignItems(vertical = UiAlign.CENTER),
-        ) {
-            StoryRowContent(scope, row)
-            problems.firstOrNull()?.let {
-                Image(
-                    ProblemIcon,
-                    tags = listOf("story-problem"),
-                    modifier = Modifier.tooltipOnHover(problems.joinToString("\n") { it.message })
+/** The rows of a story from top to bottom, leaving out what is folded away. */
+internal fun storyRows(flow: StoryFlow, folded: (String) -> Boolean): List<StoryRow> = buildList {
+    fun walk(steps: List<StoryStep>, guides: List<StoryCardKind>) {
+        steps.forEach { step ->
+            when (step) {
+                is StoryStep.Plain -> add(StoryRow(StoryRowRole.CARD, StoryCardKind.of(step.node), step.node, guides = guides))
+                is StoryStep.Jump -> add(
+                    StoryRow(StoryRowRole.JUMP, StoryCardKind.JUMP, step.target, step.pin, step.from, guides),
                 )
-            }
-            Fold(scope, row)
-            More(state, row)
-            IconButton(
-                RemoveIcon,
-                storyLang("remove"),
-                id = "story-body-${row.key}-remove",
-                tags = listOf("inline", "danger", "story-action")
-            ) {
-                state.remove(scope.model, scope.rows, row.selection)
+
+                is StoryStep.Scoped -> {
+                    val kind = StoryCardKind.of(step.node)
+                    add(StoryRow(StoryRowRole.CARD, kind, step.node, guides = guides))
+                    if (!folded(step.id)) walk(step.body, guides + kind)
+                }
+
+                is StoryStep.Split -> {
+                    val kind = StoryCardKind.of(step.node)
+                    add(StoryRow(StoryRowRole.CARD, kind, step.node, guides = guides))
+                    if (folded(step.id)) return@forEach
+                    step.pins.forEachIndexed { index, pin ->
+                        add(StoryRow(StoryRowRole.PIN, kind, step.node, pin, guides = guides + kind))
+                        if (!folded("${step.id}/$pin")) walk(step.branches[index], guides + kind + kind)
+                    }
+                }
             }
         }
     }
-}
-
-/** The button that opens the menu of a row, the same as a right click on it. */
-@Composable
-private fun More(state: StoryListState, row: StoryRow) {
-    var anchor by remember { mutableStateOf(UiRect.Zero) }
-    IconButton(
-        storyIcon("more"),
-        storyLang("more"),
-        id = "story-body-${row.key}-more",
-        tags = listOf("inline", "story-action"),
-        modifier = Modifier.onPlaced { anchor = it },
-    ) {
-        state.select(row.selection)
-        state.menu = StoryRowMenu(row.selection, anchor.x, anchor.y + anchor.height)
+    flow.sections.forEach { section ->
+        section.start?.let { add(StoryRow(StoryRowRole.START, StoryCardKind.START, it)) }
+        walk(section.steps, emptyList())
     }
 }
 
-/** The arrow that folds what is under a row, beside its buttons; a row with nothing under it has none. */
-@Composable
-private fun Fold(scope: StoryRowScope, row: StoryRow) {
-    val block = row.block
-    val key = when {
-        row.role == StoryRowRole.MENU -> scope.model.cardKey(block)
-        block.children.isNotEmpty() -> scope.model.rowKey(block)
-        else -> return
-    }
-    val expanded = !scope.state.isFolded(key)
-    Box(
-        id = "story-body-${row.key}-fold",
-        tags = listOf("story-fold"),
-        modifier = Modifier.alignItems(UiAlign.CENTER, UiAlign.CENTER).input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND).onClick { event ->
-                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) scope.state.toggleFold(key)
-                event.consume()
-            },
-    ) { DisclosureArrow(expanded) }
+/** The text of [node] and its parts, for the search. */
+internal fun searchText(node: StoryNode): String = when (node) {
+    is StoryNode.Start -> node.name
+    is StoryNode.Say -> "${node.speaker} ${node.text}"
+    is StoryNode.Call -> "${node.function} ${node.arguments.values.joinToString(" ")}"
+    is StoryNode.Choose -> node.options.joinToString(" ") { it.text }
+    is StoryNode.Branch -> node.condition
+    is StoryNode.Assign -> "${node.variable} ${node.value}"
+    is StoryNode.Code -> node.code
+    is StoryNode.Expression -> node.code
 }
 
-private fun isSelected(scope: StoryRowScope, row: StoryRow): Boolean {
-    val line = scope.state.selected?.line ?: return false
-    val card = scope.model.outline.groupOf(row.block)
-    return line in card.first().line.index..card.last().last
+/** The nodes whose text holds [query], from the top of the list. */
+internal fun storyMatches(flow: StoryFlow, query: String): List<StorySelection> {
+    if (query.isBlank()) return emptyList()
+    return storyRows(flow) { false }.filter { it.role != StoryRowRole.PIN && it.role != StoryRowRole.JUMP }
+        .filter { searchText(it.node).contains(query, ignoreCase = true) }.map { it.selection }
 }
 
-/** A phrase, a pause, an option and a menu as statements, for the menus and buttons that add them. */
-internal object StoryNewStatements {
-    fun wait() = StoryStatements.command("wait", WaitDuration.write(1f))
-
-    fun choice() = StoryStatements.choice(storyLang("new.option"))
-
-    fun command(name: String) = StoryStatements.command(name)
-}
+/** What a [StoryRowRole.PIN] of a branch says. */
+internal fun branchPinTitle(pin: String) = storyLang(if (pin == StoryPins.THEN) "branch.if" else "branch.else")
