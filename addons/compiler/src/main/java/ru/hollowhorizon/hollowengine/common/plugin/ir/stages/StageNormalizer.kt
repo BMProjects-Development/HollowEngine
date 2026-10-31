@@ -452,8 +452,7 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
         builtIns.unitType
     ).apply { this.statements += statements }
 
-    private fun zero(type: IrType): IrExpression =
-        IrConstImpl.defaultValueForType(function.startOffset, function.endOffset, type)
+    private fun zero(type: IrType): IrExpression = stages.blank(type, function.startOffset, function.endOffset)
 
     private fun unit(): IrExpression = stages.builder(function.symbol, function).irGetObject(builtIns.unitClass)
 

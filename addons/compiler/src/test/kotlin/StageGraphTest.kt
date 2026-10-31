@@ -5,11 +5,15 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryLink
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryCallKind
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariable
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariableTypes
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.reflect.typeOf
 import kotlin.test.assertTrue
 
 /** A graph is generated into stages, so it runs, resumes and fails to compile as a hand-written script does. */
@@ -40,6 +44,126 @@ class StageGraphTest : StageTest() {
             next("more", "add", StoryPins.THEN), next("more", "done", StoryPins.ELSE),
         ),
     )
+
+    @Test
+    fun `a reroute changes nothing about the story it sits in`() {
+        val plain = StoryGraph(nodes = listOf(StoryNode.Start("s", "main"), log("a", "\"a\"")), links = listOf(next("s", "a")))
+        val through = plain.copy(
+            nodes = plain.nodes + StoryNode.Reroute("r", flow = true),
+            links = listOf(next("s", "r"), next("r", "a")),
+        )
+        assertEquals(generate(plain).code, generate(through).code)
+    }
+
+    @Test
+    fun `values of operators reach a command through a reroute`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s", "main"),
+                StoryNode.Pure("sum", "add", mapOf("a" to "2", "b" to "3")),
+                StoryNode.Pure("text", "to-text"),
+                StoryNode.Reroute("r", flow = false),
+                call("say", "log"),
+            ),
+            links = listOf(
+                next("s", "say"),
+                StoryLink("sum", "result", "r", StoryPins.VALUE),
+                StoryLink("r", StoryPins.VALUE, "text", "value"),
+                StoryLink("text", "result", "say", "event"),
+            ),
+        )
+        val world = world("operators", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("5.0"), StageTrace.take())
+    }
+
+    @Test
+    fun `a for each node runs its body for every item`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s", "main"),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                call("say", "log"),
+                log("done", "\"done\""),
+            ),
+            links = listOf(
+                next("s", "each"),
+                next("each", "say", StoryPins.BODY),
+                next("each", "done"),
+                StoryLink("each", StoryPins.ITEM, "say", "event"),
+            ),
+        )
+        val world = world("for-each", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("a", "b", "done"), StageTrace.take())
+    }
+
+    /** Operators are templates of text, so nothing but compiling them says they mean anything. */
+    @Test
+    fun `every operator compiles`() = runTest {
+        val nodes = ArrayList<StoryNode>()
+        val links = ArrayList<StoryLink>()
+        nodes += StoryNode.Start("s", "main")
+        var previous = "s"
+        StoryOperators.all.forEachIndexed { index, operator ->
+            val arguments = operator.inputs.filter { it.default.isEmpty() }.associate { input ->
+                input.name to when (input.type) {
+                    StoryPinType.LIST -> "listOf(\"a\")"
+                    StoryPinType.MAP -> "mapOf(\"a\" to \"b\")"
+                    else -> "\"a\""
+                }
+            }
+            nodes += StoryNode.Pure("op$index", operator.id, arguments)
+            operator.outputs.forEachIndexed { at, output ->
+                val reader = "read${index}_$at"
+                nodes += call(reader, "log")
+                links += next(previous, reader)
+                links += StoryLink("op$index", output.name, reader, "event")
+                previous = reader
+            }
+        }
+        val code = StoryGraphCompiler.compile(StoryGraph(nodes = nodes, links = links), paramType = { _, _ -> typeOf<String>() }).code
+        world("operators-all", code)
+    }
+
+    /** A write outside the flow runs where its value is read, so a variable needs no place in the steps. */
+    @Test
+    fun `a variable is written when the value of its node is read`() = runTest {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("x", "0.0", "Double")),
+            nodes = listOf(
+                StoryNode.Start("s", "main"),
+                StoryNode.Assign("write", "x", "5.0"),
+                call("first", "log"),
+                call("second", "log", "event" to "\"x=\$x\""),
+            ),
+            links = listOf(next("s", "first"), next("first", "second"), StoryLink("write", StoryPins.VALUE, "first", "event")),
+        )
+        val world = world("assign", StoryGraphCompiler.compile(graph, paramType = { _, _ -> typeOf<String>() }).code)
+        world.launch("main")
+        world.settle()
+        assertEquals(listOf("5.0", "x=5.0"), StageTrace.take())
+    }
+
+    /** Every type a variable can be declared with has to compile and be saved by a story. */
+    @Test
+    fun `every type of a variable is declared and saved`() = runTest {
+        val blank = StoryVariable("value", "")
+        val single = StoryVariableTypes.names - StoryVariableTypes.LIST - StoryVariableTypes.MAP
+        val lists = StoryVariableTypes.elements.map { StoryVariableTypes.list(blank, it) }
+        val maps = StoryVariableTypes.keys.flatMap { key -> StoryVariableTypes.elements.map { StoryVariableTypes.map(blank, key, it) } }
+        val variables = (single.map { StoryVariableTypes.retyped(blank, it) } + lists + maps)
+            .mapIndexed { index, variable -> variable.copy(name = "value$index") }
+        val graph = StoryGraph(
+            variables = variables,
+            nodes = listOf(StoryNode.Start("s", "main"), log("first", "\"done\"")),
+            links = listOf(next("s", "first")),
+        )
+        val world = world("types", generate(graph).code)
+        world.launch("main")
+        world.settle()
+        assertEquals(listOf("done"), StageTrace.take())
+    }
 
     @Test
     fun `a loop of the graph runs and resumes after a restart`() = runTest {

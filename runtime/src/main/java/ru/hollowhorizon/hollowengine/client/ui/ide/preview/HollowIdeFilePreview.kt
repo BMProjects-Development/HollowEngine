@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.preview
 
 import androidx.compose.runtime.Composable
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -55,12 +56,19 @@ class HollowIdePreviewRegistry {
         (previews + HollowIdeExtensionPoints.PREVIEWS.registrations.map { it.value }).filter { it.matches(path) }
 }
 
+/** Something wrong with a file that a preview has found, and how to show it there. */
+class HollowIdePreviewProblem(val diagnostic: UiTextDiagnostic, val reveal: () -> Unit = {})
+
 /** What one open file remembers about its previews while it stays open. */
 class HollowIdeFileView internal constructor(val previews: List<HollowIdeFilePreview>) {
     var mode by mutableStateOf(previews.first().defaultMode)
 
     /** The preview shown in [HollowIdeViewMode.PREVIEW] and beside the text in [HollowIdeViewMode.SPLIT]. */
     var preview by mutableStateOf(previews.first())
+
+    /** What the preview shown now says is wrong with the file. */
+    var problems by mutableStateOf(emptyList<HollowIdePreviewProblem>())
+        internal set
 
     /** The text's share of the width in [HollowIdeViewMode.SPLIT]. */
     var split by mutableStateOf(0.5f)
@@ -96,6 +104,11 @@ class HollowIdePreviewContext internal constructor(
     }
 
     fun <T : Any> state(create: () -> T): T = view.state(preview, create)
+
+    /** Tells the corner of the tab and the Problems page what is wrong with the file. */
+    fun publishProblems(problems: List<HollowIdePreviewProblem>) {
+        view.problems = problems
+    }
 }
 
 /**

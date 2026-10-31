@@ -1,9 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.list
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFlow
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryStep
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
@@ -17,6 +20,7 @@ internal enum class StoryCardKind(val tag: String, icon: String, name: String) {
     START("start", "label", "start"),
     SET("command", "command", "set"),
     CODE("block", "block", "code"),
+    LOOP("block", "block", "loop"),
     BLOCK("block", "block", "block"),
     COMMAND("command", "command", "command"),
     JUMP("label", "label", "jump");
@@ -33,7 +37,8 @@ internal enum class StoryCardKind(val tag: String, icon: String, name: String) {
             is StoryNode.Choose -> CHOICE
             is StoryNode.Branch -> CONDITION
             is StoryNode.Assign -> SET
-            is StoryNode.Code, is StoryNode.Expression -> CODE
+            is StoryNode.Code, is StoryNode.Expression, is StoryNode.Pure, is StoryNode.Reroute -> CODE
+            is StoryNode.Loop -> LOOP
             is StoryNode.Call -> when {
                 node.block -> BLOCK
                 node.action == WAIT_ACTION -> WAIT
@@ -43,7 +48,23 @@ internal enum class StoryCardKind(val tag: String, icon: String, name: String) {
     }
 }
 
-internal enum class StoryRowRole { START, CARD, PIN, JUMP }
+internal enum class StoryRowRole { START, CARD, PIN, JUMP, PARAM }
+
+/** How many parameters a card shows in its row; the rest open under it. */
+private const val RowParams = 3
+
+/** What opens the parameters of the card of [node]. */
+internal fun paramsKey(node: String) = "params/$node"
+
+/** The parameters of [signature] a writer fills, those a call cannot do without first. */
+private fun filled(signature: StoryFunctionSignature): List<StoryParam> =
+    signature.params.filter { it.implicit == null }.sortedBy { it.optional }
+
+internal fun rowParams(signature: StoryFunctionSignature): List<StoryParam> = filled(signature).take(RowParams)
+
+/** The parameters of [node] that have no room in its row. */
+internal fun moreParams(node: StoryNode): List<StoryParam> =
+    (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.let(::filled).orEmpty().drop(RowParams)
 
 /**
  * One row of the list.
@@ -62,7 +83,7 @@ internal class StoryRow(
     val guides: List<StoryCardKind> = emptyList(),
 ) {
     val key: String = listOfNotNull(from, node.id, pin).joinToString("/")
-    val selection = StorySelection(from ?: node.id, pin)
+    val selection = StorySelection(from ?: node.id, pin.takeIf { role != StoryRowRole.PARAM })
     val tag: String get() = kind.tag
 
     /** Whether it can be dragged and moved: what is a place in the flow rather than a part of a card. */
@@ -74,7 +95,14 @@ internal fun storyRows(flow: StoryFlow, folded: (String) -> Boolean): List<Story
     fun walk(steps: List<StoryStep>, guides: List<StoryCardKind>) {
         steps.forEach { step ->
             when (step) {
-                is StoryStep.Plain -> add(StoryRow(StoryRowRole.CARD, StoryCardKind.of(step.node), step.node, guides = guides))
+                is StoryStep.Plain -> {
+                    val kind = StoryCardKind.of(step.node)
+                    add(StoryRow(StoryRowRole.CARD, kind, step.node, guides = guides))
+                    if (!folded(paramsKey(step.id))) moreParams(step.node).forEach { param ->
+                        add(StoryRow(StoryRowRole.PARAM, kind, step.node, param.name, guides = guides + kind))
+                    }
+                }
+
                 is StoryStep.Jump -> add(
                     StoryRow(StoryRowRole.JUMP, StoryCardKind.JUMP, step.target, step.pin, step.from, guides),
                 )
@@ -113,12 +141,15 @@ internal fun searchText(node: StoryNode): String = when (node) {
     is StoryNode.Assign -> "${node.variable} ${node.value}"
     is StoryNode.Code -> node.code
     is StoryNode.Expression -> node.code
+    is StoryNode.Pure -> "${node.operator} ${node.arguments.values.joinToString(" ")}"
+    is StoryNode.Loop -> node.items
+    is StoryNode.Reroute -> ""
 }
 
 /** The nodes whose text holds [query], from the top of the list. */
 internal fun storyMatches(flow: StoryFlow, query: String): List<StorySelection> {
     if (query.isBlank()) return emptyList()
-    return storyRows(flow) { false }.filter { it.role != StoryRowRole.PIN && it.role != StoryRowRole.JUMP }
+    return storyRows(flow) { false }.filter { it.role == StoryRowRole.START || it.role == StoryRowRole.CARD }
         .filter { searchText(it.node).contains(query, ignoreCase = true) }.map { it.selection }
 }
 

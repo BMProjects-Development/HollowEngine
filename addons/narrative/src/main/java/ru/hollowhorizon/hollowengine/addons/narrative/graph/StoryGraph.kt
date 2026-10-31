@@ -14,6 +14,8 @@ import java.util.UUID
  *
  * @param imports what the Kotlin of its nodes needs imported.
  * @param layout where the graph editor shows each node; a node without a place is arranged when it is shown.
+ * @param groups the frames the graph editor keeps nodes in.
+ * @param collapsed the nodes the graph editor shows as a title bar.
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -24,11 +26,49 @@ data class StoryGraph(
     @Serializable(SortedNodesSerializer::class) val nodes: List<StoryNode> = emptyList(),
     @Serializable(SortedLinksSerializer::class) val links: List<StoryLink> = emptyList(),
     val layout: Map<String, StoryPoint> = emptyMap(),
+    val groups: List<StoryNodeGroup> = emptyList(),
+    val collapsed: Set<String> = emptySet(),
 ) {
     fun node(id: String): StoryNode? = nodes.firstOrNull { it.id == id }
 
+    /** The graph with every reroute joined back up: what the links mean, the way a story and the list read them. */
+    fun dissolved(): StoryGraph {
+        val reroutes = nodes.filterIsInstance<StoryNode.Reroute>().mapTo(HashSet()) { it.id }
+        if (reroutes.isEmpty()) return this
+
+        fun flowTarget(id: String): String? {
+            val seen = HashSet<String>()
+            var at = id
+            while (at in reroutes) {
+                if (!seen.add(at)) return null
+                val from = at
+                at = links.firstOrNull { it.from == from && it.isFlow }?.to ?: return null
+            }
+            return at
+        }
+
+        fun valueSource(link: StoryLink): StoryLink? {
+            val seen = HashSet<String>()
+            var at = link
+            while (at.from in reroutes) {
+                if (!seen.add(at.from)) return null
+                val into = at.from
+                at = links.firstOrNull { it.to == into && !it.isFlow } ?: return null
+            }
+            return at
+        }
+        val joined = links.mapNotNull { link ->
+            when {
+                link.isFlow -> if (link.from in reroutes) null else flowTarget(link.to)?.let { link.copy(to = it) }
+                link.to in reroutes -> null
+                else -> valueSource(link)?.let { link.copy(from = it.from, fromPin = it.fromPin) }
+            }
+        }
+        return copy(nodes = nodes.filter { it.id !in reroutes }, links = joined)
+    }
+
     /** The text of the file: the same content is always the same text, so a change is a small diff. */
-    fun encode(): String = FORMAT.encodeToString(serializer(), copy(layout = layout.toSortedMap()))
+    fun encode(): String = FORMAT.encodeToString(serializer(), copy(layout = layout.toSortedMap(), collapsed = collapsed.toSortedSet()))
 
     companion object {
         const val VERSION = 1
@@ -52,6 +92,16 @@ data class StoryGraph(
 @Serializable
 data class StoryPoint(val x: Float, val y: Float)
 
+/** A frame of the graph editor around [nodes], or one node when [collapsed]; it means nothing to the story. */
+@Serializable
+data class StoryNodeGroup(
+    val id: String,
+    val title: String,
+    val color: String = "gray",
+    val nodes: List<String> = emptyList(),
+    val collapsed: Boolean = false,
+)
+
 /** A variable of the story, saved with it. [initial] is a Kotlin expression; [type] is inferred from it when null. */
 @Serializable
 data class StoryVariable(val name: String, val initial: String, val type: String? = null)
@@ -73,7 +123,10 @@ object StoryPins {
     const val BODY = "body"
     const val VALUE = "value"
     const val SPEAKER = "speaker"
+    const val TEXT = "text"
     const val CONDITION = "condition"
+    const val ITEMS = "items"
+    const val ITEM = "item"
 
     /** The argument an extension function is called on, unless the node names another. */
     const val RECEIVER = "this"
@@ -105,7 +158,8 @@ sealed interface StoryNode {
 
     /**
      * A line. [speaker] is a name, `{expression}` for what an expression gives, or empty for narration. In [text],
-     * `{name}` puts in the variable of that name, and `{player}` the name of the player.
+     * `{name}` puts in the variable of that name, and `{player}` the name of the player. A link into
+     * [StoryPins.TEXT] takes the place of [text].
      */
     @Serializable
     @SerialName("say")
@@ -166,4 +220,26 @@ sealed interface StoryNode {
     @Serializable
     @SerialName("expression")
     data class Expression(override val id: String, val code: String) : StoryNode
+
+    /** A value worked out by the [StoryOperator] named [operator] from [arguments], Kotlin expressions by input name. */
+    @Serializable
+    @SerialName("pure")
+    data class Pure(
+        override val id: String,
+        val operator: String,
+        val arguments: Map<String, String> = emptyMap(),
+    ) : StoryNode
+
+    /** Runs the flow from [StoryPins.BODY] for each of [items], a Kotlin expression, giving it [StoryPins.ITEM]. */
+    @Serializable
+    @SerialName("for-each")
+    data class Loop(override val id: String, val items: String = "") : StoryNode
+
+    /** A point of the graph editor a link passes through, which the story does not notice. */
+    @Serializable
+    @SerialName("reroute")
+    data class Reroute(override val id: String, val flow: Boolean) : StoryNode {
+        val input: String get() = if (flow) StoryPins.IN else StoryPins.VALUE
+        val output: String get() = if (flow) StoryPins.NEXT else StoryPins.VALUE
+    }
 }

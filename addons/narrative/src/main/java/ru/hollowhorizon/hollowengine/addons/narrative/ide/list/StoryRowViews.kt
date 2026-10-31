@@ -4,11 +4,14 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryVectorField
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.DisclosureArrow
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
@@ -25,9 +28,6 @@ private const val DragThreshold = 4f
 /** The width of the rail line. */
 private const val LineWidth = 2f
 
-/** How many required parameters a card shows; the rest are in the inspector. */
-private const val RowParams = 3
-
 /** What every row of one composition needs. */
 internal class StoryRowScope(
     val state: StoryListState,
@@ -35,7 +35,28 @@ internal class StoryRowScope(
     val rows: List<StoryRow>,
     val matches: Set<String>,
     val current: StorySelection?,
+    val rowWidth: Float,
 )
+
+/** How wide a row has to be for the row at [row] to fit what it holds, past which the list scrolls sideways. */
+internal fun rowFit(row: StoryRow): Float = RailWidth + row.guides.size * GuideWidth + maxOf(BodyWidth, commandFit(row))
+
+/** How wide the body of a card has to be for the fields of its command. */
+private fun commandFit(row: StoryRow): Float {
+    val signature = (row.node as? StoryNode.Call)?.takeIf { row.role == StoryRowRole.CARD }?.let(StoryCatalog::signatureOf) ?: return 0f
+    return CommandChrome + rowParams(signature).sumOf {
+        (if (StoryLiterals.vectorHelper(it.type) != null) VectorField else CommandField).toDouble()
+    }.toFloat()
+}
+
+private const val RailWidth = 24f
+private const val GuideWidth = 14f
+private const val BodyWidth = 380f
+private const val CommandField = 120f
+private const val VectorField = 190f
+
+/** What a card of a command spends on its title and buttons. */
+private const val CommandChrome = 210f
 
 /** One row of the list: the rail with the dot of a top-level card, a guide for each card it is nested in, and the row. */
 @Composable
@@ -49,7 +70,7 @@ internal fun StoryRowView(scope: StoryRowScope, row: StoryRow, index: Int) {
     Row(
         id = "story-row-${row.key}",
         tags = listOfNotNull("story-row", "dragging".takeIf { held }, "rejected".takeIf { held && drag.rejected }),
-        modifier = Modifier.size(100.percent).alignItems(vertical = UiAlign.STRETCH).layer(if (held) 10 else 0),
+        modifier = Modifier.size(scope.rowWidth.px).alignItems(vertical = UiAlign.STRETCH).layer(if (held) 10 else 0),
     ) {
         Box(
             mode = UiBoxMode.STACK,
@@ -87,7 +108,7 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
             .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
                 state.drag = null
                 state.select(row.selection)
-                if (event.isRightClick()) state.menu = StoryRowMenu(row, event.x, event.y)
+                if (event.isRightClick() && row.role != StoryRowRole.PARAM) state.menu = StoryRowMenu(row, event.x, event.y)
             }.onDrag { event ->
                 if (event.isRightClick()) return@onDrag
                 val drag = state.drag ?: run {
@@ -110,13 +131,15 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
         ) {
             RowContent(scope, row)
             Fold(scope, row)
-            More(state, row)
-            IconButton(
-                RemoveIcon,
-                storyLang("remove"),
-                id = "story-body-${row.key}-remove",
-                tags = listOf("inline", "danger", "story-action"),
-            ) { state.remove(row) }
+            if (row.role != StoryRowRole.PARAM) {
+                More(state, row)
+                IconButton(
+                    RemoveIcon,
+                    storyLang("remove"),
+                    id = "story-body-${row.key}-remove",
+                    tags = listOf("inline", "danger", "story-action"),
+                ) { state.remove(row) }
+            }
         }
     }
 }
@@ -126,7 +149,9 @@ private fun RowBody(scope: StoryRowScope, row: StoryRow, motion: Modifier) {
 private fun Head(row: StoryRow) {
     val call = (row.node as? StoryNode.Call)?.takeIf { row.role == StoryRowRole.CARD }
     val signature = call?.let(StoryCatalog::signatureOf)
+    val param = signature ?: (row.node as? StoryNode.Call)?.takeIf { row.role == StoryRowRole.PARAM }?.let(StoryCatalog::signatureOf)
     val title = when {
+        row.role == StoryRowRole.PARAM -> param?.params?.firstOrNull { it.name == row.pin }?.let { StoryCatalog.paramTitle(param, it) } ?: row.pin.orEmpty()
         row.role == StoryRowRole.PIN && row.node is StoryNode.Choose -> return
         row.role == StoryRowRole.PIN -> branchPinTitle(row.pin.orEmpty())
         call != null -> signature?.let(StoryCatalog::title) ?: call.function.substringAfterLast('.')
@@ -134,9 +159,9 @@ private fun Head(row: StoryRow) {
     }
     Row(
         tags = listOf("story-head", row.tag),
-        modifier = Modifier.alignItems(vertical = UiAlign.CENTER).let { modifier ->
-            signature?.let(StoryCatalog::description)?.let { modifier.tooltipOnHover(it) } ?: modifier
-        },
+        modifier = Modifier.alignItems(vertical = UiAlign.CENTER)
+            .let { modifier -> signature?.let(StoryCatalog::color)?.let { modifier.background(it) } ?: modifier }
+            .let { modifier -> signature?.let(StoryCatalog::description)?.let { modifier.tooltipOnHover(it) } ?: modifier },
     ) {
         Image(signature?.icon ?: row.kind.icon, tags = listOf("story-head-icon"))
         Text(title, tags = listOf("story-head-title"))
@@ -149,6 +174,12 @@ private fun RowContent(scope: StoryRowScope, row: StoryRow) {
     val state = scope.state
     when (row.role) {
         StoryRowRole.PIN -> PinRow(scope, row)
+        StoryRowRole.PARAM -> {
+            val call = row.node as StoryNode.Call
+            val signature = StoryCatalog.signatureOf(call)
+            signature?.params?.firstOrNull { it.name == row.pin }?.let { ParamField(scope, call, signature, it, null) }
+        }
+
         StoryRowRole.JUMP -> Text(
             storyLang("jump.to").format(StoryTargets.title(row.node)),
             tags = listOf("story-muted"),
@@ -164,7 +195,9 @@ private fun RowContent(scope: StoryRowScope, row: StoryRow) {
                 Field(scope, node.id, "speaker", node.speaker, storyLang("narrator"), width = 84f) { value ->
                     state.editNode(node.id, "speaker") { (it as StoryNode.Say).copy(speaker = value) }
                 }
-                Field(scope, node.id, "text", node.text, storyLang("phrase.placeholder")) { value ->
+                if (scope.graph.links.any { it.to == node.id && it.toPin == StoryPins.TEXT }) {
+                    Text(storyLang("param.linked"), tags = listOf("story-muted"), modifier = Modifier.grow(1f))
+                } else Field(scope, node.id, "text", node.text, storyLang("phrase.placeholder")) { value ->
                     state.editNode(node.id, "text") { (it as StoryNode.Say).copy(text = value) }
                 }
             }
@@ -206,23 +239,47 @@ private fun RowContent(scope: StoryRowScope, row: StoryRow) {
             )
 
             is StoryNode.Expression -> Text(node.code, tags = listOf("story-muted"), modifier = Modifier.grow(1f))
+            is StoryNode.Loop -> Field(scope, node.id, "items", node.items, storyLang("loop.items")) { value ->
+                state.editNode(node.id, "items") { (it as StoryNode.Loop).copy(items = value) }
+            }
+
+            is StoryNode.Pure, is StoryNode.Reroute -> Unit
         }
     }
 }
 
-/** The required parameters of a call, or its first ones when it needs none. */
+/** The first parameters of a call, those it needs ahead of the rest. */
 @Composable
 private fun Command(scope: StoryRowScope, call: StoryNode.Call) {
-    val signature = StoryCatalog.signatureOf(call)
-    val params = signature?.params.orEmpty().filter { !it.optional }.take(RowParams)
-    params.forEach { param ->
-        val shown = StoryLiterals.text(call.argument(param).orEmpty(), param.type)
-        Field(scope, call.id, param.name, shown, StoryCatalog.paramTitle(signature!!, param), width = 120f) { value ->
-            val written = StoryLiterals.expression(value, param.type)
-            scope.state.editNode(call.id, param.name) { (it as StoryNode.Call).with(param, written) }
+    val signature = StoryCatalog.signatureOf(call) ?: return Box(modifier = Modifier.grow(1f))
+    rowParams(signature).forEach { ParamField(scope, call, signature, it, CommandField) }
+    Box(modifier = Modifier.grow(1f))
+}
+
+/** The field of [param], or a note that its value comes from a link. */
+@Composable
+private fun ParamField(scope: StoryRowScope, call: StoryNode.Call, signature: StoryFunctionSignature, param: StoryParam, width: Float?) {
+    val state = scope.state
+    if (scope.graph.links.any { it.to == call.id && it.toPin == param.name }) {
+        return Text(storyLang("param.linked"), tags = listOf("story-muted"))
+    }
+    val written = call.argument(param).orEmpty()
+    val problem = StoryChecks.param(param, written)
+    val title = StoryCatalog.paramTitle(signature, param)
+    fun write(next: String) = state.editNode(call.id, param.name) { (it as StoryNode.Call).with(param, next) }
+    val helper = StoryLiterals.vectorHelper(param.type)
+    if (helper != null) return StoryVectorField(
+        StoryListState.fieldId(call.id, param.name), written, helper, state.context?.readOnly == true, problem,
+        listOf("story-field"), Modifier.size((width ?: VectorField).px, 20.px), write = ::write,
+    )
+    Field(scope, call.id, param.name, StoryLiterals.text(written, param.type), title, width, problem) { value ->
+        write(StoryLiterals.expression(value, param.type))
+    }
+    if (param.assets.isNotEmpty()) {
+        AssetPickerButton(title, StoryLiterals.text(written, param.type), { it.assets(param.assets) }) { picked ->
+            write(StoryLiterals.expression(picked, param.type))
         }
     }
-    Box(modifier = Modifier.grow(1f))
 }
 
 @Composable
@@ -245,6 +302,7 @@ private fun PinRow(scope: StoryRowScope, row: StoryRow) {
 @Composable
 private fun Fold(scope: StoryRowScope, row: StoryRow) {
     val key = when {
+        row.role == StoryRowRole.CARD && moreParams(row.node).isNotEmpty() -> paramsKey(row.node.id)
         row.role == StoryRowRole.PIN -> "${row.node.id}/${row.pin}"
         row.role == StoryRowRole.CARD && row.kind in FOLDING -> row.node.id
         else -> return
@@ -288,6 +346,7 @@ internal fun Field(
     value: String,
     placeholder: String,
     width: Float? = null,
+    problem: String? = null,
     write: (String) -> Unit,
 ) {
     val size = if (width != null) Modifier.size(width.px, 20.px) else Modifier.size(0.px, 20.px).grow(1f)
@@ -297,8 +356,8 @@ internal fun Field(
         readOnly = scope.state.context?.readOnly == true,
         placeholder = placeholder,
         id = StoryListState.fieldId(node, name),
-        tags = listOf("story-field", name.substringBefore('-')),
-        modifier = size.onKeyInput { input -> if (fieldKey(scope, node, input)) input.consume() },
+        tags = listOfNotNull("story-field", name.substringBefore('-'), "error".takeIf { problem != null }),
+        modifier = size.tooltipOnHover(problem.orEmpty()).onKeyInput { input -> if (fieldKey(scope, node, input)) input.consume() },
     )
 }
 

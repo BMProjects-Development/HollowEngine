@@ -3,37 +3,35 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.duplicate
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.link
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.linkValue
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeNode
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.unlink
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.unlinkValue
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryCardKind
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryTargets
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroupChanged
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.PublishStoryProblems
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCheck
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorStylesheet
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryVectorField
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.storyInspector
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeViewMode
-import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorStylesheet
-import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import kotlin.math.hypot
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 private const val CanvasId = "story-graph"
-private const val NodeWidth = 220f
-private const val HeaderHeight = 26f
-private const val PinRow = 20f
-private const val PinSize = 10f
-private const val SnapRadius = 14f
-private const val ColumnStep = 280f
-private const val RowStep = 130f
+private const val StoryGraphStylesheet = "hollowengine-narrative:ui/styles/story-graph.hss"
+private const val ColumnStep = 340f
+private const val RowStep = 170f
+private const val RemoveIcon = "hollowengine:textures/gui/icons/remove.svg"
+private const val AddIcon = "hollowengine:textures/gui/icons/add.svg"
 
 /** The `.story` file as nodes and the links between them. */
 internal val StoryGraphFilePreview = HollowIdeFilePreview(
@@ -44,29 +42,14 @@ internal val StoryGraphFilePreview = HollowIdeFilePreview(
     matcher = { it.endsWith(".story") },
 ) { StoryGraphPreview(it) }
 
-/** One pin of a node as the graph draws it. */
-private class Pin(val node: String, val name: String, val output: Boolean, val flow: Boolean, val row: Int)
+internal class StoryGraphState : StoryEditorState() {
+    val editor = GraphEditorState()
 
-/** A link being drawn out of [from], with the pointer at ([x], [y]) in graph units. */
-private class PendingLink(val from: Pin, val x: Float, val y: Float)
+    /** How big the canvas is, for bringing a node to its middle. */
+    var canvas = UiRect.Zero
 
-private class GraphMenu(
-    val x: Float,
-    val y: Float,
-    val graphX: Float,
-    val graphY: Float,
-    val node: String?,
-    val edge: StoryLink?,
-    val from: Pin?,
-)
-
-private class StoryGraphState : StoryEditorState() {
-    val view = GraphViewState()
-    var pending by mutableStateOf<PendingLink?>(null)
-    var menu by mutableStateOf<GraphMenu?>(null)
-
-    /** The node being dragged and how far it went, until the drop writes its place to the file. */
-    var moved by mutableStateOf<Pair<String, StoryPoint>?>(null)
+    /** Where a drag has taken nodes, until it ends and writes that to the file. */
+    var moved by mutableStateOf(emptyMap<String, StoryPoint>())
 }
 
 @Composable
@@ -75,203 +58,190 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     state.context = context
     val parsed = state.model.read(context.text)
     val graph = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
+    val controller = remember(state) { GraphEditorController(CanvasId, state.editor) }
     val arranged = remember(graph) { arrange(graph) }
-    val places = state.moved?.let { arranged + it } ?: arranged
-    val pins = remember(graph) { graph.nodes.associate { it.id to pinsOf(graph, it) } }
+    val checks = remember(graph) { StoryChecks.all(graph) }
+    val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
+    val model = StoryGraphEditorModel(state, graph, arranged + state.moved) { controller.select(it) }
+    controller.model = model
 
-    fun position(pin: Pin): Pair<Float, Float> {
-        val place = places.getValue(pin.node)
-        return (if (pin.output) place.x + NodeWidth else place.x) to place.y + HeaderHeight + (pin.row + 0.5f) * PinRow
+    PublishStoryProblems(context, graph, checks) { node ->
+        controller.select(GraphSelection.of(node))
+        model.all[node]?.rect?.let { state.editor.view.centerOn(it.centerX, it.centerY, state.canvas.width, state.canvas.height) }
     }
 
-    fun pinOf(node: String, name: String, output: Boolean) =
-        pins[node]?.firstOrNull { it.name == name && it.output == output }
-
-    PublishInspector(source = "story-graph:${context.file.path}", key = state.selected) {
-        storyInspector(state, state.selected)
+    val selection = state.editor.selection
+    val selected = selection.single?.takeIf { selection.group == null && it in model.all }
+    SideEffect {
+        if (state.selected?.node != selected) state.selected = selected?.let { StorySelection(it) }
+    }
+    PublishInspector(source = "story-graph:${context.file.path}", key = selection.group to selected) {
+        selection.group?.let { groupInspector(state, it) } ?: storyInspector(state, selected?.let { StorySelection(it) })
     }
 
-    val edges = graph.links.mapNotNull { link ->
-        val from = pinOf(link.from, link.fromPin, output = true) ?: return@mapNotNull null
-        val to = pinOf(link.to, link.toPin, output = false) ?: return@mapNotNull null
-        val (x1, y1) = position(from)
-        val (x2, y2) = position(to)
-        val view = state.view
-        GraphEdge(
-            link, GraphCurves.betweenPins(
-                view.toCanvasX(x1), view.toCanvasY(y1), view.toCanvasX(x2), view.toCanvasY(y2), view.zoom
-            )
-        )
-    }
-    val preview = state.pending?.let { pending ->
-        val (x, y) = position(pending.from)
-        val view = state.view
-        GraphLinkPreview(view.toCanvasX(x), view.toCanvasY(y), view.toCanvasX(pending.x), view.toCanvasY(pending.y))
-    }
-
-    Column(
-        tags = listOf("ide-file-panel", "story-list-root"),
-        modifier = Modifier.style(InspectorStylesheet).style(StoryEditorStylesheet),
-    ) {
-        GraphCanvas(
-            id = CanvasId,
-            view = state.view,
-            modifier = Modifier.size(100.percent, 0.px).grow(1f),
-            edges = edges,
-            link = preview,
-            onBackgroundClick = { state.selected = null },
-            onContextMenu = { pointer, edge ->
-                state.menu = GraphMenu(
-                    pointer.screenX, pointer.screenY, pointer.graphX, pointer.graphY, null, edge as? StoryLink, null
-                )
-            },
-            onKey = { input ->
-                val selected = state.selected?.node
-                if (input.key != GLFW.GLFW_KEY_DELETE || selected == null) return@GraphCanvas false
-                state.change(StoryUndo.REMOVE) { removeNode(selected) }
-                state.selected = null
-                true
-            },
-        ) {
-            graph.nodes.forEach { node ->
-                val place = places[node.id] ?: return@forEach
-                val nodePins = pins.getValue(node.id)
-                val rows = (nodePins.maxOfOrNull { it.row } ?: -1) + 1
-                GraphNode(
-                    id = "story-node-${node.id}",
-                    canvasId = CanvasId,
-                    view = state.view,
-                    x = place.x,
-                    y = place.y,
-                    width = NodeWidth,
-                    height = HeaderHeight + rows * PinRow,
-                    selected = state.selected?.node == node.id,
-                    tags = listOf("story-node", StoryCardKind.of(node).tag),
-                    onPress = { state.selected = StorySelection(node.id) },
-                    onDrag = { gesture ->
-                        state.moved = node.id to StoryPoint(
-                            place0(arranged, node.id).x + gesture.graphDeltaX,
-                            place0(arranged, node.id).y + gesture.graphDeltaY
-                        )
-                    },
-                    onRelease = {
-                        state.moved?.let { (id, point) -> state.change(StoryUndo.MOVE) { copy(layout = arranged + (id to point)) } }
-                        state.moved = null
-                    },
-                    onContextMenu = { x, y ->
-                        state.selected = StorySelection(node.id)
-                        state.menu = GraphMenu(x, y, place.x, place.y, node.id, null, null)
-                    },
-                ) {
-                    Text(StoryCardKind.of(node).title, tags = listOf("story-node-title"))
-                    Text(StoryTargets.title(node), tags = listOf("story-muted"))
-                }
-            }
-            pins.values.flatten().forEach { pin ->
-                if (pin.node !in places) return@forEach
-                val (x, y) = position(pin)
-                PinView(state, pin, x, y) { px, py ->
-                    pins.values.flatten().filter { it.output != pin.output && it.flow == pin.flow }.minByOrNull {
-                        val (ox, oy) = position(it)
-                        hypot(ox - px, oy - py)
-                    }?.takeIf {
-                        val (ox, oy) = position(it)
-                        hypot(ox - px, oy - py) <= SnapRadius
-                    }
-                }
-            }
-        }
-    }
-    state.menu?.let { GraphContextMenu(state, it, arranged) }
-}
-
-private fun place0(arranged: Map<String, StoryPoint>, id: String) = arranged.getValue(id)
-
-/** A pin. A link is drawn out of it; dropped on nothing, it opens the menu that adds what it leads to. */
-@Composable
-private fun PinView(state: StoryGraphState, pin: Pin, x: Float, y: Float, nearest: (Float, Float) -> Pin?) {
     Box(
-        id = "story-pin-${pin.node}-${pin.name}-${pin.output}",
-        tags = listOfNotNull("story-pin", "flow".takeIf { pin.flow }),
-        modifier = Modifier.position((x - PinSize / 2f).px, (y - PinSize / 2f).px).size(PinSize.px, PinSize.px)
-            .input(hoverable = true, clickable = true, draggable = true).onPress { it.consume() }.onDrag { event ->
-                val zoom = state.view.zoom
-                state.pending = PendingLink(pin, x + event.dragTotalX / zoom, y + event.dragTotalY / zoom)
-                event.consume()
-            }.onRelease { event ->
-                val pending = state.pending ?: return@onRelease
-                state.pending = null
-                event.consume()
-                val target = nearest(pending.x, pending.y)
-                when {
-                    target != null -> connect(state, pin, target)
-                    pin.output && pin.flow -> state.menu =
-                        GraphMenu(event.x, event.y, pending.x, pending.y, null, null, pin)
+        mode = UiBoxMode.STACK,
+        tags = listOf("ide-file-panel", "story-list-root"),
+        modifier = Modifier.size(100.percent, 100.percent).style(InspectorStylesheet).style(StoryEditorStylesheet)
+            .style(GraphNodesStylesheet).style(StoryGraphStylesheet).focusScope().onPlaced { state.canvas = it },
+    ) {
+        GraphEditorCanvas(controller, Modifier.size(100.percent, 100.percent)) {
+            GraphFrameHeaders(controller)
+            model.boxes.values.sortedBy { it.node.id in controller.selection }.forEach { box ->
+                key(box.node.id) { StoryNodeView(controller, model, state, box, problems[box.node.id]) }
+            }
+            model.scene.cards.forEach { card ->
+                key("card-${card.id}") {
+                    GraphGroupCard(
+                        controller, card,
+                        pinName = { it.name },
+                        ownerName = { model.all[it.node]?.title ?: it.node },
+                        pinTags = { listOf(model.typeOf(it).tag()) },
+                    )
                 }
-            },
-    )
+            }
+        }
+    }
 }
 
-private fun connect(state: StoryGraphState, first: Pin, second: Pin) {
-    val from = if (first.output) first else second
-    val to = if (first.output) second else first
-    state.change(StoryUndo.LINK) {
-        if (from.flow) link(from.node, from.name, to.node) else linkValue(from.node, from.name, to.node, to.name)
+/** A node on the canvas with a row per thing it holds, each edited in place. */
+@Composable
+private fun StoryNodeView(
+    controller: GraphEditorController,
+    model: StoryGraphEditorModel,
+    state: StoryGraphState,
+    box: StoryNodeBox,
+    problems: List<StoryCheck>?,
+) {
+    val node = box.node
+    if (node is StoryNode.Reroute) {
+        val output = box.pins.first { it.output }
+        return GraphRerouteView(controller, node.id, box.rect, output, listOf(model.typeOf(output).tag()))
+    }
+    val problem = problems?.map { it.message }?.distinct()?.joinToString("\n")
+    val warning = problems?.all { it.warning } == true
+    GraphNodeFrame(
+        controller, node.id, box.rect,
+        listOfNotNull("gn-node", box.tag, "collapsed".takeIf { box.collapsed }, (if (warning) "warning" else "error").takeIf { problem != null }),
+    ) {
+        GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning) {
+            state.change { copy(collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id) }
+        }
+        if (!box.collapsed) box.rows.forEach { row -> StoryRowView(controller, state, box, row) }
+        box.pins.forEach { pin ->
+            val connected = model.isPinLinked(pin)
+            GraphPinView(controller, pin, box.x, box.y, connected, listOf(model.typeOf(pin).tag()))
+        }
     }
 }
 
 @Composable
-private fun GraphContextMenu(state: StoryGraphState, menu: GraphMenu, arranged: Map<String, StoryPoint>) {
-    fun add(node: StoryNode) {
-        state.change(StoryUndo.ADD) {
-            val added = copy(nodes = nodes + node, layout = layout + (node.id to StoryPoint(menu.graphX, menu.graphY)))
-            menu.from?.let { added.link(it.node, it.name, node.id) } ?: added
+private fun StoryRowView(controller: GraphEditorController, state: StoryGraphState, box: StoryNodeBox, row: StoryNodeRow) {
+    val readOnly = state.context?.readOnly == true
+    Row(
+        tags = listOf("gn-node-row"),
+        modifier = Modifier.position(0.px, row.top.px).size(box.width.px, row.height.px)
+            .padding(GraphNodeMetrics.INSET.px, 0.px).alignItems(vertical = UiAlign.CENTER),
+    ) {
+        val field = row.field
+        if (row.label != null && field == null && row.input == null) Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
+        row.label?.let {
+            Text(it, tags = listOfNotNull("gn-pin-label", "output".takeIf { row.input == null && field == null }, "optional".takeIf { row.optional }))
         }
-        state.selected = StorySelection(node.id)
-    }
+        row.hint?.let { FieldHelp(it) }
+        if (field != null) when {
+            field.choices.isNotEmpty() -> ChoiceField(controller, box, field)
+            field.vector != null -> StoryVectorField(
+                "st-field-${box.node.id}-${field.key}", field.value, field.vector, readOnly, field.problem, listOf("gn-field"),
+                Modifier.size(0.px, 20.px).grow(1f), write = field.write,
+            )
 
-    val items = buildList {
-        val edge = menu.edge
-        val node = menu.node
-        when {
-            edge != null -> add(UiDropdownItem(storyLang("remove")) {
-                state.change(StoryUndo.REMOVE) {
-                    if (edge.isFlow) unlink(edge.from, edge.fromPin) else unlinkValue(edge.to, edge.toPin)
-                }
-            })
-
-            node != null -> {
-                add(UiDropdownItem(storyLang("duplicate")) { state.change(StoryUndo.DUPLICATE) { duplicate(node) } })
-                add(UiDropdownItem(storyLang("remove"), shortcut = "Delete") {
-                    state.change(StoryUndo.REMOVE) { removeNode(node) }
-                    state.selected = null
-                })
-            }
-
-            else -> {
-                add(UiDropdownItem(storyLang("add.phrase")) { add(StoryNode.Say(StoryGraph.newId())) })
-                add(UiDropdownItem(storyLang("add.choice")) {
-                    add(StoryNode.Choose(StoryGraph.newId(), listOf(StoryOption(storyLang("new.option")))))
-                })
-                add(UiDropdownItem(storyLang("add.condition")) { add(StoryNode.Branch(StoryGraph.newId())) })
-                add(UiDropdownItem(storyLang("add.start")) {
-                    add(
-                        StoryNode.Start(
-                            StoryGraph.newId(), storyLang("new.start")
-                        )
-                    )
-                })
-                add(UiDropdownItem(storyLang("add.expression")) { add(StoryNode.Expression(StoryGraph.newId(), "")) })
-                add(UiDropdownItem(storyLang("add.command"), children = StoryCatalog.items(::add)))
+            else -> FieldWithAsset(row, field) { TextField(
+                value = field.value,
+                onChange = field.write,
+                mode = if (field.lines > 1) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
+                readOnly = readOnly,
+                placeholder = field.placeholder,
+                id = "st-field-${box.node.id}-${field.key}",
+                tags = listOfNotNull("gn-field", "gn-expression".takeIf { field.code }, "error".takeIf { field.problem != null }),
+                modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
+                    .tooltipOnHover(field.problem.orEmpty()),
+            ) }
+        }
+        row.onRemove?.let { remove ->
+            Image(
+                RemoveIcon,
+                id = "st-remove-${box.node.id}-${row.top}",
+                tags = listOf("st-row-button"),
+                modifier = Modifier.input(hoverable = true, clickable = true).onPress { event ->
+                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT && !readOnly) remove()
+                    event.consume()
+                },
+            )
+        }
+        row.onAdd?.let { add ->
+            Row(
+                id = "st-add-${box.node.id}",
+                tags = listOf("st-row-add"),
+                modifier = Modifier.input(hoverable = true, clickable = true).alignItems(vertical = UiAlign.CENTER).onPress { event ->
+                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT && !readOnly) add()
+                    event.consume()
+                },
+            ) {
+                Image(AddIcon, tags = listOf("st-row-button"))
+                Text(storyLang("choice.add"), tags = listOf("gn-pin-hint"))
             }
         }
     }
-    ContextMenu(
-        id = "story-graph-menu",
-        anchorBounds = UiRect(menu.x, menu.y, 0f, 0f),
-        items = items,
-        onExpandedChange = { if (!it) state.menu = null },
+}
+
+/** [content], the field of [field], with the button that picks a file for it when it names one. */
+@Composable
+private fun FieldWithAsset(row: StoryNodeRow, field: StoryRowField, content: @Composable () -> Unit) {
+    content()
+    if (field.assets.isNotEmpty()) {
+        AssetPickerButton(row.label.orEmpty(), field.value, { it.assets(field.assets) }, field.write)
+    }
+}
+
+/** A value out of a known set: a press opens the values, and the field keeps anything else that was typed. */
+@Composable
+private fun ChoiceField(controller: GraphEditorController, box: StoryNodeBox, field: StoryRowField) {
+    Text(
+        field.value.ifEmpty { "—" },
+        id = "st-choice-${box.node.id}-${field.key}",
+        tags = listOf("gn-chip"),
+        modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).input(hoverable = true, clickable = true).onPress { event ->
+            if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
+            controller.menu = GraphMenu(
+                event.x, event.y,
+                field.choices.map { value ->
+                    UiDropdownItem(value, mark = UiDropdownMark.RADIO, checked = value == field.value) { field.write(value) }
+                },
+            )
+            event.consume()
+        },
     )
+}
+
+/** The inspector of a group: what it is called and how it looks. */
+private fun groupInspector(state: StoryEditorState, id: String): InspectorTarget? {
+    val group = state.read()?.groups?.firstOrNull { it.id == id } ?: return null
+    return InspectorTarget(id = "story-group-$id", title = graphEditorText("group"), subtitle = group.id, history = state.context?.history) {
+        state.read()?.groups?.firstOrNull { it.id == id }?.let { GroupFields(state, it) }
+    }
+}
+
+@Composable
+private fun GroupFields(state: StoryEditorState, group: StoryNodeGroup) {
+    fun change(update: (StoryNodeGroup) -> StoryNodeGroup) = state.change(mergeKey = "group/${group.id}") { withGroupChanged(group.id, update) }
+    Section(graphEditorText("group")) {
+        TextRow(storyLang("group.title"), group.title, id = "st-group-title-${group.id}") { title -> change { it.copy(title = title) } }
+        Label(storyLang("group.color"))
+        val current = group.color.takeIf { it in GraphGroupColors.all } ?: GraphGroupColors.all.keys.first()
+        Pills(GraphGroupColors.all.keys.toList(), current, { storyLang("color.$it") }) { color -> change { it.copy(color = color) } }
+        ToggleRow(graphEditorText("collapse_group"), group.collapsed) { collapsed -> change { it.copy(collapsed = collapsed) } }
+    }
 }
 
 /** Every node with its place: as the file says, or by how far flow is from a start for those without one. */
@@ -290,43 +260,4 @@ private fun arrange(graph: StoryGraph): Map<String, StoryPoint> {
         val row = rows.merge(column, 1, Int::plus)!! - 1
         node.id to (graph.layout[node.id] ?: StoryPoint(column * ColumnStep, row * RowStep))
     }
-}
-
-/** The pins of [node]: flow and what it reads on the left, where flow goes and what it gives on the right. */
-private fun pinsOf(graph: StoryGraph, node: StoryNode): List<Pin> {
-    val inputs = buildList {
-        if (node !is StoryNode.Expression) add(StoryPins.IN to true)
-        when (node) {
-            is StoryNode.Say -> add(StoryPins.SPEAKER to false)
-            is StoryNode.Branch -> add(StoryPins.CONDITION to false)
-            is StoryNode.Assign -> add(StoryPins.VALUE to false)
-            is StoryNode.Code -> node.inputs.keys.forEach { add(it to false) }
-            is StoryNode.Call -> {
-                val params =
-                    StoryCatalog.signatureOf(node)?.params.orEmpty().filter { it.group == null }.map { it.name }
-                val linked = graph.links.filter { it.to == node.id && !it.isFlow }.map { it.toPin }
-                (params + linked).distinct().forEach { add(it to false) }
-            }
-
-            else -> Unit
-        }
-    }
-    val outputs = when (node) {
-        is StoryNode.Expression -> listOf(StoryPins.VALUE to false)
-        is StoryNode.Branch -> listOf(StoryPins.THEN to true, StoryPins.ELSE to true)
-        is StoryNode.Choose -> node.options.indices.map { StoryPins.option(it) to true }
-        is StoryNode.Code -> listOf(StoryPins.NEXT to true) + node.outputs.keys.map { it to false }
-        is StoryNode.Call -> listOfNotNull(
-            StoryPins.NEXT to true,
-            (StoryPins.BODY to true).takeIf { node.block },
-            (StoryPins.VALUE to false).takeIf { node.returns != null },
-        )
-
-        else -> listOf(StoryPins.NEXT to true)
-    }
-    return inputs.mapIndexed { row, (name, flow) ->
-        Pin(
-            node.id, name, false, flow, row
-        )
-    } + outputs.mapIndexed { row, (name, flow) -> Pin(node.id, name, true, flow, row) }
 }

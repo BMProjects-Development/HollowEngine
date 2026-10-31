@@ -180,6 +180,12 @@ const val TextFieldDefaultKeyPriority = -1000
 data class OnPlacedModifier(val callback: (UiRect) -> Unit) : Modifier
 
 /**
+ * Like [OnPlacedModifier], with the bounds the node has on the screen: past the translation and the scale of what it is
+ * inside, which is what a popup anchored to it needs.
+ */
+data class OnShownModifier(val callback: (UiRect) -> Unit) : Modifier
+
+/**
  * Observes the node's laid-out text after each layout pass (a [SpanNode]'s line layout or a text
  * field's own layout). The runtime invokes [callback] only when the layout changes, so a field can
  * feed it straight into state to place the caret over the glyphs and map clicks to offsets.
@@ -534,6 +540,8 @@ fun Modifier.onUnfocus(handler: (UiEvent) -> Unit) = this then EventModifier(UiE
 
 /** Reports this node's bounds in root coordinates after layout; see [OnPlacedModifier]. */
 fun Modifier.onPlaced(callback: (UiRect) -> Unit) = this then OnPlacedModifier(callback)
+
+fun Modifier.onShown(callback: (UiRect) -> Unit) = this then OnShownModifier(callback)
 
 /** Reports this node's laid-out text after layout; see [OnTextLayoutModifier]. */
 fun Modifier.onTextLayout(callback: (UiTextLayout) -> Unit) = this then OnTextLayoutModifier(callback)

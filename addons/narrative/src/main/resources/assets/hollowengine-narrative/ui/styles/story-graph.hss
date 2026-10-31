@@ -1,0 +1,68 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+.st-phrase .gn-node-head, .st-phrase .gn-node-head-flat { background: #3B8950; }
+.st-wait .gn-node-head, .st-wait .gn-node-head-flat { background: #3E86C4; }
+.st-choice .gn-node-head, .st-choice .gn-node-head-flat { background: #BF8246; }
+.st-condition .gn-node-head, .st-condition .gn-node-head-flat { background: #7A5FB5; }
+.st-start .gn-node-head, .st-start .gn-node-head-flat { background: #CF5E54; }
+.st-command .gn-node-head, .st-command .gn-node-head-flat { background: #4C5566; }
+.st-block .gn-node-head, .st-block .gn-node-head-flat { background: #5F59B1; }
+.st-pure .gn-node-head, .st-pure .gn-node-head-flat { background: #2F7D80; }
+
+.gn-pin.gn-type-flow { border-color: #E6E8EE; border-radius: 2px; }
+.gn-pin.gn-type-text { border-color: #E89AC0; }
+.gn-pin.gn-type-number { border-color: #44BC74; }
+.gn-pin.gn-type-bool { border-color: #D9605A; }
+.gn-pin.gn-type-vector { border-color: #F0CF60; }
+.gn-pin.gn-type-entity { border-color: #4FA8E0; }
+.gn-pin.gn-type-npc { border-color: #4FD0D0; }
+.gn-pin.gn-type-player { border-color: #6F8CF0; }
+.gn-pin.gn-type-list { border-color: #C9874A; }
+.gn-pin.gn-type-map { border-color: #B48EE0; }
+.gn-pin.gn-type-any { border-color: #A5ABC0; }
+
+.gn-pin.connected.gn-type-flow { background: #E6E8EE; }
+.gn-pin.connected.gn-type-text { background: #E89AC0; }
+.gn-pin.connected.gn-type-number { background: #44BC74; }
+.gn-pin.connected.gn-type-bool { background: #D9605A; }
+.gn-pin.connected.gn-type-vector { background: #F0CF60; }
+.gn-pin.connected.gn-type-entity { background: #4FA8E0; }
+.gn-pin.connected.gn-type-npc { background: #4FD0D0; }
+.gn-pin.connected.gn-type-player { background: #6F8CF0; }
+.gn-pin.connected.gn-type-list { background: #C9874A; }
+.gn-pin.connected.gn-type-map { background: #B48EE0; }
+.gn-pin.connected.gn-type-any { background: #A5ABC0; }
+
+.graph-node.gn-reroute.gn-type-flow { background: #E6E8EE; border-radius: 2px; }
+
+.gn-pin-label.optional {
+    foreground: $text-faint;
+}
+
+.gn-field.error, .insp-input.error {
+    border-color: $danger;
+}
+
+.st-vector {
+    gap: 3px;
+}
+
+.st-vector-menu {
+    size: 10px 10px;
+}
+
+.st-row-button {
+    size: 12px 12px;
+    cursor: hand;
+    opacity: 0.6;
+    transition: opacity 110ms ease-out;
+}
+
+.st-row-button:hover {
+    opacity: 1;
+}
+
+.st-row-add {
+    gap: 4px;
+    cursor: hand;
+}

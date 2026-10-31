@@ -59,11 +59,16 @@ class GraphCurve(val points: FloatArray) {
     override fun hashCode() = points.contentHashCode()
 }
 
+/** The way a link runs at a point it passes through, as a vector of length one. */
+class GraphDirection(val x: Float, val y: Float)
+
 /** How the two kinds of graph link their nodes. */
 object GraphCurves {
     private const val SAMPLES = 32
     private const val MIN_BOW = 26f
     private const val MAX_BOW = 220f
+    private const val HANDLE = 0.35f
+    private const val MIN_LENGTH = 1e-3f
 
     /**
      * A link from a side of [from] into a side of [to].
@@ -89,6 +94,47 @@ object GraphCurves {
     fun betweenPins(fromX: Float, fromY: Float, toX: Float, toY: Float, zoom: Float): GraphCurve {
         val bow = (abs(toX - fromX) * 0.5f).coerceIn(MIN_BOW * zoom, MAX_BOW * zoom)
         return bezier(fromX, fromY, fromX + bow, fromY, toX - bow, toY, toX, toY)
+    }
+
+    /**
+     * A link between two pins, either of which can be a point the link passes through. It keeps to [leave] and [enter]
+     * there, for a [HANDLE] of its length: unlike a pin's reach that cannot overshoot, so a link cannot tie a knot.
+     */
+    fun throughPoints(
+        fromX: Float, fromY: Float, leave: GraphDirection?,
+        toX: Float, toY: Float, enter: GraphDirection?,
+        zoom: Float,
+    ): GraphCurve {
+        if (leave == null && enter == null) return betweenPins(fromX, fromY, toX, toY, zoom)
+        val reach = hypot(toX - fromX, toY - fromY)
+        val bow = (abs(toX - fromX) * 0.5f).coerceIn(MIN_BOW * zoom, MAX_BOW * zoom).coerceAtMost(reach * 0.5f)
+        val handle = reach * HANDLE
+        return bezier(
+            fromX, fromY,
+            fromX + (leave?.let { it.x * handle } ?: bow), fromY + (leave?.let { it.y * handle } ?: 0f),
+            toX - (enter?.let { it.x * handle } ?: bow), toY - (enter?.let { it.y * handle } ?: 0f),
+            toX, toY,
+        )
+    }
+
+    /**
+     * The way a link runs through ([x], [y]), coming from the points [from] and going to the points [to]: between the
+     * two ways, so the curves on both sides of the point meet without a corner.
+     */
+    fun passing(x: Float, y: Float, from: List<Pair<Float, Float>>, to: List<Pair<Float, Float>>): GraphDirection {
+        var sumX = 0f
+        var sumY = 0f
+        fun add(dx: Float, dy: Float) {
+            val length = hypot(dx, dy)
+            if (length > 0f) {
+                sumX += dx / length
+                sumY += dy / length
+            }
+        }
+        from.forEach { (px, py) -> add(x - px, y - py) }
+        to.forEach { (px, py) -> add(px - x, py - y) }
+        val length = hypot(sumX, sumY)
+        return if (length < MIN_LENGTH) GraphDirection(1f, 0f) else GraphDirection(sumX / length, sumY / length)
     }
 
     /** The key of the curve closest to ([x], [y]) within [radius], if any is. */

@@ -261,6 +261,22 @@ $kind-broken: $danger;
 
 .story-add:hover { background: $bg-hover; }
 
+.story-muted.wrapped {
+    size: 100% fit;
+    text-wrap: true;
+}
+
+.story-field.error {
+    border-color: $danger;
+}
+
+.story-kotlin {
+    padding: 6px;
+    font-family: $font-code;
+    background: $bg-field;
+    border-radius: 4px;
+}
+
 .story-inspector-problem {
     size: 100% fit;
     foreground: $danger;

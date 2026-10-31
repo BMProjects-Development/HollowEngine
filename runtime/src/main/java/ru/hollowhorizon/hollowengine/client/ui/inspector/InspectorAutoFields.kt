@@ -123,7 +123,7 @@ fun KeyedField(id: String, animated: Boolean, onToggle: () -> Unit, editor: @Com
 private const val KeyIcon = "hollowengine:textures/gui/icons/timeline/key_add.svg"
 
 @Composable
-internal fun FieldLabel(label: String?, description: String?) {
+fun FieldLabel(label: String?, description: String?) {
     if (label == null) return FieldHelp(description)
 
     Row(tags = listOf("insp-field-head")) {
@@ -133,7 +133,7 @@ internal fun FieldLabel(label: String?, description: String?) {
 }
 
 @Composable
-internal fun FieldHelp(description: String?) {
+fun FieldHelp(description: String?) {
     val text = description ?: return
 
     Image(

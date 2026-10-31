@@ -16,6 +16,7 @@ data class StoryParamGroup(val parameter: String, val constructor: String)
  * @param receiver whether it is what the function is called on.
  * @param group the options object it is a field of.
  * @param implicit the expression it takes when nobody fills it.
+ * @param assets the ends of the paths of the files it names, when it names one.
  */
 data class StoryParam(
     val name: String,
@@ -27,6 +28,7 @@ data class StoryParam(
     val receiver: Boolean = false,
     val group: StoryParamGroup? = null,
     val implicit: String? = null,
+    val assets: List<String> = emptyList(),
 )
 
 /**
@@ -37,7 +39,9 @@ data class StoryParam(
  * @param description what it does, a lang key or plain text.
  * @param icon a `namespace:textures/...` icon the editor shows beside it.
  * @param category the heading the editor lists it under, a lang key or plain text.
+ * @param categoryColor the `#RRGGBB` nodes of the category take, or null to be given one.
  * @param returns the type of what a call gives back, or null when it gives nothing.
+ * @param hidden whether stories that call it still work while nothing offers it for new ones.
  */
 data class StoryFunctionSignature(
     val name: String,
@@ -47,7 +51,9 @@ data class StoryFunctionSignature(
     val description: String? = null,
     val icon: String? = null,
     val category: String? = null,
+    val categoryColor: String? = null,
     val returns: String? = null,
+    val hidden: Boolean = false,
 ) {
     /** A new call of this command. */
     fun newCall(id: String) = params.filter { it.implicit != null }

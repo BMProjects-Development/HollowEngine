@@ -20,3 +20,11 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
+
+extra["langModId"] = "hollowengine-narrative"
+apply(from = rootProject.file("gradle/lang-merge.gradle"))
+
+tasks.named<ProcessResources>("processResources") {
+    dependsOn("mergeLang")
+    from(layout.buildDirectory.dir("generated/lang"))
+}

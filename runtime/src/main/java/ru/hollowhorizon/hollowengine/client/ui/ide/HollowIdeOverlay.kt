@@ -25,7 +25,9 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.history.IdeHistories
 import ru.hollowhorizon.hollowengine.client.ui.ide.panels.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineDock
+import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
+import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalInspectorHost
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.render.MinecraftUiRenderer
 import ru.hollowhorizon.hollowengine.client.ui.render.UiRenderTarget
@@ -801,6 +803,7 @@ object HollowIdeOverlay {
                         ))
                     if (handled) input.consume()
                 }) {
+            IdeInspectorHost.pending?.let { request -> AssetPickerDialog(request) { IdeInspectorHost.pending = null } }
             CompositionLocalProvider(LocalDragAndDrop provides dragAndDrop) {
                 if (collapsed) {
                     GearButton()
@@ -892,11 +895,12 @@ object HollowIdeOverlay {
 
     private fun currentProblems(): HollowIdeProblems {
         val file = activeEditorFile()
-        val diagnostics = file?.let { editorSessions[it.path]?.diagnostics(it.text) }.orEmpty()
+        val found = file?.let(::fileView)?.problems.orEmpty()
+        val diagnostics = file?.let { editorSessions[it.path]?.diagnostics(it.text) }.orEmpty() + found.map { it.diagnostic }
         return HollowIdeProblems(file, diagnostics) { diagnostic ->
             if (file != null) {
                 openFileDockItem(file)
-                focusEditorAt(file, diagnostic.start)
+                found.firstOrNull { it.diagnostic === diagnostic }?.reveal?.invoke() ?: focusEditorAt(file, diagnostic.start)
             }
         }
     }
@@ -1308,12 +1312,19 @@ object HollowIdeOverlay {
                 applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length), label, mergeKey)
             }
         }
-        HollowIdeFileViewBody(
-            view = view,
-            id = file.id,
-            text = { file.type.editor(file) },
-            preview = { key(preview.id) { preview.content(context) } },
-        )
+        Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 100.percent)) {
+            HollowIdeFileViewBody(
+                view = view,
+                id = file.id,
+                text = { file.type.editor(file) },
+                preview = {
+                    CompositionLocalProvider(LocalInspectorHost provides IdeInspectorHost) {
+                        key(preview.id) { preview.content(context) }
+                    }
+                },
+            )
+            HollowIdeDiagnosticsBadge("${file.id}-preview", view.problems.map { it.diagnostic }) { showProblems(file) }
+        }
     }
 
     private fun fileView(itemId: String): HollowIdeFileView? =

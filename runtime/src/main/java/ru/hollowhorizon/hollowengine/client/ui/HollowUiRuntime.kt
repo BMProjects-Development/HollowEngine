@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutNode
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutResult
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.layout.shownRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollOffset
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
@@ -178,6 +179,7 @@ class HollowUiRuntime(
     private val layoutPipeline = UiLayoutPipeline()
     private val input = HollowUiInputController()
     private val placedBounds = WeakHashMap<UiNode, UiRect>()
+    private val shownBounds = WeakHashMap<UiNode, UiRect>()
     private val reportedTextLayouts = WeakHashMap<UiNode, UiTextLayout>()
     private val reportedStyles = WeakHashMap<UiNode, UiComputedStyle>()
     private var lastLayout: UiLayoutResult? = null
@@ -439,6 +441,14 @@ class HollowUiRuntime(
                     val placed = layout[node]
                     modifier.target.bounds = placed.rect
                     modifier.target.clip = placed.outerClip ?: placed.clip
+                    continue
+                }
+                if (modifier is OnShownModifier) {
+                    val shown = layout[node].shownRect()
+                    if (shownBounds[node] != shown) {
+                        shownBounds[node] = shown
+                        modifier.callback(shown)
+                    }
                     continue
                 }
                 if (modifier !is OnPlacedModifier) continue

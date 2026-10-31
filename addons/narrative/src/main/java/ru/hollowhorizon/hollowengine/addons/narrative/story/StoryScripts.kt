@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslator
 import java.io.File
+import kotlin.reflect.KType
 
 /**
  * The `.story` files as running scripts: each is compiled and kept running while its text stays the same, so that
@@ -28,7 +29,7 @@ internal object StoryScripts : ScriptTranslator {
     private val loaded = HashMap<ScriptId, Loaded>()
 
     override fun translate(id: ScriptId, source: File): String {
-        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), ::kindOf)
+        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), ::kindOf, ::paramType)
         if (story.problems.isEmpty()) return story.code
         val problems = story.problems.joinToString("; ") { problem ->
             problem.node?.let { "$it: ${problem.message}" } ?: problem.message
@@ -84,6 +85,9 @@ internal object StoryScripts : ScriptTranslator {
             if (NARRATIVE in ScriptRegistry.source(id.namespace)?.dependencies.orEmpty()) "" else " List '$NARRATIVE' in dependsOn of the project it belongs to."
         return StoryException("Story '${ScriptRegistry.display(id)}' failed to load: ${cause.message}$hint", cause)
     }
+
+    private fun paramType(call: StoryNode.Call, name: String): KType? =
+        call.action?.let(ActionCommands::find)?.singleOrNull()?.signature?.params?.firstOrNull { it.name == name }?.type
 
     private fun kindOf(call: StoryNode.Call): StoryCallKind {
         val action = call.action?.let(ActionCommands::find)?.singleOrNull()?.action ?: return StoryCallKind.SUSPENDING

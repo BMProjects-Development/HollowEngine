@@ -1,13 +1,9 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 
-import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
 import ru.hollowhorizon.hollowengine.client.utils.lang
-
-/** A context menu the editor has open, where it was opened on the screen. */
-internal data class GraphMenu(val x: Float, val y: Float, val items: List<UiDropdownItem>)
 
 /**
  * The add menu: a submenu per category, in the order the kinds were registered, with the kinds of one
@@ -35,68 +31,6 @@ internal fun addNodeItems(
         },
     )
 }
-
-/** The item that puts a reroute where a link was dropped, or on the link that was clicked. */
-internal fun rerouteItem(onPick: () -> Unit) = UiDropdownItem(graphText("reroute"), icon = RerouteIcon, onClick = onPick)
-
-/**
- * What the menu of a node offers: its preview, and unless it is the output, a copy and removal; then
- * [organize], the grouping and arranging of the selection it belongs to.
- */
-internal fun nodeItems(
-    node: ShaderGraphNode,
-    kind: ShaderNodeType,
-    onPreview: (Boolean) -> Unit,
-    onDuplicate: () -> Unit,
-    onDelete: () -> Unit,
-    organize: List<UiDropdownItem>,
-): List<UiDropdownItem> = buildList {
-    if (kind.id != ShaderNodeLibrary.REROUTE) {
-        val shown = kind.showsPreview(node)
-        add(UiDropdownItem(graphText("show_preview"), mark = UiDropdownMark.CHECKBOX, checked = shown) { onPreview(!shown) })
-    }
-    if (kind.master == null) {
-        add(UiDropdownItem(graphText("duplicate"), shortcut = HollowKeys.DUPLICATE.shortcut, separatorBefore = isNotEmpty(), onClick = onDuplicate))
-        add(UiDropdownItem(graphText("delete_node"), shortcut = HollowKeys.DELETE.shortcut, onClick = onDelete))
-    }
-    organize.forEachIndexed { index, item -> add(if (index == 0) item.copy(separatorBefore = true) else item) }
-}
-
-/**
- * Grouping the selection: putting it in a new group, and, when it is [grouped], taking it out of its
- * groups or taking them apart; then [arrange], lining it up. Empty when there is nothing to do.
- */
-internal fun organizeItems(
-    canGroup: Boolean,
-    grouped: Boolean,
-    onGroup: () -> Unit,
-    onUngroup: () -> Unit,
-    onLeave: () -> Unit,
-    arrange: UiDropdownItem?,
-): List<UiDropdownItem> = listOfNotNull(
-    UiDropdownItem(graphText("group_nodes"), icon = GroupIcon, shortcut = HollowKeys.GROUP.shortcut, onClick = onGroup).takeIf { canGroup },
-    UiDropdownItem(graphText("leave_group"), onClick = onLeave).takeIf { grouped },
-    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut, onClick = onUngroup).takeIf { grouped },
-    arrange,
-)
-
-/** What the menu of a group offers: opening or collapsing it, taking it apart, lining its nodes up, removing it with its nodes. */
-internal fun groupItems(
-    group: ShaderGraphGroup,
-    onToggle: () -> Unit,
-    onUngroup: () -> Unit,
-    onDelete: () -> Unit,
-    arrange: UiDropdownItem?,
-): List<UiDropdownItem> = listOfNotNull(
-    UiDropdownItem(graphText(if (group.collapsed) "expand_group" else "collapse_group"), onClick = onToggle),
-    UiDropdownItem(graphText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut, onClick = onUngroup),
-    arrange,
-    UiDropdownItem(graphText("delete_group_nodes"), separatorBefore = true, onClick = onDelete),
-)
-
-private const val RerouteIcon = "hollowengine:textures/gui/icons/actions/reroute.svg"
-private const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg"
-private const val UngroupIcon = "hollowengine:textures/gui/icons/actions/ungroup.svg"
 
 /** The values of a choice, each marked when it is the current one. */
 internal fun choiceItems(option: ShaderOptionSpec, current: String, onPick: (String) -> Unit): List<UiDropdownItem> =
