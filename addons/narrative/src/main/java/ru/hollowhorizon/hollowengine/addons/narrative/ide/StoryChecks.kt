@@ -17,34 +17,20 @@ internal class StoryCheck(val node: String?, val message: String, val warning: B
 internal object StoryChecks {
     private val LOCATION = Regex("""([a-z0-9_.-]+:)?[a-z0-9_./-]+""")
     private val NAME = Regex("[\\p{L}_][\\p{L}\\p{N}_]*")
-    private val WHOLE = setOf(Int::class, Long::class, Short::class, Byte::class)
-    private val FRACTION = setOf(Float::class, Double::class)
-    private val KEYWORDS = setOf(
-        "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is",
-        "null", "object", "package", "return", "super", "this", "throw", "true", "try", "typealias", "val", "var",
-        "when", "while",
-    )
 
     private fun problem(name: String) = storyLang("problem.$name")
 
-    /** What is wrong with the Kotlin [expression] given to [param], which nothing is linked to. */
+    /** What is wrong with the Kotlin [expression] given to [param], which nothing is linked to. Analysis sees the rest. */
     fun param(param: StoryParam, expression: String): String? {
         if (expression.isBlank()) return if (param.optional) null else problem("required")
-        val helper = StoryLiterals.vectorHelper(param.type)
-        if (helper != null) return vector(expression, helper)
-        val shown = StoryLiterals.text(expression, param.type)
-        val kind = param.type?.classifier as? KClass<*>
-        if (kind != null && kind.java.isEnum && shown.lowercase() !in param.suggestions) return problem("choice")
-        return value(shown, param.type) ?: code(expression)
+        return format(StoryLiterals.text(expression, param.type), param.type) ?: code(expression)
     }
 
-    /** What is wrong with [shown], as a field of [type] holds it. */
-    private fun value(shown: String, type: KType?): String? {
+    /** What is wrong with the text [shown] by a field of [type], as Kotlin takes any string where a format is wanted. */
+    private fun format(shown: String, type: KType?): String? {
         val kind = type?.classifier as? KClass<*> ?: return null
         if (shown.startsWith("{")) return null
         return when {
-            kind in WHOLE -> if (isCode(shown) || shown.toLongOrNull() != null) null else problem("whole")
-            kind in FRACTION -> if (isCode(shown) || isNumber(shown)) null else problem("number")
             kind == Duration::class -> if (isDuration(shown)) null else problem("duration")
             kind == ResourceLocation::class || kind == ServerLevel::class -> if (LOCATION.matches(shown)) null else problem(
                 "location"
@@ -58,23 +44,12 @@ internal object StoryChecks {
 
     private fun isDuration(text: String) = isNumber(text) || runCatching { Duration.parse(text) }.isSuccess
 
-    /** Whether [text] is an expression rather than a number with a mistake in it. */
-    private fun isCode(text: String) = text.any { it.isLetter() || it == '(' }
-
-    /** What is wrong with the Kotlin of a vector written by [helper]. */
-    fun vector(expression: String, helper: String): String? {
-        val parts = StoryLiterals.vectorParts(expression, helper) ?: return code(expression)
-        if (expression.isBlank()) return null
-        val wrong = parts.any { it.isBlank() || !(isCode(it) || isNumber(it)) }
-        return if (wrong) problem("vector") else parts.firstNotNullOfOrNull(::code)
-    }
-
     /** What the parser finds wrong with the Kotlin [text]. */
     fun code(text: String): String? = if (StoryKotlin.syntax(text)?.valid == false) problem("code") else null
 
     /** What keeps [name] from being the name of a variable among those [taken]. */
     fun variableName(name: String, taken: Collection<String>): String? = when {
-        !NAME.matches(name) || name in KEYWORDS -> problem("name")
+        !NAME.matches(name) || StoryKotlin.syntax(name)?.tokens?.isNotEmpty() == true -> problem("name")
         name in taken -> problem("name_taken")
         else -> null
     }
@@ -86,14 +61,14 @@ internal object StoryChecks {
         else -> problem("required")
     }
 
+    /** [problem] in the language of the author. */
+    fun text(problem: StoryGraphProblem): String =
+        storyLang("problem.graph.${problem.key}", *problem.arguments.toTypedArray())
+
     /** Everything wrong with [graph]: what the compiler says, and what the editors can see. */
     fun all(graph: StoryGraph): List<StoryCheck> {
         val compiled = StoryGraphCompiler.compile(graph, StoryActionFunctions).problems.map {
-            StoryCheck(
-                it.node,
-                it.message,
-                it.warning
-            )
+            StoryCheck(it.node, text(it), it.warning)
         }
         val variables = graph.variables.mapNotNull { variable ->
             variable(variable)?.let {

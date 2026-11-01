@@ -47,6 +47,9 @@ enum class StoryPinType(val type: KType?) {
     fun fits(input: StoryPinType): Boolean = this == input || (input == ENTITY && (this == NPC || this == PLAYER)) ||
             (this != FLOW && input != FLOW && (this == ANY || input == ANY))
 
+    /** Whether a link of this type gets to the type of its place by conversion, whatever Kotlin says of the two. */
+    val converts: Boolean get() = this == NUMBER || this == ENTITY || this == NPC || this == PLAYER || this == ANY
+
     /** What is typed into a field of this type as Kotlin. */
     fun expression(text: String): String {
         if (type != null) return StoryLiterals.expression(text, type)

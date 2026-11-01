@@ -54,8 +54,9 @@ interface ScriptingAnalyzer {
     /** How the Kotlin [text], statements or an expression, reads on its own. Null when the language cannot parse Kotlin. */
     fun kotlinSyntax(text: String): KotlinSyntax? = null
 
-    /** The types of the properties of the file whose names start with [prefix]; those that do not compile are left out. */
-    fun propertyTypes(name: String, text: String, prefix: String): Map<String, String> = emptyMap()
+    /** The properties of the file whose names start with [values] and [places]; those that do not compile are left out. */
+    fun propertyTypes(name: String, text: String, values: String, places: String? = null): KotlinPropertyTypes =
+        KotlinPropertyTypes()
 
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
@@ -73,6 +74,17 @@ interface ScriptingAnalyzer {
      */
     fun symbolSource(qualifiedName: String): DefinitionLocation? = null
 }
+
+/**
+ * What analysis says of named properties.
+ *
+ * @param types what each of them is, as Kotlin writes it with packages.
+ * @param fits by value, the places that can hold it. Null does not count: links unwrap what can be null.
+ */
+data class KotlinPropertyTypes(
+    val types: Map<String, String> = emptyMap(),
+    val fits: Map<String, Set<String>> = emptyMap(),
+)
 
 /**
  * What a parser made of a snippet of Kotlin.

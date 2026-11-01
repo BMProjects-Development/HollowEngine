@@ -17,6 +17,8 @@ internal class StoryFieldColors(val text: String, val highlights: List<UiTextHig
  * @param checks what is wrong with its nodes.
  * @param fields what it says of its fields, where they are written.
  * @param types what the outputs worked out on the spot are, by node and pin.
+ * @param fits by type of value, the types of the places that can hold it, among [places].
+ * @param places the types of what links go into that analysis could tell.
  * @param revision moves on with each analysis.
  */
 internal class StoryAnalysis(
@@ -24,8 +26,16 @@ internal class StoryAnalysis(
     val fields: Map<StoryFieldKey, List<UiTextDiagnostic>> = emptyMap(),
     val colors: Map<StoryFieldKey, StoryFieldColors> = emptyMap(),
     val types: Map<Pair<String, String>, String> = emptyMap(),
+    val fits: Map<String, Set<String>> = emptyMap(),
+    val places: Set<String> = emptySet(),
     val revision: Long = 0L,
-)
+) {
+    /** Whether Kotlin lets a value of the type [from] go into a place of the type [into]; what it has not told, it lets. */
+    fun takes(from: String, into: String): Boolean {
+        val place = StoryPinType.shortName(into)
+        return place !in places || fits[StoryPinType.shortName(from)]?.contains(place) != false
+    }
+}
 
 /**
  * The Kotlin analysis of stories. A story has one file, the script it compiles to with [StoryFieldChecks] added, and
@@ -35,6 +45,7 @@ internal class StoryAnalysis(
 internal object StoryInsight {
     private const val SCRIPT = ".kts"
     private const val IMPORT = "import "
+    private const val DECLARATION = "var"
     private const val BODY_START = "\nsuspend fun storyField() {\n"
     private const val BODY_END = "\n}\n"
     private const val TYPE_START = "\nval storyType: "
@@ -46,7 +57,7 @@ internal object StoryInsight {
     private class FieldInsight(val highlighter: UiSyntaxHighlighter, val completions: UiCompletionContributor)
 
     private class Session(path: String) {
-        val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN)
+        val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN, StoryFieldChecks.PLACE)
         val fields = HashMap<StoryFieldKey, FieldInsight>()
         lateinit var state: StoryEditorState
         var graph: StoryGraph? = null
@@ -184,7 +195,14 @@ internal object StoryInsight {
                 part(found.highlights, span.start, span.end)
             )
         }
-        return StoryAnalysis(checks, fields, colors, types(session, found), session.analysis.revision + 1)
+        val properties = found.properties
+        val places = checked.places.filterKeys { it in properties.types }
+        val fits = properties.fits.entries.associate { (value, taken) ->
+            StoryPinType.shortName(properties.types.getValue(value)) to taken.mapTo(HashSet()) { places.getValue(it) }
+        }
+        return StoryAnalysis(
+            checks, fields, colors, types(session, found), fits, places.values.toSet(), session.analysis.revision + 1,
+        )
     }
 
     /**
@@ -214,7 +232,7 @@ internal object StoryInsight {
     /** The pins analysis told the types of; pins left out of this analysis keep theirs until they are back in it. */
     private fun types(session: Session, found: KotlinFragmentAnalysis): Map<Pair<String, String>, String> {
         val pins = session.checked.pins
-        val named = found.types.entries.mapNotNull { (name, type) ->
+        val named = found.properties.types.entries.mapNotNull { (name, type) ->
             pins[name]?.let { it to StoryPinType.shortName(type) }?.takeUnless { it.second in NO_TYPE }
         }
         return session.analysis.types.filterKeys { it !in pins.values } + named
@@ -230,6 +248,6 @@ internal object StoryInsight {
         return session.story.nodeAt(line)?.let { StoryCheck(it, problem.message) } ?: StoryCheck(
             null,
             problem.message
-        ).takeIf { text.startsWith(IMPORT) }
+        ).takeIf { text.startsWith(IMPORT) || text.trim() == DECLARATION }
     }
 }

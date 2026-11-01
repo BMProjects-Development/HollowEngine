@@ -337,9 +337,8 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun kotlinSyntax(text: String): KotlinSyntax = kotlinSyntax(snippetFactory, text.withUnixLineSeparators())
 
-    override fun propertyTypes(name: String, text: String, prefix: String): Map<String, String> = synchronized(lock) {
-        propertyTypes(getOrCreateFile(name, text), prefix)
-    }
+    override fun propertyTypes(name: String, text: String, values: String, places: String?): KotlinPropertyTypes =
+        synchronized(lock) { propertyTypes(getOrCreateFile(name, text), values, places) }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)

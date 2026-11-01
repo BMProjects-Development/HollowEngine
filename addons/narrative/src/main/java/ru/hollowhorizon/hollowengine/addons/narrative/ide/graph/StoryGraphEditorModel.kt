@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.with
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withMembership
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withoutGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryInsight
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryUndo
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
@@ -124,10 +125,12 @@ internal class StoryGraphEditorModel(
     }
 
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
-        if (!typeOf(output).fits(typeOf(input))) return false
+        val type = typeOf(output)
+        if (!type.fits(typeOf(input))) return false
+        if (type.converts) return true
         val from = all[output.node]?.kotlin(output) ?: return true
         val to = all[input.node]?.kotlin(input) ?: return true
-        return StoryKotlinTypes.fits(from, to)
+        return StoryInsight.analysis(state, graph).takes(from, to)
     }
 
     override fun pinTooltip(pin: GraphPin): String = all[pin.node]?.kotlin(pin) ?: typeOf(pin).let { type ->

@@ -26,6 +26,7 @@ internal class StoryFieldFrame(val before: String, val after: String)
  * @param spans the fields it holds.
  * @param left the fields left out of it, empty or broken as they are, for completing what is typed there.
  * @param pins the node and pin behind the name of each such property.
+ * @param places the type behind the name of each property that stands for what links go into.
  */
 internal class StoryCheckScript(
     val text: String,
@@ -33,6 +34,7 @@ internal class StoryCheckScript(
     val spans: List<StoryFieldSpan>,
     private val left: Map<StoryFieldKey, StoryFieldFrame>,
     val pins: Map<String, Pair<String, String>>,
+    val places: Map<String, String>,
 ) {
     private val byField = spans.associateBy { it.field }
 
@@ -51,6 +53,9 @@ internal class StoryCheckScript(
 internal object StoryFieldChecks {
     /** The start of the names of the properties that give the types of pins. */
     const val PIN = "storyPin"
+
+    /** The start of the names of the properties that give what links go into. */
+    const val PLACE = "storyPlace"
 
     private class Entry(val field: StoryFieldKey, val type: String?, val code: String, val frame: StoryFieldFrame)
 
@@ -132,6 +137,17 @@ internal object StoryFieldChecks {
 
     private fun reads(code: String) = code.isNotBlank() && StoryKotlin.syntax(code)?.valid == true
 
+    /** The types the nodes of [graph] want what is linked to them to be of. */
+    private fun places(graph: StoryGraph): Set<String> = graph.nodes.flatMap { node ->
+        when (node) {
+            is StoryNode.Call -> StoryActionFunctions.signature(StoryActionFunctions.resolved(node))?.params.orEmpty()
+                .mapNotNull { it.type?.let(StoryKotlinTypes::name) }
+
+            is StoryNode.Assign -> listOfNotNull(graph.variables.firstOrNull { it.name == node.variable }?.type)
+            else -> emptyList()
+        }
+    }.filterTo(LinkedHashSet()) { reads("null as $it") }
+
     /** [code], the script generated from [graph], with what is checked added. Broken Kotlin stays out, not to break the rest. */
     fun script(graph: StoryGraph, code: String): StoryCheckScript {
         val plain = graph.dissolved()
@@ -152,6 +168,11 @@ internal object StoryFieldChecks {
                     .append("\n)\n}")
                 "$PIN$index" to pin.key
             }
-        return StoryCheckScript(text.toString(), length, spans, left.associate { it.field to it.frame }, pins)
+        val wanted = places(plain).withIndex().associate { (index, type) -> "$PLACE$index" to type }
+        wanted.entries.joinTo(text, "", "\n\nsuspend fun storyPlaces() {\n", "}") { (name, type) ->
+            "val $name: $type = (null as $type)\n"
+        }
+        val placed = wanted.mapValues { StoryPinType.shortName(it.value) }
+        return StoryCheckScript(text.toString(), length, spans, left.associate { it.field to it.frame }, pins, placed)
     }
 }
