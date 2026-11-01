@@ -3,11 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.renameVariable
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.ColorButton
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryNodeLayout
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryNodeRow
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.fieldInsight
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
