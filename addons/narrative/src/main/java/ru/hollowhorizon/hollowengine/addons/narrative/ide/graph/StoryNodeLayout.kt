@@ -1,27 +1,30 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.addInput
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeInput
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeOption
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryNodeKind
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNodeMetrics
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import kotlin.math.ceil
 
-/** A pin of a row. */
-internal data class StoryPinSpec(val name: String, val type: StoryPinType)
+/** A pin of a row. [kotlin] is the exact type it carries, when [type] alone does not say. */
+internal data class StoryPinSpec(val name: String, val type: StoryPinType, val kotlin: String? = null)
 
 /**
  * The value a row edits in place.
  *
  * @param lines how many lines of text it shows; more than one makes it a multi-line field.
  * @param choices the values it takes, when it is one of a known set.
+ * @param picks the values a list it holds can be put together from.
+ * @param hints what it is usually given, to complete as it is typed.
+ * @param typeName whether it holds the name of a Kotlin type.
+ * @param color whether it holds a color, which a button next to it picks.
  * @param vector the function that writes it when it is a vector; [value] is then its Kotlin.
  * @param assets the ends of the paths of the files it can be picked from.
  * @param problem what is wrong with what it holds.
@@ -33,6 +36,10 @@ internal class StoryRowField(
     val placeholder: String = "",
     val lines: Int = 1,
     val choices: List<String> = emptyList(),
+    val picks: List<String> = emptyList(),
+    val hints: List<UiTextCompletion> = emptyList(),
+    val typeName: Boolean = false,
+    val color: Boolean = false,
     val code: Boolean = false,
     val vector: String? = null,
     val assets: List<String> = emptyList(),
@@ -92,11 +99,19 @@ internal class StoryNodeBox(
     private fun rerouteMiddle(reroute: StoryNode.Reroute): List<GraphPin> {
         val atX = x + width / 2f
         val atY = y + height / 2f
-        return listOf(GraphPin(node.id, reroute.input, false, atX, atY), GraphPin(node.id, reroute.output, true, atX, atY))
+        return listOf(
+            GraphPin(node.id, reroute.input, false, atX, atY),
+            GraphPin(node.id, reroute.output, true, atX, atY)
+        )
     }
 
-    fun type(pin: GraphPin): StoryPinType? =
-        rows.firstNotNullOfOrNull { row -> (if (pin.output) row.output else row.input)?.takeIf { it.name == pin.name }?.type }
+    private fun spec(pin: GraphPin) =
+        rows.firstNotNullOfOrNull { row -> (if (pin.output) row.output else row.input)?.takeIf { it.name == pin.name } }
+
+    fun type(pin: GraphPin): StoryPinType? = spec(pin)?.type
+
+    /** The exact type of what [pin] carries, when that is known. */
+    fun kotlin(pin: GraphPin): String? = spec(pin)?.kotlin
 
     companion object {
         const val FLOW_ROW = GraphNodeMetrics.FIELD_ROW
@@ -116,6 +131,7 @@ internal fun StoryPinType.color(): UiColor = UiColor.fromArgb(
         StoryPinType.PLAYER -> 0xFF6F8CF0
         StoryPinType.LIST -> 0xFFC9874A
         StoryPinType.MAP -> 0xFFB48EE0
+        StoryPinType.OBJECT -> 0xFF8FA0B8
         StoryPinType.ANY -> 0xFFA5ABC0
     }.toInt(),
 )
@@ -125,6 +141,7 @@ internal fun StoryPinType.tag(): String = "gn-type-${name.lowercase()}"
 /** Lays out the nodes of a story with the fields that edit them in [state]. */
 internal class StoryNodeLayout(private val graph: StoryGraph, private val state: StoryEditorState) {
     private val linked = graph.index.values.keys
+    private val types = StoryInsight.analysis(state, graph).types
 
     /**
      * The box of [node], with its corner at [place].
@@ -149,16 +166,31 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             size / 2f - StoryNodeBox.FLOW_ROW / 2f, size,
             input = StoryPinSpec(node.input, type), output = StoryPinSpec(node.output, type),
         )
-        return StoryNodeBox(node, storyLang("reroute"), null, "", null, place.x, place.y, size, size, listOf(row), false)
+        return StoryNodeBox(
+            node,
+            storyLang("reroute"),
+            null,
+            "",
+            null,
+            place.x,
+            place.y,
+            size,
+            size,
+            listOf(row),
+            false
+        )
     }
 
     private fun titleOf(node: StoryNode): String = when (node) {
-        is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::title) ?: node.function.substringAfterLast('.')
+        is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::title)
+            ?: node.function.substringAfterLast('.')
+
         is StoryNode.Pure -> StoryCatalog.operatorTitle(node.operator)
         else -> StoryNodeKind.of(node).title
     }
 
-    private fun iconOf(node: StoryNode): String? = (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.icon ?: StoryNodeKind.of(node).icon
+    private fun iconOf(node: StoryNode): String =
+        (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.icon ?: StoryNodeKind.of(node).icon
 
     private fun tagOf(node: StoryNode): String = when (node) {
         is StoryNode.Pure -> "st-pure"
@@ -172,7 +204,8 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         else -> null
     }
 
-    private fun edit(node: String, field: String, change: (StoryNode) -> StoryNode) = state.editNode(node, field, change)
+    private fun edit(node: String, field: String, change: (StoryNode) -> StoryNode) =
+        state.editNode(node, field, change)
 
     /** The rows of one node, each under the one before. */
     private inner class Rows(private val detailed: Boolean) {
@@ -212,9 +245,18 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             field: StoryRowField?,
             hint: String? = null,
             optional: Boolean = false,
+            kotlin: String? = null,
+            onRemove: (() -> Unit)? = null,
         ) {
             val free = (node to name) !in linked
-            row(label, StoryPinSpec(name, type), field = field.takeIf { free }, hint = hint, optional = optional)
+            row(
+                label,
+                StoryPinSpec(name, type, kotlin),
+                field = field.takeIf { free },
+                hint = hint,
+                optional = optional,
+                onRemove = onRemove
+            )
         }
 
         fun build(node: StoryNode): Float = when (node) {
@@ -239,7 +281,12 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                 )
                 value(
                     node.id, StoryPins.TEXT, storyLang("phrase.text"), StoryPinType.TEXT,
-                    StoryRowField("text", node.text, storyLang("phrase.text"), linesOf(node.text, SAY_COLUMNS)) { typed ->
+                    StoryRowField(
+                        "text",
+                        node.text,
+                        storyLang("phrase.text"),
+                        linesOf(node.text, SAY_COLUMNS)
+                    ) { typed ->
                         edit(node.id, "text") { (it as StoryNode.Say).copy(text = typed) }
                     },
                     storyLang("phrase.text.help"),
@@ -268,7 +315,13 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                 flow(hasOutput = false)
                 value(
                     node.id, StoryPins.CONDITION, storyLang("branch.placeholder"), StoryPinType.BOOL,
-                    StoryRowField("condition", node.condition, "x > 0", code = true, problem = codeProblem(node.condition)) { typed ->
+                    StoryRowField(
+                        "condition",
+                        node.condition,
+                        "x > 0",
+                        code = true,
+                        problem = codeProblem(node.condition)
+                    ) { typed ->
                         edit(node.id, "condition") { (it as StoryNode.Branch).copy(condition = typed) }
                     },
                 )
@@ -278,11 +331,16 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             }
 
             is StoryNode.Assign -> {
-                val type = StoryPinType.ofName(graph.variables.firstOrNull { it.name == node.variable }?.type)
+                val written = graph.variables.firstOrNull { it.name == node.variable }?.type
+                val type = StoryPinType.ofName(written)
+                val kotlin = written?.let(StoryPinType::shortName)
                 flow()
                 row(
                     label = storyLang("set.variable"),
-                    field = StoryRowField("variable", node.variable, choices = graph.variables.map { it.name }) { typed ->
+                    field = StoryRowField(
+                        "variable",
+                        node.variable,
+                        choices = graph.variables.map { it.name }) { typed ->
                         edit(node.id, "variable") { (it as StoryNode.Assign).copy(variable = typed.trim()) }
                     },
                 )
@@ -295,8 +353,13 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     ) { typed ->
                         edit(node.id, "value") { (it as StoryNode.Assign).copy(value = typed) }
                     },
+                    kotlin = kotlin,
                 )
-                row(storyLang("set.result"), output = StoryPinSpec(StoryPins.VALUE, type), hint = storyLang("set.result.help"))
+                row(
+                    storyLang("set.result"),
+                    output = StoryPinSpec(StoryPins.VALUE, type, kotlin),
+                    hint = storyLang("set.result.help")
+                )
                 if (helper != null) WIDE else GraphNodeMetrics.WIDTH
             }
 
@@ -309,34 +372,59 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     },
                 )
                 exit(StoryPins.BODY, storyLang("loop.body"))
-                row(storyLang("loop.item"), output = StoryPinSpec(StoryPins.ITEM, StoryPinType.ANY))
+                val item = types[node.id to StoryPins.ITEM]
+                row(storyLang("loop.item"), output = StoryPinSpec(StoryPins.ITEM, StoryPinType.ofName(item), item))
                 GraphNodeMetrics.WIDTH
             }
 
             is StoryNode.Code -> {
                 flow()
                 node.inputs.forEach { (name, written) ->
-                    value(node.id, name, name, StoryPinType.ANY, StoryRowField("in-$name", written, code = true) { typed ->
-                        edit(node.id, "in-$name") { each ->
-                            each as StoryNode.Code
-                            each.copy(inputs = each.inputs + (name to typed))
-                        }
-                    })
+                    value(
+                        node.id,
+                        name,
+                        name,
+                        StoryPinType.ANY,
+                        StoryRowField("in-$name", written, code = true) { typed ->
+                            edit(node.id, "in-$name") { each ->
+                                each as StoryNode.Code
+                                each.copy(inputs = each.inputs + (name to typed))
+                            }
+                        })
                 }
                 row(
-                    field = StoryRowField("code", node.code, storyLang("code.text"), linesOf(node.code, CODE_COLUMNS), code = true) { typed ->
+                    field = StoryRowField(
+                        "code",
+                        node.code,
+                        storyLang("code.text"),
+                        linesOf(node.code, CODE_COLUMNS),
+                        code = true
+                    ) { typed ->
                         edit(node.id, "code") { (it as StoryNode.Code).copy(code = typed) }
                     },
                     hint = storyLang("code.help"),
                 )
-                node.outputs.forEach { (name, type) -> row(name, output = StoryPinSpec(name, StoryPinType.ofName(type))) }
+                val read = graph.links.any { it.from == node.id && it.fromPin == StoryPins.VALUE }
+                if (read || !graph.index.isInFlow(node.id)) {
+                    val type = types[node.id to StoryPins.VALUE]
+                    row(
+                        storyLang("call.result"),
+                        output = StoryPinSpec(StoryPins.VALUE, StoryPinType.ofName(type), type)
+                    )
+                }
+                node.outputs.forEach { (name, type) ->
+                    row(
+                        name,
+                        output = StoryPinSpec(name, StoryPinType.ofName(type), type)
+                    )
+                }
                 CODE_WIDTH
             }
 
             is StoryNode.Expression -> {
-                val type = StoryPinType.ofName(graph.variables.firstOrNull { it.name == node.code.trim() }?.type)
+                val type = types[node.id to StoryPins.VALUE]
                 row(
-                    output = StoryPinSpec(StoryPins.VALUE, type),
+                    output = StoryPinSpec(StoryPins.VALUE, StoryPinType.ofName(type), type),
                     field = StoryRowField("code", node.code, storyLang("code.text"), code = true) { typed ->
                         edit(node.id, "code") { (it as StoryNode.Expression).copy(code = typed) }
                     },
@@ -346,7 +434,9 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
 
             is StoryNode.Pure -> {
                 pure(node)
-                if (StoryOperators.find(node.operator)?.inputs.orEmpty().any { it.type == StoryPinType.VECTOR }) WIDE else GraphNodeMetrics.WIDTH
+                if (StoryOperators.inputsOf(node)
+                        .any { it.type == StoryPinType.VECTOR }
+                ) WIDE else GraphNodeMetrics.WIDTH
             }
 
             is StoryNode.Reroute -> GraphNodeMetrics.REROUTE
@@ -378,36 +468,62 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             flow()
             if (node.block) exit(StoryPins.BODY, storyLang("loop.body"))
             val signature = StoryCatalog.signatureOf(node)
-            val params = signature?.params.orEmpty().filter { (detailed || it.group == null) && it.implicit == null }
+            val params = signature?.params.orEmpty().filter { detailed || it.group == null }
             params.forEach { param ->
                 val label = StoryCatalog.paramTitle(signature!!, param)
                 val type = StoryPinType.of(param.type)
-                value(node.id, param.name, label, type, paramField(node, param), StoryCatalog.paramHint(signature, param), param.optional)
+                val kotlin = param.type?.let(StoryKotlinTypes::name)?.let(StoryPinType::shortName)
+                value(
+                    node.id,
+                    param.name,
+                    label,
+                    type,
+                    paramField(node, param),
+                    StoryCatalog.paramHint(signature, param),
+                    param.optional,
+                    kotlin
+                )
             }
             val named = params.mapTo(HashSet()) { it.name }
             node.arguments.keys.filter { it !in named && signature == null }.forEach { name ->
-                value(node.id, name, name, StoryPinType.ANY, StoryRowField(name, node.arguments[name].orEmpty(), code = true) { typed ->
-                    edit(node.id, name) { each ->
-                        each as StoryNode.Call
-                        each.copy(arguments = each.arguments + (name to typed))
-                    }
-                })
+                value(
+                    node.id,
+                    name,
+                    name,
+                    StoryPinType.ANY,
+                    StoryRowField(name, node.arguments[name].orEmpty(), code = true) { typed ->
+                        edit(node.id, name) { each ->
+                            each as StoryNode.Call
+                            each.copy(arguments = each.arguments + (name to typed))
+                        }
+                    })
             }
-            if (node.returns != null) row(storyLang("call.result"), output = StoryPinSpec(StoryPins.VALUE, StoryPinType.ofName(node.returns)))
+            if (node.returns != null) row(
+                storyLang("call.result"),
+                output = StoryPinSpec(
+                    StoryPins.VALUE,
+                    StoryPinType.ofName(node.returns),
+                    StoryPinType.shortName(node.returns)
+                ),
+            )
         }
 
         private fun paramField(node: StoryNode.Call, param: StoryParam): StoryRowField {
             val written = node.argument(param).orEmpty()
             val helper = StoryLiterals.vectorHelper(param.type)
+            val kotlin = StoryLiterals.isKotlin(param.type)
             return StoryRowField(
                 param.name,
-                if (helper != null) written else StoryLiterals.text(written, param.type),
-                choices = param.suggestions,
+                if (helper != null || kotlin) written else StoryLiterals.text(written, param.type),
+                choices = param.suggestions.takeUnless { kotlin }.orEmpty(),
+                picks = param.suggestions.takeIf { kotlin }.orEmpty(),
+                color = param.widget == "color",
+                code = kotlin,
                 vector = helper,
                 assets = param.assets,
                 problem = StoryChecks.param(param, written),
             ) { typed ->
-                val next = if (helper != null) typed else StoryLiterals.expression(typed, param.type)
+                val next = if (helper != null || kotlin) typed else StoryLiterals.expression(typed, param.type)
                 edit(node.id, param.name) { (it as StoryNode.Call).with(param, next) }
             }
         }
@@ -416,13 +532,18 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
 
         private fun pure(node: StoryNode.Pure) {
             val operator = StoryOperators.find(node.operator) ?: return
-            operator.inputs.forEach { input ->
+            val inputs = StoryOperators.inputsOf(node)
+            inputs.forEachIndexed { index, input ->
                 val written = node.arguments[input.name].orEmpty()
                 val helper = StoryLiterals.vectorHelper(input.type.type)
                 val shown = if (helper != null) written else input.type.text(written)
-                val label = StoryCatalog.operatorPinTitle(input.name)
+                val label = if (operator.variadic) "${index + 1}" else StoryCatalog.operatorPinTitle(input.name)
                 val field = StoryRowField(
-                    input.name, shown, input.type.text(input.default), vector = helper,
+                    input.name,
+                    shown,
+                    input.type.text(input.default),
+                    vector = helper,
+                    hints = StoryCatalog.inputHints(input.name),
                     problem = helper?.let { StoryChecks.vector(written, it) } ?: codeProblem(written),
                 ) { typed ->
                     edit(node.id, input.name) { each ->
@@ -435,15 +556,27 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     node.id, input.name, label, input.type,
                     field.takeUnless { input.type == StoryPinType.ENTITY && input.default.isNotEmpty() && shown.isEmpty() },
                     StoryCatalog.operatorPinHint(operator.id, input.name),
+                    onRemove = {
+                        state.change {
+                            removeInput(
+                                node.id,
+                                index
+                            )
+                        }
+                    }.takeIf { operator.variadic && inputs.size > 1 },
                 )
             }
+            if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             operator.outputs.forEach { output ->
-                row(StoryCatalog.operatorPinTitle(output.name), output = StoryPinSpec(output.name, output.type))
+                val kotlin = types[node.id to output.name] ?: output.kotlin
+                val type = kotlin?.let(StoryPinType::ofName) ?: output.type
+                row(StoryCatalog.operatorPinTitle(output.name), output = StoryPinSpec(output.name, type, kotlin))
             }
         }
 
-        private fun linesOf(text: String, columns: Int): Int = text.split('\n')
-            .sumOf { ceil(it.length.coerceAtLeast(1) / columns.toDouble()).toInt() }.coerceIn(MIN_LINES, MAX_LINES)
+        private fun linesOf(text: String, columns: Int): Int =
+            text.split('\n').sumOf { ceil(it.length.coerceAtLeast(1) / columns.toDouble()).toInt() }
+                .coerceIn(MIN_LINES, MAX_LINES)
     }
 
     private companion object {

@@ -237,11 +237,13 @@ fun GraphPinView(
 ) {
     val half = GraphNodeMetrics.PIN / 2f
     val held = remember { booleanArrayOf(false) }
+    val tooltip = controller.model.pinTooltip(pin)
     Box(
         id = "gn-pin-${pin.node}-${if (pin.output) "out" else "in"}-${pin.name}",
         tags = listOf("gn-pin") + tags + listOfNotNull("connected".takeIf { connected }),
         modifier = Modifier.position((pin.x - nodeX - half).px, (pin.y - nodeY - half).px)
             .size(GraphNodeMetrics.PIN.px, GraphNodeMetrics.PIN.px)
+            .let { if (tooltip != null) it.tooltipOnHover(tooltip) else it }
             .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
                 if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
                 held[0] = true

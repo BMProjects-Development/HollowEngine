@@ -2,18 +2,12 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroupChanged
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.PublishStoryProblems
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCheck
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryInsight
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyInspector
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorStylesheet
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryVectorField
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNodeGroup
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPoint
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
@@ -22,11 +16,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeViewMode
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
-import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 private const val CanvasId = "story-graph"
 private const val StoryGraphStylesheet = "hollowengine-narrative:ui/styles/story-graph.hss"
@@ -62,14 +52,22 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val graph = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
     val controller = remember(state) { GraphEditorController(CanvasId, state.editor) }
     val arranged = remember(graph) { arrange(graph) }
-    val checks = remember(graph) { StoryChecks.all(graph) }
+    val ownChecks = remember(graph) { StoryChecks.all(graph) }
+    val checks = ownChecks + StoryInsight.analysis(state, graph).checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
     val model = StoryGraphEditorModel(state, graph, arranged + state.moved) { controller.select(it) }
     controller.model = model
 
     PublishStoryProblems(context, graph, checks) { node ->
         controller.select(GraphSelection.of(node))
-        model.all[node]?.rect?.let { state.editor.view.centerOn(it.centerX, it.centerY, state.canvas.width, state.canvas.height) }
+        model.all[node]?.rect?.let {
+            state.editor.view.centerOn(
+                it.centerX,
+                it.centerY,
+                state.canvas.width,
+                state.canvas.height
+            )
+        }
     }
 
     val selection = state.editor.selection
@@ -78,7 +76,9 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
         if (state.selected?.node != selected) state.selected = selected?.let { StorySelection(it) }
     }
     PublishInspector(source = "story-graph:${context.file.path}", key = selection.group to selected) {
-        selection.group?.let { groupInspector(state, it) } ?: storyInspector(state, selected?.let { StorySelection(it) })
+        selection.group?.let { groupInspector(state, it) } ?: storyInspector(
+            state,
+            selected?.let { StorySelection(it) })
     }
 
     Box(
@@ -103,6 +103,8 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
                 }
             }
         }
+        state.codeField?.let { StoryCodeDialog(state, it) }
+        state.colorField?.let { StoryColorDialog(state, it) }
     }
 }
 
@@ -124,7 +126,11 @@ private fun StoryNodeView(
     val warning = problems?.all { it.warning } == true
     GraphNodeFrame(
         controller, node.id, box.rect,
-        listOfNotNull("gn-node", box.tag, "collapsed".takeIf { box.collapsed }, (if (warning) "warning" else "error").takeIf { problem != null }),
+        listOfNotNull(
+            "gn-node",
+            box.tag,
+            "collapsed".takeIf { box.collapsed },
+            (if (warning) "warning" else "error").takeIf { problem != null }),
     ) {
         GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning) {
             state.change { copy(collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id) }
@@ -138,7 +144,12 @@ private fun StoryNodeView(
 }
 
 @Composable
-private fun StoryRowView(controller: GraphEditorController, state: StoryGraphState, box: StoryNodeBox, row: StoryNodeRow) {
+private fun StoryRowView(
+    controller: GraphEditorController,
+    state: StoryGraphState,
+    box: StoryNodeBox,
+    row: StoryNodeRow,
+) {
     val readOnly = state.context?.readOnly == true
     Row(
         tags = listOf("gn-node-row"),
@@ -146,31 +157,64 @@ private fun StoryRowView(controller: GraphEditorController, state: StoryGraphSta
             .padding(GraphNodeMetrics.INSET.px, 0.px).alignItems(vertical = UiAlign.CENTER),
     ) {
         val field = row.field
+        val insight = field?.let { fieldInsight(state, box.node.id, it) }
+        val problems =
+            field?.let { (listOfNotNull(it.problem) + insight!!.diagnostics.map { found -> found.message }).distinct() }
+                .orEmpty()
+        val problem = problems.takeIf { it.isNotEmpty() }?.joinToString("\n")
+        val wrong =
+            field?.problem != null || insight?.diagnostics?.any { it.severity == UiTextDiagnosticSeverity.ERROR } == true
         if (row.label != null && field == null && row.input == null) Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
         row.label?.let {
-            Text(it, tags = listOfNotNull("gn-pin-label", "output".takeIf { row.input == null && field == null }, "optional".takeIf { row.optional }))
+            Text(
+                it,
+                tags = listOfNotNull(
+                    "gn-pin-label",
+                    "output".takeIf { row.input == null && field == null },
+                    "optional".takeIf { row.optional })
+            )
         }
         row.hint?.let { FieldHelp(it) }
         if (field != null) when {
             field.choices.isNotEmpty() -> ChoiceField(controller, box, field)
             field.vector != null -> StoryVectorField(
-                "st-field-${box.node.id}-${field.key}", field.value, field.vector, readOnly, field.problem, listOf("gn-field"),
-                Modifier.size(0.px, 20.px).grow(1f), write = field.write,
+                "st-field-${box.node.id}-${field.key}",
+                field.value,
+                field.vector,
+                readOnly,
+                problem,
+                listOf("gn-field"),
+                Modifier.size(0.px, 20.px).grow(1f),
+                write = field.write,
             )
 
-            else -> FieldWithAsset(row, field) { TextField(
-                value = field.value,
-                onChange = field.write,
-                mode = if (field.lines > 1) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
-                readOnly = readOnly,
-                placeholder = field.placeholder,
-                insight = if (field.code) StoryInsight.field(state) else UiCodeInsight(),
-                id = "st-field-${box.node.id}-${field.key}",
-                tags = listOfNotNull("gn-field", "gn-expression".takeIf { field.code }, "error".takeIf { field.problem != null }),
-                modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
-                    .tooltipOnHover(field.problem.orEmpty()),
-            ) }
+            else -> FieldWithAsset(row, field) {
+                TextField(
+                    value = field.value,
+                    onChange = field.write,
+                    mode = if (field.lines > 1) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
+                    readOnly = readOnly,
+                    placeholder = field.placeholder,
+                    insight = insight!!.copy(diagnosticTooltips = false),
+                    id = "st-field-${box.node.id}-${field.key}",
+                    tags = listOfNotNull(
+                        "gn-field",
+                        "gn-expression".takeIf { field.code },
+                        (if (wrong) "error" else "warning").takeIf { problem != null }),
+                    modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
+                        .tooltipOnHover(problem.orEmpty()),
+                )
+            }
         }
+        val own = "${box.node.id}-${field?.key}"
+        if (field != null && field.picks.isNotEmpty()) PicksButton(controller, own, field)
+        if (field != null && field.color) ColorButton(state, own, field)
+        if (field != null && field.code && field.vector == null) CodeEditorButton(
+            state,
+            box.node.id,
+            row.label ?: field.placeholder,
+            field
+        )
         row.onRemove?.let { remove ->
             Image(
                 RemoveIcon,
@@ -186,15 +230,27 @@ private fun StoryRowView(controller: GraphEditorController, state: StoryGraphSta
             Row(
                 id = "st-add-${box.node.id}",
                 tags = listOf("st-row-add"),
-                modifier = Modifier.input(hoverable = true, clickable = true).alignItems(vertical = UiAlign.CENTER).onPress { event ->
-                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT && !readOnly) add()
-                    event.consume()
-                },
+                modifier = Modifier.input(hoverable = true, clickable = true).alignItems(vertical = UiAlign.CENTER)
+                    .onPress { event ->
+                        if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT && !readOnly) add()
+                        event.consume()
+                    },
             ) {
                 Image(AddIcon, tags = listOf("st-row-button"))
                 Text(storyLang("choice.add"), tags = listOf("gn-pin-hint"))
             }
         }
+    }
+}
+
+/** What the text field of [field] of the node [owner] offers, by what it holds. */
+internal fun fieldInsight(state: StoryEditorState, owner: String, field: StoryRowField): UiCodeInsight {
+    val analyzed = StoryInsight.field(state, StoryFieldKey(owner, field.key), field.value)
+    return when {
+        field.code -> analyzed
+        field.typeName -> StoryInsight.type(state)
+        field.hints.isNotEmpty() -> UiCodeInsight(completions = UiCompletionContributor { field.hints })
+        else -> UiCodeInsight(diagnostics = analyzed.diagnostics.map { it.copy(start = 0, end = 0) })
     }
 }
 
@@ -214,36 +270,59 @@ private fun ChoiceField(controller: GraphEditorController, box: StoryNodeBox, fi
         field.value.ifEmpty { "—" },
         id = "st-choice-${box.node.id}-${field.key}",
         tags = listOf("gn-chip"),
-        modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).input(hoverable = true, clickable = true).onPress { event ->
-            if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
-            controller.menu = GraphMenu(
-                event.x, event.y,
-                field.choices.map { value ->
-                    UiDropdownItem(value, mark = UiDropdownMark.RADIO, checked = value == field.value) { field.write(value) }
-                },
-            )
-            event.consume()
-        },
+        modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).input(hoverable = true, clickable = true)
+            .onPress { event ->
+                if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
+                controller.menu = GraphMenu(
+                    event.x, event.y,
+                    field.choices.map { value ->
+                        UiDropdownItem(
+                            value,
+                            mark = UiDropdownMark.RADIO,
+                            checked = value == field.value
+                        ) { field.write(value) }
+                    },
+                )
+                event.consume()
+            },
     )
 }
 
 /** The inspector of a group: what it is called and how it looks. */
 private fun groupInspector(state: StoryEditorState, id: String): InspectorTarget? {
     val group = state.read()?.groups?.firstOrNull { it.id == id } ?: return null
-    return InspectorTarget(id = "story-group-$id", title = graphEditorText("group"), subtitle = group.id, history = state.context?.history) {
+    return InspectorTarget(
+        id = "story-group-$id",
+        title = graphEditorText("group"),
+        subtitle = group.id,
+        history = state.context?.history
+    ) {
         state.read()?.groups?.firstOrNull { it.id == id }?.let { GroupFields(state, it) }
     }
 }
 
 @Composable
 private fun GroupFields(state: StoryEditorState, group: StoryNodeGroup) {
-    fun change(update: (StoryNodeGroup) -> StoryNodeGroup) = state.change(mergeKey = "group/${group.id}") { withGroupChanged(group.id, update) }
+    fun change(update: (StoryNodeGroup) -> StoryNodeGroup) =
+        state.change(mergeKey = "group/${group.id}") { withGroupChanged(group.id, update) }
     Section(graphEditorText("group")) {
-        TextRow(storyLang("group.title"), group.title, id = "st-group-title-${group.id}") { title -> change { it.copy(title = title) } }
+        TextRow(storyLang("group.title"), group.title, id = "st-group-title-${group.id}") { title ->
+            change {
+                it.copy(
+                    title = title
+                )
+            }
+        }
         Label(storyLang("group.color"))
         val current = group.color.takeIf { it in GraphGroupColors.all } ?: GraphGroupColors.all.keys.first()
-        Pills(GraphGroupColors.all.keys.toList(), current, { storyLang("color.$it") }) { color -> change { it.copy(color = color) } }
-        ToggleRow(graphEditorText("collapse_group"), group.collapsed) { collapsed -> change { it.copy(collapsed = collapsed) } }
+        Pills(
+            GraphGroupColors.all.keys.toList(),
+            current,
+            { storyLang("color.$it") }) { color -> change { it.copy(color = color) } }
+        ToggleRow(
+            graphEditorText("collapse_group"),
+            group.collapsed
+        ) { collapsed -> change { it.copy(collapsed = collapsed) } }
     }
 }
 

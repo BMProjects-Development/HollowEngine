@@ -6,7 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonClassDiscriminator
-import java.util.UUID
+import java.util.*
 
 /**
  * A story as authors edit it: nodes and the links between them, which [StoryGraphCompiler] turns into a script.
@@ -36,7 +36,10 @@ data class StoryGraph(
     fun node(id: String): StoryNode? = byId[id]
 
     /** What the story means, with nothing of how the editor shows it: two files of one revision run the same. */
-    fun revision(): String = FORMAT.encodeToString(serializer(), dissolved().copy(layout = emptyMap(), groups = emptyList(), collapsed = emptySet()))
+    fun revision(): String = FORMAT.encodeToString(
+        serializer(),
+        dissolved().copy(layout = emptyMap(), groups = emptyList(), collapsed = emptySet())
+    )
 
     /** The graph with every reroute joined back up: what the links mean to a story. */
     fun dissolved(): StoryGraph {
@@ -64,6 +67,7 @@ data class StoryGraph(
             }
             return at
         }
+
         val joined = links.mapNotNull { link ->
             when {
                 link.isFlow -> if (link.from in reroutes) null else flowTarget(link.to)?.let { link.copy(to = it) }
@@ -75,7 +79,8 @@ data class StoryGraph(
     }
 
     /** The text of the file: the same content is always the same text, so a change is a small diff. */
-    fun encode(): String = FORMAT.encodeToString(serializer(), copy(layout = layout.toSortedMap(), collapsed = collapsed.toSortedSet()))
+    fun encode(): String =
+        FORMAT.encodeToString(serializer(), copy(layout = layout.toSortedMap(), collapsed = collapsed.toSortedSet()))
 
     companion object {
         const val VERSION = 1
@@ -239,7 +244,8 @@ sealed interface StoryNode {
 
     /**
      * Kotlin that the graph does not look into. [inputs] are locals it can read, by name; [outputs] are the type of
-     * each local it assigns for other nodes to read.
+     * each local it assigns for other nodes to read. With no flow through it, it is an expression: its last line
+     * is the value of [StoryPins.VALUE], worked out where that value is read.
      */
     @Serializable
     @SerialName("code")
@@ -255,13 +261,19 @@ sealed interface StoryNode {
     @SerialName("expression")
     data class Expression(override val id: String, val code: String) : StoryNode
 
-    /** A value worked out by the [StoryOperator] named [operator] from [arguments], Kotlin expressions by input name. */
+    /**
+     * A value worked out by the [StoryOperator] named [operator] from [arguments], Kotlin expressions by input name.
+     *
+     * @param count how many inputs it has when the operator lets the author choose.
+     * @param element the Kotlin type of the elements of a list, which its inputs have to be.
+     */
     @Serializable
     @SerialName("pure")
     data class Pure(
         override val id: String,
         val operator: String,
         val arguments: Map<String, String> = emptyMap(),
+        val count: Int? = null,
     ) : StoryNode
 
     /** Runs the flow from [StoryPins.BODY] for each of [items], a Kotlin expression, giving it [StoryPins.ITEM]. */

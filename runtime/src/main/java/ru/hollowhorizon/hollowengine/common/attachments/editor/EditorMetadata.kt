@@ -69,7 +69,7 @@ annotation class EditorBone
  * draws its rows with the widget registered under [id].
  */
 @SerialInfo
-@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION, AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorWidget(val id: String)
 
 /** The field editors the engine registers, by the id [EditorWidget] names them with. */

@@ -44,16 +44,24 @@ data class HollowUiFrame(
     /** The node the wheel scrolls: the deepest one under the point that has room to move. */
     fun scrollTargetAt(x: Float, y: Float): UiNode? = wheelChainAt(x, y).scrollTarget()
 
-    /** Node that wheel scrolls. */
-    internal fun List<UiNode>.scrollTarget(): UiNode? {
+    /**
+     * Node that wheel scrolls. A plain [vertical] notch leaves a node that only moves sideways to whatever moves
+     * up and down around it, the way a page keeps scrolling over a wide table.
+     */
+    internal fun List<UiNode>.scrollTarget(vertical: Boolean = false): UiNode? {
         var fallback: UiNode? = null
+        var sideways: UiNode? = null
         for (node in this) {
             if (!node.resolvedSnapshot.scrollable) continue
             val range = layout[node].scrollRange
-            if (range.x > ScrollTargetRangeEpsilon || range.y > ScrollTargetRangeEpsilon) return node
+            if (range.y > ScrollTargetRangeEpsilon) return node
+            if (range.x > ScrollTargetRangeEpsilon) {
+                if (!vertical) return node
+                if (sideways == null) sideways = node
+            }
             if (fallback == null) fallback = node
         }
-        return fallback
+        return sideways ?: fallback
     }
 
     /**
@@ -356,7 +364,8 @@ class HollowUiRuntime(
         val horizontalModifier =
             input.modifiers and GLFW.GLFW_MOD_SHIFT != 0 || input.modifiers == 0 && horizontalScrollModifierDown()
         val chain = frame.wheelChainAt(input.mouseX, input.mouseY)
-        val target = with(frame) { chain.scrollTarget() } ?: this.input.focusedScrollableNode(frame)
+        val vertical = !horizontalModifier && input.scrollX == 0f
+        val target = with(frame) { chain.scrollTarget(vertical) } ?: this.input.focusedScrollableNode(frame)
 
         for (node in chain) {
             if (node.listensToScroll()) {

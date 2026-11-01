@@ -122,7 +122,7 @@ fun NpcEntity.startMove(points: List<Vec3>, options: MoveOptions = MoveOptions()
     return actions.start(NpcActionKeys.MOVEMENT) { moveThrough(points.map { point -> { point } }, options) }
 }
 
-@EditorCategory("hollowengine.gui.ide.story.category.npc")
+@EditorCategory("hollowengine.gui.ide.story.category.navigation")
 @SimpleAction("stop-moving")
 fun NpcEntity.stopMoving() {
     actions.cancel(NpcActionKeys.MOVEMENT)
@@ -249,7 +249,7 @@ suspend infix fun NpcEntity.lookAt(entity: Entity) {
     lookAt(entity, DEFAULT_LOOK_DURATION)
 }
 
-@EditorCategory("hollowengine.gui.ide.story.category.npc")
+@EditorCategory("hollowengine.gui.ide.story.category.navigation")
 @SimpleAction("stop-looking")
 fun NpcEntity.clearLookTarget() {
     actions.cancel(NpcActionKeys.LOOK)

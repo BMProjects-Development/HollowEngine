@@ -23,6 +23,8 @@ data class UiCodeEditing(
  * @param completionRevision changes when completions change while the text does not.
  * @param revision the same for signatures and hover.
  * @param inlayRevision the same for the hints of [inlayHintsProvider].
+ * @param highlightRevision the same for the colors of [highlighter], which stay on screen until the new ones are ready.
+ * @param diagnosticTooltips whether hovering a problem tells of it; a field that tells of them itself turns this off.
  */
 data class UiCodeInsight(
     val highlighter: UiSyntaxHighlighter? = null,
@@ -36,6 +38,8 @@ data class UiCodeInsight(
     val completionRevision: Long = 0L,
     val revision: Long = completionRevision,
     val inlayRevision: Long = 0L,
+    val highlightRevision: Long = 0L,
+    val diagnosticTooltips: Boolean = true,
 )
 
 /**

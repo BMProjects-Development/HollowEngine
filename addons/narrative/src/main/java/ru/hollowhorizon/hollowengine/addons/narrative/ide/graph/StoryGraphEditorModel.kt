@@ -123,12 +123,25 @@ internal class StoryGraphEditorModel(
         state.moved += positions.mapValues { (_, at) -> StoryPoint(at.first, at.second) }
     }
 
-    private fun takes(output: StoryPinType, input: StoryPinType) = output.fits(input)
+    private fun takes(output: GraphPin, input: GraphPin): Boolean {
+        if (!typeOf(output).fits(typeOf(input))) return false
+        val from = all[output.node]?.kotlin(output) ?: return true
+        val to = all[input.node]?.kotlin(input) ?: return true
+        return StoryKotlinTypes.fits(from, to)
+    }
+
+    override fun pinTooltip(pin: GraphPin): String = all[pin.node]?.kotlin(pin) ?: typeOf(pin).let { type ->
+        when (type) {
+            StoryPinType.FLOW -> storyLang("pin.flow")
+            StoryPinType.ANY, StoryPinType.OBJECT -> storyLang("pin.any")
+            else -> type.label
+        }
+    }
 
     override fun connect(from: GraphPin, to: GraphPin) {
         val output = if (from.output) from else to
         val input = if (from.output) to else from
-        if (!takes(typeOf(output), typeOf(input))) return
+        if (!takes(output, input)) return
         if (typeOf(output) == StoryPinType.FLOW) {
             state.change(StoryUndo.LINK) { link(output.node, output.name, input.node) }
         } else if (!readsFrom(output.node, input.node)) {
@@ -153,9 +166,7 @@ internal class StoryGraphEditorModel(
         val type = typeOf(own)
         val box = boxes[node] ?: return
         val target = box.pins.firstOrNull { pin ->
-            pin.output != pending.fromOutput && (if (pin.output) takes(typeOf(pin), type) else takes(
-                type, typeOf(pin)
-            )) && (pin.output || type == StoryPinType.FLOW || graph.links.none { it.to == node && it.toPin == pin.name })
+            pin.output != pending.fromOutput && (if (pin.output) takes(pin, own) else takes(own, pin)) && (pin.output || type == StoryPinType.FLOW || graph.links.none { it.to == node && it.toPin == pin.name })
         } ?: return
         connect(own, target)
     }
@@ -340,7 +351,6 @@ internal class StoryGraphEditorModel(
             add(StoryNode.Start(StoryGraph.newId(), freeStartName()))
         })
         addAll(variableItems(add))
-        add(UiDropdownItem(storyLang("add.expression")) { add(StoryNode.Expression(StoryGraph.newId(), "")) })
         addAll(StoryCatalog.items(add))
     }
 

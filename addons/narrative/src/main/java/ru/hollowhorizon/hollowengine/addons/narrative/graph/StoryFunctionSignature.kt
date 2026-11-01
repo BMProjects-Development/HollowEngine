@@ -16,6 +16,7 @@ data class StoryParamGroup(val parameter: String, val constructor: String)
  * @param receiver whether it is what the function is called on.
  * @param group the options object it is a field of.
  * @param implicit the expression it takes when nobody fills it.
+ * @param widget what edits it instead of a plain field, such as `color`.
  * @param assets the ends of the paths of the files it names, when it names one.
  */
 data class StoryParam(
@@ -29,6 +30,7 @@ data class StoryParam(
     val group: StoryParamGroup? = null,
     val implicit: String? = null,
     val assets: List<String> = emptyList(),
+    val widget: String? = null,
 )
 
 /**
@@ -58,8 +60,7 @@ data class StoryFunctionSignature(
     val hidden: Boolean = false,
 ) {
     /** A new call of this command. */
-    fun newCall(id: String) = params.filter { it.implicit != null }
-        .fold(StoryNode.Call(id, action = name)) { call, param -> call.with(param, param.implicit.orEmpty()) }
+    fun newCall(id: String) = StoryNode.Call(id, action = name)
 }
 
 /** The expression [param] has in this call, or null when it is left out. */

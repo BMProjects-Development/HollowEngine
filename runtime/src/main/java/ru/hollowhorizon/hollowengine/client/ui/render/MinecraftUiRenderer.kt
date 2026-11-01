@@ -49,6 +49,7 @@ private data class SvgRasterTexture(
 
 private data class SvgRasterQuad(
     val texture: ResourceLocation,
+    val page: UiGlyphAtlasPage,
     val width: Float,
     val height: Float,
     val transform: UiMatrix4,
@@ -530,6 +531,7 @@ class MinecraftUiRenderer {
         if (command.rect.width <= 0f || command.rect.height <= 0f || command.opacity <= 0f) return
         computeQuadBounds(command.rect.width, command.rect.height, effective(command.transform))
         if (quadFullyClipped()) return
+        if (appendIcon(command)) return
         flushBatchesOverlappingQuad(UiBatchKind.IMAGE)
         val overlapsPendingImages = imageBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
         if (phaseImageBatches.isNotEmpty() && (imageBatchClip != phaseClip || overlapsPendingImages)) {
@@ -538,6 +540,28 @@ class MinecraftUiRenderer {
         if (!appendSvgImage(command, phaseImageBatches)) appendImageBatch(command, phaseImageBatches)
         imageBatchClip = phaseClip
         imageBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
+    }
+
+    /** Puts an SVG in the rect batch the way text is, on a page of its own: icons no longer split what is drawn around them. */
+    private fun appendIcon(command: DrawImageCommand): Boolean {
+        if (!analyticRectRenderer.isAvailable || command.fit.isSliced) return false
+        val quad = svgRasterQuad(
+            width = command.rect.width,
+            height = command.rect.height,
+            source = command.source,
+            opacity = command.opacity,
+            transform = effective(command.transform),
+            fit = command.fit,
+            backfaceVisibility = command.backfaceVisibility,
+        ) ?: return false
+        flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
+        if (!analyticRectBatch.acceptsGlyphPage(quad.page)) flushAnalyticRectBatch()
+        analyticRectBatch.appendGlyph(
+            quad.transform, 0f, 0f, quad.width, quad.height, 0f, 0f, 1f, 1f,
+            command.tint.withOpacity(command.opacity), phaseShaderClip(), quad.page,
+        )
+        analyticBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
+        return true
     }
 
     private fun appendPhaseParticles(command: DrawParticlesCommand) {
@@ -671,6 +695,7 @@ class MinecraftUiRenderer {
                 }
             SvgRasterQuad(
                 texture = texture.location,
+                page = UiGlyphAtlasPage(texture.texture.id, pixelWidth.toFloat(), pixelHeight.toFloat(), 0f, UiGlyphSampling.COLOR),
                 width = placement.width,
                 height = placement.height,
                 transform = transform.translated(placement.x, placement.y),
@@ -1539,7 +1564,8 @@ class MinecraftUiRenderer {
             clipped -> phaseShaderClip().intersect(localViewportClip(command.rect, transform))
             else -> phaseShaderClip()
         }
-        if (clipped) {
+        val scissored = clipped && (!useAnalytic || command.layout.hasInlineImages())
+        if (scissored) {
             flushPhaseImageBatches()
             flushGeometryBatches()
             flushTextBatch()
@@ -1554,7 +1580,7 @@ class MinecraftUiRenderer {
                 ) else line
                 drawTextLine(command, displayLine, transform, now)
             }
-        if (clipped) {
+        if (scissored) {
             flushTextBatch()
             popClip()
             textBatchClip = phaseClip
@@ -2531,29 +2557,45 @@ class MinecraftUiRenderer {
 private data object ScissorUnknown
 
 /** Accumulated screen-space AABB of a batch's pending, not-yet-flushed pixels. */
-private class UiBatchBounds {
-    private var minX = Float.POSITIVE_INFINITY
-    private var minY = Float.POSITIVE_INFINITY
-    private var maxX = Float.NEGATIVE_INFINITY
-    private var maxY = Float.NEGATIVE_INFINITY
+/**
+ * Where the quads of a pending batch are, one rect after another: a quad falling between them has nothing to wait for.
+ * Past [MaxRects] the last rect grows over the rest, which can only flush more often than needed.
+ */
+internal class UiBatchBounds {
+    private val rects = FloatArray(MaxRects * RectStride)
+    private var count = 0
 
     fun clear() {
-        minX = Float.POSITIVE_INFINITY
-        minY = Float.POSITIVE_INFINITY
-        maxX = Float.NEGATIVE_INFINITY
-        maxY = Float.NEGATIVE_INFINITY
+        count = 0
     }
 
     fun add(minX: Float, minY: Float, maxX: Float, maxY: Float) {
-        if (minX < this.minX) this.minX = minX
-        if (minY < this.minY) this.minY = minY
-        if (maxX > this.maxX) this.maxX = maxX
-        if (maxY > this.maxY) this.maxY = maxY
+        if (count == MaxRects) {
+            val last = (count - 1) * RectStride
+            rects[last] = min(rects[last], minX)
+            rects[last + 1] = min(rects[last + 1], minY)
+            rects[last + 2] = max(rects[last + 2], maxX)
+            rects[last + 3] = max(rects[last + 3], maxY)
+            return
+        }
+        val at = count++ * RectStride
+        rects[at] = minX
+        rects[at + 1] = minY
+        rects[at + 2] = maxX
+        rects[at + 3] = maxY
     }
 
     fun overlaps(minX: Float, minY: Float, maxX: Float, maxY: Float): Boolean {
-        if (this.minX > this.maxX) return false
-        return this.minX < maxX && minX < this.maxX && this.minY < maxY && minY < this.maxY
+        for (rect in 0 until count) {
+            val at = rect * RectStride
+            if (rects[at] < maxX && minX < rects[at + 2] && rects[at + 1] < maxY && minY < rects[at + 3]) return true
+        }
+        return false
+    }
+
+    private companion object {
+        const val MaxRects = 64
+        const val RectStride = 4
     }
 }
 

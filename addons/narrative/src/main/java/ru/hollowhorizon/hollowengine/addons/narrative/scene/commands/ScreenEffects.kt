@@ -21,11 +21,12 @@ import java.util.WeakHashMap
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 
 /** `@fade-in player 600ms #000000`: covers the screen of [this] with [color]. Undone, the screen is clear again. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects")
+@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
 @Action("fade-in")
-suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, color: String = BLACK) =
+suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget("color") color: String = BLACK) =
     action(this, time, color) {
         undo { StoryClearFadePacket.send(this@fadeIn) }
         fastForward { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeIn) }
@@ -37,7 +38,7 @@ suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, color: String = B
     }
 
 /** Uncovers the screen [fadeIn] covered. Undone, it is covered with [color] again. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects")
+@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
 @Action("fade-out")
 suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = BLACK) =
     action(this, time, color) {
@@ -53,7 +54,7 @@ suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = 
  * `@hide-hud player` hides the whole HUD, `except=[chat]` keeps what is listed and `only=[crosshair, hotbar]` hides
  * just those; vanilla layers go by their bare names. Undone, the HUD is as it was before.
  */
-@EditorCategory("hollowengine.gui.ide.story.category.effects")
+@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
 @Action("hide-hud")
 suspend fun ServerPlayer.hideHud(
     @Suggestions(HudLayerNames::class) only: List<String>? = null,
@@ -69,7 +70,7 @@ suspend fun ServerPlayer.hideHud(
 }
 
 /** Shows the HUD as it was before the scene hid it, or all of it. Undone, the HUD is as it was before. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects")
+@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
 @Action("show-hud")
 suspend fun ServerPlayer.showHud() = action(this) {
     val before = capture { hiddenHudLayers().map(ResourceLocation::toString) }

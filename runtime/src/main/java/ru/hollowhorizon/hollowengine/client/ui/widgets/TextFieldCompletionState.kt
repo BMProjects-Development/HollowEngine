@@ -175,6 +175,7 @@ class TextFieldCompletionState(
         val next = imported.substring(0, start) + insertText + imported.substring(end)
         val caret = start + (item.caretOffset ?: insertText.length).coerceIn(0, insertText.length)
         val changed = state.applyEdit(next, listOf(UiTextCaret(caret)))
+        item.onAccept?.invoke()
         close()
         return changed
     }

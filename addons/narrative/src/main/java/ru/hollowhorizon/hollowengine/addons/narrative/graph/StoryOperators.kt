@@ -23,7 +23,25 @@ enum class StoryPinType(val type: KType?) {
     PLAYER(typeOf<ServerPlayer>()),
     LIST(null),
     MAP(null),
+
+    /** A value of a class with no pin of its own; the pins say which, as they do not all fit each other. */
+    OBJECT(null),
     ANY(null);
+
+    /** What a value of this type is called in Kotlin, for telling the author. */
+    val label: String
+        get() = when (this) {
+            FLOW, ANY, OBJECT -> "Any?"
+            TEXT -> "String"
+            NUMBER -> "Double"
+            BOOL -> "Boolean"
+            VECTOR -> "Vec3"
+            ENTITY -> "Entity"
+            NPC -> "NpcEntity"
+            PLAYER -> "ServerPlayer"
+            LIST -> "List<*>"
+            MAP -> "Map<*, *>"
+        }
 
     /** Whether a value of this type can be linked into a pin of [input]. */
     fun fits(input: StoryPinType): Boolean = this == input || (input == ENTITY && (this == NPC || this == PLAYER)) ||
@@ -65,9 +83,15 @@ enum class StoryPinType(val type: KType?) {
                 simple.endsWith("Entity") -> ENTITY
                 simple == "List" || simple == "Set" -> LIST
                 simple == "Map" -> MAP
-                else -> ANY
+                simple == "Any" -> ANY
+                else -> OBJECT
             }
         }
+
+        /** The Kotlin type written [name] with no packages, as the author reads it. */
+        fun shortName(name: String): String = PACKAGE.replace(name, "").replace("!", "")
+
+        private val PACKAGE = Regex("""\b[a-z_]\w*\.""")
 
         private val NUMBERS = setOf("Int", "Long", "Short", "Byte", "Float", "Double")
 
@@ -84,7 +108,8 @@ enum class StoryPinType(val type: KType?) {
                 kind.isSubclassOf(Entity::class) -> ENTITY
                 kind.isSubclassOf(Collection::class) || kind == Iterable::class -> LIST
                 kind.isSubclassOf(Map::class) -> MAP
-                else -> ANY
+                kind == Any::class -> ANY
+                else -> OBJECT
             }
         }
     }
@@ -93,15 +118,31 @@ enum class StoryPinType(val type: KType?) {
 /** An input of a [StoryOperator]. [default] is the Kotlin it reads with nothing typed or linked. */
 data class StoryOperatorInput(val name: String, val type: StoryPinType, val default: String = "")
 
-/** An output of a [StoryOperator]. In [template], `$name` stands for what the input of that name reads. */
-data class StoryOperatorOutput(val name: String, val type: StoryPinType, val template: String)
+/**
+ * An output of a [StoryOperator]. In [template], `$name` stands for what the input of that name reads.
+ *
+ * @param kotlin its exact type, until analysis tells it for the inputs at hand.
+ * @param empty what it reads with none of the inputs of a variadic operator given.
+ */
+data class StoryOperatorOutput(
+    val name: String,
+    val type: StoryPinType,
+    val template: String,
+    val kotlin: String? = null,
+    val empty: String? = null,
+)
 
-/** A value worked out on the spot: no flow goes through it, and every node reading it reads it anew. */
+/**
+ * A value worked out on the spot: no flow goes through it, and every node reading it reads it anew.
+ *
+ * @param variadic whether the author can add inputs like the last of [inputs]; `$*` in a template stands for all of them.
+ */
 data class StoryOperator(
     val id: String,
     val category: String,
     val inputs: List<StoryOperatorInput>,
     val outputs: List<StoryOperatorOutput>,
+    val variadic: Boolean = false,
 )
 
 /** The operators graphs are built from. */
@@ -150,7 +191,14 @@ object StoryOperators {
     )
 
     val all: List<StoryOperator> = listOf(
-        operator("player", "data", emptyList(), out("player", StoryPinType.PLAYER, "storyPlayer()")),
+        operator(
+            "player", "data", emptyList(),
+            out("player", StoryPinType.PLAYER, "storyPlayer()"),
+            out("level", StoryPinType.OBJECT, "storyLevel()").copy(kotlin = "ServerLevel"),
+            out("dimension", TEXT, "storyLevel().dimension().location().toString()"),
+            out("day_time", NUMBER, "storyLevel().dayTime.toDouble()"),
+            out("raining", BOOL, "storyLevel().isRaining"),
+        ),
         operator("find-player", "data", listOf(input("name", TEXT)), out("player", StoryPinType.PLAYER, "findStoryPlayer(\$name)")),
         operator(
             "entity-position", "data", listOf(entity()),
@@ -192,12 +240,8 @@ object StoryOperators {
             out("food", NUMBER, "playerFood(\$player)"),
             out("level", NUMBER, "playerLevel(\$player)"),
             out("game_mode", TEXT, "playerGameMode(\$player)"),
-            out("held_item", TEXT, "playerHeldItem(\$player)"),
         ),
-        operator(
-            "inventory-count", "data", listOf(entity("player"), input("item", TEXT, "\"minecraft:stone\"")),
-            out("count", NUMBER, "playerItemCount(\$player, \$item)"),
-        ),
+        operator("held-item", "items", listOf(entity("player")), out("held_item", TEXT, "playerHeldItem(\$player)")),
 
         math("add", "A + B"),
         math("subtract", "A - B"),
@@ -290,10 +334,13 @@ object StoryOperators {
         ),
 
         operator(
-            "list", "list", listOf(input("a", ANY, "0"), input("b", ANY, "0"), input("c", ANY, "0")),
-            out("list", LIST, "listOf(\$a, \$b, \$c)"),
+            "list", "list", listOf(input("a", ANY), input("b", ANY), input("c", ANY)),
+            out("list", LIST, "listOf(\$*)").copy(kotlin = "List<Any?>", empty = "emptyList<Any?>()"),
+        ).copy(variadic = true),
+        operator(
+            "range", "list", listOf(number("from"), number("to", "9")),
+            out("list", LIST, "(\$from.toInt()..\$to.toInt()).toList()").copy(kotlin = "List<Int>"),
         ),
-        operator("range", "list", listOf(number("from"), number("to", "9")), out("list", LIST, "(\$from.toInt()..\$to.toInt()).toList()")),
         operator("list-size", "list", listOf(input("list", LIST)), out("size", NUMBER, "\$list.size.toDouble()")),
         operator("list-get", "list", listOf(input("list", LIST), number("index")), out("item", ANY, "\$list[\$index.toInt()]")),
         operator("list-contains", "list", listOf(input("list", LIST), input("item", ANY)), out("result", BOOL, "\$item in \$list")),
@@ -304,10 +351,26 @@ object StoryOperators {
         operator("map-has", "list", listOf(input("map", MAP), input("key", ANY)), out("result", BOOL, "\$key in \$map")),
         operator("map-put", "list", listOf(input("map", MAP), input("key", ANY), input("value", ANY)), out("map", MAP, "\$map + (\$key to \$value)")),
         operator("map-remove", "list", listOf(input("map", MAP), input("key", ANY)), out("map", MAP, "\$map - \$key")),
-        operator("map-keys", "list", listOf(input("map", MAP)), out("keys", LIST, "\$map.keys.toList()"), out("size", NUMBER, "\$map.size.toDouble()")),
+        operator(
+            "map-keys", "list", listOf(input("map", MAP)),
+            out("keys", LIST, "\$map.keys.toList()").copy(kotlin = "List<Any?>"), out("size", NUMBER, "\$map.size.toDouble()"),
+        ),
     )
 
     private val byId = all.associateBy { it.id }
 
     fun find(id: String): StoryOperator? = byId[id]
+
+    /** The name of the input at [index] of a variadic operator. */
+    fun inputName(index: Int): String = if (index < LETTERS) "${'a' + index}" else "item$index"
+
+    /** The inputs of the operator of [node], with those its author added. */
+    fun inputsOf(node: StoryNode.Pure): List<StoryOperatorInput> {
+        val operator = find(node.operator) ?: return emptyList()
+        val last = operator.inputs.lastOrNull()
+        if (!operator.variadic || last == null) return operator.inputs
+        return List(node.count ?: operator.inputs.size) { last.copy(name = inputName(it)) }
+    }
+
+    private const val LETTERS = 26
 }
