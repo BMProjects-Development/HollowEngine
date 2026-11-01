@@ -12,7 +12,14 @@ data class UiPathPoint(
 data class UiPath(
     val commands: List<UiPathCommand>,
 ) {
+    private var hash = 0
+
     fun isEmpty(): Boolean = commands.isEmpty()
+
+    override fun hashCode(): Int {
+        if (hash == 0) hash = commands.hashCode()
+        return hash
+    }
 
     fun bounds(): UiRect? {
         var left = Float.POSITIVE_INFINITY

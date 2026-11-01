@@ -751,9 +751,16 @@ class MinecraftUiRenderer {
     }
 
     /** The active phase clip as a shader-space rect (or [UiShaderClip.None] when unclipped). */
+    private var phaseShaderClipSource: UiRect? = null
+    private var phaseShaderClipValue = UiShaderClip.None
+
     private fun phaseShaderClip(): UiShaderClip {
         val clip = phaseClip ?: return UiShaderClip.None
-        return UiShaderClip(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
+        if (clip !== phaseShaderClipSource) {
+            phaseShaderClipSource = clip
+            phaseShaderClipValue = UiShaderClip(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height)
+        }
+        return phaseShaderClipValue
     }
 
     /**
@@ -929,9 +936,9 @@ class MinecraftUiRenderer {
         val scale = layerScale()
         layerRequests.clear()
         layerPaddings.clear()
-        for (node in layout.traversalOrder) {
-            val layoutNode = layout.nodes[node] ?: continue
+        for (layoutNode in layout.nodes.values) {
             if (!layoutNode.needsFramebuffer) continue
+            val node = layoutNode.node
             val padding = layerPadding(node.resolvedSnapshot.filter, layout.layerOverflow(node))
             layerPaddings[node] = padding
             val layerScale = scale * layerResolutionScale(layoutNode.worldTransform, resolutionScratch)
@@ -1360,7 +1367,7 @@ class MinecraftUiRenderer {
         val cacheImage = image.copy(tintAlpha = 1f)
         for (shadow in command.shadows) {
             if (shadow.color.alpha <= 0f) continue
-            val transform = effective(UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform)
+            val transform = effective(command.transform.shifted(shadow.offset.x, shadow.offset.y, shadow.offset.z))
             if (isBackfaceHidden(command.rect.width, command.rect.height, transform, command.backfaceVisibility)) continue
             val shadowBounds = imageShadowBounds(bounds, shadow.blur, shadow.spread)
             val shadowTransform = transform.translated(shadowBounds.x, shadowBounds.y)
@@ -1406,7 +1413,7 @@ class MinecraftUiRenderer {
             val transform = if (shadow.inset) {
                 effective(command.transform)
             } else {
-                effective(UiMatrix4.translation(shadow.offset.x, shadow.offset.y, shadow.offset.z) * command.transform)
+                effective(command.transform.shifted(shadow.offset.x, shadow.offset.y, shadow.offset.z))
             }
             if (isBackfaceHidden(
                     command.rect.width,

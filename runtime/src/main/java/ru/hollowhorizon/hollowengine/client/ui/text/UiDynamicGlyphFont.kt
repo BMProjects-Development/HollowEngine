@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.text
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.platform.TextureUtil
 import com.mojang.blaze3d.systems.RenderSystem
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import org.lwjgl.opengl.GL11
 import ru.hollowhorizon.hollowengine.client.utils.font.DynamicGlyphAtlas
 import ru.hollowhorizon.hollowengine.client.utils.font.GlyphCellUploader
@@ -74,7 +75,7 @@ internal class UiDynamicGlyphFont(
         sampling = UiGlyphSampling.MSDF,
     )
 
-    private val placed = HashMap<Int, UiPlacedGlyph>()
+    private val placed = Int2ObjectOpenHashMap<UiPlacedGlyph>()
     private var placedEpoch = -1
 
     override val lineHeight: Float get() = metrics.meta.metrics.lineHeight

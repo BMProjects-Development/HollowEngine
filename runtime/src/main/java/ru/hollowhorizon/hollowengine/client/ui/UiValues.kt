@@ -533,6 +533,22 @@ class UiMatrix4(private val values: FloatArray) {
         return UiMatrix4(result)
     }
 
+    /** Whether both matrices hold the same values. */
+    fun sameAs(other: UiMatrix4): Boolean = this === other || values.contentEquals(other.values)
+
+    /** [translation] by these amounts applied after this matrix, in one array. */
+    fun shifted(x: Float, y: Float, z: Float = 0f): UiMatrix4 {
+        if (x == 0f && y == 0f && z == 0f) return this
+        val result = values.copyOf()
+        for (column in 0 until 4) {
+            val w = values[12 + column]
+            result[column] += x * w
+            result[4 + column] += y * w
+            result[8 + column] += z * w
+        }
+        return UiMatrix4(result)
+    }
+
     fun translated(x: Float, y: Float, z: Float = 0f): UiMatrix4 {
         if (x == 0f && y == 0f && z == 0f) return this
         return UiMatrix4(values.copyOf()).also { it.appendTranslation(x, y, z) }

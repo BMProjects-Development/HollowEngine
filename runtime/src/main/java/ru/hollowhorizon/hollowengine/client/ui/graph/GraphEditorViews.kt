@@ -60,6 +60,15 @@ fun GraphEditorCanvas(
         )
     }
     controller.curves = curves.map { (each, curve) -> each.key to curve }
+    val minimap = remember(scene, selection) {
+        scene.boxes.map { (id, rect) ->
+            GraphMiniMapItem(
+                rect,
+                if (id in selection) GraphSelectedColor else GraphLinkColor,
+                scene.titles[id].orEmpty()
+            )
+        } + scene.cards.map { GraphMiniMapItem(it.rect, it.color, it.title) }
+    }
     Box(mode = UiBoxMode.STACK, modifier = modifier.onPlaced { controller.canvas = it }) {
         GraphCanvas(
             id = controller.canvasId,
@@ -75,13 +84,7 @@ fun GraphEditorCanvas(
             },
             link = controller.preview(),
             frames = scene.frames.map { GraphFrame(it.rect, it.color) },
-            minimap = scene.boxes.map { (id, rect) ->
-                GraphMiniMapItem(
-                    rect,
-                    if (id in selection) GraphSelectedColor else GraphLinkColor,
-                    scene.titles[id].orEmpty()
-                )
-            } + scene.cards.map { GraphMiniMapItem(it.rect, it.color, it.title) },
+            minimap = minimap,
             onBackgroundClick = {
                 controller.menu = null
                 controller.select(GraphSelection.None)
@@ -238,10 +241,10 @@ fun GraphPinView(
     nodeY: Float,
     connected: Boolean,
     tags: List<String> = emptyList(),
+    tooltip: String? = null,
 ) {
     val half = GraphNodeMetrics.PIN / 2f
     val held = remember { booleanArrayOf(false) }
-    val tooltip = controller.model.pinTooltip(pin)
     Box(
         id = "gn-pin-${pin.node}-${if (pin.output) "out" else "in"}-${pin.name}",
         tags = listOf("gn-pin") + tags + listOfNotNull("connected".takeIf { connected }),
@@ -389,7 +392,8 @@ fun GraphGroupCard(
                     rect.x,
                     rect.y,
                     connected = true,
-                    tags = pinTags(pin)
+                    tags = pinTags(pin),
+                    tooltip = controller.model.pinTooltip(pin),
                 )
             }
         }

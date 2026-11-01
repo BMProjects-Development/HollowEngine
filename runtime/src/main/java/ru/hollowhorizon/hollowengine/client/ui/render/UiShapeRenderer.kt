@@ -554,7 +554,7 @@ private fun facingAmount(width: Float, height: Float, transform: UiMatrix4): Flo
     return abs(crossZ / length).coerceIn(0.05f, 1f)
 }
 
-internal fun UiColor.withOpacity(opacity: Float) = copy(alpha = alpha * opacity)
+internal fun UiColor.withOpacity(opacity: Float) = if (opacity == 1f) this else copy(alpha = alpha * opacity)
 
 internal fun UiColor.argb(): Int {
     val a = (alpha * 255f).toInt().coerceIn(0, 255)

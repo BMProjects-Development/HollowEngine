@@ -5,52 +5,60 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.*
 import java.util.*
 
 class UiLayoutPipeline {
-    internal var layoutPass: LayoutPass? = null
     internal var activeProfile: UiProfileFrame? = null
     internal var measureDepth = 0
     private val scrollbarCache = ScrollbarCache()
-    private val measureCache = WeakHashMap<UiNode, NodeMeasureCache>()
     private var lastScrollbarReserves: Map<UiNode, UiScrollbarReserve> = emptyMap()
 
     internal val inlineFlowChildLayouts = HashMap<UiNode, List<InlinePlacement>>()
     internal val inlineFlowFlattened = HashSet<UiNode>()
 
-    internal fun measureCacheFor(node: UiNode): NodeMeasureCache =
-        measureCache.getOrPut(node) { NodeMeasureCache() }
+    /** The layout this pass may take unchanged subtrees from. */
+    internal var reusableLayout: UiLayoutResult? = null
 
+    /** Child edges of the subtrees taken from [reusableLayout]. */
+    internal val reusedChildren = IdentityHashMap<UiNode, List<UiNode>>()
+
+    /**
+     * Lays out the tree. [previous] lets a subtree that kept its revision and its place be taken as it was; it has
+     * to be a layout of the same root, viewport and scroll offsets.
+     */
     fun compute(
         resolved: UiNode,
         width: Float,
         height: Float,
         scrollState: UiScrollState = UiScrollState(),
         profile: UiProfileFrame? = null,
+        previous: UiLayoutResult? = null,
     ): UiLayoutResult {
         val previousProfile = activeProfile
         activeProfile = profile
         try {
             val warmReserves = lastScrollbarReserves
+            reusableLayout = previous
             val warmLayout = computeLayouts(resolved, width, height, warmReserves)
-            val reserves = detectScrollbarReserves(warmLayout.nodes, warmLayout::childrenOf)
+            reusableLayout = null
+            val reserves = detectScrollbarReserves(warmLayout) { it.children }
             val finalLayout = if (reserves == warmReserves) {
                 warmLayout
             } else {
                 lastScrollbarReserves = reserves
                 computeLayouts(resolved, width, height, reserves)
             }
-            applyScrollRanges(finalLayout.nodes, scrollState, finalLayout::childrenOf)
-            val scrollbars = placeScrollbarNodes(finalLayout.nodes, scrollbarCache)
-            val traversalOrder = finalLayout.nodes.keys.toList()
-            val childrenByNode = snapshotVisibleChildren(finalLayout.nodes) { node ->
-                finalLayout.children[node] ?: node.children
-            }
+            applyScrollRanges(finalLayout, scrollState) { it.children }
+            val scrollbars = placeScrollbarNodes(finalLayout, scrollbarCache)
+            val traversalOrder = finalLayout.keys.toList()
+            val childrenByNode = snapshotVisibleChildren(finalLayout, known = reusedChildren)
             return UiLayoutResult(
                 root = resolved,
-                nodes = finalLayout.nodes,
+                nodes = finalLayout,
                 traversalOrder = traversalOrder,
                 scrollbars = scrollbars,
                 childrenByNode = childrenByNode,
             )
         } finally {
+            reusableLayout = null
+            reusedChildren.clear()
             activeProfile = previousProfile
             measureDepth = 0
         }
@@ -71,19 +79,12 @@ class UiLayoutPipeline {
         activeProfile = profile
         try {
             val layouts = LinkedHashMap(previous.nodes)
-            val pass = LayoutPass(resolved)
-            val previousPass = layoutPass
-            try {
-                layoutPass = pass
-                if (profile != null) {
-                    profile.measurePasses++
-                    profile.placementPasses++
-                    profile.incrementalLayouts++
-                }
-                for (container in moved) replaceScrolledSubtree(container, resolved, layouts)
-            } finally {
-                layoutPass = previousPass
+            if (profile != null) {
+                profile.measurePasses++
+                profile.placementPasses++
+                profile.incrementalLayouts++
             }
+            for (container in moved) replaceScrolledSubtree(container, resolved, layouts)
             applyScrollRanges(layouts, scrollState) { node -> previous.childrenOf(node) }
             val scrollbars = placeScrollbarNodes(layouts, scrollbarCache)
             return UiLayoutResult(
@@ -159,54 +160,38 @@ class UiLayoutPipeline {
         width: Float,
         height: Float,
         scrollbarReserves: Map<UiNode, UiScrollbarReserve>,
-    ): LayoutComputation {
+    ): MutableMap<UiNode, UiLayoutNode> {
         val layouts = linkedMapOf<UiNode, UiLayoutNode>()
         val viewport = UiRect(0f, 0f, width, height)
-        val previousPass = layoutPass
-        val pass = LayoutPass(resolved)
         inlineFlowChildLayouts.clear()
         inlineFlowFlattened.clear()
-        try {
-            layoutPass = pass
-            val profile = activeProfile
-            if (profile != null) {
-                profile.measurePasses++
-                profile.placementPasses++
-            }
-            val rootRect = rootRect(resolved, width, height, scrollbarReserves)
-            val placementStartedAt = if (profile != null) System.nanoTime() else 0L
-            val measureBeforePlacement = profile?.measureNanos ?: 0L
-            placeNodeNow(
-                node = resolved,
-                resolved = resolved,
-                rect = rootRect,
-                parentRect = viewport,
-                parentClip = null,
-                parentTransform = UiMatrix4.identity(),
-                parentInputTransform = UiMatrix4.identity(),
-                insideFramebuffer = false,
-                scrollbarReserves = scrollbarReserves,
-                layouts = layouts,
-            )
-            if (profile != null) {
-                val nestedMeasureNanos = profile.measureNanos - measureBeforePlacement
-                profile.placementNanos += (System.nanoTime() - placementStartedAt - nestedMeasureNanos).coerceAtLeast(0L)
-            }
-        } finally {
-            layoutPass = previousPass
+        reusedChildren.clear()
+        val profile = activeProfile
+        if (profile != null) {
+            profile.measurePasses++
+            profile.placementPasses++
         }
-        return LayoutComputation(layouts, pass.layoutChildren)
+        val rootRect = rootRect(resolved, width, height, scrollbarReserves)
+        val placementStartedAt = if (profile != null) System.nanoTime() else 0L
+        val measureBeforePlacement = profile?.measureNanos ?: 0L
+        placeNodeNow(
+            node = resolved,
+            resolved = resolved,
+            rect = rootRect,
+            parentRect = viewport,
+            parentClip = null,
+            parentTransform = UiMatrix4.identity(),
+            parentInputTransform = UiMatrix4.identity(),
+            insideFramebuffer = false,
+            scrollbarReserves = scrollbarReserves,
+            layouts = layouts,
+        )
+        if (profile != null) {
+            val nestedMeasureNanos = profile.measureNanos - measureBeforePlacement
+            profile.placementNanos += (System.nanoTime() - placementStartedAt - nestedMeasureNanos).coerceAtLeast(0L)
+        }
+        return layouts
     }
 
-    internal fun layoutChildren(node: UiNode): List<UiNode> {
-        return layoutPass?.layoutChildren?.get(node) ?: node.children
-    }
-
-}
-
-private data class LayoutComputation(
-    val nodes: MutableMap<UiNode, UiLayoutNode>,
-    val children: Map<UiNode, List<UiNode>>,
-) {
-    fun childrenOf(node: UiNode): List<UiNode> = children[node].orEmpty()
+    internal fun layoutChildren(node: UiNode): List<UiNode> = node.children
 }

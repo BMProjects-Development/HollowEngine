@@ -179,6 +179,8 @@ class UiNodeLayoutState internal constructor() {
      */
     internal var styleResolverState: Any? = null
 
+    internal var measureCache: NodeMeasureCache? = null
+
     private var parent: UiNode? = null
     private var resolvedLayoutFingerprint = 0
     private var localLayoutRevision = UiLayoutRevision.next()

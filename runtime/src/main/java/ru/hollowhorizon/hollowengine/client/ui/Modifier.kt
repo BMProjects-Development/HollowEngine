@@ -179,6 +179,10 @@ const val TextFieldDefaultKeyPriority = -1000
  */
 data class OnPlacedModifier(val callback: (UiRect) -> Unit) : Modifier
 
+/** Whether this modifier hears from layout once it is done. */
+internal fun Modifier.reportsLayout() = this is OnPlacedModifier || this is OnShownModifier ||
+        this is UiDropTargetModifier || this is OnTextLayoutModifier || this is OnResolvedStyleModifier
+
 /**
  * Like [OnPlacedModifier], with the bounds the node has on the screen: past the translation and the scale of what it is
  * inside, which is what a popup anchored to it needs.
@@ -667,9 +671,9 @@ private fun Iterable<Modifier>.appendModifierStatesTo(result: MutableSet<UiState
     }
 }
 
-private fun Iterable<Modifier>.containsModifierState(state: UiState): Boolean {
-    for (modifier in this) {
-        when (modifier) {
+private fun List<Modifier>.containsModifierState(state: UiState): Boolean {
+    for (index in indices) {
+        when (val modifier = this[index]) {
             is StateModifier -> if (state in modifier.states) return true
             is RuntimeStateModifier -> if (state in modifier.states) return true
             is CompositeModifier -> if (modifier.values.containsModifierState(state)) return true
