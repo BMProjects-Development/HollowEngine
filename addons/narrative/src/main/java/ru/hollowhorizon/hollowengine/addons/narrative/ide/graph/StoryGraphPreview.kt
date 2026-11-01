@@ -89,7 +89,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     ) {
         GraphEditorCanvas(controller, Modifier.size(100.percent, 100.percent)) {
             GraphFrameHeaders(controller)
-            model.boxes.values.sortedBy { it.node.id in controller.selection }.forEach { box ->
+            model.boxes.values.filter { it.node.id in controller.shown }.sortedBy { it.node.id in controller.selection }.forEach { box ->
                 key(box.node.id) { StoryNodeView(controller, model, state, box, problems[box.node.id]) }
             }
             model.scene.cards.forEach { card ->
@@ -185,6 +185,7 @@ private fun StoryRowView(
                 problem,
                 listOf("gn-field"),
                 Modifier.size(0.px, 20.px).grow(1f),
+                fieldModifier = Modifier.graphField(controller, box.node.id),
                 write = field.write,
             )
 
@@ -202,7 +203,7 @@ private fun StoryRowView(
                         "gn-expression".takeIf { field.code },
                         (if (wrong) "error" else "warning").takeIf { problem != null }),
                     modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
-                        .tooltipOnHover(problem.orEmpty()),
+                        .tooltipOnHover(problem.orEmpty()).graphField(controller, box.node.id),
                 )
             }
         }

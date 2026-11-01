@@ -21,7 +21,7 @@ internal fun ShaderGraphSceneView(
 ) {
     val scene = model.nodes
     GraphFrameHeaders(controller)
-    scene.boxes.values.sortedBy { it.node.id in controller.selection }.forEach { box ->
+    scene.boxes.values.filter { it.node.id in controller.shown }.sortedBy { it.node.id in controller.selection }.forEach { box ->
         key(box.node.id) {
             if (box.isReroute) {
                 GraphRerouteView(

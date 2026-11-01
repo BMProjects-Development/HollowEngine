@@ -39,6 +39,7 @@ internal fun StoryVectorField(
     fieldTags: List<String>,
     modifier: Modifier = Modifier,
     fontSize: Float? = null,
+    fieldModifier: Modifier = Modifier,
     write: (String) -> Unit,
 ) {
     val parts = StoryLiterals.vectorParts(expression, helper)
@@ -55,7 +56,7 @@ internal fun StoryVectorField(
         fontSize = fontSize ?: DefaultUiFontSize,
         id = "$id-$name",
         tags = tags,
-        modifier = Modifier.size(0.px, 20.px).grow(1f).tooltipOnHover(problem.orEmpty()),
+        modifier = fieldModifier.size(0.px, 20.px).grow(1f).tooltipOnHover(problem.orEmpty()),
     )
 
     Row(tags = listOf("st-vector"), modifier = modifier.style(VectorStylesheet).alignItems(vertical = UiAlign.CENTER)) {

@@ -60,7 +60,7 @@ fun GraphEditorCanvas(
         )
     }
     controller.curves = curves.map { (each, curve) -> each.key to curve }
-    Box(mode = UiBoxMode.STACK, modifier = modifier) {
+    Box(mode = UiBoxMode.STACK, modifier = modifier.onPlaced { controller.canvas = it }) {
         GraphCanvas(
             id = controller.canvasId,
             view = view,
@@ -157,6 +157,10 @@ fun GraphFrameHeaders(controller: GraphEditorController) {
 }
 
 /** A node at [rect] that the pointer picks and drags and whose right click opens its menu. */
+/** Marks a field of [node]: the node stays built while the field is being typed in, wherever the view goes. */
+fun Modifier.graphField(controller: GraphEditorController, node: String) =
+    onFocus { controller.editing = node }.onUnfocus { if (controller.editing == node) controller.editing = null }
+
 @Composable
 fun GraphNodeFrame(
     controller: GraphEditorController,

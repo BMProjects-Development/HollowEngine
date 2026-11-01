@@ -1,11 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.ui.graph
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
+import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import kotlin.math.hypot
@@ -23,6 +25,25 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         set(value) {
             current = value
         }
+
+    /** Where the canvas is on the screen. */
+    var canvas by mutableStateOf(UiRect.Zero)
+
+    /** The node with a field being typed in. */
+    var editing by mutableStateOf<String?>(null)
+
+    /**
+     * The nodes worth building: those in sight, and those an action in progress would be lost along with. A node out of
+     * sight costs nothing then, neither to compose and lay out nor to draw, and the links and the minimap do not need it.
+     */
+    val shown: Set<String> by derivedStateOf {
+        val size = canvas
+        val selected = selection
+        model.scene.boxes.filter { (node, rect) ->
+            size.width <= 0f || node in selected || node == link?.node || node == editing ||
+                    view.sees(rect, size.width, size.height, SIGHT_MARGIN)
+        }.keys
+    }
 
     var link by mutableStateOf<GraphPendingLink?>(null)
         private set
@@ -315,6 +336,9 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
         /** How close to a link, in canvas pixels, a lone node has to be dragged to go into it. */
         const val INSERT_REACH = 10f
+
+        /** How far past the canvas, in canvas pixels, nodes stay built: shadows and pins reach out of a node. */
+        const val SIGHT_MARGIN = 96f
 
         const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg"
         const val UngroupIcon = "hollowengine:textures/gui/icons/actions/ungroup.svg"
