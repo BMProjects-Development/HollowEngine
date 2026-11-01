@@ -119,12 +119,12 @@ class UiModifierResolver(
             // layout prop (size/padding/transform) must bump the layout revision so the frame rebuilds
             // it, while a draw-only animation (color/opacity) leaves the fingerprint and the layout untouched.
             node.layoutState.updateResolvedLayoutFingerprint(finalStyle.layoutFingerprint())
-            val modifierRefresh = finalStyle.requiresModifierRefresh()
+            val modifierRefresh = animations.isRunning(state.motion, finalStyle, nowMillis)
             if (!requiresRefresh && modifierRefresh) requiresRefresh = true
             if (profile != null && modifierRefresh) profile.animatedNodes++
             val descendantRevision = maxOf(
                 ancestorRevision,
-                layoutState.drawRevision,
+                selectorRevision(state, node, modifiers, layoutState.drawRevision),
             )
             for (index in node.children.indices.reversed()) {
                 stack.push(node.children[index], finalStyle, scopedScope, descendantRevision)
@@ -137,6 +137,25 @@ class UiModifierResolver(
         val existing = node.layoutState.styleResolverState as? NodeResolveState
         if (existing != null && existing.owner === this) return existing
         return NodeResolveState(this).also { node.layoutState.styleResolverState = it }
+    }
+
+    private fun selectorRevision(
+        state: NodeResolveState,
+        node: UiNode,
+        modifiers: List<Modifier>,
+        drawRevision: Long,
+    ): Long {
+        val cached = state.selectorEntry
+        if (cached?.drawRevision == drawRevision) return cached.revision
+        val signature = SelectorSignature(
+            node.tags.toSet(),
+            node.attributes.toMap(),
+            modifiers.filterIsInstance<AttributeModifier>(),
+            node.effectiveStates(),
+        )
+        val revision = cached?.takeIf { it.signature == signature }?.revision ?: drawRevision
+        state.selectorEntry = SelectorEntry(signature, drawRevision, revision)
+        return revision
     }
 
     private fun flattenedModifiers(
@@ -410,8 +429,22 @@ private class NodeResolveState(val owner: UiModifierResolver) {
     var modifierEntry: ModifierCacheEntry? = null
     var scopeEntry: ScopeCacheEntry? = null
     var styleEntry: StyleCacheEntry? = null
+    var selectorEntry: SelectorEntry? = null
     val motion = UiNodeMotionState()
 }
+
+private data class SelectorSignature(
+    val tags: Set<String>,
+    val attributes: Map<String, String>,
+    val attributeModifiers: List<AttributeModifier>,
+    val states: Set<UiState>,
+)
+
+private class SelectorEntry(
+    val signature: SelectorSignature,
+    val drawRevision: Long,
+    val revision: Long,
+)
 
 private class ResolvedModifiers(
     val flat: List<Modifier>,
@@ -562,8 +595,3 @@ private data class TreeCacheEntry(
     val requiresRefresh: Boolean,
 )
 
-private fun UiComputedStyle.requiresModifierRefresh(): Boolean {
-    val animations = animations
-    if (animations.isEmpty()) return false
-    return animations.any { animation -> animation.totalDurationMillis()?.let { it > 0L } ?: true }
-}

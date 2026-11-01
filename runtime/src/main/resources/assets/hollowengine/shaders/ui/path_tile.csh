@@ -133,8 +133,9 @@ void main() {
     bool boundary = false;
     for (int localIndex = 0; localIndex < pathSegmentCount; localIndex++) {
         vec4 segment = segments[segmentStart + localIndex];
-        if (rowOverlaps(segment, tileMin.y, tileMax.y, margin)) rowSegmentCount++;
-        if (tileOverlaps(segment, tileMin, tileMax, margin)) boundary = true;
+        bool near = tileOverlaps(segment, tileMin, tileMax, margin);
+        if (stroke ? near : rowOverlaps(segment, tileMin.y, tileMax.y, margin)) rowSegmentCount++;
+        if (near) boundary = true;
         winding += crossingDelta(segment, center);
     }
     if (!boundary && (stroke || winding == 0)) {
@@ -148,9 +149,9 @@ void main() {
         uint outputIndex = outputSegmentStart;
         for (int localIndex = 0; localIndex < pathSegmentCount; localIndex++) {
             vec4 segment = segments[segmentStart + localIndex];
-            if (rowOverlaps(segment, tileMin.y, tileMax.y, margin)) {
-                segmentIndices[outputIndex++] = segmentStart + localIndex;
-            }
+            bool kept = stroke ? tileOverlaps(segment, tileMin, tileMax, margin) :
+                rowOverlaps(segment, tileMin.y, tileMax.y, margin);
+            if (kept) segmentIndices[outputIndex++] = segmentStart + localIndex;
         }
     }
 
