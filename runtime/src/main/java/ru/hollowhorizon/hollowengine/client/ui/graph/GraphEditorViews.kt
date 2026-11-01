@@ -418,8 +418,8 @@ private fun CardRow(pin: GraphPin, name: String, owner: String, y: Float, width:
 
 private const val ArrowIcon = "hollowengine:textures/gui/icons/graph/arrow.svg"
 private const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg"
-private const val ErrorIcon = "hollowengine:textures/gui/icons/error.png"
-private const val WarningIcon = "hollowengine:textures/gui/icons/warn.png"
+private const val ErrorIcon = "hollowengine:textures/gui/icons/error.svg"
+private const val WarningIcon = "hollowengine:textures/gui/icons/warn.svg"
 
 /** How tall the strip is that squares off the bottom corners of the title bar of an open node. */
 private const val SquaredStrip = 8f

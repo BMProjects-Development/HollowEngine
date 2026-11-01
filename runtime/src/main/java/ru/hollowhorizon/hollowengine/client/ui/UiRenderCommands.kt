@@ -69,6 +69,11 @@ data class DrawShadowCommand(
     val borderWidth: Float = 0f,
 ) : UiRenderCommand
 
+/** Puts the texture of the layer [node], already drawn ahead of the frame, where the layer stands in the tree. */
+data class CompositeLayerCommand(
+    override val node: UiNode,
+) : UiRenderCommand
+
 data class PushClipCommand(
     override val node: UiNode,
     val rect: UiRect,
@@ -313,6 +318,7 @@ private fun UiRenderCommand.drawsPixels(): Boolean = when (this) {
     is DrawItemCommand,
     is DrawEntityCommand,
     is DrawCanvasGlCommand,
+    is CompositeLayerCommand,
         -> true
 
     is BeginLayerCommand,
@@ -412,7 +418,7 @@ class UiCommandRenderer {
 
         if (!cullNodeCommands && isFramebuffer) {
             commands += BeginLayerCommand(
-                node = node, rect = layoutNode.rect, radius = style.border.radius,
+                node = node, rect = layoutNode.rect, radius = if (style.clip) style.border.radius else 0f,
                 clipShape = style.clipShape.takeIf { style.clip },
                 transform = layoutNode.worldTransform, filter = style.filter,
                 backdropFilter = style.backdropFilter, backfaceVisibility = style.backfaceVisibility,

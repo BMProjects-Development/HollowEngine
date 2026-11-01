@@ -23,6 +23,9 @@ internal class UiPathTileBatch {
     private val paints = UiFloatArrayBuilder()
     private val stops = UiFloatArrayBuilder()
     private val paintEncoder = UiPaintBufferEncoder(paints, stops)
+
+    /** The clip of each paint record, under the same index: a tile reaches both through its paint. */
+    private val clips = UiFloatArrayBuilder()
     private val vertices = UiFloatArrayBuilder()
     private val segmentIndices = UiIntArrayBuilder()
     private val tiles = UiIntArrayBuilder()
@@ -45,6 +48,7 @@ internal class UiPathTileBatch {
     val segmentFloatCount: Int get() = segments.size
     val computeInputFloatCount: Int get() = paths.size + candidates.size
     val paintFloatCount: Int get() = paints.size
+    val clipFloatCount: Int get() = clips.size
     val stopFloatCount: Int get() = stops.size
     val vertexCount: Int get() = vertices.size / VertexStride
     val vertexFloatCount: Int get() = vertices.size
@@ -57,7 +61,11 @@ internal class UiPathTileBatch {
     val canDispatchCompute: Boolean
         get() = candidateCount <= MaxComputeCandidates &&
                 worstCaseSegmentIndexCount <= MaxComputeSegmentIndices
-    val prefersBakedCpu: Boolean get() = bakedCpuPreferred
+    /**
+     * Whether to skip the compute pass. Bakes make it free for repeated paths, and a batch this small costs less to
+     * rasterize here than a dispatch with its barriers and bindings does, even when every key in it is new.
+     */
+    val prefersBakedCpu: Boolean get() = bakedCpuPreferred || candidateCount <= MaxCpuCandidates
     val fullCoverageTileCount: Int
         get() {
             var count = 0
@@ -88,7 +96,7 @@ internal class UiPathTileBatch {
         return true
     }
 
-    fun append(command: DrawShapeCommand, transform: UiMatrix4) {
+    fun append(command: DrawShapeCommand, transform: UiMatrix4, clip: UiShaderClip = UiShaderClip.None) {
         val width = command.rect.width
         val height = command.rect.height
         if (width <= 0f || height <= 0f || command.opacity <= 0f) return
@@ -112,6 +120,7 @@ internal class UiPathTileBatch {
                 0f,
                 command.blurRadius,
                 command.spreadRadius,
+                clip,
             )
         }
         if (command.stroke.isBufferPaint() && command.strokeWidth > 0f) {
@@ -138,6 +147,7 @@ internal class UiPathTileBatch {
                 if (analyticStroke) command.strokeWidth * 0.5f else 0f,
                 command.blurRadius,
                 command.spreadRadius,
+                clip,
             )
         }
     }
@@ -154,6 +164,7 @@ internal class UiPathTileBatch {
         strokeRadius: Float,
         blurRadius: Float,
         spreadRadius: Float,
+        clip: UiShaderClip,
     ) {
         if (geometry.segments.isEmpty()) return
         val rasterMargin = aaMargin + strokeRadius + abs(spreadRadius) + blurRadius * BlurExtentFactor
@@ -174,6 +185,7 @@ internal class UiPathTileBatch {
             width,
             height,
         )
+        clips.add(clip.minX, clip.minY, clip.maxX, clip.maxY)
         val pathIndex = pathCount
         paths.add(segmentStart.toFloat(), pathSegmentCount.toFloat(), paintIndex.toFloat(), tileSize)
         paths.add(width, height, rasterMargin, minTileX.toFloat())
@@ -244,6 +256,7 @@ internal class UiPathTileBatch {
         paths.clear()
         candidates.clear()
         paints.clear()
+        clips.clear()
         stops.clear()
         vertices.clear()
         segmentIndices.clear()
@@ -261,6 +274,7 @@ internal class UiPathTileBatch {
         for (index in 0 until candidates.size) destination.put(candidates[index].toFloat())
     }
     fun writePaints(destination: FloatBuffer) = paints.writeTo(destination)
+    fun writeClips(destination: FloatBuffer) = clips.writeTo(destination)
     fun writeStops(destination: FloatBuffer) = stops.writeTo(destination)
     fun writeVertices(destination: FloatBuffer) = vertices.writeTo(destination)
     fun writeSegmentIndices(destination: IntBuffer) = segmentIndices.writeTo(destination)
@@ -485,6 +499,7 @@ internal class UiPathTileBatch {
         private const val MinimumScale = 0.01f
         private const val BlurExtentFactor = 3f
         private const val EffectOffset = 28
+        private const val MaxCpuCandidates = 512
         private const val MaxComputeCandidates = 262_144
         private const val MaxComputeSegmentIndices = 4_194_304L
     }

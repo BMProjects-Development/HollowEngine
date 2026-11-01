@@ -100,14 +100,22 @@ internal fun backdropSampleBounds(
 
 internal const val LayerSupersampling = 1f
 internal const val MaxTransformResolutionScale = 4f
+internal const val MinLayerResolutionScale = 0.25f
 internal const val RotatedResolutionScale = 2f
 
-internal fun transformResolutionScale(transform: UiMatrix4, scratch: FloatArray = FloatArray(2)): Float {
+internal fun transformResolutionScale(transform: UiMatrix4, scratch: FloatArray = FloatArray(2)): Float =
+    resolutionScale(transform, scratch, 1f)
+
+/** Like [transformResolutionScale], but a layer shrunk on screen also takes fewer pixels in the atlas. */
+internal fun layerResolutionScale(transform: UiMatrix4, scratch: FloatArray = FloatArray(2)): Float =
+    resolutionScale(transform, scratch, MinLayerResolutionScale)
+
+private fun resolutionScale(transform: UiMatrix4, scratch: FloatArray, minimum: Float): Float {
     transform.axisScales(scratch)
     val magnification = max(scratch[0], scratch[1])
     val supersampling = if (transform.isAxisAligned) 1f else RotatedResolutionScale
     if (!magnification.isFinite()) return 1f
-    return (magnification * supersampling).coerceIn(1f, MaxTransformResolutionScale)
+    return (magnification * supersampling).coerceIn(minimum, MaxTransformResolutionScale)
 }
 
 internal fun layerPadding(command: BeginLayerCommand): Float = layerPadding(command.filter)
