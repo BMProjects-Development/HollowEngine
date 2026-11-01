@@ -332,6 +332,10 @@ class ScriptingAnalyzerImpl internal constructor(
     override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =
         synchronized(lock) { findAcceptedExpressionTypes(getOrCreateFile(name, text), offset, types) }
 
+    override fun kotlinSyntax(text: String): KotlinSyntax = synchronized(lock) {
+        kotlinSyntax(factory, text.withUnixLineSeparators())
+    }
+
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)
     }

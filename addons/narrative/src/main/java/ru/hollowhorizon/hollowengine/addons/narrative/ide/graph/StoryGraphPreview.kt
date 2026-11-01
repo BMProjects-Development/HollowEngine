@@ -7,11 +7,12 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.with
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.PublishStoryProblems
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCheck
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryInsight
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyInspector
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorStylesheet
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySelection
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryVectorField
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.storyInspector
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
@@ -23,6 +24,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
@@ -81,7 +83,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
 
     Box(
         mode = UiBoxMode.STACK,
-        tags = listOf("ide-file-panel", "story-list-root"),
+        tags = listOf("ide-file-panel", "story-editor-root"),
         modifier = Modifier.size(100.percent, 100.percent).style(InspectorStylesheet).style(StoryEditorStylesheet)
             .style(GraphNodesStylesheet).style(StoryGraphStylesheet).focusScope().onPlaced { state.canvas = it },
     ) {
@@ -162,6 +164,7 @@ private fun StoryRowView(controller: GraphEditorController, state: StoryGraphSta
                 mode = if (field.lines > 1) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
                 readOnly = readOnly,
                 placeholder = field.placeholder,
+                insight = if (field.code) StoryInsight.field(state) else UiCodeInsight(),
                 id = "st-field-${box.node.id}-${field.key}",
                 tags = listOfNotNull("gn-field", "gn-expression".takeIf { field.code }, "error".takeIf { field.problem != null }),
                 modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
@@ -252,7 +255,7 @@ private fun arrange(graph: StoryGraph): Map<String, StoryPoint> {
         val (id, at) = queue.removeFirst()
         if (id in depth) continue
         depth[id] = at
-        graph.links.filter { it.from == id && it.isFlow }.forEach { queue += it.to to at + 1 }
+        graph.index.flowOut(id).forEach { queue += it to at + 1 }
     }
     val rows = HashMap<Int, Int>()
     return graph.nodes.associate { node ->

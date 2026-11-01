@@ -86,7 +86,11 @@ class StoryRuns(val owner: StoryOwner) {
             if (run.state.done) return@forEach
             runs[key] = run
             val gone = run.tree().flatMap { (it.frames + it.pending).asSequence() }.map { it.instance }.firstOrNull(StoryInstances::isGone)
-            if (gone != null) run.discard("its script '$gone' no longer exists") else run.start()
+            when {
+                gone != null -> run.discard("its script '$gone' no longer exists")
+                run.history.restartPoint != null -> run.rewind(run.history.restartPoint)
+                else -> run.start()
+            }
         }
     }
 

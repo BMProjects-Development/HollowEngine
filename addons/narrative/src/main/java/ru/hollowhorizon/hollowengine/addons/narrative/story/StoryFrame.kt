@@ -219,28 +219,28 @@ class StoryFrame internal constructor(
     }
 
     /** Ends a segment at the checkpoint at [site], which the story can be rewound to. */
-    fun checkpoint(site: Int) = pass(site, emptyList())
+    fun checkpoint(site: Int, restart: Boolean) = pass(site, restart, emptyList())
 
     /** Ends a segment at the checkpoint at [site] after [labels] captured what a rewind to it puts back. */
-    suspend fun checkpoint(site: Int, labels: suspend CheckpointScope.() -> Unit) {
+    suspend fun checkpoint(site: Int, restart: Boolean, labels: suspend CheckpointScope.() -> Unit) {
         val scope = CheckpointScope(run.path)
         scope.labels()
-        pass(site, scope.labels)
+        pass(site, restart, scope.labels)
     }
 
-    private fun pass(site: Int, labels: List<JournalEntry>) {
+    private fun pass(site: Int, restart: Boolean, labels: List<JournalEntry>) {
         position = AFTER + sites[site]
-        passCheckpoint(sites[site], labels)
+        passCheckpoint(sites[site], labels, restart)
     }
 
-    internal fun passCheckpoint(name: String, labels: List<JournalEntry> = emptyList()) {
+    internal fun passCheckpoint(name: String, labels: List<JournalEntry> = emptyList(), restart: Boolean = false) {
         run.discardPending("'$stage' moved on")
         previous = null
         result = null
         segment = CompoundTag()
         segmentMark = run.journal.next
         run.journal.checkpointPassed(run.path, name)
-        run.history.add(name, run, labels)
+        run.history.add(name, run, labels, restart)
     }
 
     internal fun standAt(site: String, calling: Boolean) {

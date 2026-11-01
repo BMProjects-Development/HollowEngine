@@ -95,34 +95,12 @@ object StoryLiterals {
         if (written.isEmpty()) return List(AXES) { "" }
         if (written == ZERO) return List(AXES) { "0" }
         if (!written.startsWith("$helper(") || !written.endsWith(")")) return null
-        return parts(written.substring(helper.length + 1, written.length - 1)).takeIf { it.size == AXES }
+        return StoryKotlin.arguments(written.substring(helper.length + 1, written.length - 1))?.takeIf { it.size == AXES }
     }
 
     /** The Kotlin of a vector out of its coordinates; with none of them typed it is left out. */
     fun vector(parts: List<String>, helper: String): String =
         if (parts.all(String::isBlank)) "" else parts.joinToString(prefix = "$helper(", postfix = ")") { it.trim() }
-
-    /** [text] split at its commas, those inside brackets and strings aside. */
-    fun parts(text: String): List<String> {
-        val parts = ArrayList<String>()
-        val part = StringBuilder()
-        var depth = 0
-        var quoted = false
-        text.forEachIndexed { index, char ->
-            when {
-                char == '"' && text.getOrNull(index - 1) != '\\' -> quoted = !quoted
-                quoted -> Unit
-                char in "([{" -> depth++
-                char in ")]}" -> depth--
-            }
-            if (char == ',' && depth == 0 && !quoted) {
-                parts += part.toString().trim()
-                part.clear()
-            } else part.append(char)
-        }
-        parts += part.toString().trim()
-        return parts
-    }
 
     private fun helperArguments(written: String): String? {
         val match = CALL.matchEntire(written) ?: return null

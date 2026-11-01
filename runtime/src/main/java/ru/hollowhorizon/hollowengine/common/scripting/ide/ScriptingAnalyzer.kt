@@ -51,6 +51,9 @@ interface ScriptingAnalyzer {
      */
     fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? = types
 
+    /** How the Kotlin [text], statements or an expression, reads on its own. Null when the language cannot parse Kotlin. */
+    fun kotlinSyntax(text: String): KotlinSyntax? = null
+
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>
@@ -67,6 +70,22 @@ interface ScriptingAnalyzer {
      */
     fun symbolSource(qualifiedName: String): DefinitionLocation? = null
 }
+
+/**
+ * What a parser made of a snippet of Kotlin.
+ *
+ * @param valid whether it parsed with no errors.
+ * @param arguments what is between the commas, when the snippet is one call; an argument not typed yet is empty.
+ * @param names the names it uses from outside, without its locals and the members of other things.
+ */
+data class KotlinSyntax(
+    val valid: Boolean,
+    val arguments: List<String>? = null,
+    val names: List<KotlinName> = emptyList(),
+)
+
+/** A name a snippet uses, at the end-exclusive range [start] to [end]. */
+data class KotlinName(val name: String, val start: Int, val end: Int)
 
 enum class SymbolKind { CLASS, ANNOTATION, FUNCTION, PROPERTY }
 

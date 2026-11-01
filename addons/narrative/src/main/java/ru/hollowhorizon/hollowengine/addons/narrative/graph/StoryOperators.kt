@@ -231,6 +231,7 @@ object StoryOperators {
         compare("less-equal", "<="),
         compare("greater", ">"),
         compare("greater-equal", ">="),
+        operator("is-null", "logic", listOf(input("value", ANY)), out("result", BOOL, "\$value == null")),
         operator("equal", "logic", listOf(input("a", ANY, "0"), input("b", ANY, "0")), out("result", BOOL, "\$a == \$b")),
         operator("not-equal", "logic", listOf(input("a", ANY, "0"), input("b", ANY, "0")), out("result", BOOL, "\$a != \$b")),
         logic("and", "&&"),

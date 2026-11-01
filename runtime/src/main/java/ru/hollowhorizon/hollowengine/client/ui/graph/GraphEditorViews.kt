@@ -5,6 +5,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNodeMetrics.FIELD_ROW
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover

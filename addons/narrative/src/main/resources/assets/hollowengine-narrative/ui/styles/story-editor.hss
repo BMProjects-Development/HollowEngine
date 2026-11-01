@@ -1,0 +1,35 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+.story-editor-root {
+    padding: 0px;
+}
+
+.story-muted {
+    height: fit;
+    foreground: $text-muted;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-muted.wrapped {
+    size: 100% fit;
+    text-wrap: true;
+}
+
+.story-field.error {
+    border-color: $danger;
+}
+
+.story-kotlin {
+    padding: 6px;
+    font-family: $font-code;
+    background: $bg-field;
+    border-radius: 4px;
+}
+
+.story-inspector-problem {
+    size: 100% fit;
+    foreground: $danger;
+    font-size: 8px;
+    text-wrap: true;
+}

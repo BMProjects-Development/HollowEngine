@@ -17,12 +17,14 @@ internal class StoryHistory(private val root: StoryRun) {
         val mark: Long,
         val tree: CompoundTag,
         val labels: List<JournalEntry>,
+        val restart: Boolean = false,
     ) {
         fun save(): CompoundTag = CompoundTag().apply {
             putString("name", name)
             putString("run", run)
             putLong("mark", mark)
             put("tree", tree.copy())
+            if (restart) putBoolean("restart", true)
             if (labels.isNotEmpty()) put("labels", ListTag().apply { labels.forEach { add(it.save()) } })
         }
 
@@ -33,6 +35,7 @@ internal class StoryHistory(private val root: StoryRun) {
                 tag.getLong("mark"),
                 tag.getCompound("tree").copy(),
                 tag.getList("labels", Tag.TAG_COMPOUND.toInt()).map { JournalEntry.load(it as CompoundTag) },
+                tag.getBoolean("restart"),
             )
         }
     }
@@ -43,12 +46,15 @@ internal class StoryHistory(private val root: StoryRun) {
 
     fun has(name: String): Boolean = checkpoints.any { it.name == name }
 
+    /** The checkpoint a restart takes the story back to: the last one passed, if it asks for that. */
+    val restartPoint: String? get() = checkpoints.lastOrNull()?.takeIf { it.restart }?.name
+
     /** Whether [run] passed a checkpoint of its own that is still kept: its entry at least, unless it was forgotten. */
     fun hasOwn(run: StoryRun): Boolean = checkpoints.any { it.run == run.path }
 
     /** [run] passed the checkpoint [name]: keeps the tree as it is now with what [labels] captured. */
-    fun add(name: String, run: StoryRun, labels: List<JournalEntry>) {
-        checkpoints += Checkpoint(name, run.path, root.journal.next, root.saveTree(), labels)
+    fun add(name: String, run: StoryRun, labels: List<JournalEntry>, restart: Boolean = false) {
+        checkpoints += Checkpoint(name, run.path, root.journal.next, root.saveTree(), labels, restart)
         if (checkpoints.size > MAX_CHECKPOINTS) checkpoints.removeAt(0)
     }
 

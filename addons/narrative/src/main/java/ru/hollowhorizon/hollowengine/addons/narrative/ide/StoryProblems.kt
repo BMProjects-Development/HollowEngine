@@ -5,7 +5,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryCardKind
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewProblem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
@@ -30,4 +29,4 @@ internal fun PublishStoryProblems(context: HollowIdePreviewContext, graph: Story
 }
 
 private fun titleOf(node: StoryNode): String =
-    (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.let(StoryCatalog::title) ?: StoryCardKind.of(node).title
+    (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.let(StoryCatalog::title) ?: StoryNodeKind.of(node).title
