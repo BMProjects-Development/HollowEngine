@@ -49,7 +49,6 @@ private data class SvgRasterTexture(
 
 private data class SvgRasterQuad(
     val texture: ResourceLocation,
-    val page: UiGlyphAtlasPage,
     val width: Float,
     val height: Float,
     val transform: UiMatrix4,
@@ -190,7 +189,16 @@ class MinecraftUiRenderer {
         }
     }
 
+    /** The batches a frame collects, in the order they are drawn in whenever several of them are pending. */
     private enum class UiBatchKind { ANALYTIC_RECT, PATH_TILE, SHAPE, IMAGE, TEXT }
+
+    private fun boundsOf(kind: UiBatchKind) = when (kind) {
+        UiBatchKind.ANALYTIC_RECT -> analyticBatchBounds
+        UiBatchKind.PATH_TILE -> pathTileBatchBounds
+        UiBatchKind.SHAPE -> shapeBatchBounds
+        UiBatchKind.IMAGE -> imageBatchBounds
+        UiBatchKind.TEXT -> textBatchBounds
+    }
 
     /** Screen-space AABB of a (0,0,width,height) quad under [transform] into quadMin/Max fields. */
     private fun computeQuadBounds(width: Float, height: Float, transform: UiMatrix4, padding: Float = 0f) {
@@ -221,23 +229,23 @@ class MinecraftUiRenderer {
                 quadMaxY <= clip.y || quadMinY >= clip.y + clip.height
     }
 
-    /** Flushes every pending batch (except [except]) whose pixels the current quad overlaps. */
-    private fun flushBatchesOverlappingQuad(except: UiBatchKind?) {
-        if (except != UiBatchKind.ANALYTIC_RECT &&
-            analyticBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        ) flushAnalyticRectBatch()
-        if (except != UiBatchKind.PATH_TILE &&
-            pathTileBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        ) flushPathTileBatch()
-        if (except != UiBatchKind.SHAPE &&
-            shapeBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        ) flushShapeBatch()
-        if (except != UiBatchKind.IMAGE &&
-            imageBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        ) flushPhaseImageBatches()
-        if (except != UiBatchKind.TEXT &&
-            textBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        ) flushTextBatch()
+    private fun flushBatchesOverlappingQuad(kind: UiBatchKind?) {
+        val kinds = UiBatchKind.entries
+        for (index in kinds.lastIndex downTo (kind?.ordinal ?: -1) + 1) {
+            if (boundsOf(kinds[index]).overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)) return flushThrough(kinds[index])
+        }
+    }
+
+    /** Draws what is pending in the batches up to [kind], in their order. */
+    private fun flushThrough(kind: UiBatchKind) {
+        flushAnalyticRectBatch()
+        if (kind >= UiBatchKind.PATH_TILE) flushPathTileBatch()
+        if (kind >= UiBatchKind.SHAPE) flushShapeBatch()
+        if (kind >= UiBatchKind.IMAGE) flushPhaseImageBatches()
+        if (kind == UiBatchKind.TEXT) {
+            textBatchBounds.clear()
+            flushMsdfTextBatch()
+        }
     }
 
     /** Renders directly unless framebuffer layers require a collected atlas pre-pass. */
@@ -298,6 +306,7 @@ class MinecraftUiRenderer {
     }
 
     private fun submit(command: UiRenderCommand) {
+        if (command is FlushBarrierCommand && analyticRectRenderer.isAvailable) return
         if (command.isSegmentBatchable()) {
             segment += command
             when (command) {
@@ -314,8 +323,7 @@ class MinecraftUiRenderer {
         renderSegment(segment)
         clearSegment()
         render(command)
-        flushGeometryBatches()
-        flushTextBatch()
+        flushThrough(UiBatchKind.TEXT)
     }
 
     private fun clearSegment() {
@@ -370,9 +378,7 @@ class MinecraftUiRenderer {
             preparingLayerAtlas = false
             clipStack.clear()
             phaseClipStack.clear()
-            flushPhaseImageBatches()
-            flushGeometryBatches()
-            flushTextBatch()
+            flushThrough(UiBatchKind.TEXT)
             restoreMainProjection()
         }
     }
@@ -419,13 +425,15 @@ class MinecraftUiRenderer {
         if (commands.isEmpty()) return
         segmentBaseClips.clear()
         segmentBaseClips.addAll(clipStack)
-        for (phase in UiRenderPhase.entries) {
-            if (segmentPhases[phase.ordinal]) renderPhase(commands, phase)
+        if (analyticRectRenderer.isAvailable) {
+            renderPhase(commands, null)
+        } else {
+            for (phase in UiRenderPhase.entries) {
+                if (segmentPhases[phase.ordinal]) renderPhase(commands, phase)
+            }
         }
         commitSegmentClips(commands)
-        flushPhaseImageBatches()
-        flushGeometryBatches()
-        flushTextBatch()
+        flushThrough(UiBatchKind.TEXT)
         setScissor(clipStack.lastOrNull())
     }
 
@@ -446,7 +454,11 @@ class MinecraftUiRenderer {
         }
     }
 
-    private fun renderPhase(commands: List<UiRenderCommand>, phase: UiRenderPhase) {
+    /**
+     * Draws the commands of [phase]. Rects and text share a batch that keeps their order, so with null all of them go
+     * in one pass as the tree lays them out; phases are only for drawing text apart from what is under it.
+     */
+    private fun renderPhase(commands: List<UiRenderCommand>, phase: UiRenderPhase?) {
         phaseClipStack.clear()
         phaseClipStack.addAll(segmentBaseClips)
         phaseClip = phaseClipStack.lastOrNull()
@@ -464,7 +476,7 @@ class MinecraftUiRenderer {
                     phaseClip = phaseClipStack.lastOrNull()
                 }
 
-                is DrawShadowCommand -> if (phase == UiRenderPhase.BACKGROUND) {
+                is DrawShadowCommand -> if (phase == null || phase == UiRenderPhase.BACKGROUND) {
                     if (!appendShapeShadows(command)) {
                         var padding = 0f
                         for (shadow in command.shadows) {
@@ -477,53 +489,53 @@ class MinecraftUiRenderer {
                         computeQuadBounds(
                             command.rect.width, command.rect.height, effective(command.transform), padding,
                         )
-                        flushBatchesOverlappingQuad(except = null)
+                        flushBatchesOverlappingQuad(null)
                         setScissor(phaseClip)
                         drawShadow(command)
                     }
                 }
 
-                is DrawBoxCommand -> if (command.phase == phase) {
+                is DrawBoxCommand -> if (phase == null || command.phase == phase) {
                     if (!appendAnalyticRect(command) && !appendBatchedShapes(command)) {
                         computeQuadBounds(command.rect.width, command.rect.height, effective(command.transform))
-                        flushBatchesOverlappingQuad(except = null)
+                        flushBatchesOverlappingQuad(null)
                         setScissor(phaseClip)
                         drawBox(command)
                     }
                 }
 
-                is DrawShapeCommand -> if (command.phase == phase) {
+                is DrawShapeCommand -> if (phase == null || command.phase == phase) {
                     if (!appendPathTile(command) && !appendBatchedShapes(command)) {
                         computeQuadBounds(command.rect.width, command.rect.height, effective(command.transform))
-                        flushBatchesOverlappingQuad(except = null)
+                        flushBatchesOverlappingQuad(null)
                         setScissor(phaseClip)
                         drawShape(command)
                     }
                 }
 
-                is DrawImageCommand -> if (command.phase == phase) {
+                is DrawImageCommand -> if (phase == null || command.phase == phase) {
                     appendPhaseImage(command)
                 }
 
-                is DrawParticlesCommand -> if (command.phase == phase) {
+                is DrawParticlesCommand -> if (phase == null || command.phase == phase) {
                     appendPhaseParticles(command)
                 }
 
-                is DrawRawTextureCommand -> if (command.phase == phase) {
+                is DrawRawTextureCommand -> if (phase == null || command.phase == phase) {
                     computeQuadBounds(command.rect.width, command.rect.height, effective(command.transform))
-                    flushBatchesOverlappingQuad(except = null)
+                    flushBatchesOverlappingQuad(null)
                     setScissor(phaseClip)
                     drawRawTexture(command)
                 }
 
-                is DrawTextCommand -> if (command.phase == phase) {
+                is DrawTextCommand -> if (phase == null || command.phase == phase) {
                     appendPhaseText(command)
                 }
 
                 else -> Unit
             }
         }
-        flushPhaseImageBatches()
+        flushThrough(UiBatchKind.IMAGE)
         phaseClip = phaseClipStack.lastOrNull()
     }
 
@@ -531,37 +543,14 @@ class MinecraftUiRenderer {
         if (command.rect.width <= 0f || command.rect.height <= 0f || command.opacity <= 0f) return
         computeQuadBounds(command.rect.width, command.rect.height, effective(command.transform))
         if (quadFullyClipped()) return
-        if (appendIcon(command)) return
         flushBatchesOverlappingQuad(UiBatchKind.IMAGE)
         val overlapsPendingImages = imageBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
         if (phaseImageBatches.isNotEmpty() && (imageBatchClip != phaseClip || overlapsPendingImages)) {
-            flushPhaseImageBatches()
+            flushThrough(UiBatchKind.IMAGE)
         }
         if (!appendSvgImage(command, phaseImageBatches)) appendImageBatch(command, phaseImageBatches)
         imageBatchClip = phaseClip
         imageBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
-    }
-
-    /** Puts an SVG in the rect batch the way text is, on a page of its own: icons no longer split what is drawn around them. */
-    private fun appendIcon(command: DrawImageCommand): Boolean {
-        if (!analyticRectRenderer.isAvailable || command.fit.isSliced) return false
-        val quad = svgRasterQuad(
-            width = command.rect.width,
-            height = command.rect.height,
-            source = command.source,
-            opacity = command.opacity,
-            transform = effective(command.transform),
-            fit = command.fit,
-            backfaceVisibility = command.backfaceVisibility,
-        ) ?: return false
-        flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
-        if (!analyticRectBatch.acceptsGlyphPage(quad.page)) flushAnalyticRectBatch()
-        analyticRectBatch.appendGlyph(
-            quad.transform, 0f, 0f, quad.width, quad.height, 0f, 0f, 1f, 1f,
-            command.tint.withOpacity(command.opacity), phaseShaderClip(), quad.page,
-        )
-        analyticBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
-        return true
     }
 
     private fun appendPhaseParticles(command: DrawParticlesCommand) {
@@ -573,7 +562,7 @@ class MinecraftUiRenderer {
         val overlapsOtherTextures = phaseImageBatches.keys.any { it != TextureAtlas.LOCATION_PARTICLES } &&
                 imageBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
         if (phaseImageBatches.isNotEmpty() && (imageBatchClip != phaseClip || overlapsOtherTextures)) {
-            flushPhaseImageBatches()
+            flushThrough(UiBatchKind.IMAGE)
         }
         appendParticleQuads(command, transform, phaseImageBatches)
         imageBatchClip = phaseClip
@@ -602,7 +591,7 @@ class MinecraftUiRenderer {
             analyticBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
         } else {
             flushBatchesOverlappingQuad(UiBatchKind.TEXT)
-            if (!msdfTextBatch.isEmpty && textBatchClip != phaseClip) flushMsdfTextBatch()
+            if (!msdfTextBatch.isEmpty && textBatchClip != phaseClip) flushThrough(UiBatchKind.TEXT)
             textBatchClip = phaseClip
             clipStack.clear()
             clipStack.addAll(phaseClipStack)
@@ -695,7 +684,6 @@ class MinecraftUiRenderer {
                 }
             SvgRasterQuad(
                 texture = texture.location,
-                page = UiGlyphAtlasPage(texture.texture.id, pixelWidth.toFloat(), pixelHeight.toFloat(), 0f, UiGlyphSampling.COLOR),
                 width = placement.width,
                 height = placement.height,
                 transform = transform.translated(placement.x, placement.y),
@@ -778,12 +766,6 @@ class MinecraftUiRenderer {
         pathTileBatch.clear()
     }
 
-    private fun flushGeometryBatches() {
-        flushAnalyticRectBatch()
-        flushPathTileBatch()
-        flushShapeBatch()
-    }
-
     private fun flushMsdfTextBatch() {
         if (msdfTextBatch.isEmpty) return
         setScissor(textBatchClip)
@@ -791,11 +773,7 @@ class MinecraftUiRenderer {
         msdfTextBatch.flush()
     }
 
-    private fun flushTextBatch() {
-        textBatchBounds.clear()
-        flushAnalyticRectBatch()
-        flushMsdfTextBatch()
-    }
+    private fun flushTextBatch() = flushThrough(UiBatchKind.TEXT)
 
     private fun appendBatchedShapes(command: UiRenderCommand): Boolean {
         if (command is DrawShapeCommand) return appendBatchedShape(command)
@@ -811,7 +789,7 @@ class MinecraftUiRenderer {
         computeQuadBounds(command.rect.width, command.rect.height, transform)
         if (quadFullyClipped()) return true
         flushBatchesOverlappingQuad(UiBatchKind.SHAPE)
-        if (!shapeBatch.isEmpty && shapeBatchClip != phaseClip) flushShapeBatch()
+        if (!shapeBatch.isEmpty && shapeBatchClip != phaseClip) flushThrough(UiBatchKind.SHAPE)
         shapeBatchClip = phaseClip
         shapeBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
         when (val paint = command.paint) {
@@ -866,7 +844,7 @@ class MinecraftUiRenderer {
         computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
         if (quadFullyClipped()) return true
         flushBatchesOverlappingQuad(UiBatchKind.SHAPE)
-        if (!shapeBatch.isEmpty && shapeBatchClip != phaseClip) flushShapeBatch()
+        if (!shapeBatch.isEmpty && shapeBatchClip != phaseClip) flushThrough(UiBatchKind.SHAPE)
         shapeBatchClip = phaseClip
         shapeBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
         return shapeBatch.appendLocalShape(
@@ -913,7 +891,7 @@ class MinecraftUiRenderer {
         computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
         if (quadFullyClipped()) return true
         flushBatchesOverlappingQuad(UiBatchKind.PATH_TILE)
-        if (!pathTileBatch.isEmpty && pathTileBatchClip != phaseClip) flushPathTileBatch()
+        if (!pathTileBatch.isEmpty && pathTileBatchClip != phaseClip) flushThrough(UiBatchKind.PATH_TILE)
         pathTileBatch.append(command, transform)
         pathTileBatchClip = phaseClip
         pathTileBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
@@ -1305,7 +1283,7 @@ class MinecraftUiRenderer {
     private fun drawShadow(command: DrawShadowCommand) {
         if (command.image != null) {
             appendImageShadows(command)
-            flushPhaseImageBatches()
+            flushThrough(UiBatchKind.IMAGE)
             return
         }
         val transform = effective(command.transform)
@@ -1394,7 +1372,7 @@ class MinecraftUiRenderer {
             }
             val overlapsOtherTextures = phaseImageBatches.keys.any { it != mask.texture } &&
                     imageBatchBounds.overlaps(quadMinX, quadMinY, quadMaxX, quadMaxY)
-            if (phaseImageBatches.isNotEmpty() && (imageBatchClip != phaseClip || overlapsOtherTextures)) flushPhaseImageBatches()
+            if (phaseImageBatches.isNotEmpty() && (imageBatchClip != phaseClip || overlapsOtherTextures)) flushThrough(UiBatchKind.IMAGE)
             phaseImageBatches.getOrPut(mask.texture) { ArrayList() } += UiTexturedQuad(
                 mask.bounds.width, mask.bounds.height, shadowTransform, command.opacity * image.tintAlpha,
                 flipY = true, tint = shadow.color.filtered(command.filter), alphaMask = true,
@@ -1530,7 +1508,7 @@ class MinecraftUiRenderer {
 
     private fun drawShape(command: DrawShapeCommand) {
         if (appendBatchedShape(command)) {
-            flushShapeBatch()
+            flushThrough(UiBatchKind.SHAPE)
             return
         }
         val transform = effective(command.transform)
@@ -1566,9 +1544,7 @@ class MinecraftUiRenderer {
         }
         val scissored = clipped && (!useAnalytic || command.layout.hasInlineImages())
         if (scissored) {
-            flushPhaseImageBatches()
-            flushGeometryBatches()
-            flushTextBatch()
+            flushThrough(UiBatchKind.TEXT)
             pushClip(UiRect(0f, 0f, command.rect.width, command.rect.height), command.transform)
             textBatchClip = clipStack.lastOrNull()
         }
@@ -2594,7 +2570,7 @@ internal class UiBatchBounds {
     }
 
     private companion object {
-        const val MaxRects = 64
+        const val MaxRects = 256
         const val RectStride = 4
     }
 }
