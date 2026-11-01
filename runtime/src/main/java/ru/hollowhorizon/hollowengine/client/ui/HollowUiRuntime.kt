@@ -26,6 +26,7 @@ data class HollowUiFrame(
     val nowMillis: Long = 0L,
 ) {
     internal var profile: UiProfileFrame? = null
+    internal var visibleHits = UiVisibleHitCache()
 
     private val nodesByIdentifier: Map<String, UiNode> by lazy {
         val index = HashMap<String, UiNode>(nodes.size * 2)
@@ -39,7 +40,8 @@ data class HollowUiFrame(
     fun hitTest(x: Float, y: Float): UiHit? = UiHitTester().hitTest(root, layout, x, y)
 
     /** Whether visible, input-opaque UI geometry is under the point (blocks click-through). */
-    fun hitsVisible(x: Float, y: Float): Boolean = UiHitTester().hitsVisible(root, layout, x, y)
+    fun hitsVisible(x: Float, y: Float): Boolean =
+        visibleHits.getOrPut(x, y) { UiHitTester().hitsVisible(root, layout, x, y) }
 
     /** The node the wheel scrolls: the deepest one under the point that has room to move. */
     fun scrollTargetAt(x: Float, y: Float): UiNode? = wheelChainAt(x, y).scrollTarget()
@@ -160,6 +162,22 @@ private sealed interface ScrollTargetTask {
     ) : ScrollTargetTask
 }
 
+/** The last answer for a point, passed along while frames change nothing that could alter it. */
+internal class UiVisibleHitCache {
+    private var x = Float.NaN
+    private var y = Float.NaN
+    private var hit = false
+
+    inline fun getOrPut(x: Float, y: Float, compute: () -> Boolean): Boolean {
+        if (x != this.x || y != this.y) {
+            hit = compute()
+            this.x = x
+            this.y = y
+        }
+        return hit
+    }
+}
+
 fun UiRect?.intersect(other: UiRect?): UiRect? {
     if (this == null) return other
     if (other == null) return this
@@ -273,7 +291,8 @@ class HollowUiRuntime(
             subtreeLayoutRevision = root.layoutState.subtreeLayoutRevision,
         )
 
-        val layoutReused = lastLayout != null && layoutKey == lastLayoutKey
+        val previousLayout = lastLayout
+        val layoutReused = previousLayout != null && layoutKey == lastLayoutKey
         val layout = when {
             layoutReused -> {
                 if (profile != null) profile.layoutReuses++
@@ -288,17 +307,23 @@ class HollowUiRuntime(
         }
         lastLayout = layout
         lastLayoutKey = layoutKey
-        dispatchPlacementCallbacks(layout)
-        dispatchTextLayoutCallbacks(layout)
-        dispatchResolvedStyleCallbacks(layout)
-        publishScrollGeometry(layout)
+        val unchanged = resolver.lastResolveReused && layout === previousLayout
+        if (!unchanged) {
+            dispatchPlacementCallbacks(layout)
+            dispatchTextLayoutCallbacks(layout)
+            dispatchResolvedStyleCallbacks(layout)
+            publishScrollGeometry(layout)
+        }
 
         return HollowUiFrame(
             root = root,
             nodes = nodes,
             layout = layout,
             nowMillis = nowMillis,
-        ).also { it.profile = profile }
+        ).also { frame ->
+            frame.profile = profile
+            if (unchanged) lastFrame?.let { frame.visibleHits = it.visibleHits }
+        }
     }
 
     private fun scrolledOnly(next: FrameLayoutKey): UiLayoutResult? {

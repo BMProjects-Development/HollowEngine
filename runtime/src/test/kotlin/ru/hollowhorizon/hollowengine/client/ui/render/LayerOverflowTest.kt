@@ -20,11 +20,11 @@ class LayerOverflowTest {
         ).also { it.children.add(plate) }
         val root = BoxNode(measurePolicy = UiMeasurePolicies.Column).also { it.children.add(panel) }
 
-        val overflow = layoutOf(root).layerOverflows()[panel]
+        val overflow = layoutOf(root).layerOverflow(panel)
 
         assertEquals(30f, overflow, "the plate sits 30px above the panel it belongs to")
         assertTrue(
-            layerPadding(UiFilterChain.Empty, overflow!!) >= 30f,
+            layerPadding(UiFilterChain.Empty, overflow) >= 30f,
             "the reserved padding has to cover the overhang, not just the guard band",
         )
     }
@@ -46,16 +46,8 @@ class LayerOverflowTest {
 
         assertEquals(
             0f,
-            layoutOf(root).layerOverflows()[panel],
+            layoutOf(root).layerOverflow(panel),
             "content the viewport clips away never reaches the panel's layer",
         )
-    }
-
-    @Test
-    fun `a layout with nothing to composite asks for nothing`() {
-        val child = BoxNode(modifiers = listOf(Modifier.size(40.px, 16.px)))
-        val root = BoxNode(measurePolicy = UiMeasurePolicies.Column).also { it.children.add(child) }
-
-        assertEquals(emptyMap(), layoutOf(root).layerOverflows())
     }
 }

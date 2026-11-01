@@ -256,15 +256,16 @@ internal fun UiPathRasterTemplate.appendTo(
 ) {
     val tileStart = tiles.size / UiPathTileBatch.TileStride
     val segmentIndexStart = segmentIndices.size
+    val point = FloatArray(3)
     var vertexOffset = 0
     while (vertexOffset < this.vertices.size) {
         val localX = this.vertices[vertexOffset + 3]
         val localY = this.vertices[vertexOffset + 4]
-        val point = transform.transform(localX, localY)
+        transform.transform(localX, localY, 0f, point, 0)
         vertices.add(
-            point.x,
-            point.y,
-            point.z,
+            point[0],
+            point[1],
+            point[2],
             localX,
             localY,
             this.vertices[vertexOffset + 5] + tileStart,
