@@ -11,6 +11,10 @@ class UiModifierResolver(
     private val transitions: UiTransitionState = UiTransitionState(),
     private val animations: UiAnimationState = UiAnimationState(),
 ) {
+    /** Whether the last [resolve] found the whole tree as it was left. */
+    var lastResolveReused = false
+        private set
+
     private val resolveStack = StyleResolveStack()
     private val stylesheetStack = ArrayDeque<UiNode>()
     private val stylesheetReferences = ArrayList<UiStylesheetReference>()
@@ -50,8 +54,10 @@ class UiModifierResolver(
                 profile.styleVisitedNodes += it.nodes.size
                 profile.styleCacheHits += it.nodes.size
             }
+            lastResolveReused = true
             return it.nodes
         }
+        lastResolveReused = false
         val stylesheetChanged = previousTreeCache != null &&
                 previousTreeCache.key.stylesheetRevision != stylesheetRevision
         transitions.beginResolve()

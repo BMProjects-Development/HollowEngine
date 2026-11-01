@@ -929,11 +929,10 @@ class MinecraftUiRenderer {
         val scale = layerScale()
         layerRequests.clear()
         layerPaddings.clear()
-        val overflows = layout.layerOverflows()
         for (node in layout.traversalOrder) {
             val layoutNode = layout.nodes[node] ?: continue
             if (!layoutNode.needsFramebuffer) continue
-            val padding = layerPadding(node.resolvedSnapshot.filter, overflows[node] ?: 0f)
+            val padding = layerPadding(node.resolvedSnapshot.filter, layout.layerOverflow(node))
             layerPaddings[node] = padding
             val layerScale = scale * layerResolutionScale(layoutNode.worldTransform, resolutionScratch)
             val width = ceil((layoutNode.rect.width + padding * 2f) * layerScale).toInt().coerceAtLeast(1)

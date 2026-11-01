@@ -486,7 +486,7 @@ private fun UiSvgStyle.withoutGeometryEffects(): UiSvgStyle {
     return copy(clipPath = null, mask = null, filter = null)
 }
 
-private fun parseSvgResourceLocation(location: String): ResourceLocation {
+internal fun parseSvgResourceLocation(location: String): ResourceLocation {
     val trimmed = location.trim()
     return ResourceLocation.parse(if (trimmed.contains(":")) trimmed else "hollowengine:$trimmed")
 }
