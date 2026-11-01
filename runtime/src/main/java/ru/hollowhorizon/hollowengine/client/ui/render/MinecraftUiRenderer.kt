@@ -110,7 +110,7 @@ internal fun UiRenderCommand.isSegmentBatchable(): Boolean = when (this) {
     is DrawImageCommand -> !renderToFramebuffer && filter == UiFilterChain.Empty
     is DrawParticlesCommand -> filter == UiFilterChain.Empty
     is DrawTextCommand -> true
-    is PushClipCommand, is PopClipCommand -> true
+    is PushClipCommand, is PopClipCommand, is CompositeLayerCommand -> true
     else -> false
 }
 
@@ -170,7 +170,6 @@ class MinecraftUiRenderer {
     private val phaseClipStack = ArrayDeque<UiRect>()
     private val segmentBaseClips = ArrayList<UiRect>()
     private var phaseClip: UiRect? = null
-    private var pathTileBatchClip: UiRect? = null
     private var shapeBatchClip: UiRect? = null
     private var imageBatchClip: UiRect? = null
     private var textBatchClip: UiRect? = null
@@ -360,6 +359,7 @@ class MinecraftUiRenderer {
             is DrawItemCommand -> drawItem(command)
             is DrawEntityCommand -> drawEntity(command)
             is DrawCanvasGlCommand -> drawCanvasGl(command)
+            is CompositeLayerCommand -> compositePreparedLayer(command.node, clipStack.lastOrNull())
         }
     }
 
@@ -387,17 +387,33 @@ class MinecraftUiRenderer {
         var index = 0
         for (layer in plan.layers) {
             while (index < layer.startIndex) submit(plan.commands[index++])
-            renderSegment(segment)
-            clearSegment()
-            compositePreparedLayer(layer.command.node)
+            if (analyticRectRenderer.isAvailable) {
+                submit(CompositeLayerCommand(layer.command.node))
+            } else {
+                renderSegment(segment)
+                clearSegment()
+                compositePreparedLayer(layer.command.node, clipStack.lastOrNull())
+            }
             index = layer.endIndex + 1
         }
         while (index < plan.commands.size) submit(plan.commands[index++])
     }
 
-    private fun compositePreparedLayer(node: UiNode) {
+    /** Draws a prepared layer between the batches around it: only what lies under the layer has to go first. */
+    private fun compositePhaseLayer(node: UiNode) {
+        val layer = preparedLayers[node]?.layer ?: return
+        computeQuadBounds(
+            layer.rect.width + layer.padding * 2f,
+            layer.rect.height + layer.padding * 2f,
+            calculateRootTransform(layer),
+        )
+        flushBatchesOverlappingQuad(null)
+        compositePreparedLayer(node, phaseClip)
+    }
+
+    private fun compositePreparedLayer(node: UiNode, clip: UiRect?) {
         val prepared = preparedLayers.remove(node) ?: return
-        setScissor(clipStack.lastOrNull())
+        setScissor(clip)
         val transform = calculateRootTransform(prepared.layer)
         drawLayerTexture(
             prepared.layer,
@@ -531,6 +547,8 @@ class MinecraftUiRenderer {
                 is DrawTextCommand -> if (phase == null || command.phase == phase) {
                     appendPhaseText(command)
                 }
+
+                is CompositeLayerCommand -> compositePhaseLayer(command.node)
 
                 else -> Unit
             }
@@ -759,7 +777,7 @@ class MinecraftUiRenderer {
     private fun flushPathTileBatch() {
         pathTileBatchBounds.clear()
         if (!pathTileBatch.isEmpty) {
-            setScissor(pathTileBatchClip)
+            setScissor(null)
             activeProfile?.pathTileDraws++
             pathTileRenderer.draw(pathTileBatch)
         }
@@ -891,9 +909,7 @@ class MinecraftUiRenderer {
         computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
         if (quadFullyClipped()) return true
         flushBatchesOverlappingQuad(UiBatchKind.PATH_TILE)
-        if (!pathTileBatch.isEmpty && pathTileBatchClip != phaseClip) flushThrough(UiBatchKind.PATH_TILE)
-        pathTileBatch.append(command, transform)
-        pathTileBatchClip = phaseClip
+        pathTileBatch.append(command, transform, phaseShaderClip())
         pathTileBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
         return true
     }
@@ -919,23 +935,19 @@ class MinecraftUiRenderer {
             if (!layoutNode.needsFramebuffer) continue
             val padding = layerPadding(node.resolvedSnapshot.filter, overflows[node] ?: 0f)
             layerPaddings[node] = padding
-            val layerScale = scale * transformResolutionScale(layoutNode.worldTransform, resolutionScratch)
+            val layerScale = scale * layerResolutionScale(layoutNode.worldTransform, resolutionScratch)
             val width = ceil((layoutNode.rect.width + padding * 2f) * layerScale).toInt().coerceAtLeast(1)
             val height = ceil((layoutNode.rect.height + padding * 2f) * layerScale).toInt().coerceAtLeast(1)
             layerRequests += UiLayerRequest(width, height)
         }
-        framebuffers.beginFrame(
-            layerRequests,
-            1,
-            1,
-        )
+        framebuffers.beginFrame(layerRequests)
         return layerRequests.isNotEmpty()
     }
 
     private fun beginLayer(command: BeginLayerCommand) {
         scissorState = ScissorUnknown
         // Must match prepareFramebuffers, which sized the atlas this layer is allocated from.
-        val resolution = transformResolutionScale(command.transform, resolutionScratch)
+        val resolution = layerResolutionScale(command.transform, resolutionScratch)
         val scale = layerScale() * resolution
         val padding = layerPaddings[command.node] ?: layerPadding(command)
         val logicalWidth = command.rect.width + padding * 2f
@@ -1404,9 +1416,12 @@ class MinecraftUiRenderer {
                     command.backfaceVisibility,
                 )
             ) continue
+            if (shadow.color.alpha <= 0f) continue
             val blur = shadow.blur.coerceAtLeast(0f)
             val spread = if (shadow.inset) 0f else abs(shadow.spread)
             val padding = if (shadow.inset) 0f else spread + blur * 3f + 1f
+            computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
+            if (quadFullyClipped()) continue
             computeQuadBounds(command.rect.width, command.rect.height, transform, if (shadow.inset) 0f else spread + blur * VisibleShadowBlurs)
             flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
             computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
