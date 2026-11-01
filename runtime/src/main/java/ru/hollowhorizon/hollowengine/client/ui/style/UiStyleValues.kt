@@ -51,7 +51,9 @@ data class UiUvRect(val u0: Float, val v0: Float, val u1: Float, val v1: Float) 
 
 sealed interface UiPaint {
     data object None : UiPaint
-    data class Color(val color: UiColor) : UiPaint
+    data class Color(val color: UiColor) : UiPaint {
+        internal val resolved = UiResolvedPaint.Color(color)
+    }
     data class LinearGradient(val angleDegrees: Float, val stops: List<UiGradientStop>) : UiPaint
     data class RadialGradient(val gradient: UiRadialGradient) : UiPaint
     data class Image(val source: String) : UiPaint

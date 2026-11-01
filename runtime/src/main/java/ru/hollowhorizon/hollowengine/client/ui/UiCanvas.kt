@@ -280,8 +280,9 @@ internal class UiCommandCanvasScope(
         val scaleX = contentRect.width / viewBox.width.coerceAtLeast(0.0001f)
         val scaleY = contentRect.height / viewBox.height.coerceAtLeast(0.0001f)
         val effectScale = max(abs(scaleX), abs(scaleY))
-        for (element in document.elements) {
-            val shape = SvgPathShape(element.path, viewBox)
+        for (index in document.elements.indices) {
+            val element = document.elements[index]
+            val shape = document.shapes[index]
             for (effect in element.filterEffects) {
                 if (effect !is UiSvgFilterEffect.DropShadow) continue
                 submitSvgShape(
@@ -294,9 +295,10 @@ internal class UiCommandCanvasScope(
                 )
             }
         }
-        for (element in document.elements) {
-            if (element.paint == UiPaint.None) continue
-            val shape = SvgPathShape(element.path, viewBox)
+        for (index in document.elements.indices) {
+            val element = document.elements[index]
+            if (element.paint === UiPaint.None) continue
+            val shape = document.shapes[index]
             var blurRadius = 0f
             for (effect in element.filterEffects) {
                 when (effect) {

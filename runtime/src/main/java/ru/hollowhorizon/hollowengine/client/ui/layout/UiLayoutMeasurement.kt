@@ -95,17 +95,12 @@ private inline fun UiLayoutPipeline.measureNodeCached(
     allowHeightOverflow: Boolean,
     onCacheHit: () -> Unit = {},
 ): LayoutSize {
-    val cache = measureCacheFor(node)
+    val cache = node.layoutState.measureCache ?: NodeMeasureCache().also { node.layoutState.measureCache = it }
     val revision = node.layoutState.subtreeLayoutRevision
-    val key = MeasureCacheKey(
-        availableWidth = availableWidth,
-        availableHeight = availableHeight,
-        widthOverride = widthOverride,
-        heightOverride = heightOverride,
-        flags = measureFlags(deferFlexibleWidth, deferFlexibleHeight, allowWidthOverflow, allowHeightOverflow),
-        scrollbarReserves = scrollbarReserves,
-    )
-    cache.get(revision, key)?.let {
+    val flags = measureFlags(deferFlexibleWidth, deferFlexibleHeight, allowWidthOverflow, allowHeightOverflow)
+    val overrideWidth = widthOverride ?: Float.NaN
+    val overrideHeight = heightOverride ?: Float.NaN
+    cache.get(revision, availableWidth, availableHeight, overrideWidth, overrideHeight, flags, scrollbarReserves)?.let {
         onCacheHit()
         return it
     }
@@ -121,7 +116,9 @@ private inline fun UiLayoutPipeline.measureNodeCached(
         deferFlexibleHeight,
         allowWidthOverflow,
         allowHeightOverflow,
-    ).also { cache.put(revision, key, it) }
+    ).also {
+        cache.put(revision, availableWidth, availableHeight, overrideWidth, overrideHeight, flags, scrollbarReserves, it)
+    }
 }
 
 private fun measureFlags(
@@ -138,42 +135,73 @@ private fun measureFlags(
     return flags
 }
 
-internal data class MeasureCacheKey(
-    val availableWidth: Float,
-    val availableHeight: Float,
-    val widthOverride: Float?,
-    val heightOverride: Float?,
-    val flags: Int,
-    val scrollbarReserves: Map<UiNode, UiScrollbarReserve>,
-)
-
+/** The last sizes of a node by what it was measured against; an override of NaN stands for none. */
 internal class NodeMeasureCache {
     private var revision = Long.MIN_VALUE
-    private val keys = ArrayList<MeasureCacheKey>(MaxEntries)
-    private val sizes = ArrayList<LayoutSize>(MaxEntries)
+    private val constraints = FloatArray(MaxEntries * ConstraintStride)
+    private val flags = IntArray(MaxEntries)
+    private val reserves = arrayOfNulls<Map<UiNode, UiScrollbarReserve>>(MaxEntries)
+    private val sizes = arrayOfNulls<LayoutSize>(MaxEntries)
+    private var count = 0
+    private var cursor = 0
 
-    fun get(revision: Long, key: MeasureCacheKey): LayoutSize? {
+    fun get(
+        revision: Long,
+        availableWidth: Float,
+        availableHeight: Float,
+        widthOverride: Float,
+        heightOverride: Float,
+        flags: Int,
+        reserves: Map<UiNode, UiScrollbarReserve>,
+    ): LayoutSize? {
         if (this.revision != revision) return null
-        val index = keys.indexOf(key)
-        return if (index >= 0) sizes[index] else null
+        for (index in 0 until count) {
+            val offset = index * ConstraintStride
+            if (this.flags[index] == flags &&
+                sameConstraint(constraints[offset], availableWidth) &&
+                sameConstraint(constraints[offset + 1], availableHeight) &&
+                sameConstraint(constraints[offset + 2], widthOverride) &&
+                sameConstraint(constraints[offset + 3], heightOverride) &&
+                this.reserves[index] == reserves
+            ) {
+                return sizes[index]
+            }
+        }
+        return null
     }
 
-    fun put(revision: Long, key: MeasureCacheKey, size: LayoutSize) {
+    fun put(
+        revision: Long,
+        availableWidth: Float,
+        availableHeight: Float,
+        widthOverride: Float,
+        heightOverride: Float,
+        flags: Int,
+        reserves: Map<UiNode, UiScrollbarReserve>,
+        size: LayoutSize,
+    ) {
         if (this.revision != revision) {
             this.revision = revision
-            keys.clear()
-            sizes.clear()
+            count = 0
+            cursor = 0
         }
-        if (keys.size >= MaxEntries) {
-            keys.removeAt(0)
-            sizes.removeAt(0)
-        }
-        keys.add(key)
-        sizes.add(size)
+        val offset = cursor * ConstraintStride
+        constraints[offset] = availableWidth
+        constraints[offset + 1] = availableHeight
+        constraints[offset + 2] = widthOverride
+        constraints[offset + 3] = heightOverride
+        this.flags[cursor] = flags
+        this.reserves[cursor] = reserves
+        sizes[cursor] = size
+        cursor = (cursor + 1) % MaxEntries
+        if (count < MaxEntries) count++
     }
+
+    private fun sameConstraint(cached: Float, value: Float) = cached == value || cached.isNaN() && value.isNaN()
 
     private companion object {
         const val MaxEntries = 6
+        const val ConstraintStride = 4
     }
 }
 

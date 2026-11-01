@@ -21,15 +21,16 @@ internal fun ShaderGraphSceneView(
 ) {
     val scene = model.nodes
     GraphFrameHeaders(controller)
-    scene.boxes.values.filter { it.node.id in controller.shown }.sortedBy { it.node.id in controller.selection }.forEach { box ->
+    scene.boxes.values.forEach { box ->
         key(box.node.id) {
-            if (box.isReroute) {
-                GraphRerouteView(
+            when {
+                box.node.id !in controller.shown -> Unit
+                box.isReroute -> GraphRerouteView(
                     controller, box.node.id, box.rect, box.pins.first { it.output },
                     listOfNotNull(types.output(box.node.id, ShaderNodeLibrary.REROUTE_OUTPUT)?.tag()),
                 )
-            } else {
-                ShaderNodeView(
+
+                else -> ShaderNodeView(
                     graph = graph,
                     box = box,
                     model = model,

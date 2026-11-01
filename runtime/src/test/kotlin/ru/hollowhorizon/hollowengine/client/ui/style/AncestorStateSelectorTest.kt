@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.style
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 /**
  * `.parent:hover .child` - a rule whose *ancestor* carries the state. The child has no state
@@ -43,6 +44,20 @@ class AncestorStateSelectorTest {
             icon.resolvedSnapshot.tint,
             "leaving the ancestor puts the child back",
         )
+    }
+
+    @Test
+    fun `a state no selector asks of a node leaves the nodes below it alone`() {
+        val (button, icon) = tree()
+        val panel = BoxNode().also { it.children.add(button) }
+        button.layoutState.attachTo(panel)
+        val resolver = UiModifierResolver(stylesheet = sheet)
+        resolver.resolve(panel, animate = false)
+        val style = icon.resolvedSnapshot
+
+        panel.setRuntimeStates(setOf(UiState.HOVER))
+        resolver.resolve(panel, animate = false)
+        assertSame(style, icon.resolvedSnapshot)
     }
 
     @Test

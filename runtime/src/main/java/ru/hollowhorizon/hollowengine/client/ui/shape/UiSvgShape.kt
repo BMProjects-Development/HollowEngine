@@ -20,7 +20,10 @@ data class UiSvgPathDocument(
     val path: UiPath,
     val viewBox: UiRect,
     val elements: List<UiSvgPathElement> = listOf(UiSvgPathElement(path)),
-)
+) {
+    /** The shape of each of [elements], in the same order. */
+    internal val shapes: List<SvgPathShape> by lazy { elements.map { SvgPathShape(it.path, viewBox) } }
+}
 
 data class SvgResourceShape(
     val location: ResourceLocation,

@@ -53,9 +53,11 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val controller = remember(state) { GraphEditorController(CanvasId, state.editor) }
     val arranged = remember(graph) { arrange(graph) }
     val ownChecks = remember(graph) { StoryChecks.all(graph) }
-    val checks = ownChecks + StoryInsight.analysis(state, graph).checks
+    val analysis = StoryInsight.analysis(state, graph)
+    val checks = ownChecks + analysis.checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
-    val model = StoryGraphEditorModel(state, graph, arranged + state.moved) { controller.select(it) }
+    val boxes = remember(graph, analysis) { StoryGraphBoxes(graph, state) }
+    val model = StoryGraphEditorModel(state, graph, boxes, arranged + state.moved) { controller.select(it) }
     controller.model = model
 
     PublishStoryProblems(context, graph, checks) { node ->
@@ -70,16 +72,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
         }
     }
 
-    val selection = state.editor.selection
-    val selected = selection.single?.takeIf { selection.group == null && it in model.all }
-    SideEffect {
-        if (state.selected?.node != selected) state.selected = selected?.let { StorySelection(it) }
-    }
-    PublishInspector(source = "story-graph:${context.file.path}", key = selection.group to selected) {
-        selection.group?.let { groupInspector(state, it) } ?: storyInspector(
-            state,
-            selected?.let { StorySelection(it) })
-    }
+    PublishStorySelection(context, state, model)
 
     Box(
         mode = UiBoxMode.STACK,
@@ -89,8 +82,13 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     ) {
         GraphEditorCanvas(controller, Modifier.size(100.percent, 100.percent)) {
             GraphFrameHeaders(controller)
-            model.boxes.values.filter { it.node.id in controller.shown }.sortedBy { it.node.id in controller.selection }.forEach { box ->
-                key(box.node.id) { StoryNodeView(controller, model, state, box, problems[box.node.id]) }
+            model.boxes.values.forEach { box ->
+                key(box.node.id) {
+                    // A node out of sight keeps its key: one taken out of the list makes Compose move every node after it.
+                    if (box.node.id in controller.shown) {
+                        StoryNodeView(controller, boxes, state, box, problems[box.node.id])
+                    }
+                }
             }
             model.scene.cards.forEach { card ->
                 key("card-${card.id}") {
@@ -108,11 +106,30 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     }
 }
 
+/** Keeps the inspector on what is selected; apart from the graph, which a click has no need to make anew. */
+@Composable
+private fun PublishStorySelection(
+    context: HollowIdePreviewContext,
+    state: StoryGraphState,
+    model: StoryGraphEditorModel,
+) {
+    val selection = state.editor.selection
+    val selected = selection.single?.takeIf { selection.group == null && it in model.all }
+    SideEffect {
+        if (state.selected?.node != selected) state.selected = selected?.let { StorySelection(it) }
+    }
+    PublishInspector(source = "story-graph:${context.file.path}", key = selection.group to selected) {
+        selection.group?.let { groupInspector(state, it) } ?: storyInspector(
+            state,
+            selected?.let { StorySelection(it) })
+    }
+}
+
 /** A node on the canvas with a row per thing it holds, each edited in place. */
 @Composable
 private fun StoryNodeView(
     controller: GraphEditorController,
-    model: StoryGraphEditorModel,
+    boxes: StoryGraphBoxes,
     state: StoryGraphState,
     box: StoryNodeBox,
     problems: List<StoryCheck>?,
@@ -120,7 +137,7 @@ private fun StoryNodeView(
     val node = box.node
     if (node is StoryNode.Reroute) {
         val output = box.pins.first { it.output }
-        return GraphRerouteView(controller, node.id, box.rect, output, listOf(model.typeOf(output).tag()))
+        return GraphRerouteView(controller, node.id, box.rect, output, listOf(boxes.typeOf(output).tag()))
     }
     val problem = problems?.map { it.message }?.distinct()?.joinToString("\n")
     val warning = problems?.all { it.warning } == true
@@ -137,8 +154,9 @@ private fun StoryNodeView(
         }
         if (!box.collapsed) box.rows.forEach { row -> StoryRowView(controller, state, box, row) }
         box.pins.forEach { pin ->
-            val connected = model.isPinLinked(pin)
-            GraphPinView(controller, pin, box.x, box.y, connected, listOf(model.typeOf(pin).tag()))
+            GraphPinView(
+                controller, pin, box.x, box.y, boxes.isLinked(pin), listOf(boxes.typeOf(pin).tag()), boxes.tooltip(pin),
+            )
         }
     }
 }

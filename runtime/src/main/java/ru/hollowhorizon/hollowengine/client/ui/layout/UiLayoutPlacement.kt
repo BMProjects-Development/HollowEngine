@@ -22,12 +22,6 @@ internal fun UiLayoutPipeline.placeNodeNow(
         profile.matrixCalculations++
     }
     val style = resolved[node]
-    val boxes = nodeBoxes(rect, style, scrollbarReserves[node] ?: UiScrollbarReserve.None)
-    val scrollOffset = style.scroll?.state?.offset ?: UiScrollOffset.Zero
-    // Computed by the parent inline flow (wrapping depends on where the span starts in a line)
-    val textLayout = (node as? SpanNode)?.lineLayout
-    val overflowClip = overflowClipRect(rect, style, boxes.content)
-    val clip = if (style.clip || style.scrollable) parentClip.intersect(overflowClip) else parentClip
     val localX = rect.x - parentRect.x
     val localY = rect.y - parentRect.y
     val nodeTransform = style.transform
@@ -49,6 +43,16 @@ internal fun UiLayoutPipeline.placeNodeNow(
             if (parentInputTransform === parentTransform) transform
             else parentInputTransform * localTransform
     }
+    val placed = reusableLayout?.nodes?.get(node)
+    if (placed != null && placed.isValidFor(node, rect, parentClip, transform, inputTransform, insideFramebuffer)) {
+        reusePlacedSubtree(node, reusableLayout!!, layouts)
+        return
+    }
+    val boxes = nodeBoxes(rect, style, scrollbarReserves[node] ?: UiScrollbarReserve.None)
+    val scrollOffset = style.scroll?.state?.offset ?: UiScrollOffset.Zero
+    val textLayout = (node as? SpanNode)?.lineLayout
+    val overflowClip = overflowClipRect(rect, style, boxes.content)
+    val clip = if (style.clip || style.scrollable) parentClip.intersect(overflowClip) else parentClip
     val opacityNeedsLayer = style.opacity < 1f && node.children.isNotEmpty()
     val needsFramebuffer = opacityNeedsLayer ||
             nodeTransform.needsFramebuffer && !node.drawsInSpace() ||
@@ -76,6 +80,7 @@ internal fun UiLayoutPipeline.placeNodeNow(
         scrollArea = boxes.scrollArea,
         textLayout = textLayout,
         inlineDecoration = (node as? BaseUiNode)?.inlineDecoration,
+        subtreeRevision = node.layoutState.subtreeLayoutRevision,
     )
 
     if (node.children.isEmpty()) return
@@ -102,6 +107,37 @@ internal fun UiLayoutPipeline.placeNodeNow(
             layouts = layouts,
         ),
     )
+}
+
+/**
+ * Whether this placement of [node] still stands. Text is left out: where a span wraps comes from the flow around it,
+ * which a span or a nested flow cannot see from here.
+ */
+private fun UiLayoutNode.isValidFor(
+    node: UiNode,
+    rect: UiRect,
+    parentClip: UiRect?,
+    transform: UiMatrix4,
+    inputTransform: UiMatrix4,
+    insideFramebuffer: Boolean,
+): Boolean = subtreeRevision == node.layoutState.subtreeLayoutRevision &&
+        node !is SpanNode &&
+        (node.measurePolicy as? UiBuiltInMeasurePolicy)?.kind != UiBuiltInMeasurePolicyKind.INLINE_FLOW &&
+        this.rect == rect &&
+        this.insideFramebuffer == insideFramebuffer &&
+        outerClip == parentClip &&
+        worldTransform.sameAs(transform) &&
+        this.inputTransform.sameAs(inputTransform)
+
+private fun UiLayoutPipeline.reusePlacedSubtree(
+    node: UiNode,
+    previous: UiLayoutResult,
+    layouts: MutableMap<UiNode, UiLayoutNode>,
+) {
+    layouts[node] = previous[node]
+    val children = previous.childrenByNode[node] ?: return
+    reusedChildren[node] = children
+    for (index in children.indices) reusePlacedSubtree(children[index], previous, layouts)
 }
 
 private fun ChildPlacementScope.unscrolled(node: UiNode, rect: UiRect): UiRect {

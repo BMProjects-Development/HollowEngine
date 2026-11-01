@@ -96,6 +96,12 @@ data class HssSelector(
      */
     val stateDependent: Boolean = states.isNotEmpty() || ancestor?.stateDependent == true
 
+    private val requiredTags = tags.toTypedArray()
+
+    /** The selectors to the left of this one that ask for a state. */
+    internal fun statefulAncestors(): List<HssSelector> =
+        generateSequence(ancestor) { it.ancestor }.filter { it.states.isNotEmpty() }.toList()
+
     fun matches(node: UiNode): Boolean {
         if (!matchesSelf(node)) return false
         val requiredAncestor = ancestor ?: return true
@@ -107,13 +113,16 @@ data class HssSelector(
         return false
     }
 
-    private fun matchesSelf(node: UiNode): Boolean {
+    private fun matchesSelf(node: UiNode): Boolean = matchesIgnoringStates(node) && node.hasEffectiveStates(states)
+
+    /** Whether [node] matches this selector alone, whatever state it is in and whatever is above it. */
+    internal fun matchesIgnoringStates(node: UiNode): Boolean {
         if (type != null && node.type != type) return false
         if (id != null && node.id != id) return false
-        if (!node.tags.containsAll(tags)) return false
-        if (!node.hasEffectiveStates(states)) return false
-        if (attributes.any { !it.matches(node) }) return false
-        return true
+        for (tag in requiredTags) {
+            if (tag !in node.tags) return false
+        }
+        return attributes.none { !it.matches(node) }
     }
 }
 

@@ -66,6 +66,11 @@ class GraphCurve(val points: FloatArray) {
         return floatArrayOf(points[step * 2], points[step * 2 + 1])
     }
 
+    /** Whether ([x], [y]) can be within [radius] of the curve at all. */
+    fun passesNear(x: Float, y: Float, radius: Float): Boolean = bounds.let {
+        x >= it.x - radius && y >= it.y - radius && x <= it.x + it.width + radius && y <= it.y + it.height + radius
+    }
+
     fun distanceTo(x: Float, y: Float): Float = (0 until pointCount - 1).minOfOrNull { index ->
         distanceToSegment(
             x, y,
@@ -177,7 +182,8 @@ object GraphCurves {
 
     /** The key of the curve closest to ([x], [y]) within [radius], if any is. */
     fun <K> nearest(curves: List<Pair<K, GraphCurve>>, x: Float, y: Float, radius: Float): K? =
-        curves.map { (key, curve) -> key to curve.distanceTo(x, y) }.filter { it.second <= radius }
+        curves.filter { (_, curve) -> curve.passesNear(x, y, radius) }
+            .map { (key, curve) -> key to curve.distanceTo(x, y) }.filter { it.second <= radius }
             .minByOrNull { it.second }?.first
 
     private fun bezier(

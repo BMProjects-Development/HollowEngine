@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.with
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withMembership
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withoutGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryInsight
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryUndo
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
@@ -19,18 +20,66 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 
+/**
+ * The boxes of one analyzed graph, and what can be read off them wherever they stand. A node that stays where it was
+ * keeps its box, so a drag recomposes only the nodes it moves.
+ */
+internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditorState) {
+    private val layout = StoryNodeLayout(graph, state)
+    private val boxes = HashMap<String, StoryNodeBox>()
+
+    fun at(node: StoryNode, place: StoryPoint): StoryNodeBox =
+        boxes[node.id]?.takeIf { it.x == place.x && it.y == place.y }
+            ?: layout.of(node, place).also { boxes[node.id] = it }
+
+    /** The box [node] gets on its own, for one not in the graph yet. */
+    fun of(node: StoryNode): StoryNodeBox = layout.of(node, StoryPoint(0f, 0f))
+
+    fun typeOf(pin: GraphPin): StoryPinType {
+        val box = boxes[pin.node] ?: return StoryPinType.ANY
+        val node = box.node
+        if (node is StoryNode.Reroute && !node.flow) return carried(node)
+        return box.type(pin) ?: StoryPinType.ANY
+    }
+
+    /** What the value passing through [reroute] is, by the pin it comes from. */
+    private fun carried(reroute: StoryNode.Reroute): StoryPinType {
+        val seen = HashSet<String>()
+        var at = reroute.id
+        while (seen.add(at)) {
+            val link = graph.index.valuesInto(at).firstOrNull() ?: return StoryPinType.ANY
+            val box = boxes[link.from] ?: return StoryPinType.ANY
+            if (box.node !is StoryNode.Reroute) return box.rows.firstNotNullOfOrNull { row -> row.output?.takeIf { it.name == link.fromPin } }?.type
+                ?: StoryPinType.ANY
+            at = link.from
+        }
+        return StoryPinType.ANY
+    }
+
+    fun isLinked(pin: GraphPin): Boolean = graph.links.any {
+        if (pin.output) it.from == pin.node && it.fromPin == pin.name else it.to == pin.node && it.toPin == pin.name
+    }
+
+    fun tooltip(pin: GraphPin): String = boxes[pin.node]?.kotlin(pin) ?: typeOf(pin).let { type ->
+        when (type) {
+            StoryPinType.FLOW -> storyLang("pin.flow")
+            StoryPinType.ANY, StoryPinType.OBJECT -> storyLang("pin.any")
+            else -> type.label
+        }
+    }
+}
+
 /** A story as [GraphEditorController] sees it, made anew for each graph drawn. */
 internal class StoryGraphEditorModel(
     private val state: StoryGraphState,
     private val graph: StoryGraph,
+    private val layout: StoryGraphBoxes,
     private val places: Map<String, StoryPoint>,
     private val select: (GraphSelection) -> Unit,
 ) : GraphEditorModel {
-    private val layout = StoryNodeLayout(graph, state)
-
     /** Every node, those a collapsed group hides too. */
     val all: Map<String, StoryNodeBox> =
-        graph.nodes.mapNotNull { node -> places[node.id]?.let { node.id to layout.of(node, it) } }.toMap()
+        graph.nodes.mapNotNull { node -> places[node.id]?.let { node.id to layout.at(node, it) } }.toMap()
 
     private val hidden = graph.groups.filter { it.collapsed }.flatMap { it.nodes }.toSet()
     val boxes: Map<String, StoryNodeBox> = all.filterKeys { it !in hidden }
@@ -77,30 +126,7 @@ internal class StoryGraphEditorModel(
         )
     }
 
-    fun typeOf(pin: GraphPin): StoryPinType {
-        val box = all[pin.node] ?: return StoryPinType.ANY
-        val node = box.node
-        if (node is StoryNode.Reroute && !node.flow) return carried(node)
-        return box.type(pin) ?: StoryPinType.ANY
-    }
-
-    /** What the value passing through [reroute] is, by the pin it comes from. */
-    private fun carried(reroute: StoryNode.Reroute): StoryPinType {
-        val seen = HashSet<String>()
-        var at = reroute.id
-        while (seen.add(at)) {
-            val link = graph.index.valuesInto(at).firstOrNull() ?: return StoryPinType.ANY
-            val box = all[link.from] ?: return StoryPinType.ANY
-            if (box.node !is StoryNode.Reroute) return box.rows.firstNotNullOfOrNull { row -> row.output?.takeIf { it.name == link.fromPin } }?.type
-                ?: StoryPinType.ANY
-            at = link.from
-        }
-        return StoryPinType.ANY
-    }
-
-    fun isPinLinked(pin: GraphPin): Boolean = graph.links.any {
-        if (pin.output) it.from == pin.node && it.fromPin == pin.name else it.to == pin.node && it.toPin == pin.name
-    }
+    fun typeOf(pin: GraphPin): StoryPinType = layout.typeOf(pin)
 
     override fun pinColor(pin: GraphPin): UiColor = typeOf(pin).color()
 
@@ -133,13 +159,7 @@ internal class StoryGraphEditorModel(
         return StoryInsight.analysis(state, graph).takes(from, to)
     }
 
-    override fun pinTooltip(pin: GraphPin): String = all[pin.node]?.kotlin(pin) ?: typeOf(pin).let { type ->
-        when (type) {
-            StoryPinType.FLOW -> storyLang("pin.flow")
-            StoryPinType.ANY, StoryPinType.OBJECT -> storyLang("pin.any")
-            else -> type.label
-        }
-    }
+    override fun pinTooltip(pin: GraphPin): String = layout.tooltip(pin)
 
     override fun connect(from: GraphPin, to: GraphPin) {
         val output = if (from.output) from else to
@@ -194,7 +214,7 @@ internal class StoryGraphEditorModel(
         select(GraphSelection.of(node.id))
     }
 
-    private fun boxFor(node: StoryNode) = layout.of(node, StoryPoint(0f, 0f))
+    private fun boxFor(node: StoryNode) = layout.of(node)
 
     /** Links [pending] to the first pin of the new [node] that takes it. */
     private fun StoryGraph.linked(pending: GraphPendingLink, type: StoryPinType, node: StoryNode): StoryGraph {

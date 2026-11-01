@@ -19,6 +19,10 @@ $category-texture: #C067A4;
 $category-procedural: #5F59B1;
 $category-output: #CF5E54;
 
+.graph-node.selected {
+    layer: 1;
+}
+
 .graph-node.gn-node {
     background: $node-bg;
     border: 0px $node-line;

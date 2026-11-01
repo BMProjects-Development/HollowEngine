@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.UiModifierResolver
 import ru.hollowhorizon.hollowengine.client.ui.text.Bold
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
@@ -76,6 +77,11 @@ class StyleInvalidationTest {
         runtime.frame(root, 200f, 200f, 10f, 10f, 0L)
         assertTrue(UiState.HOVER in child.effectiveStates(), "the hovered leaf is hovered")
         assertTrue(UiState.HOVER in parent.effectiveStates(), "its ancestor is hovered too")
+
+        runtime.frame(root, 200f, 200f, 150f, 150f, 0L)
+        runtime.frame(root, 200f, 200f, 150f, 150f, 0L)
+        assertFalse(UiState.HOVER in child.effectiveStates(), "the pointer left the leaf")
+        assertFalse(UiState.HOVER in parent.effectiveStates(), "and its ancestor")
     }
 
     @Test

@@ -382,7 +382,7 @@ class UiCommandRenderer {
         val isFramebuffer = layoutNode.needsFramebuffer
         val baseFilter = if (isFramebuffer) UiFilterChain.Empty else style.filter
         val localOpacity = if (isFramebuffer) 1f else style.opacity
-        val visibleShadows = if (style.shadows.isEmpty()) emptyList() else style.shadows.filterNot { it.inset }
+        val visibleShadows = style.shadows.outer()
         val nodeLayoutBoundsMatchVisualBounds =
             layoutBoundsMatchVisualBounds && style.transform == DirectLayoutTransform
         val canCullNode =
@@ -500,7 +500,7 @@ class UiCommandRenderer {
             var start = 0
             while (start < sorted.size) {
                 val groupLayer = sorted[start].resolvedSnapshot.layer
-                var end = start + 1
+                var end = if (sorted[sorted.size - 1].resolvedSnapshot.layer == groupLayer) sorted.size else start + 1
                 while (end < sorted.size && sorted[end].resolvedSnapshot.layer == groupLayer) end++
                 if (start > 0) commands += FlushBarrierCommand(node)
                 val groupSink = if (end - start > 1 && node.childrenCanOverlap()) {
@@ -596,9 +596,6 @@ class UiCommandRenderer {
         filter: UiFilterChain,
         commands: UiRenderSink,
     ) {
-        val contentTransform = layoutNode.worldTransform.translated(
-            layoutNode.content.x - layoutNode.rect.x, layoutNode.content.y - layoutNode.rect.y, 0f
-        )
         val backface = style.backfaceVisibility
 
         when (node) {
@@ -610,7 +607,7 @@ class UiCommandRenderer {
                     node.text,
                     style.foreground,
                     opacity,
-                    contentTransform,
+                    layoutNode.contentTransform(),
                     filter,
                     wrap = false,
                     style.textOverflow,
@@ -641,7 +638,7 @@ class UiCommandRenderer {
                             )
                     } else {
                         commands += DrawImageCommand(
-                            node, layoutNode.content, source, opacity, style.tint, contentTransform,
+                            node, layoutNode.content, source, opacity, style.tint, layoutNode.contentTransform(),
                             false, style.imageFit, style.imageSlice, filter, backface,
                             uv = style.imageUv,
                         )
@@ -649,12 +646,12 @@ class UiCommandRenderer {
                 }
                 style.item?.let {
                     commands += DrawItemCommand(
-                        node, layoutNode.content, it, opacity, contentTransform, filter, backface,
+                        node, layoutNode.content, it, opacity, layoutNode.contentTransform(), filter, backface,
                     )
                 }
                 style.entity?.let {
                     commands += DrawEntityCommand(
-                        node, layoutNode.content, it, opacity, contentTransform, false, filter, backface,
+                        node, layoutNode.content, it, opacity, layoutNode.contentTransform(), false, filter, backface,
                     )
                 }
             }
@@ -662,6 +659,9 @@ class UiCommandRenderer {
     }
 
     /** The parsed (cached) vector document for an `.svg` image source, or null for raster images. */
+    private fun UiLayoutNode.contentTransform(): UiMatrix4 =
+        worldTransform.translated(content.x - rect.x, content.y - rect.y, 0f)
+
     private fun svgImageGeometry(source: String): UiSvgPathDocument? {
         if (!source.endsWith(".svg", ignoreCase = true)) return null
         return runCatching {
@@ -708,7 +708,7 @@ class UiCommandRenderer {
             )
             return
         }
-        if (style.background == UiPaint.None && style.border.width == UiInsets.Zero) return
+        if (style.background === UiPaint.None && style.border.width == UiInsets.Zero) return
         val paint = style.background.resolve()
         val border = style.border.withNormalizedRadius()
         if (!paint.hasVisiblePixels() && !border.hasVisiblePixels()) return
@@ -880,8 +880,8 @@ internal fun UiResolvedPaint.hasVisiblePixels(): Boolean = when (this) {
 internal fun UiBorder.hasVisiblePixels(): Boolean = width != UiInsets.Zero && paint.resolve().hasVisiblePixels()
 
 internal fun UiPaint.resolve(): UiResolvedPaint = when (this) {
-    UiPaint.None -> UiResolvedPaint.None
-    is UiPaint.Color -> UiResolvedPaint.Color(color)
+    is UiPaint.Color -> resolved
+    is UiPaint.None -> UiResolvedPaint.None
     is UiPaint.LinearGradient -> UiResolvedPaint.LinearGradient(angleDegrees, stops)
     is UiPaint.RadialGradient -> UiResolvedPaint.RadialGradient(gradient)
     is UiPaint.Image -> UiResolvedPaint.Image(source)
@@ -902,7 +902,7 @@ class UiHitTester {
             if (!style.hoverable && !style.clickable && !style.focusable && !style.draggable && !style.scrollable) {
                 return@findTopmost null
             }
-            if (current.hasEffectiveState(UiState.DISABLED) || !layoutNode.inputContains(x, y)) {
+            if (!layoutNode.inputContains(x, y) || current.hasEffectiveState(UiState.DISABLED)) {
                 return@findTopmost null
             }
             val local = layoutNode.inputTransform.inverse()?.transform(x, y, 0f) ?: return@findTopmost null
@@ -954,6 +954,14 @@ class UiHitTester {
 }
 
 private val DirectLayoutTransform = UiTransform()
+
+/** The shadows drawn outside a node; nearly always all of them, which then stay one list. */
+private fun List<UiShadow>.outer(): List<UiShadow> {
+    for (index in indices) {
+        if (this[index].inset) return filterNot { it.inset }
+    }
+    return this
+}
 
 private fun UiRect.hasVisibleArea(): Boolean {
     return width > 0f && height > 0f

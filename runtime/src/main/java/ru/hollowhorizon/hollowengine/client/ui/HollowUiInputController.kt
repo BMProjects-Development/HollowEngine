@@ -18,7 +18,10 @@ class HollowUiInputController {
 
     private val focusByScope = LinkedHashMap<UiNode, UiNode>()
     private val hoverChain = HashSet<UiNode>()
+    private val engagedNodes = HashSet<UiNode>()
+    private val statedNodes = ArrayList<UiNode>()
     private val runtimeStack = ArrayDeque<UiNode>()
+    private var closingApplied = false
     private var activeScope: UiNode? = null
 
     private fun primaryFocus(): UiNode? = activeScope?.let { focusByScope[it] } ?: focusByScope.values.firstOrNull()
@@ -76,7 +79,9 @@ class HollowUiInputController {
         val active = activeNode
         val dragging = draggingNode
         val scope = activeScope
-        if (hovered == null && active == null && dragging == null && scope == null && focusByScope.isEmpty()) return
+        if (hovered.isUnder(root) && active.isUnder(root) && dragging.isUnder(root) && scope.isUnder(root) &&
+            focusByScope.all { (focusScope, target) -> focusScope.isUnder(root) && target.isUnder(root) }
+        ) return
 
         val wantedIds = HashSet<String>(8)
         val identityChecked = HashSet<UiNode>(8)
@@ -560,7 +565,8 @@ class HollowUiInputController {
         }
     }
 
-    private fun applyRuntimeStates(node: UiNode, closing: Boolean) {
+    /** Only the nodes the pointer or the focus is on hold states, so the whole tree is walked just to close it. */
+    private fun applyRuntimeStates(root: UiNode, closing: Boolean) {
         hoverChain.clear()
 
         var ancestor = hoveredNode
@@ -569,31 +575,54 @@ class HollowUiInputController {
             ancestor = ancestor.layoutState.parentNode
         }
 
-        val focusTargets = if (focusByScope.isEmpty()) emptySet() else HashSet(focusByScope.values)
+        engagedNodes.clear()
+        engagedNodes += hoverChain
+        activeNode?.let { engagedNodes += it }
+        draggingNode?.let { engagedNodes += it }
+        engagedNodes += focusByScope.values
 
-        runtimeStack.clear()
-        runtimeStack.add(node)
-        while (runtimeStack.isNotEmpty()) {
-            val current = runtimeStack.removeLast()
-            val hover = current in hoverChain
-            val active = current === activeNode
-            val focus = focusTargets.isNotEmpty() && current in focusTargets
-            val dragging = current === draggingNode
-            if (!hover && !active && !focus && !dragging && !closing) {
-                current.setRuntimeStates(emptySet())
-            } else {
-                val states = linkedSetOf<UiState>()
-                if (hover) states += UiState.HOVER
-                if (active) states += UiState.ACTIVE
-                if (focus) states += UiState.FOCUS
-                if (dragging) states += UiState.DRAGGING
-                if (closing) states += UiState.CLOSING
-                current.setRuntimeStates(states)
+        if (closing || closingApplied) {
+            runtimeStack.clear()
+            runtimeStack.add(root)
+            while (runtimeStack.isNotEmpty()) {
+                val current = runtimeStack.removeLast()
+                current.setRuntimeStates(runtimeStatesOf(current, closing))
+                for (index in current.children.indices.reversed()) {
+                    runtimeStack.add(current.children[index])
+                }
             }
-            for (index in current.children.indices.reversed()) {
-                runtimeStack.add(current.children[index])
+        } else {
+            for (node in statedNodes) {
+                if (node !in engagedNodes) node.setRuntimeStates(emptySet())
+            }
+            for (node in engagedNodes) {
+                if (node !is ScrollbarNode && node !is ScrollbarThumbNode) node.setRuntimeStates(runtimeStatesOf(node, false))
             }
         }
+        closingApplied = closing
+        statedNodes.clear()
+        statedNodes += engagedNodes
+    }
+
+    private fun runtimeStatesOf(node: UiNode, closing: Boolean): Set<UiState> {
+        val hover = node in hoverChain
+        val active = node === activeNode
+        val focus = focusByScope.containsValue(node)
+        val dragging = node === draggingNode
+        if (!hover && !active && !focus && !dragging && !closing) return emptySet()
+        val states = linkedSetOf<UiState>()
+        if (hover) states += UiState.HOVER
+        if (active) states += UiState.ACTIVE
+        if (focus) states += UiState.FOCUS
+        if (dragging) states += UiState.DRAGGING
+        if (closing) states += UiState.CLOSING
+        return states
+    }
+
+    private fun UiNode?.isUnder(root: UiNode): Boolean {
+        var current = this ?: return true
+        while (current !== root) current = current.layoutState.parentNode ?: return false
+        return true
     }
 }
 

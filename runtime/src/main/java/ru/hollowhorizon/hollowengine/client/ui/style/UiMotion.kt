@@ -247,11 +247,13 @@ class UiTransitionState {
             return target
         }
         val oldTarget = state.transitionTarget
-        if (oldTarget !== target && oldTarget != target) {
+        val changed = oldTarget !== target && oldTarget != target
+        state.transitionTarget = target
+        if (changed) {
             state.transitionStart = current
-            state.transitionTarget = target
             state.transitionStartedAt = nowMillis
         } else if (state.transitionStartedAt == UiNodeMotionState.NoTimestamp) {
+            state.rendered = target
             return target
         }
         val startStyle = state.transitionStart ?: current
