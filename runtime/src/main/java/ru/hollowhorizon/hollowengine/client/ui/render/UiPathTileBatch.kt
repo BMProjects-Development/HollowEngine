@@ -327,6 +327,7 @@ internal class UiPathTileBatch {
                 tileSize,
                 paintIndex,
                 rowSegmentCount,
+                aaMargin,
                 strokeRadius,
                 blurRadius,
                 spreadRadius,
@@ -343,13 +344,15 @@ internal class UiPathTileBatch {
         tileSize: Float,
         paintIndex: Int,
         rowSegmentCount: Int,
+        aaMargin: Float,
         strokeRadius: Float,
         blurRadius: Float,
         spreadRadius: Float,
     ) {
+        val stroke = strokeRadius > 0f
         val rowSegmentStart = segmentIndices.size
-        for (index in 0 until rowSegmentCount) segmentIndices.add(rowIndexScratch[index])
-        val crossingCount = if (strokeRadius > 0f) {
+        if (!stroke) for (index in 0 until rowSegmentCount) segmentIndices.add(rowIndexScratch[index])
+        val crossingCount = if (stroke) {
             0
         } else {
             buildCrossings(rowSegmentCount, (rowMinY + rowMaxY) * 0.5f).also {
@@ -367,15 +370,21 @@ internal class UiPathTileBatch {
                 winding += crossingDeltaScratch[crossingIndex++]
             }
             val boundary = boundaryColumnScratch[tileX - minTileX]
-            if (!boundary && (strokeRadius > 0f || winding == 0)) continue
+            if (!boundary && (stroke || winding == 0)) continue
+            val tileSegmentStart = if (stroke) segmentIndices.size else rowSegmentStart
+            val tileSegmentCount = if (stroke) {
+                appendStrokeTileSegments(rowSegmentCount, tileMinX, tileMaxX, aaMargin)
+            } else {
+                rowSegmentCount
+            }
             appendTile(
                 tileMinX,
                 rowMinY,
                 tileMaxX,
                 rowMaxY,
                 transforms[pathIndex],
-                if (boundary) rowSegmentStart else 0,
-                if (boundary) rowSegmentCount else 0,
+                if (boundary) tileSegmentStart else 0,
+                if (boundary) tileSegmentCount else 0,
                 paintIndex,
                 !boundary,
                 strokeRadius,
@@ -383,6 +392,20 @@ internal class UiPathTileBatch {
                 spreadRadius,
             )
         }
+    }
+
+    private fun appendStrokeTileSegments(rowSegmentCount: Int, tileMinX: Float, tileMaxX: Float, margin: Float): Int {
+        var count = 0
+        for (rowIndex in 0 until rowSegmentCount) {
+            val segmentIndex = rowIndexScratch[rowIndex]
+            val offset = segmentIndex * SegmentStride
+            val x0 = segments[offset]
+            val x1 = segments[offset + 2]
+            if (max(x0, x1) + margin < tileMinX || min(x0, x1) - margin > tileMaxX) continue
+            segmentIndices.add(segmentIndex)
+            count++
+        }
+        return count
     }
 
     private fun buildCrossings(rowSegmentCount: Int, y: Float): Int {

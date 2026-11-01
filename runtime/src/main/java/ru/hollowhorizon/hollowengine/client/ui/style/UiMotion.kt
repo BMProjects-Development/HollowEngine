@@ -327,6 +327,13 @@ class UiAnimationState {
         }
     }
 
+    /** Whether a later resolve can still give [style] something else than this one did. */
+    internal fun isRunning(state: UiNodeMotionState, style: UiComputedStyle, nowMillis: Long): Boolean {
+        if (state.animationSignature == null) return false
+        val elapsed = nowMillis - state.animationStartedAt
+        return style.animations.any { animation -> animation.totalDurationMillis()?.let { it > elapsed } ?: true }
+    }
+
     private fun animationProgress(animation: UiAnimation, elapsedMillis: Long): Float? {
         val activeElapsed = elapsedMillis - animation.delayMillis
         if (activeElapsed < 0L) {
