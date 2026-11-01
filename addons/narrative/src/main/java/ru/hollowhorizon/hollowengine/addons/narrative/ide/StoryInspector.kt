@@ -141,7 +141,7 @@ private fun StoryProperties(state: StoryEditorState) {
     }
     StoryImports(state, graph)
     val kotlin = StoryGraphCompiler.compile(graph, StoryActionFunctions)
-    kotlin.problems.forEach { Text(it.message, tags = listOf("story-inspector-problem")) }
+    kotlin.problems.forEach { Text(StoryChecks.text(it), tags = listOf("story-inspector-problem")) }
     CollapsibleSection(
         storyLang("kotlin"),
         state.showsKotlin,

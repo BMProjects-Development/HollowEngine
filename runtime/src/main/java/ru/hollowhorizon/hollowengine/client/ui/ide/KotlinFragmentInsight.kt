@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextHighlight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.withColor
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinPropertyTypes
 import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinToken
 
 /** What surrounds a fragment of Kotlin in the file it belongs to. */
@@ -19,12 +20,12 @@ data class KotlinFragmentContext(val before: String, val after: String)
 /**
  * What analysis made of a whole file.
  *
- * @param types what the properties it was asked about turned out to be, by name.
+ * @param properties what the properties it was asked about turned out to be.
  */
 class KotlinFragmentAnalysis(
     val highlights: List<UiTextHighlight>,
     val diagnostics: List<UiTextDiagnostic>,
-    val types: Map<String, String>,
+    val properties: KotlinPropertyTypes,
 )
 
 /** Colors text by what a parser made of it, which any number of fields can do at once. */
@@ -37,10 +38,11 @@ fun kotlinTokenHighlighter(tokens: (String) -> List<KotlinToken>) = UiSyntaxHigh
  *
  * @param path the name analysis knows the text by; its extension picks the language.
  * @param typedProperties the start of the names of the properties to tell the types of.
+ * @param placeProperties the start of the names of the properties to tell whether those fit.
  */
-class KotlinFragmentInsight(path: String, typedProperties: String? = null) {
+class KotlinFragmentInsight(path: String, typedProperties: String? = null, placeProperties: String? = null) {
     private var revision by mutableLongStateOf(0L)
-    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties) { revision = session.revision }
+    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties, placeProperties) { revision = session.revision }
 
     /** Moves on with analysis, for telling a field to read it again. */
     val version: Long get() = revision

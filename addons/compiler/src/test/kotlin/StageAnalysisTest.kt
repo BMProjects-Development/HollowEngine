@@ -55,11 +55,33 @@ class StageAnalysisTest {
                 val other = 1
             }
         """.trimIndent()
-        val types = compiler.environment.analyzer.propertyTypes("types.stage.kts", source, "storyPin")
+        val types = compiler.environment.analyzer.propertyTypes("types.stage.kts", source, "storyPin").types
         assertEquals(
             mapOf("storyPin0" to "kotlin.collections.List<kotlin.String>", "storyPin1" to "kotlin.String"),
             types
         )
+    }
+
+    @Test
+    fun `values fit places the way Kotlin assigns them`() {
+        val source = """
+            suspend fun check() {
+                val storyPin0 = listOf("x")
+                val storyPin1 = listOf(1)
+                val storyPin2 = listOf<String?>()
+                val storyPin3: String? = null
+                val storyPlace0: List<String> = listOf()
+                val storyPlace1: Iterable<*> = listOf<Int>()
+                val storyPlace2: String = ""
+                val storyPlace3: Missing = ""
+            }
+        """.trimIndent()
+        val found = compiler.environment.analyzer.propertyTypes("fits.stage.kts", source, "storyPin", "storyPlace")
+        assertEquals(setOf("storyPlace0", "storyPlace1"), found.fits["storyPin0"])
+        assertEquals(setOf("storyPlace1"), found.fits["storyPin1"])
+        assertEquals(setOf("storyPlace1"), found.fits["storyPin2"])
+        assertEquals(setOf("storyPlace2"), found.fits["storyPin3"])
+        assertTrue("storyPlace3" !in found.types)
     }
 
     @Test
@@ -84,7 +106,7 @@ class StageAnalysisTest {
         val script = StoryGraphCompiler.compile(graph).code + pins.withIndex().joinToString("") { (index, pin) ->
             "\nsuspend fun storyPinOf$index() {\nval storyPin$index = (\n${pin.value}\n)\n}"
         }
-        val found = compiler.environment.analyzer.propertyTypes("graph.stage.kts", script, "storyPin")
+        val found = compiler.environment.analyzer.propertyTypes("graph.stage.kts", script, "storyPin").types
         val types = found.mapKeys { (name, _) -> pins[name.removePrefix("storyPin").toInt()].key }
         assertEquals("kotlin.String", types["text" to StoryPins.VALUE])
         assertEquals("kotlin.Int", types["sum" to StoryPins.VALUE])

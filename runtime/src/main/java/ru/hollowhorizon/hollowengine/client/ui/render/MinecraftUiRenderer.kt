@@ -1404,9 +1404,12 @@ class MinecraftUiRenderer {
                     command.backfaceVisibility,
                 )
             ) continue
-            val padding = if (shadow.inset) 0f else abs(shadow.spread) + shadow.blur.coerceAtLeast(0f) * 3f + 1f
-            computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
+            val blur = shadow.blur.coerceAtLeast(0f)
+            val spread = if (shadow.inset) 0f else abs(shadow.spread)
+            val padding = if (shadow.inset) 0f else spread + blur * 3f + 1f
+            computeQuadBounds(command.rect.width, command.rect.height, transform, if (shadow.inset) 0f else spread + blur * VisibleShadowBlurs)
             flushBatchesOverlappingQuad(UiBatchKind.ANALYTIC_RECT)
+            computeQuadBounds(command.rect.width, command.rect.height, transform, padding)
             analyticRectBatch.appendShadow(command, shadow, transform, phaseShaderClip())
             analyticBatchBounds.add(quadMinX, quadMinY, quadMaxX, quadMaxY)
         }
@@ -2537,6 +2540,9 @@ private data object ScissorUnknown
  * Where the quads of a pending batch are, one rect after another: a quad falling between them has nothing to wait for.
  * Past [MaxRects] the last rect grows over the rest, which can only flush more often than needed.
  */
+/** How many blur radii out a shadow still shows: past that it is too faint to keep neighbors out of a batch for. */
+private const val VisibleShadowBlurs = 1.5f
+
 internal class UiBatchBounds {
     private val rects = FloatArray(MaxRects * RectStride)
     private var count = 0

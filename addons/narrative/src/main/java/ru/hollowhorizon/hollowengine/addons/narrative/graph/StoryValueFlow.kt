@@ -17,12 +17,12 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
 
     private fun problem(reader: String, source: StoryNode): List<StoryGraphProblem> = when (source) {
         is StoryNode.Loop -> if (reader in body(source)) emptyList() else listOf(
-            StoryGraphProblem(reader, "The item of a loop only exists in the body of that loop"),
+            StoryGraphProblem(reader, "loop_item", "The item of a loop only exists in the body of that loop"),
         )
 
         else -> if (source.id != reader && source.id in passed.getValue(reader)) emptyList() else listOf(
             StoryGraphProblem(
-                reader, "Flow can get here without passing the node this value comes from", warning = true
+                reader, "other_branch", "Flow can get here without passing the node this value comes from", warning = true
             ),
         )
     }

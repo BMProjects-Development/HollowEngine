@@ -21,6 +21,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class HollowIdeEditorSession(
     private val path: String,
     private val typedProperties: String? = null,
+    private val placeProperties: String? = null,
     private val onUpdated: () -> Unit,
 ) {
     private val languageService = languageServiceForPath(path)
@@ -320,11 +321,11 @@ internal class HollowIdeEditorSession(
                     EditorStructure()
                 },
                 propertyTypes = typedProperties?.let { prefix ->
-                    runCatching { analyzer.propertyTypes(path, text, prefix) }.getOrElse { failure ->
+                    runCatching { analyzer.propertyTypes(path, text, prefix, placeProperties) }.getOrElse { failure ->
                         reportAnalysisFailure("types", failure)
-                        emptyMap()
+                        KotlinPropertyTypes()
                     }
-                }.orEmpty(),
+                } ?: KotlinPropertyTypes(),
             )
             publishAnalysisIfCurrent(requestRevision) {
                 snapshot = next
@@ -535,7 +536,7 @@ private data class EditorAnalysisSnapshot(
     val inlayHints: List<UiInlayHint>,
     val diagnostics: List<UiTextDiagnostic>,
     val structure: EditorStructure = EditorStructure(),
-    val propertyTypes: Map<String, String> = emptyMap(),
+    val propertyTypes: KotlinPropertyTypes = KotlinPropertyTypes(),
 ) {
     val fragment = KotlinFragmentAnalysis(highlights, diagnostics, propertyTypes)
 

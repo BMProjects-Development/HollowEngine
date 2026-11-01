@@ -349,7 +349,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     node.id, StoryPins.VALUE, storyLang("set.value"), type,
                     StoryRowField(
                         "value", node.value, "0", code = true, vector = helper,
-                        problem = helper?.let { StoryChecks.vector(node.value, it) } ?: codeProblem(node.value),
+                        problem = codeProblem(node.value),
                     ) { typed ->
                         edit(node.id, "value") { (it as StoryNode.Assign).copy(value = typed) }
                     },
@@ -544,7 +544,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     input.type.text(input.default),
                     vector = helper,
                     hints = StoryCatalog.inputHints(input.name),
-                    problem = helper?.let { StoryChecks.vector(written, it) } ?: codeProblem(written),
+                    problem = codeProblem(written),
                 ) { typed ->
                     edit(node.id, input.name) { each ->
                         each as StoryNode.Pure

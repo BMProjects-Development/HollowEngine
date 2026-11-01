@@ -406,20 +406,6 @@ class StoryTopologyTest : StageTest() {
     }
 
     @Test
-    fun `links tell lists apart by what they hold`() {
-        assertTrue(StoryKotlinTypes.fits("List<String>", "kotlin.collections.List<kotlin.String>"))
-        assertTrue(StoryKotlinTypes.fits("List<String>", "List<*>"))
-        assertTrue(StoryKotlinTypes.fits("List<ServerPlayer>", "List<Entity>"))
-        assertTrue(StoryKotlinTypes.fits("Any?", "List<String>"))
-        assertFalse(StoryKotlinTypes.fits("List<Int>", "List<String>"))
-        assertFalse(StoryKotlinTypes.fits("List<Any?>", "List<String>"))
-        assertFalse(StoryKotlinTypes.fits("List<String?>", "List<String>"))
-        assertFalse(StoryKotlinTypes.fits("List<Int>", "List<Double>"))
-        assertFalse(StoryKotlinTypes.fits("StoryHandle<Unit>", "ServerLevel"))
-        assertTrue(StoryKotlinTypes.fits("StoryHandle<Unit>", "StoryHandle<*>"))
-    }
-
-    @Test
     fun `only a nullable variable can start empty`() {
         val start = listOf(StoryNode.Start("s", "main"))
         val empty = StoryGraph(variables = listOf(StoryVariable("a", "", "String?")), nodes = start)

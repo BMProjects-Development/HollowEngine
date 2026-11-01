@@ -16,6 +16,8 @@ internal const val StoryEditorStylesheet = "hollowengine-narrative:ui/styles/sto
 
 internal fun storyLang(name: String) = "hollowengine.gui.ide.story.$name".lang
 
+internal fun storyLang(name: String, vararg arguments: Any) = "hollowengine.gui.ide.story.$name".lang(*arguments)
+
 internal fun storyIcon(name: String) = "hollowengine-narrative:textures/gui/icons/story/$name.svg"
 
 /** What the edits of a story are called in the history window. */
