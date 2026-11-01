@@ -3,8 +3,10 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.edit
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
@@ -38,6 +40,18 @@ internal open class StoryEditorState {
 
     val model = HollowIdeTextModel(StoryGraph::decode)
     var selected by mutableStateOf<StorySelection?>(null)
+
+    /** The field open in the full editor of Kotlin. */
+    var codeField by mutableStateOf<StoryCodeField?>(null)
+
+    /** The field whose color is being picked. */
+    var colorField by mutableStateOf<StoryRowField?>(null)
+
+    /** The names of the variables open in the inspector. */
+    var openVariables by mutableStateOf(emptySet<String>())
+
+    /** Whether the inspector shows the imports of the story. */
+    var showsImports by mutableStateOf(false)
 
     /** Whether the inspector shows the Kotlin of the story. */
     var showsKotlin by mutableStateOf(false)

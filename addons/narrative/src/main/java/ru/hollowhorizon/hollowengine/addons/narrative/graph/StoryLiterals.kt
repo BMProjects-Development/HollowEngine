@@ -44,9 +44,7 @@ object StoryLiterals {
             kind.isSubclassOf(DialogueCharacter::class) -> call("character", typed)
             kind.isSubclassOf(Entity::class) -> call("actor", typed)
             kind.java.isEnum -> "${kind.qualifiedName}.${typed.uppercase().replace('-', '_')}"
-            kind in COLLECTIONS -> typed.split(',').joinToString(prefix = "listOf(", postfix = ")") {
-                expression(it, type.arguments.singleOrNull()?.type)
-            }
+            isKotlin(type) -> text
 
             else -> StoryGraphCompiler.literal(text)
         }
@@ -68,13 +66,25 @@ object StoryLiterals {
             kind.java.isEnum -> written.substringAfterLast('.').takeIf { written.endsWith(it) && it.uppercase() == it }
                 ?.lowercase()?.replace('_', '-')
 
-            kind in COLLECTIONS -> Regex("""^listOf\((.*)\)$""").matchEntire(written)?.groupValues?.get(1)?.split(", ")
-                ?.map { text(it, type.arguments.singleOrNull()?.type) }?.joinToString(", ")
+            isKotlin(type) -> expression
 
             else -> helperArguments(written)
         }
         return plain ?: "{$written}"
     }
+
+    /** Whether a field of [type] holds plain Kotlin, as nothing shorter says what such a value is. */
+    fun isKotlin(type: KType?): Boolean = type?.classifier in COLLECTIONS
+
+    /** The strings of a `listOf` of the Kotlin [expression]; anything else holds none. */
+    fun listed(expression: String): List<String> {
+        val inner = expression.trim().removePrefix("listOf(").takeIf { it.endsWith(")") }?.dropLast(1).orEmpty()
+        return StoryKotlin.arguments(inner).orEmpty().mapNotNull { string(it) }
+    }
+
+    /** The Kotlin of a list of [values]; with none of them it is left out. */
+    fun list(values: List<String>): String =
+        if (values.isEmpty()) "" else values.joinToString(prefix = "listOf(", postfix = ")") { StoryGraphCompiler.literal(it) }
 
     /** [typed] with [suffix] when it is a number; anything else is an expression and stays as it was typed. */
     private fun numeric(typed: String, suffix: String) = if (typed.toDoubleOrNull() != null) "$typed$suffix" else typed

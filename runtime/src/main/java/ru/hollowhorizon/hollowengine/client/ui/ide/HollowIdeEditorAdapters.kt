@@ -20,6 +20,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class HollowIdeEditorSession(
     private val path: String,
+    private val typedProperties: String? = null,
     private val onUpdated: () -> Unit,
 ) {
     private val languageService = languageServiceForPath(path)
@@ -165,6 +166,15 @@ internal class HollowIdeEditorSession(
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
 
+    /** What analysis made of exactly [text], once it has it; nothing until then. */
+    fun exactAnalysis(text: String): KotlinFragmentAnalysis? {
+        val analyzer = currentAnalyzer()
+        val current = snapshot
+        if (current.matchesText(text, analyzer)) return current.fragment
+        requestAnalysis(text, analyzer)
+        return null
+    }
+
     fun inlayHints(text: String): List<UiInlayHint> {
         val analyzer = currentAnalyzer()
         val current = snapshot
@@ -309,6 +319,12 @@ internal class HollowIdeEditorSession(
                     reportAnalysisFailure("structure", failure)
                     EditorStructure()
                 },
+                propertyTypes = typedProperties?.let { prefix ->
+                    runCatching { analyzer.propertyTypes(path, text, prefix) }.getOrElse { failure ->
+                        reportAnalysisFailure("types", failure)
+                        emptyMap()
+                    }
+                }.orEmpty(),
             )
             publishAnalysisIfCurrent(requestRevision) {
                 snapshot = next
@@ -519,7 +535,10 @@ private data class EditorAnalysisSnapshot(
     val inlayHints: List<UiInlayHint>,
     val diagnostics: List<UiTextDiagnostic>,
     val structure: EditorStructure = EditorStructure(),
+    val propertyTypes: Map<String, String> = emptyMap(),
 ) {
+    val fragment = KotlinFragmentAnalysis(highlights, diagnostics, propertyTypes)
+
     fun matchesText(text: String, analyzer: ScriptingAnalyzer): Boolean {
         return textHash == text.hashCode() && textLength == text.length && this.analyzer === analyzer
     }

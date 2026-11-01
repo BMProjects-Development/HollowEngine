@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
@@ -103,6 +104,7 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 receiver = receiver,
                 implicit = if (implicit) "storyLevel()" else null,
                 assets = parameter.findAnnotation<EditorAsset>()?.extensions?.toList().orEmpty(),
+                widget = parameter.findAnnotation<EditorWidget>()?.id,
             )
         }
 

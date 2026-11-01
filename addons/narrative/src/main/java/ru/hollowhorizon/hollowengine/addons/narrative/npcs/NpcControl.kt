@@ -21,7 +21,6 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val NPC = "hollowengine.gui.ide.story.category.npc"
 private const val NAVIGATION = "hollowengine.gui.ide.story.category.navigation"
-private const val EVERY_TICK = "hollowengine.gui.ide.story.category.every_tick"
 
 @EditorCategory(NPC)
 @SimpleAction("spawn-npc")
@@ -70,22 +69,4 @@ fun NpcEntity.beginLooking(pos: Vec3, duration: Duration = 1.seconds, maxAngular
 @SimpleAction("start-watching")
 fun NpcEntity.beginWatching(target: Entity, duration: Duration = 1.seconds, maxAngularSpeed: Float = 360f) {
     startLookingAt(with(server ?: currentServer) { target.entityRef }, duration, maxAngularSpeed)
-}
-
-@EditorCategory(EVERY_TICK)
-@SimpleAction("step-to")
-fun NpcEntity.stepTo(pos: Vec3, speed: Double = 1.0) {
-    navigation.moveTo(pos.x, pos.y, pos.z, speed)
-}
-
-@EditorCategory(EVERY_TICK)
-@SimpleAction("turn-to")
-fun NpcEntity.turnTo(pos: Vec3, maxAngularSpeed: Float = 360f) {
-    lookAtNow(pos, maxAngularSpeed)
-}
-
-@EditorCategory(EVERY_TICK)
-@SimpleAction("turn-to-entity")
-fun NpcEntity.turnToEntity(target: Entity, maxAngularSpeed: Float = 360f) {
-    lookAtNow(target, maxAngularSpeed)
 }

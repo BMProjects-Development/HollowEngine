@@ -1,8 +1,9 @@
-import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
+import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,7 +14,9 @@ class StageAnalysisTest {
     private lateinit var compiler: StageCompiler
 
     @BeforeAll
-    fun setUp() { compiler = StageCompiler() }
+    fun setUp() {
+        compiler = StageCompiler()
+    }
 
     @AfterAll
     fun close() = compiler.close()
@@ -41,35 +44,98 @@ class StageAnalysisTest {
     }
 
     @Test
+    fun `named values tell what they turned out to be`() {
+        val source = """
+            suspend fun first() {
+                val storyPin0 = (listOf("x"))
+            }
+            suspend fun second() {
+                val storyPin1 = (listOf("x")).iterator().next()
+                val storyPin2 = (missing)
+                val other = 1
+            }
+        """.trimIndent()
+        val types = compiler.environment.analyzer.propertyTypes("types.stage.kts", source, "storyPin")
+        assertEquals(
+            mapOf("storyPin0" to "kotlin.collections.List<kotlin.String>", "storyPin1" to "kotlin.String"),
+            types
+        )
+    }
+
+    @Test
+    fun `pins of a graph get their types from the script it compiles to`() {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("trust", "0")),
+            nodes = listOf(
+                StoryNode.Start("s", "main"),
+                StoryNode.Expression("text", "\"a\""),
+                StoryNode.Expression("sum", "trust + 1"),
+                StoryNode.Pure("list", "list", count = 1),
+                StoryNode.Loop("each", ""),
+                StoryNode.Code("block", "val found = 2\nfound.toString()"),
+            ),
+            links = listOf(
+                StoryLink("s", StoryPins.NEXT, "each", StoryPins.IN),
+                StoryLink("text", StoryPins.VALUE, "list", "a"),
+                StoryLink("list", "list", "each", StoryPins.ITEMS),
+            ),
+        )
+        val pins = StoryGraphCompiler.pins(graph, StoryFunctions.Builtin).entries.toList()
+        val script = StoryGraphCompiler.compile(graph).code + pins.withIndex().joinToString("") { (index, pin) ->
+            "\nsuspend fun storyPinOf$index() {\nval storyPin$index = (\n${pin.value}\n)\n}"
+        }
+        val found = compiler.environment.analyzer.propertyTypes("graph.stage.kts", script, "storyPin")
+        val types = found.mapKeys { (name, _) -> pins[name.removePrefix("storyPin").toInt()].key }
+        assertEquals("kotlin.String", types["text" to StoryPins.VALUE])
+        assertEquals("kotlin.Int", types["sum" to StoryPins.VALUE])
+        assertEquals("kotlin.collections.List<kotlin.String>", types["list" to "list"])
+        assertEquals("kotlin.String", types["each" to StoryPins.ITEM])
+        assertEquals("kotlin.String", types["block" to StoryPins.VALUE])
+    }
+
+    @Test
     fun `the editor reports mutable and unserializable captures`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             fun start(runs: StoryRuns) {
                 var counter = 0
                 val lock = Any()
                 runs.launch("main") { log(counter.toString()); log(lock.toString()) }
             }
-        """)
-        assertTrue(errors.any { it.message.contains("can share 'var counter' only with the @State function or lambda that declares it directly") }, errors.toString())
+        """
+        )
+        assertTrue(
+            errors.any { it.message.contains("can share 'var counter' only with the @State function or lambda that declares it directly") },
+            errors.toString()
+        )
         assertTrue(errors.any { it.message.contains("'lock' cannot be saved") }, errors.toString())
     }
 
     @Test
     fun `the editor validates stage declarations and argument types`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             @State fun plain() {}
             @State suspend fun <T> generic(value: T) {}
             @State suspend fun unsafe(lock: Any): Any = lock
             fun outer() { @State suspend fun local() {} }
-        """)
-        listOf("must be a suspend function", "cannot have type parameters", "'lock' cannot be",
-            "The result of a stage is saved", "top level").forEach { expected ->
+        """
+        )
+        listOf(
+            "must be a suspend function",
+            "cannot have type parameters",
+            "'lock' cannot be",
+            "The result of a stage is saved",
+            "top level"
+        ).forEach { expected ->
             assertTrue(errors.any { expected in it.message }, "$expected: $errors")
         }
     }
 
     @Test
     fun `safe helpers and captures do not receive narrative errors`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             import ru.hollowhorizon.hollowengine.addons.narrative.story.State as Stage
 
             fun greet(name: String) = log(name)
@@ -82,33 +148,38 @@ class StageAnalysisTest {
                 }
                 await("end")
             }
-        """).filter { it.severity.isError() }
+        """
+        ).filter { it.severity.isError() }
         assertTrue(errors.isEmpty(), errors.toString())
     }
 
     @Test
     fun `the editor reports stage calls in lambdas and exception handlers`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             @State suspend fun step() {}
             @State suspend fun main() {
                 listOf(1).forEach { step() }
                 try { log("try") } catch (failure: Exception) { step() } finally { step() }
             }
-        """)
+        """
+        )
         assertTrue(errors.any { "cannot be called from a lambda" in it.message }, errors.toString())
         assertEquals(2, errors.count { "cannot be called in catch or finally" in it.message }, errors.toString())
     }
 
     @Test
     fun `the editor validates checkpoint placement and names`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             suspend fun helper() { checkpoint("outside") }
             @State suspend fun main() {
                 checkpoint("gate")
                 checkpoint("gate")
                 checkpoint(StageTrace.token)
             }
-        """)
+        """
+        )
         listOf("must be called directly", "appears twice", "needs a constant name").forEach { expected ->
             assertTrue(errors.any { expected in it.message }, "$expected: $errors")
         }
@@ -116,66 +187,81 @@ class StageAnalysisTest {
 
     @Test
     fun `the editor validates actions and duplicate stage names`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             @State("same") suspend fun first() {}
             @State("same") suspend fun second() {}
             suspend fun invalid() = action { perform { } }
             @Action suspend fun unsafe(lock: Any) = action { perform { } }
             @Action suspend fun missing(@Unsaved lock: Any) = action { perform { } }
-        """)
-        listOf("Two stages", "must be the body of an @Action", "'lock' cannot be saved", "needs one").forEach { expected ->
+        """
+        )
+        listOf(
+            "Two stages",
+            "must be the body of an @Action",
+            "'lock' cannot be saved",
+            "needs one"
+        ).forEach { expected ->
             assertTrue(errors.any { expected in it.message }, "$expected: $errors")
         }
     }
 
     @Test
     fun `the editor rejects function references and stored ordinary lambdas`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             suspend fun helper() {}
             fun start(runs: StoryRuns) {
                 val body: @State suspend () -> Unit = {}
                 runs.launch("one", ::helper)
                 runs.launch("two", body)
             }
-        """)
+        """
+        )
         assertEquals(2, errors.count { "a regular function value has no saved stage" in it.message }, errors.toString())
     }
 
     @Test
     fun `lambda arguments and results have the same persistence restrictions as named stages`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             fun consume(block: @State suspend (Any) -> Unit) {}
             fun produce(block: @State suspend () -> Any) {}
             fun start() {
                 consume { lock -> log(lock.toString()) }
                 produce { Any() }
             }
-        """)
+        """
+        )
         assertTrue(errors.any { "'lock' cannot be" in it.message }, errors.toString())
         assertTrue(errors.any { "The result of a stage is saved" in it.message }, errors.toString())
     }
 
     @Test
     fun `unfinished stage code produces diagnostics without breaking editor analysis`() {
-        val errors = diagnostics("""
+        val errors = diagnostics(
+            """
             @State suspend fun main() {
                 async("timer") {
                     val captured =
                 }
             }
-        """)
+        """
+        )
         assertTrue(errors.any { it.severity.isError() }, errors.toString())
     }
 
     @Test
     fun `a rewind to a checkpoint the script does not have is a warning`() {
-        val warnings = diagnostics("""
+        val warnings = diagnostics(
+            """
             @State
             suspend fun main() {
                 checkpoint("arena")
                 rewind("arnea")
             }
-        """).filter { !it.severity.isError() }
+        """
+        ).filter { !it.severity.isError() }
         assertTrue(warnings.any { "No checkpoint of this script is named 'arnea'" in it.message }, warnings.toString())
     }
 
@@ -190,10 +276,14 @@ class StageAnalysisTest {
             }
         """.trimIndent()
         val items = ArrayList<String>()
-        compiler.environment.analyzer.completions("names.stage.kts", source, source.indexOf("\"ar\")") + 3, CompletionSink { batch ->
-            batch.forEach { items += it.show }
-            true
-        })
+        compiler.environment.analyzer.completions(
+            "names.stage.kts",
+            source,
+            source.indexOf("\"ar\")") + 3,
+            CompletionSink { batch ->
+                batch.forEach { items += it.show }
+                true
+            })
         assertEquals(listOf("arena"), items)
     }
 }

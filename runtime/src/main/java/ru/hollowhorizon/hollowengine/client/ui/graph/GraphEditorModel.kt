@@ -149,6 +149,9 @@ interface GraphEditorModel {
     /** The color of what [pin] carries, for the link drawn from it. */
     fun pinColor(pin: GraphPin): UiColor
 
+    /** What [pin] carries, in words, shown when the pointer is on it. */
+    fun pinTooltip(pin: GraphPin): String? = null
+
     /** Links [from] to [to], an output and an input in either order. */
     fun connect(from: GraphPin, to: GraphPin)
 

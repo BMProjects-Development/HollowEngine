@@ -19,6 +19,7 @@
 .gn-pin.gn-type-player { border-color: #6F8CF0; }
 .gn-pin.gn-type-list { border-color: #C9874A; }
 .gn-pin.gn-type-map { border-color: #B48EE0; }
+.gn-pin.gn-type-object { border-color: #8FA0B8; }
 .gn-pin.gn-type-any { border-color: #A5ABC0; }
 
 .gn-pin.connected.gn-type-flow { background: #E6E8EE; }
@@ -31,6 +32,7 @@
 .gn-pin.connected.gn-type-player { background: #6F8CF0; }
 .gn-pin.connected.gn-type-list { background: #C9874A; }
 .gn-pin.connected.gn-type-map { background: #B48EE0; }
+.gn-pin.connected.gn-type-object { background: #8FA0B8; }
 .gn-pin.connected.gn-type-any { background: #A5ABC0; }
 
 .graph-node.gn-reroute.gn-type-flow { background: #E6E8EE; border-radius: 2px; }
@@ -41,6 +43,10 @@
 
 .gn-field.error, .insp-input.error {
     border-color: $danger;
+}
+
+.gn-field.warning {
+    border-color: $warning;
 }
 
 .st-vector {

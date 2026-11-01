@@ -12,7 +12,12 @@ object StoryGraphEdits {
         fun line(text: String) = INSERT.replace(text) { "{${code(it.groupValues[1])}}" }
         fun Map<String, String>.renamed() = mapValues { code(it.value) }
         return copy(
-            variables = variables.map { it.copy(name = if (it.name == old) name else it.name, initial = code(it.initial)) },
+            variables = variables.map {
+                it.copy(
+                    name = if (it.name == old) name else it.name,
+                    initial = code(it.initial)
+                )
+            },
             nodes = nodes.map { node ->
                 when (node) {
                     is StoryNode.Say -> node.copy(speaker = line(node.speaker), text = line(node.text))
@@ -22,11 +27,20 @@ object StoryGraphEdits {
                     )
 
                     is StoryNode.Choose -> node.copy(
-                        options = node.options.map { it.copy(text = line(it.text), condition = it.condition?.let(::code)) },
+                        options = node.options.map {
+                            it.copy(
+                                text = line(it.text),
+                                condition = it.condition?.let(::code)
+                            )
+                        },
                     )
 
                     is StoryNode.Branch -> node.copy(condition = code(node.condition))
-                    is StoryNode.Assign -> node.copy(variable = if (node.variable == old) name else node.variable, value = code(node.value))
+                    is StoryNode.Assign -> node.copy(
+                        variable = if (node.variable == old) name else node.variable,
+                        value = code(node.value)
+                    )
+
                     is StoryNode.Code -> node.copy(code = code(node.code), inputs = node.inputs.renamed())
                     is StoryNode.Expression -> node.copy(code = code(node.code))
                     is StoryNode.Pure -> node.copy(arguments = node.arguments.renamed())
@@ -39,7 +53,8 @@ object StoryGraphEdits {
 
     /** The nodes [ids] gone with their links; a link through a reroute among them joins back up. */
     fun StoryGraph.removeNodes(ids: Set<String>): StoryGraph =
-        ids.mapNotNull { node(it) as? StoryNode.Reroute }.fold(this) { graph, reroute -> graph.bridge(reroute) }.without(ids)
+        ids.mapNotNull { node(it) as? StoryNode.Reroute }.fold(this) { graph, reroute -> graph.bridge(reroute) }
+            .without(ids)
 
     private fun StoryGraph.bridge(reroute: StoryNode.Reroute): StoryGraph {
         val into = links.filter { it.to == reroute.id }
@@ -91,7 +106,12 @@ object StoryGraphEdits {
 
     /** [pin] of [to] reads the output [fromPin] of [from], instead of whatever it read. */
     fun StoryGraph.linkValue(from: String, fromPin: String, to: String, pin: String): StoryGraph =
-        copy(links = links.filterNot { !it.isFlow && it.to == to && it.toPin == pin } + StoryLink(from, fromPin, to, pin))
+        copy(links = links.filterNot { !it.isFlow && it.to == to && it.toPin == pin } + StoryLink(
+            from,
+            fromPin,
+            to,
+            pin
+        ))
 
     /** [pin] of [node] no longer reads a value, and a call that only gave it that value is gone. */
     fun StoryGraph.unlinkValue(node: String, pin: String): StoryGraph {
@@ -115,6 +135,26 @@ object StoryGraphEdits {
             if (at != null && at > index) link.copy(fromPin = StoryPins.option(at - 1)) else link
         }
         return copy(links = shifted).edit(id) { menu.copy(options = menu.options.filterIndexed { at, _ -> at != index }) }
+    }
+
+    /** One more input on the variadic operator of [id]. */
+    fun StoryGraph.addInput(id: String): StoryGraph = edit(id) { node ->
+        node as StoryNode.Pure
+        node.copy(count = StoryOperators.inputsOf(node).size + 1)
+    }
+
+    /** The node [id] without its input at [index]; those after it move up with what they hold and read. */
+    fun StoryGraph.removeInput(id: String, index: Int): StoryGraph {
+        val node = node(id) as? StoryNode.Pure ?: return this
+        val size = StoryOperators.inputsOf(node).size
+        val moved =
+            ((index + 1) until size).associate { StoryOperators.inputName(it) to StoryOperators.inputName(it - 1) }
+        val gone = StoryOperators.inputName(index)
+        val shifted = links.filterNot { it.to == id && it.toPin == gone }.map { link ->
+            if (link.to == id) link.copy(toPin = moved[link.toPin] ?: link.toPin) else link
+        }
+        val held = (node.arguments - gone).mapKeys { (name, _) -> moved[name] ?: name }
+        return copy(links = shifted).edit(id) { node.copy(arguments = held, count = size - 1) }
     }
 
     private fun StoryGraph.without(ids: Set<String>): StoryGraph = copy(

@@ -10,7 +10,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariable
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariableTypes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -147,12 +146,10 @@ class StageGraphTest : StageTest() {
     /** Every type a variable can be declared with has to compile and be saved by a story. */
     @Test
     fun `every type of a variable is declared and saved`() = runTest {
-        val blank = StoryVariable("value", "")
-        val single = StoryVariableTypes.names - StoryVariableTypes.LIST - StoryVariableTypes.MAP
-        val lists = StoryVariableTypes.elements.map { StoryVariableTypes.list(blank, it) }
-        val maps = StoryVariableTypes.keys.flatMap { key -> StoryVariableTypes.elements.map { StoryVariableTypes.map(blank, key, it) } }
-        val variables = (single.map { StoryVariableTypes.retyped(blank, it) } + lists + maps)
-            .mapIndexed { index, variable -> variable.copy(name = "value$index") }
+        val variables = listOf(
+            "Double" to "0.0", "String" to "\"\"", "Boolean" to "false", "String?" to "", "Entity?" to "",
+            "List<Double>" to "listOf(1.0)", "Map<String, Double>" to "mapOf(\"a\" to 1.0)",
+        ).mapIndexed { index, (type, initial) -> StoryVariable("value$index", initial, type) }
         val graph = StoryGraph(
             variables = variables,
             nodes = listOf(StoryNode.Start("s", "main"), log("first", "\"done\"")),

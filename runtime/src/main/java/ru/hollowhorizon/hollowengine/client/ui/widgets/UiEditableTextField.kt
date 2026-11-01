@@ -521,6 +521,7 @@ fun EditableTextField(
         inlayHints = insight.inlayHints,
         inlayHintsProvider = insight.inlayHintsProvider,
         inlayRevision = insight.inlayRevision,
+        highlightRevision = insight.highlightRevision,
     )
     state.folding.update(text, folds)
     val foldProjection = state.folding.projection()
@@ -647,7 +648,7 @@ fun EditableTextField(
                 val inside = generateSequence(hit) { it.layoutState.parentNode }.any { it === event.node }
                 if (handleEditableFieldRelease(state, offset, event.modifiers, pointerState, inside)) event.consume()
             }.onHover { event ->
-                hoverTooltip = if (diagnostics.isEmpty()) null else {
+                hoverTooltip = if (diagnostics.isEmpty() || !insight.diagnosticTooltips) null else {
                     val viewport = scrollState.viewport
                     val surface = uiViewport.takeIf { it.width > 0f && it.height > 0f } ?: viewport
                     editableFieldDiagnosticTooltipAt(
@@ -725,6 +726,7 @@ fun EditableTextField(
                 layout,
                 visible,
                 gutterPanelWidth,
+                layout.height.coerceAtLeast(scrollState.viewport.height),
                 view?.lineNumberColor ?: EditableFieldLineNumberColor,
                 state,
                 folds,

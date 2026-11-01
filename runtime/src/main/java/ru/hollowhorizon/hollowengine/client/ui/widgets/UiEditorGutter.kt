@@ -41,6 +41,7 @@ internal fun EditableFieldGutter(
     layout: EditableFieldLayout,
     visible: IntRange,
     width: Float,
+    height: Float,
     color: UiColor,
     state: TextFieldState,
     folds: List<CodeFold>,
@@ -56,12 +57,12 @@ internal fun EditableFieldGutter(
         id = "$fieldId-gutter",
         mode = UiBoxMode.STACK,
         tags = listOf("editable-text-field-gutter", "code-editor-gutter"),
-        modifier = Modifier.position(0.px, 0.px, 5f).size(width.px, layout.height.px).layer(5)
+        modifier = Modifier.position(0.px, 0.px, 5f).size(width.px, height.px).layer(5)
             .pinnedToViewport(horizontal = true, vertical = false).input(hoverable = true),
     ) {
         Box(
             tags = listOf("gutter-separator"),
-            modifier = Modifier.position((width - 1f).px, 0.px).size(1.px, layout.height.px).background(separatorColor)
+            modifier = Modifier.position((width - 1f).px, 0.px).size(1.px, height.px).background(separatorColor)
                 .inputTransparent()
         )
         for (index in visible) {

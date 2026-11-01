@@ -1,8 +1,10 @@
 import kotlinx.coroutines.test.runTest
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.copyNodes
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeInput
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeNodes
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.renameVariable
+import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 import kotlin.reflect.typeOf
 import kotlin.test.*
 
@@ -336,13 +338,101 @@ class StoryTopologyTest : StageTest() {
     }
 
     @Test
-    fun `lists and maps keep their shape through a field`() {
-        val list = StoryVariableTypes.expression("1, 2.5", "List<Double>")
-        assertEquals("listOf(1.toDouble(), 2.5)", list)
-        assertEquals("1, 2.5", StoryVariableTypes.text(list, "List<Double>"))
-        val map = StoryVariableTypes.expression("a = 1, b = 2.5", "Map<String, Double>")
-        assertEquals("mapOf(\"a\" to 1.toDouble(), \"b\" to 2.5)", map)
-        assertEquals("a = 1, b = 2.5", StoryVariableTypes.text(map, "Map<String, Double>"))
+    fun `a list field keeps the Kotlin it was given`() {
+        val written = "listOf(\"a\",  \"b\")"
+        val type = typeOf<List<String>>()
+        assertEquals(written, StoryLiterals.expression(written, type))
+        assertEquals(written, StoryLiterals.text(written, type))
+        assertEquals(listOf("a", "b"), StoryLiterals.listed(written))
+        assertEquals("listOf(\"a\", \"c\")", StoryLiterals.list(listOf("a", "c")))
+        assertEquals("", StoryLiterals.list(emptyList()))
+    }
+
+    @Test
+    fun `code with no flow is an expression where it is read`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Code("c", "\"value\""), call("say", "log")),
+            links = listOf(next("s", "say"), StoryLink("c", StoryPins.VALUE, "say", "event")),
+        )
+        world("code-value", code(graph)).launch("main")
+        assertEquals(listOf("value"), StageTrace.take())
+    }
+
+    @Test
+    fun `code in the flow has no untyped value to keep`() {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Code("c", "\"value\""), call("say", "log")),
+            links = listOf(next("s", "c"), next("c", "say"), StoryLink("c", StoryPins.VALUE, "say", "event")),
+        )
+        assertTrue(compile(graph).problems.any { it.node == "c" || it.node == "say" })
+    }
+
+    @Test
+    fun `a list takes as many inputs as its author added`() {
+        val list = StoryNode.Pure("l", "list", mapOf("a" to "1", "b" to "2", "c" to "3", "d" to "4"), count = 4)
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s", "main"), list, StoryNode.Pure("x", "list"), call("use", "log")),
+            links = listOf(
+                next("s", "use"),
+                StoryLink("l", "list", "use", "event"),
+                StoryLink("x", "list", "l", "d"),
+            ),
+        )
+        assertContains(compile(graph).code, "listOf((1), (2), (3), (emptyList<Any?>()))")
+        val shorter = graph.removeInput("l", 1)
+        assertEquals(mapOf("a" to "1", "b" to "3", "c" to "4"), (shorter.node("l") as StoryNode.Pure).arguments)
+        assertEquals("c", shorter.links.single { it.from == "x" }.toPin)
+    }
+
+    @Test
+    fun `pins read what they carry without the flow that made it`() {
+        val list = StoryNode.Pure("l", "list", mapOf("a" to "\"x\""), count = 1)
+        val loop = StoryNode.Loop("each", "")
+        val sum = StoryNode.Pure("sum", "add", mapOf("b" to "1"))
+        val code = StoryNode.Code("c", "", outputs = mapOf("found" to "Int"))
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s", "main"), list, loop, sum, code),
+            links = listOf(
+                next("s", "c"),
+                next("c", "each"),
+                StoryLink("l", "list", "each", StoryPins.ITEMS),
+                StoryLink("c", "found", "sum", "a"),
+            ),
+        )
+        val pins = StoryGraphCompiler.pins(graph, TestCommands())
+        assertEquals("listOf((\"x\"))", pins["l" to "list"])
+        assertEquals("(listOf((\"x\"))).iterator().next()", pins["each" to StoryPins.ITEM])
+        assertContains(pins.getValue("sum" to "result"), "(null as Int?)")
+    }
+
+    @Test
+    fun `links tell lists apart by what they hold`() {
+        assertTrue(StoryKotlinTypes.fits("List<String>", "kotlin.collections.List<kotlin.String>"))
+        assertTrue(StoryKotlinTypes.fits("List<String>", "List<*>"))
+        assertTrue(StoryKotlinTypes.fits("List<ServerPlayer>", "List<Entity>"))
+        assertTrue(StoryKotlinTypes.fits("Any?", "List<String>"))
+        assertFalse(StoryKotlinTypes.fits("List<Int>", "List<String>"))
+        assertFalse(StoryKotlinTypes.fits("List<Any?>", "List<String>"))
+        assertFalse(StoryKotlinTypes.fits("List<String?>", "List<String>"))
+        assertFalse(StoryKotlinTypes.fits("List<Int>", "List<Double>"))
+        assertFalse(StoryKotlinTypes.fits("StoryHandle<Unit>", "ServerLevel"))
+        assertTrue(StoryKotlinTypes.fits("StoryHandle<Unit>", "StoryHandle<*>"))
+    }
+
+    @Test
+    fun `only a nullable variable can start empty`() {
+        val start = listOf(StoryNode.Start("s", "main"))
+        val empty = StoryGraph(variables = listOf(StoryVariable("a", "", "String?")), nodes = start)
+        assertContains(code(empty), "var a by saved<String?>(null)")
+        val required = StoryGraph(variables = listOf(StoryVariable("a", "", "String")), nodes = start)
+        assertTrue(compile(required).problems.isNotEmpty())
+    }
+
+    @Test
+    fun `the parser finds what has a color of its own`() {
+        val tokens = StoryKotlin.syntax("val a = \"x\" + 1 // note")!!.tokens
+        assertEquals(TokenType.KEYWORD, tokens.first { it.start == 0 }.type)
+        assertEquals(listOf(TokenType.KEYWORD, TokenType.STRING, TokenType.NUMERIC_LITERAL, TokenType.COMMENT), tokens.map { it.type }.distinct())
     }
 
     @Test

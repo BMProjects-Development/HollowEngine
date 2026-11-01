@@ -55,6 +55,9 @@ class ScriptingAnalyzerImpl internal constructor(
         get() = kotlinCoreProjectEnvironment.project
     private val factory = KtPsiFactory(project, eventSystemEnabled = true)
 
+    /** Parses for fields as they are typed: on files of its own, so it never waits for analysis to finish. */
+    private val snippetFactory = KtPsiFactory(project, eventSystemEnabled = false)
+
     internal val fileCache = object : LinkedHashMap<String, CachedFile>(5, 0.75f, true) {
         override fun removeEldestEntry(entry: MutableMap.MutableEntry<String, CachedFile>?): Boolean {
             val shouldRemove = size > 5
@@ -332,8 +335,10 @@ class ScriptingAnalyzerImpl internal constructor(
     override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =
         synchronized(lock) { findAcceptedExpressionTypes(getOrCreateFile(name, text), offset, types) }
 
-    override fun kotlinSyntax(text: String): KotlinSyntax = synchronized(lock) {
-        kotlinSyntax(factory, text.withUnixLineSeparators())
+    override fun kotlinSyntax(text: String): KotlinSyntax = kotlinSyntax(snippetFactory, text.withUnixLineSeparators())
+
+    override fun propertyTypes(name: String, text: String, prefix: String): Map<String, String> = synchronized(lock) {
+        propertyTypes(getOrCreateFile(name, text), prefix)
     }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {

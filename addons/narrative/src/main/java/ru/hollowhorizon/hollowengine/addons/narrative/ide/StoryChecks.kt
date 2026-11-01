@@ -3,6 +3,8 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks.param
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks.variable
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -44,8 +46,9 @@ internal object StoryChecks {
             kind in WHOLE -> if (isCode(shown) || shown.toLongOrNull() != null) null else problem("whole")
             kind in FRACTION -> if (isCode(shown) || isNumber(shown)) null else problem("number")
             kind == Duration::class -> if (isDuration(shown)) null else problem("duration")
-            kind == ResourceLocation::class || kind == ServerLevel::class ->
-                if (LOCATION.matches(shown)) null else problem("location")
+            kind == ResourceLocation::class || kind == ServerLevel::class -> if (LOCATION.matches(shown)) null else problem(
+                "location"
+            )
 
             else -> null
         }
@@ -76,45 +79,30 @@ internal object StoryChecks {
         else -> null
     }
 
-    /** What is wrong with what [variable] starts as. */
-    fun variable(variable: StoryVariable): String? {
-        if (StoryVariableTypes.startsEmpty(variable.type)) return null
-        if (variable.initial.isBlank()) return problem("required")
-        val pin = StoryPinType.ofName(variable.type)
-        return when (StoryVariableTypes.nameOf(variable.type)) {
-            StoryVariableTypes.LIST -> elements(StoryVariableTypes.listParts(variable.initial), variable.initial, listElement(variable.type))
-            StoryVariableTypes.MAP -> entries(variable)
-            "vector" -> vector(variable.initial, StoryLiterals.vectorHelper(pin.type).orEmpty())
-            "bool" -> flag(variable.initial)
-            else -> if (pin.type == null) code(variable.initial) else value(pin.text(variable.initial), pin.type) ?: code(variable.initial)
-        }
-    }
-
-    private fun listElement(type: String?) = StoryPinType.ofName(type?.substringAfter('<')?.removeSuffix(">"))
-
-    private fun flag(code: String) = if (code == "true" || code == "false" || isCode(code)) code(code) else problem("bool")
-
-    private fun elements(parts: List<String>?, written: String, element: StoryPinType): String? =
-        if (parts == null) code(written) else parts.firstNotNullOfOrNull { check(it, element) }
-
-    private fun check(written: String, pin: StoryPinType): String? = when (pin) {
-        StoryPinType.VECTOR -> vector(written, StoryLiterals.vectorHelper(pin.type).orEmpty())
-        StoryPinType.BOOL -> flag(written)
-        else -> value(pin.text(written), pin.type) ?: code(written)
-    }
-
-    private fun entries(variable: StoryVariable): String? {
-        val entries = StoryVariableTypes.mapParts(variable.initial) ?: return code(variable.initial)
-        val inner = variable.type?.substringAfter('<')?.removeSuffix(">")
-        val key = StoryPinType.ofName(inner?.substringBefore(','))
-        val value = StoryPinType.ofName(inner?.substringAfter(',')?.trim())
-        return entries.firstNotNullOfOrNull { (at, held) -> check(at, key) ?: check(held, value) }
+    /** What is wrong with what [variable] starts as; a variable that can be empty need not start with anything. */
+    fun variable(variable: StoryVariable): String? = when {
+        variable.initial.isNotBlank() -> code(variable.initial)
+        variable.type?.endsWith("?") == true -> null
+        else -> problem("required")
     }
 
     /** Everything wrong with [graph]: what the compiler says, and what the editors can see. */
     fun all(graph: StoryGraph): List<StoryCheck> {
-        val compiled = StoryGraphCompiler.compile(graph, StoryActionFunctions).problems.map { StoryCheck(it.node, it.message, it.warning) }
-        val variables = graph.variables.mapNotNull { variable -> variable(variable)?.let { StoryCheck(null, "${variable.name}: $it") } }
+        val compiled = StoryGraphCompiler.compile(graph, StoryActionFunctions).problems.map {
+            StoryCheck(
+                it.node,
+                it.message,
+                it.warning
+            )
+        }
+        val variables = graph.variables.mapNotNull { variable ->
+            variable(variable)?.let {
+                StoryCheck(
+                    null,
+                    "${variable.name}: $it"
+                )
+            }
+        }
         return compiled + variables + nodes(graph)
     }
 
@@ -134,15 +122,19 @@ internal object StoryChecks {
                 is StoryNode.Say -> emptyList()
                 is StoryNode.Branch -> filled(node.condition, free(StoryPins.CONDITION))
                 is StoryNode.Loop -> filled(node.items, free(StoryPins.ITEMS))
-                is StoryNode.Assign -> filled(node.value, free(StoryPins.VALUE)) +
-                        listOfNotNull(problem("no_variable").takeIf { graph.variables.none { it.name == node.variable } })
+                is StoryNode.Assign -> filled(
+                    node.value,
+                    free(StoryPins.VALUE)
+                ) + listOfNotNull(problem("no_variable").takeIf { graph.variables.none { it.name == node.variable } })
 
                 is StoryNode.Expression -> filled(node.code, true)
                 is StoryNode.Code -> listOfNotNull(code(node.code))
                 else -> emptyList()
             }
             val empty = node is StoryNode.Say && node.text.isBlank() && free(StoryPins.TEXT)
-            val lost = node.id !in reached && needsFlow(node) && node.id !in read
+            val value =
+                node.id in read && !plain.index.isInFlow(node.id) && (node is StoryNode.Call || node is StoryNode.Assign || node is StoryNode.Code)
+            val lost = node.id !in reached && needsFlow(node) && !value
             own.map { StoryCheck(node.id, it) } + listOfNotNull(
                 warning(node.id, "empty_text").takeIf { empty },
                 warning(node.id, "unreachable").takeIf { lost },
@@ -158,19 +150,20 @@ internal object StoryChecks {
 
     private fun call(node: StoryNode.Call, free: (String) -> Boolean): List<String> {
         val signature = StoryCatalog.signatureOf(node) ?: return emptyList()
-        return signature.params.filter { it.implicit == null && (it.group != null || free(it.name)) }.mapNotNull { param ->
+        return signature.params.filter { it.group != null || free(it.name) }.mapNotNull { param ->
             param(param, node.argument(param).orEmpty())?.let { "${StoryCatalog.paramTitle(signature, param)}: $it" }
         }
     }
 
     private fun pure(node: StoryNode.Pure, free: (String) -> Boolean): List<String> =
-        StoryOperators.find(node.operator)?.inputs.orEmpty().filter { free(it.name) }.mapNotNull { input ->
+        StoryOperators.inputsOf(node).filter { free(it.name) }.mapNotNull { input ->
             val written = node.arguments[input.name].orEmpty()
             val wrong = if (written.isBlank() && input.default.isBlank()) problem("required") else code(written)
             wrong?.let { "${StoryCatalog.operatorPinTitle(input.name)}: $it" }
         }
 
-    private fun needsFlow(node: StoryNode) = node !is StoryNode.Start && node !is StoryNode.Pure && node !is StoryNode.Expression
+    private fun needsFlow(node: StoryNode) =
+        node !is StoryNode.Start && node !is StoryNode.Pure && node !is StoryNode.Expression
 
     /** The nodes flow gets to from the starts of [graph]. */
     private fun reached(graph: StoryGraph): Set<String> {
