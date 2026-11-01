@@ -81,7 +81,8 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 icon = function.findAnnotation<EditorIcon>()?.icon,
                 category = function.findAnnotation<EditorCategory>()?.category,
                 categoryColor = function.findAnnotation<EditorCategory>()?.color?.ifEmpty { null },
-                returns = (function.returnType.classifier as? KClass<*>)?.takeIf { it != Unit::class }?.qualifiedName,
+                returns = function.returnType.takeIf { it.classifier is KClass<*> && it.classifier != Unit::class }
+                    ?.toString()?.replace("!", ""),
                 hidden = function.hasAnnotation<EditorHidden>(),
             )
             return StoryCommand(action, signature)

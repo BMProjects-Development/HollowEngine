@@ -13,7 +13,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariable
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariableTypes
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.reflect.typeOf
 import kotlin.test.assertTrue
 
 /** A graph is generated into stages, so it runs, resumes and fails to compile as a hand-written script does. */
@@ -122,7 +121,7 @@ class StageGraphTest : StageTest() {
                 previous = reader
             }
         }
-        val code = StoryGraphCompiler.compile(StoryGraph(nodes = nodes, links = links), paramType = { _, _ -> typeOf<String>() }).code
+        val code = StoryGraphCompiler.compile(StoryGraph(nodes = nodes, links = links), TestCommands()).code
         world("operators-all", code)
     }
 
@@ -139,7 +138,7 @@ class StageGraphTest : StageTest() {
             ),
             links = listOf(next("s", "first"), next("first", "second"), StoryLink("write", StoryPins.VALUE, "first", "event")),
         )
-        val world = world("assign", StoryGraphCompiler.compile(graph, paramType = { _, _ -> typeOf<String>() }).code)
+        val world = world("assign", StoryGraphCompiler.compile(graph, TestCommands()).code)
         world.launch("main")
         world.settle()
         assertEquals(listOf("5.0", "x=5.0"), StageTrace.take())
@@ -276,7 +275,7 @@ class StageGraphTest : StageTest() {
         val kinds: (StoryNode.Call) -> StoryCallKind = {
             if (it.function == "log") StoryCallKind.INSTANT else StoryCallKind.SUSPENDING
         }
-        val stages = Regex("suspend fun (step_\\w+)").findAll(StoryGraphCompiler.compile(graph, kinds).code)
+        val stages = Regex("suspend fun (step_\\w+)").findAll(StoryGraphCompiler.compile(graph, TestCommands(kinds)).code)
         assertEquals(listOf("step_first", "step_wait", "step_line"), stages.map { it.groupValues[1] }.toList())
     }
 

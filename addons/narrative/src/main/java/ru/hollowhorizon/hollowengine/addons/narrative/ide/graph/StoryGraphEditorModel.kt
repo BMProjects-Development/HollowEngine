@@ -58,11 +58,10 @@ internal class StoryGraphEditorModel(
             }
         }
         val pins = boxes.values.flatMap { it.pins } + cards.flatMap { it.pins }
+        val byName = pins.reversed().associateBy { Triple(it.node, it.name, it.output) }
         val links = graph.links.mapNotNull { link ->
-            val from = pins.firstOrNull { it.node == link.from && it.output && it.name == link.fromPin }
-                ?: return@mapNotNull null
-            val to =
-                pins.firstOrNull { it.node == link.to && !it.output && it.name == link.toPin } ?: return@mapNotNull null
+            val from = byName[Triple(link.from, link.fromPin, true)] ?: return@mapNotNull null
+            val to = byName[Triple(link.to, link.toPin, false)] ?: return@mapNotNull null
             GraphLinkView(link, from, to, pinColor(from))
         }
         val reroutes = boxes.filterValues { it.node is StoryNode.Reroute }.keys
@@ -89,7 +88,7 @@ internal class StoryGraphEditorModel(
         val seen = HashSet<String>()
         var at = reroute.id
         while (seen.add(at)) {
-            val link = graph.links.firstOrNull { it.to == at && !it.isFlow } ?: return StoryPinType.ANY
+            val link = graph.index.valuesInto(at).firstOrNull() ?: return StoryPinType.ANY
             val box = all[link.from] ?: return StoryPinType.ANY
             if (box.node !is StoryNode.Reroute) return box.rows.firstNotNullOfOrNull { row -> row.output?.takeIf { it.name == link.fromPin } }?.type
                 ?: StoryPinType.ANY
@@ -144,7 +143,7 @@ internal class StoryGraphEditorModel(
         while (queue.isNotEmpty()) {
             val at = queue.removeFirst()
             if (at == target) return true
-            if (seen.add(at)) queue += graph.links.filter { it.to == at && !it.isFlow }.map { it.from }
+            if (seen.add(at)) queue += graph.index.valuesInto(at).map { it.from }
         }
         return false
     }

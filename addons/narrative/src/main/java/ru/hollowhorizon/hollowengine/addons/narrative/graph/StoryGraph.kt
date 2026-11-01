@@ -9,8 +9,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 import java.util.UUID
 
 /**
- * A story as authors edit it: nodes and the links between them. Both the list and the graph editor show this one
- * model, and [StoryGraphCompiler] turns it into a script.
+ * A story as authors edit it: nodes and the links between them, which [StoryGraphCompiler] turns into a script.
  *
  * @param imports what the Kotlin of its nodes needs imported.
  * @param layout where the graph editor shows each node; a node without a place is arranged when it is shown.
@@ -29,9 +28,17 @@ data class StoryGraph(
     val groups: List<StoryNodeGroup> = emptyList(),
     val collapsed: Set<String> = emptySet(),
 ) {
-    fun node(id: String): StoryNode? = nodes.firstOrNull { it.id == id }
+    private val byId by lazy { nodes.associateBy { it.id } }
 
-    /** The graph with every reroute joined back up: what the links mean, the way a story and the list read them. */
+    /** The links by what they join. */
+    val index: StoryLinkIndex by lazy { StoryLinkIndex(links) }
+
+    fun node(id: String): StoryNode? = byId[id]
+
+    /** What the story means, with nothing of how the editor shows it: two files of one revision run the same. */
+    fun revision(): String = FORMAT.encodeToString(serializer(), dissolved().copy(layout = emptyMap(), groups = emptyList(), collapsed = emptySet()))
+
+    /** The graph with every reroute joined back up: what the links mean to a story. */
     fun dissolved(): StoryGraph {
         val reroutes = nodes.filterIsInstance<StoryNode.Reroute>().mapTo(HashSet()) { it.id }
         if (reroutes.isEmpty()) return this
@@ -42,7 +49,7 @@ data class StoryGraph(
             while (at in reroutes) {
                 if (!seen.add(at)) return null
                 val from = at
-                at = links.firstOrNull { it.from == from && it.isFlow }?.to ?: return null
+                at = index.flowOut(from).firstOrNull() ?: return null
             }
             return at
         }
@@ -53,7 +60,7 @@ data class StoryGraph(
             while (at.from in reroutes) {
                 if (!seen.add(at.from)) return null
                 val into = at.from
-                at = links.firstOrNull { it.to == into && !it.isFlow } ?: return null
+                at = index.valuesInto(into).firstOrNull() ?: return null
             }
             return at
         }
@@ -87,6 +94,32 @@ data class StoryGraph(
 
         private const val ID_LENGTH = 10
     }
+}
+
+/** The links of a graph by what they join: going through a graph must not search all its links at every step. */
+class StoryLinkIndex(links: List<StoryLink>) {
+    private val flowLinks = links.filter { it.isFlow }
+    private val valueLinks = links.filter { !it.isFlow }
+    private val outgoing = flowLinks.groupBy { it.from }
+    private val entering = flowLinks.groupBy { it.to }
+    private val reading = valueLinks.groupBy { it.to }
+    private val read = valueLinks.mapTo(HashSet()) { it.from to it.fromPin }
+
+    /** Where flow goes from a pin of a node. */
+    val flow: Map<Pair<String, String>, String> = flowLinks.associate { (it.from to it.fromPin) to it.to }
+
+    /** What a pin of a node reads. */
+    val values: Map<Pair<String, String>, StoryLink> = valueLinks.associateBy { it.to to it.toPin }
+
+    fun flowOut(node: String): List<String> = outgoing[node].orEmpty().map { it.to }
+
+    fun flowIn(node: String): List<String> = entering[node].orEmpty().map { it.from }
+
+    fun valuesInto(node: String): List<StoryLink> = reading[node].orEmpty()
+
+    fun isRead(node: String, pin: String): Boolean = (node to pin) in read
+
+    fun isInFlow(node: String): Boolean = node in outgoing || node in entering
 }
 
 @Serializable
@@ -166,10 +199,11 @@ sealed interface StoryNode {
     data class Say(override val id: String, val speaker: String = "", val text: String = "") : StoryNode
 
     /**
-     * A call of [function], fully qualified or known to scripts. [arguments] are Kotlin expressions by parameter name.
-     * With no flow into it the call is a value, placed where it is read.
+     * A call of the command [action]. [arguments] are Kotlin expressions by parameter name. With no flow into it the
+     * call is a value, placed where it is read. All that is known of a command comes from [StoryFunctions], so the other
+     * fields only describe a call of something no command stands for.
      *
-     * @param action the id of the action it calls, which the editors find its parameters by.
+     * @param function what is called, fully qualified or known to scripts.
      * @param groups the arguments built from fields of their own.
      * @param receiver the argument it is called on, when it is an extension.
      * @param returns the type of a result that is read later.
@@ -179,7 +213,7 @@ sealed interface StoryNode {
     @SerialName("call")
     data class Call(
         override val id: String,
-        val function: String,
+        val function: String = "",
         val action: String? = null,
         val arguments: Map<String, String> = emptyMap(),
         val groups: Map<String, StoryGroup> = emptyMap(),

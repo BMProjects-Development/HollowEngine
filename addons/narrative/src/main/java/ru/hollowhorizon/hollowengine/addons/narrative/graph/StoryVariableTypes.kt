@@ -80,13 +80,13 @@ object StoryVariableTypes {
     /** The elements of the Kotlin [initial] of a list as a field shows them, split, or null when it is another expression. */
     fun listParts(initial: String): List<String>? {
         if (initial.trim() == EMPTY_LIST) return emptyList()
-        return LIST_VALUE.matchEntire(initial.trim())?.let { StoryLiterals.parts(it.groupValues[1]) }
+        return LIST_VALUE.matchEntire(initial.trim())?.let { StoryKotlin.arguments(it.groupValues[1]) }
     }
 
     /** The entries of the Kotlin [initial] of a map, or null when it is another expression. */
     fun mapParts(initial: String): List<Pair<String, String>>? {
         if (initial.trim() == EMPTY_MAP) return emptyList()
-        val entries = MAP_VALUE.matchEntire(initial.trim())?.let { StoryLiterals.parts(it.groupValues[1]) } ?: return null
+        val entries = MAP_VALUE.matchEntire(initial.trim())?.let { StoryKotlin.arguments(it.groupValues[1]) } ?: return null
         return entries.map { entry ->
             if (ARROW !in entry) return null
             entry.substringBefore(ARROW).trim() to entry.substringAfter(ARROW).trim()
@@ -112,7 +112,7 @@ object StoryVariableTypes {
     fun expression(text: String, type: String): String {
         val typed = text.trim()
         if (typed.startsWith("{") && typed.endsWith("}")) return typed.substring(1, typed.length - 1)
-        val parts = StoryLiterals.parts(typed).filter(String::isNotBlank)
+        val parts = (StoryKotlin.arguments(typed) ?: listOf(typed)).filter(String::isNotBlank)
         val element = LIST_TYPE.matchEntire(type)?.groupValues?.get(1)
         if (element != null) {
             val pin = StoryPinType.ofName(element)

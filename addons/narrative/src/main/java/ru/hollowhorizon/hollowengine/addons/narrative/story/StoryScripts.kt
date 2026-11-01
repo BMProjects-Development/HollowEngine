@@ -5,6 +5,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryCallKind
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctions
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
@@ -13,7 +15,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslator
 import java.io.File
-import kotlin.reflect.KType
 
 /**
  * The `.story` files as running scripts: each is compiled and kept running while its text stays the same, so that
@@ -24,14 +25,16 @@ internal object StoryScripts : ScriptTranslator {
     private const val MAIN = "main"
     private const val NARRATIVE = "hollowengine-narrative"
 
-    private class Loaded(val text: String, val scope: CoroutineScope)
+    /** A running file: [revision] says what it means, so moving its nodes around does not restart it. */
+    private class Loaded(val revision: String, val scope: CoroutineScope)
 
     private val loaded = HashMap<ScriptId, Loaded>()
 
     override fun translate(id: ScriptId, source: File): String {
-        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), ::kindOf, ::paramType)
-        if (story.problems.isEmpty()) return story.code
-        val problems = story.problems.joinToString("; ") { problem ->
+        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), StoryActionFunctions)
+        val errors = story.problems.filter { !it.warning }
+        if (errors.isEmpty()) return story.code
+        val problems = errors.joinToString("; ") { problem ->
             problem.node?.let { "$it: ${problem.message}" } ?: problem.message
         }
         throw StoryException("Story '${ScriptRegistry.display(id)}' cannot be built: $problems")
@@ -71,12 +74,13 @@ internal object StoryScripts : ScriptTranslator {
     private fun ensure(id: ScriptId): String {
         val key = ScriptRegistry.display(id)
         val text = ScriptRegistry.artifacts(id)?.sourceFile?.readText()
+        val revision = text?.let { written -> runCatching { StoryGraph.decode(written).revision() }.getOrDefault(written) }
         val current = loaded[id]
-        if (current != null && (text == null || current.text == text)) return key
+        if (current != null && (revision == null || current.revision == revision)) return key
         val instance = ScriptLoader.execute<Any>(id).getOrElse { throw failure(id, it) }
         val scope = CoroutineScope(SupervisorJob())
         StoryInstances.register(instance, scope)
-        loaded.put(id, Loaded(text.orEmpty(), scope))?.scope?.cancel()
+        loaded.put(id, Loaded(revision.orEmpty(), scope))?.scope?.cancel()
         return key
     }
 
@@ -86,11 +90,17 @@ internal object StoryScripts : ScriptTranslator {
         return StoryException("Story '${ScriptRegistry.display(id)}' failed to load: ${cause.message}$hint", cause)
     }
 
-    private fun paramType(call: StoryNode.Call, name: String): KType? =
-        call.action?.let(ActionCommands::find)?.singleOrNull()?.signature?.params?.firstOrNull { it.name == name }?.type
+}
 
-    private fun kindOf(call: StoryNode.Call): StoryCallKind {
-        val action = call.action?.let(ActionCommands::find)?.singleOrNull()?.action ?: return StoryCallKind.SUSPENDING
+/** The commands of the running game. */
+internal object StoryActionFunctions : StoryFunctions {
+    private fun command(call: StoryNode.Call) = call.action?.let(ActionCommands::find)?.singleOrNull()
+
+    override fun signature(call: StoryNode.Call): StoryFunctionSignature? =
+        StoryFunctions.Builtin.signature(call) ?: command(call)?.signature
+
+    override fun kind(call: StoryNode.Call): StoryCallKind {
+        val action = command(call)?.action ?: return StoryCallKind.SUSPENDING
         return when {
             action.reversible -> StoryCallKind.ACTION
             !action.function.isSuspend -> StoryCallKind.INSTANT

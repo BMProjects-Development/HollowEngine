@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.time.Duration
@@ -65,21 +66,8 @@ internal object StoryChecks {
         return if (wrong) problem("vector") else parts.firstNotNullOfOrNull(::code)
     }
 
-    /** What is wrong with the shape of the Kotlin [text]: its brackets and strings have to close. */
-    fun code(text: String): String? {
-        val open = ArrayDeque<Char>()
-        var quoted = false
-        text.forEachIndexed { index, char ->
-            when {
-                char == '"' && text.getOrNull(index - 1) != '\\' -> quoted = !quoted
-                quoted -> Unit
-                char in "([{" -> open.addLast(char)
-                char in ")]}" -> if (open.removeLastOrNull() != "([{"[")]}".indexOf(char)]) return problem("code")
-            }
-        }
-        val operator = text.trimEnd().lastOrNull()?.let { it in "+-*/%=<>&|,." } == true
-        return if (quoted || open.isNotEmpty() || operator) problem("code") else null
-    }
+    /** What the parser finds wrong with the Kotlin [text]. */
+    fun code(text: String): String? = if (StoryKotlin.syntax(text)?.valid == false) problem("code") else null
 
     /** What keeps [name] from being the name of a variable among those [taken]. */
     fun variableName(name: String, taken: Collection<String>): String? = when {
@@ -125,7 +113,7 @@ internal object StoryChecks {
 
     /** Everything wrong with [graph]: what the compiler says, and what the editors can see. */
     fun all(graph: StoryGraph): List<StoryCheck> {
-        val compiled = StoryGraphCompiler.compile(graph).problems.map { StoryCheck(it.node, it.message) }
+        val compiled = StoryGraphCompiler.compile(graph, StoryActionFunctions).problems.map { StoryCheck(it.node, it.message, it.warning) }
         val variables = graph.variables.mapNotNull { variable -> variable(variable)?.let { StoryCheck(null, "${variable.name}: $it") } }
         return compiled + variables + nodes(graph)
     }
@@ -190,7 +178,7 @@ internal object StoryChecks {
         val queue = ArrayDeque(graph.nodes.filterIsInstance<StoryNode.Start>().map { it.id })
         while (queue.isNotEmpty()) {
             val at = queue.removeFirst()
-            if (seen.add(at)) queue += graph.links.filter { it.from == at && it.isFlow }.map { it.to }
+            if (seen.add(at)) queue += graph.index.flowOut(at)
         }
         return seen
     }

@@ -20,6 +20,7 @@
   "greater": "Greater",
   "greater-equal": "Greater or equal",
   "inventory-count": "Items in inventory",
+  "is-null": "Is empty",
   "join-text": "Join text",
   "lerp": "Blend",
   "less": "Less",

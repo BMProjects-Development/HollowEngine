@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.addons.narrative.client
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneTimeline
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGraphFilePreview
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryListFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdePreview
@@ -28,7 +27,6 @@ internal object NarrativeClient {
         extensions.register(IdeTimelines.defaults, "cutscene", CutsceneTimeline)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "speech", DialogueOverlays.speech)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "choice", DialogueOverlays.choice)
-        extensions.registerIdePreview(StoryListFilePreview)
         extensions.registerIdePreview(StoryGraphFilePreview)
         extensions.registerIdeScriptTemplate(
             HollowIdeScriptTemplate.fromResource(

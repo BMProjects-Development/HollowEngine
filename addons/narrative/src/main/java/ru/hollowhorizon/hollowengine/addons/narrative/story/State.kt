@@ -21,9 +21,12 @@ annotation class State(val name: String = "")
  * Ends a segment of the enclosing stage: after a restart the stage continues from here rather than from its
  * previous stage call. [rewind] with [name] takes the whole story back to how it was here. Must be called directly
  * in a `@State` function, and [name] must be unique within it.
+ *
+ * @param restart whether a restart takes the story back here while this is the last checkpoint it passed, as with
+ * [rewind], instead of going on from where it was: a question asked after it is then asked again.
  */
-@Suppress("RedundantSuspendModifier")
-suspend fun checkpoint(name: String): Unit =
+@Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER")
+suspend fun checkpoint(name: String, restart: Boolean = false): Unit =
     throw StoryException("checkpoint(\"$name\") must be called directly in a @State function")
 
 /**
@@ -31,7 +34,7 @@ suspend fun checkpoint(name: String): Unit =
  * the checkpoint is passed, and every rewind to it puts back what they captured.
  */
 @Suppress("RedundantSuspendModifier", "UNUSED_PARAMETER")
-suspend fun checkpoint(name: String, labels: suspend CheckpointScope.() -> Unit): Unit =
+suspend fun checkpoint(name: String, restart: Boolean = false, labels: suspend CheckpointScope.() -> Unit): Unit =
     throw StoryException("checkpoint(\"$name\") { } must be called directly in a @State function")
 
 /** Marks the entry the compiler generates for a stage. The runtime calls it to start or resume the stage by [name]. */

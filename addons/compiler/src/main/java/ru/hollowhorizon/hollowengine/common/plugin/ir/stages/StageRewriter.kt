@@ -265,11 +265,13 @@ internal class StageRewriter(
         val fresh = builder.irBlock(resultType = type) {
             if (site.kind == SiteKind.CHECKPOINT) {
                 saveLocals(site)
-                val labels = site.call.arguments.getOrNull(1)
-                +(if (labels == null) frameCall(this, "checkpoint", irInt(site.index)) else frameCall(
+                val restart = site.call.arguments[1] ?: irFalse()
+                val labels = site.call.arguments.getOrNull(2)
+                +(if (labels == null) frameCall(this, "checkpoint", irInt(site.index), restart) else frameCall(
                     this,
                     "checkpoint",
                     irInt(site.index),
+                    restart,
                     labels
                 ))
             } else {

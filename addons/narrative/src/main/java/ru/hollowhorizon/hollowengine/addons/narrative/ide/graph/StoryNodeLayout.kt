@@ -4,9 +4,10 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeOption
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryNodeKind
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.list.StoryCardKind
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNodeMetrics
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
@@ -123,12 +124,16 @@ internal fun StoryPinType.tag(): String = "gn-type-${name.lowercase()}"
 
 /** Lays out the nodes of a story with the fields that edit them in [state]. */
 internal class StoryNodeLayout(private val graph: StoryGraph, private val state: StoryEditorState) {
-    private val linked = graph.links.filter { !it.isFlow }.mapTo(HashSet()) { it.to to it.toPin }
+    private val linked = graph.index.values.keys
 
-    /** The box of [node], with its corner at [place]. */
-    fun of(node: StoryNode, place: StoryPoint): StoryNodeBox {
+    /**
+     * The box of [node], with its corner at [place].
+     *
+     * @param detailed whether to add the fields too rare to take up room on a node, for the inspector.
+     */
+    fun of(node: StoryNode, place: StoryPoint, detailed: Boolean = false): StoryNodeBox {
         if (node is StoryNode.Reroute) return reroute(node, place)
-        val rows = Rows()
+        val rows = Rows(detailed)
         val width = rows.build(node)
         val collapsed = node.id in graph.collapsed
         return StoryNodeBox(
@@ -150,15 +155,15 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
     private fun titleOf(node: StoryNode): String = when (node) {
         is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::title) ?: node.function.substringAfterLast('.')
         is StoryNode.Pure -> StoryCatalog.operatorTitle(node.operator)
-        else -> StoryCardKind.of(node).title
+        else -> StoryNodeKind.of(node).title
     }
 
-    private fun iconOf(node: StoryNode): String? = (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.icon ?: StoryCardKind.of(node).icon
+    private fun iconOf(node: StoryNode): String? = (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.icon ?: StoryNodeKind.of(node).icon
 
     private fun tagOf(node: StoryNode): String = when (node) {
         is StoryNode.Pure -> "st-pure"
         is StoryNode.Expression -> "st-pure"
-        else -> "st-${StoryCardKind.of(node).tag}"
+        else -> "st-${StoryNodeKind.of(node).tag}"
     }
 
     private fun colorOf(node: StoryNode): UiColor? = when (node) {
@@ -170,7 +175,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
     private fun edit(node: String, field: String, change: (StoryNode) -> StoryNode) = state.editNode(node, field, change)
 
     /** The rows of one node, each under the one before. */
-    private inner class Rows {
+    private inner class Rows(private val detailed: Boolean) {
         val result = ArrayList<StoryNodeRow>()
         private var y = GraphNodeMetrics.HEADER + PADDING
 
@@ -230,12 +235,14 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     StoryRowField("speaker", node.speaker, storyLang("narrator")) { typed ->
                         edit(node.id, "speaker") { (it as StoryNode.Say).copy(speaker = typed) }
                     },
+                    storyLang("phrase.speaker.help"),
                 )
                 value(
                     node.id, StoryPins.TEXT, storyLang("phrase.text"), StoryPinType.TEXT,
                     StoryRowField("text", node.text, storyLang("phrase.text"), linesOf(node.text, SAY_COLUMNS)) { typed ->
                         edit(node.id, "text") { (it as StoryNode.Say).copy(text = typed) }
                     },
+                    storyLang("phrase.text.help"),
                 )
                 WIDE
             }
@@ -320,6 +327,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                     field = StoryRowField("code", node.code, storyLang("code.text"), linesOf(node.code, CODE_COLUMNS), code = true) { typed ->
                         edit(node.id, "code") { (it as StoryNode.Code).copy(code = typed) }
                     },
+                    hint = storyLang("code.help"),
                 )
                 node.outputs.forEach { (name, type) -> row(name, output = StoryPinSpec(name, StoryPinType.ofName(type))) }
                 CODE_WIDTH
@@ -344,22 +352,33 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             is StoryNode.Reroute -> GraphNodeMetrics.REROUTE
         }
 
-        private fun option(node: StoryNode.Choose, index: Int, option: StoryOption) = row(
-            output = StoryPinSpec(StoryPins.option(index), StoryPinType.FLOW),
-            field = StoryRowField("option-$index", option.text, storyLang("new.option")) { typed ->
-                edit(node.id, "option-$index") { each ->
-                    each as StoryNode.Choose
-                    each.copy(options = each.options.mapIndexed { at, it -> if (at == index) it.copy(text = typed) else it })
-                }
-            },
-            onRemove = { state.change { removeOption(node.id, index) } }.takeIf { node.options.size > 1 },
-        )
+        private fun option(node: StoryNode.Choose, index: Int, option: StoryOption) {
+            fun change(key: String, update: StoryOption.() -> StoryOption) = edit(node.id, key) { each ->
+                each as StoryNode.Choose
+                each.copy(options = each.options.mapIndexed { at, it -> if (at == index) it.update() else it })
+            }
+            row(
+                output = StoryPinSpec(StoryPins.option(index), StoryPinType.FLOW),
+                field = StoryRowField("option-$index", option.text, storyLang("new.option")) { typed ->
+                    change("option-$index") { copy(text = typed) }
+                },
+                onRemove = { state.change { removeOption(node.id, index) } }.takeIf { node.options.size > 1 },
+            )
+            if (detailed) row(
+                storyLang("option.condition"),
+                field = StoryRowField("condition-$index", option.condition.orEmpty(), code = true) { typed ->
+                    change("condition-$index") { copy(condition = typed.ifBlank { null }) }
+                },
+                hint = storyLang("option.condition.help"),
+            )
+        }
 
-        private fun call(node: StoryNode.Call) {
+        private fun call(written: StoryNode.Call) {
+            val node = StoryActionFunctions.resolved(written)
             flow()
             if (node.block) exit(StoryPins.BODY, storyLang("loop.body"))
             val signature = StoryCatalog.signatureOf(node)
-            val params = signature?.params.orEmpty().filter { it.group == null && it.implicit == null }
+            val params = signature?.params.orEmpty().filter { (detailed || it.group == null) && it.implicit == null }
             params.forEach { param ->
                 val label = StoryCatalog.paramTitle(signature!!, param)
                 val type = StoryPinType.of(param.type)

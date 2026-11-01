@@ -41,6 +41,7 @@ data class StoryParam(
  * @param category the heading the editor lists it under, a lang key or plain text.
  * @param categoryColor the `#RRGGBB` nodes of the category take, or null to be given one.
  * @param returns the type of what a call gives back, or null when it gives nothing.
+ * @param block whether a call takes the flow from [StoryPins.BODY] as its last argument, such as `temporary { }`.
  * @param hidden whether stories that call it still work while nothing offers it for new ones.
  */
 data class StoryFunctionSignature(
@@ -53,13 +54,12 @@ data class StoryFunctionSignature(
     val category: String? = null,
     val categoryColor: String? = null,
     val returns: String? = null,
+    val block: Boolean = false,
     val hidden: Boolean = false,
 ) {
     /** A new call of this command. */
     fun newCall(id: String) = params.filter { it.implicit != null }
-        .fold(StoryNode.Call(id, function, action = name, returns = returns)) { call, param ->
-            call.with(param, param.implicit.orEmpty())
-        }.copy(receiver = params.firstOrNull { it.receiver }?.name)
+        .fold(StoryNode.Call(id, action = name)) { call, param -> call.with(param, param.implicit.orEmpty()) }
 }
 
 /** The expression [param] has in this call, or null when it is left out. */

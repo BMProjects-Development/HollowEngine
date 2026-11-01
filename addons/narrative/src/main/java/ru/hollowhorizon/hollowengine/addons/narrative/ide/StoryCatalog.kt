@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import net.minecraft.locale.Language
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryBuiltins
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
@@ -8,45 +9,25 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperator
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
-import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryHandle
 import ru.hollowhorizon.hollowengine.client.HighlightTheme
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
-import kotlin.reflect.typeOf
 
 /** What can be added to a story: the steps of its own and the commands stories know, under shared headings. */
 internal object StoryCatalog {
-    private const val STORY_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.story"
     private const val NAMESPACE = "hollowengine-narrative"
     private const val PARAM = "hollowengine.story.param"
     private const val OPERATOR = "hollowengine.story.operator"
-    private const val HANDLE = "StoryHandle<Unit>"
     private const val HEX = 16
     private const val OPAQUE = 0xFF shl 24
     private const val DIMMED = 0.6f
 
     private var palette: Pair<List<StoryCommand>, Map<String, UiColor>>? = null
 
-    /** A function of a story that takes a block of steps. */
-    private val BLOCKS = setOf("temporary", "async")
-
-    private val FLOW = listOf(
-        builtin("checkpoint", param("name")),
-        builtin("rewind", param("checkpoint", optional = true)),
-        builtin("temporary", param("until", optional = true)),
-        builtin("async", param("name")).copy(returns = HANDLE),
-        builtin("join", handle()).copy(function = "join"),
-        builtin("cancel", handle()).copy(function = "cancel"),
-        builtin("scene", param("address")),
-    )
-
-    fun signatureOf(call: StoryNode.Call): StoryFunctionSignature? {
-        val action = call.action ?: return null
-        return FLOW.firstOrNull { it.name == action }
-            ?: ActionCommands.find(action).singleOrNull()?.signature
-    }
+    fun signatureOf(call: StoryNode.Call): StoryFunctionSignature? = StoryActionFunctions.signature(call)
 
     fun title(signature: StoryFunctionSignature): String =
         signature.title?.lang ?: known(key(signature.name)) ?: "@${signature.name.substringAfter(':')}"
@@ -114,10 +95,7 @@ internal object StoryCatalog {
 
     /** A menu item per command and step of the flow, for adding a node of it. */
     fun items(add: (StoryNode) -> Unit): List<UiDropdownItem> {
-        val own = FLOW.map { storyLang("category.flow") to item(it, add) } + listOf(
-            storyLang("category.flow") to UiDropdownItem(storyLang("kind.loop"), icon = storyIcon("block")) {
-                add(StoryNode.Loop(StoryGraph.newId()))
-            },
+        val own = StoryBuiltins.all.map { storyLang("category.flow") to item(it, add) } + listOf(
             storyLang("category.variables") to UiDropdownItem(storyLang("kind.set"), icon = storyIcon("command")) {
                 add(StoryNode.Assign(StoryGraph.newId(), ""))
             },
@@ -134,15 +112,8 @@ internal object StoryCatalog {
 
     private fun item(signature: StoryFunctionSignature, add: (StoryNode) -> Unit) =
         UiDropdownItem(title(signature), icon = signature.icon) {
-            add(signature.newCall(StoryGraph.newId()).let { it.copy(block = signature.name in BLOCKS) })
+            add(signature.newCall(StoryGraph.newId()))
         }
-
-    private fun builtin(name: String, vararg params: StoryParam) =
-        StoryFunctionSignature(name, "$STORY_PACKAGE.$name", params.toList())
-
-    private fun handle() = StoryParam("handle", typeOf<StoryHandle<*>>(), receiver = true)
-
-    private fun param(name: String, optional: Boolean = false) = StoryParam(name, typeOf<String>(), optional)
 
     /** The key of [id]: `ns:path` is named by `ns.story.command.path`. */
     private fun key(id: String) = "${id.substringBefore(':', NAMESPACE)}.story.command.${id.substringAfter(':')}"
