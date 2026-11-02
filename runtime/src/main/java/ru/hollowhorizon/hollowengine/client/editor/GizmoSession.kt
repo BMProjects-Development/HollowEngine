@@ -128,6 +128,16 @@ class GizmoSession(val projector: GizmoProjector, snapping: GizmoSnapping = Gizm
      */
     fun key(target: GizmoTarget?, key: Int, modifiers: Int, x: Float, y: Float): Boolean {
         keyboard?.let { transform ->
+            val mode = GizmoKeyboardTransform.modeFor(key, modifiers)
+            if (mode != null && mode != transform.mode) {
+                val held = held ?: return false
+                if (!held.canEdit(mode)) return true
+                held.restore()
+                shiftX = 0f
+                shiftY = 0f
+                keyboard = GizmoKeyboardTransform(mode, transform.start, x, y, projector, geometry, manipulator)
+                return true
+            }
             val result = transform.key(key, modifiers)
             if (result == GizmoKeyResult.CHANGED) {
                 held?.restore()

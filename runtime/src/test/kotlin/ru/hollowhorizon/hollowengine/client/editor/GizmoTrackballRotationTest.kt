@@ -17,6 +17,25 @@ class GizmoTrackballRotationTest {
     private val start = GizmoTransformValues(Vec3f.ZERO, QuatF.IDENTITY, Vec3f(1f, 1f, 1f))
 
     @Test
+    fun `changing transform mode restores the pose and keeps one edit`() {
+        val session = GizmoSession(projector())
+        val target = Target(start)
+        val modes = listOf(GLFW.GLFW_KEY_G, GLFW.GLFW_KEY_R, GLFW.GLFW_KEY_S, GLFW.GLFW_KEY_G)
+        modes.forEachIndexed { index, key ->
+            val x = 450f + index * 40f
+            assertTrue(session.key(target, key, 0, x, 300f))
+            assertEquals(start, target.values)
+            session.moveTo(x + 40f, 340f, 0)
+            assertNotEquals(start, target.values)
+        }
+        assertEquals(1, target.begun)
+        assertEquals(0, target.ended)
+        session.cancel()
+        assertEquals(start, target.values)
+        assertEquals(1, target.ended)
+    }
+
+    @Test
     fun `switching rotation modes stays in one edit and cancellation restores the target`() {
         val session = GizmoSession(projector())
         val target = Target(start)
