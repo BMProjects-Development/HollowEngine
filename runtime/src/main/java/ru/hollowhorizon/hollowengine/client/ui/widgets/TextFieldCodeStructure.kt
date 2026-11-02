@@ -88,4 +88,4 @@ internal data class TextFieldIndentEdit(val start: Int, val end: Int, val replac
 internal fun String.indentOfLine(position: Int): String =
     substring(lineStart(this, position), lineEnd(this, position)).takeWhile { it == ' ' || it == '\t' }
 
-internal val EditorPairClosings = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'')
+internal val EditorPairClosings = mapOf('(' to ')', '[' to ']', '{' to '}', '<' to '>', '"' to '"', '\'' to '\'')
