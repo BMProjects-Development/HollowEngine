@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.graph
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import org.lwjgl.glfw.GLFW
@@ -52,6 +53,7 @@ fun GraphEditorCanvas(
     val view = controller.view
     val scene = controller.model.scene
     val selection = controller.selection
+    DisposableEffect(controller) { onDispose { controller.cancelGesture() } }
     val curves = scene.links.map { each ->
         each to GraphCurves.throughPoints(
             view.toCanvasX(each.from.x), view.toCanvasY(each.from.y), scene.passing[each.from.node],

@@ -59,6 +59,7 @@
   "no_problems": "Граф компилируется.",
   "problem.unknown_node": "Неизвестный узел",
   "problem.unknown_pin": "Неизвестный пин",
+  "problem.missing_node": "Связь ведёт к узлу, которого нет в графе",
   "problem.no_output_node": "У графа нет выходного узла",
   "problem.second_output_node": "Используется только первый выходной узел",
   "problem.cycle": "Узел стоит в цикле и пропущен",

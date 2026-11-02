@@ -30,9 +30,9 @@ internal fun animatorInspectorTarget(
     ) { StateSection(document, selection, onSelect) }
 
     is AnimatorSelection.Transition -> InspectorTarget(
-        id = "animator-link-${selection.layerId}-${selection.index}",
+        id = "animator-link-${selection.layerId}-${selection.from}-${selection.to}",
         title = document.animator.controller(selection.layerId)
-            ?.transitions?.getOrNull(selection.index)
+            ?.transition(selection.from, selection.to)
             ?.let { "${it.from} → ${it.to}" }
             ?: animatorText("section_link"),
         icon = AnimatorIcon,
@@ -158,13 +158,12 @@ private fun StateSection(
 
     if (state is BlendStateSpec) BlendMotionsSection(document, layerId, state)
 
-    val links = controller.transitions.withIndex()
-        .filter { (_, transition) -> transition.from == state.id || transition.to == state.id }
+    val links = controller.transitions.filter { it.from == state.id || it.to == state.id }
     if (links.isNotEmpty()) {
         Section(animatorText("state_transitions")) {
-            links.forEach { (index, transition) ->
+            links.forEach { transition ->
                 InspectorButton("${transition.from} → ${transition.to}") {
-                    onSelect(AnimatorSelection.Transition(layerId, index))
+                    onSelect(AnimatorSelection.Transition(layerId, transition.from, transition.to))
                 }
             }
         }
@@ -187,10 +186,10 @@ private fun TransitionSection(
 ) {
     val layerId = selection.layerId
     val controller = document.animator.controller(layerId) ?: return Hint(animatorText("layer_removed"))
-    val transition = controller.transitions.getOrNull(selection.index) ?: return Hint(animatorText("transition_removed"))
+    val transition = controller.transition(selection.from, selection.to) ?: return Hint(animatorText("transition_removed"))
 
     fun update(change: (AnimationControllerTransitionSpec) -> AnimationControllerTransitionSpec) {
-        document.edit { it.withTransitionAt(layerId, selection.index, change(transition)) }
+        document.edit { it.withTransitionChanged(layerId, selection.from, selection.to, change(transition)) }
     }
 
     Section(animatorText("section_link")) {
@@ -211,7 +210,7 @@ private fun TransitionSection(
     }
 
     InspectorButton(animatorText("delete_transition"), tags = listOf("danger")) {
-        document.edit { it.withoutTransitionAt(layerId, selection.index) }
+        document.edit { it.withoutTransition(layerId, selection.from, selection.to) }
         onSelect(AnimatorSelection.Layer(layerId))
     }
 }

@@ -97,13 +97,14 @@ fun Animator.withoutState(layerId: String, stateId: String): Animator {
     if (controller.states.none { it.id == stateId }) return this
 
     val states = controller.states.filterNot { it.id == stateId }
+    val placed = withLayoutFixed(layerId).layout
     return withLayer(
         controller.copy(
             states = states,
             transitions = controller.transitions.filterNot { it.from == stateId || it.to == stateId },
             entryState = controller.entryState?.takeIf { it != stateId } ?: states.firstOrNull()?.id,
         )
-    ).copy(layout = layout - graphKey(layerId, stateId))
+    ).copy(layout = placed - graphKey(layerId, stateId))
 }
 
 /**
@@ -118,7 +119,8 @@ fun Animator.withStateAsAnyState(layerId: String, stateId: String): Animator {
         .filterNot { it.to == stateId }
         .map { if (it.from == stateId) it.copy(from = ANY_STATE) else it }
         .distinctBy { it.from to it.to }
-    val point = nodeAt(layerId, stateId)
+    val placed = withLayoutFixed(layerId).layout
+    val point = placed[graphKey(layerId, stateId)]
 
     return withLayer(
         controller.copy(
@@ -127,7 +129,7 @@ fun Animator.withStateAsAnyState(layerId: String, stateId: String): Animator {
             entryState = controller.entryState?.takeIf { it != stateId } ?: states.firstOrNull()?.id,
         )
     ).copy(
-        layout = (layout - graphKey(layerId, stateId)).let { rest ->
+        layout = (placed - graphKey(layerId, stateId)).let { rest ->
             if (point == null) rest else rest + (graphKey(layerId, ANY_STATE) to point)
         }
     )
@@ -146,7 +148,8 @@ fun Animator.withoutAnyState(layerId: String): Animator {
     val layoutKey = graphKey(layerId, ANY_STATE)
     if (transitions.size == controller.transitions.size && layoutKey !in layout) return this
 
-    return withLayer(controller.copy(transitions = transitions)).copy(layout = layout - layoutKey)
+    val placed = withLayoutFixed(layerId).layout
+    return withLayer(controller.copy(transitions = transitions)).copy(layout = placed - layoutKey)
 }
 
 fun Animator.withEntryState(layerId: String, stateId: String): Animator {
@@ -164,28 +167,35 @@ fun Animator.withTransition(layerId: String, transition: AnimationControllerTran
     return withLayer(controller.copy(transitions = controller.transitions + transition))
 }
 
-fun Animator.withTransitionAt(
+/** The transition between two states: there is one at most, which is what tells it apart. */
+fun AnimationControllerLayerSpec.transition(from: String, to: String): AnimationControllerTransitionSpec? =
+    transitions.firstOrNull { it.from == from && it.to == to }
+
+/** With the transition from [from] to [to] replaced by [transition]. */
+fun Animator.withTransitionChanged(
     layerId: String,
-    index: Int,
+    from: String,
+    to: String,
     transition: AnimationControllerTransitionSpec,
 ): Animator {
     val controller = controller(layerId) ?: return this
-    if (index !in controller.transitions.indices) return this
     return withLayer(
-        controller.copy(transitions = controller.transitions.toMutableList().also { it[index] = transition })
+        controller.copy(transitions = controller.transitions.map { if (it.from == from && it.to == to) transition else it })
     )
 }
 
-fun Animator.withoutTransitionAt(layerId: String, index: Int): Animator {
+fun Animator.withoutTransition(layerId: String, from: String, to: String): Animator {
     val controller = controller(layerId) ?: return this
-    if (index !in controller.transitions.indices) return this
-    return withLayer(
-        controller.copy(transitions = controller.transitions.filterIndexed { at, _ -> at != index })
-    )
+    return withLayer(controller.copy(transitions = controller.transitions.filterNot { it.from == from && it.to == to }))
 }
 
+/** With [stateId] at [at]. The other states stay where they are seen, those placed by default too. */
 fun Animator.withNodeAt(layerId: String, stateId: String, at: GraphPoint): Animator =
-    copy(layout = layout + (graphKey(layerId, stateId) to at))
+    withLayoutFixed(layerId).let { it.copy(layout = it.layout + (graphKey(layerId, stateId) to at)) }
+
+/** With the place of every state of the layer written down, since a default place follows from how many are. */
+private fun Animator.withLayoutFixed(layerId: String): Animator =
+    copy(layout = layout + nodeLayout(layerId).mapKeys { (stateId, _) -> graphKey(layerId, stateId) })
 
 fun Animator.nodeAt(layerId: String, stateId: String): GraphPoint? = layout[graphKey(layerId, stateId)]
 

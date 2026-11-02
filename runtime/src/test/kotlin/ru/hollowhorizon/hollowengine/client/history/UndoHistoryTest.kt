@@ -194,4 +194,22 @@ class UndoHistoryTest {
         assertEquals("a", value.current)
         assertEquals("x", held.current)
     }
+
+    @Test
+    fun `a rolled back transaction leaves the value as it was and nothing in the history`() {
+        val history = history()
+        val value = Value("a")
+        value.set("b", history)
+
+        history.begin()
+        history.begin()
+        value.set("c", history)
+        value.set("d", history)
+        history.rollback()
+
+        assertEquals("b", value.current)
+        assertEquals(1, history.steps.size)
+        assertTrue(history.undo())
+        assertEquals("a", value.current)
+    }
 }

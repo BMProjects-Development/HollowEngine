@@ -22,12 +22,12 @@ internal class ShaderGraphEditorModel(
         titles = nodes.boxes.mapValues { it.value.kind.title() },
         reroutes = nodes.boxes.filterValues { it.isReroute }.keys,
         pins = nodes.pins,
-        links = graph.links.mapIndexedNotNull { index, each ->
+        links = graph.links.mapNotNull { each ->
             val from = nodes.pins.firstOrNull { it.node == each.from && it.output && it.name == each.output }
-                ?: return@mapIndexedNotNull null
+                ?: return@mapNotNull null
             val to = nodes.pins.firstOrNull { it.node == each.to && !it.output && it.name == each.input }
-                ?: return@mapIndexedNotNull null
-            GraphLinkView(index, from, to, code.types.output(each.from, each.output)?.color() ?: GraphLinkColor)
+                ?: return@mapNotNull null
+            GraphLinkView(each, from, to, code.types.output(each.from, each.output)?.color() ?: GraphLinkColor)
         },
         frames = nodes.frames.mapNotNull { (id, rect) ->
             graph.group(id)?.let { GraphFrameView(id, it.title.ifBlank { graphEditorText("group") }, GraphGroupColors.of(it.color), rect) }
@@ -44,6 +44,7 @@ internal class ShaderGraphEditorModel(
 
     override fun beginGesture() = document.beginGesture()
     override fun endGesture() = document.endGesture()
+    override fun cancelGesture() = document.cancelGesture()
 
     override fun positionOf(node: String) = document.graph.node(node)?.let { it.x to it.y }
 
@@ -83,11 +84,16 @@ internal class ShaderGraphEditorModel(
     private fun intoType(pending: GraphPendingLink) =
         graph.node(pending.node)?.let { owner -> ShaderNodeTypes.of(owner.type)?.input(owner, pending.pin)?.type }
 
-    private fun add(kind: ShaderNodeType, x: Float, y: Float): ShaderGraphNode {
+    /** A new node at ([x], [y]), with what [then] makes of the graph in the same step back. */
+    private fun add(
+        kind: ShaderNodeType,
+        x: Float,
+        y: Float,
+        then: ShaderGraph.(ShaderGraphNode) -> ShaderGraph = { this },
+    ) {
         val node = ShaderGraphNode(document.graph.freeNodeId(kind.id), kind.id, x, y)
-        document.edit { it.withNode(node) }
+        document.edit { it.withNode(node).then(node) }
         select(GraphSelection.of(node.id))
-        return node
     }
 
     /** The add menu, showing only what can take the link, and a reroute, which always can. */
@@ -97,22 +103,26 @@ internal class ShaderGraphEditorModel(
         val items = if (pending.fromOutput) {
             val carried = carried(pending)
             val reroute = graphRerouteItem {
-                val node = add(rerouteKind ?: return@graphRerouteItem, x - half, y - half)
-                document.edit { it.withLink(pending.node, pending.pin, node.id, ShaderNodeLibrary.REROUTE_INPUT) }
+                add(rerouteKind ?: return@graphRerouteItem, x - half, y - half) { node ->
+                    withLink(pending.node, pending.pin, node.id, ShaderNodeLibrary.REROUTE_INPUT)
+                }
             }
             listOf(reroute) + addNodeItems(graph.target, { it.inputFor(carried) != null }) { kind ->
-                val node = add(kind, x, y - ShaderNodeLayout.HEADER)
-                kind.inputFor(carried, node)?.let { pin -> document.edit { it.withLink(pending.node, pending.pin, node.id, pin.name) } }
+                add(kind, x, y - ShaderNodeLayout.HEADER) { node ->
+                    kind.inputFor(carried, node)?.let { pin -> withLink(pending.node, pending.pin, node.id, pin.name) } ?: this
+                }
             }
         } else {
             val into = intoType(pending) ?: return emptyList()
             val reroute = graphRerouteItem {
-                val node = add(rerouteKind ?: return@graphRerouteItem, x - half, y - half)
-                document.edit { it.withLink(node.id, ShaderNodeLibrary.REROUTE_OUTPUT, pending.node, pending.pin) }
+                add(rerouteKind ?: return@graphRerouteItem, x - half, y - half) { node ->
+                    withLink(node.id, ShaderNodeLibrary.REROUTE_OUTPUT, pending.node, pending.pin)
+                }
             }
             listOf(reroute) + addNodeItems(graph.target, { it.outputFor(into) != null }) { kind ->
-                val node = add(kind, x - ShaderNodeLayout.WIDTH, y - ShaderNodeLayout.HEADER)
-                kind.outputFor(into)?.let { output -> document.edit { it.withLink(node.id, output.name, pending.node, pending.pin) } }
+                add(kind, x - ShaderNodeLayout.WIDTH, y - ShaderNodeLayout.HEADER) { node ->
+                    kind.outputFor(into)?.let { output -> withLink(node.id, output.name, pending.node, pending.pin) } ?: this
+                }
             }
         }
         return items.mapIndexed { index, item -> if (index == 1) item.copy(separatorBefore = true) else item }
@@ -122,26 +132,26 @@ internal class ShaderGraphEditorModel(
 
     /** Whatever fed the link feeds the node, and the node feeds where the link went. */
     override fun insertIntoLink(link: Any, node: String) {
-        val index = link as Int
+        val target = link as ShaderGraphLink
         val current = document.graph
-        val target = current.links.getOrNull(index) ?: return
+        if (target !in current.links) return
         val placed = current.node(node) ?: return
         val kind = ShaderNodeTypes.of(placed.type) ?: return
         val input = kind.inputFor(code.types.output(target.from, target.output) ?: ShaderType.FLOAT, placed) ?: return
         val into = current.node(target.to)?.let { ShaderNodeTypes.of(it.type)?.input(it, target.input)?.type } ?: return
         val output = kind.outputFor(into) ?: return
         document.edit {
-            it.withoutLinkAt(index).withLink(target.from, target.output, node, input.name)
+            it.withoutLink(target).withLink(target.from, target.output, node, input.name)
                 .withLink(node, output.name, target.to, target.input)
         }
     }
 
-    override fun removeLink(link: Any) = document.edit { it.withoutLinkAt(link as Int) }
+    override fun removeLink(link: Any) = document.edit { it.withoutLink(link as ShaderGraphLink) }
 
     override fun addReroute(link: Any, x: Float, y: Float): GraphSelection {
         val id = graph.freeNodeId(ShaderNodeLibrary.REROUTE)
         val half = ShaderNodeLayout.REROUTE / 2f
-        document.edit { it.withReroute(link as Int, id, x - half, y - half) }
+        document.edit { it.withReroute(link as ShaderGraphLink, id, x - half, y - half) }
         return GraphSelection.of(id)
     }
 

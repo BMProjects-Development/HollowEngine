@@ -51,6 +51,9 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     var insertInto by mutableStateOf<Any?>(null)
         private set
 
+    /** Whether a gesture is open in [model]. There is one at a time, whatever began it. */
+    private var gesture = false
+
     private val dragOrigins = HashMap<String, Pair<Float, Float>>()
 
     /** The node whose corner lands on the grid while a drag snaps; the rest keep their distance to it. */
@@ -65,6 +68,29 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
     fun select(next: GraphSelection?) {
         if (next != null) state.selection = next
+    }
+
+    private fun beginGesture() {
+        endGesture()
+        model.beginGesture()
+        gesture = true
+    }
+
+    private fun endGesture() {
+        if (!gesture) return
+        gesture = false
+        model.endGesture()
+    }
+
+    /** Takes back the gesture under way, the link it drew and the nodes it dragged; false when there is none. */
+    fun cancelGesture(): Boolean {
+        if (!gesture) return false
+        gesture = false
+        link = null
+        insertInto = null
+        dragOrigins.clear()
+        model.cancelGesture()
+        return true
     }
 
     private fun pinAt(x: Float, y: Float, outputs: Boolean): GraphPin? =
@@ -93,7 +119,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
                 menu = GraphMenu(pending.screenX, pending.screenY, items)
             }
         }
-        model.endGesture()
+        endGesture()
     }
 
     /** Ends a drag of nodes: one dropped on a link goes into it, and the whole drag is one step back. */
@@ -103,7 +129,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         insertInto = null
         joinFrame()
         dragOrigins.clear()
-        model.endGesture()
+        endGesture()
     }
 
     /**
@@ -125,7 +151,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         dragOrigins.clear()
         selection.nodes.forEach { id -> model.positionOf(id)?.let { dragOrigins[id] = it } }
         dragAnchor = anchor
-        model.beginGesture()
+        if (dragOrigins.isEmpty()) endGesture() else beginGesture()
     }
 
     /** A click with Shift or Control adds to the selection and takes away what was in it. */
@@ -170,7 +196,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
     fun pressPin(pin: GraphPin, screenX: Float, screenY: Float) {
         menu = null
-        model.beginGesture()
+        beginGesture()
         val x = view.toCanvasX(pin.x)
         val y = view.toCanvasY(pin.y)
         val source = if (pin.output) null else model.detach(pin)
@@ -229,16 +255,13 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         when {
             HollowKeys.DELETE.matches(input) -> deleteSelection()
             HollowKeys.DUPLICATE.matches(input) -> duplicateSelection()
-            HollowKeys.SELECT_ALL.matches(input) -> select(GraphSelection(scene.boxes.keys.toSet()))
+            HollowKeys.SELECT_ALL.matches(input) ->
+                select(GraphSelection(scene.boxes.keys + scene.cards.flatMap { model.groupMembers(it.id) }))
+
             HollowKeys.GROUP.matches(input) -> select(model.groupNodes(selection.nodes))
             HollowKeys.UNGROUP.matches(input) -> select(model.ungroup(selection))
             model.history?.let { UndoKeys.handle(it, input.key, input.modifiers) } == true -> Unit
-            input.key == GLFW.GLFW_KEY_ESCAPE -> if (link != null) {
-                link = null
-                model.endGesture()
-            } else {
-                select(GraphSelection.None)
-            }
+            input.key == GLFW.GLFW_KEY_ESCAPE -> if (!cancelGesture()) select(GraphSelection.None)
 
             else -> return false
         }

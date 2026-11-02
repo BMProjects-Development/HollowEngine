@@ -24,6 +24,10 @@ private const val AutoSaveDelayMillis = 900L
 @Composable
 internal fun HollowIdeAnimatorEditor(file: HollowIdeOpenFile) {
     val document = file.document as HollowIdeAnimatorDocument
+    document.error?.let { message ->
+        return Text(animatorText("broken_file") + " " + message, tags = listOf("animator-empty-hint"), modifier = Modifier.padding(10.px))
+    }
+
     val view = remember(document) { document.editorState { GraphViewState() } }
     var selection by remember(document) { mutableStateOf<AnimatorSelection>(AnimatorSelection.None) }
     var openLayer by remember(document) { mutableStateOf(document.animator.layers.firstOrNull()?.id) }
