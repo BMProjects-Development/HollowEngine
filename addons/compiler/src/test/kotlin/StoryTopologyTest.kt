@@ -214,12 +214,12 @@ class StoryTopologyTest : StageTest() {
     }
 
     @Test
-    fun `a value from another branch is pointed out`() {
-        val graph = StoryGraph(
+    fun `a value from another branch is an error unless it can be null anyway`() {
+        fun graph(returns: String) = StoryGraph(
             nodes = listOf(
                 StoryNode.Start("s", "main"),
                 StoryNode.Branch("b", "true"),
-                call("get", "name", returns = "kotlin.String"),
+                call("get", "name", returns = returns),
                 call("say", "log"),
                 log("end"),
             ),
@@ -228,9 +228,10 @@ class StoryTopologyTest : StageTest() {
                 StoryLink("get", StoryPins.VALUE, "say", "event"), next("get", "end"), next("say", "end"),
             ),
         )
-        val problem = compile(graph).problems.single()
+        val problem = compile(graph("kotlin.String")).problems.single()
         assertEquals("say", problem.node)
-        assertTrue(problem.warning)
+        assertFalse(problem.warning)
+        assertTrue(compile(graph("kotlin.String?")).problems.single().warning)
     }
 
     @Test

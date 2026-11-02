@@ -63,16 +63,34 @@ object StoryGraphEdits {
         return copy(links = links - (into + out).toSet() + joined)
     }
 
-    /** Copies of [ids], [offset] away, linked as they were among themselves; a value they read they keep reading. */
+    fun StoryGraph.startNames(): MutableSet<String> = nodes.filterIsInstance<StoryNode.Start>().mapTo(HashSet()) { it.name }
+
+    /** A name for a start that none of [taken] has: two starts of one name would be one stage. */
+    fun freeStartName(taken: Set<String>): String =
+        generateSequence(1) { it + 1 }.map { "scene$it" }.first { it !in taken }
+
+    /**
+     * Copies of [ids], [offset] away, linked as they were among themselves; a value they read they keep reading. They
+     * stay collapsed if they were, and a start gets a name of its own.
+     */
     fun StoryGraph.copyNodes(ids: Set<String>, offset: StoryPoint): Pair<StoryGraph, Map<String, String>> {
         val fresh = ids.associateWith { StoryGraph.newId() }
-        val copies = fresh.mapNotNull { (old, new) -> node(old)?.withId(new) }
+        val taken = startNames()
+        val copies = fresh.mapNotNull { (old, new) -> node(old)?.withId(new) }.map { copy ->
+            if (copy is StoryNode.Start) copy.copy(name = freeStartName(taken).also(taken::add)) else copy
+        }
         val kept = links.filter { it.to in ids && (it.from in ids || !it.isFlow) }
             .map { it.copy(from = fresh[it.from] ?: it.from, to = fresh.getValue(it.to)) }
         val places = fresh.mapNotNull { (old, new) ->
             layout[old]?.let { new to StoryPoint(it.x + offset.x, it.y + offset.y) }
         }
-        return copy(nodes = nodes + copies, links = links + kept, layout = layout + places) to fresh
+        val folded = fresh.filterKeys { it in collapsed }.values
+        return copy(
+            nodes = nodes + copies,
+            links = links + kept,
+            layout = layout + places,
+            collapsed = collapsed + folded,
+        ) to fresh
     }
 
     /** A new group of [ids], taken out of the groups they were in. */

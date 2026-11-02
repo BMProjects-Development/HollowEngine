@@ -17,8 +17,10 @@ fun ShaderGraph.withNode(node: ShaderGraphNode): ShaderGraph = copy(nodes = node
  */
 fun ShaderGraph.withoutNodes(ids: Set<String>): ShaderGraph {
     fun sourceOf(reroute: String): ShaderGraphLink? {
+        val seen = hashSetOf(reroute)
         var link = linkInto(reroute, ShaderNodeLibrary.REROUTE_INPUT) ?: return null
         while (link.from in ids && node(link.from)?.type == ShaderNodeLibrary.REROUTE) {
+            if (!seen.add(link.from)) return null
             link = linkInto(link.from, ShaderNodeLibrary.REROUTE_INPUT) ?: return null
         }
         return link.takeIf { it.from !in ids }
@@ -34,12 +36,12 @@ fun ShaderGraph.withoutNodes(ids: Set<String>): ShaderGraph {
 }
 
 /**
- * A reroute [id] at ([x], [y]) put into the link at [index]: what fed the link feeds the reroute, and
- * the reroute feeds where the link went.
+ * A reroute [id] at ([x], [y]) put into [link]: what fed the link feeds the reroute, and the reroute
+ * feeds where the link went.
  */
-fun ShaderGraph.withReroute(index: Int, id: String, x: Float, y: Float): ShaderGraph {
-    val link = links.getOrNull(index) ?: return this
-    return withoutLinkAt(index).withNode(ShaderGraphNode(id, ShaderNodeLibrary.REROUTE, x, y))
+fun ShaderGraph.withReroute(link: ShaderGraphLink, id: String, x: Float, y: Float): ShaderGraph {
+    if (link !in links) return this
+    return withoutLink(link).withNode(ShaderGraphNode(id, ShaderNodeLibrary.REROUTE, x, y))
         .withLink(link.from, link.output, id, ShaderNodeLibrary.REROUTE_INPUT)
         .withLink(id, ShaderNodeLibrary.REROUTE_OUTPUT, link.to, link.input)
 }
@@ -117,8 +119,7 @@ fun ShaderGraph.withLink(from: String, output: String, to: String, input: String
 fun ShaderGraph.withoutLinkInto(node: String, input: String): ShaderGraph =
     copy(links = links.filterNot { it.to == node && it.input == input })
 
-fun ShaderGraph.withoutLinkAt(index: Int): ShaderGraph =
-    if (index !in links.indices) this else copy(links = links.filterIndexed { at, _ -> at != index })
+fun ShaderGraph.withoutLink(link: ShaderGraphLink): ShaderGraph = copy(links = links - link)
 
 /** With [values] for the unconnected input [input] of the node. */
 fun ShaderGraph.withValue(node: String, input: String, values: List<Float>): ShaderGraph =

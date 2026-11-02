@@ -140,6 +140,9 @@ interface GraphEditorModel {
     fun beginGesture()
     fun endGesture()
 
+    /** Ends the gesture with the graph back as it was when it began; nothing of it stays in the history. */
+    fun cancelGesture()
+
     /** Where the corner of [node] is, also while a collapsed group hides it. */
     fun positionOf(node: String): Pair<Float, Float>?
 

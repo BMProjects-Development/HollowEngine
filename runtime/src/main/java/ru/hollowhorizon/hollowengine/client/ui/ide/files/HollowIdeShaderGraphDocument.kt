@@ -61,6 +61,9 @@ class HollowIdeShaderGraphDocument(bytes: ByteArray) : HollowIdeFileDocument, Un
 
     fun endGesture() = history.commit()
 
+    /** Ends the gesture with the graph as it was when it began. */
+    fun cancelGesture() = history.rollback()
+
     private fun apply(next: ShaderGraph) {
         graph = next
         isModified = true

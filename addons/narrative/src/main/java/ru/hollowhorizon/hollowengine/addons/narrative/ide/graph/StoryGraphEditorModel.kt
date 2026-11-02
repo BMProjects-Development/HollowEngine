@@ -2,9 +2,11 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.copyNodes
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.freeStartName
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.link
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.linkValue
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeNodes
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.startNames
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroupChanged
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withMembership
@@ -148,6 +150,11 @@ internal class StoryGraphEditorModel(
             state.moved = emptyMap()
         }
         history?.commit()
+    }
+
+    override fun cancelGesture() {
+        state.moved = emptyMap()
+        history?.rollback()
     }
 
     override fun positionOf(node: String): Pair<Float, Float>? = places[node]?.let { it.x to it.y }
@@ -376,7 +383,7 @@ internal class StoryGraphEditorModel(
             ) { add(StoryNode.Branch(StoryGraph.newId())) })
         add(UiDropdownItem(storyLang("add.loop"), icon = kindIcon("block")) { add(StoryNode.Loop(StoryGraph.newId())) })
         add(UiDropdownItem(storyLang("add.start"), icon = kindIcon("label")) {
-            add(StoryNode.Start(StoryGraph.newId(), freeStartName()))
+            add(StoryNode.Start(StoryGraph.newId(), freeStartName(graph.startNames())))
         })
         addAll(variableItems(add))
         addAll(StoryCatalog.items(add))
@@ -398,11 +405,6 @@ internal class StoryGraphEditorModel(
     }
 
     private fun kindIcon(name: String) = storyIcon(name)
-
-    private fun freeStartName(): String {
-        val taken = graph.nodes.filterIsInstance<StoryNode.Start>().mapTo(HashSet()) { it.name }
-        return generateSequence(1) { it + 1 }.map { "scene$it" }.first { it !in taken }
-    }
 
     private companion object {
         const val COPY_OFFSET = 24f

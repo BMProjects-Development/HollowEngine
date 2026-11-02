@@ -59,6 +59,7 @@
   "no_problems": "The graph compiles.",
   "problem.unknown_node": "Unknown node",
   "problem.unknown_pin": "Unknown pin",
+  "problem.missing_node": "A link leads to a node the graph does not have",
   "problem.no_output_node": "The graph has no output node",
   "problem.second_output_node": "Only the first output node is used",
   "problem.cycle": "The node is on a loop and is left out",
