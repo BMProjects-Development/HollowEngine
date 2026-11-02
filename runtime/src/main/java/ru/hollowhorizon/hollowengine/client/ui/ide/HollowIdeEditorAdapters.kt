@@ -284,7 +284,11 @@ internal class HollowIdeEditorSession(
     }
 
     fun close() {
+        if (!scope.isActive) return
         scope.cancel()
+        analysisDispatcher.executor.execute {
+            runCatching { currentAnalyzer().forget(path) }.onFailure { reportAnalysisFailure("forget", it) }
+        }
         analysisDispatcher.close()
     }
 

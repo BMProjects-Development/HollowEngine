@@ -80,6 +80,9 @@ class HollowIdeFileView internal constructor(val previews: List<HollowIdeFilePre
     @Suppress("UNCHECKED_CAST")
     internal fun <T : Any> state(preview: HollowIdeFilePreview, create: () -> T): T =
         (states[preview.id] as? T) ?: create().also { states[preview.id] = it }
+
+    /** Lets go of what the previews keep, as the file closes. */
+    internal fun close() = states.values.filterIsInstance<AutoCloseable>().forEach(AutoCloseable::close)
 }
 
 class HollowIdePreviewContext internal constructor(

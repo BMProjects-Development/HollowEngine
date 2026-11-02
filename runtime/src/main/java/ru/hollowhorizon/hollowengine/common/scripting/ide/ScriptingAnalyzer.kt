@@ -58,6 +58,9 @@ interface ScriptingAnalyzer {
     fun propertyTypes(name: String, text: String, values: String, places: String? = null): KotlinPropertyTypes =
         KotlinPropertyTypes()
 
+    /** Lets go of what is kept for the file [name], which nothing has open any more. */
+    fun forget(name: String) = Unit
+
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>

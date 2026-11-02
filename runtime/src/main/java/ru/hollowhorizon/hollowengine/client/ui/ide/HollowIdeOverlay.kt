@@ -221,7 +221,10 @@ object HollowIdeOverlay {
             editorSessions.clear()
             editorAnalysisRevision++
         },
-        onPreviewsChanged = fileViews::clear,
+        onPreviewsChanged = {
+            fileViews.values.forEach(HollowIdeFileView::close)
+            fileViews.clear()
+        },
     )
 
     private fun editorState(file: HollowIdeOpenFile): TextFieldState = editorStates.getOrPut(file.path) {
@@ -686,7 +689,7 @@ object HollowIdeOverlay {
         dock.close(id)
         editorSessions.remove(path)?.close()
         editorStates.remove(path)
-        fileViews.remove(path)
+        fileViews.remove(path)?.close()
         if (activeEditorPath == path) activeEditorPath = null
         findStates.remove(path)
         if (colorPicker?.path == path) colorPicker = null

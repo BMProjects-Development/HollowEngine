@@ -40,7 +40,7 @@ fun kotlinTokenHighlighter(tokens: (String) -> List<KotlinToken>) = UiSyntaxHigh
  * @param typedProperties the start of the names of the properties to tell the types of.
  * @param placeProperties the start of the names of the properties to tell whether those fit.
  */
-class KotlinFragmentInsight(path: String, typedProperties: String? = null, placeProperties: String? = null) {
+class KotlinFragmentInsight(path: String, typedProperties: String? = null, placeProperties: String? = null) : AutoCloseable {
     private var revision by mutableLongStateOf(0L)
     private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties, placeProperties) { revision = session.revision }
 
@@ -70,4 +70,7 @@ class KotlinFragmentInsight(path: String, typedProperties: String? = null, place
             }
         }
     }
+
+    /** Ends analysis; what was found stays readable, and nothing new gets found. */
+    override fun close() = session.close()
 }

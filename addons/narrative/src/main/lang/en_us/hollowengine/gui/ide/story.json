@@ -96,6 +96,7 @@
   "problem.graph.code_outputs": "Code in the flow gives values through its outputs",
   "problem.graph.gives_nothing": "This node gives no value",
   "problem.graph.loop_item": "The item of a loop only exists in the body of that loop",
+  "problem.graph.loop_item_merged": "Flow gets here through a node several links lead to, which runs apart from the loop and cannot read its item: put the item into a variable first",
   "problem.graph.many_next": "Pin '%s' continues to several nodes",
   "problem.graph.many_values": "Pin '%s' reads several values",
   "problem.graph.missing_node": "A link joins a missing node: %s",

@@ -125,6 +125,9 @@ class StoryLinkIndex(links: List<StoryLink>) {
     fun isRead(node: String, pin: String): Boolean = (node to pin) in read
 
     fun isInFlow(node: String): Boolean = node in outgoing || node in entering
+
+    /** Whether several links lead to [node], which makes it a stage of its own. */
+    fun isMerge(node: String): Boolean = flowIn(node).size > 1
 }
 
 @Serializable

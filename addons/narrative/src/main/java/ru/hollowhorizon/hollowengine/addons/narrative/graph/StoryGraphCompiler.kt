@@ -135,7 +135,7 @@ class StoryGraphCompiler private constructor(
         val node = nodes[id] ?: return
         when {
             node is StoryNode.Start -> emit("${node.name}()", id, depth)
-            index.flowIn(id).size > 1 -> {
+            index.isMerge(id) -> {
                 if (queued.add(id)) pending += { stage(stageName(id), id) { step(id, 1) } }
                 emit("${stageName(id)}()", id, depth)
             }
@@ -239,7 +239,7 @@ class StoryGraphCompiler private constructor(
         var next = flow[first.id to StoryPins.NEXT]
         while (true) {
             val node = next?.let(nodes::get) ?: break
-            if (!isInstant(node) || index.flowIn(node.id).size > 1) break
+            if (!isInstant(node) || index.isMerge(node.id)) break
             run += node
             next = flow[node.id to StoryPins.NEXT]
         }
