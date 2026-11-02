@@ -340,6 +340,11 @@ class ScriptingAnalyzerImpl internal constructor(
     override fun propertyTypes(name: String, text: String, values: String, places: String?): KotlinPropertyTypes =
         synchronized(lock) { propertyTypes(getOrCreateFile(name, text), values, places) }
 
+    override fun forget(name: String) = synchronized(lock) {
+        fileCache.remove(name)?.let { cleanupFiles(it.relatedFiles) }
+        Unit
+    }
+
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)
     }

@@ -36,9 +36,11 @@ internal object StoryUndo {
 internal data class StorySelection(val node: String, val pin: String? = null)
 
 /** What the editors of a `.story` share: the file as a graph and what is selected. Every edit is written to the file. */
-internal open class StoryEditorState {
+internal open class StoryEditorState : AutoCloseable {
     /** The file drawn now; the inspector, drawn elsewhere, reads and writes through it. */
     var context: HollowIdePreviewContext? = null
+
+    var insight: StoryInsight.Session? = null
 
     val model = HollowIdeTextModel(StoryGraph::decode)
     var selected by mutableStateOf<StorySelection?>(null)
@@ -75,4 +77,8 @@ internal open class StoryEditorState {
     /** Changes the node [id]; typing into [field] of it is one step of the history. */
     fun editNode(id: String, field: String, change: (StoryNode) -> StoryNode) =
         change(mergeKey = "$id/$field") { edit(id, change) }
+
+    override fun close() {
+        insight?.close()
+    }
 }

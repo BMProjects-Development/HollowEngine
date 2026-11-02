@@ -32,35 +32,41 @@ internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditor
         boxes[node.id]?.takeIf { it.x == place.x && it.y == place.y }
             ?: layout.of(node, place).also { boxes[node.id] = it }
 
-    /** The box [node] gets on its own, for one not in the graph yet. */
-    fun of(node: StoryNode): StoryNodeBox = layout.of(node, StoryPoint(0f, 0f))
+    /** The box [node] gets on its own, for one not in the graph yet; what its pins carry can be asked from then on. */
+    fun of(node: StoryNode): StoryNodeBox = layout.of(node, StoryPoint(0f, 0f)).also { boxes[node.id] = it }
 
     fun typeOf(pin: GraphPin): StoryPinType {
         val box = boxes[pin.node] ?: return StoryPinType.ANY
         val node = box.node
-        if (node is StoryNode.Reroute && !node.flow) return carried(node)
+        if (node is StoryNode.Reroute && !node.flow) return carried(node)?.type ?: StoryPinType.ANY
         return box.type(pin) ?: StoryPinType.ANY
     }
 
-    /** What the value passing through [reroute] is, by the pin it comes from. */
-    private fun carried(reroute: StoryNode.Reroute): StoryPinType {
+    /** The exact type of what [pin] carries, when that is known. */
+    fun kotlinOf(pin: GraphPin): String? {
+        val box = boxes[pin.node] ?: return null
+        val node = box.node
+        return if (node is StoryNode.Reroute && !node.flow) carried(node)?.kotlin else box.kotlin(pin)
+    }
+
+    /** The pin the value passing through [reroute] comes from. */
+    private fun carried(reroute: StoryNode.Reroute): StoryPinSpec? {
         val seen = HashSet<String>()
         var at = reroute.id
         while (seen.add(at)) {
-            val link = graph.index.valuesInto(at).firstOrNull() ?: return StoryPinType.ANY
-            val box = boxes[link.from] ?: return StoryPinType.ANY
-            if (box.node !is StoryNode.Reroute) return box.rows.firstNotNullOfOrNull { row -> row.output?.takeIf { it.name == link.fromPin } }?.type
-                ?: StoryPinType.ANY
+            val link = graph.index.valuesInto(at).firstOrNull() ?: return null
+            val box = boxes[link.from] ?: return null
+            if (box.node !is StoryNode.Reroute) return box.rows.firstNotNullOfOrNull { row -> row.output?.takeIf { it.name == link.fromPin } }
             at = link.from
         }
-        return StoryPinType.ANY
+        return null
     }
 
     fun isLinked(pin: GraphPin): Boolean = graph.links.any {
         if (pin.output) it.from == pin.node && it.fromPin == pin.name else it.to == pin.node && it.toPin == pin.name
     }
 
-    fun tooltip(pin: GraphPin): String = boxes[pin.node]?.kotlin(pin) ?: typeOf(pin).let { type ->
+    fun tooltip(pin: GraphPin): String = kotlinOf(pin) ?: typeOf(pin).let { type ->
         when (type) {
             StoryPinType.FLOW -> storyLang("pin.flow")
             StoryPinType.ANY, StoryPinType.OBJECT -> storyLang("pin.any")
@@ -150,12 +156,13 @@ internal class StoryGraphEditorModel(
         state.moved += positions.mapValues { (_, at) -> StoryPoint(at.first, at.second) }
     }
 
+    /** Whether a link can go from [output] to [input], whichever way it gets made. */
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
         val type = typeOf(output)
         if (!type.fits(typeOf(input))) return false
         if (type.converts) return true
-        val from = all[output.node]?.kotlin(output) ?: return true
-        val to = all[input.node]?.kotlin(input) ?: return true
+        val from = layout.kotlinOf(output) ?: return true
+        val to = layout.kotlinOf(input) ?: return true
         return StoryInsight.analysis(state, graph).takes(from, to)
     }
 
@@ -218,12 +225,10 @@ internal class StoryGraphEditorModel(
 
     /** Links [pending] to the first pin of the new [node] that takes it. */
     private fun StoryGraph.linked(pending: GraphPendingLink, type: StoryPinType, node: StoryNode): StoryGraph {
-        val pins = boxFor(node).let { box -> box.pins.map { it to box.type(it) } }
-        val target = pins.firstOrNull { (pin, carried) ->
-            pin.output != pending.fromOutput && carried != null && (if (pin.output) carried.fits(type) else type.fits(
-                carried
-            ))
-        }?.first ?: return this
+        val own = pinOf(pending) ?: return this
+        val target = boxFor(node).pins.firstOrNull { pin ->
+            pin.output != pending.fromOutput && (if (pin.output) takes(pin, own) else takes(own, pin))
+        } ?: return this
         return when {
             type == StoryPinType.FLOW && pending.fromOutput -> link(pending.node, pending.pin, node.id)
             type == StoryPinType.FLOW -> link(node.id, target.name, pending.node)
@@ -273,10 +278,10 @@ internal class StoryGraphEditorModel(
             }
             return
         }
-        val carried = typeOf(GraphPin(link.from, link.fromPin, true, 0f, 0f))
-        val into = typeOf(GraphPin(link.to, link.toPin, false, 0f, 0f))
-        val input = pins.firstOrNull { !it.output && carried.fits(box.type(it) ?: StoryPinType.FLOW) } ?: return
-        val output = pins.firstOrNull { it.output && (box.type(it) ?: StoryPinType.FLOW).fits(into) } ?: return
+        val from = GraphPin(link.from, link.fromPin, true, 0f, 0f)
+        val into = GraphPin(link.to, link.toPin, false, 0f, 0f)
+        val input = pins.firstOrNull { !it.output && takes(from, it) } ?: return
+        val output = pins.firstOrNull { it.output && takes(it, into) } ?: return
         state.change(StoryUndo.LINK) {
             copy(links = links - link).linkValue(link.from, link.fromPin, node, input.name)
                 .linkValue(node, output.name, link.to, link.toPin)

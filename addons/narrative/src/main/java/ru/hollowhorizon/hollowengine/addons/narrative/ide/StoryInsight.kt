@@ -51,15 +51,14 @@ internal object StoryInsight {
     private const val TYPE_START = "\nval storyType: "
     private const val TYPE_END = "\n"
     private val NO_TYPE = setOf("Nothing", "Nothing?")
-    private val sessions = HashMap<String, Session>()
     private val tokens = kotlinTokenHighlighter { StoryKotlin.syntax(it)?.tokens.orEmpty() }
 
-    private class FieldInsight(val highlighter: UiSyntaxHighlighter, val completions: UiCompletionContributor)
+    internal class FieldInsight(val highlighter: UiSyntaxHighlighter, val completions: UiCompletionContributor)
 
-    private class Session(path: String) {
+    /** What analysis has of the story in [state], which goes when the file closes. */
+    internal class Session(val state: StoryEditorState, path: String) : AutoCloseable {
         val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN, StoryFieldChecks.PLACE)
         val fields = HashMap<StoryFieldKey, FieldInsight>()
-        lateinit var state: StoryEditorState
         var graph: StoryGraph? = null
         lateinit var story: GeneratedStory
         lateinit var checked: StoryCheckScript
@@ -85,11 +84,13 @@ internal object StoryInsight {
         }
 
         fun current() = of(state.read() ?: StoryGraph())
+
+        override fun close() = script.close()
     }
 
     private fun session(state: StoryEditorState, graph: StoryGraph = state.read() ?: StoryGraph()): Session {
-        val path = state.context?.file?.path.orEmpty()
-        return sessions.getOrPut(path) { Session(path) }.also { it.state = state }.of(graph)
+        val session = state.insight ?: Session(state, state.context?.file?.path.orEmpty()).also { state.insight = it }
+        return session.of(graph)
     }
 
     private fun addImport(session: Session, name: String) =

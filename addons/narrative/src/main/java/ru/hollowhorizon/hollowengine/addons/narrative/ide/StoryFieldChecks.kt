@@ -137,16 +137,16 @@ internal object StoryFieldChecks {
 
     private fun reads(code: String) = code.isNotBlank() && StoryKotlin.syntax(code)?.valid == true
 
-    /** The types the nodes of [graph] want what is linked to them to be of. */
-    private fun places(graph: StoryGraph): Set<String> = graph.nodes.flatMap { node ->
-        when (node) {
-            is StoryNode.Call -> StoryActionFunctions.signature(StoryActionFunctions.resolved(node))?.params.orEmpty()
-                .mapNotNull { it.type?.let(StoryKotlinTypes::name) }
+    /** The types the nodes of [graph] and those a wire can make for its variables want what is linked to them to be of. */
+    private fun places(graph: StoryGraph): Set<String> = (graph.nodes.filterIsInstance<StoryNode.Call>().flatMap { node ->
+        StoryActionFunctions.signature(StoryActionFunctions.resolved(node))?.params.orEmpty()
+            .mapNotNull { it.type?.let(StoryKotlinTypes::name) }
+    } + graph.variables.mapNotNull { it.type }).filterTo(LinkedHashSet()) { reads("null as $it") }
 
-            is StoryNode.Assign -> listOfNotNull(graph.variables.firstOrNull { it.name == node.variable }?.type)
-            else -> emptyList()
-        }
-    }.filterTo(LinkedHashSet()) { reads("null as $it") }
+    /** The types of what a wire can make that is not in [graph] yet can give. */
+    private fun values(graph: StoryGraph): Set<String> =
+        (graph.variables.mapNotNull { it.type } + StoryOperators.all.flatMap { it.outputs }.mapNotNull { it.kotlin })
+            .toSet().filterTo(LinkedHashSet()) { reads("null as $it") }
 
     /** [code], the script generated from [graph], with what is checked added. Broken Kotlin stays out, not to break the rest. */
     fun script(graph: StoryGraph, code: String): StoryCheckScript {
@@ -171,6 +171,9 @@ internal object StoryFieldChecks {
         val wanted = places(plain).withIndex().associate { (index, type) -> "$PLACE$index" to type }
         wanted.entries.joinTo(text, "", "\n\nsuspend fun storyPlaces() {\n", "}") { (name, type) ->
             "val $name: $type = (null as $type)\n"
+        }
+        values(plain).withIndex().joinTo(text, "", "\n\nsuspend fun storyValues() {\n", "}") { (index, type) ->
+            "val ${PIN}Value$index: $type = (null as $type)\n"
         }
         val placed = wanted.mapValues { StoryPinType.shortName(it.value) }
         return StoryCheckScript(text.toString(), length, spans, left.associate { it.field to it.frame }, pins, placed)

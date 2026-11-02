@@ -12,43 +12,67 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
     private val passed: Map<String, Set<String>> = dominators()
 
     fun problems(): List<StoryGraphProblem> = passed.keys.sorted().flatMap { reader ->
-        sources(reader).flatMap { source -> problem(reader, source) }
+        sources(reader).mapNotNull { source -> problem(reader, source) }
+    }.distinct()
+
+    private fun problem(reader: String, source: StoryLink): StoryGraphProblem? {
+        val node = nodes.getValue(source.from)
+        return if (node is StoryNode.Loop) itemProblem(reader, node) else resultProblem(reader, source)
     }
 
-    private fun problem(reader: String, source: StoryNode): List<StoryGraphProblem> = when (source) {
-        is StoryNode.Loop -> if (reader in body(source)) emptyList() else listOf(
-            StoryGraphProblem(reader, "loop_item", "The item of a loop only exists in the body of that loop"),
-        )
+    /** The item is a local of the `for`, which only holds the nodes that are not stages of their own. */
+    private fun itemProblem(reader: String, loop: StoryNode.Loop): StoryGraphProblem? {
+        val inFor = body(loop.id) { index.isMerge(it) || nodes[it] is StoryNode.Start }
+        return when (reader) {
+            in inFor -> null
+            in body(loop.id) -> StoryGraphProblem(
+                reader, "loop_item_merged",
+                "Flow gets here through a node several links lead to, which runs apart from the loop and cannot read its item: put the item into a variable first",
+            )
 
-        else -> if (source.id != reader && source.id in passed.getValue(reader)) emptyList() else listOf(
-            StoryGraphProblem(
-                reader, "other_branch", "Flow can get here without passing the node this value comes from", warning = true
-            ),
+            else -> StoryGraphProblem(reader, "loop_item", "The item of a loop only exists in the body of that loop")
+        }
+    }
+
+    /** A result nothing has set yet is null, which is an error unless it can be null anyway. */
+    private fun resultProblem(reader: String, source: StoryLink): StoryGraphProblem? {
+        val node = source.from
+        if (node != reader && node in passed.getValue(reader) && reader !in body(node)) return null
+        return StoryGraphProblem(
+            reader, "other_branch", "Flow can get here without passing the node this value comes from",
+            warning = isOptional(source),
         )
     }
 
-    /** The nodes of the flow whose results [reader] takes, directly or through values worked out on the way. */
-    private fun sources(reader: String): List<StoryNode> {
-        val found = LinkedHashSet<StoryNode>()
+    private fun isOptional(source: StoryLink): Boolean = when (val node = nodes[source.from]) {
+        is StoryNode.Call -> node.returns
+        is StoryNode.Code -> node.outputs[source.fromPin]
+        else -> null
+    }?.endsWith("?") == true
+
+    /** The links that bring [reader] results of nodes of the flow, directly or through values worked out on the way. */
+    private fun sources(reader: String): List<StoryLink> {
+        val found = LinkedHashSet<StoryLink>()
         val seen = hashSetOf(reader)
         val queue = ArrayDeque(index.valuesInto(reader))
         while (queue.isNotEmpty()) {
             val link = queue.removeFirst()
             val node = nodes[link.from] ?: continue
             when {
-                node is StoryNode.Loop || (node.id in inFlow && (node is StoryNode.Call || node is StoryNode.Code)) -> found += node
+                node is StoryNode.Loop || (node.id in inFlow && (node is StoryNode.Call || node is StoryNode.Code)) -> found += link
                 node.id !in inFlow && seen.add(node.id) -> queue += index.valuesInto(node.id)
             }
         }
         return found.toList()
     }
 
-    private fun body(loop: StoryNode.Loop): Set<String> {
+    /** What flow goes through from the body of [node] until it gets to where [stops] says. */
+    private fun body(node: String, stops: (String) -> Boolean = { it == node }): Set<String> {
         val seen = HashSet<String>()
-        val queue = ArrayDeque(listOfNotNull(index.flow[loop.id to StoryPins.BODY]))
+        val queue = ArrayDeque(listOfNotNull(index.flow[node to StoryPins.BODY]))
         while (queue.isNotEmpty()) {
             val at = queue.removeFirst()
-            if (at != loop.id && seen.add(at)) queue += index.flowOut(at)
+            if (!stops(at) && seen.add(at)) queue += index.flowOut(at)
         }
         return seen
     }
