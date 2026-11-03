@@ -33,7 +33,11 @@ class GraphEditorState {
     var selection by mutableStateOf(GraphSelection.None)
 }
 
-/** A link being drawn from a pin: where the pointer is on the canvas, and on the screen for the menu of a drop on nothing. */
+/**
+ * A link being drawn from a pin: where the pointer is on the canvas, and on the screen for the menu of a drop on nothing.
+ *
+ * @param detached whether it was taken off the input it ended at, rather than pulled out of a pin anew.
+ */
 data class GraphPendingLink(
     val node: String,
     val pin: String,
@@ -42,10 +46,15 @@ data class GraphPendingLink(
     val y: Float,
     val screenX: Float,
     val screenY: Float,
+    val detached: Boolean = false,
 )
 
-/** A context menu an editor has open, where it was opened on the screen. */
-data class GraphMenu(val x: Float, val y: Float, val items: List<UiDropdownItem>)
+/**
+ * A context menu an editor has open, where it was opened on the screen.
+ *
+ * @param search whether it has a field that finds its items through every submenu.
+ */
+data class GraphMenu(val x: Float, val y: Float, val items: List<UiDropdownItem>, val search: Boolean = false)
 
 /** A link as the canvas draws it. [key] tells it apart in a [GraphSelection] and in [GraphEditorModel]. */
 class GraphLinkView(val key: Any, val from: GraphPin, val to: GraphPin, val color: UiColor)
@@ -193,6 +202,9 @@ interface GraphEditorModel {
     fun removeGroup(group: String)
     fun toggleGroup(group: String)
     fun isCollapsed(group: String): Boolean
+
+    /** What a search of the graph finds [node] by: its title, and what its fields hold. */
+    fun searchText(node: String): String = scene.titles[node].orEmpty()
 
     /** What the menu of [node] offers ahead of copying, removing and grouping. */
     fun nodeItems(node: String): List<UiDropdownItem> = emptyList()

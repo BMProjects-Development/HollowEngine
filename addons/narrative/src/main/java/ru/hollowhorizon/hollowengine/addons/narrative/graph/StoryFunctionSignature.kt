@@ -5,6 +5,17 @@ import kotlin.reflect.KType
 /** What an options object such as `MoveOptions` a parameter belongs to: [parameter] of the function, built by [constructor]. */
 data class StoryParamGroup(val parameter: String, val constructor: String)
 
+enum class StoryParamMeaning {
+    /** A clip of the model of the entity the call is made on. */
+    ANIMATION,
+
+    /** The model of the entity the call gives back. */
+    MODEL,
+
+    /** The author's id of the NPC the call gives back. */
+    NPC_ID,
+}
+
 /**
  * One parameter of a command as the editors fill it.
  *
@@ -18,6 +29,7 @@ data class StoryParamGroup(val parameter: String, val constructor: String)
  * @param implicit the expression it takes when nobody fills it.
  * @param widget what edits it instead of a plain field, such as `color`.
  * @param assets the ends of the paths of the files it names, when it names one.
+ * @param meaning what its value names, when the editor can check that.
  */
 data class StoryParam(
     val name: String,
@@ -31,6 +43,7 @@ data class StoryParam(
     val implicit: String? = null,
     val assets: List<String> = emptyList(),
     val widget: String? = null,
+    val meaning: StoryParamMeaning? = null,
 )
 
 /**

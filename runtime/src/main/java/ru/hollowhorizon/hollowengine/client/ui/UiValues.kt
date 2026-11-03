@@ -210,7 +210,20 @@ data class UiPopupAlignment(
     val popupVertical: UiAlign = UiAlign.START,
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
+    val flipsHorizontally: Boolean = false,
 ) {
+    fun mirrored(): UiPopupAlignment = copy(
+        anchorHorizontal = anchorHorizontal.mirrored(),
+        popupHorizontal = popupHorizontal.mirrored(),
+        offsetX = -offsetX,
+    )
+
+    private fun UiAlign.mirrored() = when (this) {
+        UiAlign.START -> UiAlign.END
+        UiAlign.END -> UiAlign.START
+        else -> this
+    }
+
     companion object {
         val BelowStart = UiPopupAlignment()
         val Cursor = UiPopupAlignment(anchorVertical = UiAlign.START, offsetX = 8f, offsetY = 8f)

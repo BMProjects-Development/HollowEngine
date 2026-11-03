@@ -73,6 +73,10 @@ object StoryLiterals {
         return plain ?: "{$written}"
     }
 
+    /** What a field of [type] shows for [expression] when that is a plain value; null for any other Kotlin. */
+    fun literal(expression: String, type: KType?): String? =
+        text(expression, type).takeIf { it.isNotBlank() && it != "{${expression.trim()}}" }
+
     /** Whether a field of [type] holds plain Kotlin, as nothing shorter says what such a value is. */
     fun isKotlin(type: KType?): Boolean = type?.classifier in COLLECTIONS
 

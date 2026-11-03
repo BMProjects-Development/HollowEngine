@@ -44,6 +44,7 @@ fun StoryFunctions.resolved(call: StoryNode.Call): StoryNode.Call {
 object StoryBuiltins {
     private const val STORY_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.story"
     private const val HANDLE = "$STORY_PACKAGE.StoryHandle<kotlin.Unit>"
+    private const val FLOW = "hollowengine.gui.ide.story.category.flow"
 
     val all: List<StoryFunctionSignature> = listOf(
         builtin("checkpoint", param("name"), flag("restart")),
@@ -58,7 +59,7 @@ object StoryBuiltins {
     fun find(action: String): StoryFunctionSignature? = all.firstOrNull { it.name == action }
 
     private fun builtin(name: String, vararg params: StoryParam) =
-        StoryFunctionSignature(name, "$STORY_PACKAGE.$name", params.toList())
+        StoryFunctionSignature(name, "$STORY_PACKAGE.$name", params.toList(), category = FLOW)
 
     private fun handle() = StoryParam("handle", typeOf<StoryHandle<*>>(), receiver = true)
 

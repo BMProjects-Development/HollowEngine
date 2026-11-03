@@ -12,10 +12,11 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.with
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withMembership
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withoutGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCategories
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryInsight
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryNodeKind
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryUndo
-import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyIcon
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
@@ -174,6 +175,12 @@ internal class StoryGraphEditorModel(
     }
 
     override fun pinTooltip(pin: GraphPin): String = layout.tooltip(pin)
+
+    /** A node is found by its title and by what its fields hold, also while it is collapsed. */
+    override fun searchText(node: String): String {
+        val box = all[node] ?: return ""
+        return (listOf(box.title) + box.node.texts()).joinToString("\n")
+    }
 
     override fun connect(from: GraphPin, to: GraphPin) {
         val output = if (from.output) from else to
@@ -364,25 +371,24 @@ internal class StoryGraphEditorModel(
     override fun addItems(x: Float, y: Float): List<UiDropdownItem> {
         fun placed(node: StoryNode) = add(node, x, y)
         return addStepItems(::placed) + UiDropdownItem(
-            storyLang("add.values"), children = StoryCatalog.operatorItems(add = ::placed),
+            storyLang("add.values"),
+            icon = StoryNodeKind.VALUE.icon,
+            iconColor = StoryCategories.tint(StoryNodeKind.VALUE.color),
+            children = StoryCatalog.operatorItems(add = ::placed),
         ).let(::listOf)
     }
 
     /** What can be added to the flow. */
     private fun addStepItems(add: (StoryNode) -> Unit): List<UiDropdownItem> = buildList {
-        add(
-            UiDropdownItem(
-                storyLang("add.phrase"), icon = kindIcon("phrase")
-            ) { add(StoryNode.Say(StoryGraph.newId())) })
-        add(UiDropdownItem(storyLang("add.choice"), icon = kindIcon("choice")) {
+        add(StoryCatalog.kindItem(storyLang("add.phrase"), StoryNodeKind.PHRASE) { add(StoryNode.Say(StoryGraph.newId())) })
+        add(StoryCatalog.kindItem(storyLang("add.choice"), StoryNodeKind.CHOICE) {
             add(StoryNode.Choose(StoryGraph.newId(), listOf(StoryOption(storyLang("new.option")))))
         })
-        add(
-            UiDropdownItem(
-                storyLang("add.condition"), icon = kindIcon("condition")
-            ) { add(StoryNode.Branch(StoryGraph.newId())) })
-        add(UiDropdownItem(storyLang("add.loop"), icon = kindIcon("block")) { add(StoryNode.Loop(StoryGraph.newId())) })
-        add(UiDropdownItem(storyLang("add.start"), icon = kindIcon("label")) {
+        add(StoryCatalog.kindItem(storyLang("add.condition"), StoryNodeKind.CONDITION) {
+            add(StoryNode.Branch(StoryGraph.newId()))
+        })
+        add(StoryCatalog.kindItem(storyLang("add.loop"), StoryNodeKind.LOOP) { add(StoryNode.Loop(StoryGraph.newId())) })
+        add(StoryCatalog.kindItem(storyLang("add.start"), StoryNodeKind.START) {
             add(StoryNode.Start(StoryGraph.newId(), freeStartName(graph.startNames())))
         })
         addAll(variableItems(add))
@@ -392,21 +398,40 @@ internal class StoryGraphEditorModel(
     /** Reading and writing the variables of the story. */
     private fun variableItems(add: (StoryNode) -> Unit): List<UiDropdownItem> {
         if (graph.variables.isEmpty()) return emptyList()
-        return listOf(UiDropdownItem(storyLang("add.variable"), children = graph.variables.flatMap { variable ->
-            listOf(
-                UiDropdownItem(storyLang("add.variable.read").format(variable.name)) {
-                    add(StoryNode.Expression(StoryGraph.newId(), variable.name))
-                },
-                UiDropdownItem(storyLang("add.variable.write").format(variable.name)) {
-                    add(StoryNode.Assign(StoryGraph.newId(), variable.name))
-                },
-            )
-        }))
+        val heading = StoryCategories.PREFIX + "variables"
+        return listOf(UiDropdownItem(
+            storyLang("add.variable"),
+            icon = StoryCategories.icon(heading),
+            iconColor = StoryCategories.tint(StoryCategories.color(heading)),
+            children = graph.variables.flatMap { variable ->
+                listOf(
+                    StoryCatalog.kindItem(storyLang("add.variable.read").format(variable.name), StoryNodeKind.VALUE) {
+                        add(StoryNode.Expression(StoryGraph.newId(), variable.name))
+                    },
+                    StoryCatalog.kindItem(storyLang("add.variable.write").format(variable.name), StoryNodeKind.SET) {
+                        add(StoryNode.Assign(StoryGraph.newId(), variable.name))
+                    },
+                )
+            },
+        ))
     }
-
-    private fun kindIcon(name: String) = storyIcon(name)
 
     private companion object {
         const val COPY_OFFSET = 24f
     }
+}
+
+/** What [this] holds in words, whether its node shows it or is collapsed. */
+private fun StoryNode.texts(): List<String> = when (this) {
+    is StoryNode.Start -> listOf(name)
+    is StoryNode.Say -> listOf(speaker, text)
+    is StoryNode.Call -> arguments.values + groups.values.flatMap { it.arguments.values }
+    is StoryNode.Choose -> options.flatMap { listOfNotNull(it.text, it.condition) }
+    is StoryNode.Branch -> listOf(condition)
+    is StoryNode.Assign -> listOf(variable, value)
+    is StoryNode.Code -> listOf(code)
+    is StoryNode.Expression -> listOf(code)
+    is StoryNode.Pure -> arguments.values.toList()
+    is StoryNode.Loop -> listOf(items)
+    is StoryNode.Reroute -> emptyList()
 }

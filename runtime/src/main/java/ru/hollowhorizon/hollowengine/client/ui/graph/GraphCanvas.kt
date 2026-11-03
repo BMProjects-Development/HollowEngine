@@ -91,6 +91,7 @@ fun GraphCanvas(
     onRelease: () -> Unit = {},
     onSelectArea: ((area: GraphRect, modifiers: Int) -> Unit)? = null,
     onKey: (UiKeyInput) -> Boolean = { false },
+    onPointer: (GraphPointer?) -> Unit = {},
     overlay: @Composable () -> Unit = {},
     nodes: @Composable () -> Unit,
 ) {
@@ -132,8 +133,12 @@ fun GraphCanvas(
             .onHover { event ->
                 val edge = edgeAt(event.localX, event.localY)
                 if (edge != hovered) hovered = edge
+                onPointer(pointer(event))
             }
-            .onExit { hovered = null }
+            .onExit {
+                hovered = null
+                onPointer(null)
+            }
             .focus()
             .onKeyInput { input ->
                 when {

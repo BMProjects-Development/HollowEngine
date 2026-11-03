@@ -1,14 +1,5 @@
 @import "hollowengine:ui/styles/theme.hss";
 
-.st-phrase .gn-node-head, .st-phrase .gn-node-head-flat { background: #3B8950; }
-.st-wait .gn-node-head, .st-wait .gn-node-head-flat { background: #3E86C4; }
-.st-choice .gn-node-head, .st-choice .gn-node-head-flat { background: #BF8246; }
-.st-condition .gn-node-head, .st-condition .gn-node-head-flat { background: #7A5FB5; }
-.st-start .gn-node-head, .st-start .gn-node-head-flat { background: #CF5E54; }
-.st-command .gn-node-head, .st-command .gn-node-head-flat { background: #4C5566; }
-.st-block .gn-node-head, .st-block .gn-node-head-flat { background: #5F59B1; }
-.st-pure .gn-node-head, .st-pure .gn-node-head-flat { background: #2F7D80; }
-
 .gn-pin.gn-type-flow { border-color: #E6E8EE; border-radius: 2px; }
 .gn-pin.gn-type-text { border-color: #E89AC0; }
 .gn-pin.gn-type-number { border-color: #44BC74; }

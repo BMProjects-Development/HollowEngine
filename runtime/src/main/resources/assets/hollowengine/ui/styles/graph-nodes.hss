@@ -42,6 +42,14 @@ $category-output: #CF5E54;
     shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 1.5px $warning;
 }
 
+.graph-node.gn-node.gn-found {
+    shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 1.5px alpha($accent, 0.55);
+}
+
+.graph-node.gn-node.gn-found.selected {
+    shadow: 0px 3px 10px 0px $shadow, 0px 0px 0px 2.5px $accent;
+}
+
 .gn-node-problem {
     size: 13px 13px;
     margin: 0px 5px 0px 0px;

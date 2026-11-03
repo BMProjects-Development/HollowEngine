@@ -51,6 +51,8 @@ internal open class StoryEditorState : AutoCloseable {
     /** The field whose color is being picked. */
     var colorField by mutableStateOf<StoryRowField?>(null)
 
+    var clips by mutableStateOf(StoryClips.None)
+
     /** The names of the variables open in the inspector. */
     var openVariables by mutableStateOf(emptySet<String>())
 

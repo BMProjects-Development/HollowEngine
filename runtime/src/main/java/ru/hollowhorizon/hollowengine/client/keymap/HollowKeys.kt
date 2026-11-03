@@ -108,10 +108,15 @@ object HollowKeys {
     val VIEW_SELECTED = action("viewport.view_selected", VIEWPORT, key(GLFW.GLFW_KEY_KP_DECIMAL))
 
     // Node Graphs
-    val ADD_NODE = action("graph.add_node", GRAPH, key(GLFW.GLFW_KEY_INSERT), key(GLFW.GLFW_KEY_N, CONTROL))
+    val ADD_NODE = action(
+        "graph.add_node", GRAPH,
+        key(GLFW.GLFW_KEY_A, SHIFT), key(GLFW.GLFW_KEY_INSERT), key(GLFW.GLFW_KEY_N, CONTROL),
+    )
     val GROUP = action("graph.group", GRAPH, key(GLFW.GLFW_KEY_G, CONTROL))
     val UNGROUP = action("graph.ungroup", GRAPH, key(GLFW.GLFW_KEY_G, CONTROL or SHIFT))
     val ENTRY_STATE = action("graph.entry_state", GRAPH, key(GLFW.GLFW_KEY_E))
+    val NEXT_FOUND = action("graph.next_found", GRAPH, key(GLFW.GLFW_KEY_DOWN), key(GLFW.GLFW_KEY_F3))
+    val PREVIOUS_FOUND = action("graph.previous_found", GRAPH, key(GLFW.GLFW_KEY_UP), key(GLFW.GLFW_KEY_F3, SHIFT))
 
     fun init() = Unit
 

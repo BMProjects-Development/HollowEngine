@@ -9,6 +9,8 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.coroutines.entityRef
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
@@ -26,9 +28,9 @@ private const val NAVIGATION = "hollowengine.gui.ide.story.category.navigation"
 @SimpleAction("spawn-npc")
 suspend fun ServerLevel.spawnNpc(
     pos: Vec3,
-    id: String? = null,
+    @EditorNpcId id: String? = null,
     name: String = "",
-    @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel") model: String = "",
+    @EditorModel @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel") model: String = "",
 ): NpcEntity = npc(pos, id) {
     if (model.isNotEmpty()) set(Model(model))
     if (name.isNotEmpty()) setNameplate(name)
@@ -40,7 +42,7 @@ fun NpcEntity.removeFromWorld() = despawn()
 
 @EditorCategory(NPC)
 @SimpleAction("find-npc")
-fun findNpc(id: String): NpcEntity =
+fun findNpc(@EditorNpcId id: String): NpcEntity =
     currentServer.npcs.alive(id) ?: throw StoryException("No live NPC has the id '$id'")
 
 @EditorCategory(NPC)
