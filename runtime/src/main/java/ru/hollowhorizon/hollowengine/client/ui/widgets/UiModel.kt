@@ -165,6 +165,28 @@ class ModelViewerState(model: String) : OrbitCamera {
         selectedAnimation = ((index % count) + count) % count
     }
 
+    /** Centers the model and zooms it to fill [share] of the panel; false while it has no geometry to measure. */
+    fun frame(share: Float = FRAME_SHARE): Boolean {
+        val (low, high) = attachment.calculateBounds() ?: return false
+        val size = maxOf(high.x - low.x, high.y - low.y, high.z - low.z)
+        if (size <= 0f) return false
+        focus(Vec3f((low.x + high.x) / 2f, (low.y + high.y) / 2f, (low.z + high.z) / 2f))
+        zoomSpring.snapTo(share / size)
+        return true
+    }
+
+    /** Plays the clip called [name] and nothing else; false while the model has no such clip. */
+    fun playOnly(name: String): Boolean {
+        val index = animations.indexOfFirst { it.name == name }
+        if (index < 0) return false
+        selectedAnimation = index
+        if (playing.singleOrNull() != index) {
+            playing.clear()
+            playing.add(index)
+        }
+        return true
+    }
+
     /** Toggles playback of the current animation; render() fades its weight in/out over [AnimBlendTime]. */
     fun togglePlayback() {
         val index = selectedAnimation
@@ -475,6 +497,7 @@ class ModelViewerState(model: String) : OrbitCamera {
 
     companion object {
         private const val PREVIEW_FRONT_YAW = 180f
+        private const val FRAME_SHARE = 0.85f
         private const val TICKS_PER_SECOND = 20f
     }
 }

@@ -8,6 +8,7 @@
   "world": "World",
   "timeline": "Timeline",
   "edit": "Edit",
+  "code.rename": "Rename %s to %s",
   "held_edit": "Edit at the playhead",
   "typing": "Typing",
   "stroke": "Brush stroke",

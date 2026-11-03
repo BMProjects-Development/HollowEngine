@@ -479,6 +479,10 @@
     clip: true;
 }
 
+.ide-completion-preview {
+    padding: 4px;
+}
+
 .ide-completion-divider {
     background: $bg-hover;
 }

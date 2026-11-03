@@ -51,6 +51,7 @@ internal class HollowIdeEditorSession(
     private var completionJob: Job? = null
     private var definitionJob: Job? = null
     private var gutterJob: Job? = null
+    private var renameJob: Job? = null
     private var formatJob: Job? = null
 
     @Volatile
@@ -246,6 +247,43 @@ internal class HollowIdeEditorSession(
             withContext(publicationDispatcher) {
                 onResolved(definition)
             }
+        }
+    }
+
+    /** Tells [onResolved], on the client thread, what name at [caret] can be renamed. */
+    fun resolveRenameTarget(text: String, caret: Int, onResolved: (RenameTarget?) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        renameJob?.cancel()
+        renameJob = scope.launch {
+            val target = runCatching { analyzer.renameTarget(path, text, caret.coerceIn(0, text.length)) }
+                .getOrElse { failure ->
+                    reportAnalysisFailure("rename target", failure)
+                    null
+                }
+            withContext(publicationDispatcher) { onResolved(target) }
+        }
+    }
+
+    /** Tells [onRenamed], on the client thread, what renaming the name at [caret] to [newName] changes in each file. */
+    fun rename(
+        text: String,
+        caret: Int,
+        newName: String,
+        documents: Map<String, String>,
+        onRenamed: (List<FileRename>) -> Unit,
+    ) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        renameJob?.cancel()
+        renameJob = scope.launch {
+            val renames = runCatching {
+                analyzer.rename(path, text, caret.coerceIn(0, text.length), newName, documents)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("rename", failure)
+                emptyList()
+            }
+            withContext(publicationDispatcher) { onRenamed(renames) }
         }
     }
 
