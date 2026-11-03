@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Position
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Range
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
+import ru.hollowhorizon.hollowengine.common.utils.Spelling
 
 /**
  * Diagnostics for a stylesheet: syntax errors reported on the token they are about, plus
@@ -134,31 +135,13 @@ private fun keyframeDiagnostics(
 }
 
 private fun unknownPropertyMessage(property: String): String {
-    val suggestion = HssSchema.allNames.minByOrNull { editDistance(property.lowercase(), it) }
-        ?.takeIf { editDistance(property.lowercase(), it) <= property.length / 2 + 1 }
+    val suggestion = HssSchema.allNames.minByOrNull { Spelling.distance(property.lowercase(), it) }
+        ?.takeIf { Spelling.distance(property.lowercase(), it) <= property.length / 2 + 1 }
     return if (suggestion == null) {
         "Unknown property '$property'"
     } else {
         "Unknown property '$property'; did you mean '$suggestion'?"
     }
-}
-
-/** Small Levenshtein distance, used only to suggest a property name on a typo. */
-private fun editDistance(left: String, right: String): Int {
-    if (left == right) return 0
-    var previous = IntArray(right.length + 1) { it }
-    var current = IntArray(right.length + 1)
-    for (i in 1..left.length) {
-        current[0] = i
-        for (j in 1..right.length) {
-            val substitution = previous[j - 1] + if (left[i - 1] == right[j - 1]) 0 else 1
-            current[j] = minOf(current[j - 1] + 1, previous[j] + 1, substitution)
-        }
-        val swap = previous
-        previous = current
-        current = swap
-    }
-    return previous[right.length]
 }
 
 /** Offset-to-position mapping computed once per diagnostics pass. */

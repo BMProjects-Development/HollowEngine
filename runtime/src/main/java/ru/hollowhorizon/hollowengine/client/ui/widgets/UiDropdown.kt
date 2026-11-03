@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 
@@ -19,9 +21,15 @@ data class UiDropdownSlider(
     val onCommit: ((Float) -> Unit)? = null,
 )
 
+/**
+ * One line of a menu.
+ *
+ * @param iconColor what [icon] is tinted in, when it stands for something with a color of its own.
+ */
 data class UiDropdownItem(
     val label: String,
     val icon: String? = null,
+    val iconColor: UiColor? = null,
     val enabled: Boolean = true,
     val checked: Boolean = false,
     val mark: UiDropdownMark? = null,
@@ -66,6 +74,11 @@ fun UiDropdown(
     ContextMenu(id, anchorBounds, items, onExpandedChange = onExpandedChange)
 }
 
+private const val SearchIcon = "hollowengine:textures/gui/icons/search.svg"
+
+/** How long the pointer may rest on its way to an open submenu before the item under it takes over. */
+private const val SubmenuIntentMillis = 300L
+
 /** How much of the height of the screen a menu may take before it scrolls. */
 private const val MenuHeightShare = 0.8f
 
@@ -74,8 +87,15 @@ private val SubmenuAlignment = UiPopupAlignment(
     anchorVertical = UiAlign.START,
     offsetX = 6f,
     offsetY = -4f,
+    flipsHorizontally = true,
 )
 
+/**
+ * A menu at [anchorBounds].
+ *
+ * @param search the hint of a field on top that finds items through every submenu as it is typed; null leaves it out.
+ * @param onBounds told where the menu lies once it is placed.
+ */
 @Composable
 fun ContextMenu(
     id: String,
@@ -83,22 +103,113 @@ fun ContextMenu(
     items: List<UiDropdownItem>,
     alignment: UiPopupAlignment = UiPopupAlignment.BelowStart,
     layer: Int = 0,
+    search: String? = null,
+    onBounds: (UiRect) -> Unit = {},
     onExpandedChange: (Boolean) -> Unit = {},
 ) {
     val anyLeading = items.any { it.icon != null || it.mark != null }
     val maxHeight = LocalUiViewport.current.height * MenuHeightShare
     var openSubmenu by remember { mutableStateOf<Int?>(null) }
     var anchors by remember { mutableStateOf(emptyMap<Int, UiRect>()) }
+    val intent = remember { UiSubmenuIntent() }
+    var pending by remember { mutableStateOf<Int?>(null) }
+
+    fun submenuOf(index: Int): Int? = index.takeIf { items.getOrNull(it)?.let { item -> item.children != null && item.enabled } == true }
+
+    fun show(index: Int) {
+        val submenu = submenuOf(index)
+        if (submenu == openSubmenu) return
+        openSubmenu = submenu
+        intent.submenu = null
+    }
+
+    fun hover(index: Int, event: UiEvent) {
+        when {
+            index == openSubmenu -> {
+                intent.track(event.x, event.y)
+                pending = null
+            }
+
+            openSubmenu != null && intent.aims(event.x, event.y) -> pending = index
+            else -> {
+                pending = null
+                show(index)
+            }
+        }
+    }
+
+    LaunchedEffect(pending) {
+        val index = pending ?: return@LaunchedEffect
+        delay(SubmenuIntentMillis)
+        pending = null
+        show(index)
+    }
+    var query by remember { mutableStateOf("") }
+    var picked by remember { mutableStateOf(0) }
+    val found = remember(items, query) { if (search == null || query.isBlank()) null else UiMenuSearch.find(items, query) }
     Popup(
         anchorBounds = anchorBounds,
         alignment = alignment,
         layer = layer,
         id = "$id-popup",
         tags = listOf("dropdown-popup"),
-        modifier = Modifier.maxSize(height = maxHeight.px).scrollable(horizontal = false),
+        modifier = Modifier.maxSize(height = maxHeight.px).scrollable(horizontal = false).onPlaced(onBounds),
         onDismiss = { onExpandedChange(false) },
     ) {
-        items.forEachIndexed { index, item ->
+        if (search != null) {
+            Row(tags = listOf("dropdown-search"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
+                Image(SearchIcon, tags = listOf("dropdown-search-icon"))
+                TextField(
+                    value = query,
+                    placeholder = search,
+                    onChange = {
+                        query = it
+                        picked = 0
+                        openSubmenu = null
+                    },
+                    id = "$id-search",
+                    tags = listOf("dropdown-search-input"),
+                    modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).onKeyInput { input ->
+                        val shown = found.orEmpty()
+                        when (input.key) {
+                            GLFW.GLFW_KEY_DOWN -> picked = (picked + 1).coerceAtMost((shown.size - 1).coerceAtLeast(0))
+                            GLFW.GLFW_KEY_UP -> picked = (picked - 1).coerceAtLeast(0)
+                            GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> shown.getOrNull(picked)?.let { match ->
+                                dismiss()
+                                match.item.onClick()
+                            }
+
+                            GLFW.GLFW_KEY_ESCAPE -> dismiss()
+
+                            else -> return@onKeyInput
+                        }
+                        input.consume()
+                    },
+                )
+            }
+            val focus = LocalUiFocusRequester.current
+            LaunchedEffect(Unit) { focus.request("$id-search") }
+        }
+        if (found != null) {
+            val leading = found.any { it.item.icon != null }
+            found.forEachIndexed { index, match ->
+                Row(
+                    id = "$id-found-$index",
+                    tags = listOfNotNull("dropdown-item", "picked".takeIf { index == picked }),
+                    modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
+                        .alignItems(vertical = UiAlign.CENTER)
+                        .onClick { event ->
+                            dismiss()
+                            match.item.onClick()
+                            event.consume()
+                        },
+                ) {
+                    MenuIcon(match.item, leading)
+                    Text(match.item.label, tags = listOf("dropdown-item-label"))
+                    if (match.path.isNotEmpty()) Text(match.path, tags = listOf("dropdown-item-shortcut"))
+                }
+            }
+        } else items.forEachIndexed { index, item ->
             if (item.separatorBefore && index > 0) Box(tags = listOf("dropdown-separator"))
             if (item.slider != null) {
                 DropdownSliderRow("$id-item-$index", item.label, item.slider) { openSubmenu = null }
@@ -126,7 +237,9 @@ fun ContextMenu(
                 modifier = Modifier.input(hoverable = item.enabled, clickable = item.enabled)
                     .cursor(if (item.enabled) UiCursorShape.HAND else UiCursorShape.DEFAULT)
                     .alignItems(vertical = UiAlign.CENTER)
-                    .onEnter { openSubmenu = if (children != null && item.enabled) index else null }
+                    .onEnter { hover(index, it) }
+                    .onHover { hover(index, it) }
+                    .onExit { if (pending == index) pending = null }
                     .let { if (children != null) it.onPlaced { rect -> if (anchors[index] != rect) anchors = anchors + (index to rect) } else it }
                     .onClick(itemAction)
             ) {
@@ -140,10 +253,8 @@ fun ContextMenu(
                         tags = listOf("dropdown-item-check"),
                         modifier = Modifier.onClick(itemAction),
                     )
-                } else if (item.icon != null) {
-                    Image(item.icon, tags = listOf("dropdown-item-icon"))
-                } else if (anyLeading) {
-                    Box(modifier = Modifier.size(16.px, 16.px))
+                } else {
+                    MenuIcon(item, anyLeading)
                 }
                 Text(item.label, tags = listOf("dropdown-item-label"))
                 if (item.shortcut != null) Text(item.shortcut, tags = listOf("dropdown-item-shortcut"))
@@ -163,7 +274,22 @@ fun ContextMenu(
             onExpandedChange = onExpandedChange,
             alignment = SubmenuAlignment,
             layer = layer + 1,
+            onBounds = { intent.submenu = it },
         )
+    }
+}
+
+/** The icon of [item] in its own color, or the room for one when [leading] says other items of the menu have one. */
+@Composable
+private fun MenuIcon(item: UiDropdownItem, leading: Boolean) {
+    when {
+        item.icon != null -> Image(
+            item.icon,
+            tags = listOf("dropdown-item-icon"),
+            modifier = item.iconColor?.let { Modifier.tint(it) },
+        )
+
+        leading -> Box(modifier = Modifier.size(16.px, 16.px))
     }
 }
 

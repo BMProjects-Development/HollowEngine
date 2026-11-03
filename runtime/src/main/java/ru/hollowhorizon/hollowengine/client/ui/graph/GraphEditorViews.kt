@@ -110,16 +110,21 @@ fun GraphEditorCanvas(
             },
             onSelectArea = controller::selectArea,
             onKey = controller::handleKey,
+            onPointer = { controller.pointer = it },
             nodes = content,
         )
 
+        controller.search?.let { GraphSearchBar(controller, it) }
         controller.menu?.let { open ->
-            ContextMenu(
-                id = "${controller.canvasId}-menu",
-                anchorBounds = UiRect(open.x, open.y, 0f, 0f),
-                items = open.items,
-                onExpandedChange = { if (!it) controller.menu = null },
-            )
+            key(open) {
+                ContextMenu(
+                    id = "${controller.canvasId}-menu",
+                    anchorBounds = UiRect(open.x, open.y, 0f, 0f),
+                    items = open.items,
+                    search = graphEditorText("search_items").takeIf { open.search },
+                    onExpandedChange = { if (!it) controller.menu = null },
+                )
+            }
         }
     }
 }
@@ -183,7 +188,7 @@ fun GraphNodeFrame(
         width = rect.width,
         height = rect.height,
         selected = node in controller.selection,
-        tags = tags,
+        tags = if (node in controller.found) tags + "gn-found" else tags,
         onPress = { controller.pressNode(node, it) },
         onDrag = controller::dragNode,
         onRelease = controller::releaseNode,

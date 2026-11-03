@@ -89,6 +89,8 @@
   "action.viewport.orbit_down": "Orbit down",
   "action.viewport.view_selected": "Center the view on the selection",
   "action.graph.add_node": "Add a node",
+  "action.graph.next_found": "Next node found",
+  "action.graph.previous_found": "Previous node found",
   "action.graph.group": "Group the selection",
   "action.graph.ungroup": "Ungroup",
   "action.graph.entry_state": "Make the state the entry"

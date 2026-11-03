@@ -144,10 +144,11 @@ val PopupOverlayMeasurePolicy = UiMeasurePolicy { measurables, constraints ->
     layout(constraints.maxWidth, constraints.maxHeight) {
         for ((measurable, placeable) in placed) {
             val popup = measurable.node as? PopupNode ?: continue
-            val rect = popup.alignment.popupRect(
-                popup.anchorBounds,
-                LayoutSize(placeable.width, placeable.height),
-            )
+            val size = LayoutSize(placeable.width, placeable.height)
+            val placed = popup.alignment.popupRect(popup.anchorBounds, size)
+            val rect = if (popup.alignment.flipsHorizontally && placed.x + placed.width > constraints.maxWidth) {
+                popup.alignment.mirrored().popupRect(popup.anchorBounds, size).takeIf { it.x >= 0f } ?: placed
+            } else placed
             val maxX = (constraints.maxWidth - placeable.width).coerceAtLeast(0f)
             val maxY = (constraints.maxHeight - placeable.height).coerceAtLeast(0f)
             placeable.place(rect.x.coerceIn(0f, maxX), rect.y.coerceIn(0f, maxY))

@@ -89,6 +89,8 @@
   "action.viewport.view_selected": "Центрировать вид на выделенном",
   "action.timeline.select_key_columns": "Выделить ключи на курсоре или метках выделенных ключей",
   "action.graph.add_node": "Добавить ноду",
+  "action.graph.next_found": "Следующая найденная нода",
+  "action.graph.previous_found": "Предыдущая найденная нода",
   "action.graph.group": "Сгруппировать выделенное",
   "action.graph.ungroup": "Разгруппировать",
   "action.graph.entry_state": "Сделать состояние входным"

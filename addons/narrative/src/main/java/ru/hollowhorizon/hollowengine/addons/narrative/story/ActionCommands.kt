@@ -8,13 +8,17 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamMeaning
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAnimation
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
@@ -105,7 +109,15 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 implicit = if (implicit) "storyLevel()" else null,
                 assets = parameter.findAnnotation<EditorAsset>()?.extensions?.toList().orEmpty(),
                 widget = parameter.findAnnotation<EditorWidget>()?.id,
+                meaning = meaningOf(parameter),
             )
+        }
+
+        private fun meaningOf(parameter: KParameter): StoryParamMeaning? = when {
+            parameter.hasAnnotation<EditorAnimation>() -> StoryParamMeaning.ANIMATION
+            parameter.hasAnnotation<EditorModel>() -> StoryParamMeaning.MODEL
+            parameter.hasAnnotation<EditorNpcId>() -> StoryParamMeaning.NPC_ID
+            else -> null
         }
 
         private fun receiverName(parameter: KParameter): String {

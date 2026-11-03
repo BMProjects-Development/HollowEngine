@@ -19,5 +19,11 @@
   "editor.leave_group": "Take out of the group",
   "editor.collapse_group": "Collapse into one node",
   "editor.expand_group": "Expand",
-  "editor.delete_group_nodes": "Delete with the nodes"
+  "editor.delete_group_nodes": "Delete with the nodes",
+  "editor.search": "Find a node",
+  "editor.search_none": "Nothing found",
+  "editor.search_previous": "Previous",
+  "editor.search_next": "Next",
+  "editor.search_close": "Close",
+  "editor.search_items": "Search"
 }

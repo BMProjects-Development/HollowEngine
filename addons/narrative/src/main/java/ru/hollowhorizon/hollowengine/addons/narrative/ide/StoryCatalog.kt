@@ -7,8 +7,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryCatalog.paramHelp
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ActionCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
-import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
-import ru.hollowhorizon.hollowengine.client.HighlightTheme
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
@@ -19,12 +17,9 @@ internal object StoryCatalog {
     private const val NAMESPACE = "hollowengine-narrative"
     private const val PARAM = "hollowengine.story.param"
     private const val OPERATOR = "hollowengine.story.operator"
-    private const val HEADING = "hollowengine.gui.ide.story.category."
+    private const val HEADING = StoryCategories.PREFIX
     private const val HEX = 16
     private const val OPAQUE = 0xFF shl 24
-    private const val DIMMED = 0.6f
-
-    private var palette: Pair<List<StoryCommand>, Map<String, UiColor>>? = null
 
     fun signatureOf(call: StoryNode.Call): StoryFunctionSignature? = StoryActionFunctions.signature(call)
 
@@ -54,38 +49,26 @@ internal object StoryCatalog {
         return listOfNotNull(paramHelp(signature, param), note).joinToString("\n").ifEmpty { null }
     }
 
-    /** The color of the category of [signature]. */
-    fun color(signature: StoryFunctionSignature): UiColor? = signature.category?.let { colors()[rootOf(it)] }
+    /** The color of the nodes of [signature]: the one it gives its category, or that of the category. */
+    fun color(signature: StoryFunctionSignature): UiColor? {
+        signature.categoryColor?.removePrefix("#")?.toIntOrNull(HEX)?.let { return UiColor.fromArgb(OPAQUE or it) }
+        return signature.category?.let(StoryCategories::color)
+    }
+
+    /** The icon of the nodes of [signature]: its own, or that of its category. */
+    fun icon(signature: StoryFunctionSignature): String? =
+        signature.icon ?: signature.category?.let(StoryCategories::icon)
+
+    /** The key of the category of operators [category] is: they share the categories of commands. */
+    fun operatorCategory(category: String) = HEADING + category
+
+    fun operatorColor(operator: StoryOperator): UiColor = StoryCategories.color(operatorCategory(operator.category))
+
+    fun operatorIcon(operator: StoryOperator): String? = StoryCategories.icon(operatorCategory(operator.category))
 
     /** The heading a category sits under: `effects.sound` under `effects`, and one of the top level under itself. */
     private fun rootOf(category: String) =
         if ('.' in category.substringAfter(HEADING, "")) category.substringBeforeLast('.') else category
-
-    fun operatorColor(category: String): UiColor? = colors()["$OPERATOR.$category"]
-
-    /**
-     * The color of every category: the one a command gives it, or else a slot of the palette in the order of the names,
-     * dimmed to carry white text.
-     */
-    private fun colors(): Map<String, UiColor> {
-        val commands = ActionCommands.commands
-        palette?.takeIf { it.first === commands }?.let { return it.second }
-        val named = commands.mapNotNull { command ->
-            val signature = command.signature
-            val color = signature.categoryColor?.removePrefix("#")?.toIntOrNull(HEX) ?: return@mapNotNull null
-            signature.category?.let { rootOf(it) to UiColor.fromArgb(OPAQUE or color) }
-        }.toMap()
-        val free =
-            (commands.mapNotNull { it.signature.category?.let(::rootOf) } + StoryOperators.all.map { "$OPERATOR.${it.category}" }).filter { it !in named }
-                .distinct().sorted()
-        val given =
-            free.withIndex().associate { (slot, category) -> category to dimmed(HighlightTheme.paletteArgb(slot)) }
-        return (named + given).also { palette = commands to it }
-    }
-
-    private fun dimmed(argb: Int) = UiColor(channel(argb shr 16), channel(argb shr 8), channel(argb))
-
-    private fun channel(value: Int) = (value and 0xFF) / 255f * DIMMED
 
     /** What the input [name] of the operator [id] takes, when that needs saying. */
     fun operatorPinHint(id: String, name: String): String? = known("$OPERATOR.$id.$name.description")
@@ -115,18 +98,34 @@ internal object StoryCatalog {
     /** A heading per category of operators with those [accepts] lets through, for adding a value. */
     fun operatorItems(accepts: (StoryOperator) -> Boolean = { true }, add: (StoryNode) -> Unit): List<UiDropdownItem> =
         StoryOperators.all.filter(accepts).groupBy { it.category }.map { (category, operators) ->
-            UiDropdownItem(storyLang("category.$category"), children = operators.map { operator ->
-                UiDropdownItem(operatorTitle(operator.id)) { add(StoryNode.Pure(StoryGraph.newId(), operator.id)) }
+            heading(operatorCategory(category), operators.map { operator ->
+                UiDropdownItem(
+                    operatorTitle(operator.id),
+                    icon = operatorIcon(operator) ?: StoryNodeKind.VALUE.icon,
+                    iconColor = StoryCategories.tint(operatorColor(operator)),
+                ) { add(StoryNode.Pure(StoryGraph.newId(), operator.id)) }
             })
         }
 
+    /** The submenu of [category], in its icon and color. */
+    fun heading(category: String, children: List<UiDropdownItem>) = UiDropdownItem(
+        category.lang,
+        icon = StoryCategories.icon(category),
+        iconColor = StoryCategories.tint(StoryCategories.color(category)),
+        children = children,
+    )
+
+    /** An item that adds a node of [kind], in its icon and color. */
+    fun kindItem(label: String, kind: StoryNodeKind, onClick: () -> Unit) =
+        UiDropdownItem(label, icon = kind.icon, iconColor = StoryCategories.tint(kind.color), onClick = onClick)
+
     /** A menu item per command and step of the flow, for adding a node of it. */
     fun items(add: (StoryNode) -> Unit): List<UiDropdownItem> {
-        val own = StoryBuiltins.all.map { "${HEADING}flow" to item(it, add) } + listOf(
-            "${HEADING}variables" to UiDropdownItem(storyLang("kind.set"), icon = storyIcon("command")) {
+        val own = StoryBuiltins.all.map { it.category to item(it, add) } + listOf(
+            "${HEADING}variables" to kindItem(storyLang("kind.set"), StoryNodeKind.SET) {
                 add(StoryNode.Assign(StoryGraph.newId(), ""))
             },
-            "${HEADING}flow" to UiDropdownItem(storyLang("kind.code"), icon = storyIcon("block")) {
+            "${HEADING}flow" to kindItem(storyLang("kind.code"), StoryNodeKind.CODE) {
                 add(StoryNode.Code(StoryGraph.newId(), ""))
             },
         )
@@ -135,15 +134,19 @@ internal object StoryCatalog {
         val all = own + commands
         val headings = all.mapNotNull { it.first }.groupBy(::rootOf).map { (root, categories) ->
             val inner = categories.distinct().filter { it != root }.map { category ->
-                UiDropdownItem(category.lang, children = all.filter { it.first == category }.map { it.second })
+                heading(category, all.filter { it.first == category }.map { it.second })
             }.sortedBy { it.label }
-            UiDropdownItem(root.lang, children = inner + all.filter { it.first == root }.map { it.second })
+            heading(root, inner + all.filter { it.first == root }.map { it.second })
         }
         return headings.sortedBy { it.label } + all.filter { it.first == null }.map { it.second }
     }
 
     private fun item(signature: StoryFunctionSignature, add: (StoryNode) -> Unit) =
-        UiDropdownItem(title(signature), icon = signature.icon) {
+        UiDropdownItem(
+            title(signature),
+            icon = icon(signature) ?: StoryNodeKind.COMMAND.icon,
+            iconColor = StoryCategories.tint(color(signature) ?: StoryNodeKind.COMMAND.color),
+        ) {
             add(signature.newCall(StoryGraph.newId()))
         }
 

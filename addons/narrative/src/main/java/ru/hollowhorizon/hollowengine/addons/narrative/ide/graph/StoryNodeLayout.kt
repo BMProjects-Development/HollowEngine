@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import kotlin.math.ceil
+import ru.hollowhorizon.hollowengine.common.utils.Spelling
 
 /** A pin of a row. [kotlin] is the exact type it carries, when [type] alone does not say. */
 internal data class StoryPinSpec(val name: String, val type: StoryPinType, val kotlin: String? = null)
@@ -189,20 +190,21 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         else -> StoryNodeKind.of(node).title
     }
 
-    private fun iconOf(node: StoryNode): String =
-        (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.icon ?: StoryNodeKind.of(node).icon
-
-    private fun tagOf(node: StoryNode): String = when (node) {
-        is StoryNode.Pure -> "st-pure"
-        is StoryNode.Expression -> "st-pure"
-        else -> "st-${StoryNodeKind.of(node).tag}"
-    }
-
-    private fun colorOf(node: StoryNode): UiColor? = when (node) {
-        is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::color)
-        is StoryNode.Pure -> StoryOperators.find(node.operator)?.let { StoryCatalog.operatorColor(it.category) }
+    /** The icon of [node]: that of its command or its category, or else that of its kind. */
+    private fun iconOf(node: StoryNode): String = when (node) {
+        is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::icon)
+        is StoryNode.Pure -> StoryOperators.find(node.operator)?.let(StoryCatalog::operatorIcon)
         else -> null
-    }
+    } ?: StoryNodeKind.of(node).icon
+
+    private fun tagOf(node: StoryNode): String = "st-${StoryNodeKind.of(node).tag}"
+
+    /** The color of [node]: that of its category, or else that of its kind. */
+    private fun colorOf(node: StoryNode): UiColor = when (node) {
+        is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::color)
+        is StoryNode.Pure -> StoryOperators.find(node.operator)?.let(StoryCatalog::operatorColor)
+        else -> null
+    } ?: StoryNodeKind.of(node).color
 
     private fun edit(node: String, field: String, change: (StoryNode) -> StoryNode) =
         state.editNode(node, field, change)
@@ -521,10 +523,34 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
                 code = kotlin,
                 vector = helper,
                 assets = param.assets,
-                problem = StoryChecks.param(param, written),
+                hints = clipHints(node, param),
+                problem = StoryChecks.param(param, written) ?: clipProblem(node, param, written),
             ) { typed ->
                 val next = if (helper != null || kotlin) typed else StoryLiterals.expression(typed, param.type)
                 edit(node.id, param.name) { (it as StoryNode.Call).with(param, next) }
+            }
+        }
+
+        /** The clips of the model of the entity [node] acts on, to complete a parameter naming one as it is typed. */
+        private fun clipHints(node: StoryNode.Call, param: StoryParam): List<UiTextCompletion> {
+            if (param.meaning != StoryParamMeaning.ANIMATION) return emptyList()
+            val clips = state.clips.of(node.id) ?: return emptyList()
+            return clips.names.orEmpty().map { UiTextCompletion(label = it, tail = clips.model, wordChars = CLIP_CHARS) }
+        }
+
+        /** What is wrong with the clip [written] names, when the model of the entity [node] acts on is known to lack it. */
+        private fun clipProblem(node: StoryNode.Call, param: StoryParam, written: String): String? {
+            if (param.meaning != StoryParamMeaning.ANIMATION) return null
+            val clip = StoryLiterals.literal(written, param.type) ?: return null
+            val clips = state.clips.of(node.id) ?: return null
+            val names = clips.names ?: return null
+            if (clip in names) return null
+            if (names.isEmpty()) return storyLang("problem.animation_none")
+            val similar = Spelling.similar(clip, names)
+            return if (similar.isEmpty()) {
+                storyLang("problem.animation_unknown", clip)
+            } else {
+                storyLang("problem.animation_similar", clip, similar.joinToString())
             }
         }
 
@@ -580,6 +606,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
     }
 
     private companion object {
+        const val CLIP_CHARS = "._-:|/"
         const val PADDING = 6f
         const val WIDE = 264f
         const val CODE_WIDTH = 320f

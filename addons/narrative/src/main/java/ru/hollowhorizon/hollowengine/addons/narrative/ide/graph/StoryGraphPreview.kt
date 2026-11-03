@@ -56,7 +56,8 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val analysis = StoryInsight.analysis(state, graph)
     val checks = ownChecks + analysis.checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
-    val boxes = remember(graph, analysis) { StoryGraphBoxes(graph, state) }
+    state.clips = rememberStoryClips(graph)
+    val boxes = remember(graph, analysis, state.clips) { StoryGraphBoxes(graph, state) }
     val model = StoryGraphEditorModel(state, graph, boxes, arranged + state.moved) { controller.select(it) }
     controller.model = model
 

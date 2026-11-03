@@ -45,6 +45,19 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         }.keys
     }
 
+    var pointer: GraphPointer? = null
+
+    var search by mutableStateOf<GraphSearch?>(null)
+        private set
+
+    val found: List<String> by derivedStateOf {
+        val words = search?.query?.trim().orEmpty()
+        if (words.isEmpty()) return@derivedStateOf emptyList()
+        val boxes = model.scene.boxes
+        boxes.keys.filter { model.searchText(it).contains(words, ignoreCase = true) }
+            .sortedWith(compareBy({ boxes.getValue(it).y }, { boxes.getValue(it).x }))
+    }
+
     var link by mutableStateOf<GraphPendingLink?>(null)
         private set
     var menu by mutableStateOf<GraphMenu?>(null)
@@ -113,10 +126,10 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         when {
             pin != null && own != null -> model.connect(own, pin)
             node != null -> model.connectToNode(pending, node)
-            cardAt(pending.x, pending.y) != null -> Unit
+            cardAt(pending.x, pending.y) != null || pending.detached -> Unit
             else -> {
                 val items = model.offerNodes(pending, view.toGraphX(pending.x), view.toGraphY(pending.y))
-                menu = GraphMenu(pending.screenX, pending.screenY, items)
+                menu = GraphMenu(pending.screenX, pending.screenY, items, search = true)
             }
         }
         endGesture()
@@ -202,7 +215,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         val source = if (pin.output) null else model.detach(pin)
         link = when {
             pin.output -> GraphPendingLink(pin.node, pin.name, true, x, y, screenX, screenY)
-            source != null -> GraphPendingLink(source.node, source.name, true, x, y, screenX, screenY)
+            source != null -> GraphPendingLink(source.node, source.name, true, x, y, screenX, screenY, detached = true)
             else -> GraphPendingLink(pin.node, pin.name, false, x, y, screenX, screenY)
         }
     }
@@ -253,6 +266,11 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
     fun handleKey(input: UiKeyInput): Boolean {
         when {
+            menu != null -> if (input.key == GLFW.GLFW_KEY_ESCAPE) menu = null else return false
+            HollowKeys.ADD_NODE.matches(input) -> addMenu()
+            HollowKeys.FIND.matches(input) -> openSearch()
+            HollowKeys.NEXT_FOUND.matches(input) && search != null -> stepSearch(1)
+            HollowKeys.PREVIOUS_FOUND.matches(input) && search != null -> stepSearch(-1)
             HollowKeys.DELETE.matches(input) -> deleteSelection()
             HollowKeys.DUPLICATE.matches(input) -> duplicateSelection()
             HollowKeys.SELECT_ALL.matches(input) ->
@@ -311,7 +329,53 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     }
 
     fun backgroundMenu(pointer: GraphPointer) {
-        menu = GraphMenu(pointer.screenX, pointer.screenY, model.addItems(pointer.graphX, pointer.graphY) + graphViewItems())
+        menu = GraphMenu(
+            pointer.screenX, pointer.screenY,
+            model.addItems(pointer.graphX, pointer.graphY) + graphViewItems(),
+            search = true,
+        )
+    }
+
+    /** The menu of what can be added, under the pointer, or in the middle of the canvas while the pointer is away. */
+    fun addMenu() {
+        val at = pointer ?: GraphPointer(
+            canvas.x + canvas.width / 2f, canvas.y + canvas.height / 2f,
+            canvas.width / 2f, canvas.height / 2f,
+            view.toGraphX(canvas.width / 2f), view.toGraphY(canvas.height / 2f),
+        )
+        menu = GraphMenu(at.screenX, at.screenY, model.addItems(at.graphX, at.graphY), search = true)
+    }
+
+    fun openSearch() {
+        val open = search ?: GraphSearch().also { search = it }
+        open.focusRequests++
+    }
+
+    fun closeSearch() {
+        search = null
+    }
+
+    /** Looks for [query] anew and brings the first node it finds into view. */
+    fun searchFor(query: String) {
+        val open = search ?: return
+        open.query = query
+        open.index = 0
+        found.firstOrNull()?.let(::reveal)
+    }
+
+    /** Brings the next node found into view, or the one before it when [step] is negative. */
+    fun stepSearch(step: Int) {
+        val open = search ?: return
+        if (found.isEmpty()) return
+        open.index = (open.index + step).mod(found.size)
+        reveal(found[open.index])
+    }
+
+    /** Selects [node] and brings it to the middle of the canvas. */
+    fun reveal(node: String) {
+        val rect = scene.boxes[node] ?: return
+        select(GraphSelection.of(node))
+        view.centerOn(rect.centerX, rect.centerY, canvas.width, canvas.height)
     }
 
     /** Grouping the selection, taking it out of its groups, and lining it up. */

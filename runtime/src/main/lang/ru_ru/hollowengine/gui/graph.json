@@ -19,5 +19,11 @@
   "editor.leave_group": "Убрать из группы",
   "editor.collapse_group": "Свернуть в одну ноду",
   "editor.expand_group": "Развернуть",
-  "editor.delete_group_nodes": "Удалить вместе с нодами"
+  "editor.delete_group_nodes": "Удалить вместе с нодами",
+  "editor.search": "Найти ноду",
+  "editor.search_none": "Ничего не найдено",
+  "editor.search_previous": "Предыдущая",
+  "editor.search_next": "Следующая",
+  "editor.search_close": "Закрыть",
+  "editor.search_items": "Поиск"
 }

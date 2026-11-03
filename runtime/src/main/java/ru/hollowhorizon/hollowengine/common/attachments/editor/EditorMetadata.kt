@@ -99,3 +99,18 @@ annotation class EditorMultiline
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY, AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorAsset(vararg val extensions: String)
+
+/**
+ * A parameter of a story action naming a clip of the model of the entity the action is called on, so the editor offers
+ * the clips of that model and warns about one it lacks, when it can tell which model that is.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorAnimation
+
+/** A parameter of a story action naming the model of the entity the action gives back. */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorModel
+
+/** A parameter of a story action naming, by the author's id, the NPC the action gives back. */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorNpcId
