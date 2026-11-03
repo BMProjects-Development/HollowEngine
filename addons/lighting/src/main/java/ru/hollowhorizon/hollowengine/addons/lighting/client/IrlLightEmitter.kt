@@ -3,8 +3,8 @@ package ru.hollowhorizon.hollowengine.addons.lighting.client
 import org.qualet.irl.light.LightMath
 import org.qualet.irl.light.LightRegistry
 import ru.hollowhorizon.hollowengine.addons.lighting.LightInstance
-import ru.hollowhorizon.hollowengine.common.lighting.LightKind
-import ru.hollowhorizon.hollowengine.common.lighting.LightTarget
+import ru.hollowhorizon.hollowengine.addons.lighting.LightKind
+import ru.hollowhorizon.hollowengine.addons.lighting.LightTarget
 
 internal object IrlLightEmitter {
     fun emit(instance: LightInstance, identity: Long) {

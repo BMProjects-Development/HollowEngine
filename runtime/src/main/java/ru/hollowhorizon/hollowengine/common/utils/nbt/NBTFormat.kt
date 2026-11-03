@@ -10,7 +10,6 @@ import net.minecraft.nbt.*
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
@@ -18,7 +17,6 @@ import ru.hollowhorizon.hollowengine.common.models.AnimatorLayerTypes
 import ru.hollowhorizon.hollowengine.common.models.AnimatorStateTypes
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
-import ru.hollowhorizon.hollowengine.common.utils.JavaHacks
 import ru.hollowhorizon.hollowengine.common.utils.serialization.Format
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize
@@ -40,11 +38,7 @@ internal val TagModule
     get() = SerializersModule {
         contextual(Tag::class, PolymorphicSerializer(Tag::class))
 
-        polymorphic(Component::class) {
-            ComponentDescriptorRegistry.map { it.value }.forEach {
-                subclass(it.value, JavaHacks.forceCast(it.serializer))
-            }
-        }
+        ComponentDescriptorRegistry.registerInto(this)
         VirtualComponentRegistry.registerSerializers(this)
         AnimatorLayerTypes.registerInto(this)
         AnimatorStateTypes.registerInto(this)

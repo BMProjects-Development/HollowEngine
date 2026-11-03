@@ -1,9 +1,7 @@
-package ru.hollowhorizon.hollowengine.common.lighting
+package ru.hollowhorizon.hollowengine.addons.lighting
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.api.Registerable
-import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
@@ -66,8 +64,6 @@ data class LightSpec(
 
 /** The engine persists, synchronizes and inspects this just like its built-in entity components. */
 @Serializable
-@Registerable
-@Syncable
 @SerialName("hollowengine-lighting:light")
 data class LightComponent(
     @EditorName("$LANG.light") val light: LightSpec = LightSpec(),

@@ -293,8 +293,7 @@ object EntityStateSync {
     }
 
     private fun idOf(component: Component): ResourceLocation =
-        ComponentDescriptorRegistry.idFor(component::class)
-            ?: error("Component descriptor not found for ${component::class.qualifiedName}")
+        ComponentDescriptorRegistry.idOf(component)
 
     @SubscribeEvent
     @ClientOnly

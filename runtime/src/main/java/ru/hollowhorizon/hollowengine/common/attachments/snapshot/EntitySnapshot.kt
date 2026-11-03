@@ -8,6 +8,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
@@ -15,6 +16,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDesc
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
+import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 
 @Serializable
 sealed class Snapshot {
@@ -23,8 +25,7 @@ sealed class Snapshot {
     fun componentById(): LinkedHashMap<ResourceLocation, Component> =
         LinkedHashMap<ResourceLocation, Component>().apply {
             components.forEach { component ->
-                val id = ComponentDescriptorRegistry.idFor(component::class)
-                    ?: error("Component descriptor not found for ${component::class.qualifiedName}")
+                val id = ComponentDescriptorRegistry.idOf(component)
                 put(id, component)
             }
         }
@@ -49,6 +50,20 @@ data class EntitySnapshot(
 
 object ComponentListSerializer : KSerializer<List<Component>> {
     private val componentSerializer = PolymorphicSerializer(Component::class)
+    /** Each wire entry is self-describing, so missing addon schemas never consume the next entry's bytes. */
+    private val wireSerializer = object : KSerializer<Component> {
+        override val descriptor = componentSerializer.descriptor
+
+        override fun serialize(encoder: Encoder, value: Component) {
+            val tag = NBTFormat(encoder.serializersModule).serialize(componentSerializer, value)
+            (encoder as FriendlyByteBufEncoder).buf.writeNbt(tag as CompoundTag)
+        }
+
+        override fun deserialize(decoder: Decoder): Component {
+            val tag = checkNotNull((decoder as FriendlyByteBufDecoder).input.readNbt())
+            return NBTFormat(decoder.serializersModule).deserialize(componentSerializer, tag)
+        }
+    }
 
     override val descriptor: SerialDescriptor =
         ListSerializer(componentSerializer).descriptor
@@ -61,7 +76,7 @@ object ComponentListSerializer : KSerializer<List<Component>> {
                 encodeSerializableElement(
                     descriptor,
                     index,
-                    componentSerializer,
+                    if (buffer == null) componentSerializer else wireSerializer,
                     component
                 )
                 if (buffer != null && lengthAt != null) {
@@ -82,7 +97,7 @@ object ComponentListSerializer : KSerializer<List<Component>> {
                 val component = composite.decodeSerializableElement(
                     descriptor,
                     index,
-                    PolymorphicSerializer(Component::class)
+                    if (buffer == null) componentSerializer else wireSerializer,
                 )
                 result += component
             } catch (e: Exception) {

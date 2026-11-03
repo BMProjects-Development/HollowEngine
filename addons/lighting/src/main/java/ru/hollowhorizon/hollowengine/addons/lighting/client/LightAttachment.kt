@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.render.RenderPasses
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.common.lighting.LightAttachmentSpec
+import ru.hollowhorizon.hollowengine.addons.lighting.LightAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import java.util.*

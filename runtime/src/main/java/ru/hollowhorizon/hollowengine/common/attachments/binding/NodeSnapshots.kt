@@ -63,12 +63,10 @@ fun Snapshot.modelNodes(): List<ModelNodeEntry> {
 
 fun <T : Snapshot> T.withOrReplace(component: Component, nodeId: UUID? = null): T {
     if (nodeId != null && nodeId != ROOT_COMPONENT_ID) return this
-    val id = ComponentDescriptorRegistry.idFor(component::class)
-        ?: error("Component descriptor not found for ${component::class.qualifiedName}")
+    val id = ComponentDescriptorRegistry.idOf(component)
     val merged = LinkedHashMap<ResourceLocation, Component>()
     components.forEach { existing ->
-        val existingId = ComponentDescriptorRegistry.idFor(existing::class)
-            ?: error("Component descriptor not found for ${existing::class.qualifiedName}")
+        val existingId = ComponentDescriptorRegistry.idOf(existing)
         merged[existingId] = existing
     }
     merged[id] = component

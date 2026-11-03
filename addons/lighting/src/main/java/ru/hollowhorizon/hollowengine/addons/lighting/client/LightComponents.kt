@@ -8,7 +8,7 @@ import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.addons.lighting.LightInstance
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.lighting.LightComponent
+import ru.hollowhorizon.hollowengine.addons.lighting.LightComponent
 import kotlin.math.abs
 
 internal object LightComponents {

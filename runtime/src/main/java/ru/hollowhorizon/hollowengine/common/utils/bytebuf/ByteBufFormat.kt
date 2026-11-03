@@ -7,7 +7,7 @@ import kotlinx.serialization.SerialFormat
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.plus
+import kotlinx.serialization.modules.overwriteWith
 import kotlinx.serialization.serializer
 import net.minecraft.network.FriendlyByteBuf
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
@@ -28,7 +28,7 @@ open class ByteBufFormat(private val context: SerializersModule = EmptySerialize
             val revision = TagModuleRevision.current
             cachedModule?.takeIf { cachedRevision == revision }?.let { return it }
 
-            return (context + TagModule).also {
+            return TagModule.overwriteWith(context).also {
                 cachedModule = it
                 cachedRevision = revision
             }

@@ -11,9 +11,9 @@ order: 10
 
 ## Установка
 
-Установите аддон и Iris для Minecraft 1.21.1 на клиент. После первой установки перезапустите Minecraft: объявления из встроенных `.mixin.kts` применяются до загрузки игровых классов. Скрипты уже скомпилированы, поэтому для игры аддон компилятора не нужен.
+Установите аддон на сервер и клиенты, а Iris для Minecraft 1.21.1 на клиенты. После первой установки перезапустите Minecraft: объявления из встроенных `.mixin.kts` применяются до загрузки игровых классов. Скрипты уже скомпилированы, поэтому для игры аддон компилятора не нужен.
 
-Описания источников входят в общий API HollowEngine. Сервер с обновлённым движком сохраняет и синхронизирует их без рендера. Чтобы увидеть цветной свет, каждому зрителю нужны рендерер и совместимый шейдерпак. Удаление рендера сохраняет данные источников.
+Типы источников, их регистрация и интерфейс принадлежат аддону. Чтобы увидеть цветной свет, каждому зрителю нужны Iris и совместимый шейдерпак. Без аддона движок сохраняет крепления как `UnknownRigAttachmentSpec`, а отдельные компоненты как `UnknownComponent`: данные остаются в мире и восстанавливаются после возвращения аддона. Создание и редактирование источников требуют установленного аддона.
 
 Соберите аддон командой `./gradlew :addons:lighting:addonJar`. Jar появится в `build/addons/lighting/libs/`. Задача `buildAddons` собирает его в `build/addon-jars/`, а `buildAndCollect` также включает в `merged/`. Один jar подходит для Fabric и NeoForge.
 
@@ -42,12 +42,14 @@ order: 10
 
 Этот полный пример серверного `.kts` ставит создание объекта в очередь сервера. Координаты заданы явно:
 
+Для доступа к классам аддона добавьте `hollowengine-lighting` в `dependsOn` файла `hollowengine/META-INF/plugin.properties` вашего проекта.
+
 ```kotlin
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
-import ru.hollowhorizon.hollowengine.common.lighting.LightComponent
-import ru.hollowhorizon.hollowengine.common.lighting.LightKind
-import ru.hollowhorizon.hollowengine.common.lighting.LightSpec
+import ru.hollowhorizon.hollowengine.addons.lighting.LightComponent
+import ru.hollowhorizon.hollowengine.addons.lighting.LightKind
+import ru.hollowhorizon.hollowengine.addons.lighting.LightSpec
 import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 

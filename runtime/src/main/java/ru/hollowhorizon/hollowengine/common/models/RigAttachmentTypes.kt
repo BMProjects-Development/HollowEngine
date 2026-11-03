@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.lighting.LightAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -34,6 +33,11 @@ class RigAttachmentType<S : RigAttachmentSpec>(
 }
 
 object RigAttachmentTypes {
+    private class Schema(var serializer: KSerializer<*>? = null)
+    private val schemas = object : ClassValue<Schema>() {
+        override fun computeValue(type: Class<*>) = Schema()
+    }
+
     val point = ExtensionPoints.create<RigAttachmentType<*>>("hollowengine:rig/attachment_types".rl)
 
     init {
@@ -74,18 +78,20 @@ object RigAttachmentTypes {
         register(ColliderAttachmentSpec.TYPE)
         register(SoundBoneAttachmentSpec.TYPE)
         register(DecalAttachmentSpec.TYPE)
-        register(LightAttachmentSpec.TYPE)
         register(UiPanelAttachmentSpec.TYPE)
         register(IkTargetSpec.TYPE)
         register(IkChainSpec.TYPE)
     }
 
-    fun register(type: RigAttachmentType<*>): ExtensionHandle = point.register(type.key, type)
+    fun register(type: RigAttachmentType<*>): ExtensionHandle = point.register(type.key, type).also {
+        schemas.get(type.specClass.java).serializer = type.serializer
+    }
 
     val all: List<RigAttachmentType<*>> get() = point.extensions
 
     fun of(spec: RigAttachmentSpec): RigAttachmentType<*>? = all.firstOrNull { it.specClass.isInstance(spec) }
 
+    @Suppress("UNCHECKED_CAST")
     fun registerInto(builder: SerializersModuleBuilder) {
         builder.polymorphic(RigAttachmentSpec::class) {
             all.forEach { type -> subclass(type) }
@@ -93,6 +99,7 @@ object RigAttachmentTypes {
         }
         builder.polymorphicDefaultSerializer(RigAttachmentSpec::class) { spec ->
             (spec as? UnknownRigAttachmentSpec)?.serializer()
+                ?: schemas.get(spec.javaClass).serializer as? KSerializer<RigAttachmentSpec>
         }
     }
 

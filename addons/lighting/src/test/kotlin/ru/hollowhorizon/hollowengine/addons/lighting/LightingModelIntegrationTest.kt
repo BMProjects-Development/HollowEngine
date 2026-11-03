@@ -1,3 +1,5 @@
+package ru.hollowhorizon.hollowengine.addons.lighting
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
@@ -6,10 +8,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
 import ru.hollowhorizon.hollowengine.client.render.RenderPasses
-import ru.hollowhorizon.hollowengine.common.lighting.LightAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.lighting.LightComponent
-import ru.hollowhorizon.hollowengine.common.lighting.LightKind
-import ru.hollowhorizon.hollowengine.common.lighting.LightSpec
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,6 +25,7 @@ class LightingModelIntegrationTest {
     }
 
     @Test fun `models rebuild when an optional attachment factory appears and disappears`() {
+        val type = RigAttachmentTypes.register(LightAttachmentSpec.TYPE)
         val model = ModelAttachment(MutableStateFlow(Model.EMPTY), null)
         model.rig = ModelRig(attachments = listOf(LightAttachmentSpec()))
         assertTrue(model.carriesEffects, "Off-screen lamps must keep being posed even before the renderer is loaded")
@@ -44,6 +44,7 @@ class LightingModelIntegrationTest {
         assertTrue(closed)
         assertTrue(model.modelRoot!!.attachments.isEmpty())
         model.close()
+        type.close()
     }
 
     @Test fun `nested shadow passes restore the previous state even after a render failure`() {

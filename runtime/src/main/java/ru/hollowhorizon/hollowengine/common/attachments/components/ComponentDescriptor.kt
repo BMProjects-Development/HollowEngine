@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.attachments.components
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.SerializersModuleBuilder
 import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.attachments.api.Component
@@ -36,6 +37,11 @@ data class ComponentDescriptor<T : Any>(
 
 object ComponentDescriptorRegistry :
     MutableRegistry<ComponentDescriptor<*>> by RegistryManager.create("hollowengine:component_descriptors".rl) {
+    private class Schema(var descriptor: ComponentDescriptor<*>? = null)
+    private val schemas = object : ClassValue<Schema>() {
+        override fun computeValue(type: Class<*>) = Schema()
+    }
+
     private val mutableRegistry: MutableRegistry<ComponentDescriptor<*>>
         get() = this as MutableRegistry<ComponentDescriptor<*>>
 
@@ -57,6 +63,7 @@ object ComponentDescriptorRegistry :
         ensureRegisteringState()
         mutableRegistry.register(descriptor.id) { descriptor }
         mutableRegistry.bake()
+        schemas.get(descriptor.value.java).descriptor = descriptor
         TagModuleRevision.invalidate()
         return descriptor
     }
@@ -92,10 +99,28 @@ object ComponentDescriptorRegistry :
 
     fun idFor(type: KClass<*>): ResourceLocation? = descriptorOrNull(type)?.id
 
+    /** Saved/editor snapshots can outlive the addon registration that produced them. */
+    fun idOf(component: Component): ResourceLocation = when (component) {
+        is UnknownComponent -> component.typeId.rl
+        else -> descriptorOfInstance(component)?.id
+            ?: error("Component descriptor not found for ${component::class.qualifiedName}")
+    }
+
+    private fun descriptorOfInstance(component: Component): ComponentDescriptor<*>? =
+        descriptorOrNull(component::class) ?: schemas.get(component.javaClass).descriptor
+
+    @Suppress("UNCHECKED_CAST")
+    private fun serializerFor(component: Component): KSerializer<Component>? =
+        descriptorOfInstance(component)?.serializer as? KSerializer<Component>
+
     fun isLooseOnDeath(component: Any): Boolean =
         descriptorOrNull(component::class)?.persistencePolicy == ComponentPersistencePolicy.LOOSE_ON_DEATH
 
     fun serializersModule(): SerializersModule = SerializersModule {
+        registerInto(this)
+    }
+
+    fun registerInto(builder: SerializersModuleBuilder) = with(builder) {
         polymorphic(Component::class) {
             ComponentDescriptorRegistry.map { it.value }.forEach { descriptor ->
                 @Suppress("UNCHECKED_CAST")
@@ -104,6 +129,10 @@ object ComponentDescriptorRegistry :
                     descriptor.serializer as KSerializer<Component>
                 )
             }
+            defaultDeserializer { typeId -> typeId?.let(UnknownComponent::deserializerFor) }
+        }
+        polymorphicDefaultSerializer(Component::class) { component ->
+            (component as? UnknownComponent)?.serializer() ?: serializerFor(component)
         }
     }
 }

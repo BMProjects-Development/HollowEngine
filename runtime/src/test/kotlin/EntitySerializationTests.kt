@@ -1,5 +1,6 @@
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.AfterEach
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
+import ru.hollowhorizon.hollowengine.common.attachments.components.UnknownComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.ai.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
@@ -15,6 +17,7 @@ import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 
 class EntitySerializationTests {
     private val basicId = "test:basic_component".rl
@@ -70,7 +73,7 @@ class EntitySerializationTests {
     }
 
     @Test
-    fun `a component the game no longer knows is skipped`() {
+    fun `a missing component survives saving without its addon and restores when registered`() {
         registerDescriptors()
         val saved = EntitySerialization.serializeToNbt(
             EntitySnapshot(components = listOf(LooseComponent("removed from the engine"), BasicComponent("keep"))),
@@ -79,20 +82,44 @@ class EntitySerializationTests {
 
         val decoded = EntitySerialization.deserializeFromNbt(saved)
 
-        assertEquals(listOf(BasicComponent("keep")), decoded.components)
+        assertIs<UnknownComponent>(decoded.components.first())
+        assertEquals(looseId, decoded.componentById().keys.first())
+        assertEquals(BasicComponent("keep"), decoded.components.last())
+        val savedAgain = EntitySerialization.serializeToNbt(decoded)
+        assertEquals(saved, savedAgain)
+
+        registerDescriptors()
+        assertEquals(
+            listOf(LooseComponent("removed from the engine"), BasicComponent("keep")),
+            EntitySerialization.deserializeFromNbt(savedAgain).components,
+        )
     }
 
     @Test
-    fun `a component the client does not know is skipped`() {
+    fun `a missing component survives a network relay without its addon`() {
         registerDescriptors()
         val sent = EntitySerialization.serializeToByteBuf(
             EntitySnapshot(components = listOf(LooseComponent("server only"), BasicComponent("keep"))),
         )
         ComponentDescriptorRegistry.unregisterDescriptor(looseId)
 
-        val received = EntitySerialization.deserializeFromByteBuf(sent)
-
-        assertEquals(listOf(BasicComponent("keep")), received.components)
+        try {
+            val received = EntitySerialization.deserializeFromByteBuf(sent)
+            assertIs<UnknownComponent>(received.components.first())
+            assertEquals(BasicComponent("keep"), received.components.last())
+            val relayed = EntitySerialization.serializeToByteBuf(received)
+            try {
+                registerDescriptors()
+                assertEquals(
+                    listOf(LooseComponent("server only"), BasicComponent("keep")),
+                    EntitySerialization.deserializeFromByteBuf(relayed).components,
+                )
+            } finally {
+                relayed.release()
+            }
+        } finally {
+            sent.release()
+        }
     }
 
     @Test
@@ -194,7 +221,9 @@ class EntitySerializationTests {
 }
 
 @Serializable
+@SerialName("test:basic_component")
 private data class BasicComponent(val value: String)
 
 @Serializable
+@SerialName("test:loose_component")
 private data class LooseComponent(val value: String)

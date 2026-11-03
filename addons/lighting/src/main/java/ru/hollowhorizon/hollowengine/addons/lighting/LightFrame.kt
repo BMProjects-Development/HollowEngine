@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.lighting
 import kotlin.math.max
 import kotlin.math.sqrt
 import org.qualet.irl.light.LightBuffer
-import ru.hollowhorizon.hollowengine.common.lighting.LightSpec
+import ru.hollowhorizon.hollowengine.addons.lighting.LightSpec
 
 /** Position stays double precision until it is made relative to the current frame's camera. */
 data class LightInstance(

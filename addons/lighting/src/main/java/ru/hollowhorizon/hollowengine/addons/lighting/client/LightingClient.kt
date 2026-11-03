@@ -25,7 +25,7 @@ import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
-import ru.hollowhorizon.hollowengine.common.lighting.LightAttachmentSpec
+import ru.hollowhorizon.hollowengine.addons.lighting.LightAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 

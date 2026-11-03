@@ -1,15 +1,19 @@
 package ru.hollowhorizon.hollowengine.common.attachments.api
 
+import kotlinx.serialization.PolymorphicSerializer
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
+import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 
 /**
  * The components attached to one entity.
  */
 class ComponentStore internal constructor() {
     private val components = LinkedHashMap<ResourceLocation, Component>()
+    private var typesRevision = TagModuleRevision.current
 
     @Volatile
     private var cachedSnapshot: EntitySnapshot? = null
@@ -23,12 +27,16 @@ class ComponentStore internal constructor() {
     val isEmpty: Boolean get() = components.isEmpty()
 
     /** Read-only view for callers that only look things up; never invalidates the snapshot cache. */
-    val readOnly: Map<ResourceLocation, Component> get() = components
+    val readOnly: Map<ResourceLocation, Component> get() {
+        updateTypes()
+        return components
+    }
 
     /** Mutable view. Every mutating path drops the cached snapshot. */
     fun asMutableMap(): MutableMap<ResourceLocation, Component> = View()
 
     fun snapshot(entity: Entity): EntitySnapshot? {
+        updateTypes()
         if (components.isEmpty()) return null
         cachedSnapshot?.let { if (it.entity === entity) return it }
         return EntitySnapshot(components = components.values.toList())
@@ -38,19 +46,22 @@ class ComponentStore internal constructor() {
 
     /** Puts [component] under the id its descriptor gives it, replacing whatever was there. */
     fun put(component: Component) {
+        updateTypes()
         components[idOf(component)] = component
         invalidate()
     }
 
     fun replaceAll(source: Collection<Component>) {
+        updateTypes()
         components.clear()
         source.forEach { component -> components[idOf(component)] = component }
         invalidate()
     }
 
-    fun copyOf(): Map<ResourceLocation, Component> = LinkedHashMap(components)
+    fun copyOf(): Map<ResourceLocation, Component> = LinkedHashMap(readOnly)
 
     fun putAll(source: Map<ResourceLocation, Component>) {
+        updateTypes()
         components.putAll(source)
         invalidate()
     }
@@ -65,14 +76,32 @@ class ComponentStore internal constructor() {
         onChange?.invoke()
     }
 
+    /** Rebind on the owning game thread, including addon-defined attachments inside model components. */
+    private fun updateTypes() {
+        val revision = TagModuleRevision.current
+        if (typesRevision == revision) return
+        val serializer = PolymorphicSerializer(Component::class)
+        val updated = components.mapValues { (_, component) ->
+            NBTFormat.deserialize(serializer, NBTFormat.serialize(serializer, component))
+        }
+        typesRevision = revision
+        if (components == updated) return
+        components.clear()
+        components.putAll(updated)
+        invalidate()
+    }
+
     private inner class View : AbstractMutableMap<ResourceLocation, Component>() {
         override val entries: MutableSet<MutableMap.MutableEntry<ResourceLocation, Component>>
-            get() = EntrySet()
+            get() { updateTypes(); return EntrySet() }
 
-        override fun put(key: ResourceLocation, value: Component): Component? =
-            components.put(key, value).also { invalidate() }
+        override fun put(key: ResourceLocation, value: Component): Component? {
+            updateTypes()
+            return components.put(key, value).also { invalidate() }
+        }
 
         override fun remove(key: ResourceLocation): Component? {
+            updateTypes()
             val previous = components.remove(key) ?: return null
             invalidate()
             return previous
@@ -83,9 +112,9 @@ class ComponentStore internal constructor() {
             invalidate()
         }
 
-        override fun containsKey(key: ResourceLocation): Boolean = components.containsKey(key)
+        override fun containsKey(key: ResourceLocation): Boolean = readOnly.containsKey(key)
 
-        override fun get(key: ResourceLocation): Component? = components[key]
+        override fun get(key: ResourceLocation): Component? = readOnly[key]
 
         override val size: Int get() = components.size
     }
@@ -127,8 +156,7 @@ class ComponentStore internal constructor() {
     }
 
     private fun idOf(component: Component): ResourceLocation =
-        ComponentDescriptorRegistry.idFor(component::class)
-            ?: error("Component descriptor not found for ${component::class.qualifiedName}")
+        ComponentDescriptorRegistry.idOf(component)
 }
 
 /**
