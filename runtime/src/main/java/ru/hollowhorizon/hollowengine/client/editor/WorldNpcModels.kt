@@ -25,6 +25,9 @@ object WorldNpcModels {
         return known[id]
     }
 
+    /** What the server last said of [id], without asking again; safe to read from any thread. */
+    fun known(id: String): WorldNpcModel? = known[id]
+
     internal fun answer(id: String, alive: Boolean, model: String?) {
         val answer = WorldNpcModel(alive, model)
         if (known[id] != answer) known[id] = answer

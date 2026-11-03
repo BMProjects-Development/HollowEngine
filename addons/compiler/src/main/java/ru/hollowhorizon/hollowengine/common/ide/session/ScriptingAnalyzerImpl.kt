@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
+import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
@@ -29,12 +30,13 @@ import ru.hollowhorizon.hollowengine.common.ide.session.insight.findSignatureHel
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaKotlinSourceModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaScriptModule
+import ru.hollowhorizon.hollowengine.common.ide.session.rename.SymbolRename
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.editorStructure
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.kotlinGutterTargets
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
-import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptImportError
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -130,8 +132,7 @@ class ScriptingAnalyzerImpl internal constructor(
                 updateLibrarySourcesModule()
             } else {
                 projectStructureProvider.setModule(
-                    file,
-                    KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
+                    file, KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
                 )
             }
             return file
@@ -264,7 +265,8 @@ class ScriptingAnalyzerImpl internal constructor(
 
     /** The path [HollowIdeModel][ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel] opens files by. */
     private fun editorPathOf(file: File): String {
-        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }?.let { return it.qualified }
+        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }
+            ?.let { return it.qualified }
         val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
         val path = file.toPath().toAbsolutePath().normalize()
         if (!path.startsWith(root)) return file.name
@@ -345,6 +347,56 @@ class ScriptingAnalyzerImpl internal constructor(
         Unit
     }
 
+    override fun renameTarget(name: String, text: String, offset: Int): RenameTarget? = synchronized(lock) {
+        SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }?.target
+    }
+
+    override fun rename(
+        name: String,
+        text: String,
+        offset: Int,
+        newName: String,
+        documents: Map<String, String>,
+    ): List<FileRename> = synchronized(lock) {
+        if (!SymbolRename.accepts(newName)) return emptyList()
+        val renamed = SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }
+            ?: return emptyList()
+        if (renamed.name == newName) return emptyList()
+        val texts = LinkedHashMap<String, String>()
+        texts[name] = text
+        if (renamed.key.project) {
+            projectScripts().forEach { (path, file) ->
+                texts.getOrPut(path) {
+                    documents[path] ?: file.readTextOrNull() ?: return@forEach
+                }
+            }
+        } else if (renamed.key.path != name) {
+            val declaring = renamed.key.path
+            documents[declaring]?.let { texts[declaring] = it } ?: declaring.fromReadablePath().readTextOrNull()
+                ?.let { texts[declaring] = it }
+        }
+        val word = Regex("(?<![A-Za-z0-9_])${Regex.escape(renamed.name)}(?![A-Za-z0-9_])")
+        texts.mapNotNull { (path, source) ->
+            val normalized = source.withUnixLineSeparators()
+            if (!word.containsMatchIn(normalized)) return@mapNotNull null
+            if (!renamed.key.project && path != renamed.key.path) return@mapNotNull null
+            val edits = SymbolRename.edits(getOrCreateFile(path, normalized), renamed.key, renamed.name, newName)
+            edits.takeIf { it.isNotEmpty() }?.let { FileRename(path, normalized, it) }
+        }
+    }
+
+    /** Whether the script the editor opens as [path] is a file of the project, not one shipped by an addon. */
+    private fun isProjectScript(path: String): Boolean {
+        val file = runCatching { path.fromReadablePath() }.getOrNull() ?: return false
+        return file.isFile && projectScripts().any { it.second == file.absoluteFile.normalize() }
+    }
+
+    /** The scripts of the project, by the path the editor opens them with. */
+    private fun projectScripts(): List<Pair<String, File>> =
+        ScriptRegistry.listIn(ScriptRegistry.sandboxNamespace, ".kts").mapNotNull { id ->
+            ScriptRegistry.artifacts(id)?.sourceFile?.absoluteFile?.normalize()?.let { editorPathOf(it) to it }
+        }
+
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
         findSignatureHelp(getOrCreateFile(name, text), offset)
     }
@@ -381,6 +433,12 @@ private fun removeFromPsiManager(file: KtFile) {
     val psiManager = PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
     val fileManager = psiManager.fileManager
     fileManager.setViewProvider(file.virtualFile, null)
+}
+
+private fun File.readTextOrNull(): String? = try {
+    readText()
+} catch (_: IOException) {
+    null
 }
 
 private fun String.withUnixLineSeparators(): String = replace("\r\n", "\n").replace('\r', '\n')

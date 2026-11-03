@@ -223,6 +223,9 @@ internal fun EditableFieldCompletionPopup(
         Box(tags = listOf("ide-completion-divider"), modifier = Modifier.size(UiLength.Fill, 1.px))
         CompletionPopupHint(geometry.footerHeight)
     }
+    items.getOrNull(selectedIndex)?.preview?.let { preview ->
+        CompletionPreviewPopup(preview, UiRect(surface.x + geometry.x, surface.y + geometry.y, geometry.width, geometry.height))
+    }
 }
 
 @Composable

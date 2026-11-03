@@ -66,6 +66,8 @@ internal class SpringZoom(
     }
 
     fun advance(frameNanos: Long) = spring.advance(frameNanos)
+
+    fun snapTo(next: Float) = spring.snapTo(next.coerceIn(min, max))
 }
 
 /** How much one wheel notch scales a model preview. */

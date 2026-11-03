@@ -61,6 +61,23 @@ interface ScriptingAnalyzer {
     /** Lets go of what is kept for the file [name], which nothing has open any more. */
     fun forget(name: String) = Unit
 
+    /** The name at [offset] that [rename] can change, or null when it does not name a declaration of the project. */
+    fun renameTarget(name: String, text: String, offset: Int): RenameTarget? = null
+
+    /**
+     * What changes, through every script of the project, once the declaration named at [offset] is called [newName]:
+     * the declaration itself, the places that refer to it and the imports that name it.
+     *
+     * @param documents the texts of files open in the editor, read in place of what is on disk.
+     */
+    fun rename(
+        name: String,
+        text: String,
+        offset: Int,
+        newName: String,
+        documents: Map<String, String>,
+    ): List<FileRename> = emptyList()
+
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>
@@ -126,6 +143,19 @@ data class SymbolMatch(
  */
 fun interface CompletionSink {
     fun emit(items: List<CompletionItem>): Boolean
+}
+
+/** A name [ScriptingAnalyzer.rename] can change, at the end-exclusive range [start] to [end]. */
+data class RenameTarget(val name: String, val start: Int, val end: Int)
+
+/** The [edits] renaming makes in the file [path], whose text was [text] when they were worked out. */
+data class FileRename(val path: String, val text: String, val edits: List<TextEdit>) {
+    /** [text] with the [edits] made. */
+    fun applied(): String {
+        val builder = StringBuilder(text)
+        edits.sortedByDescending { it.start }.forEach { builder.replace(it.start, it.end, it.replacement) }
+        return builder.toString()
+    }
 }
 
 data class OccurrenceRange(

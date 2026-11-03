@@ -26,7 +26,7 @@ object Spelling {
      */
     fun similar(word: String, names: Iterable<String>, limit: Int = 3): List<String> {
         val typed = word.lowercase()
-        val allowed = typed.length / 2 + 1
+        val allowed = (typed.length / 3).coerceAtLeast(1)
         return names.asSequence()
             .map { it to distance(typed, it.lowercase()) }
             .filter { (name, distance) -> distance <= allowed || typed.isNotEmpty() && (typed in name.lowercase() || name.lowercase() in typed) }

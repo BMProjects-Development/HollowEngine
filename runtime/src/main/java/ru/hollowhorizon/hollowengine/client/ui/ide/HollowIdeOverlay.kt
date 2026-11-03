@@ -186,6 +186,13 @@ object HollowIdeOverlay {
     )
     private val findStates = mutableStateMapOf<String, HollowIdeFindState>()
     private val search = HollowIdeSearchController { statusText = it }
+    private val codeRename = HollowIdeCodeRename(
+        model = model,
+        sessionOf = ::editorSession,
+        editorOf = editorStates::get,
+        changed = { dock.updateItem(it.dockItem()) },
+        setStatus = { statusText = it },
+    )
     private var colorPicker by mutableStateOf<EditorColorPicker?>(null)
     private val ideContext = object : HollowIdeContext {
         override val focusedFile: HollowIdeOpenFile? get() = this@HollowIdeOverlay.focusedFile()
@@ -807,6 +814,7 @@ object HollowIdeOverlay {
                     if (handled) input.consume()
                 }) {
             IdeInspectorHost.pending?.let { request -> AssetPickerDialog(request) { IdeInspectorHost.pending = null } }
+            codeRename.Dialog()
             CompositionLocalProvider(LocalDragAndDrop provides dragAndDrop) {
                 if (collapsed) {
                     GearButton()
@@ -1500,6 +1508,11 @@ object HollowIdeOverlay {
         } == true
 
         HollowKeys.DEFINITION.matches(key, modifiers) -> goToDefinition()
+        HollowKeys.RENAME.matches(key, modifiers) -> focusedEditorFile()?.let { file ->
+            val caret = editorStates[file.path]?.caret ?: return@let false
+            codeRename.start(file, caret, surface.runtime.mouseX, surface.runtime.mouseY)
+        } == true
+
         HollowKeys.KEYMAP.matches(key, modifiers) -> true.also { keymapVisible = true }
         else -> false
     }

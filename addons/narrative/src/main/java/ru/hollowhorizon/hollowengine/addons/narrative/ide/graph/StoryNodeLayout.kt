@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import kotlin.math.ceil
+import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelClipPreview
 import ru.hollowhorizon.hollowengine.common.utils.Spelling
 
 /** A pin of a row. [kotlin] is the exact type it carries, when [type] alone does not say. */
@@ -535,7 +536,9 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         private fun clipHints(node: StoryNode.Call, param: StoryParam): List<UiTextCompletion> {
             if (param.meaning != StoryParamMeaning.ANIMATION) return emptyList()
             val clips = state.clips.of(node.id) ?: return emptyList()
-            return clips.names.orEmpty().map { UiTextCompletion(label = it, tail = clips.model, wordChars = CLIP_CHARS) }
+            return clips.names.orEmpty().map { clip ->
+                UiTextCompletion(label = clip, tail = clips.model, wordChars = CLIP_CHARS, preview = ModelClipPreview(clips.model, clip))
+            }
         }
 
         /** What is wrong with the clip [written] names, when the model of the entity [node] acts on is known to lack it. */
