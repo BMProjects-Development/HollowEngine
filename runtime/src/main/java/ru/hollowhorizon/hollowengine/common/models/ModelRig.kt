@@ -151,6 +151,9 @@ const val MAX_NESTING = 8
 abstract class RigAttachmentSpec {
     abstract val id: String
 
+    /** Keeps the model posed off-screen when this attachment affects more than its mesh bounds. */
+    open val affectsWorld: Boolean get() = false
+
     abstract fun withId(id: String): RigAttachmentSpec
 
     /**

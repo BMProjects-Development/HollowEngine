@@ -73,5 +73,7 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
 
 /** Whether an effect hangs anywhere on this rig, models nested in it included. */
 internal fun ModelRig.carriesEffects(): Boolean = allAttachments().any { (_, spec) ->
-    spec is VfxBoneAttachmentSpec || spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesEffects()
+    spec.affectsWorld || spec is VfxBoneAttachmentSpec ||
+        spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec ||
+        spec is ModelAttachmentSpec && spec.rig.carriesEffects()
 }

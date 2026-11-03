@@ -1,0 +1,77 @@
+---
+title: Lighting addon
+order: 10
+---
+
+<center><h1>Lighting addon</h1></center>
+
+Place colored point lights and spotlights in the world, attach them to animated bones, and illuminate blocks and entities through Iris.
+
+The `hollowengine-lighting` renderer includes [irl-core](https://github.com/quaIett/irl-core) 1.1.7 for Minecraft 1.21.1 under its MIT license. GPU formats, shadow atlases and sampler names are retained. Existing shaderpacks patched for this IRLights contract work without conversion.
+
+## Installation
+
+Install the addon and Iris for Minecraft 1.21.1 on the client. Restart Minecraft after the first installation: bundled `.mixin.kts` declarations are applied before game classes load. The scripts are already compiled, so playing does not require the compiler addon.
+
+Light descriptions belong to HollowEngine's common API. A server with the updated engine can save and synchronize them without the renderer. Each viewer needs the renderer and a compatible shaderpack to see colored light. Removing the renderer preserves the light data.
+
+Build with `./gradlew :addons:lighting:addonJar`. The jar is in `build/addons/lighting/libs/`. `buildAddons` collects it into `build/addon-jars/`, and `buildAndCollect` also includes it in `merged/`. The same addon jar serves Fabric and NeoForge.
+
+## Shaderpacks and patches
+
+An already patched IRLights pack can be selected directly in Iris. For a clean pack, use these client commands:
+
+```text
+/hollowlights packs
+/hollowlights patches
+/hollowlights check "BSL_v10.1.5.zip" bsl.irlights
+/hollowlights patch "BSL_v10.1.5.zip" bsl.irlights
+```
+
+Replace the pack name with one listed by `packs`. `check` reports incompatible anchors without writing files. `patch` creates a new folder in `shaderpacks/`, leaving the source and existing output folders intact. Select the new pack in Iris afterwards.
+
+Bundled patches cover Bliss, BSL, Complementary Reimagined, IterationRP, Photon, Rethinking Voxels and Solas. Exact supported versions are in each patch's `@packversion` header. Compatibility requires both the IRLights contract and matching GLSL source anchors. Additional original `.irlights` files go into `hollowengine/lighting/patches/`. Shaderpacks themselves are not bundled.
+
+The addon owns the IRLights bindings: light SSBO 7, cluster SSBO 6 and globals UBO 7. Run one IRLights renderer at a time; the source registries of independent IRLights mods are not merged.
+
+## Creating lights
+
+Select an entity or world object and add its **Light** component in the inspector. **Point light** shines in every direction; **Spotlight** emits a cone along the local -Z axis. Rotating a world object turns its spotlight.
+
+The **Light** rig attachment works on an entire model or an individual bone. It follows animation and stays active off-screen. Like the IRLights render-path collector, bone attachments feed their latest completed pose into the following frame's light collection.
+
+This complete server `.kts` example schedules a world object's creation at explicit world coordinates:
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.lighting.LightComponent
+import ru.hollowhorizon.hollowengine.common.lighting.LightKind
+import ru.hollowhorizon.hollowengine.common.lighting.LightSpec
+import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+
+val server = checkNotNull(currentServerOrNull())
+server.execute {
+    val level = server.overworld()
+    val lamp = WorldObjectEntity(level)
+    lamp.setPos(0.5, 70.0, 0.5)
+    lamp set LightComponent(
+        light = LightSpec(kind = LightKind.SPOT, color = Vec3f(1f, 0.7f, 0.3f), radius = 16f),
+        rotation = Vec3f(-90f, 0f, 0f),
+    )
+    level.addFreshEntity(lamp)
+}
+```
+
+## Settings and limits
+
+Color uses linear RGB. Radius and offset use blocks; rotations and full cone angles use degrees. The inner cone is limited to the outer cone when sent to IRLights. Source size controls shadow softness. Choose whether the light affects everything, entities only, or blocks only.
+
+Enable shadows for block and entity occlusion. **Volumetric beam strength** makes the beam visible; density and anisotropy control its appearance. For a projection mask, add an image to project resources or an asset pack and select its resource ID, such as `example:textures/lights/window.png`. The cookie array supports up to 16 distinct images.
+
+Global settings are in `config/hollowengine-lighting.json`: shadow quality `0..3`, static bake budget, block shadow radius, uploaded light count, surface specular and volumetrics. Run `/hollowlights reload` after editing. This also reloads cookies and shadow caches; resource pack reloads invalidate them automatically.
+
+The renderer requires OpenGL 4.3. The original GPU limit is 2048 lights, with 256 uploaded by default. Shadow slots and block collection have separate budgets. Blocks cast shadows within `shadowBlockRadius`, even when a light's radius is larger. Available shading features depend on the IRLights patch. Vanilla rendering without Iris and unpatched shaderpacks do not consume this light data.
+
+When the addon is disabled, a pack created by its patcher switches to its recorded original. For an independently patched pack, shaders are disabled before GPU resources are freed. Light descriptions remain in the world.

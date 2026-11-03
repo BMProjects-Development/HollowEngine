@@ -77,7 +77,7 @@ object RenderManager {
      * Whether a shader pack draws the level from its light now. Models drawn then are not where the camera sees
      * them, so nothing should remember their placement for the frame.
      */
-    val isShadowPass: Boolean get() = IrisHelper.isShadowRendering()
+    val isShadowPass: Boolean get() = RenderPasses.isShadowPass || IrisHelper.isShadowRendering()
 
     @SubscribeEvent
     fun onTrackWorldPass(event: RenderLevelStageEvent) {
@@ -279,5 +279,5 @@ object RenderManager {
         return LevelRenderer.getLightColor(level, position)
     }
 
-    private fun shouldAllowInstancingInCurrentPass(): Boolean = true
+    private fun shouldAllowInstancingInCurrentPass(): Boolean = !RenderPasses.isShadowPass
 }

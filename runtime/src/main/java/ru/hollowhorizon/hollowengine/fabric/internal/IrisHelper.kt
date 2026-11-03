@@ -9,6 +9,7 @@ import net.irisshaders.iris.vertices.IrisVertexFormats
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ModelInstancingBackend
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.client.utils.InstancingEntityInfo
+import ru.hollowhorizon.hollowengine.client.render.RenderPasses
 import ru.hollowhorizon.hollowengine.common.utils.ModList
 import ru.hollowhorizon.hollowengine.fabric.internal.rendering.IrisInstancingBackend
 import ru.hollowhorizon.hollowengine.fabric.internal.rendering.IrisInstancingPrograms
@@ -16,7 +17,8 @@ import ru.hollowhorizon.hollowengine.fabric.internal.rendering.IrisInstancingPro
 object IrisHelper {
     @JvmStatic
     fun shouldOverrideShaders() =
-        hasIris && (Iris.getPipelineManager().pipelineNullable as? ShaderRenderingPipeline)?.shouldOverrideShaders() == true
+        !RenderPasses.isShadowPass && hasIris &&
+            (Iris.getPipelineManager().pipelineNullable as? ShaderRenderingPipeline)?.shouldOverrideShaders() == true
 
     val hasIris = ModList.isLoaded("iris") || ModList.isLoaded("oculus")
 

@@ -110,6 +110,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
      * Advances the animation and leaves the nodes ready to draw, once per frame.
      */
     fun update(context: AnimatorEvaluationContext, frame: Long = TickHandler.renderFrame) {
+        attachment.ensureReady()
         if (posedFrame == frame) return
         posedFrame = frame
         if (isSettled()) return
@@ -130,11 +131,13 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         val still = animator.isEmpty && !attachment.carriesEffects && attachment.rig.ikChains().isEmpty()
         settledRig = if (still) attachment.rig else null
         settledModel = attachment.model
+        settledStructureVersion = attachment.structureVersion
     }
 
     /** The rig and model of the last pose, when nothing in it moves by itself; see [isSettled]. */
     private var settledRig: ModelRig? = null
     private var settledModel: Model? = null
+    private var settledStructureVersion = -1
 
     /**
      * Whether the last pose is the one the next would give: no animation plays, nothing reads the entity or the world,
@@ -142,7 +145,8 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
      */
     private fun isSettled(): Boolean =
         settledRig != null && pendingRig == null && animator.isEmpty &&
-            settledRig === attachment.rig && settledModel === attachment.model
+            settledRig === attachment.rig && settledModel === attachment.model &&
+            settledStructureVersion == attachment.structureVersion
 
     private fun dress() = attachment.applyMaterials(materials?.materials ?: emptyMap())
 }

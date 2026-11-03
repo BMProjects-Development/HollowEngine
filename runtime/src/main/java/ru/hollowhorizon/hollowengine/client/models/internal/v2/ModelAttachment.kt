@@ -72,6 +72,9 @@ class ModelAttachment(
             return (listOf(root.instanceId) + nested).joinToString("/")
         }
     private var builtFor: Model? = null
+    private var builtWithFactories = -1
+    internal var structureVersion = 0
+        private set
     private var runtimeNodes: List<RuntimeNode> = emptyList()
 
     /** Every node of [runtimeNodes], parents first; the hierarchy only changes when the model is built again. */
@@ -195,7 +198,7 @@ class ModelAttachment(
      */
     fun ensureReady() {
         val current = flow.value
-        if (builtFor !== current) rebuild(current)
+        if (builtFor !== current || builtWithFactories != RigAttachmentFactories.point.generation) rebuild(current)
     }
 
     /** Puts every node back in "T-pose"; the animator then poses on top. */
@@ -267,6 +270,8 @@ class ModelAttachment(
     }
 
     private fun rebuild(model: Model) {
+        builtWithFactories = RigAttachmentFactories.point.generation
+        structureVersion++
         runtimeNodes.forEach(RuntimeNode::close)
         modelRoot?.close()
         builtFor = model
