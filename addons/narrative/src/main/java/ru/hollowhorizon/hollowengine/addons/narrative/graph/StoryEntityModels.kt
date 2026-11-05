@@ -42,10 +42,14 @@ object StoryEntityModels {
 
         private fun made(call: StoryNode.Call): StoryEntityModel? {
             val params = signatureOf(call)?.params ?: return null
-            fun written(meaning: StoryParamMeaning) = params.firstOrNull { it.meaning == meaning }
-                ?.let { param -> call.argument(param)?.let { StoryLiterals.literal(it, param.type) } }
-            return written(StoryParamMeaning.MODEL)?.let(StoryEntityModel::Path)
-                ?: written(StoryParamMeaning.NPC_ID)?.let(StoryEntityModel::Npc)
+            fun param(meaning: StoryParamMeaning) = params.firstOrNull { it.meaning == meaning }
+            fun given(param: StoryParam?) =
+                param?.let(call::argument)?.takeIf { StoryLiterals.text(it, param.type).isNotBlank() }
+            val model = param(StoryParamMeaning.MODEL)
+            val npc = param(StoryParamMeaning.NPC_ID)
+            given(model)?.let { return StoryLiterals.literal(it, model?.type)?.let(StoryEntityModel::Path) }
+            given(npc)?.let { return StoryLiterals.literal(it, npc?.type)?.let(StoryEntityModel::Npc) }
+            return model?.fallback?.let(StoryEntityModel::Path)
         }
     }
 }

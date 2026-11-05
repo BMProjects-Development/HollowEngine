@@ -30,7 +30,7 @@ suspend fun ServerLevel.spawnNpc(
     pos: Vec3,
     @EditorNpcId id: String? = null,
     name: String = "",
-    @EditorModel @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel") model: String = "",
+    @EditorModel(Model.DEFAULT) @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel") model: String = "",
 ): NpcEntity = npc(pos, id) {
     if (model.isNotEmpty()) set(Model(model))
     if (name.isNotEmpty()) setNameplate(name)

@@ -840,6 +840,7 @@ private fun CompletionItem.toUi(): UiTextCompletion {
         wordChars = wordChars,
         filterText = name,
         closeness = closeness,
+        preview = declaration?.clipOf?.let { ModelClipPreview(it, insert) },
     )
 }
 

@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
 /**
@@ -20,11 +21,16 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
 @EditorIcon("hollowengine:textures/gui/icons/file_model.svg")
 @SerialName("hollowengine:model")
 data class Model(
-    @EditorAsset(
+    @EditorModel(DEFAULT) @EditorAsset(
         "gltf", "glb", "geo.json", "fbx", "obj", "bbmodel"
-    ) val model: String = "hollowengine:models/entity/player_model.gltf",
+    ) val model: String = DEFAULT,
     @EditorHidden
     val rig: ModelRig = ModelRig.EMPTY,
 ) {
     val isEmpty: Boolean get() = model.isBlank()
+
+    companion object {
+        /** The model an entity shows when nothing says which. */
+        const val DEFAULT = "hollowengine:models/entity/player_model.gltf"
+    }
 }

@@ -14,7 +14,9 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.animationNameCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.editorClips
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
@@ -317,8 +319,8 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
         val file = getOrCreateFile(name, text)
-        val checkpoints = checkpointNameCompletions(file, offset)
-        if (checkpoints != null) sink.emit(checkpoints) else createCompletions(file, offset, sink)
+        val names = checkpointNameCompletions(file, offset) ?: animationNameCompletions(file, offset, editorClips)
+        if (names != null) sink.emit(names) else createCompletions(file, offset, sink)
         Unit
     }
 

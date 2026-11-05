@@ -12,6 +12,9 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.Action
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryException
 import ru.hollowhorizon.hollowengine.addons.narrative.story.Unsaved
 import ru.hollowhorizon.hollowengine.addons.narrative.story.action
+import ru.hollowhorizon.hollowengine.common.attachments.components.Model
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.buildNpc
@@ -31,7 +34,11 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 @EditorCategory("hollowengine.gui.ide.story.category.npc")
 @EditorHidden
 @Action("npc")
-suspend fun ServerLevel.npc(pos: Vec3, id: String? = null, @Unsaved builder: NpcEntity.() -> Unit = {}): NpcEntity =
+suspend fun ServerLevel.npc(
+    pos: Vec3,
+    @EditorNpcId id: String? = null,
+    @Unsaved @EditorModel(Model.DEFAULT) builder: NpcEntity.() -> Unit = {},
+): NpcEntity =
     action(this, pos, id, builder) {
         val npcs = server.npcs
         val built = capture { if (id != null && npcs.alive(id) != null) null else BuiltNpc.of(buildNpc(pos, builder)) }

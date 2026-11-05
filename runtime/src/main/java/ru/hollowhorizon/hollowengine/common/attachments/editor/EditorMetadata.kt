@@ -107,9 +107,14 @@ annotation class EditorAsset(vararg val extensions: String)
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorAnimation
 
-/** A parameter of a story action naming the model of the entity the action gives back. */
+/**
+ * A parameter of a story action naming the model of the entity the action gives back. On a builder of the entity it is
+ * the model a call inside the builder names through such a parameter of its own, such as `set(Model("..."))`.
+ *
+ * @param default the model the entity shows when the parameter is left out or blank, or the builder names none.
+ */
 @Target(AnnotationTarget.VALUE_PARAMETER)
-annotation class EditorModel
+annotation class EditorModel(val default: String = "")
 
 /** A parameter of a story action naming, by the author's id, the NPC the action gives back. */
 @Target(AnnotationTarget.VALUE_PARAMETER)

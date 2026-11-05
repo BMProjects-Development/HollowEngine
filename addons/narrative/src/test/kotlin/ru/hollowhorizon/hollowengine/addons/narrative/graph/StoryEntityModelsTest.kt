@@ -9,7 +9,7 @@ class StoryEntityModelsTest {
     private val spawn = StoryFunctionSignature(
         "spawn", "spawn", listOf(
             StoryParam("id", text, optional = true, meaning = StoryParamMeaning.NPC_ID),
-            StoryParam("model", text, optional = true, meaning = StoryParamMeaning.MODEL),
+            StoryParam("model", text, optional = true, meaning = StoryParamMeaning.MODEL, fallback = "default.glb"),
         ),
     )
     private val play = StoryFunctionSignature(
@@ -67,5 +67,13 @@ class StoryEntityModelsTest {
             links + into("b", "set-b", StoryPins.VALUE),
         )
         assertEquals(emptyMap(), disagreeing)
+    }
+
+    @Test
+    fun `an NPC spawned with no model and no id shows the model it falls back to`() {
+        val left = models(listOf(spawn("npc"), play("wave")), listOf(into("npc", "wave")))
+        assertEquals(mapOf("wave" to StoryEntityModel.Path("default.glb")), left)
+        val blank = models(listOf(spawn("npc", "model" to "\"\""), play("wave")), listOf(into("npc", "wave")))
+        assertEquals(mapOf("wave" to StoryEntityModel.Path("default.glb")), blank)
     }
 }

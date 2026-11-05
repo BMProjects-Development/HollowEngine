@@ -30,6 +30,8 @@ enum class StoryParamMeaning {
  * @param widget what edits it instead of a plain field, such as `color`.
  * @param assets the ends of the paths of the files it names, when it names one.
  * @param meaning what its value names, when the editor can check that.
+ * @param fallback what a call that leaves it out or blank acts as having, when the editor needs to know, such as the
+ * model an NPC shows.
  */
 data class StoryParam(
     val name: String,
@@ -44,6 +46,7 @@ data class StoryParam(
     val assets: List<String> = emptyList(),
     val widget: String? = null,
     val meaning: StoryParamMeaning? = null,
+    val fallback: String? = null,
 )
 
 /**

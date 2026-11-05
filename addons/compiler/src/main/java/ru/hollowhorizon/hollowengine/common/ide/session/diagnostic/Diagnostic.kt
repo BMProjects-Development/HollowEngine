@@ -9,9 +9,7 @@ import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaSeverity
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
-import ru.hollowhorizon.hollowengine.client.editor.GameAnimationClips
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
-import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 fun diagnosticCode(file: KtFile): List<Diagnostic> {
     val document = file.fileDocument
@@ -30,7 +28,7 @@ fun diagnosticCode(file: KtFile): List<Diagnostic> {
             Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
         }
     }
-    val clips = if (isPhysicalClient) GameAnimationClips else AnimationClips.None
+    val clips = editorClips
     val inspections = listOf(
         ::unusedImportDiagnostics,
         ::subscribeEventDiagnostics,

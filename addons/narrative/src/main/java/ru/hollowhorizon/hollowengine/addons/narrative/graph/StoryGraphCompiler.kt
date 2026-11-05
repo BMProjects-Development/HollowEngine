@@ -55,6 +55,16 @@ class StoryGraphCompiler private constructor(
     private val values = index.values
     private val variables = graph.variables.associateBy { it.name }
 
+    /**
+     * Writes of variables left out of the flow that take their value straight from a node in it, by that node: each
+     * runs right after it, so a result goes into a variable without a write of its own in the flow.
+     */
+    private val writes: Map<String, List<StoryNode.Assign>> = graph.nodes.filterIsInstance<StoryNode.Assign>()
+        .filter { !index.isInFlow(it.id) }
+        .mapNotNull { assign -> values[assign.id to StoryPins.VALUE]?.from?.takeIf(index::isInFlow)?.let { it to assign } }
+        .groupBy({ it.first }, { it.second })
+    private val attached = writes.values.flatten().mapTo(HashSet()) { it.id }
+
     private val lines = ArrayList<String>()
     private val origins = ArrayList<String?>()
     private val imports = (DEFAULT_IMPORTS + graph.imports).toSortedSet()
@@ -258,7 +268,7 @@ class StoryGraphCompiler private constructor(
             is StoryNode.Call -> {
                 when {
                     isInstant(node) -> return instantRun(node, depth)
-                    functions.kind(node) == StoryCallKind.ACTION -> call(node, depth)
+                    functions.kind(node) == StoryCallKind.ACTION || hasStageBody(node) -> call(node, depth)
                     else -> boundary(id, depth) { call(node, it) }
                 }
                 next(id, StoryPins.NEXT, depth)
@@ -330,6 +340,12 @@ class StoryGraphCompiler private constructor(
         pending += { stage(name, node, null) { body(1) } }
     }
 
+    /**
+     * Whether [node] takes a body that is a stage of its own, such as `async { }`. It is called right in the stage
+     * around it: what it starts belongs to the stage it is called in and would end with a step made just for it.
+     */
+    private fun hasStageBody(node: StoryNode.Call) = node.block && functions.signature(node)?.plainBlock != true
+
     private fun isInstant(node: StoryNode): Boolean = when (node) {
         is StoryNode.Assign -> !readsSuspending(node.id)
         is StoryNode.Call -> !node.block && functions.kind(node) == StoryCallKind.INSTANT && !readsSuspending(node.id)
@@ -381,6 +397,7 @@ class StoryGraphCompiler private constructor(
     /** The body of a loop is one lambda to the stages around it, so its steps stay in place. */
     private fun loop(node: StoryNode.Loop, depth: Int) {
         emit("for (${loopName(node.id)} in ${argument(node.id, StoryPins.ITEMS, node.items)}) {", node.id, depth)
+        write(node.id, depth + 1)
         blocks++
         chain(flow[node.id to StoryPins.BODY], depth + 1)
         blocks--
@@ -411,17 +428,27 @@ class StoryGraphCompiler private constructor(
             if (node.returns == null) problem(node.id, "needs_return", "'${node.function}' is read later, so it needs its return type", node.function)
             "${outputName(node.id, StoryPins.VALUE)} = $call"
         } else call
-        if (!node.block) return emit(assigned, node.id, depth)
+        if (!node.block) {
+            emit(assigned, node.id, depth)
+            return write(node.id, depth)
+        }
         emit("$assigned {", node.id, depth)
-        val flat = functions.signature(node)?.plainBlock == true
-        blocks++
+        val stage = hasStageBody(node)
+        val flat = !stage && functions.signature(node)?.plainBlock == true
+        if (stage) lambdas++ else blocks++
         if (flat) plain++
         chain(flow[node.id to StoryPins.BODY], depth + 1)
         if (flat) plain--
-        blocks--
+        if (stage) lambdas-- else blocks--
         // A body of the graph gives nothing back; without this its last call would be the result `async` saves.
         emit("Unit", node.id, depth + 1)
         emit("}", node.id, depth)
+        write(node.id, depth)
+    }
+
+    /** The writes of variables that take their value from what [node] just gave. */
+    private fun write(node: String, depth: Int) {
+        writes[node].orEmpty().forEach { emit("${it.variable} = ${assigned(it)}", it.id, depth) }
     }
 
     /** Whether the flow is in a block such as `temporary { }`, whose body is an ordinary lambda no stage can be called in. */
@@ -445,6 +472,7 @@ class StoryGraphCompiler private constructor(
                 read.forEach { emit("${outputName(node.id, it.name)} = $result.${it.name}", node.id, depth) }
             }
         }
+        write(node.id, depth)
     }
 
     /**
@@ -532,6 +560,7 @@ class StoryGraphCompiler private constructor(
         node.code.trimIndent().lines().forEach { emit(it, node.id, at) }
         node.outputs.keys.filter { index.isRead(node.id, it) }
             .forEach { emit("${outputName(node.id, it)} = $it", node.id, at) }
+        write(node.id, at)
         if (scoped) emit("}", node.id, depth)
     }
 
@@ -627,7 +656,7 @@ class StoryGraphCompiler private constructor(
                 is StoryNode.Assign -> {
                     val empty = isNullable(variables[node.variable]?.type)
                     Value(
-                        if (index.isInFlow(id)) node.variable else "(${assigned(node)}).also { ${node.variable} = it }",
+                        if (index.isInFlow(id) || id in attached) node.variable else "(${assigned(node)}).also { ${node.variable} = it }",
                         empty
                     )
                 }

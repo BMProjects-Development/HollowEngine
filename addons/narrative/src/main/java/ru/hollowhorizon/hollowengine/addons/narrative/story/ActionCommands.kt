@@ -110,6 +110,7 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 assets = parameter.findAnnotation<EditorAsset>()?.extensions?.toList().orEmpty(),
                 widget = parameter.findAnnotation<EditorWidget>()?.id,
                 meaning = meaningOf(parameter),
+                fallback = parameter.findAnnotation<EditorModel>()?.default?.ifEmpty { null },
             )
         }
 
