@@ -20,10 +20,12 @@ class AnalysisEnvironmentDisposalTest {
         }
         try {
             val environment = AnalysisEnvironment(emptyList())
+            var disposal: CompletableFuture<Void>? = null
             EventQueue.invokeAndWait {
                 BinaryFileTypeDecompilers.getInstance().notifyDecompilerSetChange()
-                environment.dispose()
+                disposal = environment.dispose()
             }
+            disposal!!.get(30, TimeUnit.SECONDS)
             EventQueue.invokeAndWait {}
             assertTrue(failures.isEmpty(), failures.joinToString("\n") { it.stackTraceToString() })
         } finally {

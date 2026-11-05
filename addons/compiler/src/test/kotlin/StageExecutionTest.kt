@@ -1,7 +1,4 @@
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,20 +8,7 @@ import kotlin.test.assertTrue
  * Stages run like ordinary code, and a restart brings each frame back to the boundary it last passed: the code
  * before that boundary does not run again, the segment after it does.
  */
-class StageExecutionTest {
-    private lateinit var compiler: StageCompiler
-
-    @BeforeTest
-    fun setUp() {
-        StageTrace.reset()
-        compiler = StageCompiler()
-    }
-
-    @AfterTest
-    fun tearDown() = compiler.close()
-
-    private fun TestScope.world(name: String, code: String) = StageWorld(this, compiler.compile(name, code))
-
+class StageExecutionTest : StageTest() {
     @Test
     fun `a nested stage resumes inside the call and the caller continues after it`() = runTest {
         val world = world("nested", """
