@@ -1,20 +1,8 @@
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 
 /** What a stage cannot do is a compilation error that says why, not a story that breaks after a restart. */
-class StageCompileErrorsTest {
-    private lateinit var compiler: StageCompiler
-
-    @BeforeTest
-    fun setUp() {
-        compiler = StageCompiler()
-    }
-
-    @AfterTest
-    fun tearDown() = compiler.close()
-
+class StageCompileErrorsTest : StageTest() {
     private fun assertError(expected: String, code: String) = assertContains(compiler.errors(code), expected)
 
     @Test

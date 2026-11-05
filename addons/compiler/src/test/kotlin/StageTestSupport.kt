@@ -21,15 +21,14 @@ import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
+import ru.hollowhorizon.hollowengine.test.StageTestScript
 import java.io.File
 import kotlin.coroutines.ContinuationInterceptor
-import kotlin.test.AfterTest
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import kotlin.test.BeforeTest
 import kotlin.io.path.createTempDirectory
 import kotlin.test.fail
-
-/** The base of the scripts stage tests compile. */
-abstract class StageTestScript
 
 /** What test scripts write down and wait for; it outlives a simulated restart, like the world does. */
 object StageTrace {
@@ -89,7 +88,12 @@ private val NARRATIVE_IMPORTS = listOf(
     "ru.hollowhorizon.hollowengine.addons.narrative.npcs.*",
 )
 
-/** Compiles stage scripts with the real compiler and plugin, as `.stage.kts` or as a node of the game. */
+/**
+ * Compiles stage scripts with the real compiler and plugin, as `.stage.kts` or as a node of the game.
+ *
+ * A test class shares one: starting a compiler takes seconds, and the analysis it starts for the editor tens of
+ * them. [prepare] gives each test a clean start on it.
+ */
 class StageCompiler : AutoCloseable {
     val environment = ScriptingEnvironmentImpl(
         javaHome = File(System.getProperty("java.home")),
@@ -114,6 +118,13 @@ class StageCompiler : AutoCloseable {
 
     private val sources = createTempDirectory("stages").toFile()
 
+    /** Forgets the files and the trace an earlier test left behind. */
+    fun prepare() {
+        StageTrace.reset()
+        sources.listFiles()?.forEach(File::deleteRecursively)
+        File("hollowengine").deleteRecursively()
+    }
+
     /** Compiles [code] from a file, as the game compiles scripts, so the same [name] keeps its path across versions. */
     fun compile(name: String, code: String): CompiledScript =
         compileFile(name, code).getOrElse { fail("Expected the script to compile: $it") }
@@ -133,7 +144,6 @@ class StageCompiler : AutoCloseable {
     private fun compileFile(name: String, code: String): Result<CompiledScript> = compileAs("$name.stage.kts", code)
 
     override fun close() {
-        sources.deleteRecursively()
         sources.deleteRecursively()
         ScriptingEnvironment.clear()
         environment.close()
@@ -216,18 +226,27 @@ class StageWorld(private val test: TestScope, private var compiled: CompiledScri
     }
 }
 
-/** A test that compiles stage scripts, with a fresh trace and compiler for every test. */
+/** A test that compiles stage scripts, with a fresh trace for every test. */
 abstract class StageTest {
-    protected lateinit var compiler: StageCompiler
+    protected val compiler: StageCompiler get() = shared
 
     @BeforeTest
-    fun setUpStages() {
-        StageTrace.reset()
-        compiler = StageCompiler()
-    }
-
-    @AfterTest
-    fun tearDownStages() = compiler.close()
+    fun setUpStages() = compiler.prepare()
 
     protected fun TestScope.world(name: String, code: String) = StageWorld(this, compiler.compile(name, code))
+
+    companion object {
+        /** The compiler of the test class running now. */
+        private lateinit var shared: StageCompiler
+
+        @JvmStatic
+        @BeforeAll
+        fun startCompiler() {
+            shared = StageCompiler()
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun closeCompiler() = shared.close()
+    }
 }

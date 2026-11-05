@@ -485,22 +485,12 @@ class StoryGraphCompiler private constructor(
         else -> resultClass(function)
     }
 
-    private fun resultClass(function: StoryNode.Function) = "$RESULTS.${resultName(function)}"
+    private fun resultClass(function: StoryNode.Function) = function.name.replaceFirstChar(Char::uppercaseChar) + "Result"
 
-    private fun resultName(function: StoryNode.Function) = function.name.replaceFirstChar(Char::uppercaseChar) + "Result"
-
-    /**
-     * A class per function of this story that gives several results; stories save it through [StoryValues]. They sit
-     * in one object, since a class at the top of a script cannot be named in the signatures of the script.
-     */
-    private fun resultClasses(): List<String> {
-        val functions = declared.filter { it.results.size > 1 }.sortedBy { it.id }
-        if (functions.isEmpty()) return emptyList()
-        val classes = functions.map { function ->
-            val fields = function.results.joinToString { "val ${it.name}: ${it.type}" }
-            "    data class ${resultName(function)}($fields) : StoryRecord"
-        }
-        return listOf("", "object $RESULTS {") + classes + "}"
+    /** A class per function of this story that gives several results; stories save it through [StoryValues]. */
+    private fun resultClasses(): List<String> = declared.filter { it.results.size > 1 }.sortedBy { it.id }.map { function ->
+        val fields = function.results.joinToString { "val ${it.name}: ${it.type}" }
+        "data class ${resultClass(function)}($fields) : StoryRecord"
     }
 
     private fun code(node: StoryNode.Code, depth: Int) {
@@ -752,7 +742,6 @@ class StoryGraphCompiler private constructor(
     companion object {
         private const val MAIN = "main"
         private const val FLOW_TYPE = "@State suspend () -> Unit"
-        private const val RESULTS = "Results"
         private const val PLAYER = "player"
         private const val NARRATIVE = "ru.hollowhorizon.hollowengine.addons.narrative"
         private val DEFAULT_IMPORTS = listOf(
