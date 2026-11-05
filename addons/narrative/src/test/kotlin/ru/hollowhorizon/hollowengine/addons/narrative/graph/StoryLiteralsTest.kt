@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryHandle
 import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 import kotlin.test.Test
@@ -16,6 +17,17 @@ class StoryLiteralsTest {
             assertEquals(text, typed(text, typeOf<Float>()))
             assertEquals(text, typed(text, typeOf<Double>()))
         }
+    }
+
+    @Test
+    fun `a value with no plain form survives being typed`() {
+        fun typed(text: String, type: KType) = StoryLiterals.text(StoryLiterals.expression(text, type), type)
+        listOf("t", "task", "tasks[0]").forEach { text ->
+            assertEquals(text, typed(text, typeOf<StoryHandle<*>>()))
+            assertEquals(text, typed(text, typeOf<Any>()))
+        }
+        assertEquals("task", StoryLiterals.expression("task", typeOf<StoryHandle<*>>()))
+        assertEquals("\"task\"", StoryLiterals.expression("task", typeOf<Any>()))
     }
 
     @Test

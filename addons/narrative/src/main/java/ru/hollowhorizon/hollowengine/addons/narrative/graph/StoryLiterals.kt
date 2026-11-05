@@ -30,6 +30,7 @@ object StoryLiterals {
         if (typed.startsWith("{") && typed.endsWith("}")) return typed.substring(1, typed.length - 1)
         val kind = type?.classifier as? KClass<*> ?: return StoryGraphCompiler.literal(text)
         return when {
+            kind in TEXTS -> StoryGraphCompiler.literal(text)
             kind == Boolean::class || kind == Int::class -> typed
             kind == Double::class -> if (typed.toIntOrNull() != null) "$typed.toDouble()" else typed
             kind == Long::class -> numeric(typed, "L")
@@ -44,9 +45,8 @@ object StoryLiterals {
             kind.isSubclassOf(DialogueCharacter::class) -> call("character", typed)
             kind.isSubclassOf(Entity::class) -> call("actor", typed)
             kind.java.isEnum -> "${kind.qualifiedName}.${typed.uppercase().replace('-', '_')}"
-            isKotlin(type) -> text
 
-            else -> StoryGraphCompiler.literal(text)
+            else -> text
         }
     }
 
@@ -56,7 +56,7 @@ object StoryLiterals {
         if (written.isEmpty()) return ""
         val kind = type?.classifier as? KClass<*>
         val plain = when {
-            kind == null || kind == String::class -> string(written)
+            kind == null || kind in TEXTS -> string(written)
             kind == Boolean::class || kind == Int::class -> written
             kind == Double::class -> written.removeSuffix(".toDouble()")
             kind == Long::class -> written.removeSuffix("L")
@@ -66,9 +66,10 @@ object StoryLiterals {
             kind.java.isEnum -> written.substringAfterLast('.').takeIf { written.endsWith(it) && it.uppercase() == it }
                 ?.lowercase()?.replace('_', '-')
 
-            isKotlin(type) -> expression
+            kind in HELPED || kind.isSubclassOf(DialogueCharacter::class) || kind.isSubclassOf(Entity::class) ->
+                helperArguments(written)
 
-            else -> helperArguments(written)
+            else -> expression
         }
         return plain ?: "{$written}"
     }
@@ -155,4 +156,10 @@ object StoryLiterals {
     fun seconds(seconds: Float): String = seconds.toString().removeSuffix(".0") + SECONDS
 
     private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
+
+    /** Types a field takes plain text for. */
+    private val TEXTS = setOf(String::class, CharSequence::class, Any::class)
+
+    /** Types whose fields are written through a helper function, such as `duration("2s")`. */
+    private val HELPED = setOf(Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class)
 }

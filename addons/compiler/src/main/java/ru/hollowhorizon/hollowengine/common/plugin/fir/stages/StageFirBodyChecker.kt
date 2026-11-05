@@ -41,6 +41,7 @@ internal object StageFirBodyChecker {
 
     context(context: CheckerContext, reporter: DiagnosticReporter)
     fun check(function: FirFunction, stage: Boolean) {
+        if (stage) StageFirLiveness.check(function)
         val stageLambdas = HashSet<FirAnonymousFunction>()
         function.body?.accept(object : FirVisitorVoid() {
             override fun visitElement(element: FirElement) {

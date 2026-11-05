@@ -27,6 +27,7 @@ internal object StageValueTypes {
     val BASIC = setOf(
         "kotlin.Int", "kotlin.Long", "kotlin.Short", "kotlin.Byte", "kotlin.Float", "kotlin.Double",
         "kotlin.Boolean", "kotlin.Char", "kotlin.String", "kotlin.Unit",
+        "kotlin.time.Duration",
     )
 
     val CONTAINERS = setOf(

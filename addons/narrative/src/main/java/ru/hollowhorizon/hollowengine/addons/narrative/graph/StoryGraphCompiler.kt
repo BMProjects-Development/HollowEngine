@@ -68,6 +68,9 @@ class StoryGraphCompiler private constructor(
     /** How many blocks the flow is inside of: a block is one lambda, which steps cannot be split out of. */
     private var blocks = 0
 
+    /** How many blocks with an ordinary lambda for a body, such as `temporary { }`, the flow is inside of. */
+    private var plain = 0
+
     /** How many flows passed to a function the flow is inside of: a stage of its own, which cannot return for the one around it. */
     private var lambdas = 0
 
@@ -127,6 +130,12 @@ class StoryGraphCompiler private constructor(
         graph.nodes.filterIsInstance<StoryNode.Invoke>().filter { definition(it) == null }.forEach { invoke ->
             problem(invoke.id, "no_function", "There is no function '${invoke.function}'", invoke.function)
         }
+        if (location != null) graph.nodes.filterIsInstance<StoryNode.Invoke>().forEach { invoke ->
+            val file = invoke.file ?: return@forEach
+            if (functions.reaches(file, location)) {
+                problem(invoke.id, "import_cycle", "Story '$file' already calls this one, so this one cannot call it", file)
+            }
+        }
         declared.forEach(::checkFunction)
         problems += StoryValueFlow(graph, index) { invoke, pin ->
             definition(invoke)?.results?.firstOrNull { it.name == pin }?.type
@@ -135,16 +144,19 @@ class StoryGraphCompiler private constructor(
 
     private fun checkFunction(function: StoryNode.Function) {
         val id = function.id
-        if (!IDENTIFIER.matches(function.name)) problem(id, "bad_function", "'${function.name}' is not a name of a function", function.name)
+        if (!isName(function.name)) problem(id, "bad_function", "'${function.name}' is not a name of a function", function.name)
         if (function.name == MAIN || declared.count { it.name == function.name } > 1) {
             problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
+        } else if (function.results.size > 1 && declared.count { it.results.size > 1 && resultClass(it) == resultClass(function) } > 1) {
+            problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
         }
+        if (isGenerated(function.name)) problem(id, "reserved_name", "'${function.name}' is a name the story generates for itself", function.name)
         (function.params + function.results).forEach { value ->
-            if (!IDENTIFIER.matches(value.name)) problem(id, "bad_value_name", "'${value.name}' is not a name of a value", value.name)
+            if (!isName(value.name)) problem(id, "bad_value_name", "'${value.name}' is not a name of a value", value.name)
             if (value.type.isBlank()) problem(id, "no_type", "'${value.name}' needs a type", value.name)
         }
         function.flows.forEach { flow ->
-            if (!IDENTIFIER.matches(flow)) problem(id, "bad_value_name", "'$flow' is not a name of a value", flow)
+            if (!isName(flow)) problem(id, "bad_value_name", "'$flow' is not a name of a value", flow)
         }
         val reserved = listOf(StoryPins.IN, StoryPins.NEXT)
         val named = listOf(
@@ -220,6 +232,7 @@ class StoryGraphCompiler private constructor(
         when {
             node is StoryNode.Start -> emit("$MAIN()", id, depth)
             index.isMerge(id) -> {
+                if (inPlainBlock(id)) return
                 val outside = atTop()
                 if (queued.putIfAbsent(id, outside) == null) {
                     val continues = scopeOf(id)?.takeIf { outside }
@@ -400,14 +413,27 @@ class StoryGraphCompiler private constructor(
         } else call
         if (!node.block) return emit(assigned, node.id, depth)
         emit("$assigned {", node.id, depth)
+        val flat = functions.signature(node)?.plainBlock == true
         blocks++
+        if (flat) plain++
         chain(flow[node.id to StoryPins.BODY], depth + 1)
+        if (flat) plain--
         blocks--
+        // A body of the graph gives nothing back; without this its last call would be the result `async` saves.
+        emit("Unit", node.id, depth + 1)
         emit("}", node.id, depth)
+    }
+
+    /** Whether the flow is in a block such as `temporary { }`, whose body is an ordinary lambda no stage can be called in. */
+    private fun inPlainBlock(node: String): Boolean {
+        if (plain == 0) return false
+        if (problems.none { it.node == node && it.key == "stage_in_block" }) problem(node, "stage_in_block", "This node runs apart from the steps around it, which a block such as 'temporary' cannot hold")
+        return true
     }
 
     /** A call of a function: one result goes where it is read, several are taken out of the class that holds them. */
     private fun invoke(node: StoryNode.Invoke, depth: Int) {
+        if (inPlainBlock(node.id)) return
         val function = definition(node) ?: return
         val read = function.results.filter { index.isRead(node.id, it.name) }
         when {
@@ -493,12 +519,20 @@ class StoryGraphCompiler private constructor(
         "data class ${resultClass(function)}($fields) : StoryRecord"
     }
 
+    /**
+     * Emits the code of [node] with its inputs and outputs as locals. Inside a block, steps share one body, so the code
+     * gets a scope of its own there: `if (true)`, as a lambda would keep it from calling stages.
+     */
     private fun code(node: StoryNode.Code, depth: Int) {
-        node.inputs.forEach { (name, value) -> emit("val $name = ${argument(node.id, name, value)}", node.id, depth) }
-        node.outputs.forEach { (name, type) -> emit("var $name: ${nullable(type)} = null", node.id, depth) }
-        node.code.trimIndent().lines().forEach { emit(it, node.id, depth) }
+        val scoped = blocks > 0
+        if (scoped) emit("if (true) {", node.id, depth)
+        val at = if (scoped) depth + 1 else depth
+        node.inputs.forEach { (name, value) -> emit("val $name = ${argument(node.id, name, value)}", node.id, at) }
+        node.outputs.forEach { (name, type) -> emit("var $name: ${nullable(type)} = null", node.id, at) }
+        node.code.trimIndent().lines().forEach { emit(it, node.id, at) }
         node.outputs.keys.filter { index.isRead(node.id, it) }
-            .forEach { emit("${outputName(node.id, it)} = $it", node.id, depth) }
+            .forEach { emit("${outputName(node.id, it)} = $it", node.id, at) }
+        if (scoped) emit("}", node.id, depth)
     }
 
     private fun sayOf(node: StoryNode.Say): String {
@@ -610,6 +644,7 @@ class StoryGraphCompiler private constructor(
                 }
 
                 is StoryNode.Invoke -> {
+                    if (!index.isInFlow(id) && inPlainBlock(id)) return Value("error(\"no value\")")
                     val function = definition(node)
                     val result = function?.results?.firstOrNull { it.name == link.fromPin }
                     when {
@@ -699,7 +734,8 @@ class StoryGraphCompiler private constructor(
     }
 
     private fun declaration(variable: StoryVariable): String {
-        if (!IDENTIFIER.matches(variable.name)) problem(null, "bad_variable", "'${variable.name}' is not a name of a variable", variable.name)
+        if (!isName(variable.name)) problem(null, "bad_variable", "'${variable.name}' is not a name of a variable", variable.name)
+        if (isGenerated(variable.name)) problem(null, "reserved_name", "'${variable.name}' is a name the story generates for itself", variable.name)
         val type = variable.type?.let { "<$it>" }.orEmpty()
         val initial = variable.initial.ifBlank { if (isNullable(variable.type)) "null" else "" }
         if (initial.isEmpty()) problem(null, "needs_start", "'${variable.name}' needs a value to start with", variable.name)
@@ -757,6 +793,21 @@ class StoryGraphCompiler private constructor(
         )
         private val IDENTIFIER_PART = Regex("[\\p{L}\\p{N}_]+")
         private val IDENTIFIER = Regex("[\\p{L}_][\\p{L}\\p{N}_]*")
+
+        /** Words of Kotlin that cannot name anything. */
+        private val KEYWORDS = setOf(
+            "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is",
+            "null", "object", "package", "return", "super", "this", "throw", "true", "try", "typealias", "typeof",
+            "val", "var", "when", "while",
+        )
+
+        /** What names of stages, outputs and loop items the generated script starts with. */
+        private val GENERATED = listOf("step_", "block_", "out_", "item_", "result_")
+
+        /** Whether [name] can name a function, a value or a variable in the generated script. */
+        private fun isName(name: String) = IDENTIFIER.matches(name) && name !in KEYWORDS
+
+        private fun isGenerated(name: String) = GENERATED.any(name::startsWith)
         private val NAME_IN_BRACES = Regex("\\{([\\p{L}_][\\p{L}\\p{N}_]*)}")
         private val OPERATOR_INPUT = Regex("\\$(\\w+)")
 

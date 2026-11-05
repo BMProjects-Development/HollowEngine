@@ -152,6 +152,18 @@ internal class StageNormalizer(private val stages: StageScope, private val funct
                 Lifted(lifted.first, expression)
             }
 
+            is IrVararg -> {
+                val elements = expression.elements.map { (it as? IrSpreadElement)?.expression ?: it as IrExpression }
+                val lifted = operands(elements)
+                lifted.second.forEachIndexed { index, operand ->
+                    when (val element = expression.elements[index]) {
+                        is IrSpreadElement -> element.expression = operand!!
+                        else -> expression.elements[index] = operand!!
+                    }
+                }
+                Lifted(lifted.first, expression)
+            }
+
             is IrStringConcatenation -> {
                 val lifted = operands(expression.arguments.toList())
                 lifted.second.forEachIndexed { index, operand -> expression.arguments[index] = operand!! }

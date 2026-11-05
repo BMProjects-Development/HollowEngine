@@ -24,6 +24,9 @@ interface StoryFunctions {
     /** The function [name] of the story the qualified script id [file] names, when there is one. */
     fun storyFunction(file: String, name: String): StoryNode.Function? = null
 
+    /** The qualified script ids of the stories that the story [file] calls functions of. */
+    fun storyImports(file: String): Set<String> = emptySet()
+
     /** Knows the functions of the runtime alone; a call of anything else is treated as able to suspend. */
     object Builtin : StoryFunctions {
         override fun signature(call: StoryNode.Call) = call.action?.let(StoryBuiltins::find)
@@ -36,6 +39,18 @@ interface StoryFunctions {
 fun StoryFunctions.definition(graph: StoryGraph, invoke: StoryNode.Invoke): StoryNode.Function? {
     val file = invoke.file ?: return graph.functions.firstOrNull { it.name == invoke.function }
     return storyFunction(file, invoke.function)
+}
+
+/** Whether the story [file] is [target] or imports it, itself or through the stories it imports. */
+fun StoryFunctions.reaches(file: String, target: String): Boolean {
+    val seen = hashSetOf(file)
+    val queue = ArrayDeque(listOf(file))
+    while (queue.isNotEmpty()) {
+        val next = queue.removeFirst()
+        if (next == target) return true
+        storyImports(next).filter(seen::add).forEach(queue::addLast)
+    }
+    return false
 }
 
 /** [call] with what its [StoryFunctions.signature] says, which beats anything a file written by an older version holds. */
@@ -58,7 +73,7 @@ object StoryBuiltins {
     val all: List<StoryFunctionSignature> = listOf(
         builtin("checkpoint", param("name"), flag("restart")),
         builtin("rewind", param("checkpoint", optional = true)),
-        builtin("temporary", param("until", optional = true)).copy(block = true),
+        builtin("temporary", param("until", optional = true)).copy(block = true, plainBlock = true),
         builtin("async", param("name")).copy(returns = HANDLE, block = true),
         builtin("join", handle()).copy(function = "join"),
         builtin("cancel", handle()).copy(function = "cancel"),

@@ -5,7 +5,6 @@ import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
@@ -189,15 +188,10 @@ internal class StageLayout(private val stages: StageScope, private val function:
         }
     }
 
-    /** Works out [StageSite.live] in evaluation order: a local is saved at a site when it is read after it. */
+    /** Works out [StageSite.live]: a local is saved at a site when some way on from the call reads it. */
     private fun liveness(statements: List<IrStatement>) {
-        var clock = 0
         val declared = IdentityHashMap<IrVariable, Int>()
-        val reads = IdentityHashMap<IrValueDeclaration, MutableList<Int>>()
-        val at = IdentityHashMap<StageSite, Int>()
-        val loops = ArrayList<IntRange>()
         var depth = 0
-
         val visitor = object : IrVisitorVoid() {
             override fun visitElement(element: IrElement) = element.acceptChildrenVoid(this)
 
@@ -208,43 +202,20 @@ internal class StageLayout(private val stages: StageScope, private val function:
             }
 
             override fun visitVariable(declaration: IrVariable) {
-                declaration.initializer?.acceptVoid(this)
-                if (depth == 0) declared[declaration] = ++clock
-            }
-
-            override fun visitGetValue(expression: IrGetValue) {
-                reads.getOrPut(expression.symbol.owner, ::ArrayList) += ++clock
-            }
-
-            override fun visitSetValue(expression: IrSetValue) {
-                expression.value.acceptVoid(this)
-                ++clock
-            }
-
-            override fun visitCall(expression: IrCall) {
-                super.visitCall(expression)
-                byCall[expression]?.let { at[it] = ++clock }
-            }
-
-            override fun visitLoop(loop: IrLoop) {
-                val start = ++clock
-                super.visitLoop(loop)
-                loops += start..++clock
+                super.visitVariable(declaration)
+                if (depth == 0) declared[declaration] = declared.size
             }
         }
         statements.forEach { it.acceptVoid(visitor) }
 
+        val live = StageLiveness(byCall).analyze(statements)
         val saved = LinkedHashSet<IrVariable>()
         sites.forEach { site ->
-            val time = at.getValue(site)
-            site.live = declared.entries.filter { (variable, declaredAt) ->
-                if (declaredAt >= time) return@filter false
-                val uses = reads[variable].orEmpty()
-                uses.any { it > time } || loops.any { loop -> time in loop && declaredAt < loop.first && uses.any { it in loop } }
-            }.sortedBy { it.value }.map { it.key }
+            val read = live[site].orEmpty()
+            site.live = declared.keys.filter { it in read }.sortedBy(declared::getValue)
             saved += site.live
         }
-        this.saved = saved.sortedBy { declared.getValue(it) }
+        this.saved = saved.sortedBy(declared::getValue)
         val names = HashMap<String, Int>()
         this.saved.forEach { variable ->
             val base = variable.name.asString()
