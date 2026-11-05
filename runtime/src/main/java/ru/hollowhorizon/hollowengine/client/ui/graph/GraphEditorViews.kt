@@ -283,6 +283,9 @@ fun GraphPinView(
     )
 }
 
+/** A button on the title bar that goes inside what a node holds: [hint] says so on hover. */
+class GraphNodeOpen(val hint: String, val onOpen: () -> Unit)
+
 /**
  * The title bar in the color of the category: its icon, the name, and the arrow that collapses the node.
  *
@@ -290,6 +293,7 @@ fun GraphPinView(
  * @param problem what is wrong with the node, told by a mark on the bar: the bar itself has to keep taking the pointer.
  * @param color what the bar is painted in, when the style of the node does not say.
  * @param warning whether [problem] lets the node work all the same.
+ * @param open the button that goes inside what the node holds, when it holds something.
  */
 @Composable
 fun GraphNodeHeader(
@@ -301,6 +305,7 @@ fun GraphNodeHeader(
     problem: String? = null,
     color: UiColor? = null,
     warning: Boolean = false,
+    open: GraphNodeOpen? = null,
     onToggle: () -> Unit,
 ) {
     val bar = GraphNodeMetrics.COLLAPSED
@@ -318,6 +323,18 @@ fun GraphNodeHeader(
         }
         if (icon != null) Image(icon, tags = listOf("gn-node-icon"))
         Text(title, tags = listOf("gn-node-title"), modifier = Modifier.size(0.px, UiLength.Auto).grow(1f))
+        if (open != null) {
+            Box(
+                id = "gn-open-$node",
+                tags = listOf("gn-node-toggle"),
+                modifier = Modifier.input(hoverable = true, clickable = true).tooltipOnHover(open.hint).onPress { event ->
+                    if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) open.onOpen()
+                    event.consume()
+                },
+            ) {
+                Image(EnterIcon, tags = listOf("gn-node-enter"))
+            }
+        }
         Box(
             id = "gn-collapse-$node",
             tags = listOf("gn-node-toggle"),
@@ -428,6 +445,7 @@ private fun CardRow(pin: GraphPin, name: String, owner: String, y: Float, width:
 }
 
 private const val ArrowIcon = "hollowengine:textures/gui/icons/graph/arrow.svg"
+private const val EnterIcon = "hollowengine:textures/gui/icons/graph/enter.svg"
 private const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg"
 private const val ErrorIcon = "hollowengine:textures/gui/icons/error.svg"
 private const val WarningIcon = "hollowengine:textures/gui/icons/warn.svg"

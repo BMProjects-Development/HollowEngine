@@ -9,7 +9,7 @@ import kotlin.reflect.typeOf
 import kotlin.test.*
 
 /** Commands of tests: what a node says of itself, with every parameter taking a string. */
-internal class TestCommands(private val kinds: (StoryNode.Call) -> StoryCallKind = { StoryCallKind.SUSPENDING }) :
+internal open class TestCommands(private val kinds: (StoryNode.Call) -> StoryCallKind = { StoryCallKind.SUSPENDING }) :
     StoryFunctions {
     override fun signature(call: StoryNode.Call) = StoryBuiltins.find(call.action.orEmpty()) ?: StoryFunctionSignature(
         call.function, call.function, (call.arguments.keys + "event").map { StoryParam(it, typeOf<String>()) },
@@ -36,7 +36,7 @@ class StoryTopologyTest : StageTest() {
     fun `branches that meet go on together`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Branch("b", "true"),
                 log("a"),
                 log("c"),
@@ -56,7 +56,7 @@ class StoryTopologyTest : StageTest() {
     fun `a branch inside a branch finds its way back`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"), StoryNode.Branch("outer", "true"), StoryNode.Branch("inner", "false"),
+                StoryNode.Start("s"), StoryNode.Branch("outer", "true"), StoryNode.Branch("inner", "false"),
                 log("x"), log("y"), log("z"), log("end"),
             ),
             links = listOf(
@@ -74,7 +74,7 @@ class StoryTopologyTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("count", "0")),
             nodes = listOf(
-                StoryNode.Start("s", "main"), StoryNode.Assign("add", "count", "count + 1"),
+                StoryNode.Start("s"), StoryNode.Assign("add", "count", "count + 1"),
                 call("say", "log", "event" to "\"turn \$count\""), StoryNode.Branch("more", "count < 2"), log("end"),
             ),
             links = listOf(
@@ -90,7 +90,7 @@ class StoryTopologyTest : StageTest() {
     fun `a chain of reroutes survives losing a link of it`() {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Reroute("r1", flow = true),
                 StoryNode.Reroute("r2", flow = true),
                 StoryNode.Reroute("r3", flow = true),
@@ -107,7 +107,7 @@ class StoryTopologyTest : StageTest() {
     fun `a copy links up inside and keeps reading from outside`() {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"), StoryNode.Expression("value", "1"), log("a"), call("b", "log"), log("c")
+                StoryNode.Start("s"), StoryNode.Expression("value", "1"), log("a"), call("b", "log"), log("c")
             ),
             links = listOf(
                 next("s", "a"), next("a", "b"), next("b", "c"), StoryLink("value", StoryPins.VALUE, "b", "event")
@@ -126,7 +126,7 @@ class StoryTopologyTest : StageTest() {
     fun `a link beats what is typed into the receiver`() {
         val call = call("use", "show", "target" to "typed").copy(receiver = "target")
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Expression("value", "linked"), call),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Expression("value", "linked"), call),
             links = listOf(next("s", "use"), StoryLink("value", StoryPins.VALUE, "use", "target")),
         )
         val generated = code(graph)
@@ -139,7 +139,7 @@ class StoryTopologyTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("found", "null", "String?")),
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 call("get", "nothing", returns = "kotlin.String?"),
                 StoryNode.Assign("keep", "found"),
                 StoryNode.Branch("empty", "found == null"),
@@ -162,7 +162,7 @@ class StoryTopologyTest : StageTest() {
     fun `a required result is asserted to be there`() {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"), call("get", "name", returns = "kotlin.String"), call("say", "log")
+                StoryNode.Start("s"), call("get", "name", returns = "kotlin.String"), call("say", "log")
             ),
             links = listOf(next("s", "get"), next("get", "say"), StoryLink("get", StoryPins.VALUE, "say", "event")),
         )
@@ -171,7 +171,7 @@ class StoryTopologyTest : StageTest() {
 
     @Test
     fun `moving nodes around does not change what a story means`() {
-        val graph = StoryGraph(nodes = listOf(StoryNode.Start("s", "main"), log("a")), links = listOf(next("s", "a")))
+        val graph = StoryGraph(nodes = listOf(StoryNode.Start("s"), log("a")), links = listOf(next("s", "a")))
         val moved = graph.copy(layout = mapOf("a" to StoryPoint(100f, 40f)), collapsed = setOf("a"))
         assertEquals(graph.revision(), moved.revision())
         assertNotEquals(graph.revision(), graph.copy(nodes = graph.nodes.dropLast(1) + log("a", "other")).revision())
@@ -200,7 +200,7 @@ class StoryTopologyTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("value", "\"\"", "String")),
             nodes = listOf(
-                StoryNode.Start("s", "main"), log("first"), StoryNode.Assign("set", "value"), log("last"),
+                StoryNode.Start("s"), log("first"), StoryNode.Assign("set", "value"), log("last"),
                 call("ask", "question", returns = "kotlin.String"),
             ),
             links = listOf(
@@ -217,7 +217,7 @@ class StoryTopologyTest : StageTest() {
     fun `a value from another branch is an error unless it can be null anyway`() {
         fun graph(returns: String) = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Branch("b", "true"),
                 call("get", "name", returns = returns),
                 call("say", "log"),
@@ -238,7 +238,7 @@ class StoryTopologyTest : StageTest() {
     fun `an item is out of reach after its loop`() {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"), StoryNode.Loop("each", "listOf(1)"), log("body"), call("after", "log")
+                StoryNode.Start("s"), StoryNode.Loop("each", "listOf(1)"), log("body"), call("after", "log")
             ),
             links = listOf(
                 next("s", "each"), next("each", "body", StoryPins.BODY), next("each", "after"),
@@ -300,7 +300,7 @@ class StoryTopologyTest : StageTest() {
     fun `a checkpoint node can ask for it too`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Call(
                     "mark", action = "checkpoint", arguments = mapOf("name" to "\"question\"", "restart" to "true")
                 ),
@@ -320,7 +320,7 @@ class StoryTopologyTest : StageTest() {
         val stale = StoryNode.Call(
             "mark", "old.name", action = "checkpoint", arguments = mapOf("name" to "\"a\""), block = true
         )
-        val graph = StoryGraph(nodes = listOf(StoryNode.Start("s", "main"), stale), links = listOf(next("s", "mark")))
+        val graph = StoryGraph(nodes = listOf(StoryNode.Start("s"), stale), links = listOf(next("s", "mark")))
         val generated = code(graph)
         assertTrue("checkpoint(" in generated, generated)
         assertFalse("old.name" in generated, generated)
@@ -352,7 +352,7 @@ class StoryTopologyTest : StageTest() {
     @Test
     fun `code with no flow is an expression where it is read`() = runTest {
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Code("c", "\"value\""), call("say", "log")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Code("c", "\"value\""), call("say", "log")),
             links = listOf(next("s", "say"), StoryLink("c", StoryPins.VALUE, "say", "event")),
         )
         world("code-value", code(graph)).launch("main")
@@ -362,7 +362,7 @@ class StoryTopologyTest : StageTest() {
     @Test
     fun `code in the flow has no untyped value to keep`() {
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Code("c", "\"value\""), call("say", "log")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Code("c", "\"value\""), call("say", "log")),
             links = listOf(next("s", "c"), next("c", "say"), StoryLink("c", StoryPins.VALUE, "say", "event")),
         )
         assertTrue(compile(graph).problems.any { it.node == "c" || it.node == "say" })
@@ -372,7 +372,7 @@ class StoryTopologyTest : StageTest() {
     fun `a list takes as many inputs as its author added`() {
         val list = StoryNode.Pure("l", "list", mapOf("a" to "1", "b" to "2", "c" to "3", "d" to "4"), count = 4)
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), list, StoryNode.Pure("x", "list"), call("use", "log")),
+            nodes = listOf(StoryNode.Start("s"), list, StoryNode.Pure("x", "list"), call("use", "log")),
             links = listOf(
                 next("s", "use"),
                 StoryLink("l", "list", "use", "event"),
@@ -392,7 +392,7 @@ class StoryTopologyTest : StageTest() {
         val sum = StoryNode.Pure("sum", "add", mapOf("b" to "1"))
         val code = StoryNode.Code("c", "", outputs = mapOf("found" to "Int"))
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), list, loop, sum, code),
+            nodes = listOf(StoryNode.Start("s"), list, loop, sum, code),
             links = listOf(
                 next("s", "c"),
                 next("c", "each"),
@@ -408,7 +408,7 @@ class StoryTopologyTest : StageTest() {
 
     @Test
     fun `only a nullable variable can start empty`() {
-        val start = listOf(StoryNode.Start("s", "main"))
+        val start = listOf(StoryNode.Start("s"))
         val empty = StoryGraph(variables = listOf(StoryVariable("a", "", "String?")), nodes = start)
         assertContains(code(empty), "var a by saved<String?>(null)")
         val required = StoryGraph(variables = listOf(StoryVariable("a", "", "String")), nodes = start)

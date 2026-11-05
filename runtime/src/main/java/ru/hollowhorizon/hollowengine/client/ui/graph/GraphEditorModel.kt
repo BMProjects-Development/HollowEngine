@@ -189,6 +189,9 @@ interface GraphEditorModel {
 
     fun removeNodes(nodes: Set<String>)
 
+    /** Opens what [node] holds, as a double click on it asks; false when it holds nothing to open. */
+    fun openNode(node: String): Boolean = false
+
     /** Copies [nodes] next to them and gives the copies. */
     fun duplicate(nodes: Set<String>): Set<String>
 

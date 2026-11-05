@@ -21,12 +21,21 @@ interface StoryFunctions {
 
     fun kind(call: StoryNode.Call): StoryCallKind
 
+    /** The function [name] of the story the qualified script id [file] names, when there is one. */
+    fun storyFunction(file: String, name: String): StoryNode.Function? = null
+
     /** Knows the functions of the runtime alone; a call of anything else is treated as able to suspend. */
     object Builtin : StoryFunctions {
         override fun signature(call: StoryNode.Call) = call.action?.let(StoryBuiltins::find)
 
         override fun kind(call: StoryNode.Call) = StoryCallKind.SUSPENDING
     }
+}
+
+/** The function [invoke] calls: one of [graph], or one of the story it names. */
+fun StoryFunctions.definition(graph: StoryGraph, invoke: StoryNode.Invoke): StoryNode.Function? {
+    val file = invoke.file ?: return graph.functions.firstOrNull { it.name == invoke.function }
+    return storyFunction(file, invoke.function)
 }
 
 /** [call] with what its [StoryFunctions.signature] says, which beats anything a file written by an older version holds. */

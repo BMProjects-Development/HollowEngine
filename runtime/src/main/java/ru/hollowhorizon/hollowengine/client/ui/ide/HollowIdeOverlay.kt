@@ -944,7 +944,7 @@ object HollowIdeOverlay {
             )
 
             focused == InspectorId && selection != null -> inspectorStatus(project, selection, navigation)
-            file != null -> fileStatus(project, file, editorStates[file.path], navigation)
+            file != null -> fileStatus(project, file, editorStates[file.path], navigation, fileView(file))
             selection != null -> inspectorStatus(project, selection, navigation)
             else -> HollowIdeStatus(listOf(project))
         }

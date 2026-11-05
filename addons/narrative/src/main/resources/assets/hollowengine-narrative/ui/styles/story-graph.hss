@@ -63,3 +63,29 @@
     gap: 4px;
     cursor: hand;
 }
+
+.st-scope-back {
+    padding: 6px;
+    align-items: center center;
+    background: $bg-raised;
+    border-radius: $radius;
+    cursor: hand;
+    transition: background 110ms ease-out;
+}
+
+.st-scope-back:hover {
+    background: $bg-hover;
+}
+
+.st-scope-back-icon {
+    size: $icon $icon;
+}
+
+.st-section {
+    gap: 6px;
+    cursor: hand;
+}
+
+.st-section-title {
+    foreground: $text-soft;
+}

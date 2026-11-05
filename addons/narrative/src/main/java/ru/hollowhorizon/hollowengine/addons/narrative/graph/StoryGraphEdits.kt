@@ -45,7 +45,10 @@ object StoryGraphEdits {
                     is StoryNode.Expression -> node.copy(code = code(node.code))
                     is StoryNode.Pure -> node.copy(arguments = node.arguments.renamed())
                     is StoryNode.Loop -> node.copy(items = code(node.items))
-                    is StoryNode.Start, is StoryNode.Reroute -> node
+                    is StoryNode.Return -> node.copy(values = node.values.renamed())
+                    is StoryNode.Invoke -> node.copy(arguments = node.arguments.renamed())
+                    is StoryNode.Function -> node.copy(body = node.body.renameVariable(old, name))
+                    is StoryNode.Start, is StoryNode.Parameters, is StoryNode.Signal, is StoryNode.Reroute -> node
                 }
             },
         )
@@ -63,21 +66,153 @@ object StoryGraphEdits {
         return copy(links = links - (into + out).toSet() + joined)
     }
 
-    fun StoryGraph.startNames(): MutableSet<String> = nodes.filterIsInstance<StoryNode.Start>().mapTo(HashSet()) { it.name }
+    /** A name for a function that none of [taken] has: two functions of one name would be one stage. */
+    fun freeFunctionName(taken: Set<String>): String =
+        generateSequence(1) { it + 1 }.map { "function$it" }.first { it !in taken }
 
-    /** A name for a start that none of [taken] has: two starts of one name would be one stage. */
-    fun freeStartName(taken: Set<String>): String =
-        generateSequence(1) { it + 1 }.map { "scene$it" }.first { it !in taken }
+    /** A new function, whose body starts at the block of its parameters. */
+    fun StoryGraph.newFunction(): StoryNode.Function {
+        val entry = StoryNode.Parameters(StoryGraph.newId())
+        val body = StoryGraph(nodes = listOf(entry), layout = mapOf(entry.id to StoryPoint(0f, 0f)))
+        return StoryNode.Function(StoryGraph.newId(), freeFunctionName(functions.mapTo(HashSet()) { it.name }), body = body)
+    }
+
+    /**
+     * The story with a value of the function [id] called [name] instead of [old], in everything that reads or gives it:
+     * the pins of its body and of its calls in the story.
+     *
+     * @param result whether it is a result rather than a parameter.
+     */
+    fun StoryGraph.renameValue(id: String, old: String, name: String, result: Boolean): StoryGraph =
+        retargetValue(id, old, name, result)
+
+    /** The story without the value [name] of the function [id], and without what was linked to it. */
+    fun StoryGraph.removeValue(id: String, name: String, result: Boolean): StoryGraph =
+        retargetValue(id, name, null, result)
+
+    /** A new parameter or result of the function [id], of a name it does not have yet. */
+    fun StoryGraph.addValue(id: String, result: Boolean): StoryGraph = edit(id) { node ->
+        node as StoryNode.Function
+        val value = StoryTypedName(freeValueName(node, "value"), "Int")
+        if (result) node.copy(results = node.results + value) else node.copy(params = node.params + value)
+    }
+
+    /** A new flow of the function [id], which its calls link on from. */
+    fun StoryGraph.addFlow(id: String): StoryGraph = edit(id) { node ->
+        node as StoryNode.Function
+        node.copy(flows = node.flows + freeValueName(node, "flow"))
+    }
+
+    /**
+     * The story with the flow [old] of the function [id] called [name], or gone when it is null, in the signals of its
+     * body and the links out of its calls.
+     */
+    fun StoryGraph.renameFlow(id: String, old: String, name: String?): StoryGraph {
+        val function = node(id) as? StoryNode.Function ?: return this
+        val body = function.body.copy(
+            nodes = function.body.nodes.map { if (it is StoryNode.Signal && it.flow == old && name != null) it.copy(flow = name) else it },
+        )
+        val changed = function.copy(flows = function.flows.mapNotNull { if (it == old) name else it }, body = body)
+        val calls = callsOf(function)
+
+        fun StoryGraph.callsChanged(): StoryGraph = copy(
+            nodes = nodes.map { if (it is StoryNode.Function) it.copy(body = it.body.callsChanged()) else it },
+            links = links.mapNotNull { link ->
+                when {
+                    link.from !in calls || link.fromPin != old -> link
+                    name == null -> null
+                    else -> link.copy(fromPin = name)
+                }
+            },
+        )
+        return edit(id) { changed }.callsChanged()
+    }
+
+    /** A name of [prefix] and a number that no parameter, result or flow of [function] has. */
+    private fun freeValueName(function: StoryNode.Function, prefix: String): String {
+        val taken = (function.params + function.results).mapTo(HashSet()) { it.name } + function.flows
+        return generateSequence(1) { it + 1 }.map { "$prefix$it" }.first { it !in taken }
+    }
+
+    /** The ids of the calls of [function] in the story. */
+    private fun StoryGraph.callsOf(function: StoryNode.Function): Set<String> = flattened().nodes
+        .filterIsInstance<StoryNode.Invoke>().filter { it.file == null && it.function == function.name }.mapTo(HashSet()) { it.id }
+
+    /** The story with the function [id] called [name], and the calls of it in the story too. */
+    fun StoryGraph.renameFunction(id: String, name: String): StoryGraph {
+        val old = (node(id) as? StoryNode.Function)?.name ?: return this
+        fun StoryGraph.callsRenamed(): StoryGraph = copy(
+            nodes = nodes.map { node ->
+                when {
+                    node is StoryNode.Invoke && node.file == null && node.function == old -> node.copy(function = name)
+                    node is StoryNode.Function -> node.copy(
+                        name = if (node.id == id) name else node.name,
+                        body = node.body.callsRenamed(),
+                    )
+
+                    else -> node
+                }
+            },
+        )
+        return callsRenamed()
+    }
+
+    /** The value [old] of the function [id] called [name], or gone when it is null, with its pins wherever they are. */
+    private fun StoryGraph.retargetValue(id: String, old: String, name: String?, result: Boolean): StoryGraph {
+        val function = node(id) as? StoryNode.Function ?: return this
+        fun List<StoryTypedName>.renamed() =
+            mapNotNull { if (it.name != old) it else name?.let { renamed -> it.copy(name = renamed) } }
+
+        fun <T> Map<String, T>.renamed(): Map<String, T> {
+            val value = this[old] ?: return this
+            return if (name == null) this - old else this - old + (name to value)
+        }
+
+        fun List<StoryLink>.renamed(ends: Set<String>, output: Boolean): List<StoryLink> = mapNotNull { link ->
+            val end = if (output) link.from to link.fromPin else link.to to link.toPin
+            when {
+                end.first !in ends || end.second != old -> link
+                name == null -> null
+                output -> link.copy(fromPin = name)
+                else -> link.copy(toPin = name)
+            }
+        }
+
+        val entries = function.body.nodes.filter { it is StoryNode.Parameters || it is StoryNode.Return }
+            .mapTo(HashSet()) { it.id }
+        val body = function.body.copy(
+            nodes = function.body.nodes.map { if (it is StoryNode.Return && result) it.copy(values = it.values.renamed()) else it },
+            links = function.body.links.renamed(entries, output = !result),
+        )
+        val changed = function.copy(
+            params = if (result) function.params else function.params.renamed(),
+            results = if (result) function.results.renamed() else function.results,
+            body = body,
+        )
+        val calls = callsOf(function)
+
+        fun StoryGraph.callsChanged(): StoryGraph = copy(
+            nodes = nodes.map { node ->
+                when {
+                    node is StoryNode.Invoke && node.id in calls && !result -> node.copy(arguments = node.arguments.renamed())
+                    node is StoryNode.Function -> node.copy(body = node.body.callsChanged())
+                    else -> node
+                }
+            },
+            links = links.renamed(calls, output = result),
+        )
+        return edit(id) { changed }.callsChanged()
+    }
 
     /**
      * Copies of [ids], [offset] away, linked as they were among themselves; a value they read they keep reading. They
-     * stay collapsed if they were, and a start gets a name of its own.
+     * stay collapsed if they were, and a function gets a name of its own.
      */
     fun StoryGraph.copyNodes(ids: Set<String>, offset: StoryPoint): Pair<StoryGraph, Map<String, String>> {
         val fresh = ids.associateWith { StoryGraph.newId() }
-        val taken = startNames()
+        val taken = functions.mapTo(HashSet()) { it.name }
         val copies = fresh.mapNotNull { (old, new) -> node(old)?.withId(new) }.map { copy ->
-            if (copy is StoryNode.Start) copy.copy(name = freeStartName(taken).also(taken::add)) else copy
+            if (copy is StoryNode.Function) copy.copy(name = freeFunctionName(taken).also(taken::add)) else copy
         }
         val kept = links.filter { it.to in ids && (it.from in ids || !it.isFlow) }
             .map { it.copy(from = fresh[it.from] ?: it.from, to = fresh.getValue(it.to)) }
@@ -182,8 +317,26 @@ object StoryGraphEdits {
         collapsed = collapsed - ids,
     ).withMembership(ids, null)
 
+    /** The graph with a new id for every node, linked, laid out and grouped as before: ids are unique in a whole file. */
+    private fun StoryGraph.reidentified(): StoryGraph {
+        val fresh = nodes.associate { it.id to StoryGraph.newId() }
+        fun id(old: String) = fresh[old] ?: old
+        return copy(
+            nodes = nodes.map { it.withId(id(it.id)) },
+            links = links.map { it.copy(from = id(it.from), to = id(it.to)) },
+            layout = layout.mapKeys { id(it.key) },
+            groups = groups.map { group -> group.copy(id = StoryGraph.newId(), nodes = group.nodes.map(::id)) },
+            collapsed = collapsed.mapTo(HashSet(), ::id),
+        )
+    }
+
     private fun StoryNode.withId(id: String): StoryNode = when (this) {
         is StoryNode.Start -> copy(id = id)
+        is StoryNode.Function -> copy(id = id, body = body.reidentified())
+        is StoryNode.Parameters -> copy(id = id)
+        is StoryNode.Return -> copy(id = id)
+        is StoryNode.Signal -> copy(id = id)
+        is StoryNode.Invoke -> copy(id = id)
         is StoryNode.Say -> copy(id = id)
         is StoryNode.Call -> copy(id = id)
         is StoryNode.Choose -> copy(id = id)

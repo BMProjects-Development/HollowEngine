@@ -31,7 +31,7 @@ internal object StoryScripts : ScriptTranslator {
     private val loaded = HashMap<ScriptId, Loaded>()
 
     override fun translate(id: ScriptId, source: File): String {
-        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), StoryActionFunctions)
+        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), StoryActionFunctions, id.qualified)
         val errors = story.problems.filter { !it.warning }
         if (errors.isEmpty()) return story.code
         val problems = errors.joinToString("; ") { problem ->
@@ -98,6 +98,8 @@ internal object StoryActionFunctions : StoryFunctions {
 
     override fun signature(call: StoryNode.Call): StoryFunctionSignature? =
         StoryFunctions.Builtin.signature(call) ?: command(call)?.signature
+
+    override fun storyFunction(file: String, name: String): StoryNode.Function? = StoryLibrary.function(file, name)
 
     override fun kind(call: StoryNode.Call): StoryCallKind {
         val action = command(call)?.action ?: return StoryCallKind.SUSPENDING

@@ -85,7 +85,7 @@ internal object StoryChecks {
 
     /** What is wrong with the nodes of [graph]. */
     private fun nodes(graph: StoryGraph): List<StoryCheck> {
-        val plain = graph.dissolved()
+        val plain = graph.flattened().dissolved()
         val reached = reached(plain)
         val fed = plain.links.filter { !it.isFlow }.mapTo(HashSet()) { it.to to it.toPin }
         val read = plain.links.filter { !it.isFlow }.mapTo(HashSet()) { it.from }
@@ -108,7 +108,8 @@ internal object StoryChecks {
             }
             val empty = node is StoryNode.Say && node.text.isBlank() && free(StoryPins.TEXT)
             val value =
-                node.id in read && !plain.index.isInFlow(node.id) && (node is StoryNode.Call || node is StoryNode.Assign || node is StoryNode.Code)
+                node.id in read && !plain.index.isInFlow(node.id) &&
+                    (node is StoryNode.Call || node is StoryNode.Assign || node is StoryNode.Code || node is StoryNode.Invoke)
             val lost = node.id !in reached && needsFlow(node) && !value
             own.map { StoryCheck(node.id, it) } + listOfNotNull(
                 warning(node.id, "empty_text").takeIf { empty },
@@ -138,12 +139,13 @@ internal object StoryChecks {
         }
 
     private fun needsFlow(node: StoryNode) =
-        node !is StoryNode.Start && node !is StoryNode.Pure && node !is StoryNode.Expression
+        node !is StoryNode.Start && node !is StoryNode.Parameters && node !is StoryNode.Function &&
+            node !is StoryNode.Pure && node !is StoryNode.Expression
 
-    /** The nodes flow gets to from the starts of [graph]. */
+    /** The nodes flow gets to from the start of [graph] and those of its functions. */
     private fun reached(graph: StoryGraph): Set<String> {
         val seen = HashSet<String>()
-        val queue = ArrayDeque(graph.nodes.filterIsInstance<StoryNode.Start>().map { it.id })
+        val queue = ArrayDeque(graph.nodes.filter { it is StoryNode.Start || it is StoryNode.Parameters }.map { it.id })
         while (queue.isNotEmpty()) {
             val at = queue.removeFirst()
             if (seen.add(at)) queue += graph.index.flowOut(at)

@@ -89,7 +89,7 @@ class StageAnalysisTest {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("trust", "0")),
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Expression("text", "\"a\""),
                 StoryNode.Expression("sum", "trust + 1"),
                 StoryNode.Pure("list", "list", count = 1),

@@ -28,5 +28,9 @@ internal fun PublishStoryProblems(context: HollowIdePreviewContext, graph: Story
     DisposableEffect(context) { onDispose { context.publishProblems(emptyList()) } }
 }
 
-private fun titleOf(node: StoryNode): String =
-    (node as? StoryNode.Call)?.let(StoryCatalog::signatureOf)?.let(StoryCatalog::title) ?: StoryNodeKind.of(node).title
+private fun titleOf(node: StoryNode): String = when (node) {
+    is StoryNode.Function -> node.name
+    is StoryNode.Invoke -> node.function
+    is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::title) ?: StoryNodeKind.of(node).title
+    else -> StoryNodeKind.of(node).title
+}

@@ -9,8 +9,7 @@
     },
     {
       "kind": "start",
-      "id": "main",
-      "name": "main"
+      "id": "main"
     }
   ],
   "links": [

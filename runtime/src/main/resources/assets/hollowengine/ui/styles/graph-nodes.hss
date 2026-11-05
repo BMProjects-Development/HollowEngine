@@ -110,6 +110,10 @@ $category-output: #CF5E54;
     background: alpha(#FFFFFF, 0.16);
 }
 
+.gn-node-enter {
+    size: 10px 10px;
+}
+
 .gn-node-arrow {
     size: 7px 5px;
     transform: rotate(180deg);

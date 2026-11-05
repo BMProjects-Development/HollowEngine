@@ -2,11 +2,10 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.copyNodes
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.freeStartName
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.newFunction
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.link
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.linkValue
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeNodes
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.startNames
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroupChanged
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withMembership
@@ -171,7 +170,7 @@ internal class StoryGraphEditorModel(
         if (type.converts) return true
         val from = layout.kotlinOf(output) ?: return true
         val to = layout.kotlinOf(input) ?: return true
-        return StoryInsight.analysis(state, graph).takes(from, to)
+        return StoryInsight.analysis(state, state.root() ?: graph).takes(from, to)
     }
 
     override fun pinTooltip(pin: GraphPin): String = layout.tooltip(pin)
@@ -370,7 +369,8 @@ internal class StoryGraphEditorModel(
 
     override fun addItems(x: Float, y: Float): List<UiDropdownItem> {
         fun placed(node: StoryNode) = add(node, x, y)
-        return addStepItems(::placed) + UiDropdownItem(
+        val functions = if (state.scope == null) listOf(functionItem(x, y)) else emptyList()
+        return addStepItems(::placed) + functions + UiDropdownItem(
             storyLang("add.values"),
             icon = StoryNodeKind.VALUE.icon,
             iconColor = StoryCategories.tint(StoryNodeKind.VALUE.color),
@@ -388,12 +388,38 @@ internal class StoryGraphEditorModel(
             add(StoryNode.Branch(StoryGraph.newId()))
         })
         add(StoryCatalog.kindItem(storyLang("add.loop"), StoryNodeKind.LOOP) { add(StoryNode.Loop(StoryGraph.newId())) })
-        add(StoryCatalog.kindItem(storyLang("add.start"), StoryNodeKind.START) {
-            add(StoryNode.Start(StoryGraph.newId(), freeStartName(graph.startNames())))
-        })
+        if (state.scope == null && graph.nodes.none { it is StoryNode.Start }) {
+            add(StoryCatalog.kindItem(storyLang("add.start"), StoryNodeKind.START) { add(StoryNode.Start(StoryGraph.newId())) })
+        }
+        if (state.scope != null) {
+            add(StoryCatalog.kindItem(storyLang("add.return"), StoryNodeKind.RETURN) { add(StoryNode.Return(StoryGraph.newId())) })
+        }
+        state.function()?.flows.orEmpty().forEach { flow ->
+            add(StoryCatalog.kindItem(storyLang("add.signal", flow), StoryNodeKind.SIGNAL) { add(StoryNode.Signal(StoryGraph.newId(), flow)) })
+        }
         addAll(variableItems(add))
+        StoryFunctionItems.of(state, add)?.let(::add)
         addAll(StoryCatalog.items(add))
     }
+
+    /** A function and what it holds: only the story itself declares them, so none is offered inside another. */
+    private fun functionItem(x: Float, y: Float) = StoryCatalog.kindItem(storyLang("add.function"), StoryNodeKind.FUNCTION) {
+        add(graph.newFunction(), x, y)
+    }
+
+    /** A double click on a function goes inside it, and so does one on a call of a function of this story. */
+    override fun openNode(node: String): Boolean {
+        state.scope = graph.node(node)?.let(state::functionInside) ?: return false
+        return true
+    }
+
+    override fun nodeItems(node: String): List<UiDropdownItem> {
+        val target = graph.node(node)?.let(state::functionInside) ?: return emptyList()
+        return listOf(UiDropdownItem(storyLang("function.enter"), icon = ENTER_ICON) { state.scope = target })
+    }
+
+    /** The parameters of a function are where it starts, so a body never goes without them. */
+    override fun isRemovable(node: String): Boolean = graph.node(node) !is StoryNode.Parameters
 
     /** Reading and writing the variables of the story. */
     private fun variableItems(add: (StoryNode) -> Unit): List<UiDropdownItem> {
@@ -418,12 +444,17 @@ internal class StoryGraphEditorModel(
 
     private companion object {
         const val COPY_OFFSET = 24f
+        const val ENTER_ICON = "hollowengine:textures/gui/icons/graph/enter.svg"
     }
 }
 
 /** What [this] holds in words, whether its node shows it or is collapsed. */
 private fun StoryNode.texts(): List<String> = when (this) {
-    is StoryNode.Start -> listOf(name)
+    is StoryNode.Start, is StoryNode.Parameters -> emptyList()
+    is StoryNode.Function -> listOf(name) + (params + results).map { it.name } + flows
+    is StoryNode.Signal -> listOf(flow)
+    is StoryNode.Return -> values.values.toList()
+    is StoryNode.Invoke -> listOf(function) + arguments.values
     is StoryNode.Say -> listOf(speaker, text)
     is StoryNode.Call -> arguments.values + groups.values.flatMap { it.arguments.values }
     is StoryNode.Choose -> options.flatMap { listOfNotNull(it.text, it.condition) }

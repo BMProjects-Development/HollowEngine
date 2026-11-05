@@ -24,14 +24,24 @@ object ScriptTranslators {
         translators -= extension
     }
 
-    /** The Kotlin file to compile for the script [id]: [source] itself unless a translator takes it. */
-    internal fun kotlinSource(id: ScriptId, source: File): File {
+    /**
+     * The Kotlin file to compile for the script [id]: [source] itself unless a translator takes it. A script that
+     * imports [id] compiles this file too, so another language can be imported as any script is.
+     */
+    fun kotlinSource(id: ScriptId, source: File): File {
         val translator = translatorOf(id) ?: return source
         val generated = ScriptCache.generatedSource(id)
         generated.parentFile.mkdirs()
         generated.writeText(translator.translate(id, source))
+        ScriptRegistry.bind(generated, id)
         return generated
     }
+
+    /** The Kotlin of the script [id] as text, which is [source] itself unless a translator takes it. */
+    fun kotlinText(id: ScriptId, source: File): String = translatorOf(id)?.translate(id, source) ?: source.readText()
+
+    /** Whether the script [id] is written in a language a translator turns into Kotlin. */
+    fun translates(id: ScriptId): Boolean = translatorOf(id) != null
 
     /** Makes the Kotlin of [id] belong to it, which a compiled artifact names as its source even when it is cached. */
     internal fun bind(id: ScriptId) {

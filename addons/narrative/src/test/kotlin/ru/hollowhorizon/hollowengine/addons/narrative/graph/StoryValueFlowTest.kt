@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class StoryValueFlowTest {
-    private val start = StoryNode.Start("s", "main")
+    private val start = StoryNode.Start("s")
     private val loop = StoryNode.Loop("loop", "listOf(1)")
     private val itemIntoSay = StoryLink("loop", StoryPins.ITEM, "say", StoryPins.TEXT)
 

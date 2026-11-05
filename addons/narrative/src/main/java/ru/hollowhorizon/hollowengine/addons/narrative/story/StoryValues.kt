@@ -80,6 +80,7 @@ object StoryValues {
             classifier == StoryBox::class -> StoryBoxSerializer(arguments[0])
             classifier == Pair::class -> PairSerializer(arguments[0], arguments[1])
             classifier == Triple::class -> TripleSerializer(arguments[0], arguments[1], arguments[2])
+            StoryRecord::class.java.isAssignableFrom(classifier.java) -> StoryRecordSerializer(classifier as KClass<Any>)
             else -> runCatching { NBTFormat.serializersModule.serializer(type) }.getOrElse {
                 throw StoryException("A story cannot keep a value of type $type: it is not serializable", it)
             }
