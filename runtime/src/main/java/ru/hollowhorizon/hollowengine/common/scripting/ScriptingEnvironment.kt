@@ -32,7 +32,7 @@ interface ScriptingEnvironment {
         var INSTANCE: ScriptingEnvironment
             get() = current ?: error("Kotlin scripting environment is not available. Install the compiler addon to compile or analyze Kotlin scripts.")
             set(value) {
-                current?.close()
+                if (current !== value) current?.close()
                 current = value
             }
 

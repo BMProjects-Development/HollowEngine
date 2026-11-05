@@ -26,6 +26,13 @@ class IdeContextCompletionsTest {
     }
 
     @Test
+    fun `snippets are left out where their type does not fit`() {
+        val onlyItems = contextSnippetCompletions(Vec3.ZERO, "minecraft:diamond", 1, listOf(ItemSnippetType))
+        assertEquals(listOf("item(\"minecraft:diamond\", 1)"), onlyItems.map { it.insertText })
+        assertTrue(contextSnippetCompletions(Vec3.ZERO, "minecraft:diamond", 1, emptyList()).isEmpty())
+    }
+
+    @Test
     fun `item specifications retain changed and removed components and escape Kotlin strings`() {
         val patch = CompoundTag().apply {
             putString("minecraft:custom_name", "\"example\$")

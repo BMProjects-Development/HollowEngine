@@ -6,5 +6,6 @@
   "orientation.global": "global",
   "orientation.local": "local",
   "orientation.view": "view",
-  "orbit_selection": "Orbit around the selection instead of the view's center"
+  "rotation.view_aligned": "View-aligned rotation · Switch to trackball",
+  "rotation.trackball": "Trackball rotation · Switch to view-aligned"
 }

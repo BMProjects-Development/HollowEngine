@@ -221,7 +221,7 @@ class EditorGutterFoldingTest {
         }
         HollowUiSurface(stylesheet = compileHss(source)).use { surface ->
             surface.setContent {
-                UiCodeEditor(text, {}, state = state, folds = listOf(fold), id = "editor",
+                UiCodeEditor(text, {}, state = state, view = UiCodeView(folds = listOf(fold)), id = "editor",
                     modifier = Modifier.size(500.px, 250.px))
             }
             var time = 0L
@@ -256,8 +256,8 @@ class EditorGutterFoldingTest {
         HollowUiSurface(stylesheet = compileHss(source)).use { surface ->
             val state = TextFieldState(text, multiline = true)
             surface.setContent {
-                UiCodeEditor(text, {}, state = state, folds = folds, id = "editor",
-                    gutterMarkers = listOf(UiGutterMarker("run", 0, "play.svg", "Run", onClick = {})),
+                UiCodeEditor(text, {}, state = state, id = "editor",
+                    view = UiCodeView(folds, listOf(UiGutterMarker("run", 0, "play.svg", "Run", onClick = {}))),
                     modifier = Modifier.size(500.px, 250.px))
             }
             var time = 0L
@@ -294,8 +294,8 @@ class EditorGutterFoldingTest {
         var clicks = 0
         HollowUiSurface().use { surface ->
             surface.setContent {
-                UiCodeEditor(text, {}, state = state, folds = folds, id = "editor",
-                    gutterMarkers = listOf(UiGutterMarker("run", 0, "run.svg", "Run", onClick = { clicks++ })),
+                UiCodeEditor(text, {}, state = state, id = "editor",
+                    view = UiCodeView(folds, listOf(UiGutterMarker("run", 0, "run.svg", "Run", onClick = { clicks++ }))),
                     modifier = Modifier.size(500.px, 250.px))
             }
             var tick = 0L

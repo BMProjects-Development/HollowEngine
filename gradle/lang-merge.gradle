@@ -3,9 +3,9 @@ import groovy.json.JsonSlurper
 
 import java.nio.charset.StandardCharsets
 
-def modId = property("modId")
-def splitLangDir = rootProject.file("runtime/src/main/lang")
-def legacyLangDir = rootProject.file("runtime/src/main/resources/assets/${modId}/lang")
+def modId = project.ext.has("langModId") ? project.ext.get("langModId") : property("modId")
+def splitLangDir = project.file("src/main/lang")
+def legacyLangDir = project.file("src/main/resources/assets/${modId}/lang")
 def mergedLangDir = layout.buildDirectory.dir("generated/lang/assets/${modId}/lang")
 def jsonSlurper = new JsonSlurper()
 
@@ -87,7 +87,9 @@ tasks.register("mergeLang") {
     description = "Merges split and legacy lang files into standard locale json files."
 
     inputs.dir(splitLangDir)
-    inputs.dir(legacyLangDir)
+    if (legacyLangDir.exists()) {
+        inputs.dir(legacyLangDir)
+    }
     outputs.dir(mergedLangDir)
 
     doLast {

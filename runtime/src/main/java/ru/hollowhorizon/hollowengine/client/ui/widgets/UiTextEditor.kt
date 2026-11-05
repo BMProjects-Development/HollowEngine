@@ -90,6 +90,8 @@ data class UiTextCompletion(
      */
     val closeness: Int = 0,
     val edits: List<UiTextEdit> = emptyList(),
+    val onAccept: (() -> Unit)? = null,
+    val preview: UiCompletionPreview? = null,
 )
 
 fun interface UiCompletionContributor {

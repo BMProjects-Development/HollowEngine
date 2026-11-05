@@ -8,6 +8,29 @@ import kotlin.test.*
 
 class DropFeedbackTest {
     @Test
+    fun `drop preview is cleared on leaving rejection cancellation and target disposal`() {
+        val state = UiDragAndDropState()
+        var exits = 0
+        val target = UiDropTarget("editor", UiRect(0f, 0f, 100f, 100f), onDragExit = { exits++ })
+        val unregister = state.register(target)
+        state.begin(UiDragItem("file"), 10f, 10f)
+        state.move(110f, 10f)
+        assertEquals(1, exits)
+        state.move(10f, 10f)
+        target.accepts = { false }
+        state.move(10f, 10f)
+        assertEquals(2, exits)
+        target.accepts = { true }
+        state.move(10f, 10f)
+        state.cancel()
+        assertEquals(3, exits)
+        state.begin(UiDragItem("file"), 10f, 10f)
+        unregister()
+        assertEquals(4, exits)
+        assertFalse(state.canDrop)
+    }
+
+    @Test
     fun `invalid row blocks the root and leaving clears folder feedback`() {
         val state = UiDragAndDropState()
         var drops = 0

@@ -70,6 +70,7 @@ internal fun HollowIdeKeymapDialog(visible: Boolean, onDismiss: () -> Unit) {
                 }
             }
             SearchField(query) { query = it }
+            LaunchedEffect(Unit) { focus.request("ide-keymap-search") }
             Column(
                 tags = listOf("ide-keymap-list"),
                 modifier = Modifier.size(100.percent, UiLength.Fit).maxSize(

@@ -9,6 +9,10 @@ order: 1
 
 ![Диалог](/hollowengine/titles/dialogues/index.webp)
 
+:::advice
+Диалоги входят в [аддон Narrative](/docs/hollowengine/addons/narrative). Скриптам папки `hollowengine` для работы с ними нужен `dependsOn=hollowengine-narrative` в `plugin.properties` проекта.
+:::
+
 Сценарии диалогов пишутся в `.story` файлах. Они лежат рядом с Kotlin-скриптами в `hollowengine/scripts`, но используют отдельный построчный язык. Встроенная IDE поддерживает его подсветку, диагностику, автодополнение и навигацию.
 
 Например, файл `hollowengine/scripts/stories/gate.story` имеет адрес `project:stories/gate.story`.
@@ -32,8 +36,8 @@ order: 1
 ## Запуск из Kotlin
 
 ```kotlin
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueCharacter
-import ru.hollowhorizon.hollowengine.common.dialogue.DialogueController
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueCharacter
+import ru.hollowhorizon.hollowengine.addons.narrative.dialogue.DialogueController
 
 val gateDialogue = DialogueController("project:stories/gate.story")
 

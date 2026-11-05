@@ -4,26 +4,21 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
-import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 
+/**
+ * The editor of a code file: a multi-caret field with line numbers, folds, markers and indent guides, which indents
+ * and pairs delimiters as it is typed in.
+ *
+ * @param syntax the language of the code, which typing reads blocks and literals by; null edits it as plain text.
+ */
 @Composable
 fun UiCodeEditor(
     value: String,
     onChange: (String) -> Unit,
-    highlighter: UiSyntaxHighlighter? = null,
-    completions: UiCompletionContributor? = null,
-    signatureHelp: UiSignatureHelpProvider? = null,
-    hoverInfo: UiHoverInfoProvider? = null,
-    diagnostics: List<UiTextDiagnostic> = emptyList(),
-    folds: List<CodeFold> = emptyList(),
-    gutterMarkers: List<UiGutterMarker> = emptyList(),
-    searchMatches: List<IntRange> = emptyList(),
-    activeSearchMatch: IntRange? = null,
-    inlayHints: List<UiInlayHint> = emptyList(),
-    inlayHintsProvider: UiInlayHintsProvider? = null,
-    inlayRevision: Long = 0L,
-    onInlayAction: ((UiInlayAction) -> Unit)? = null,
-    completionRevision: Long = inlayRevision,
+    insight: UiCodeInsight = UiCodeInsight(),
+    view: UiCodeView = UiCodeView(),
+    search: UiTextSearch? = null,
+    syntax: UiCodeSyntax? = null,
     readOnly: Boolean = false,
     fontSize: Float = DefaultUiFontSize,
     fontFamily: String? = UiCodeFontFamily,
@@ -36,37 +31,22 @@ fun UiCodeEditor(
 ) {
     TextField(
         value = value,
+        onChange = onChange,
         mode = UiTextFieldMode.MULTI_LINE,
-        multiCaret = true,
-        syntaxHighlighter = highlighter,
-        completionContributor = completions,
-        signatureHelpProvider = signatureHelp,
-        hoverInfoProvider = hoverInfo,
-        codeInsightRevision = completionRevision,
-        indentSize = 4,
-        autoPairs = true,
         readOnly = readOnly,
-        diagnostics = diagnostics,
-        folds = folds,
-        gutterMarkers = gutterMarkers,
-        searchMatches = searchMatches,
-        activeSearchMatch = activeSearchMatch,
-        inlayHints = inlayHints,
-        inlayHintsProvider = inlayHintsProvider,
-        inlayRevision = inlayRevision,
-        onInlayAction = onInlayAction,
-        completionRevision = completionRevision,
+        editing = UiCodeEditing(syntax = syntax),
+        insight = insight,
+        view = view.copy(
+            lineNumberColor = view.lineNumberColor ?: CodeEditorLineNumberColor,
+            indentGuideColor = view.indentGuideColor ?: CodeEditorIndentGuideColor,
+        ),
+        search = search,
         wrap = false,
         fontSize = fontSize,
         fontFamily = fontFamily,
         textShadow = textShadow,
         caretColor = CodeEditorCaretColor,
         selectionColor = CodeEditorSelectionColor,
-        lineNumbers = true,
-        lineNumberColor = CodeEditorLineNumberColor,
-        indentGuides = true,
-        indentGuideColor = CodeEditorIndentGuideColor,
-        onChange = onChange,
         state = state,
         id = id,
         tags = listOf("code-editor") + tags,

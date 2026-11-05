@@ -11,6 +11,11 @@ data class CompiledHss(
 ) {
     private val index by lazy { HssRuleIndex(rules) }
 
+    /** Everything here that looks at the state of an ancestor, as `.row:hover` does in `.row:hover .icon`. */
+    internal val statefulAncestors: List<HssSelector> by lazy {
+        rules.flatMap { it.selector.statefulAncestors() }.distinct()
+    }
+
     /** Rules of [origin] that match [node], sourced from the index so only candidates are tested. */
     fun matching(node: UiNode, origin: StyleOrigin): List<StyleRule> =
         index.matching(node, origin)

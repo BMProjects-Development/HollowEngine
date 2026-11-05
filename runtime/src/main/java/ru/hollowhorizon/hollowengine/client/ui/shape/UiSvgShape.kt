@@ -20,7 +20,10 @@ data class UiSvgPathDocument(
     val path: UiPath,
     val viewBox: UiRect,
     val elements: List<UiSvgPathElement> = listOf(UiSvgPathElement(path)),
-)
+) {
+    /** The shape of each of [elements], in the same order. */
+    internal val shapes: List<SvgPathShape> by lazy { elements.map { SvgPathShape(it.path, viewBox) } }
+}
 
 data class SvgResourceShape(
     val location: ResourceLocation,
@@ -486,7 +489,7 @@ private fun UiSvgStyle.withoutGeometryEffects(): UiSvgStyle {
     return copy(clipPath = null, mask = null, filter = null)
 }
 
-private fun parseSvgResourceLocation(location: String): ResourceLocation {
+internal fun parseSvgResourceLocation(location: String): ResourceLocation {
     val trimmed = location.trim()
     return ResourceLocation.parse(if (trimmed.contains(":")) trimmed else "hollowengine:$trimmed")
 }

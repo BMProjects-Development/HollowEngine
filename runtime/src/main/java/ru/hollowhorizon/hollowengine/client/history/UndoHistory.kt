@@ -86,6 +86,14 @@ class UndoHistory(
         if (!step.isEmpty) push(step)
     }
 
+    /** Ends the open transaction, however deep it is, taking back all it recorded; none of it stays in the history. */
+    fun rollback() {
+        val open = transaction ?: return
+        transaction = null
+        lastMergeKey = null
+        (open.steps + open.attached).asReversed().forEach { it.undo() }
+    }
+
     inline fun <R> transaction(label: UndoLabel? = null, block: () -> R): R {
         begin(label)
         try {

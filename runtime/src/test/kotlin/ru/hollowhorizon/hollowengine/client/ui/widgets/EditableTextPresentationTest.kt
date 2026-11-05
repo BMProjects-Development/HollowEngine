@@ -341,8 +341,7 @@ class EditableTextPresentationTest {
                 compositions++
                 EditableTextField(
                     state = state,
-                    syntaxHighlighter = highlighter,
-                    inlayHintsProvider = inlayProvider,
+                    insight = UiCodeInsight(highlighter = highlighter, inlayHintsProvider = inlayProvider),
                     modifier = Modifier.size(240.px, 120.px),
                 )
             }

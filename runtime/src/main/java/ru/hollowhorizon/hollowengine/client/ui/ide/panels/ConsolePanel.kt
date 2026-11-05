@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.ui.docking.LocalDockPanelTitle
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeConsoleFontSize
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeProblems
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeProblemsList
+import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinCodeSyntax
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -110,6 +111,12 @@ private fun ConsoleToolbar(console: HollowIdeConsole) {
             tags = listOf("console-auto-scroll"),
             modifier = Modifier.tooltipOnHover("$LANG.auto_scroll".lang),
         )
+        ConsoleIconButton(
+            id = "console-clear",
+            icon = ClearIcon,
+            tooltip = "$LANG.clear".lang,
+            onClick = console::clearLogView,
+        )
     }
 }
 
@@ -127,8 +134,11 @@ private fun ConsoleLog(console: HollowIdeConsole) {
 
     val filter = remember(console.filterText) { ConsoleLogFilter.compile(console.filterText) }
     val minimumLevel = console.minimumLevel
-    val visibleEntries = remember(snapshot, minimumLevel, filter) {
-        snapshot.entries.filter { entry -> entry.level.ordinal <= minimumLevel.ordinal && filter.matches(entry) }
+    val firstVisibleId = console.firstVisibleLogId
+    val visibleEntries = remember(snapshot, minimumLevel, filter, firstVisibleId) {
+        snapshot.entries.filter { entry ->
+            entry.id >= firstVisibleId && entry.level.ordinal <= minimumLevel.ordinal && filter.matches(entry)
+        }
     }
 
     val document = remember { ConsoleLogDocument() }
@@ -169,7 +179,7 @@ private fun ConsoleLog(console: HollowIdeConsole) {
         id = "console-log",
         tags = listOf("console-log"),
         scrollState = logScroll,
-        syntaxHighlighter = highlighter,
+        insight = UiCodeInsight(highlighter = highlighter),
         modifier = Modifier.size(100.percent, 0.px).grow(1f).onScroll { event ->
             if (event.isCtrlDown()) {
                 HollowIdeConsoleFontSize.zoom(event.rawScrollY)
@@ -211,16 +221,17 @@ private fun ConsoleInput(console: HollowIdeConsole) {
             value = console.input,
             mode = if (multiline) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
             onChange = { console.input = it },
-            syntaxHighlighter = if (kotlinMode) console.kotlin.highlighter else console.commands.highlighter,
-            completionContributor = if (kotlinMode) console.kotlin.completions else console.commands.contributor,
-            signatureHelpProvider = if (kotlinMode) console.kotlin.signatures else null,
-            hoverInfoProvider = if (kotlinMode) console.kotlin.hover else null,
-            inlayHintsProvider = if (kotlinMode) kotlinInlays else null,
-            inlayRevision = console.assistRevision,
-            completionRevision = console.assistRevision,
-            diagnostics = console.diagnostics(),
-            indentSize = if (kotlinMode) 4 else null,
-            autoPairs = kotlinMode,
+            insight = UiCodeInsight(
+                highlighter = if (kotlinMode) console.kotlin.highlighter else console.commands.highlighter,
+                completions = if (kotlinMode) console.kotlin.completions else console.commands.contributor,
+                signatureHelp = if (kotlinMode) console.kotlin.signatures else null,
+                hover = if (kotlinMode) console.kotlin.hover else null,
+                diagnostics = console.diagnostics(),
+                inlayHintsProvider = if (kotlinMode) kotlinInlays else null,
+                completionRevision = console.assistRevision,
+                inlayRevision = console.assistRevision,
+            ),
+            editing = if (kotlinMode) UiCodeEditing(multiCaret = false, syntax = KotlinCodeSyntax) else null,
             wrap = false,
             fontFamily = LogFontFamily,
             textShadow = null,
@@ -417,3 +428,4 @@ private const val RunIcon = "hollowengine:textures/gui/icons/play.svg"
 private const val StopIcon = "hollowengine:textures/gui/icons/stop.svg"
 private const val MaximizeIcon = "hollowengine:textures/gui/icons/maximize.svg"
 private const val MinimizeIcon = "hollowengine:textures/gui/icons/minimize.svg"
+private const val ClearIcon = "hollowengine:textures/gui/icons/actions/delete.svg"

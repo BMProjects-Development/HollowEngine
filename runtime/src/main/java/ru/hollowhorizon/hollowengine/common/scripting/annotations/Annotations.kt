@@ -45,5 +45,3 @@ annotation class ClientSide
 @Target(AnnotationTarget.FILE)
 annotation class ServerSide
 
-@Target(AnnotationTarget.FUNCTION)
-annotation class State(val name: String = "")

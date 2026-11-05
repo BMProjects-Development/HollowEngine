@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "kind": "say",
+      "id": "hello",
+      "speaker": "Guide",
+      "text": "Hello, {player}!"
+    },
+    {
+      "kind": "start",
+      "id": "main"
+    }
+  ],
+  "links": [
+    {
+      "from": "main",
+      "fromPin": "next",
+      "to": "hello",
+      "toPin": "in"
+    }
+  ]
+}

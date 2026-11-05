@@ -6,7 +6,6 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.slots.ClientSlots
 import ru.hollowhorizon.hollowengine.client.utils.mc
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
-import ru.hollowhorizon.hollowengine.common.events.client.ScreenEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.ui.UiData
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
@@ -109,13 +108,4 @@ object UiScriptClient {
 fun onClientTickResetUi(event: TickEvent.Client) {
     UiScriptClient.onLevelPresenceChanged(event.minecraft.level != null)
     UiScriptHudHost.tick()
-}
-
-/**
- * Draws `aboveScreens` overlays on top of an open screen. The in-HUD render pass does not run while
- * a screen is up, so overlays that must stay visible over a menu are drawn from here instead.
- */
-@SubscribeEvent
-fun onScreenRenderDrawOverlays(event: ScreenEvent.Render.Post) {
-    UiScriptHudHost.renderAboveScreens(System.nanoTime())
 }

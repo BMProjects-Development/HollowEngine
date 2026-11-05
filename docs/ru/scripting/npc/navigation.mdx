@@ -7,7 +7,7 @@ order: 6
 
 *Как NPC ищет путь и идёт по нему, и как это настроить для одного NPC или одного перемещения.*
 
-Каждый NPC движка ищет путь и идёт по нему одинаково, что бы его ни вело: [`move`](/docs/hollowengine/scripting/npc/movement) из скрипта, цель вроде атаки или компонент патрулирования. Компонент **«Навигация»** настраивает это для одного NPC. Без него NPC пользуется значениями по умолчанию из таблиц ниже, а скрипт может поменять их на одно перемещение.
+Каждый NPC движка ищет путь и идёт по нему одинаково, что бы его ни вело: [`move`](/docs/hollowengine/scripting/npc/movement) из скрипта, цель вроде атаки или компонент патрулирования. Компонент **«Навигация»** настраивает это для одного NPC. Без него NPC пользуется значениями по умолчанию из таблиц ниже; скрипт меняет их, задавая компонент.
 
 ---
 
@@ -81,36 +81,34 @@ NPC, который уже стоит на блоке, куда ему нель�
 
 Скорость полёта задаёт атрибут `minecraft:generic.flying_speed`, в блоках за тик. Его можно изменить в редакторе атрибутов сущности. Скорость перемещения умножает эту скорость. Полёт учитывает препятствия и размер тела и не позволяет проходить через стены.
 
-Например, разрешить полёт только на одно перемещение:
+Например, разрешить NPC летать:
 
 ```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightMode
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.FlightStyle
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NavigationComponent
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.navigationComponent
 
-npc.move(
-    pos(40, 80, 12),
-    MoveOptions(navigation = {
-        copy(flight = flight.copy(
-            flies = FlightMode.CAN,
-            style = FlightStyle.HOVER,
-            cruiseHeight = 6f,
-            landAtGoal = true,
-        ))
-    }),
-)
+val settings = npc.navigationComponent ?: NavigationComponent()
+npc.set(settings.copy(flight = settings.flight.copy(
+    flies = FlightMode.CAN,
+    style = FlightStyle.HOVER,
+    cruiseHeight = 6f,
+    landAtGoal = true,
+)))
+npc.move(pos(40, 80, 12))
 ```
 
 Для анимации доступны `q.is_flying`, `q.flight_pitch` и `q.flight_bank`: факт полёта, наклон траектории и крен в повороте. Углы задаются в градусах. Они позволяют переключать клип полёта и наклонять модель в аниматоре.
 
-## Настройки на одно перемещение
+## Настройки из скрипта
 
-`MoveOptions(navigation = ...)` меняет настройки только на это перемещение. Функция получает настройки самого NPC (или значения по умолчанию, если компонента нет) и возвращает те, с которыми идти:
+Настройки живут только в компоненте, у перемещения своих нет. Скрипт задаёт компонент, взяв за основу настройки самого NPC или значения по умолчанию, если компонента нет:
 
 ```kotlin
-npc.move(
-    pos(40, 64, 12),
-    MoveOptions(navigation = { copy(jumps = jumps.copy(maxGap = 3, runUp = 2f)) }),
-)
+val settings = npc.navigationComponent ?: NavigationComponent()
+npc.set(settings.copy(jumps = settings.jumps.copy(maxGap = 3, runUp = 2f)))
 ```
 
 Зоны, которые нужно обходить, тоже задаются из скриптов - на одно перемещение или насовсем: см. [Обход зон](/docs/hollowengine/scripting/npc/movement#keeping-out-of-zones).

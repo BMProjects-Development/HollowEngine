@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs
 
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec2
 import net.minecraft.world.phys.Vec3
@@ -7,14 +8,16 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
+import ru.hollowhorizon.hollowengine.common.npcs.registry.ServerNpcs
 import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import kotlin.contracts.ExperimentalContracts
 
 /**
  * Создаёт и возвращает нового NPC (`NpcEntity`) в указанной позиции и с заданными параметрами внешнего вида, поведения и анимации.
@@ -46,11 +49,11 @@ import kotlin.contracts.ExperimentalContracts
  *
  * @return Созданный экземпляр [NpcEntity], добавленный в мир.
  */
-@OptIn(ExperimentalContracts::class)
+@Deprecated("Use ServerLevel.npc(pos, id) { ... } to configure the NPC before spawning.")
 fun npc(
     pos: Vec3,
     name: String = "NPC",
-    model: String = "hollowengine:models/entity/player_model.gltf",
+    @EditorModel(Model.DEFAULT) model: String = Model.DEFAULT,
     rotation: Vec2 = rotation(0, 0),
     world: String = "minecraft:overworld",
     attributes: Map<String, Float> = emptyMap(),
@@ -58,7 +61,7 @@ fun npc(
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
-    id: String? = null,
+    @EditorNpcId id: String? = null,
 ): NpcEntity {
     assert(model.isValidRL()) {
         "Non [a-z0-9/._-] character in path of location: $model"
@@ -71,7 +74,7 @@ fun npc(
         ?: throw IllegalStateException("Dimension $world not found!"))
         ?: throw IllegalStateException("Dimension $world is not loaded!")
 
-    return NpcEntity(level).apply {
+    return level.npc(pos, id) {
         inventory.resize(inventorySize)
         moveTo(pos.x, pos.y, pos.z, rotation.x, rotation.y)
         yHeadRot = rotation.x
@@ -84,12 +87,35 @@ fun npc(
             setAttributes(attributes)
         }
 
-        refreshDimensions()
-
         setNameplate(name, nameplateMode)
-
-        npcs.spawn(this, id)
     }
+}
+
+/**
+ * Spawns an NPC at [pos] in this level, after [builder] set it up: model, name, attributes and the rest.
+ *
+ * @param id the author's id, such as `"village:blacksmith"`. When a live NPC has it, that NPC is returned and
+ * [builder] does not run, so a scene that starts again makes no twins.
+ */
+fun ServerLevel.npc(
+    pos: Vec3,
+    @EditorNpcId id: String? = null,
+    @EditorModel(Model.DEFAULT) builder: NpcEntity.() -> Unit = {},
+): NpcEntity {
+    val npcs = server.npcs
+    if (id != null) npcs.alive(id)?.let { return it }
+    return buildNpc(pos, builder).also { npcs.spawn(it, id) }
+}
+
+/** An NPC at [pos] set up by [builder], not yet in the world: [ServerNpcs.spawn] adds it. */
+fun ServerLevel.buildNpc(pos: Vec3, builder: NpcEntity.() -> Unit = {}): NpcEntity = NpcEntity(this).apply {
+    moveTo(pos.x, pos.y, pos.z, 0f, 0f)
+    set(Model())
+    set(TransformComponent())
+    setNameplate("NPC")
+
+    builder()
+    refreshDimensions()
 }
 
 /**

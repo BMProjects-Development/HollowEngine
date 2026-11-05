@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.scripting.ConsoleScripts
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeEditorSession
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
+import ru.hollowhorizon.hollowengine.common.logging.HollowLogStore
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 
 /** What the console's input line does with its text. */
@@ -30,6 +31,8 @@ internal class HollowIdeConsole {
     var minimumLevel by mutableStateOf(StandardLevel.DEBUG)
     var filterText by mutableStateOf("")
     var autoScroll by mutableStateOf(true)
+    var firstVisibleLogId by mutableStateOf(0L)
+        private set
 
     var mode by mutableStateOf(ConsoleInputMode.COMMAND)
     var expanded by mutableStateOf(false)
@@ -87,6 +90,11 @@ internal class HollowIdeConsole {
     }
 
     fun stopSnippets() = ConsoleScripts.stop()
+
+    /** Advances only this console's view; log consumers and the persistent log keep their entries. */
+    fun clearLogView() {
+        firstVisibleLogId = HollowLogStore.snapshot().entries.lastOrNull()?.id?.plus(1) ?: 0L
+    }
 
     /** Steps through earlier inputs of the current mode; [older] goes back in time. */
     fun browseHistory(older: Boolean): Boolean {

@@ -57,6 +57,54 @@
     border-color: $text-strong;
 }
 
+.graph-search {
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
+    background: $bg-raised;
+    border: 1px $border;
+    border-radius: $radius-large;
+    shadow: 0px 4px 12px 0px $shadow;
+}
+
+.graph-search-icon {
+    size: 12px 12px;
+    tint: $text-soft;
+}
+
+.graph-search-input {
+    height: 22px;
+    background: transparent;
+    caret-color: $caret;
+    selection-color: $selection;
+}
+
+.graph-search-count {
+    min-width: 36px;
+    font-size: $font-size-small;
+    foreground: $text-muted;
+    text-wrap: false;
+}
+
+.graph-search-count.missing {
+    foreground: $danger;
+}
+
+.graph-search-button {
+    size: 20px 20px;
+    align-items: center center;
+    border-radius: $radius;
+    transition: background 110ms ease-out;
+}
+
+.graph-search-button:hover {
+    background: $bg-hover;
+}
+
+.graph-search-button-icon {
+    size: 10px 10px;
+    tint: $text-soft;
+}
+
 .graph-marquee {
     background: alpha($accent, 0.08);
     border: 1px alpha($accent, 0.7);

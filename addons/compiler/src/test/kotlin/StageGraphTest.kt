@@ -1,0 +1,424 @@
+import kotlinx.coroutines.test.runTest
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.GeneratedStory
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryLink
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryCallKind
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperators
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariable
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/** A graph is generated into stages, so it runs, resumes and fails to compile as a hand-written script does. */
+class StageGraphTest : StageTest() {
+    private fun call(id: String, function: String, vararg arguments: Pair<String, String>) =
+        StoryNode.Call(id, function, arguments = mapOf(*arguments))
+
+    private fun log(id: String, text: String) = call(id, "log", "event" to text)
+
+    private fun next(from: String, to: String, pin: String = StoryPins.NEXT) = StoryLink(from, pin, to, StoryPins.IN)
+
+    private fun generate(graph: StoryGraph): GeneratedStory =
+        StoryGraphCompiler.compile(StoryGraph.decode(graph.encode())).also { assertEquals(emptyList(), it.problems) }
+
+    /** start → count → (trust < 3 ? count : done), with a wait inside the loop. */
+    private val loop = StoryGraph(
+        variables = listOf(StoryVariable("trust", "0")),
+        nodes = listOf(
+            StoryNode.Start("s"),
+            StoryNode.Assign("add", "trust", "trust + 1"),
+            log("say", "\"trust \$trust\""),
+            call("wait", "await", "name" to "\"step\""),
+            StoryNode.Branch("more", "trust < 3"),
+            log("done", "\"done\""),
+        ),
+        links = listOf(
+            next("s", "add"), next("add", "say"), next("say", "wait"), next("wait", "more"),
+            next("more", "add", StoryPins.THEN), next("more", "done", StoryPins.ELSE),
+        ),
+    )
+
+    @Test
+    fun `a reroute changes nothing about the story it sits in`() {
+        val plain = StoryGraph(nodes = listOf(StoryNode.Start("s"), log("a", "\"a\"")), links = listOf(next("s", "a")))
+        val through = plain.copy(
+            nodes = plain.nodes + StoryNode.Reroute("r", flow = true),
+            links = listOf(next("s", "r"), next("r", "a")),
+        )
+        assertEquals(generate(plain).code, generate(through).code)
+    }
+
+    @Test
+    fun `values of operators reach a command through a reroute`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Pure("sum", "add", mapOf("a" to "2", "b" to "3")),
+                StoryNode.Pure("text", "to-text"),
+                StoryNode.Reroute("r", flow = false),
+                call("say", "log"),
+            ),
+            links = listOf(
+                next("s", "say"),
+                StoryLink("sum", "result", "r", StoryPins.VALUE),
+                StoryLink("r", StoryPins.VALUE, "text", "value"),
+                StoryLink("text", "result", "say", "event"),
+            ),
+        )
+        val world = world("operators", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("5.0"), StageTrace.take())
+    }
+
+    @Test
+    fun `a for each node runs its body for every item`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                call("say", "log"),
+                log("done", "\"done\""),
+            ),
+            links = listOf(
+                next("s", "each"),
+                next("each", "say", StoryPins.BODY),
+                next("each", "done"),
+                StoryLink("each", StoryPins.ITEM, "say", "event"),
+            ),
+        )
+        val world = world("for-each", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("a", "b", "done"), StageTrace.take())
+    }
+
+    /** Operators are templates of text, so nothing but compiling them says they mean anything. */
+    @Test
+    fun `every operator compiles`() = runTest {
+        val nodes = ArrayList<StoryNode>()
+        val links = ArrayList<StoryLink>()
+        nodes += StoryNode.Start("s")
+        var previous = "s"
+        StoryOperators.all.forEachIndexed { index, operator ->
+            val arguments = operator.inputs.filter { it.default.isEmpty() }.associate { input ->
+                input.name to when (input.type) {
+                    StoryPinType.LIST -> "listOf(\"a\")"
+                    StoryPinType.MAP -> "mapOf(\"a\" to \"b\")"
+                    else -> "\"a\""
+                }
+            }
+            nodes += StoryNode.Pure("op$index", operator.id, arguments)
+            operator.outputs.forEachIndexed { at, output ->
+                val reader = "read${index}_$at"
+                nodes += call(reader, "log")
+                links += next(previous, reader)
+                links += StoryLink("op$index", output.name, reader, "event")
+                previous = reader
+            }
+        }
+        val code = StoryGraphCompiler.compile(StoryGraph(nodes = nodes, links = links), TestCommands()).code
+        world("operators-all", code)
+    }
+
+    /** A write outside the flow runs where its value is read, so a variable needs no place in the steps. */
+    @Test
+    fun `a variable is written when the value of its node is read`() = runTest {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("x", "0.0", "Double")),
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Assign("write", "x", "5.0"),
+                call("first", "log"),
+                call("second", "log", "event" to "\"x=\$x\""),
+            ),
+            links = listOf(next("s", "first"), next("first", "second"), StoryLink("write", StoryPins.VALUE, "first", "event")),
+        )
+        val world = world("assign", StoryGraphCompiler.compile(graph, TestCommands()).code)
+        world.launch("main")
+        world.settle()
+        assertEquals(listOf("5.0", "x=5.0"), StageTrace.take())
+    }
+
+    /** Every type a variable can be declared with has to compile and be saved by a story. */
+    @Test
+    fun `every type of a variable is declared and saved`() = runTest {
+        val variables = listOf(
+            "Double" to "0.0", "String" to "\"\"", "Boolean" to "false", "String?" to "", "Entity?" to "",
+            "List<Double>" to "listOf(1.0)", "Map<String, Double>" to "mapOf(\"a\" to 1.0)",
+        ).mapIndexed { index, (type, initial) -> StoryVariable("value$index", initial, type) }
+        val graph = StoryGraph(
+            variables = variables,
+            nodes = listOf(StoryNode.Start("s"), log("first", "\"done\"")),
+            links = listOf(next("s", "first")),
+        )
+        val world = world("types", generate(graph).code)
+        world.launch("main")
+        world.settle()
+        assertEquals(listOf("done"), StageTrace.take())
+    }
+
+    @Test
+    fun `a loop of the graph runs and resumes after a restart`() = runTest {
+        val world = world("loop", generate(loop).code)
+        world.launch("main")
+        assertEquals(listOf("trust 1"), StageTrace.take())
+
+        world.restart()
+        assertEquals(emptyList(), StageTrace.take())
+        StageTrace.release("step")
+        world.settle()
+        assertEquals(listOf("trust 2", "trust 3", "done"), StageTrace.take())
+    }
+
+    @Test
+    fun `a long loop does not pile up frames`() = runTest {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("count", "0")),
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Assign("add", "count", "count + 1"),
+                StoryNode.Branch("more", "count < 5000"),
+                log("done", "\"done \$count\""),
+            ),
+            links = listOf(
+                next("s", "add"), next("add", "more"),
+                next("more", "add", StoryPins.THEN), next("more", "done", StoryPins.ELSE),
+            ),
+        )
+        world("long", generate(graph).code).launch("main")
+        assertEquals(listOf("done 5000"), StageTrace.take())
+    }
+
+    @Test
+    fun `values travel between stages and through a code node`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Code(
+                    "made", "doubled = base * 2\nlog(\"code \$base\")",
+                    inputs = mapOf("base" to "21"), outputs = mapOf("doubled" to "Int"),
+                ),
+                StoryNode.Branch("again", "false"),
+                call("wait", "await", "name" to "\"after\""),
+                call("show", "log"),
+                StoryNode.Expression("text", "\"\" + 1"),
+                StoryNode.Code("sum", "log(\"sum \$value\")", inputs = mapOf("value" to "")),
+            ),
+            links = listOf(
+                next("s", "made"), next("made", "again"),
+                next("again", "wait", StoryPins.THEN), next("again", "wait", StoryPins.ELSE),
+                next("wait", "show"), next("show", "sum"),
+                StoryLink("text", StoryPins.VALUE, "show", "event"),
+                StoryLink("made", "doubled", "sum", "value"),
+            ),
+        )
+        val world = world("values", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("code 21"), StageTrace.take())
+        world.restart()
+        world.release("after")
+        assertEquals(listOf("1", "sum 42"), StageTrace.take())
+    }
+
+    @Test
+    fun `a choice compiles into branches of its options`() {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Choose("ask", listOf(StoryOption("Да \"точно\""), StoryOption("Цена: $5"))),
+                log("yes", "\"yes\""),
+                log("after", "\"after\""),
+            ),
+            links = listOf(
+                next("s", "ask"), next("ask", "yes", StoryPins.option(0)),
+                next("ask", "after", StoryPins.option(1)), next("yes", "after"),
+            ),
+        )
+        val story = generate(graph)
+        compiler.compile("choice", story.code)
+        assertEquals(1, Regex("suspend fun block_after").findAll(story.code).count())
+    }
+
+    @Test
+    fun `a line with a speaker and the name of the player compiles`() {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Say("hello", "Guide", "Hello, {player}!")),
+            links = listOf(next("s", "hello")),
+        )
+        compiler.compile("line", generate(graph).code)
+    }
+
+    @Test
+    fun `steps that do not pause share a stage and a pause gets its own`() {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("count", "0")),
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Assign("first", "count", "1"),
+                log("second", "\"instant\""),
+                StoryNode.Assign("third", "count", "2"),
+                call("wait", "await", "name" to "\"step\""),
+                StoryNode.Say("line", text = "Hello"),
+            ),
+            links = listOf(
+                next("s", "first"), next("first", "second"), next("second", "third"),
+                next("third", "wait"), next("wait", "line"),
+            ),
+        )
+        val kinds: (StoryNode.Call) -> StoryCallKind = {
+            if (it.function == "log") StoryCallKind.INSTANT else StoryCallKind.SUSPENDING
+        }
+        val stages = Regex("suspend fun (step_\\w+)").findAll(StoryGraphCompiler.compile(graph, TestCommands(kinds)).code)
+        assertEquals(listOf("step_first", "step_wait", "step_line"), stages.map { it.groupValues[1] }.toList())
+    }
+
+    @Test
+    fun `an error of the Kotlin compiler leads back to its node`() {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s"), log("fine", "\"ok\""), call("broken", "log", "event" to "missing")),
+            links = listOf(next("s", "fine"), next("fine", "broken")),
+        )
+        val story = generate(graph)
+        val failure = compiler.errors(story.code, "located")
+        val line = story.code.lines().indexOfFirst { "missing" in it } + 1
+        assertEquals("broken", story.nodeAt(line))
+        assertTrue("missing" in failure, failure)
+    }
+
+    @Test
+    fun `problems of the graph are reported before Kotlin sees them`() {
+        val story = StoryGraphCompiler.compile(
+            StoryGraph(
+                nodes = listOf(StoryNode.Start("s"), StoryNode.Assign("set", "nothing", "1"), call("a", "x"), call("b", "y")),
+                links = listOf(next("s", "set"), next("set", "a"), next("set", "b"), StoryLink("gone", "value", "a", "x")),
+            )
+        )
+        assertEquals(listOf(null, "set", "set"), story.problems.map { it.node }.sortedBy { it.orEmpty() })
+    }
+
+    @Test
+    fun `code nodes in a loop keep their locals apart`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                StoryNode.Code("first", "val text = item\nlog(text)", inputs = mapOf("item" to "")),
+                StoryNode.Code("second", "val text = \"\$item!\"\nlog(text)", inputs = mapOf("item" to "")),
+            ),
+            links = listOf(
+                next("s", "each"), next("each", "first", StoryPins.BODY), next("first", "second"),
+                StoryLink("each", StoryPins.ITEM, "first", "item"),
+                StoryLink("each", StoryPins.ITEM, "second", "item"),
+            ),
+        )
+        world("code-loop", generate(graph).code).launch("main")
+        assertEquals(listOf("a", "a!", "b", "b!"), StageTrace.take())
+    }
+
+    @Test
+    fun `branches cannot meet inside a block that holds no stages`() {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Call("hold", action = "temporary"),
+                StoryNode.Branch("pick", "true"),
+                log("join", "\"joined\""),
+            ),
+            links = listOf(
+                next("s", "hold"), next("hold", "pick", StoryPins.BODY),
+                next("pick", "join", StoryPins.THEN), next("pick", "join", StoryPins.ELSE),
+            ),
+        )
+        val story = StoryGraphCompiler.compile(graph, TestCommands())
+        assertEquals(listOf("join"), story.problems.filter { it.key == "stage_in_block" }.map { it.node })
+    }
+
+    @Test
+    fun `a keyword or a generated name cannot name a function or a variable`() {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("step_1", "0")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Function("f", "when"), StoryNode.Function("g", "block_a")),
+        )
+        val problems = StoryGraphCompiler.compile(graph, TestCommands()).problems.map { it.key to it.node }
+        assertTrue("bad_function" to "f" in problems, "$problems")
+        assertTrue("reserved_name" to "g" in problems, "$problems")
+        assertTrue("reserved_name" to null in problems, "$problems")
+    }
+
+    @Test
+    fun `a story cannot call one that already calls it`() {
+        val functions = object : TestCommands() {
+            override fun storyFunction(file: String, name: String) = StoryNode.Function("f", name)
+
+            override fun storyImports(file: String) = if (file == "test:b") setOf("test:c") else setOf("test:a")
+        }
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Invoke("call", "greet", file = "test:b")),
+            links = listOf(next("s", "call")),
+        )
+        val problems = StoryGraphCompiler.compile(graph, functions, location = "test:a").problems
+        assertEquals(listOf("call"), problems.filter { it.key == "import_cycle" }.map { it.node })
+        assertEquals(emptyList(), StoryGraphCompiler.compile(graph, functions, location = "test:d").problems)
+    }
+
+    @Test
+    fun `a task of the graph runs beside the story and resumes after a restart`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Call("task", action = "async", arguments = mapOf("name" to "\"walk\"")),
+                log("going", "\"going\""),
+                call("wait", "await", "name" to "\"walk\""),
+                log("walked", "\"walked\""),
+                call("thread", "java.lang.Thread.currentThread"),
+                log("meanwhile", "\"meanwhile\""),
+                StoryNode.Call("join", action = "join"),
+                log("done", "\"done\""),
+            ),
+            links = listOf(
+                next("s", "task"), next("task", "going", StoryPins.BODY), next("going", "wait"), next("wait", "walked"),
+                next("walked", "thread"), next("task", "meanwhile"), next("meanwhile", "join"), next("join", "done"),
+                StoryLink("task", StoryPins.VALUE, "join", "handle"),
+            ),
+        )
+        val world = world("task", generate(graph).code)
+        world.launch("main")
+        assertEquals(setOf("going", "meanwhile"), StageTrace.take().toSet())
+        world.restart()
+        world.release("walk")
+        assertEquals(listOf("walked", "done"), StageTrace.take())
+    }
+
+    @Test
+    fun `a write left out of the flow runs right after the node it takes its value from`() = runTest {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("who", "\"nobody\"", "String"), StoryVariable("last", "\"\"", "String")),
+            nodes = listOf(
+                StoryNode.Start("s"),
+                log("before", "\"who=\$who\""),
+                StoryNode.Code("make", "name = \"Bob\"", outputs = mapOf("name" to "String")),
+                StoryNode.Assign("keep", "who", ""),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                StoryNode.Assign("item", "last", ""),
+                call("wait", "await", "name" to "\"later\""),
+                log("after", "\"who=\$who last=\$last\""),
+            ),
+            links = listOf(
+                next("s", "before"), next("before", "make"), next("make", "each"), next("each", "wait"),
+                next("wait", "after"),
+                StoryLink("make", "name", "keep", StoryPins.VALUE),
+                StoryLink("each", StoryPins.ITEM, "item", StoryPins.VALUE),
+            ),
+        )
+        val world = world("attached", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("who=nobody"), StageTrace.take())
+        world.restart()
+        world.release("later")
+        assertEquals(listOf("who=Bob last=b"), StageTrace.take())
+    }
+}

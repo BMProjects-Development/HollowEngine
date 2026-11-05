@@ -11,7 +11,6 @@ import com.intellij.openapi.extensions.DefaultPluginDescriptor
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.LoadingOrder
 import com.intellij.openapi.fileTypes.BinaryFileTypeDecompilers
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.psi.ClassFileViewProviderFactory
@@ -70,8 +69,10 @@ import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJarLibraryModu
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaJdkLibraryModuleImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
+import java.awt.EventQueue
 import java.nio.file.Path
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
@@ -308,6 +309,7 @@ class AnalysisEnvironment(
         if (application.getUserData(DecompilersRegistered) == true) return@underApplicationLock
         application.putUserData(DecompilersRegistered, true)
         val registrationDisposable = applicationEnvironment.parentDisposable
+        Disposer.register(registrationDisposable, ::runPendingAwtEvents)
 
         applicationEnvironment.registerFileType(
             KotlinBuiltInFileType,
@@ -512,7 +514,7 @@ class AnalysisEnvironment(
             implementationClassName,
             DefaultPluginDescriptor("hollowengine-analysis-api"),
         )
-        point.registerExtension(extension, LoadingOrder.ANY, projectDisposable)
+        point.registerExtension(extension, LoadingOrder.ANY, kotlinCoreProjectEnvironment.environment.parentDisposable)
     }
 
     private fun MockProject.registerFirAnalysisServices() {
@@ -656,16 +658,18 @@ class AnalysisEnvironment(
         }
     }
 
-    fun dispose() {
-        if (Disposer.isDisposed(projectDisposable)) return
+    /**
+     * Disposes the project, and the application with it when no one else holds it. On the AWT thread the disposal
+     * moves to a background thread, since taking the application down waits for the AWT thread to run what it queued.
+     *
+     * @return completes when the disposal is done.
+     */
+    fun dispose(): CompletableFuture<Void> {
+        if (Disposer.isDisposed(projectDisposable)) return CompletableFuture.completedFuture(null)
         scriptConfigurationsProvider?.close()
-        val application = kotlinCoreProjectEnvironment.environment.application
-        if (application.isDispatchThread) {
-            application.invokeLater { Disposer.dispose(projectDisposable) }
-        } else {
-            application.invokeAndWait({}, ModalityState.any())
-            Disposer.dispose(projectDisposable)
-        }
+        if (EventQueue.isDispatchThread()) return CompletableFuture.runAsync { Disposer.dispose(projectDisposable) }
+        Disposer.dispose(projectDisposable)
+        return CompletableFuture.completedFuture(null)
     }
 
     fun warmUpClassIndex() {
@@ -674,6 +678,11 @@ class AnalysisEnvironment(
 }
 
 private val DecompilersRegistered = Key.create<Boolean>("hollowengine.decompilers")
+
+/** Waits until the AWT thread has run what is queued so far; on the AWT thread itself there is no one to wait for. */
+private fun runPendingAwtEvents() {
+    if (!EventQueue.isDispatchThread()) EventQueue.invokeAndWait {}
+}
 
 private fun SourceCode.matchesExtension(extension: String): Boolean {
     return sequenceOf(locationId, name)

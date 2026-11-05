@@ -17,8 +17,8 @@ enum class OverlayInput {
 
     /**
      * The overlay receives pointer and keyboard input. During gameplay the cursor is locked to the
-     * screen center, so an interactive overlay reads the center point; with [UiOverlayDefinition.aboveScreens]
-     * it can also sit on top of an open screen (e.g. above the chat box) and take the real cursor.
+     * screen center, so an interactive overlay reads the center point; anchored [OverlayAnchor.OnScreen]
+     * it sits on top of an open screen (e.g. above the chat box) and takes the real cursor.
      */
     INTERACTIVE,
 }
@@ -59,9 +59,9 @@ class UiScreenDefinition(
 )
 
 /**
- * A HUD layer declared by a `.ui.kts` script. It draws into the vanilla HUD at [anchor]/[placement],
- * which is how a scripted layer can land under the crosshair but over the hotbar without the engine
- * owning a fixed list of slots.
+ * A HUD layer declared by a `.ui.kts` script. It draws where its [anchors] put it: into the vanilla HUD
+ * next to a layer, which is how a scripted layer can land under the crosshair but over the hotbar
+ * without the engine owning a fixed list of slots, or on top of the screens it names.
  *
  * [autoShow] layers appear as soon as the script loads, the right default for client-side HUD like
  * a "look at a block to see its name" hint, which has no reason to involve the server. [input] opts
@@ -70,16 +70,28 @@ class UiScreenDefinition(
  */
 class UiOverlayDefinition(
     val id: ResourceLocation,
-    val anchor: ResourceLocation,
-    val placement: HudPlacement,
+    /** In priority; see [OverlayAnchor]. At most one of them is in the HUD. */
+    val anchors: List<OverlayAnchor>,
     val autoShow: Boolean,
     val input: OverlayInput,
-    val aboveScreens: Boolean,
     val rebuildEveryFrame: Boolean,
     val exitDuration: Long,
     val content: UiContent,
 ) {
+    init {
+        require(anchors.isNotEmpty()) { "UI overlay '$id' has no anchor" }
+        require(anchors.count { it is OverlayAnchor.HudLayer } <= 1) { "UI overlay '$id' has more than one HUD anchor" }
+    }
+
     val isInteractive: Boolean get() = input == OverlayInput.INTERACTIVE
+
+    private val hudLayer = anchors.firstNotNullOfOrNull { it as? OverlayAnchor.HudLayer }
+
+    /** Where the overlay draws while a screen of [screen] is open, or with no screen if it is null; null if nowhere. */
+    fun anchorFor(screen: Class<*>?): OverlayAnchor? {
+        if (screen == null) return hudLayer
+        return anchors.firstOrNull { it is OverlayAnchor.OnScreen && it.screens.matches(screen) } ?: hudLayer
+    }
 }
 
 /**

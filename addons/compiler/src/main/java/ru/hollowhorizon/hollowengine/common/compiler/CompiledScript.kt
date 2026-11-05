@@ -13,15 +13,19 @@ import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.ScriptEvaluationConfiguration
 import kotlin.script.experimental.api.implicitReceivers
 import kotlin.script.experimental.api.with
+import kotlin.script.experimental.api.valueOr
+import kotlin.script.experimental.api.CompiledScript as KotlinCompiledScript
 
 data class CompiledScriptImpl(
     override val name: String,
-    val script: kotlin.script.experimental.api.CompiledScript,
+    val script: KotlinCompiledScript,
     val evalConfiguration: ScriptEvaluationConfiguration,
 ) : CompiledScript {
     private val scriptClassDelegate = lazy {
         runScriptingBlocking {
-            (script.getClass(evalConfiguration) as ResultWithDiagnostics.Success).value
+            script.getClass(evalConfiguration).valueOr { failure ->
+                throw ScriptEvaluationException(name, failure.reports.map { it.convert() })
+            }
         }
     }
 

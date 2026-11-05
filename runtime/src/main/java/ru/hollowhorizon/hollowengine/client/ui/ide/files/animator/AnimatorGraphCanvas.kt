@@ -25,7 +25,7 @@ private const val ResetIcon = "hollowengine:textures/gui/icons/reload.svg"
 /** Where a right click landed: on a state, on a transition, or on the empty canvas. */
 private sealed interface CanvasMenuTarget {
     data class State(val stateId: String) : CanvasMenuTarget
-    data class Transition(val index: Int) : CanvasMenuTarget
+    data class Transition(val link: AnimatorSelection.Transition) : CanvasMenuTarget
     data object Empty : CanvasMenuTarget
 }
 
@@ -61,6 +61,9 @@ internal fun AnimatorGraphCanvas(
     val onCanvas = boxes.mapValues { (_, box) -> box.toCanvas(view) }
     val transitionCurves = controller.transitionCurves(onCanvas, view.zoom)
 
+    fun keyOf(transition: AnimationControllerTransitionSpec) =
+        AnimatorSelection.Transition(layerId, transition.from, transition.to)
+
     /** Ends a link being drawn: a transition to the state it was dropped on, or nothing. */
     fun finishLink() {
         val drawn = link ?: return
@@ -76,8 +79,9 @@ internal fun AnimatorGraphCanvas(
         id = AnimatorCanvasId,
         view = view,
         modifier = modifier,
-        edges = transitionCurves.map { (index, curve) ->
-            GraphEdge(index, curve, arrow = true, selected = selection == AnimatorSelection.Transition(layerId, index))
+        edges = transitionCurves.map { (transition, curve) ->
+            val key = keyOf(transition)
+            GraphEdge(key, curve, arrow = true, selected = selection == key)
         },
         link = pending?.let { from ->
             val box = onCanvas[from.from] ?: return@let null
@@ -96,9 +100,9 @@ internal fun AnimatorGraphCanvas(
         },
         onBackgroundClick = { onSelect(AnimatorSelection.None) },
         onRelease = ::finishLink,
-        onEdgeClick = { index -> onSelect(AnimatorSelection.Transition(layerId, index as Int)) },
+        onEdgeClick = { edge -> onSelect(edge as AnimatorSelection.Transition) },
         onContextMenu = { pointer, edge ->
-            val target = (edge as? Int)?.let(CanvasMenuTarget::Transition) ?: CanvasMenuTarget.Empty
+            val target = (edge as? AnimatorSelection.Transition)?.let(CanvasMenuTarget::Transition) ?: CanvasMenuTarget.Empty
             menu = CanvasMenu(target, pointer.screenX, pointer.screenY, GraphPoint(pointer.graphX, pointer.graphY))
         },
         onKey = { input ->
@@ -112,18 +116,17 @@ internal fun AnimatorGraphCanvas(
             }
         },
     ) {
-        transitionCurves.forEach { (index, curve) ->
+        transitionCurves.forEach { (transition, curve) ->
             // The two links of a pair run side by side in opposite directions, so a label a third of
             // the way along each sits near its own start and the two never land on each other.
-            val transition = controller.transitions[index]
             val paired = controller.transitions.any { it.from == transition.to && it.to == transition.from }
             val label = curve.pointAt(if (paired) 0.3f else 0.5f)
             TransitionLabel(
                 transition = transition,
-                selected = selection == AnimatorSelection.Transition(layerId, index),
+                selected = selection == keyOf(transition),
                 x = view.toGraphX(label[0]),
                 y = view.toGraphY(label[1]),
-                onSelect = { onSelect(AnimatorSelection.Transition(layerId, index)) },
+                onSelect = { onSelect(keyOf(transition)) },
             )
         }
 
@@ -254,7 +257,7 @@ private fun handleKey(
                     if (selection.stateId == ANY_STATE) it.withoutAnyState(layerId) else it.withoutState(layerId, selection.stateId)
                 }
 
-                is AnimatorSelection.Transition -> document.edit { it.withoutTransitionAt(layerId, selection.index) }
+                is AnimatorSelection.Transition -> document.edit { it.withoutTransition(layerId, selection.from, selection.to) }
                 else -> return false
             }
             onSelect(AnimatorSelection.Layer(layerId))
@@ -294,7 +297,7 @@ private fun CanvasContextMenu(
         items = when (val target = menu.target) {
             is CanvasMenuTarget.State -> stateMenu(document, layerId, target.stateId, onSelect)
             is CanvasMenuTarget.Transition -> listOf(UiDropdownItem(animatorText("delete_transition")) {
-                document.edit { it.withoutTransitionAt(layerId, target.index) }
+                document.edit { it.withoutTransition(layerId, target.link.from, target.link.to) }
                 onSelect(AnimatorSelection.Layer(layerId))
             })
 
@@ -357,17 +360,17 @@ internal fun addStateItems(
     }
 }
 
-/** Every transition between two placed states, as a curve on the canvas, keyed by its index. */
+/** Every transition between two placed states with its curve on the canvas; a pair repeated in the file counts once. */
 private fun AnimationControllerLayerSpec.transitionCurves(boxes: Map<String, GraphRect>, zoom: Float) =
-    transitions.mapIndexedNotNull { index, transition ->
-        val from = boxes[transition.from] ?: return@mapIndexedNotNull null
-        val to = boxes[transition.to] ?: return@mapIndexedNotNull null
-        if (transition.from == transition.to) return@mapIndexedNotNull null
+    transitions.distinctBy { it.from to it.to }.mapNotNull { transition ->
+        val from = boxes[transition.from] ?: return@mapNotNull null
+        val to = boxes[transition.to] ?: return@mapNotNull null
+        if (transition.from == transition.to) return@mapNotNull null
 
         val twoWay = transitions.any { it.from == transition.to && it.to == transition.from }
         val side = if (twoWay && transition.from > transition.to) -1f else 1f
         val offset = if (twoWay) ParallelOffset * zoom * side else 0f
-        index to GraphCurves.betweenBoxes(from, to, offset, gap = ARROW_SIZE * zoom * 0.5f)
+        transition to GraphCurves.betweenBoxes(from, to, offset, gap = ARROW_SIZE * zoom * 0.5f)
     }
 
 private fun AnimationControllerLayerSpec.state(stateId: String): AnimationControllerStateSpec? =

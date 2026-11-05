@@ -30,6 +30,10 @@ val ijPlatform = "261.25134.147"
 val ijJava = "261.25134.137"
 
 val runtimeProjectPath = ":runtime"
+val minecraftTestClasspath = project(runtimeProjectPath).configurations.named("compileClasspath").map { classpath ->
+    classpath.filter { file -> listOf("org.jetbrains", "androidx", "io.insert-koin").none { file.path.contains(it) } }
+}
+val narrativeTestJar = provider { project(":addons:narrative").tasks.named<Jar>("jar").get().archiveFile.get() }
 val lightTreeClasses = project.projectDir.resolve("lightTree")
 val patchedLightTreeJar = tasks.register<ShadowJar>("patchedLightTreeJar") {
     archiveBaseName.set("hollowengine-light-tree")
@@ -169,7 +173,11 @@ dependencies {
     runtimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
 
     testImplementation(kotlin("test"))
+    testImplementation("io.insert-koin:koin-core:${rootProject.property("koinVersion")}")
     testImplementation("androidx.compose.runtime:runtime:$composeRuntimeVersion")
+    testImplementation(files(narrativeTestJar) { builtBy(":addons:narrative:jar") })
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation(files(minecraftTestClasspath))
     testRuntimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
     testRuntimeOnly(files(compilerPluginRuntimeJar.flatMap { it.archiveFile }))
     testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
@@ -177,6 +185,7 @@ dependencies {
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     testRuntimeOnly("org.apache.logging.log4j:log4j-api:2.23.1")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -305,7 +314,8 @@ tasks.withType<Test>().configureEach {
     })
     inputs.files(analysisClasspath).withPropertyName("ideAnalysisClasspath")
     doFirst {
-        systemProperty("hollowengine.ide.testClasspath", analysisClasspath.get().asPath)
+        val classpath = analysisClasspath.get().files + narrativeTestJar.get().asFile
+        systemProperty("hollowengine.ide.testClasspath", classpath.joinToString(File.pathSeparator))
     }
     useJUnitPlatform()
     maxHeapSize = "2g"

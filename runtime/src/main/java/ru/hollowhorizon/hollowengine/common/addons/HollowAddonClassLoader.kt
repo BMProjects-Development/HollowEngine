@@ -35,6 +35,8 @@ internal class HollowAddonClassLoader(
         "kotlin.sequences.",
         "kotlin.script.experimental.api.",
         "kotlin.script.experimental.host.",
+        // Compiled metadata and JVM modules cross the compiler addon's boundary into the runtime evaluator.
+        "kotlin.script.experimental.jvm.",
         "kotlin.script.experimental.util.",
         "kotlin.text.",
         "kotlin.time.",

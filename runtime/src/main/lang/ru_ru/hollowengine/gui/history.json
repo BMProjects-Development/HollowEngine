@@ -8,6 +8,7 @@
   "world": "Мир",
   "timeline": "Таймлайн",
   "edit": "Изменение",
+  "code.rename": "Переименование %s в %s",
   "held_edit": "Правка на кадре",
   "typing": "Ввод текста",
   "stroke": "Мазок кистью",
@@ -32,7 +33,5 @@
   "timeline.curve_preset": "Пресет кривой",
   "timeline.rotation_basis": "Смена базиса вращения",
   "timeline.record_keys": "Запись ключей",
-  "timeline.capture_key": "Захват ключа",
-  "timeline.move_cutscene": "Перемещение катсцены",
-  "timeline.reanchor_cutscene": "Перепривязка катсцены"
+  "timeline.capture_key": "Захват ключа"
 }

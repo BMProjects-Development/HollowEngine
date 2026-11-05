@@ -149,7 +149,7 @@ object UiProps {
     val BackfaceVisibility = prop("backface-visibility", UiBackfaceVisibility.VISIBLE)
     val Clip = prop("clip", false, fingerprint = true)
     val ClipShape = prop<Shape?>("clip-shape", null, fingerprint = true)
-    val Layer = prop("layer", 0)
+    val Layer = prop("layer", 0, fingerprint = true)
     val ImageFit = prop("image-fit", UiImageFit.STRETCH)
     val ImageSlice = prop("image-slice", UiInsets.all(4.px))
     val ImageUv = prop("image-uv", UiImageUv.Full, aliases = setOf("uv"))

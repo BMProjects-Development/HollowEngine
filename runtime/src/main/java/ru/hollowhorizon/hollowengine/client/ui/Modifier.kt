@@ -179,6 +179,16 @@ const val TextFieldDefaultKeyPriority = -1000
  */
 data class OnPlacedModifier(val callback: (UiRect) -> Unit) : Modifier
 
+/** Whether this modifier hears from layout once it is done. */
+internal fun Modifier.reportsLayout() = this is OnPlacedModifier || this is OnShownModifier ||
+        this is UiDropTargetModifier || this is OnTextLayoutModifier || this is OnResolvedStyleModifier
+
+/**
+ * Like [OnPlacedModifier], with the bounds the node has on the screen: past the translation and the scale of what it is
+ * inside, which is what a popup anchored to it needs.
+ */
+data class OnShownModifier(val callback: (UiRect) -> Unit) : Modifier
+
 /**
  * Observes the node's laid-out text after each layout pass (a [SpanNode]'s line layout or a text
  * field's own layout). The runtime invokes [callback] only when the layout changes, so a field can
@@ -535,6 +545,8 @@ fun Modifier.onUnfocus(handler: (UiEvent) -> Unit) = this then EventModifier(UiE
 /** Reports this node's bounds in root coordinates after layout; see [OnPlacedModifier]. */
 fun Modifier.onPlaced(callback: (UiRect) -> Unit) = this then OnPlacedModifier(callback)
 
+fun Modifier.onShown(callback: (UiRect) -> Unit) = this then OnShownModifier(callback)
+
 /** Reports this node's laid-out text after layout; see [OnTextLayoutModifier]. */
 fun Modifier.onTextLayout(callback: (UiTextLayout) -> Unit) = this then OnTextLayoutModifier(callback)
 
@@ -659,9 +671,9 @@ private fun Iterable<Modifier>.appendModifierStatesTo(result: MutableSet<UiState
     }
 }
 
-private fun Iterable<Modifier>.containsModifierState(state: UiState): Boolean {
-    for (modifier in this) {
-        when (modifier) {
+private fun List<Modifier>.containsModifierState(state: UiState): Boolean {
+    for (index in indices) {
+        when (val modifier = this[index]) {
             is StateModifier -> if (state in modifier.states) return true
             is RuntimeStateModifier -> if (state in modifier.states) return true
             is CompositeModifier -> if (modifier.values.containsModifierState(state)) return true

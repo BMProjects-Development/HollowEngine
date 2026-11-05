@@ -5,11 +5,11 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptFailedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.CompiledScript
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateContext
-import ru.hollowhorizon.hollowengine.common.scripting.state.StateExecutor
 import kotlin.script.experimental.api.ScriptEvaluationConfiguration
 import kotlin.script.experimental.api.constructorArgs
 import kotlin.script.experimental.api.implicitReceivers
@@ -62,19 +62,27 @@ class NodeManager(val server: MinecraftServer) {
                     HollowEngine.LOGGER.info("Node '{}' is kept dormant: its namespace is not installed", key)
                     return@runCatching
                 }
-                val extras = nodeTag.getCompound("extras")
-                val context = (nodeTag.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) }
-                server.addNode(key, extras, context)
+                server.startNode(key, nodeTag, entry = null, compiled = null)
             }.onFailure {
                 HollowEngine.LOGGER.error("Error while deserializing node '$key'", it)
             }
         }
     }
 
-    internal fun register(script: NodeScript, executor: StateExecutor, context: StateContext?) {
+    internal fun register(script: NodeScript) {
         dormant.remove(script.path)
-        nodes[script.path] = RunningNode(script, executor, context)
-        context?.let { executor.start(it) }
+        nodes[script.path] = RunningNode(script)
+        notifyExecutionChanged()
+    }
+
+    /**
+     * Forgets the saved node [path], which could not start: its script is gone or broken. Kept, it would fail
+     * at every start and stay in the world save with nothing to remove it.
+     */
+    internal fun discard(path: String) {
+        val canonicalPath = canonicalNodePath(path)
+        if (dormant.remove(canonicalPath) == null) return
+        HollowEngine.LOGGER.error("Server node '{}' is removed from the world: it could not start", canonicalPath)
         notifyExecutionChanged()
     }
 
@@ -145,12 +153,7 @@ class NodeManager(val server: MinecraftServer) {
     }
 
     private fun startSaved(path: String, saved: CompoundTag, compiled: CompiledScript) {
-        server.addNode(
-            path,
-            saved.getCompound("extras"),
-            (saved.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) },
-            compiled,
-        )
+        server.startNode(path, saved, entry = null, compiled = compiled)
     }
 
     /** Stops the nodes of [namespace] without losing their state. */
@@ -173,8 +176,7 @@ class NodeManager(val server: MinecraftServer) {
                 if (path in nodes || lifecycle.isPending(path)) return@forEach
                 dormant.remove(path)
                 runCatching {
-                    val context = (nodeTag.get("states") as? CompoundTag)?.let { StateContext.deserialize(it) }
-                    server.addNode(path, nodeTag.getCompound("extras"), context)
+                    server.startNode(path, nodeTag, entry = null, compiled = null)
                 }.onFailure { HollowEngine.LOGGER.error("Error while resuming node '$path'", it) }
             }
     }
@@ -182,43 +184,51 @@ class NodeManager(val server: MinecraftServer) {
     private fun isAvailable(path: String): Boolean = ScriptRegistry.source(ScriptRegistry.parse(path).namespace) != null
 }
 
-internal class RunningNode(
-    val script: NodeScript,
-    val executor: StateExecutor,
-    val context: StateContext?,
-) {
+internal class RunningNode(val script: NodeScript) {
     /** The tag this node would be written to the world save as. */
     fun persist(server: MinecraftServer): CompoundTag {
         val serialization = SerializationContext(server, CompoundTag())
         script.onSaveHandlers.forEach { it(serialization) }
+        val sections = CompoundTag()
+        script.sections.forEach { (key, section) -> section.save()?.let { sections.put(key, it) } }
         return CompoundTag().apply {
-            put("extras", serialization.tag)
-            context?.let { put("states", it.serialize()) }
+            put(EXTRAS, serialization.tag)
+            if (!sections.isEmpty) put(SECTIONS, sections)
         }.copy()
     }
 }
 
+/** A node save written by [RunningNode.persist] that holds only the script's own [extras]. */
+internal fun nodeSave(extras: CompoundTag?): CompoundTag =
+    CompoundTag().apply { extras?.let { put(EXTRAS, it.copy()) } }
+
 /**
  * Compiles [path], binds it to a fresh child scope of [host]'s scope, runs the script body (which
- * registers its handlers), then replays `onLoad` -> `onStart` -> `@State` states.
+ * registers its handlers), announces it with [ScriptStartedEvent], then replays the sections and `onLoad`
+ * of [saved] and launches `onStart`.
  *
  * The bound [NodeScript] is returned so the caller can register it with the owning manager; `null` is
  * returned when compilation is unavailable or fails.
+ *
+ * @param saved what [RunningNode.persist] wrote for the node.
+ * @param entry what to start with, passed on to [ScriptStartedEvent].
  */
 internal fun buildNode(
     host: NodeHost,
     parentScope: CoroutineScope,
     path: String,
-    tag: CompoundTag?,
+    saved: CompoundTag,
+    entry: String?,
     receivers: List<Any>,
     compiled: CompiledScript? = null,
-): Pair<NodeScript, StateExecutor>? {
+): NodeScript? {
     val id = ScriptRegistry.parse(path)
     // Nodes are keyed by their path in the world save, so every spelling of one script has to settle on
     // the same string before anything is registered.
     val canonicalPath = ScriptRegistry.display(id)
     val nodeScope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext.job))
-    val binding = NodeBinding(host, nodeScope, tag)
+    val extras = saved.takeIf { it.contains(EXTRAS) }?.getCompound(EXTRAS)
+    val binding = NodeBinding(host, nodeScope, extras)
 
     val validate: (CompiledScript) -> Unit = { program ->
         receiverMismatch(program.implicitReceiverCount, host, receivers)?.let { error(it) }
@@ -231,22 +241,26 @@ internal fun buildNode(
     val script = ScriptLoader.executeCompiled<NodeScript>(id, validate, compiled, configure).onFailure {
         HollowEngine.LOGGER.error("Error while loading $canonicalPath", it)
         nodeScope.cancel()
+        ScriptFailedEvent.post(ScriptFailedEvent(id))
     }.getOrNull() ?: return null
 
     return runCatching {
-        val executor = StateExecutor(nodeScope)
-        script.prepareExecutor(executor)
+        ScriptStartedEvent.post(ScriptStartedEvent(id, script, nodeScope, entry))
 
-        tag?.let { extras ->
-            val context = SerializationContext(host.server, extras)
-            script.onLoadHandlers.forEach { it(context) }
+        val sections = saved.getCompound(SECTIONS)
+        script.sections.forEach { (key, section) -> sections.get(key)?.let(section::load) }
+
+        extras?.let {
+            val context = SerializationContext(host.server, it)
+            script.onLoadHandlers.forEach { load -> load(context) }
         }
 
         script.onStartHandlers.forEach { start -> nodeScope.launch { start() } }
-        script to executor
+        script
     }.onFailure {
         HollowEngine.LOGGER.error("Error while initializing $canonicalPath", it)
         nodeScope.cancel()
+        ScriptFailedEvent.post(ScriptFailedEvent(id))
     }.getOrNull()
 }
 
@@ -285,33 +299,39 @@ private fun NodeHost.describe(): String = when (this) {
  */
 fun canonicalNodePath(path: String): String = ScriptRegistry.display(ScriptRegistry.parse(path))
 
-fun MinecraftServer.addNode(path: String, tag: CompoundTag? = null, context: StateContext? = null) =
-    addNode(path, tag, context, null)
+/**
+ * Starts the server node [path], restarting it if it already runs.
+ *
+ * @param tag the data its `onLoad` handlers receive.
+ * @param entry what to start with, see [ScriptStartedEvent.entry].
+ */
+fun MinecraftServer.addNode(path: String, tag: CompoundTag? = null, entry: String? = null) =
+    startNode(path, nodeSave(tag), entry, null)
 
-internal fun MinecraftServer.addNode(
+internal fun MinecraftServer.startNode(
     path: String,
-    tag: CompoundTag?,
-    context: StateContext?,
+    saved: CompoundTag,
+    entry: String?,
     compiled: CompiledScript?,
 ) {
-    val saved = CompoundTag().apply {
-        tag?.let { put("extras", it.copy()) }
-        context?.let { put("states", it.serialize().copy()) }
-    }
-    runtimeContext.nodes.startAfterStop(path, saved) {
-        val (script, executor) = buildNode(
+    runtimeContext.nodes.startAfterStop(path, saved.copy()) {
+        val script = buildNode(
             host = NodeHost.Server(this),
             parentScope = runtimeContext.scope,
             path = path,
-            tag = tag,
+            saved = saved,
+            entry = entry,
             receivers = listOf(this),
             compiled = compiled,
-        ) ?: return@startAfterStop
+        ) ?: return@startAfterStop runtimeContext.nodes.discard(path)
 
-        runtimeContext.nodes.register(script, executor, context)
+        runtimeContext.nodes.register(script)
     }
 }
 
 fun MinecraftServer.removeNode(path: String) {
     runtimeContext.nodes.removeNode(path)
 }
+
+private const val EXTRAS = "extras"
+private const val SECTIONS = "sections"

@@ -9,8 +9,8 @@ import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.history.UndoOwner
 import ru.hollowhorizon.hollowengine.client.ui.ide.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.cutscene.CutsceneEditorSessions
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
+import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -33,7 +33,7 @@ internal class IdeHistories(
             add(HistoryContext(file.id, file.title, IconHelper.forPath(file.path).toString(), history))
         }
 
-        val timeline = timelineHistory()
+        val timeline = timelineHistory() ?: return@buildList
         if (none { it.history === timeline }) add(HistoryContext(TIMELINE, "$LANG.timeline".lang, TIMELINE_ICON, timeline))
     }
 
@@ -54,18 +54,21 @@ internal class IdeHistories(
         val history = when (focused) {
             null -> null
             TimelineId -> timelineHistory()
-            SceneId, InspectorId, GameViewportId ->
-                IdeScenes.current?.history ?: WorldHistory.history.takeIf { EditorMode.isAvailable() }
+            InspectorId -> InspectorSelection.current?.history ?: sceneHistory()
+            SceneId, GameViewportId -> sceneHistory()
 
             else -> model.files.values.firstOrNull { it.id == focused }?.let(::historyOf)
         } ?: return null
         return contexts.firstOrNull { it.history === history }
     }
 
+    private fun sceneHistory(): UndoHistory? =
+        IdeScenes.current?.history ?: WorldHistory.history.takeIf { EditorMode.isAvailable() }
+
     private fun historyOf(file: HollowIdeOpenFile): UndoHistory? = (file.document as? UndoOwner)?.history ?: textHistory(file)
 
-    private fun timelineHistory(): UndoHistory =
-        (IdeTimelines.current?.controller ?: CutsceneEditorSessions.default.timeline).history
+    private fun timelineHistory(): UndoHistory? =
+        (IdeTimelines.current?.controller ?: IdeTimelines.default?.controller)?.history
 
     private companion object {
         const val LANG = UndoLabel.LANG

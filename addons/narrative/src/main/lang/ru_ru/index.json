@@ -1,0 +1,22 @@
+{
+  "hollowengine.commands.dialogue_no_such_option": "В вашем диалоге нет варианта %s.",
+  "hollowengine.commands.dialogue_not_in_dialogue": "Сейчас вы не участвуете в диалоге.",
+  "hollowengine.commands.story.checkpoint": "%s. %s (%s)",
+  "hollowengine.commands.story.entry": "%s: %s",
+  "hollowengine.commands.story.failed": "История отказалась: %s",
+  "hollowengine.commands.story.missing": "Здесь нет истории %s.",
+  "hollowengine.commands.story.none": "Здесь нет историй.",
+  "hollowengine.commands.story.rewound": "История %s возвращается к чекпоинту %s.",
+  "hollowengine.commands.story.rewound_latest": "История %s возвращается к последнему пройденному чекпоинту.",
+  "hollowengine.commands.story.started": "История %s запущена со стадии %s.",
+  "hollowengine.commands.story.started_scene": "История %s запущена: %s.",
+  "hollowengine.commands.story.stopped": "История %s остановлена.",
+  "hollowengine.gui.history.story.add": "Добавление карточки",
+  "hollowengine.gui.history.story.duplicate": "Копия карточки",
+  "hollowengine.gui.history.story.edit": "Правка карточки",
+  "hollowengine.gui.history.story.link": "Изменение связи",
+  "hollowengine.gui.history.story.move": "Перемещение карточки",
+  "hollowengine.gui.history.story.remove": "Удаление карточки",
+  "hollowengine.gui.history.timeline.move_cutscene": "Перемещение катсцены",
+  "hollowengine.gui.history.timeline.reanchor_cutscene": "Перепривязка катсцены"
+}

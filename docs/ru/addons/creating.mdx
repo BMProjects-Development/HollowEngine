@@ -17,7 +17,7 @@ order: 2
 ./gradlew buildAddons
 ```
 
-Готовые jar складываются в `build/addon-jars/`.
+Готовые jar складываются в `build/addon-jars/`. Собственные `runClient` и `runServer` репозитория сначала собирают их и загружают прямо оттуда, так что копировать ничего в `mods/` не нужно. Запустите `buildAddons` ещё раз при открытой игре, и пересобранные аддоны перезагрузятся на месте; аддону с нативными библиотеками по-прежнему нужен перезапуск.
 
 Чтобы собирать аддон вне репозитория, компилируйте против **development jar**. `./gradlew developmentJar` создаёт `build/development/HollowEngine-<minecraft>-<version>-dev.jar`, а `buildAndCollect` копирует его в `merged/`. Он выставляет классы движка, мост и встроенные библиотеки в compile classpath. Подключайте его как `compileOnly` с маппингами Mojang или Parchment и той версией Kotlin, которую использует HollowEngine. В игру ставьте обычный универсальный jar; development jar нужен только для компиляции.
 

@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.layer
 import ru.hollowhorizon.hollowengine.client.ui.text.UiTextLayout
 import java.util.*
+import kotlin.math.abs
 
 data class UiRect(
     val x: Float,
@@ -43,6 +44,7 @@ data class UiLayoutNode(
     val scrollArea: UiRect = content,
     val textLayout: UiTextLayout? = null,
     val inlineDecoration: InlineGroupDecoration? = null,
+    val subtreeRevision: Long = 0L,
 )
 
 data class UiLayoutResult(
@@ -61,10 +63,16 @@ data class UiLayoutResult(
 
 internal fun snapshotVisibleChildren(
     layouts: Map<UiNode, UiLayoutNode>,
+    known: Map<UiNode, List<UiNode>> = emptyMap(),
     childrenOf: (UiNode) -> List<UiNode> = { node -> node.children },
 ): Map<UiNode, List<UiNode>> {
     val result = IdentityHashMap<UiNode, List<UiNode>>()
     for (node in layouts.keys) {
+        val knownChildren = known[node]
+        if (knownChildren != null) {
+            result[node] = knownChildren
+            continue
+        }
         val source = childrenOf(node)
         if (source.isEmpty()) continue
         var visible: ArrayList<UiNode>? = null
@@ -115,4 +123,11 @@ internal data class ResolvedUiInsets(
 ) {
     val horizontal: Float get() = left + right
     val vertical: Float get() = top + bottom
+}
+
+/** Where the node is on the screen. */
+internal fun UiLayoutNode.shownRect(): UiRect {
+    val from = inputTransform.transform(0f, 0f)
+    val to = inputTransform.transform(rect.width, rect.height)
+    return UiRect(minOf(from.x, to.x), minOf(from.y, to.y), abs(to.x - from.x), abs(to.y - from.y))
 }

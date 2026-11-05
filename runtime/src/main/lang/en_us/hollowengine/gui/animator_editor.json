@@ -7,6 +7,7 @@
   "reset_view": "Reset view",
   "parameters": "Parameters",
   "no_graph": "This layer has no graph; its parameters are in the inspector.",
+  "broken_file": "The file could not be read, so it is open read-only:",
   "no_layers": "No layers",
   "nothing_selected": "Nothing selected",
   "layer_removed": "Layer removed",

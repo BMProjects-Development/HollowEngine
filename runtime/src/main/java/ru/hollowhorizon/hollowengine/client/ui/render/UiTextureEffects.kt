@@ -555,7 +555,7 @@ internal object UiTextureEffects {
     }
 }
 
-private val UiImageFit.isSliced: Boolean
+internal val UiImageFit.isSliced: Boolean
     get() = this == UiImageFit.NINE_SLICE ||
             this == UiImageFit.THREE_SLICE_VERTICAL ||
             this == UiImageFit.THREE_SLICE_HORIZONTAL

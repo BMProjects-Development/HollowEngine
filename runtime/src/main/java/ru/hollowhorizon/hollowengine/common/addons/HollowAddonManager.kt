@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.addons
 
 import kotlinx.coroutines.runBlocking
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import java.io.File
 import kotlin.reflect.KClass
@@ -23,8 +24,8 @@ object HollowAddonManager : AutoCloseable {
         get() = runtime?.let { addonRuntime -> runBlocking { addonRuntime.statuses() } }.orEmpty()
 
     /**
-     * Loaded addons from `hollowengine/addons` that carry assets or data, highest priority first. Addons
-     * in `mods` are left out: their loader already serves their resources.
+     * Loaded addons that carry assets or data, highest priority first. Addons in `mods` are left out:
+     * their loader already serves their resources.
      */
     val resourcePacks: List<HollowAddonResourcePack>
         get() = runtime?.resourcePackSnapshot.orEmpty()
@@ -35,6 +36,8 @@ object HollowAddonManager : AutoCloseable {
             HollowAddonRuntime(
                 sources = sources,
                 cacheDirectory = cacheDirectory,
+                addonsDirectory = addonsDirectory,
+                modsDirectory = modsDirectory,
             ).also { runtime = it }
         }
         runCatching { runBlocking { created.start() } }
@@ -47,10 +50,22 @@ object HollowAddonManager : AutoCloseable {
             .getOrThrow()
     }
 
-    /** Where addons are looked for, highest priority first. */
-    internal fun defaultSources(): List<File> = listOf(
-        DirectoryManager.HOLLOW_ENGINE.resolve("addons").toFile(),
-        File("mods").absoluteFile,
+    /** `hollowengine/addons`, which also keeps the list of addons switched off. */
+    internal val addonsDirectory: File
+        get() = DirectoryManager.HOLLOW_ENGINE.resolve("addons").toFile()
+
+    /** Addons here are mods as well, so the mod loader serves their resources. */
+    internal val modsDirectory: File
+        get() = File("mods").absoluteFile
+
+    /**
+     * Where addons are looked for, highest priority first. A development run puts the addons the
+     * Gradle build has just made ahead of the rest, so stale copies elsewhere never win.
+     */
+    internal fun defaultSources(): List<File> = listOfNotNull(
+        AddonBootstrapContract.developmentAddonsDirectory(),
+        addonsDirectory,
+        modsDirectory,
     )
 
     internal val cacheDirectory: File

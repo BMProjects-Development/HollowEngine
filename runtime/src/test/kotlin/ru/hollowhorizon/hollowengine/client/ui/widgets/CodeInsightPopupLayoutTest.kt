@@ -55,7 +55,7 @@ class CodeInsightPopupLayoutTest {
                 EditableTextField(
                     state = state,
                     modifier = Modifier.size(620.px, 40.px),
-                    signatureHelpProvider = provider,
+                    insight = UiCodeInsight(signatureHelp = provider),
                 )
             }
 
@@ -102,7 +102,7 @@ class CodeInsightPopupLayoutTest {
                 EditableTextField(
                     state = state,
                     modifier = Modifier.size(620.px, 90.px),
-                    signatureHelpProvider = provider,
+                    insight = UiCodeInsight(signatureHelp = provider),
                 )
             }
 
@@ -157,7 +157,7 @@ class CodeInsightPopupLayoutTest {
                 EditableTextField(
                     state = state,
                     modifier = Modifier.size(360.px, 100.px),
-                    hoverInfoProvider = provider,
+                    insight = UiCodeInsight(hover = provider),
                 )
             }
 

@@ -66,7 +66,7 @@ fun Modifier.tooltipOnHover(
     return then(Modifier.input(hoverable = true)
         .onEnter { hovered = true }
         .onExit { hovered = false }
-        .onPlaced { bounds = it })
+        .onShown { bounds = it })
 }
 
 private const val TooltipDelayMillis = 450L

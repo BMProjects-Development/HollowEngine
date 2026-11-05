@@ -43,6 +43,41 @@ interface ScriptingAnalyzer {
      * Alt+Enter actions at the caret, such as import suggestions.
      */
     fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = emptyList()
+
+    /**
+     * Which of [types], fully qualified class names as scripts see them, an expression typed at [offset]
+     * may have; used by completions that insert a whole expression. Null when [offset] is not where an
+     * expression starts. A language that cannot tell accepts every type.
+     */
+    fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? = types
+
+    /** How the Kotlin [text], statements or an expression, reads on its own. Null when the language cannot parse Kotlin. */
+    fun kotlinSyntax(text: String): KotlinSyntax? = null
+
+    /** The properties of the file whose names start with [values] and [places]; those that do not compile are left out. */
+    fun propertyTypes(name: String, text: String, values: String, places: String? = null): KotlinPropertyTypes =
+        KotlinPropertyTypes()
+
+    /** Lets go of what is kept for the file [name], which nothing has open any more. */
+    fun forget(name: String) = Unit
+
+    /** The name at [offset] that [rename] can change, or null when it does not name a declaration of the project. */
+    fun renameTarget(name: String, text: String, offset: Int): RenameTarget? = null
+
+    /**
+     * What changes, through every script of the project, once the declaration named at [offset] is called [newName]:
+     * the declaration itself, the places that refer to it and the imports that name it.
+     *
+     * @param documents the texts of files open in the editor, read in place of what is on disk.
+     */
+    fun rename(
+        name: String,
+        text: String,
+        offset: Int,
+        newName: String,
+        documents: Map<String, String>,
+    ): List<FileRename> = emptyList()
+
     fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = null
     fun hover(name: String, text: String, offset: Int): HoverInfo? = null
     fun diagnostic(name: String, text: String): List<Diagnostic>
@@ -60,6 +95,38 @@ interface ScriptingAnalyzer {
     fun symbolSource(qualifiedName: String): DefinitionLocation? = null
 }
 
+/**
+ * What analysis says of named properties.
+ *
+ * @param types what each of them is, as Kotlin writes it with packages.
+ * @param fits by value, the places that can hold it. Null does not count: links unwrap what can be null.
+ */
+data class KotlinPropertyTypes(
+    val types: Map<String, String> = emptyMap(),
+    val fits: Map<String, Set<String>> = emptyMap(),
+)
+
+/**
+ * What a parser made of a snippet of Kotlin.
+ *
+ * @param valid whether it parsed with no errors.
+ * @param arguments what is between the commas, when the snippet is one call; an argument not typed yet is empty.
+ * @param names the names it uses from outside, without its locals and the members of other things.
+ * @param tokens what can be colored by the look of it, with no analysis.
+ */
+data class KotlinSyntax(
+    val valid: Boolean,
+    val arguments: List<String>? = null,
+    val names: List<KotlinName> = emptyList(),
+    val tokens: List<KotlinToken> = emptyList(),
+)
+
+/** A token of a snippet, at the end-exclusive range [start] to [end]. */
+data class KotlinToken(val start: Int, val end: Int, val type: TokenType)
+
+/** A name a snippet uses, at the end-exclusive range [start] to [end]. */
+data class KotlinName(val name: String, val start: Int, val end: Int)
+
 enum class SymbolKind { CLASS, ANNOTATION, FUNCTION, PROPERTY }
 
 /** A declaration found by [ScriptingAnalyzer.searchSymbols]; [signature] is empty for classes. */
@@ -76,6 +143,19 @@ data class SymbolMatch(
  */
 fun interface CompletionSink {
     fun emit(items: List<CompletionItem>): Boolean
+}
+
+/** A name [ScriptingAnalyzer.rename] can change, at the end-exclusive range [start] to [end]. */
+data class RenameTarget(val name: String, val start: Int, val end: Int)
+
+/** The [edits] renaming makes in the file [path], whose text was [text] when they were worked out. */
+data class FileRename(val path: String, val text: String, val edits: List<TextEdit>) {
+    /** [text] with the [edits] made. */
+    fun applied(): String {
+        val builder = StringBuilder(text)
+        edits.sortedByDescending { it.start }.forEach { builder.replace(it.start, it.end, it.replacement) }
+        return builder.toString()
+    }
 }
 
 data class OccurrenceRange(

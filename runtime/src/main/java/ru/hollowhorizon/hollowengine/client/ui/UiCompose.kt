@@ -14,7 +14,6 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.invalidateLayout
 import ru.hollowhorizon.hollowengine.client.ui.style.*
 import ru.hollowhorizon.hollowengine.client.ui.text.Shadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
-import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.roundToInt
 
@@ -144,15 +143,14 @@ fun Layout(
 ) {
     val modifiers = modifier.asList()
     val imports = modifier.styleReferences()
-    val scoped: HollowUiContent =
-        if (imports.isEmpty()) content
-        else {
-            {
-                CompositionLocalProvider(LocalStylesheets provides LocalStylesheets.current + imports) {
-                    content()
-                }
+    val scoped: HollowUiContent = if (imports.isEmpty()) content
+    else {
+        {
+            CompositionLocalProvider(LocalStylesheets provides LocalStylesheets.current + imports) {
+                content()
             }
         }
+    }
     key(id) {
         ReusableComposeNode<BoxNode, HollowUiApplier>(
             factory = { BoxNode(id, measurePolicy, tags, modifiers, attributes) },
@@ -227,9 +225,11 @@ fun Caret(
 ) = Box(
     id = id,
     tags = tags,
-    modifier = Modifier
-        .animation(UiCaretBlinkKeyframes, UiCaretBlinkPeriodMillis, iterationCount = Float.POSITIVE_INFINITY)
-        .then(modifier ?: Modifier),
+    modifier = Modifier.animation(
+            UiCaretBlinkKeyframes,
+            UiCaretBlinkPeriodMillis,
+            iterationCount = Float.POSITIVE_INFINITY
+        ).then(modifier ?: Modifier),
 )
 
 /**
@@ -354,12 +354,9 @@ fun Slider(
         id = id,
         mode = UiBoxMode.STACK,
         tags = tags + "slider",
-        modifier = Modifier.size(120.px, 16.px)
-            .cursor(UiCursorShape.HAND)
-            .onPress { setFromPointer(it.localX, it.width) }
-            .onDrag { setFromPointer(it.localX, it.width) }
-            .onRelease { onValueCommit?.invoke(current) }
-            .then(modifier ?: Modifier),
+        modifier = Modifier.size(120.px, 16.px).cursor(UiCursorShape.HAND)
+            .onPress { setFromPointer(it.localX, it.width) }.onDrag { setFromPointer(it.localX, it.width) }
+            .onRelease { onValueCommit?.invoke(current) }.then(modifier ?: Modifier),
     ) {
         Row(modifier = Modifier.size(100.percent, 100.percent)) {
             Box(modifier = Modifier.size(SliderThumbRadius.px, 1.px))
@@ -380,8 +377,7 @@ fun Slider(
                 Box(
                     tags = listOf("slider-thumb"),
                     modifier = Modifier.size(SliderThumbSize.px, SliderThumbSize.px).align(vertical = UiAlign.CENTER)
-                        .position((fraction * 100f).percent - SliderThumbRadius.px, 0.px)
-                        .background(UiColor.White)
+                        .position((fraction * 100f).percent - SliderThumbRadius.px, 0.px).background(UiColor.White)
                         .border(1.px, WidgetThumbBorderColor, radius = SliderThumbRadius),
                 )
             }
@@ -418,8 +414,8 @@ fun Checkbox(
             onCheckedChange?.invoke(next)
         }
     }
-    val base = Modifier.cursor(UiCursorShape.HAND).onClick(toggle)
-        .let { if (current) it.state(UiState.SELECTED) else it }
+    val base =
+        Modifier.cursor(UiCursorShape.HAND).onClick(toggle).let { if (current) it.state(UiState.SELECTED) else it }
     val progress by animateFloatAsState(if (current) 1f else 0f, durationMillis = CheckboxToggleMillis)
 
     when (variant) {
@@ -428,14 +424,12 @@ fun Checkbox(
             mode = UiBoxMode.STACK,
             tags = tags + "checkbox",
             modifier = base.size(28.px, 16.px).borderRadius(8f)
-                .background(CheckboxTrackColor.interpolate(WidgetAccentColor, progress))
-                .then(modifier ?: Modifier),
+                .background(CheckboxTrackColor.interpolate(WidgetAccentColor, progress)).then(modifier ?: Modifier),
         ) {
             Box(
                 tags = listOf("checkbox-mark"),
                 modifier = Modifier.size(12.px, 12.px).align(vertical = UiAlign.CENTER)
-                    .position((2f + 12f * progress).px, 0.px)
-                    .background(UiColor.White).borderRadius(6f),
+                    .position((2f + 12f * progress).px, 0.px).background(UiColor.White).borderRadius(6f),
             )
         }
 
@@ -453,8 +447,7 @@ fun Checkbox(
                 if (progress > 0.001f) {
                     Box(
                         tags = listOf("checkbox-mark"),
-                        modifier = Modifier.size(8.px, 8.px).align(UiAlign.CENTER, UiAlign.CENTER)
-                            .opacity(progress)
+                        modifier = Modifier.size(8.px, 8.px).align(UiAlign.CENTER, UiAlign.CENTER).opacity(progress)
                             .background(UiColor.White).borderRadius(if (circle) 4f else 2f),
                     )
                 }
@@ -486,6 +479,7 @@ private sealed interface HssShadowResolution {
     data object Inherit : HssShadowResolution
     data class Override(val shadow: Shadow?) : HssShadowResolution
 }
+
 private val WidgetAccentColor = UiColor(0.36f, 0.62f, 0.95f, 1f)
 private val WidgetThumbBorderColor = UiColor(0.06f, 0.07f, 0.08f, 0.45f)
 private val WidgetCheckboxBorderColor = UiColor(0.55f, 0.6f, 0.68f, 1f)
@@ -494,43 +488,30 @@ private val WidgetCheckboxBorderColor = UiColor(0.55f, 0.6f, 0.68f, 1f)
  * Value/onChange convenience wrapper over [EditableTextField]: owns a [TextFieldState], mirrors
  * external [value] changes into it and reports edits back through [onChange]. The state (carets,
  * selection, undo history) lives for as long as the composition does.
+ *
+ * @param editing how typing reshapes code; null edits plain text with one caret.
+ * @param insight what the field offers on top of its text: highlighting, completion, problems, hints.
+ * @param view the gutter and indent guides of a code field; null shows the text alone.
+ * @param search the search hits to mark.
  */
 @Composable
 fun TextField(
     value: String = "",
+    onChange: ((String) -> Unit)? = null,
     mode: UiTextFieldMode = UiTextFieldMode.SINGLE_LINE,
     filter: UiTextInputFilter = UiTextInputFilter.ANY,
-    multiCaret: Boolean = false,
-    syntaxHighlighter: UiSyntaxHighlighter? = null,
-    completionContributor: UiCompletionContributor? = null,
-    indentSize: Int? = null,
-    autoPairs: Boolean = false,
     readOnly: Boolean = false,
-    diagnostics: List<UiTextDiagnostic> = emptyList(),
-    searchMatches: List<IntRange> = emptyList(),
-    activeSearchMatch: IntRange? = null,
-    inlayHints: List<UiInlayHint> = emptyList(),
-    inlayHintsProvider: UiInlayHintsProvider? = null,
-    inlayRevision: Long = 0L,
-    completionRevision: Long = 0L,
-    signatureHelpProvider: UiSignatureHelpProvider? = null,
-    hoverInfoProvider: UiHoverInfoProvider? = null,
-    codeInsightRevision: Long = completionRevision,
     placeholder: String = "",
+    editing: UiCodeEditing? = null,
+    insight: UiCodeInsight = UiCodeInsight(),
+    view: UiCodeView? = null,
+    search: UiTextSearch? = null,
     wrap: Boolean? = null,
     fontSize: Float = DefaultUiFontSize,
     fontFamily: String? = null,
     textShadow: Shadow? = Shadow(offsetX = 1f, offsetY = 1f),
     caretColor: UiColor? = null,
     selectionColor: UiColor? = null,
-    lineNumbers: Boolean = false,
-    folds: List<CodeFold> = emptyList(),
-    gutterMarkers: List<UiGutterMarker> = emptyList(),
-    lineNumberColor: UiColor? = null,
-    indentGuides: Boolean = false,
-    indentGuideColor: UiColor? = null,
-    onChange: ((String) -> Unit)? = null,
-    onInlayAction: ((UiInlayAction) -> Unit)? = null,
     state: TextFieldState? = null,
     id: String? = null,
     tags: Iterable<String> = emptyList(),
@@ -544,9 +525,6 @@ fun TextField(
             multiline = multiline,
             readOnly = readOnly,
             filter = filter,
-            indentSize = indentSize,
-            autoPairs = autoPairs,
-            multiCaret = multiCaret,
             fontSize = fontSize,
             fontFamily = fontFamily,
             wrap = wrap ?: multiline,
@@ -556,9 +534,10 @@ fun TextField(
     fieldState.multiline = multiline
     fieldState.readOnly = readOnly
     fieldState.filter = filter
-    fieldState.indentSize = indentSize
-    fieldState.autoPairs = autoPairs
-    fieldState.multiCaret = multiCaret
+    fieldState.indentSize = editing?.indentSize
+    fieldState.autoPairs = editing?.autoPairs == true
+    fieldState.syntax = editing?.syntax
+    fieldState.multiCaret = editing?.multiCaret == true
     fieldState.fontSize = fontSize
     var hssFontFamily by remember { mutableStateOf<String?>(null) }
     fieldState.fontFamily = fontFamily ?: hssFontFamily
@@ -606,26 +585,10 @@ fun TextField(
         },
         id = id,
         tags = tags,
-        syntaxHighlighter = syntaxHighlighter,
-        inlayHints = if (hssInlayHints) inlayHints else emptyList(),
-        inlayHintsProvider = inlayHintsProvider.takeIf { hssInlayHints },
-        inlayRevision = inlayRevision,
-        onInlayAction = onInlayAction,
-        completionContributor = completionContributor,
-        completionRevision = completionRevision,
-        signatureHelpProvider = signatureHelpProvider,
-        hoverInfoProvider = hoverInfoProvider,
-        codeInsightRevision = codeInsightRevision,
-        diagnostics = diagnostics,
-        searchMatches = searchMatches,
-        activeSearchMatch = activeSearchMatch,
+        insight = if (hssInlayHints) insight else insight.copy(inlayHints = emptyList(), inlayHintsProvider = null),
+        view = view,
+        search = search,
         placeholder = placeholder,
-        lineNumbers = lineNumbers,
-        folds = folds,
-        gutterMarkers = gutterMarkers,
-        lineNumberColor = lineNumberColor ?: EditableFieldLineNumberColor,
-        indentGuides = indentGuides,
-        indentGuideColor = indentGuideColor ?: EditableFieldIndentGuideColor,
         attributes = attributes,
     )
 }
@@ -751,8 +714,8 @@ fun Popup(
     }
     val isModal = rememberUpdatedState(modal)
     val parentLayer = LocalPopupLayer.current
-    val entry = remember {
-        PopupEntry(Any()).apply {
+    val entry = remember(id) {
+        PopupEntry(Any(), id).apply {
             this.content = {
                 PopupNodeEmitter(
                     anchorBounds = anchor.value,
@@ -809,13 +772,10 @@ private fun PopupNodeEmitter(
     }
     if (!visible) return
     val shown = appeared && !exiting
-    val appearance = if (!animated) Modifier else Modifier
-        .transition(
+    val appearance = if (!animated) Modifier else Modifier.transition(
             UiTransition(UiProps.Opacity.name, PopupAppearMillis, TransitionEasing.EASE_OUT),
             UiTransition(UiProps.Translate.name, PopupAppearMillis, TransitionEasing.EASE_OUT),
-        )
-        .opacity(if (shown) 1f else 0f)
-        .translate(y = if (shown) 0f else -PopupAppearRise)
+        ).opacity(if (shown) 1f else 0f).translate(y = if (shown) 0f else -PopupAppearRise)
 
     val base = appearance.then(modifier ?: Modifier)
         .let { if (exiting) it.inputTransparent() else it.focusScope().input(hoverable = true) }
@@ -855,15 +815,14 @@ fun OverlayHost() {
         if (manager.hasModal) {
             Box(
                 tags = listOf("overlay-scrim"),
-                modifier = Modifier.size(100.percent, 100.percent).inputTransparent().style("hollowengine:ui/styles/widgets.hss"),
+                modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
+                    .style("hollowengine:ui/styles/widgets.hss"),
             )
         }
         if (manager.hasDismissable) {
             Box(
                 tags = listOf("overlay-dismiss"),
-                modifier = Modifier.size(100.percent, 100.percent)
-                    .focusScope()
-                    .onClick { manager.dismissAll() }
+                modifier = Modifier.size(100.percent, 100.percent).focusScope().onClick { manager.dismissAll() }
                     .onKeyInput { input ->
                         if (input.key == GLFW.GLFW_KEY_ESCAPE) {
                             manager.dismissAll()

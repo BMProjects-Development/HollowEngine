@@ -20,6 +20,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal class HollowIdeEditorSession(
     private val path: String,
+    private val typedProperties: String? = null,
+    private val placeProperties: String? = null,
     private val onUpdated: () -> Unit,
 ) {
     private val languageService = languageServiceForPath(path)
@@ -49,6 +51,7 @@ internal class HollowIdeEditorSession(
     private var completionJob: Job? = null
     private var definitionJob: Job? = null
     private var gutterJob: Job? = null
+    private var renameJob: Job? = null
     private var formatJob: Job? = null
 
     @Volatile
@@ -165,6 +168,15 @@ internal class HollowIdeEditorSession(
     val signatures: UiSignatureHelpProvider get() = codeInsight.signatures
     val hover: UiHoverInfoProvider get() = codeInsight.hover
 
+    /** What analysis made of exactly [text], once it has it; nothing until then. */
+    fun exactAnalysis(text: String): KotlinFragmentAnalysis? {
+        val analyzer = currentAnalyzer()
+        val current = snapshot
+        if (current.matchesText(text, analyzer)) return current.fragment
+        requestAnalysis(text, analyzer)
+        return null
+    }
+
     fun inlayHints(text: String): List<UiInlayHint> {
         val analyzer = currentAnalyzer()
         val current = snapshot
@@ -196,7 +208,7 @@ internal class HollowIdeEditorSession(
         val current = snapshot
         if (current.matchesText(text, analyzer)) return current.structure
         requestAnalysis(text, analyzer)
-        return EditorStructure(folds = shiftCodeFoldsThroughEdit(current.text, text, current.structure.folds))
+        return shiftEditorStructureThroughEdit(current.text, text, current.structure)
     }
 
     val canFormat: Boolean get() = currentAnalyzer().canFormat
@@ -238,6 +250,43 @@ internal class HollowIdeEditorSession(
         }
     }
 
+    /** Tells [onResolved], on the client thread, what name at [caret] can be renamed. */
+    fun resolveRenameTarget(text: String, caret: Int, onResolved: (RenameTarget?) -> Unit) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        renameJob?.cancel()
+        renameJob = scope.launch {
+            val target = runCatching { analyzer.renameTarget(path, text, caret.coerceIn(0, text.length)) }
+                .getOrElse { failure ->
+                    reportAnalysisFailure("rename target", failure)
+                    null
+                }
+            withContext(publicationDispatcher) { onResolved(target) }
+        }
+    }
+
+    /** Tells [onRenamed], on the client thread, what renaming the name at [caret] to [newName] changes in each file. */
+    fun rename(
+        text: String,
+        caret: Int,
+        newName: String,
+        documents: Map<String, String>,
+        onRenamed: (List<FileRename>) -> Unit,
+    ) {
+        val analyzer = currentAnalyzer()
+        val publicationDispatcher = Minecraft.getInstance().dispatcher
+        renameJob?.cancel()
+        renameJob = scope.launch {
+            val renames = runCatching {
+                analyzer.rename(path, text, caret.coerceIn(0, text.length), newName, documents)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("rename", failure)
+                emptyList()
+            }
+            withContext(publicationDispatcher) { onRenamed(renames) }
+        }
+    }
+
     fun resolveGutterTargets(text: String, offset: Int, onResolved: (List<GutterNavigationTarget>) -> Unit) {
         val analyzer = currentAnalyzer()
         val publicationDispatcher = Minecraft.getInstance().dispatcher
@@ -273,7 +322,11 @@ internal class HollowIdeEditorSession(
     }
 
     fun close() {
+        if (!scope.isActive) return
         scope.cancel()
+        analysisDispatcher.executor.execute {
+            runCatching { currentAnalyzer().forget(path) }.onFailure { reportAnalysisFailure("forget", it) }
+        }
         analysisDispatcher.close()
     }
 
@@ -309,6 +362,12 @@ internal class HollowIdeEditorSession(
                     reportAnalysisFailure("structure", failure)
                     EditorStructure()
                 },
+                propertyTypes = typedProperties?.let { prefix ->
+                    runCatching { analyzer.propertyTypes(path, text, prefix, placeProperties) }.getOrElse { failure ->
+                        reportAnalysisFailure("types", failure)
+                        KotlinPropertyTypes()
+                    }
+                } ?: KotlinPropertyTypes(),
             )
             publishAnalysisIfCurrent(requestRevision) {
                 snapshot = next
@@ -341,6 +400,14 @@ internal class HollowIdeEditorSession(
         val requestRevision = completionRevision.incrementAndGet()
         completionJob?.cancel()
         completionJob = scope.launch {
+            val acceptedTypes = runCatching {
+                analyzer.acceptedExpressionTypes(path, text, key.caret, ContextSnippetTypes)
+            }.getOrElse { failure ->
+                reportAnalysisFailure("expected types", failure)
+                null
+            }
+            requestContextCompletions(text, key, analyzer, requestRevision, acceptedTypes)
+
             val collected = ArrayList<UiTextCompletion>()
             var publishedAt = 0L
             var publishedSize = -1
@@ -366,11 +433,20 @@ internal class HollowIdeEditorSession(
             }
             if (publishedSize != collected.size) publish()
         }
+    }
+
+    private fun requestContextCompletions(
+        text: String,
+        key: CompletionKey,
+        analyzer: ScriptingAnalyzer,
+        requestRevision: Long,
+        acceptedTypes: List<String>?,
+    ) {
         contextCompletionJob?.cancel()
         contextCompletionJob = scope.launch(Minecraft.getInstance().dispatcher) {
             val context = UiCompletionContext(text, key.caret)
             val items = runCatching {
-                val candidates = ideContextCompletions(path, context).toMutableList()
+                val candidates = ideContextCompletions(path, context, acceptedTypes).toMutableList()
                 IdeCompletionEvent.post(IdeCompletionEvent(path, text, key.caret, candidates)).items.toList()
             }.getOrElse { failure ->
                 HollowEngine.LOGGER.error("Context completions failed for '{}'", path, failure)
@@ -502,7 +578,10 @@ private data class EditorAnalysisSnapshot(
     val inlayHints: List<UiInlayHint>,
     val diagnostics: List<UiTextDiagnostic>,
     val structure: EditorStructure = EditorStructure(),
+    val propertyTypes: KotlinPropertyTypes = KotlinPropertyTypes(),
 ) {
+    val fragment = KotlinFragmentAnalysis(highlights, diagnostics, propertyTypes)
+
     fun matchesText(text: String, analyzer: ScriptingAnalyzer): Boolean {
         return textHash == text.hashCode() && textLength == text.length && this.analyzer === analyzer
     }
@@ -637,6 +716,25 @@ private const val OccurrenceBackgroundAlpha = 0.24f
 private val OccurrenceFallbackBackground = UiColor(0.66f, 0.72f, 0.78f, OccurrenceBackgroundAlpha)
 private val OccurrenceFallbackStyle = UiInlineStyle().withBackground(OccurrenceFallbackBackground)
 
+/**
+ * [structure] of [originalText] as it applies to [editedText]: what lies before or after the edit moves with the
+ * text, and what the edit touched waits for the next analysis.
+ */
+internal fun shiftEditorStructureThroughEdit(originalText: String, editedText: String, structure: EditorStructure): EditorStructure {
+    if (originalText == editedText) return structure
+    val edit = uiTextEditSpan(originalText, editedText)
+    fun shifted(offset: Int): Int? = when {
+        offset < edit.oldStart -> offset
+        offset >= edit.oldEnd -> offset + edit.delta
+        else -> null
+    }
+    return EditorStructure(
+        folds = shiftCodeFoldsThroughEdit(originalText, editedText, structure.folds),
+        markers = structure.markers.mapNotNull { marker -> shifted(marker.offset)?.let { marker.copy(offset = it) } },
+        runTargets = structure.runTargets.mapNotNull { target -> shifted(target.offset)?.let { target.copy(offset = it) } },
+    )
+}
+
 internal fun shiftDiagnosticsForEditedText(
     originalText: String,
     editedText: String,
@@ -742,6 +840,7 @@ private fun CompletionItem.toUi(): UiTextCompletion {
         wordChars = wordChars,
         filterText = name,
         closeness = closeness,
+        preview = declaration?.clipOf?.let { ModelClipPreview(it, insert) },
     )
 }
 

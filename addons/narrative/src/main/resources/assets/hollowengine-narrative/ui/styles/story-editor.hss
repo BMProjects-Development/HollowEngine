@@ -1,0 +1,151 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+.story-editor-root {
+    padding: 0px;
+}
+
+.story-muted {
+    height: fit;
+    foreground: $text-muted;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-muted.wrapped {
+    size: 100% fit;
+    text-wrap: true;
+}
+
+.story-field.error {
+    border-color: $danger;
+}
+
+.story-kotlin {
+    padding: 6px 0px;
+    font-family: $font-code;
+    background: $bg-field;
+    border-radius: 4px;
+}
+
+.story-inspector-problem {
+    size: 100% fit;
+    foreground: $danger;
+    font-size: 8px;
+    text-wrap: true;
+}
+
+.story-inspector-problem.warning {
+    foreground: $warning;
+}
+
+.story-code-dialog {
+    padding: 0px;
+}
+
+.story-code-frame {
+    background: $bg-panel;
+    border-radius: $radius-large;
+}
+
+.story-code-head {
+    size: 100% 26px;
+    padding: 0px 6px 0px 10px;
+    gap: 8px;
+    align-items: center;
+    border-bottom: 1px $divider;
+}
+
+.story-code-title {
+    foreground: $text-strong;
+    font-size: 9px;
+}
+
+.story-code-type {
+    foreground: $text-muted;
+    font-family: $font-code;
+    font-size: 8px;
+}
+
+.story-code-body {
+    padding: 6px 0px;
+    background: $bg-field;
+}
+
+.story-card {
+    size: 100% fit;
+    background: $bg-field;
+    border-radius: $radius;
+    margin-bottom: 4px;
+}
+
+.story-card-head {
+    size: 100% 22px;
+    padding: 0px 3px 0px 5px;
+    gap: 5px;
+    align-items: center;
+    background: $bg-raised;
+    border-radius: $radius;
+    transition: background 110ms ease-out;
+}
+
+.story-card-head:hover {
+    background: $bg-hover;
+}
+
+.story-card-head .insp-arrow {
+    size: 8px 8px;
+    margin: 0px;
+}
+
+.story-card-title {
+    foreground: $text-strong;
+    font-family: $font-code;
+    font-size: 9px;
+    text-wrap: false;
+}
+
+.story-card-type {
+    foreground: $text-muted;
+    font-family: $font-code;
+    font-size: 8px;
+    text-wrap: false;
+}
+
+.story-card-body {
+    size: 100% fit;
+    padding: 2px 8px 8px 8px;
+    gap: 4px;
+}
+
+.st-color {
+    size: 16px 16px;
+    margin-left: 4px;
+    border: 1px $border-strong;
+    border-radius: $radius-small;
+}
+
+.st-color:hover {
+    border: 1px $white;
+}
+
+.st-picks {
+    size: 16px 16px;
+    margin-left: 4px;
+    align-items: center;
+    justify-content: center;
+    border-radius: $radius-small;
+}
+
+.st-picks:hover {
+    background: $bg-hover;
+}
+
+.st-picks-arrow {
+    size: 7px 5px;
+    transform: rotate(180deg);
+}
+
+.st-signature-entry {
+    gap: 4px;
+    align-items: center center;
+}

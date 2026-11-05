@@ -5,7 +5,6 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
-import ru.hollowhorizon.hollowengine.client.ui.shape.GenericShape
 import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
@@ -39,7 +38,7 @@ data class GraphPointer(
 }
 
 /** A link of the graph as the canvas draws it under the nodes. [key] is what a click on it reports. */
-class GraphEdge(
+data class GraphEdge(
     val key: Any,
     val curve: GraphCurve,
     val color: UiColor = GraphColors.Edge,
@@ -92,6 +91,7 @@ fun GraphCanvas(
     onRelease: () -> Unit = {},
     onSelectArea: ((area: GraphRect, modifiers: Int) -> Unit)? = null,
     onKey: (UiKeyInput) -> Boolean = { false },
+    onPointer: (GraphPointer?) -> Unit = {},
     overlay: @Composable () -> Unit = {},
     nodes: @Composable () -> Unit,
 ) {
@@ -130,28 +130,15 @@ fun GraphCanvas(
             .clip(true)
             .onPlaced { canvas = it }
             .input(hoverable = true, clickable = true, draggable = true)
-            .drawBehind(GraphDrawKey(view.zoom, view.panX, view.panY, edges, link, hovered, frames)) {
-                drawGrid(view)
-                frames.forEach { drawFrame(it, view) }
-                edges.sortedBy { it.selected }.forEach { edge ->
-                    val color = when {
-                        edge.selected -> GraphColors.EdgeSelected
-                        edge.key == hovered -> GraphColors.EdgeHover
-                        else -> edge.color
-                    }
-                    drawCurve(edge.curve, view.zoom, color, edge.arrow)
-                }
-                link?.let { pending ->
-                    val curve = pending.curve
-                    if (curve != null) drawCurve(curve, view.zoom, pending.color, arrow = false)
-                    else drawSegment(pending.fromX, pending.fromY, pending.toX, pending.toY, pending.color, 1.5f)
-                }
-            }
             .onHover { event ->
                 val edge = edgeAt(event.localX, event.localY)
                 if (edge != hovered) hovered = edge
+                onPointer(pointer(event))
             }
-            .onExit { hovered = null }
+            .onExit {
+                hovered = null
+                onPointer(null)
+            }
             .focus()
             .onKeyInput { input ->
                 when {
@@ -209,6 +196,32 @@ fun GraphCanvas(
                 event.consume()
             },
     ) {
+        // A layer of its own: what a node draws behind itself is not bounded by its clip, but its children are.
+        Box(
+            modifier = Modifier
+                .position(0.px, 0.px)
+                .size(100.percent, 100.percent)
+                .inputTransparent()
+                .drawBehind(GraphDrawKey(view.zoom, view.panX, view.panY, edges, link, hovered, frames)) {
+                    drawGrid(view)
+                    frames.forEach { drawFrame(it, view) }
+                    edges.sortedBy { it.selected }.forEach { edge ->
+                        val color = when {
+                            edge.selected -> GraphColors.EdgeSelected
+                            edge.key == hovered -> GraphColors.EdgeHover
+                            else -> edge.color
+                        }
+                        drawCurve(edge.curve, view.zoom, color, edge.arrow)
+                    }
+                    link?.let { pending ->
+                        val curve = pending.curve ?: GraphCurve(
+                            floatArrayOf(pending.fromX, pending.fromY, pending.toX, pending.toY),
+                        )
+                        drawCurve(curve, view.zoom, pending.color, arrow = false)
+                    }
+                },
+        )
+
         Box(
             mode = UiBoxMode.STACK,
             modifier = Modifier
@@ -297,48 +310,34 @@ private fun UiCanvasDrawScope.drawGrid(view: GraphViewState) {
     }
 }
 
-/** Draws a curve segment by segment, each clipped to the canvas, and an arrowhead at its end. */
+/** Draws a curve as one stroke, with an arrowhead at its end when asked to. */
 private fun UiCanvasDrawScope.drawCurve(curve: GraphCurve, zoom: Float, color: UiColor, arrow: Boolean) {
-    val points = curve.points
-    val width = (1.5f * zoom).coerceIn(1f, 3f)
-    for (index in 0 until curve.pointCount - 1) {
-        drawSegment(points[index * 2], points[index * 2 + 1], points[index * 2 + 2], points[index * 2 + 3], color, width)
-    }
-    if (!arrow || curve.pointCount < 2) return
+    if (curve.pointCount < 2) return
+    val paint = UiPaint.Color(color)
+    val stroke = UiDrawStyle.Stroke((1.5f * zoom).coerceIn(1f, 3f))
+    drawShape(curve.shape, curve.bounds, paint, stroke)
+    if (!arrow) return
 
+    val points = curve.points
     val head = ARROW_SIZE * zoom
     val last = points.size - 2
     val angle = atan2(points[last + 1] - points[last - 1], points[last] - points[last - 2])
     val tipX = points[last]
     val tipY = points[last + 1]
-    drawSegment(tipX, tipY, tipX - head * cos(angle - ARROW_SPREAD), tipY - head * sin(angle - ARROW_SPREAD), color, width)
-    drawSegment(tipX, tipY, tipX - head * cos(angle + ARROW_SPREAD), tipY - head * sin(angle + ARROW_SPREAD), color, width)
+    val barbs = floatArrayOf(
+        tipX - head * cos(angle - ARROW_SPREAD), tipY - head * sin(angle - ARROW_SPREAD),
+        tipX, tipY,
+        tipX - head * cos(angle + ARROW_SPREAD), tipY - head * sin(angle + ARROW_SPREAD),
+    )
+    GraphCurve(barbs).let { drawShape(it.shape, it.bounds, paint, stroke) }
 }
 
-/** Lines are clipped here because a stroke drawn behind a node is not bounded by the node's clip. */
-private fun UiCanvasDrawScope.drawSegment(x1: Float, y1: Float, x2: Float, y2: Float, color: UiColor, width: Float) {
-    val clipped = clipSegment(x1, y1, x2, y2, size.width, size.height) ?: return
-    val shape = GenericShape {
-        moveTo(clipped[0], clipped[1])
-        lineTo(clipped[2], clipped[3])
-    }
-    drawShape(shape, bounds, UiPaint.Color(color), UiDrawStyle.Stroke(width))
-}
-
-/**
- * A frame fills its part of the canvas and outlines it, cut to the canvas by hand, since what is drawn
- * behind a node is not bounded by the node's clip.
- */
+/** A frame fills its part of the canvas and outlines it. */
 private fun UiCanvasDrawScope.drawFrame(frame: GraphFrame, view: GraphViewState) {
     val onCanvas = frame.rect.toCanvas(view)
-    val left = onCanvas.x.coerceAtLeast(0f)
-    val top = onCanvas.y.coerceAtLeast(0f)
-    val right = (onCanvas.x + onCanvas.width).coerceAtMost(size.width)
-    val bottom = (onCanvas.y + onCanvas.height).coerceAtMost(size.height)
-    if (right <= left || bottom <= top) return
     val radius = FRAME_RADIUS * view.zoom
     drawRect(
-        UiRect(left, top, right - left, bottom - top),
+        UiRect(onCanvas.x, onCanvas.y, onCanvas.width, onCanvas.height),
         UiPaint.Color(frame.color.copy(alpha = frame.color.alpha * FRAME_FILL)),
         radius = radius,
         border = UiBorder(UiInsets.all(1.px), frame.color.copy(alpha = frame.color.alpha * FRAME_OUTLINE), radius),

@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.compiling.loadKotlinCompil
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptArtifacts
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
@@ -30,6 +31,7 @@ object ScriptLoader {
             ?: return Result.failure(NoSuchElementException("Unknown script '${ScriptRegistry.display(id)}'"))
         val fingerprint = ScriptFingerprint.compute(id)
         val cached = ScriptCache.artifact(id)
+        ScriptTranslators.bind(id)
 
         currentArtifact(artifacts, fingerprint, cached)?.let { jar ->
             return runCatching { load(id, jar) }
@@ -43,7 +45,9 @@ object ScriptLoader {
                 cacheOutput = fingerprint?.let { cached },
                 cacheFingerprint = fingerprint,
             )
-            return scripting.compiler.compile(artifacts.sourceFile, context).onSuccess {
+            val source = runCatching { ScriptTranslators.kotlinSource(id, artifacts.sourceFile) }
+                .getOrElse { return Result.failure(it) }
+            return scripting.compiler.compile(source, context).onSuccess {
                 // The artifact at this path has just been rewritten, so an earlier rejection of it
                 // says nothing about the new one.
                 rejectedArtifacts -= cached.canonicalPath
@@ -113,12 +117,12 @@ object ScriptLoader {
      * Compiles every known script so a pack can be shipped to players who have no compiler addon.
      * Returns the scripts that failed, with the reason.
      */
-    fun compileAll(ids: Collection<ScriptId> = ScriptRegistry.list(SCRIPT_EXTENSION)): Map<ScriptId, Throwable> {
+    fun compileAll(ids: Collection<ScriptId> = ScriptTranslators.compilable()): Map<ScriptId, Throwable> {
         val failures = LinkedHashMap<ScriptId, Throwable>()
         ids.forEach { id ->
             compile(id).onFailure { failures[id] = it }
         }
-        ScriptCache.prune(ScriptRegistry.list(SCRIPT_EXTENSION))
+        ScriptCache.prune(ScriptTranslators.compilable())
         return failures
     }
 
@@ -157,12 +161,10 @@ object ScriptLoader {
         }
     }
 
-    private fun load(id: ScriptId, jar: File): CompiledScript {
-        val classLoader = ScriptRegistry.source(id.namespace)?.classLoader
-        return jar.loadKotlinCompiledScriptFromJar(classLoader)
-    }
+    /** Loads a compiled artifact in the classloader a fresh compilation would run in, dependencies included. */
+    private fun load(id: ScriptId, jar: File): CompiledScript =
+        jar.loadKotlinCompiledScriptFromJar(ScriptRegistry.classLoader(id.namespace))
 
-    private const val SCRIPT_EXTENSION = ".kts"
     private const val MAX_CAUSE_DEPTH = 8
 }
 

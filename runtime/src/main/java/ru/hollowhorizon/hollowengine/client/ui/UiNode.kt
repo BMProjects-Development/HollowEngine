@@ -14,6 +14,12 @@ interface UiNode {
     val states: MutableSet<UiState>
     val modifiers: MutableList<Modifier>
     var resolvedModifiers: List<Modifier>
+
+    /** The canvases among [resolvedModifiers]; most nodes have none, and all of them are asked twice a frame. */
+    val resolvedCanvases: List<UiCanvasModifier>
+
+    /** Those of [resolvedModifiers] that layout reports to; the rest are not worth looking through once a frame. */
+    val resolvedReports: List<Modifier>
     var resolvedSnapshot: UiComputedStyle
     val children: UiChildren
     val layoutState: UiNodeLayoutState
@@ -54,6 +60,16 @@ open class BaseUiNode(
     final override val modifiers: MutableList<Modifier> =
         InvalidatingMutableList(modifiers) { invalidateDraw() }
     final override var resolvedModifiers: List<Modifier> = modifiers.toList()
+        set(value) {
+            if (field === value) return
+            field = value
+            resolvedCanvases = value.filterIsInstance<UiCanvasModifier>()
+            resolvedReports = value.filter { it.reportsLayout() }
+        }
+    final override var resolvedCanvases: List<UiCanvasModifier> = resolvedModifiers.filterIsInstance<UiCanvasModifier>()
+        private set
+    final override var resolvedReports: List<Modifier> = resolvedModifiers.filter { it.reportsLayout() }
+        private set
     final override var resolvedSnapshot: UiComputedStyle = defaultModifierSnapshot()
     final override val children = UiChildren()
     final override var measurePolicy: UiMeasurePolicy = measurePolicy

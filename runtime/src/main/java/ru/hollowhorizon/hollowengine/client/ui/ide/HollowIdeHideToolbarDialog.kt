@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiButtonKind
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
-internal val CenteredOnViewport = UiPopupAlignment(
+val CenteredOnViewport = UiPopupAlignment(
     anchorHorizontal = UiAlign.CENTER,
     anchorVertical = UiAlign.CENTER,
     popupHorizontal = UiAlign.CENTER,

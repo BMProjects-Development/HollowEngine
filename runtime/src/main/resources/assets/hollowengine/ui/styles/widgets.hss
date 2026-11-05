@@ -191,6 +191,34 @@
     opacity: 0.42;
 }
 
+.dropdown-search {
+    width: 100%;
+    gap: 5px;
+    margin: 0px 0px 3px 0px;
+    padding: 0px 6px;
+    background: $bg-field;
+    border: 1px $border;
+    border-radius: $radius;
+}
+
+.dropdown-search-icon {
+    size: 12px 12px;
+    tint: $text-soft;
+}
+
+.dropdown-search-input {
+    height: 22px;
+    min-width: 180px;
+    background: transparent;
+    caret-color: $caret;
+    selection-color: $selection;
+}
+
+/* What Enter would pick of what the search found. */
+.dropdown-item.picked {
+    background: alpha($accent, 0.28);
+}
+
 .tree-view {
     clip: true;
 }
@@ -449,6 +477,10 @@
     border-radius: $radius-large;
     shadow: 0px 6px 16px 0px $shadow;
     clip: true;
+}
+
+.ide-completion-preview {
+    padding: 4px;
 }
 
 .ide-completion-divider {

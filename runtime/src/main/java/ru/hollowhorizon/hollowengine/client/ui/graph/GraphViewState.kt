@@ -39,6 +39,14 @@ class GraphViewState(
     fun toGraphX(x: Float) = (x - panX) / zoom
     fun toGraphY(y: Float) = (y - panY) / zoom
 
+    /** Whether any of [rect] comes within [margin] of a canvas of the size [width] by [height]. */
+    fun sees(rect: GraphRect, width: Float, height: Float, margin: Float): Boolean {
+        val left = toCanvasX(rect.x)
+        val top = toCanvasY(rect.y)
+        return left + rect.width * zoom > -margin && left < width + margin &&
+                top + rect.height * zoom > -margin && top < height + margin
+    }
+
     /** Zooms by [step] times, keeping the graph point under ([aroundX], [aroundY]) of the canvas in place. */
     fun zoomBy(step: Float, aroundX: Float, aroundY: Float) {
         anchorCanvasX = aroundX

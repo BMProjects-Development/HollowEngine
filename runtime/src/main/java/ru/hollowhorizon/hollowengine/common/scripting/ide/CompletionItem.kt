@@ -17,6 +17,7 @@ sealed interface CompletionItem {
     /** How close the declaration is to the caret; see [CompletionCloseness]. Higher wins ties. */
     val closeness: Int get() = CompletionCloseness.DEFAULT
 
+    /** @param clipOf the model the item names a clip of, which the editor plays beside the list. */
     data class Declaration(
         override val show: String,
         override val insert: String,
@@ -30,6 +31,7 @@ sealed interface CompletionItem {
         val itemIcon: String? = null,
         override val wordChars: String = "",
         override val closeness: Int = CompletionCloseness.DEFAULT,
+        val clipOf: String? = null,
     ) : CompletionItem
 
     data class Keyword(
@@ -95,6 +97,7 @@ class DeclarationCompletionItemBuilder {
     var itemIcon: String? = null
     var wordChars: String = ""
     var closeness: Int = CompletionCloseness.DEFAULT
+    var clipOf: String? = null
 
     fun withImport() {
         import = true
@@ -113,6 +116,7 @@ class DeclarationCompletionItemBuilder {
         middle = completionItem.middle
         itemIcon = completionItem.itemIcon
         closeness = completionItem.closeness
+        clipOf = completionItem.clipOf
     }
 
     fun build() =
@@ -129,6 +133,7 @@ class DeclarationCompletionItemBuilder {
             itemIcon = itemIcon,
             wordChars = wordChars,
             closeness = closeness,
+            clipOf = clipOf,
         )
 }
 

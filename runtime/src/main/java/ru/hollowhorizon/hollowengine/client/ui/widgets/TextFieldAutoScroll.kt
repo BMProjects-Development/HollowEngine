@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 /** Follows caret requests across editor mounts without losing the user's scroll position. */
 internal class TextFieldAutoScroll {
     private var caretRevision = 0
+    private var dropOffset: Int? = null
     private var caretMovePending = false
     private var followedRevision = Int.MIN_VALUE
     private var settling = false
@@ -15,14 +16,19 @@ internal class TextFieldAutoScroll {
 
     fun follow(state: TextFieldState, layout: EditableFieldLayout, scrollState: UiScrollHandle, gutterWidth: Float) {
         val revision = state.caretVisibilityRevision
+        val drop = state.dropPreview.offset
+        if (drop != dropOffset) {
+            if (drop != null) caretMovePending = true else settling = false
+            dropOffset = drop
+        }
         if (caretRevision != revision) caretMovePending = true
         caretRevision = revision
 
         val viewport = scrollState.viewport
         if (!caretMovePending) {
             if (!settling || followedRevision != revision) return
-            val unchanged = followedViewport == viewport &&
-                followedContentWidth == layout.naturalWidth && followedContentHeight == layout.height
+            val unchanged =
+                followedViewport == viewport && followedContentWidth == layout.naturalWidth && followedContentHeight == layout.height
             if (unchanged) {
                 settling = false
                 return
@@ -36,15 +42,15 @@ internal class TextFieldAutoScroll {
         followedContentWidth = layout.naturalWidth
         followedContentHeight = layout.height
 
-        val caret = layout.caretAt(state.primaryCaret.position, state.primaryCaret.inlayAffinity)
+        val caret = if (drop != null) layout.caretAt(drop)
+        else layout.caretAt(state.primaryCaret.position, state.primaryCaret.inlayAffinity)
         val margin = layout.fontSize
         val caretEndX = caret.x + TextFieldCaretWidth
         val viewportWidth = (viewport.width - gutterWidth).coerceAtLeast(0f)
 
         val targetY = when {
             caret.y < scrollState.offsetY + margin -> (caret.y - margin).coerceAtLeast(0f)
-            caret.y + layout.fontSize > scrollState.offsetY + viewport.height - margin ->
-                caret.y + layout.fontSize + margin - viewport.height
+            caret.y + layout.fontSize > scrollState.offsetY + viewport.height - margin -> caret.y + layout.fontSize + margin - viewport.height
             else -> null
         }
         val targetX = when {

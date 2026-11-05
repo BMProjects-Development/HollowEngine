@@ -17,7 +17,7 @@ In the HollowEngine repository, every directory under `addons/` that contains a 
 ./gradlew buildAddons
 ```
 
-The resulting jars are collected in `build/addon-jars/`.
+The resulting jars are collected in `build/addon-jars/`. The repository's own `runClient` and `runServer` build them first and load them from there, so nothing has to be copied into `mods/`. Run `buildAddons` again while the game is open and the rebuilt addons are reloaded in place; one with native libraries still needs a restart.
 
 To build an addon outside the repository, compile against the **development jar**. `./gradlew developmentJar` produces `build/development/HollowEngine-<minecraft>-<version>-dev.jar` and `buildAndCollect` copies it into `merged/`. It exposes the engine classes, the bridge, and bundled libraries on the compile classpath. Use it as `compileOnly` with Mojang or Parchment mappings and the Kotlin version HollowEngine uses. Install the regular universal jar in the game; the development jar is only for compiling.
 

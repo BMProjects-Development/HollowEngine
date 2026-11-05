@@ -218,13 +218,22 @@ class UiPathTileBatchTest {
     }
 
     @Test
-    fun `stable raster switches from compute preference to baked cpu after observation`() {
+    fun `new raster goes to compute only in a large batch and to baked cpu after observation`() {
         val batch = UiPathTileBatch()
 
         batch.append(command(square), UiMatrix4.identity())
+        assertTrue(batch.prefersBakedCpu)
+        batch.clear()
+        val other = GenericShape { size ->
+            moveTo(0f, 0f)
+            lineTo(size.width, 0f)
+            lineTo(0f, size.height)
+            close()
+        }
+        repeat(600) { batch.append(command(other), UiMatrix4.identity()) }
         assertTrue(!batch.prefersBakedCpu)
         batch.clear()
-        batch.append(command(square), UiMatrix4.translation(20f, 10f, 0f))
+        repeat(600) { batch.append(command(other), UiMatrix4.translation(20f, 10f, 0f)) }
 
         assertTrue(batch.prefersBakedCpu)
     }

@@ -14,13 +14,14 @@ internal class UiPathTileRenderer : UiSdfRenderer(
     name = "path tile",
     vertexShaderPath = VertexShaderPath,
     fragmentShaderPath = FragmentShaderPath,
-    samplerNames = arrayOf("SegmentBuffer", "SegmentIndexBuffer", "TileBuffer", "PaintBuffer", "StopBuffer"),
+    samplerNames = arrayOf("SegmentBuffer", "SegmentIndexBuffer", "TileBuffer", "PaintBuffer", "StopBuffer", "ClipBuffer"),
 ) {
     private val segmentBuffer = UiStreamingTextureBuffer(GL30.GL_RGBA32F)
     private val segmentIndexBuffer = UiStreamingTextureBuffer(GL30.GL_R32I)
     private val tileBuffer = UiStreamingTextureBuffer(GL30.GL_RGBA32I)
     private val paintBuffer = UiStreamingTextureBuffer(GL30.GL_RGBA32F)
     private val stopBuffer = UiStreamingTextureBuffer(GL30.GL_RGBA32F)
+    private val clipBuffer = UiStreamingTextureBuffer(GL30.GL_RGBA32F)
     private val computeDispatcher = UiPathTileComputeDispatcher()
     private var vertexData: FloatBuffer? = null
     private var segmentData: FloatBuffer? = null
@@ -28,6 +29,7 @@ internal class UiPathTileRenderer : UiSdfRenderer(
     private var tileData: IntBuffer? = null
     private var paintData: FloatBuffer? = null
     private var stopData: FloatBuffer? = null
+    private var clipData: FloatBuffer? = null
 
     override val vertexStrideFloats get() = UiPathTileBatch.VertexStride
 
@@ -70,7 +72,7 @@ internal class UiPathTileRenderer : UiSdfRenderer(
                 bindProgram()
                 uploadMatrices()
                 bindVertexArray()
-                bindTextureBuffers(arrayOf(segmentBuffer, segmentIndexBuffer, tileBuffer, paintBuffer, stopBuffer))
+                bindTextureBuffers(arrayOf(segmentBuffer, segmentIndexBuffer, tileBuffer, paintBuffer, stopBuffer, clipBuffer))
                 if (computed) {
                     computeDispatcher.drawIndirect()
                 } else {
@@ -102,6 +104,7 @@ internal class UiPathTileRenderer : UiSdfRenderer(
         tileBuffer.close()
         paintBuffer.close()
         stopBuffer.close()
+        clipBuffer.close()
         computeDispatcher.close()
         vertexData = vertexData.releaseUiBuffer()
         segmentData = segmentData.releaseUiBuffer()
@@ -109,24 +112,30 @@ internal class UiPathTileRenderer : UiSdfRenderer(
         tileData = tileData.releaseUiBuffer()
         paintData = paintData.releaseUiBuffer()
         stopData = stopData.releaseUiBuffer()
+        clipData = clipData.releaseUiBuffer()
     }
 
     private fun uploadSharedInputs(batch: UiPathTileBatch) {
         segmentData = segmentData.ensureUiCapacity(batch.segmentFloatCount)
         paintData = paintData.ensureUiCapacity(batch.paintFloatCount)
         stopData = stopData.ensureUiCapacity(batch.stopFloatCount)
+        clipData = clipData.ensureUiCapacity(batch.clipFloatCount)
         val segments = segmentData.prepareUiBuffer(batch.segmentFloatCount)
         val paints = paintData.prepareUiBuffer(batch.paintFloatCount)
         val stops = stopData.prepareUiBuffer(batch.stopFloatCount)
+        val clips = clipData.prepareUiBuffer(batch.clipFloatCount)
         batch.writeSegments(segments)
         batch.writePaints(paints)
         batch.writeStops(stops)
+        batch.writeClips(clips)
         segments.flip()
         paints.flip()
         stops.flip()
+        clips.flip()
         segmentBuffer.upload(segments)
         paintBuffer.upload(paints)
         stopBuffer.upload(stops)
+        clipBuffer.upload(clips)
     }
 
     private fun uploadCpuOutput(batch: UiPathTileBatch) {

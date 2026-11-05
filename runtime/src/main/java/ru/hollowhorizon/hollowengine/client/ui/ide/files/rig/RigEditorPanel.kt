@@ -123,7 +123,7 @@ private fun Toolbar(
         IconButton(ColliderIcon, rigText("toggle_colliders"), iconSize = 12f, active = state.showColliders) {
             state.showColliders = !state.showColliders
         }
-        if (state.partSelection != null) GizmoToolbarButtons()
+        if (state.partSelection != null) GizmoToolbarButtons("rig-gizmo-${System.identityHashCode(state)}")
         if (RigPreviews.isAvailable) {
             IconButton(
                 icon = if (preview == null) PhysicsIcon else StopIcon,

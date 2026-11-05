@@ -2,24 +2,31 @@ package ru.hollowhorizon.hollowengine.client.ui.script
 
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.script.UiScriptHudHost.dropFinishedExits
 import ru.hollowhorizon.hollowengine.common.ui.HudPlacement
+import ru.hollowhorizon.hollowengine.common.ui.OverlayAnchor
+import ru.hollowhorizon.hollowengine.common.ui.ScreenLevel
 import ru.hollowhorizon.hollowengine.common.ui.UiData
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 import ru.hollowhorizon.hollowengine.common.ui.UiOverlayDefinition
 import ru.hollowhorizon.hollowengine.common.ui.hud.HudLayerRegistry
+import java.util.EnumSet
 
 /**
  * Draws the scripted HUD layers that are currently shown, and routes input to the ones that opted
- * in. Each layer is anchored to a vanilla layer and drawn from that layer's Pre/Post hook, which is
- * what lets a scripted overlay sit *between* two vanilla ones without the engine owning a fixed list
- * of slots. Overlays flagged `aboveScreens` also draw over an open screen.
+ * in. A layer in the HUD is drawn from the Pre/Post hook of the vanilla layer it is anchored to, which
+ * is what lets a scripted overlay sit *between* two vanilla ones without the engine owning a fixed list
+ * of slots; one on a screen is drawn from the screen's hooks at its [ScreenLevel].
  */
 object UiScriptHudHost {
     private val shown = LinkedHashMap<ResourceLocation, ShownOverlay>()
+    private val drawnLevels = EnumSet.noneOf(ScreenLevel::class.java)
 
     private class ShownOverlay(
         val definition: UiOverlayDefinition,
@@ -113,40 +120,53 @@ object UiScriptHudHost {
         }
     }
 
-    /** Draws every overlay anchored at [anchor]/[placement] that is not currently suppressed. */
-    fun render(anchor: ResourceLocation, placement: HudPlacement, nowNanos: Long) {
+    /** Draws every overlay that sits in the HUD at [layer]/[placement] right now and is not suppressed. */
+    fun render(layer: ResourceLocation, placement: HudPlacement, nowNanos: Long) {
         dropFinishedExits()
         if (shown.isEmpty()) return
-        val screenOpen = Minecraft.getInstance().screen != null
+        val anchor = OverlayAnchor.HudLayer(layer, placement)
+        val screen = Minecraft.getInstance().screen?.javaClass
         shown.values.forEach { overlay ->
-            if (overlay.definition.anchor != anchor || overlay.definition.placement != placement) return@forEach
-            if (screenOpen && overlay.definition.aboveScreens) return@forEach
-            renderOne(overlay, nowNanos)
+            if (overlay.definition.anchorFor(screen) == anchor) renderOne(overlay, nowNanos)
         }
     }
 
-    /** Draws the overlays that opted to sit on top of an open screen. */
-    fun renderAboveScreens(nowNanos: Long) {
+    /** Starts a frame of the open screen; each [ScreenLevel] is drawn once in it. */
+    fun beginScreenFrame() {
+        drawnLevels.clear()
+    }
+
+    /**
+     * Draws the overlays on top of [screen] up to [level], the levels below it included if the screen skipped
+     * their hook: a screen without a background still gets its [ScreenLevel.BACKGROUND] overlays.
+     */
+    fun renderOnScreen(screen: Screen, level: ScreenLevel, graphics: GuiGraphics, nowNanos: Long) {
         dropFinishedExits()
-        if (shown.isEmpty()) return
-        shown.values.forEach { overlay ->
-            if (overlay.definition.aboveScreens) renderOne(overlay, nowNanos)
+        for (current in ScreenLevel.entries) {
+            if (current > level) break
+            if (!drawnLevels.add(current) || shown.isEmpty()) continue
+            // What the screen batched so far lies under the overlay, so it goes out first.
+            graphics.flush()
+            shown.values.forEach { overlay ->
+                val anchor = overlay.definition.anchorFor(screen.javaClass)
+                if (anchor is OverlayAnchor.OnScreen && anchor.level == current) renderOne(overlay, nowNanos)
+            }
         }
     }
 
-    fun handleMouseMove(x: Float, y: Float): Boolean = dispatch { it.surface.mouseMoved(x, y) }
+    fun handleMouseMove(x: Float, y: Float): Boolean = dispatch(x, y) { it.surface.mouseMoved(x, y) }
 
     fun handleMouseButton(x: Float, y: Float, button: Int, action: Int): Boolean =
-        dispatch { it.surface.mousePressed(x, y, button, action) }
+        dispatch(x, y) { it.surface.mousePressed(x, y, button, action) }
 
     fun handleMouseScroll(x: Float, y: Float, scrollX: Double, scrollY: Double): Boolean =
-        dispatch { it.surface.mouseScrolled(x, y, scrollX, scrollY) }
+        dispatch(x, y) { it.surface.mouseScrolled(x, y, scrollX, scrollY) }
 
     fun handleKey(key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean =
-        dispatch { it.surface.keyPressed(key, scanCode, action, modifiers) }
+        dispatch(null, null) { it.surface.keyPressed(key, scanCode, action, modifiers) }
 
     fun handleChar(codePoint: Int, modifiers: Int): Boolean =
-        dispatch { it.surface.charTyped(codePoint, modifiers) }
+        dispatch(null, null) { it.surface.charTyped(codePoint, modifiers) }
 
     /**
      * Drops every shown overlay and brings back the ones scripts declare as auto-showing. Called
@@ -214,16 +234,32 @@ object UiScriptHudHost {
     }
 
     /**
-     * Dispatches an input action to the most recently shown interactive overlay that consumes it.
+     * Dispatches an input action to the most recently shown interactive overlay that consumes it. [x] and [y] are
+     * the pointer, null for keys.
      */
-    private inline fun dispatch(action: (ShownOverlay) -> Boolean): Boolean {
+    private inline fun dispatch(x: Float?, y: Float?, action: (ShownOverlay) -> Boolean): Boolean {
         if (shown.isEmpty()) return false
-        val screenOpen = Minecraft.getInstance().screen != null
+        val screen = Minecraft.getInstance().screen
         for (overlay in shown.values.reversed()) {
-            if (!overlay.definition.isInteractive) continue
-            if (screenOpen && !overlay.definition.aboveScreens) continue
+            if (!overlay.definition.isInteractive || !takesInput(overlay.definition, screen, x, y)) continue
             if (action(overlay)) return true
         }
         return false
+    }
+
+    private fun takesInput(definition: UiOverlayDefinition, screen: Screen?, x: Float?, y: Float?): Boolean {
+        val anchor = definition.anchorFor(screen?.javaClass)
+        if (screen == null) return anchor != null
+        if (anchor !is OverlayAnchor.OnScreen) return false
+        if (anchor.level != ScreenLevel.BACKGROUND) return true
+        return x != null && y != null && !covers(screen, x, y)
+    }
+
+    /** Whether [screen] has something of its own to click at [x], [y]. */
+    private fun covers(screen: Screen, x: Float, y: Float): Boolean {
+        if (screen.getChildAt(x.toDouble(), y.toDouble()).isPresent) return true
+        if (screen !is AbstractContainerScreen<*>) return false
+        return x >= screen.leftPos && x < screen.leftPos + screen.imageWidth &&
+                y >= screen.topPos && y < screen.topPos + screen.imageHeight
     }
 }

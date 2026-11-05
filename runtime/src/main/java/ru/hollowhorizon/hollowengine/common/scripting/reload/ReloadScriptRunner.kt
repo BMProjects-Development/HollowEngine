@@ -7,6 +7,8 @@ import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.scripting.RELOAD_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptEventHandlers
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptFailedEvent
+import ru.hollowhorizon.hollowengine.common.scripting.ScriptStartedEvent
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import kotlin.script.experimental.api.constructorArgs
@@ -51,9 +53,11 @@ internal class ReloadScriptRunner(private val side: LogicalSide) {
             implicitReceivers(receiver)
         }.onSuccess { script ->
             ScriptEventHandlers.subscribe(id, script, scriptScope)
+            ScriptStartedEvent.post(ScriptStartedEvent(id, script, scriptScope))
         }.onFailure { error ->
             scriptScope.cancel()
             HollowEngine.LOGGER.error("Failed to execute reload script: {}", ScriptRegistry.display(id), error)
+            if (side == LogicalSide.SERVER) ScriptFailedEvent.post(ScriptFailedEvent(id))
         }
     }
 }

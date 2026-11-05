@@ -47,11 +47,14 @@ private fun SplitDivider(view: HollowIdeFileView, id: String) {
     )
 }
 
-/** The three mode buttons at the right end of the tab bar, as in IDEA. */
+/**
+ * The mode buttons at the right end of the tab bar, as in IDEA: the text, the split, then a button per preview. While
+ * split, picking another preview puts it beside the text, and picking the one there opens it alone.
+ */
 @Composable
 internal fun HollowIdeViewModeSwitch(view: HollowIdeFileView, id: String) {
     Row(tags = listOf("ide-view-modes"), modifier = Modifier.alignItems(vertical = UiAlign.CENTER)) {
-        HollowIdeViewMode.entries.forEach { mode ->
+        listOf(HollowIdeViewMode.TEXT, HollowIdeViewMode.SPLIT).forEach { mode ->
             IconButton(
                 mode.icon,
                 mode.tooltip.lang,
@@ -59,6 +62,20 @@ internal fun HollowIdeViewModeSwitch(view: HollowIdeFileView, id: String) {
                 active = view.mode == mode,
                 tags = listOf("ide-view-mode"),
             ) { view.mode = mode }
+        }
+        view.previews.forEach { preview ->
+            IconButton(
+                preview.icon,
+                preview.title.lang,
+                id = "$id-view-${preview.id}",
+                active = view.preview == preview && (view.mode == HollowIdeViewMode.PREVIEW ||
+                    view.mode == HollowIdeViewMode.SPLIT && view.previews.size > 1),
+                tags = listOf("ide-view-mode"),
+            ) {
+                val swap = view.mode == HollowIdeViewMode.SPLIT && view.preview != preview
+                view.preview = preview
+                if (!swap) view.mode = HollowIdeViewMode.PREVIEW
+            }
         }
     }
 }

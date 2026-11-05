@@ -8,5 +8,22 @@
   "align.center_y": "Center vertically",
   "align.bottom": "Align bottom edges",
   "distribute.horizontal": "Space evenly across",
-  "distribute.vertical": "Space evenly down"
+  "distribute.vertical": "Space evenly down",
+  "editor.duplicate": "Duplicate",
+  "editor.delete_node": "Delete node",
+  "editor.delete_link": "Delete link",
+  "editor.reroute": "Reroute",
+  "editor.group": "Group",
+  "editor.group_nodes": "Group",
+  "editor.ungroup": "Ungroup",
+  "editor.leave_group": "Take out of the group",
+  "editor.collapse_group": "Collapse into one node",
+  "editor.expand_group": "Expand",
+  "editor.delete_group_nodes": "Delete with the nodes",
+  "editor.search": "Find a node",
+  "editor.search_none": "Nothing found",
+  "editor.search_previous": "Previous",
+  "editor.search_next": "Next",
+  "editor.search_close": "Close",
+  "editor.search_items": "Search"
 }

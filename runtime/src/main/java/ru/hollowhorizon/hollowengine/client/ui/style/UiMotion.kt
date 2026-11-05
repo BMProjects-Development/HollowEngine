@@ -247,11 +247,13 @@ class UiTransitionState {
             return target
         }
         val oldTarget = state.transitionTarget
-        if (oldTarget !== target && oldTarget != target) {
+        val changed = oldTarget !== target && oldTarget != target
+        state.transitionTarget = target
+        if (changed) {
             state.transitionStart = current
-            state.transitionTarget = target
             state.transitionStartedAt = nowMillis
         } else if (state.transitionStartedAt == UiNodeMotionState.NoTimestamp) {
+            state.rendered = target
             return target
         }
         val startStyle = state.transitionStart ?: current
@@ -325,6 +327,13 @@ class UiAnimationState {
             val progress = animationProgress(animation, nowMillis - startedAt) ?: return@fold style
             frames.sample(style, progress, animation.easing)
         }
+    }
+
+    /** Whether a later resolve can still give [style] something else than this one did. */
+    internal fun isRunning(state: UiNodeMotionState, style: UiComputedStyle, nowMillis: Long): Boolean {
+        if (state.animationSignature == null) return false
+        val elapsed = nowMillis - state.animationStartedAt
+        return style.animations.any { animation -> animation.totalDurationMillis()?.let { it > elapsed } ?: true }
     }
 
     private fun animationProgress(animation: UiAnimation, elapsedMillis: Long): Float? {
