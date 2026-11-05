@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 class StoryGraphEditsTest {
     @Test
     fun `duplicating a start gives the copy a distinct stage name`() {
-        val graph = StoryGraph(nodes = listOf(StoryNode.Start("start", "main")))
+        val graph = StoryGraph(nodes = listOf(StoryNode.Start("start")))
 
         val (copied, _) = graph.copyNodes(setOf("start"), StoryPoint(24f, 24f))
         val generated = StoryGraphCompiler.compile(copied)

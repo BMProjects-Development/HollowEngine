@@ -11,6 +11,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewCrumb
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeViewMode
@@ -20,6 +21,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 private const val CanvasId = "story-graph"
 private const val StoryGraphStylesheet = "hollowengine-narrative:ui/styles/story-graph.hss"
+private const val BackIcon = "hollowengine:textures/gui/icons/graph/back.svg"
 private const val ColumnStep = 340f
 private const val RowStep = 170f
 private const val RemoveIcon = "hollowengine:textures/gui/icons/remove.svg"
@@ -35,13 +37,19 @@ internal val StoryGraphFilePreview = HollowIdeFilePreview(
 ) { StoryGraphPreview(it) }
 
 internal class StoryGraphState : StoryEditorState() {
-    val editor = GraphEditorState()
+    /** The view and selection of the story and of each function, kept apart: going inside one leaves the rest as it was. */
+    private val editors = HashMap<String?, GraphEditorState>()
+
+    val editor: GraphEditorState get() = editors.getOrPut(scope) { GraphEditorState() }
 
     /** How big the canvas is, for bringing a node to its middle. */
     var canvas = UiRect.Zero
 
     /** Where a drag has taken nodes, until it ends and writes that to the file. */
     var moved by mutableStateOf(emptyMap<String, StoryPoint>())
+
+    /** The node to select and bring into sight once the editor shows the graph it is in. */
+    var reveal by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -49,29 +57,34 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val state = context.state { StoryGraphState() }
     state.context = context
     val parsed = state.model.read(context.text)
-    val graph = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
-    val controller = remember(state) { GraphEditorController(CanvasId, state.editor) }
+    val root = parsed.getOrNull() ?: return HollowIdePreviewError(parsed.exceptionOrNull())
+    val scope = state.scope.takeIf { root.scope(it) != null }
+    SideEffect { if (state.scope != scope) state.scope = scope }
+    val graph = root.scope(scope) ?: root
+    val controller = remember(state, scope) { GraphEditorController(CanvasId, state.editor) }
     val arranged = remember(graph) { arrange(graph) }
-    val ownChecks = remember(graph) { StoryChecks.all(graph) }
-    val analysis = StoryInsight.analysis(state, graph)
+    val ownChecks = remember(root) { StoryChecks.all(root) }
+    val analysis = StoryInsight.analysis(state, root)
     val checks = ownChecks + analysis.checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
     state.clips = rememberStoryClips(graph)
-    val boxes = remember(graph, analysis, state.clips) { StoryGraphBoxes(graph, state) }
+    val boxes = remember(graph, analysis, state.clips, state.openSections) { StoryGraphBoxes(graph, state) }
     val model = StoryGraphEditorModel(state, graph, boxes, arranged + state.moved) { controller.select(it) }
     controller.model = model
 
-    PublishStoryProblems(context, graph, checks) { node ->
-        controller.select(GraphSelection.of(node))
-        model.all[node]?.rect?.let {
-            state.editor.view.centerOn(
-                it.centerX,
-                it.centerY,
-                state.canvas.width,
-                state.canvas.height
-            )
-        }
+    val owners = remember(root) { root.owners() }
+    PublishStoryProblems(context, root.flattened(), checks) { node ->
+        state.scope = owners[node]?.id
+        state.reveal = node
     }
+    SideEffect {
+        val node = state.reveal ?: return@SideEffect
+        val rect = model.all[node]?.rect ?: return@SideEffect
+        state.reveal = null
+        controller.select(GraphSelection.of(node))
+        state.editor.view.centerOn(rect.centerX, rect.centerY, state.canvas.width, state.canvas.height)
+    }
+    PublishStoryCrumbs(context, state, root.functions.firstOrNull { it.id == scope })
 
     PublishStorySelection(context, state, model)
 
@@ -102,9 +115,40 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
                 }
             }
         }
+        if (scope != null) ScopeBack(state)
         state.codeField?.let { StoryCodeDialog(state, it) }
         state.colorField?.let { StoryColorDialog(state, it) }
     }
+}
+
+/** The button in the corner of a function's body that leads back out to the story. */
+@Composable
+private fun ScopeBack(state: StoryGraphState) {
+    Box(
+        id = "st-scope-back",
+        tags = listOf("st-scope-back"),
+        modifier = Modifier.position(8.px, 8.px).input(hoverable = true, clickable = true)
+            .tooltipOnHover(storyLang("function.back")).onPress { event ->
+                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) state.scope = null
+                event.consume()
+            },
+    ) {
+        Image(BackIcon, tags = listOf("st-scope-back-icon"))
+    }
+}
+
+/** Tells the status bar which function the editor is inside of; its first step leads back out to the story. */
+@Composable
+private fun PublishStoryCrumbs(context: HollowIdePreviewContext, state: StoryGraphState, function: StoryNode.Function?) {
+    SideEffect {
+        context.publishCrumbs(
+            if (function == null) emptyList() else listOf(
+                HollowIdePreviewCrumb(storyLang("story"), StoryNodeKind.START.icon) { state.scope = null },
+                HollowIdePreviewCrumb(function.name, StoryNodeKind.FUNCTION.icon),
+            ),
+        )
+    }
+    DisposableEffect(context) { onDispose { context.publishCrumbs(emptyList()) } }
 }
 
 /** Keeps the inspector on what is selected; apart from the graph, which a click has no need to make anew. */
@@ -150,7 +194,10 @@ private fun StoryNodeView(
             "collapsed".takeIf { box.collapsed },
             (if (warning) "warning" else "error").takeIf { problem != null }),
     ) {
-        GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning) {
+        val open = state.functionInside(node)?.let { target ->
+            GraphNodeOpen(storyLang("function.enter")) { state.scope = target }
+        }
+        GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning, open) {
             state.change { copy(collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id) }
         }
         if (!box.collapsed) box.rows.forEach { row -> StoryRowView(controller, state, box, row) }
@@ -169,6 +216,7 @@ private fun StoryRowView(
     box: StoryNodeBox,
     row: StoryNodeRow,
 ) {
+    row.section?.let { return SectionRowView(box, row, it) }
     val readOnly = state.context?.readOnly == true
     Row(
         tags = listOf("gn-node-row"),
@@ -183,6 +231,16 @@ private fun StoryRowView(
         val problem = problems.takeIf { it.isNotEmpty() }?.joinToString("\n")
         val wrong =
             field?.problem != null || insight?.diagnostics?.any { it.severity == UiTextDiagnosticSeverity.ERROR } == true
+        row.nameField?.let { name ->
+            TextField(
+                value = name.value,
+                onChange = name.write,
+                readOnly = readOnly,
+                id = "st-field-${box.node.id}-${name.key}",
+                tags = listOf("gn-field"),
+                modifier = Modifier.size(0.px, 20.px).grow(1f).graphField(controller, box.node.id),
+            )
+        }
         if (row.label != null && field == null && row.input == null) Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
         row.label?.let {
             Text(
@@ -257,9 +315,27 @@ private fun StoryRowView(
                     },
             ) {
                 Image(AddIcon, tags = listOf("st-row-button"))
-                Text(storyLang("choice.add"), tags = listOf("gn-pin-hint"))
+                Text(row.addLabel ?: storyLang("choice.add"), tags = listOf("gn-pin-hint"))
             }
         }
+    }
+}
+
+/** A heading that folds the rows under it: a click anywhere on it shows or hides them. */
+@Composable
+private fun SectionRowView(box: StoryNodeBox, row: StoryNodeRow, section: StoryRowSection) {
+    Row(
+        id = "st-section-${box.node.id}-${row.top}",
+        tags = listOf("gn-node-row", "st-section"),
+        modifier = Modifier.position(0.px, row.top.px).size(box.width.px, row.height.px)
+            .padding(GraphNodeMetrics.INSET.px, 0.px).alignItems(vertical = UiAlign.CENTER)
+            .input(hoverable = true, clickable = true).onPress { event ->
+                if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) section.toggle()
+                event.consume()
+            },
+    ) {
+        DisclosureArrow(section.open)
+        Text(row.label.orEmpty(), tags = listOf("gn-pin-label", "st-section-title"))
     }
 }
 
@@ -346,10 +422,10 @@ private fun GroupFields(state: StoryEditorState, group: StoryNodeGroup) {
     }
 }
 
-/** Every node with its place: as the file says, or by how far flow is from a start for those without one. */
+/** Every node with its place: as the file says, or by how far flow is from where it starts for those without one. */
 private fun arrange(graph: StoryGraph): Map<String, StoryPoint> {
     val depth = HashMap<String, Int>()
-    val queue = ArrayDeque(graph.nodes.filterIsInstance<StoryNode.Start>().map { it.id to 0 })
+    val queue = ArrayDeque(graph.nodes.filter { it is StoryNode.Start || it is StoryNode.Parameters }.map { it.id to 0 })
     while (queue.isNotEmpty()) {
         val (id, at) = queue.removeFirst()
         if (id in depth) continue

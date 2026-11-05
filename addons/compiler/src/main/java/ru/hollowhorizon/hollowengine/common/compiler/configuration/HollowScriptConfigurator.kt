@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.annotations.Import
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.FileBasedScriptSource
@@ -67,7 +68,8 @@ class HollowScriptConfigurator : RefineScriptCompilationConfigurationHandler {
     private fun resolve(owner: ScriptId?, scriptFile: File?, reference: String): File? {
         if (owner != null) {
             val id = ScriptImports.resolve(owner, reference) ?: return null
-            return ScriptRegistry.artifacts(id)?.sourceFile
+            val source = ScriptRegistry.artifacts(id)?.sourceFile ?: return null
+            return ScriptTranslators.kotlinSource(id, source)
         }
         val base = scriptFile?.parentFile ?: return File(reference).takeIf(File::isFile)
         return base.resolve(reference).takeIf(File::isFile) ?: File(reference).takeIf(File::isFile)

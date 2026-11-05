@@ -83,12 +83,12 @@ internal object StoryInsight {
             checked = StoryFieldChecks.script(graph, story.code)
         }
 
-        fun current() = of(state.read() ?: StoryGraph())
+        fun current() = of(state.root() ?: StoryGraph())
 
         override fun close() = script.close()
     }
 
-    private fun session(state: StoryEditorState, graph: StoryGraph = state.read() ?: StoryGraph()): Session {
+    private fun session(state: StoryEditorState, graph: StoryGraph = state.root() ?: StoryGraph()): Session {
         val session = state.insight ?: Session(state, state.context?.file?.path.orEmpty()).also { state.insight = it }
         return session.of(graph)
     }
@@ -159,7 +159,7 @@ internal object StoryInsight {
         return UiCodeInsight(completions = session.types, completionRevision = session.script.version)
     }
 
-    /** What the Kotlin compiler says of the story in [state], as analysis gets to it. */
+    /** What the Kotlin compiler says of the story in [state], the whole file [graph], as analysis gets to it. */
     fun analysis(state: StoryEditorState, graph: StoryGraph): StoryAnalysis = analysis(session(state, graph))
 
     private fun analysis(session: Session): StoryAnalysis {

@@ -54,6 +54,9 @@ internal class StoryRowField(
  *
  * @param hint what the mark beside the label says.
  * @param optional whether what it holds can be left out.
+ * @param addLabel what the button of [onAdd] says.
+ * @param nameField the field of the name of what the row holds, which takes the place of [label].
+ * @param section the heading that folds the rows under it, when the row is one.
  */
 internal class StoryNodeRow(
     val top: Float,
@@ -66,7 +69,13 @@ internal class StoryNodeRow(
     val onAdd: (() -> Unit)? = null,
     val hint: String? = null,
     val optional: Boolean = false,
+    val addLabel: String? = null,
+    val nameField: StoryRowField? = null,
+    val section: StoryRowSection? = null,
 )
+
+/** A heading of rows that a click on it shows or hides. */
+internal class StoryRowSection(val open: Boolean, val toggle: () -> Unit)
 
 /** Where everything of one node sits, in graph units from the corner of the node. */
 internal class StoryNodeBox(
@@ -141,9 +150,9 @@ internal fun StoryPinType.color(): UiColor = UiColor.fromArgb(
 internal fun StoryPinType.tag(): String = "gn-type-${name.lowercase()}"
 
 /** Lays out the nodes of a story with the fields that edit them in [state]. */
-internal class StoryNodeLayout(private val graph: StoryGraph, private val state: StoryEditorState) {
+internal class StoryNodeLayout(internal val graph: StoryGraph, internal val state: StoryEditorState) {
     private val linked = graph.index.values.keys
-    private val types = StoryInsight.analysis(state, graph).types
+    private val types = StoryInsight.analysis(state, state.root() ?: graph).types
 
     /**
      * The box of [node], with its corner at [place].
@@ -187,6 +196,9 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         is StoryNode.Call -> StoryCatalog.signatureOf(node)?.let(StoryCatalog::title)
             ?: node.function.substringAfterLast('.')
 
+        is StoryNode.Function -> node.name
+        is StoryNode.Invoke -> node.function
+
         is StoryNode.Pure -> StoryCatalog.operatorTitle(node.operator)
         else -> StoryNodeKind.of(node).title
     }
@@ -211,13 +223,16 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         state.editNode(node, field, change)
 
     /** The rows of one node, each under the one before. */
-    private inner class Rows(private val detailed: Boolean) {
+    internal inner class Rows(internal val detailed: Boolean) {
+        /** The layout the rows are of. */
+        val layout: StoryNodeLayout get() = this@StoryNodeLayout
+
         val result = ArrayList<StoryNodeRow>()
         private var y = GraphNodeMetrics.HEADER + PADDING
 
         fun bottom() = y + PADDING
 
-        private fun row(
+        internal fun row(
             label: String? = null,
             input: StoryPinSpec? = null,
             output: StoryPinSpec? = null,
@@ -226,13 +241,18 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             onAdd: (() -> Unit)? = null,
             hint: String? = null,
             optional: Boolean = false,
+            addLabel: String? = null,
+            nameField: StoryRowField? = null,
+            section: StoryRowSection? = null,
         ) {
             val height = if (field != null && field.lines > 1) field.lines * LINE + 12f else StoryNodeBox.FLOW_ROW
-            result += StoryNodeRow(y, height, label, input, output, field, onRemove, onAdd, hint, optional)
+            result += StoryNodeRow(
+                y, height, label, input, output, field, onRemove, onAdd, hint, optional, addLabel, nameField, section,
+            )
             y += height
         }
 
-        private fun flow(hasInput: Boolean = true, hasOutput: Boolean = true) = row(
+        internal fun flow(hasInput: Boolean = true, hasOutput: Boolean = true) = row(
             input = FLOW_IN.takeIf { hasInput },
             output = FLOW_NEXT.takeIf { hasOutput },
         )
@@ -240,7 +260,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
         private fun exit(pin: String, label: String) = row(label = label, output = StoryPinSpec(pin, StoryPinType.FLOW))
 
         /** A value pin with what it holds when nothing is linked to it. */
-        private fun value(
+        internal fun value(
             node: String,
             name: String,
             label: String,
@@ -264,12 +284,32 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
 
         fun build(node: StoryNode): Float = when (node) {
             is StoryNode.Start -> {
-                row(
-                    output = FLOW_NEXT,
-                    field = StoryRowField("name", node.name, storyLang("start.name")) { typed ->
-                        edit(node.id, "name") { (it as StoryNode.Start).copy(name = typed.trim()) }
-                    },
-                )
+                row(label = storyLang("start.hint"), output = FLOW_NEXT)
+                GraphNodeMetrics.WIDTH
+            }
+
+            is StoryNode.Function -> {
+                signature(node)
+                GraphNodeMetrics.WIDTH
+            }
+
+            is StoryNode.Parameters -> {
+                parameters(node)
+                GraphNodeMetrics.WIDTH
+            }
+
+            is StoryNode.Return -> {
+                giveBack(node)
+                WIDE
+            }
+
+            is StoryNode.Invoke -> {
+                invoke(node)
+                WIDE
+            }
+
+            is StoryNode.Signal -> {
+                signal(node)
                 GraphNodeMetrics.WIDTH
             }
 
@@ -557,7 +597,7 @@ internal class StoryNodeLayout(private val graph: StoryGraph, private val state:
             }
         }
 
-        private fun codeProblem(code: String) = code.takeIf { it.isNotBlank() }?.let(StoryChecks::code)
+        internal fun codeProblem(code: String) = code.takeIf { it.isNotBlank() }?.let(StoryChecks::code)
 
         private fun pure(node: StoryNode.Pure) {
             val operator = StoryOperators.find(node.operator) ?: return

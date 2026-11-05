@@ -39,7 +39,7 @@ internal fun ConeKotlinType.stageProblem(session: FirSession): String? {
         val symbol = type.toRegularClassSymbol(session) ?: return false
         if (!visited.add(symbol.classId)) return false
         val qualified = symbol.classId.asSingleFqName().asString()
-        if (qualified == "net.minecraft.world.entity.Entity" || qualified == "net.minecraft.nbt.Tag") return true
+        if (qualified == "net.minecraft.world.entity.Entity" || qualified == "net.minecraft.nbt.Tag" || qualified == StageValueTypes.STORY_RECORD) return true
         return symbol.resolvedSuperTypes.any { inherits(it, visited) }
     }
     if (inherits(this)) return null

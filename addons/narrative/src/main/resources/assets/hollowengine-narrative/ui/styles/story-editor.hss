@@ -144,3 +144,8 @@
     size: 7px 5px;
     transform: rotate(180deg);
 }
+
+.st-signature-entry {
+    gap: 4px;
+    align-items: center center;
+}

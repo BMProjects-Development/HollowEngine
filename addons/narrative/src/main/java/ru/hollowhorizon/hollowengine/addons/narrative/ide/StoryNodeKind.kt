@@ -15,6 +15,11 @@ internal enum class StoryNodeKind(val tag: String, icon: String, name: String, c
     CHOICE("choice", "choice", "choice", 0xBF8246),
     CONDITION("condition", "condition", "condition", 0x7A5FB5),
     START("start", "label", "start", 0xCF5E54),
+    FUNCTION("block", "block", "function", 0x2B8A9E),
+    PARAMETERS("start", "label", "parameters", 0x2B8A9E),
+    RETURN("start", "label", "return", 0x2B8A9E),
+    SIGNAL("command", "command", "signal", 0x2B8A9E),
+    INVOKE("command", "command", "invoke", 0x2B8A9E),
     SET("command", "command", "set", 0x4C5566),
     CODE("block", "block", "code", 0x5F59B1),
     VALUE("pure", "block", "code", 0x2F7D80),
@@ -31,6 +36,11 @@ internal enum class StoryNodeKind(val tag: String, icon: String, name: String, c
 
         fun of(node: StoryNode): StoryNodeKind = when (node) {
             is StoryNode.Start -> START
+            is StoryNode.Function -> FUNCTION
+            is StoryNode.Parameters -> PARAMETERS
+            is StoryNode.Return -> RETURN
+            is StoryNode.Signal -> SIGNAL
+            is StoryNode.Invoke -> INVOKE
             is StoryNode.Say -> PHRASE
             is StoryNode.Choose -> CHOICE
             is StoryNode.Branch -> CONDITION

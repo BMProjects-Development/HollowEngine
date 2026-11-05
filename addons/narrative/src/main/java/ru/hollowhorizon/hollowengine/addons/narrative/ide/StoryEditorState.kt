@@ -62,18 +62,51 @@ internal open class StoryEditorState : AutoCloseable {
     /** Whether the inspector shows the Kotlin of the story. */
     var showsKotlin by mutableStateOf(false)
 
-    fun read(): StoryGraph? = context?.let { model.read(it.text).getOrNull() }
+    /** The id of the function the editor is inside of, or null while it shows the story itself. */
+    var scope by mutableStateOf<String?>(null)
+
+    /** The parts of function signatures shown unfolded, by the id of the function and the part; the rest stay folded. */
+    var openSections by mutableStateOf(emptySet<String>())
+        private set
+
+    fun toggleSection(key: String) {
+        openSections = if (key in openSections) openSections - key else openSections + key
+    }
+
+    /** The whole file, the functions with their bodies. */
+    fun root(): StoryGraph? = context?.let { model.read(it.text).getOrNull() }
+
+    /** What the editor shows: the story, or the body of the function it is inside of. */
+    fun read(): StoryGraph? = root()?.scope(scope)
+
+    /** The function the editor is inside of. */
+    fun function(): StoryNode.Function? = scope?.let { root()?.node(it) as? StoryNode.Function }
+
+    /** The function going inside [node] leads to: the function itself, or the one of this story a call is of. */
+    fun functionInside(node: StoryNode): String? = when (node) {
+        is StoryNode.Function -> node.id
+        is StoryNode.Invoke -> if (node.file == null) root()?.functions?.firstOrNull { it.name == node.function }?.id else null
+        else -> null
+    }
 
     /**
-     * Writes what [change] makes of the story.
+     * Writes what [change] makes of what the editor shows.
      *
      * @param label what the step is called in the history window.
      * @param mergeKey folds the step into the one just before with the same key, as for the letters typed into a field.
      */
     fun change(label: UndoLabel = StoryUndo.EDIT, mergeKey: String? = null, change: StoryGraph.() -> StoryGraph) {
         val context = context?.takeUnless { it.readOnly } ?: return
-        val graph = read() ?: return
-        context.edit(graph.change().encode(), label, mergeKey)
+        val root = root() ?: return
+        val shown = root.scope(scope) ?: return
+        context.edit(root.withScope(scope, shown.change()).encode(), label, mergeKey)
+    }
+
+    /** Writes what [change] makes of the whole file, wherever the editor is. */
+    fun changeRoot(label: UndoLabel = StoryUndo.EDIT, mergeKey: String? = null, change: StoryGraph.() -> StoryGraph) {
+        val context = context?.takeUnless { it.readOnly } ?: return
+        val root = root() ?: return
+        context.edit(root.change().encode(), label, mergeKey)
     }
 
     /** Changes the node [id]; typing into [field] of it is one step of the history. */

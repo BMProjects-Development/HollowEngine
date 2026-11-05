@@ -40,6 +40,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -217,7 +218,7 @@ class ScriptingAnalyzerImpl internal constructor(
                     return@argumentLoop
                 }
 
-                val importedName = editorPathOf(source)
+                val importedName = editorPathOf(source) + if (ScriptTranslators.translates(imported)) TRANSLATED else ""
                 if (importedName in activeFiles) {
                     diagnostics += importDiagnostic(
                         file,
@@ -229,8 +230,8 @@ class ScriptingAnalyzerImpl internal constructor(
                 if (!importedNames.add(importedName)) return@argumentLoop
 
                 val importedText = try {
-                    source.readText().withUnixLineSeparators()
-                } catch (exception: IOException) {
+                    ScriptTranslators.kotlinText(imported, source).withUnixLineSeparators()
+                } catch (exception: Exception) {
                     diagnostics += importDiagnostic(
                         file,
                         expression,
@@ -426,6 +427,9 @@ class ScriptingAnalyzerImpl internal constructor(
     private companion object {
         /** An empty sandbox script, so name lookups see the classpath the project's own scripts compile against. */
         val SymbolLookupScript = "${SandboxScriptSource.SCRIPTS_DIRECTORY}/.symbol-lookup.kts"
+
+        /** What the name of a translated script gets to be read as the Kotlin it is translated into. */
+        const val TRANSLATED = ".generated.kts"
     }
 }
 

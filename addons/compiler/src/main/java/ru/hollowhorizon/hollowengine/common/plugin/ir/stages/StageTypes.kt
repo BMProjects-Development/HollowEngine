@@ -23,6 +23,7 @@ internal class StageTypes(context: IrPluginContext) {
     private val finder = context.finderForBuiltins()
     private val entity: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName("net.minecraft.world.entity.Entity")))
     private val tag: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName("net.minecraft.nbt.Tag")))
+    private val record: IrClassSymbol? = finder.findClass(ClassId.topLevel(FqName(StageValueTypes.STORY_RECORD)))
 
     /** Why a story cannot keep a value of [type], or null when it can. */
     fun problem(type: IrType): String? {
@@ -31,6 +32,9 @@ internal class StageTypes(context: IrPluginContext) {
         val klass = simple.classOrNull?.owner ?: return "${type.render()} is a type parameter, which cannot be saved"
         if (entity != null && type.isSubtypeOfClass(entity)) return null
         if (tag != null && type.isSubtypeOfClass(tag)) return null
+        if (record != null && type.isSubtypeOfClass(record)) {
+            return klass.primaryConstructor?.parameters.orEmpty().firstNotNullOfOrNull { problem(it.type) }
+        }
         val name = klass.kotlinFqName.asString()
         if (name in StageValueTypes.BASIC || name == StageValueTypes.STORY_HANDLE) return null
         if (isFunction(type)) {

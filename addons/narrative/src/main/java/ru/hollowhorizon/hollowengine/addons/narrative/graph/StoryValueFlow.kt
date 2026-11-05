@@ -4,7 +4,11 @@ package ru.hollowhorizon.hollowengine.addons.narrative.graph
  * Whether what nodes read exists by the time flow gets to them. A link says where a value comes from, not that flow
  * passed the node that gives it: that takes the source being on every way from a start to the reader.
  */
-internal class StoryValueFlow(private val graph: StoryGraph, private val index: StoryLinkIndex) {
+internal class StoryValueFlow(
+    private val graph: StoryGraph,
+    private val index: StoryLinkIndex,
+    private val resultType: (StoryNode.Invoke, String) -> String? = { _, _ -> null },
+) {
     private val nodes = graph.nodes.associateBy { it.id }
     private val inFlow = graph.links.filter { it.isFlow }.flatMapTo(HashSet()) { listOf(it.from, it.to) }
 
@@ -22,7 +26,7 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
 
     /** The item is a local of the `for`, which only holds the nodes that are not stages of their own. */
     private fun itemProblem(reader: String, loop: StoryNode.Loop): StoryGraphProblem? {
-        val inFor = body(loop.id) { index.isMerge(it) || nodes[it] is StoryNode.Start }
+        val inFor = body(loop.id) { index.isMerge(it) || isEntry(nodes[it]) }
         return when (reader) {
             in inFor -> null
             in body(loop.id) -> StoryGraphProblem(
@@ -47,6 +51,7 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
     private fun isOptional(source: StoryLink): Boolean = when (val node = nodes[source.from]) {
         is StoryNode.Call -> node.returns
         is StoryNode.Code -> node.outputs[source.fromPin]
+        is StoryNode.Invoke -> resultType(node, source.fromPin)
         else -> null
     }?.endsWith("?") == true
 
@@ -59,12 +64,17 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
             val link = queue.removeFirst()
             val node = nodes[link.from] ?: continue
             when {
-                node is StoryNode.Loop || (node.id in inFlow && (node is StoryNode.Call || node is StoryNode.Code)) -> found += link
+                node is StoryNode.Loop || (node.id in inFlow && node.givesResults()) -> found += link
                 node.id !in inFlow && seen.add(node.id) -> queue += index.valuesInto(node.id)
             }
         }
         return found.toList()
     }
+
+    private fun StoryNode.givesResults() = this is StoryNode.Call || this is StoryNode.Code || this is StoryNode.Invoke
+
+    /** Where flow starts: the start of the story, and the parameters of each function. */
+    private fun isEntry(node: StoryNode?) = node is StoryNode.Start || node is StoryNode.Parameters
 
     /** What flow goes through from the body of [node] until it gets to where [stops] says. */
     private fun body(node: String, stops: (String) -> Boolean = { it == node }): Set<String> {
@@ -78,7 +88,7 @@ internal class StoryValueFlow(private val graph: StoryGraph, private val index: 
     }
 
     private fun dominators(): Map<String, Set<String>> {
-        val starts = graph.nodes.filterIsInstance<StoryNode.Start>().map { it.id }
+        val starts = graph.nodes.filter(::isEntry).map { it.id }
         val reached = LinkedHashSet<String>()
         val queue = ArrayDeque(starts)
         while (queue.isNotEmpty()) {

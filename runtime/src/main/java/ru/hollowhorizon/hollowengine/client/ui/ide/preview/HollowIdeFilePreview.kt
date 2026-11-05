@@ -59,6 +59,9 @@ class HollowIdePreviewRegistry {
 /** Something wrong with a file that a preview has found, and how to show it there. */
 class HollowIdePreviewProblem(val diagnostic: UiTextDiagnostic, val reveal: () -> Unit = {})
 
+/** A step of where a preview is inside its file, shown after the file in the status bar; [onClick] goes back to it. */
+class HollowIdePreviewCrumb(val label: String, val icon: String? = null, val onClick: (() -> Unit)? = null)
+
 /** What one open file remembers about its previews while it stays open. */
 class HollowIdeFileView internal constructor(val previews: List<HollowIdeFilePreview>) {
     var mode by mutableStateOf(previews.first().defaultMode)
@@ -68,6 +71,10 @@ class HollowIdeFileView internal constructor(val previews: List<HollowIdeFilePre
 
     /** What the preview shown now says is wrong with the file. */
     var problems by mutableStateOf(emptyList<HollowIdePreviewProblem>())
+        internal set
+
+    /** Where the preview shown now is inside the file, such as a function of a graph it was opened into. */
+    var crumbs by mutableStateOf(emptyList<HollowIdePreviewCrumb>())
         internal set
 
     /** The text's share of the width in [HollowIdeViewMode.SPLIT]. */
@@ -111,6 +118,11 @@ class HollowIdePreviewContext internal constructor(
     /** Tells the corner of the tab and the Problems page what is wrong with the file. */
     fun publishProblems(problems: List<HollowIdePreviewProblem>) {
         view.problems = problems
+    }
+
+    /** Tells the status bar where in the file the preview is, after the path of the file. */
+    fun publishCrumbs(crumbs: List<HollowIdePreviewCrumb>) {
+        view.crumbs = crumbs
     }
 }
 

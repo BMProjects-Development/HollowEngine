@@ -37,6 +37,11 @@ private fun NodeInspector(state: StoryEditorState, selection: StorySelection) {
     val graph = state.read() ?: return
     val node = graph.node(selection.node) ?: return
     if (node is StoryNode.Reroute) return Text(storyLang("reroute.help"), tags = listOf("story-muted"))
+    if (node is StoryNode.Function) return FunctionInspector(state, node)
+    if (node is StoryNode.Parameters) {
+        state.root()?.owners()?.get(node.id)?.let { FunctionInspector(state, it) }
+        return
+    }
     if (node is StoryNode.Say) FormatHint()
     val only = selection.pin?.let(StoryPins::optionIndex)
     StoryNodeLayout(graph, state).of(node, StoryPoint(0f, 0f), detailed = true).rows.forEach { row ->
@@ -140,7 +145,7 @@ private fun StoryProperties(state: StoryEditorState) {
         }
     }
     StoryImports(state, graph)
-    val kotlin = StoryGraphCompiler.compile(graph, StoryActionFunctions)
+    val kotlin = StoryGraphCompiler.compile(state.root() ?: graph, StoryActionFunctions)
     kotlin.problems.forEach { Text(StoryChecks.text(it), tags = listOf("story-inspector-problem")) }
     CollapsibleSection(
         storyLang("kotlin"),

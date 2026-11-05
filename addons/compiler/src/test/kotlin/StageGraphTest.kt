@@ -30,7 +30,7 @@ class StageGraphTest : StageTest() {
     private val loop = StoryGraph(
         variables = listOf(StoryVariable("trust", "0")),
         nodes = listOf(
-            StoryNode.Start("s", "main"),
+            StoryNode.Start("s"),
             StoryNode.Assign("add", "trust", "trust + 1"),
             log("say", "\"trust \$trust\""),
             call("wait", "await", "name" to "\"step\""),
@@ -45,7 +45,7 @@ class StageGraphTest : StageTest() {
 
     @Test
     fun `a reroute changes nothing about the story it sits in`() {
-        val plain = StoryGraph(nodes = listOf(StoryNode.Start("s", "main"), log("a", "\"a\"")), links = listOf(next("s", "a")))
+        val plain = StoryGraph(nodes = listOf(StoryNode.Start("s"), log("a", "\"a\"")), links = listOf(next("s", "a")))
         val through = plain.copy(
             nodes = plain.nodes + StoryNode.Reroute("r", flow = true),
             links = listOf(next("s", "r"), next("r", "a")),
@@ -57,7 +57,7 @@ class StageGraphTest : StageTest() {
     fun `values of operators reach a command through a reroute`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Pure("sum", "add", mapOf("a" to "2", "b" to "3")),
                 StoryNode.Pure("text", "to-text"),
                 StoryNode.Reroute("r", flow = false),
@@ -79,7 +79,7 @@ class StageGraphTest : StageTest() {
     fun `a for each node runs its body for every item`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
                 call("say", "log"),
                 log("done", "\"done\""),
@@ -101,7 +101,7 @@ class StageGraphTest : StageTest() {
     fun `every operator compiles`() = runTest {
         val nodes = ArrayList<StoryNode>()
         val links = ArrayList<StoryLink>()
-        nodes += StoryNode.Start("s", "main")
+        nodes += StoryNode.Start("s")
         var previous = "s"
         StoryOperators.all.forEachIndexed { index, operator ->
             val arguments = operator.inputs.filter { it.default.isEmpty() }.associate { input ->
@@ -130,7 +130,7 @@ class StageGraphTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("x", "0.0", "Double")),
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Assign("write", "x", "5.0"),
                 call("first", "log"),
                 call("second", "log", "event" to "\"x=\$x\""),
@@ -152,7 +152,7 @@ class StageGraphTest : StageTest() {
         ).mapIndexed { index, (type, initial) -> StoryVariable("value$index", initial, type) }
         val graph = StoryGraph(
             variables = variables,
-            nodes = listOf(StoryNode.Start("s", "main"), log("first", "\"done\"")),
+            nodes = listOf(StoryNode.Start("s"), log("first", "\"done\"")),
             links = listOf(next("s", "first")),
         )
         val world = world("types", generate(graph).code)
@@ -179,7 +179,7 @@ class StageGraphTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("count", "0")),
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Assign("add", "count", "count + 1"),
                 StoryNode.Branch("more", "count < 5000"),
                 log("done", "\"done \$count\""),
@@ -197,7 +197,7 @@ class StageGraphTest : StageTest() {
     fun `values travel between stages and through a code node`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Code(
                     "made", "doubled = base * 2\nlog(\"code \$base\")",
                     inputs = mapOf("base" to "21"), outputs = mapOf("doubled" to "Int"),
@@ -228,7 +228,7 @@ class StageGraphTest : StageTest() {
     fun `a choice compiles into branches of its options`() {
         val graph = StoryGraph(
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Choose("ask", listOf(StoryOption("Да \"точно\""), StoryOption("Цена: $5"))),
                 log("yes", "\"yes\""),
                 log("after", "\"after\""),
@@ -246,7 +246,7 @@ class StageGraphTest : StageTest() {
     @Test
     fun `a line with a speaker and the name of the player compiles`() {
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Say("hello", "Guide", "Hello, {player}!")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Say("hello", "Guide", "Hello, {player}!")),
             links = listOf(next("s", "hello")),
         )
         compiler.compile("line", generate(graph).code)
@@ -257,7 +257,7 @@ class StageGraphTest : StageTest() {
         val graph = StoryGraph(
             variables = listOf(StoryVariable("count", "0")),
             nodes = listOf(
-                StoryNode.Start("s", "main"),
+                StoryNode.Start("s"),
                 StoryNode.Assign("first", "count", "1"),
                 log("second", "\"instant\""),
                 StoryNode.Assign("third", "count", "2"),
@@ -279,7 +279,7 @@ class StageGraphTest : StageTest() {
     @Test
     fun `an error of the Kotlin compiler leads back to its node`() {
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), log("fine", "\"ok\""), call("broken", "log", "event" to "missing")),
+            nodes = listOf(StoryNode.Start("s"), log("fine", "\"ok\""), call("broken", "log", "event" to "missing")),
             links = listOf(next("s", "fine"), next("fine", "broken")),
         )
         val story = generate(graph)
@@ -293,7 +293,7 @@ class StageGraphTest : StageTest() {
     fun `problems of the graph are reported before Kotlin sees them`() {
         val story = StoryGraphCompiler.compile(
             StoryGraph(
-                nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Assign("set", "nothing", "1"), call("a", "x"), call("b", "y")),
+                nodes = listOf(StoryNode.Start("s"), StoryNode.Assign("set", "nothing", "1"), call("a", "x"), call("b", "y")),
                 links = listOf(next("s", "set"), next("set", "a"), next("set", "b"), StoryLink("gone", "value", "a", "x")),
             )
         )

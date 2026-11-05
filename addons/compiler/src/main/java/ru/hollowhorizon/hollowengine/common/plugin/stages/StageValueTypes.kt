@@ -16,6 +16,9 @@ internal object StageValueTypes {
     /** The box a shared var becomes; it is saved as its value. */
     val STORY_BOX = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StoryBox")).asString()
 
+    /** A class of values a story keeps field by field, such as the results of a story function. */
+    val STORY_RECORD = FqName("ru.hollowhorizon.hollowengine.addons.narrative.story").child(Name.identifier("StoryRecord")).asString()
+
     val PRIMITIVE_ARRAYS = setOf(
         "kotlin.IntArray", "kotlin.LongArray", "kotlin.ShortArray", "kotlin.ByteArray", "kotlin.FloatArray",
         "kotlin.DoubleArray", "kotlin.BooleanArray", "kotlin.CharArray",

@@ -35,11 +35,55 @@ data class StoryGraph(
 
     fun node(id: String): StoryNode? = byId[id]
 
+    /** The functions the story declares. */
+    val functions: List<StoryNode.Function> get() = nodes.filterIsInstance<StoryNode.Function>()
+
+    /** The function each node of a body belongs to, by the id of the node. */
+    fun owners(): Map<String, StoryNode.Function> =
+        functions.flatMap { function -> function.body.nodes.map { it.id to function } }.toMap()
+
+    /**
+     * The story and the bodies of its functions as one graph, which is how it runs and is checked: links never cross
+     * the edge of a body, and ids are unique in the whole file.
+     */
+    fun flattened(): StoryGraph {
+        val bodies = functions.map { it.body }
+        if (bodies.isEmpty()) return this
+        return copy(nodes = nodes + bodies.flatMap { it.nodes }, links = links + bodies.flatMap { it.links })
+    }
+
+    /**
+     * What the editor shows inside the function [function]: its body with the variables and imports of the story, or
+     * the story itself when it is null. Null when there is no such function.
+     */
+    fun scope(function: String?): StoryGraph? {
+        if (function == null) return this
+        val body = (node(function) as? StoryNode.Function)?.body ?: return null
+        return body.copy(variables = variables, imports = imports)
+    }
+
+    /** The story with [scoped], what [scope] gave for [function] and an editor changed, back in its place. */
+    fun withScope(function: String?, scoped: StoryGraph): StoryGraph {
+        if (function == null) return scoped
+        val body = scoped.copy(variables = emptyList(), imports = emptyList())
+        return copy(
+            variables = scoped.variables,
+            imports = scoped.imports,
+            nodes = nodes.map { if (it.id == function && it is StoryNode.Function) it.copy(body = body) else it },
+        )
+    }
+
     /** What the story means, with nothing of how the editor shows it: two files of one revision run the same. */
-    fun revision(): String = FORMAT.encodeToString(
-        serializer(),
-        dissolved().copy(layout = emptyMap(), groups = emptyList(), collapsed = emptySet())
-    )
+    fun revision(): String = FORMAT.encodeToString(serializer(), meaning())
+
+    private fun meaning(): StoryGraph = dissolved().let { plain ->
+        plain.copy(
+            layout = emptyMap(),
+            groups = emptyList(),
+            collapsed = emptySet(),
+            nodes = plain.nodes.map { if (it is StoryNode.Function) it.copy(body = it.body.meaning()) else it },
+        )
+    }
 
     /** The graph with every reroute joined back up: what the links mean to a story. */
     fun dissolved(): StoryGraph {
@@ -79,8 +123,13 @@ data class StoryGraph(
     }
 
     /** The text of the file: the same content is always the same text, so a change is a small diff. */
-    fun encode(): String =
-        FORMAT.encodeToString(serializer(), copy(layout = layout.toSortedMap(), collapsed = collapsed.toSortedSet()))
+    fun encode(): String = FORMAT.encodeToString(serializer(), sorted())
+
+    private fun sorted(): StoryGraph = copy(
+        layout = layout.toSortedMap(),
+        collapsed = collapsed.toSortedSet(),
+        nodes = nodes.map { if (it is StoryNode.Function) it.copy(body = it.body.sorted()) else it },
+    )
 
     companion object {
         const val VERSION = 1
@@ -143,6 +192,10 @@ data class StoryNodeGroup(
     val collapsed: Boolean = false,
 )
 
+/** A parameter or a result of a function: its [name] and its Kotlin [type]. */
+@Serializable
+data class StoryTypedName(val name: String, val type: String)
+
 /** A variable of the story, saved with it. [initial] is a Kotlin expression; [type] is inferred from it when null. */
 @Serializable
 data class StoryVariable(val name: String, val initial: String, val type: String? = null)
@@ -192,10 +245,55 @@ data class StoryGroup(val constructor: String, val arguments: Map<String, String
 sealed interface StoryNode {
     val id: String
 
-    /** Where a story can be started and flow can jump to; becomes the stage [name]. */
+    /** Where the story starts, the stage `main`; flow can jump back to it. A story has one. */
     @Serializable
     @SerialName("start")
-    data class Start(override val id: String, val name: String) : StoryNode
+    data class Start(override val id: String) : StoryNode
+
+    /**
+     * A function, the stage [name] taking [params] and giving back [results]: one of them as it is, several in a class
+     * of their own. Its flow is [body], which starts at its [Parameters] and ends at a [Return]. Each of [flows] is a
+     * flow the caller links on, which a [Signal] runs before the function goes on. Other stories and scripts call it
+     * through `@file:Import` of the story.
+     */
+    @Serializable
+    @SerialName("function")
+    data class Function(
+        override val id: String,
+        val name: String,
+        val params: List<StoryTypedName> = emptyList(),
+        val results: List<StoryTypedName> = emptyList(),
+        val flows: List<String> = emptyList(),
+        val body: StoryGraph = StoryGraph(),
+    ) : StoryNode
+
+    /** Where the flow of a function starts; each of its parameters comes out at the pin of its name. */
+    @Serializable
+    @SerialName("parameters")
+    data class Parameters(override val id: String) : StoryNode
+
+    /** Ends a function, giving back [values], Kotlin expressions by the name of the result. */
+    @Serializable
+    @SerialName("return")
+    data class Return(override val id: String, val values: Map<String, String> = emptyMap()) : StoryNode
+
+    /** Runs what the caller of the function links on from its flow [flow], then goes on. */
+    @Serializable
+    @SerialName("signal")
+    data class Signal(override val id: String, val flow: String = "") : StoryNode
+
+    /**
+     * A call of the function [function] of this story or, with [file], of the story that qualified script id names.
+     * [arguments] are Kotlin expressions by parameter name; each result comes out at the pin of its name.
+     */
+    @Serializable
+    @SerialName("invoke")
+    data class Invoke(
+        override val id: String,
+        val function: String,
+        val file: String? = null,
+        val arguments: Map<String, String> = emptyMap(),
+    ) : StoryNode
 
     /**
      * A line. [speaker] is a name, `{expression}` for what an expression gives, or empty for narration. In [text],

@@ -69,6 +69,9 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
     private val dragOrigins = HashMap<String, Pair<Float, Float>>()
 
+    /** The node pressed last and when, so that a second press on it soon after reads as a double click. */
+    private var lastPress: Pair<String, Long>? = null
+
     /** The node whose corner lands on the grid while a drag snaps; the rest keep their distance to it. */
     private var dragAnchor: String? = null
 
@@ -170,6 +173,10 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     /** A click with Shift or Control adds to the selection and takes away what was in it. */
     fun pressNode(node: String, gesture: GraphNodeGesture) {
         menu = null
+        val now = System.currentTimeMillis()
+        val repeated = lastPress?.let { (pressed, at) -> pressed == node && now - at <= DOUBLE_PRESS_MILLIS } == true
+        lastPress = if (repeated) null else node to now
+        if (repeated && !gesture.shift && !gesture.control && model.openNode(node)) return
         when {
             gesture.shift || gesture.control -> {
                 val nodes = if (node in selection) selection.nodes - node else selection.nodes + node
@@ -426,6 +433,9 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
         /** How far past the canvas, in canvas pixels, nodes stay built: shadows and pins reach out of a node. */
         const val SIGHT_MARGIN = 96f
+
+        /** How soon a second press on a node has to follow the first to open it. */
+        const val DOUBLE_PRESS_MILLIS = 400L
 
         const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg"
         const val UngroupIcon = "hollowengine:textures/gui/icons/actions/ungroup.svg"

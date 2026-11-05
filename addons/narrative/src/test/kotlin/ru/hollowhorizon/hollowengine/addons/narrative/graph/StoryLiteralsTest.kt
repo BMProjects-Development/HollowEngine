@@ -31,7 +31,7 @@ class StoryLiteralsTest {
     @Test
     fun `a line takes its text from a link`() {
         val graph = StoryGraph(
-            nodes = listOf(StoryNode.Start("s", "main"), StoryNode.Say("say", text = "typed"), StoryNode.Expression("value", "name")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Say("say", text = "typed"), StoryNode.Expression("value", "name")),
             links = listOf(StoryLink("s", StoryPins.NEXT, "say", StoryPins.IN), StoryLink("value", StoryPins.VALUE, "say", StoryPins.TEXT)),
         )
         val code = StoryGraphCompiler.compile(graph).code
