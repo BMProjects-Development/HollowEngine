@@ -8,6 +8,8 @@ import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.inventory.NpcInventory
@@ -51,7 +53,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 fun npc(
     pos: Vec3,
     name: String = "NPC",
-    model: String = "hollowengine:models/entity/player_model.gltf",
+    @EditorModel(Model.DEFAULT) model: String = Model.DEFAULT,
     rotation: Vec2 = rotation(0, 0),
     world: String = "minecraft:overworld",
     attributes: Map<String, Float> = emptyMap(),
@@ -59,7 +61,7 @@ fun npc(
     nameplateMode: NameplateMode = NameplateMode.SHOW,
     inverseHeadRotation: Boolean = false,
     inventorySize: Int = NpcInventory.DEFAULT_SIZE,
-    id: String? = null,
+    @EditorNpcId id: String? = null,
 ): NpcEntity {
     assert(model.isValidRL()) {
         "Non [a-z0-9/._-] character in path of location: $model"
@@ -97,8 +99,8 @@ fun npc(
  */
 fun ServerLevel.npc(
     pos: Vec3,
-    id: String? = null,
-    builder: NpcEntity.() -> Unit = {},
+    @EditorNpcId id: String? = null,
+    @EditorModel(Model.DEFAULT) builder: NpcEntity.() -> Unit = {},
 ): NpcEntity {
     val npcs = server.npcs
     if (id != null) npcs.alive(id)?.let { return it }

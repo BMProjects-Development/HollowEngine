@@ -366,22 +366,59 @@ class StageGraphTest : StageTest() {
     }
 
     @Test
-    fun `a task whose last node gives a value that cannot be saved compiles`() {
+    fun `a task of the graph runs beside the story and resumes after a restart`() = runTest {
         val graph = StoryGraph(
             nodes = listOf(
                 StoryNode.Start("s"),
                 StoryNode.Call("task", action = "async", arguments = mapOf("name" to "\"walk\"")),
-                log("walk", "\"walked\""),
+                log("going", "\"going\""),
+                call("wait", "await", "name" to "\"walk\""),
+                log("walked", "\"walked\""),
                 call("thread", "java.lang.Thread.currentThread"),
+                log("meanwhile", "\"meanwhile\""),
                 StoryNode.Call("join", action = "join"),
                 log("done", "\"done\""),
             ),
             links = listOf(
-                next("s", "task"), next("task", "walk", StoryPins.BODY), next("walk", "thread"),
-                next("task", "join"), next("join", "done"),
+                next("s", "task"), next("task", "going", StoryPins.BODY), next("going", "wait"), next("wait", "walked"),
+                next("walked", "thread"), next("task", "meanwhile"), next("meanwhile", "join"), next("join", "done"),
                 StoryLink("task", StoryPins.VALUE, "join", "handle"),
             ),
         )
-        compiler.compile("task-value", generate(graph).code)
+        val world = world("task", generate(graph).code)
+        world.launch("main")
+        assertEquals(setOf("going", "meanwhile"), StageTrace.take().toSet())
+        world.restart()
+        world.release("walk")
+        assertEquals(listOf("walked", "done"), StageTrace.take())
+    }
+
+    @Test
+    fun `a write left out of the flow runs right after the node it takes its value from`() = runTest {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("who", "\"nobody\"", "String"), StoryVariable("last", "\"\"", "String")),
+            nodes = listOf(
+                StoryNode.Start("s"),
+                log("before", "\"who=\$who\""),
+                StoryNode.Code("make", "name = \"Bob\"", outputs = mapOf("name" to "String")),
+                StoryNode.Assign("keep", "who", ""),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                StoryNode.Assign("item", "last", ""),
+                call("wait", "await", "name" to "\"later\""),
+                log("after", "\"who=\$who last=\$last\""),
+            ),
+            links = listOf(
+                next("s", "before"), next("before", "make"), next("make", "each"), next("each", "wait"),
+                next("wait", "after"),
+                StoryLink("make", "name", "keep", StoryPins.VALUE),
+                StoryLink("each", StoryPins.ITEM, "item", StoryPins.VALUE),
+            ),
+        )
+        val world = world("attached", generate(graph).code)
+        world.launch("main")
+        assertEquals(listOf("who=nobody"), StageTrace.take())
+        world.restart()
+        world.release("later")
+        assertEquals(listOf("who=Bob last=b"), StageTrace.take())
     }
 }
