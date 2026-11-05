@@ -101,6 +101,8 @@ internal object StoryActionFunctions : StoryFunctions {
 
     override fun storyFunction(file: String, name: String): StoryNode.Function? = StoryLibrary.function(file, name)
 
+    override fun storyImports(file: String): Set<String> = StoryLibrary.imports(file)
+
     override fun kind(call: StoryNode.Call): StoryCallKind {
         val action = command(call)?.action ?: return StoryCallKind.SUSPENDING
         return when {

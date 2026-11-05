@@ -214,4 +214,99 @@ class StageFeaturesTest : StageTest() {
         assertTrue(type.isAnnotationPresent(StageScript::class.java))
         assertEquals(setOf("main", "main\$async#1"), type.declaredMethods.mapNotNull { it.getAnnotation(StageEntry::class.java)?.name }.toSet())
     }
+
+    @Test
+    fun `a stage lambda written at the top level of a script becomes a stage`() = runTest {
+        val world = world("topLevelLambda", """
+            var kept: (@State suspend () -> Unit)? = null
+
+            fun keep(block: @State suspend () -> Unit) {
+                kept = block
+            }
+
+            keep { log("kept") }
+
+            @State
+            suspend fun main() {
+                val block = kept!!
+                block()
+            }
+        """
+        )
+        world.launch("main")
+        assertEquals(listOf("kept"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `a stage call among the elements of a vararg resumes with what came before it`() = runTest {
+        val world = world("vararg", """
+            @State
+            suspend fun one(): Int {
+                await("one")
+                return 1
+            }
+
+            @State
+            suspend fun main() {
+                val list = listOf(StageTrace.token.length, one(), 2)
+                log(list.toString())
+            }
+        """
+        )
+        StageTrace.token = "abc"
+        world.launch("main")
+        StageTrace.token = ""
+        world.restart()
+        world.release("one")
+        assertEquals(listOf("[3, 1, 2]"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `a stage takes a duration and a local read only off the path after a call is not saved`() = runTest {
+        val world = world("durationAndBranches", """
+            import kotlin.time.Duration
+            import kotlin.time.Duration.Companion.seconds
+
+            @State
+            suspend fun pause(time: Duration) {
+                await("pause")
+                log(time.toString())
+            }
+
+            @State
+            suspend fun main() {
+                val iterator = listOf(1).iterator()
+                if (StageTrace.token.isEmpty()) pause(2.seconds) else log(iterator.next().toString())
+            }
+        """
+        )
+        world.launch("main")
+        world.restart()
+        world.release("pause")
+        assertEquals(listOf("2s"), StageTrace.take())
+        world.stop()
+    }
+
+    @Test
+    fun `overloaded stages with names of their own both run`() = runTest {
+        val world = world("overloads", """
+            @State(name = "number")
+            suspend fun step(value: Int) { log("number " + value) }
+
+            @State(name = "text")
+            suspend fun step(value: String) { log("text " + value) }
+
+            @State
+            suspend fun main() {
+                step(1)
+                step("a")
+            }
+        """
+        )
+        world.launch("main")
+        assertEquals(listOf("number 1", "text a"), StageTrace.take())
+        world.stop()
+    }
 }

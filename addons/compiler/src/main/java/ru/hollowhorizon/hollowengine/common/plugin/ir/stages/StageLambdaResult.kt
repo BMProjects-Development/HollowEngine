@@ -16,7 +16,7 @@ internal fun StageScope.lambdaResult(function: IrSimpleFunction, name: String): 
     val factory = context.irFactory.buildFun {
         startOffset = function.startOffset
         endOffset = function.endOffset
-        this.name = Name.identifier("stage\$result\$${function.name.asString()}")
+        this.name = Name.identifier("stage\$result\$${memberName(function)}")
         returnType = symbols.serializerType
         visibility = DescriptorVisibilities.PUBLIC
     }

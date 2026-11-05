@@ -481,7 +481,7 @@ internal class StageRewriter(
         val entry = stages.context.irFactory.buildFun {
             startOffset = function.startOffset
             endOffset = function.endOffset
-            this.name = Name.identifier($$"stage$entry$$${function.name.asString()}")
+            this.name = Name.identifier($$"stage$entry$$${stages.memberName(function)}")
             returnType = builtIns.anyNType
             isSuspend = true
             visibility = DescriptorVisibilities.PUBLIC
@@ -524,7 +524,7 @@ internal class StageRewriter(
         val call = stages.context.irFactory.buildFun {
             startOffset = function.startOffset
             endOffset = function.endOffset
-            this.name = Name.identifier("stage\$call\$${function.name.asString()}")
+            this.name = Name.identifier("stage\$call\$${stages.memberName(function)}")
             returnType = builtIns.anyNType
             isSuspend = true
             visibility = DescriptorVisibilities.PUBLIC

@@ -100,7 +100,9 @@ internal object StageFirCallChecker : FirFunctionCallChecker(MppCheckerKind.Comm
                 if (element is FirFunctionCall) {
                     val symbol = element.calleeReference.toResolvedCallableSymbol()
                     if (symbol?.callableId?.packageName == StageFirIds.PACKAGE && symbol.name.asString() == "checkpoint") {
-                        ((element.argumentList.arguments.firstOrNull() as? FirLiteralExpression)?.value as? String)?.let(names::add)
+                        val name = (element.argumentList as? FirResolvedArgumentList)?.mapping?.entries
+                            ?.firstOrNull { it.value.name.asString() == "name" }?.key
+                        ((name as? FirLiteralExpression)?.value as? String)?.let(names::add)
                     }
                 }
                 element.acceptChildren(this)

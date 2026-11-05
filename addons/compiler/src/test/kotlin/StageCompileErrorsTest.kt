@@ -43,7 +43,7 @@ class StageCompileErrorsTest : StageTest() {
 
     @Test
     fun `a local that cannot be saved cannot outlive a stage call`() = assertError(
-        "'iterator', used after the stage call 'step#1'", """
+        "'iterator' is used after the call 'step'", """
         @State suspend fun step() {}
 
         @State
@@ -57,7 +57,7 @@ class StageCompileErrorsTest : StageTest() {
 
     @Test
     fun `a value computed before a stage call in the same expression must be saveable`() = assertError(
-        "A value computed before the stage call 'name#1'", """
+        "A value computed before the call 'name'", """
         @State suspend fun name(): String = "a"
 
         fun join(first: Any, second: String) = log(first.toString() + second)
@@ -238,7 +238,7 @@ class StageCompileErrorsTest : StageTest() {
 
     @Test
     fun `an action of an addon is a boundary like an action of the script`() = assertError(
-        "'iterator', used after the action call 'move#1'", """
+        "'iterator' is used after the call 'move'", """
         import net.minecraft.world.phys.Vec3
         import ru.hollowhorizon.hollowengine.addons.narrative.npcs.move
         import ru.hollowhorizon.hollowengine.common.entities.NpcEntity

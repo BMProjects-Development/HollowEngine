@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.*
@@ -58,6 +59,13 @@ internal class StageScope(
     fun stageName(function: IrFunction): String {
         val explicit = stateAnnotation(function)?.getValueArgument(Name.identifier("name")) as? IrConst
         return (explicit?.value as? String)?.takeIf(String::isNotBlank) ?: function.name.asString()
+    }
+
+    fun memberName(function: IrFunction): String {
+        val overloads = script.declarations.filterIsInstance<IrSimpleFunction>()
+            .filter { it.name == function.name && isSuspendState(it) }
+        val name = function.name.asString()
+        return if (overloads.size < 2) name else "$name\$${overloads.indexOf(function)}"
     }
 
     /** What [call] is from the point of view of the stage it is in, or null when it is an ordinary call. */

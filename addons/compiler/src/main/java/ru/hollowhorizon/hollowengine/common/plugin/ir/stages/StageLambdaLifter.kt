@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
+import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
@@ -33,6 +34,9 @@ import java.util.IdentityHashMap
 @OptIn(UnsafeDuringIrConstructionAPI::class)
 internal class StageLambdaLifter(private val stages: StageScope) : IrElementTransformerVoid() {
     private val functions = ArrayDeque<IrFunction>()
+
+    /** The declarations the code being visited belongs to: functions, and initializers of the script itself. */
+    private val scopes = ArrayDeque<IrSymbol>()
     private val owners = ArrayDeque<String>()
     private val counters = HashMap<String, Int>()
 
@@ -54,9 +58,24 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         if (named) owners.addLast(declaration.name.asString())
         functions.addLast(declaration)
 
-        return super.visitFunction(declaration).also {
+        return within(declaration.symbol) { super.visitFunction(declaration) }.also {
             functions.removeLast()
             if (named) owners.removeLast()
+        }
+    }
+
+    /** Top-level statements of a script run in its initializers, and property values in their fields. */
+    override fun visitAnonymousInitializer(declaration: IrAnonymousInitializer): IrStatement =
+        within(declaration.symbol) { super.visitAnonymousInitializer(declaration) }
+
+    override fun visitField(declaration: IrField): IrStatement = within(declaration.symbol) { super.visitField(declaration) }
+
+    private fun <T> within(scope: IrSymbol, visit: () -> T): T {
+        scopes.addLast(scope)
+        return try {
+            visit()
+        } finally {
+            scopes.removeLast()
         }
     }
 
@@ -97,7 +116,8 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
         val parameters = createStage(lambda, name, captured)
 
         val scriptThis = scriptThis()
-        return stages.builder(functions.last().symbol, expression).irBlock(resultType = parameter.type) {
+        val scope = scopes.lastOrNull() ?: stages.script.symbol
+        return stages.builder(scope, expression).irBlock(resultType = parameter.type) {
             val tag = irTemporary(irCallConstructor(stages.symbols.compoundTagConstructor, emptyList()))
             with(stages) {
                 parameters.forEach { (value, copy) ->
@@ -187,7 +207,7 @@ internal class StageLambdaLifter(private val stages: StageScope) : IrElementTran
             }
             stages.types.problem(value.type)?.let { problem ->
                 stages.reporter.error(
-                    lambda, StageMessages.unsavedCapture(value.name.asString(), problem)
+                    lambda, StageMessages.unsavedCapture(value.name.asString().removeSuffix("\$delegate"), problem)
                 )
                 valid = false
             }

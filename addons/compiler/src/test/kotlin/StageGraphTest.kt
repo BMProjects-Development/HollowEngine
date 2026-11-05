@@ -299,4 +299,89 @@ class StageGraphTest : StageTest() {
         )
         assertEquals(listOf(null, "set", "set"), story.problems.map { it.node }.sortedBy { it.orEmpty() })
     }
+
+    @Test
+    fun `code nodes in a loop keep their locals apart`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Loop("each", "listOf(\"a\", \"b\")"),
+                StoryNode.Code("first", "val text = item\nlog(text)", inputs = mapOf("item" to "")),
+                StoryNode.Code("second", "val text = \"\$item!\"\nlog(text)", inputs = mapOf("item" to "")),
+            ),
+            links = listOf(
+                next("s", "each"), next("each", "first", StoryPins.BODY), next("first", "second"),
+                StoryLink("each", StoryPins.ITEM, "first", "item"),
+                StoryLink("each", StoryPins.ITEM, "second", "item"),
+            ),
+        )
+        world("code-loop", generate(graph).code).launch("main")
+        assertEquals(listOf("a", "a!", "b", "b!"), StageTrace.take())
+    }
+
+    @Test
+    fun `branches cannot meet inside a block that holds no stages`() {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Call("hold", action = "temporary"),
+                StoryNode.Branch("pick", "true"),
+                log("join", "\"joined\""),
+            ),
+            links = listOf(
+                next("s", "hold"), next("hold", "pick", StoryPins.BODY),
+                next("pick", "join", StoryPins.THEN), next("pick", "join", StoryPins.ELSE),
+            ),
+        )
+        val story = StoryGraphCompiler.compile(graph, TestCommands())
+        assertEquals(listOf("join"), story.problems.filter { it.key == "stage_in_block" }.map { it.node })
+    }
+
+    @Test
+    fun `a keyword or a generated name cannot name a function or a variable`() {
+        val graph = StoryGraph(
+            variables = listOf(StoryVariable("step_1", "0")),
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Function("f", "when"), StoryNode.Function("g", "block_a")),
+        )
+        val problems = StoryGraphCompiler.compile(graph, TestCommands()).problems.map { it.key to it.node }
+        assertTrue("bad_function" to "f" in problems, "$problems")
+        assertTrue("reserved_name" to "g" in problems, "$problems")
+        assertTrue("reserved_name" to null in problems, "$problems")
+    }
+
+    @Test
+    fun `a story cannot call one that already calls it`() {
+        val functions = object : TestCommands() {
+            override fun storyFunction(file: String, name: String) = StoryNode.Function("f", name)
+
+            override fun storyImports(file: String) = if (file == "test:b") setOf("test:c") else setOf("test:a")
+        }
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s"), StoryNode.Invoke("call", "greet", file = "test:b")),
+            links = listOf(next("s", "call")),
+        )
+        val problems = StoryGraphCompiler.compile(graph, functions, location = "test:a").problems
+        assertEquals(listOf("call"), problems.filter { it.key == "import_cycle" }.map { it.node })
+        assertEquals(emptyList(), StoryGraphCompiler.compile(graph, functions, location = "test:d").problems)
+    }
+
+    @Test
+    fun `a task whose last node gives a value that cannot be saved compiles`() {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Start("s"),
+                StoryNode.Call("task", action = "async", arguments = mapOf("name" to "\"walk\"")),
+                log("walk", "\"walked\""),
+                call("thread", "java.lang.Thread.currentThread"),
+                StoryNode.Call("join", action = "join"),
+                log("done", "\"done\""),
+            ),
+            links = listOf(
+                next("s", "task"), next("task", "walk", StoryPins.BODY), next("walk", "thread"),
+                next("task", "join"), next("join", "done"),
+                StoryLink("task", StoryPins.VALUE, "join", "handle"),
+            ),
+        )
+        compiler.compile("task-value", generate(graph).code)
+    }
 }

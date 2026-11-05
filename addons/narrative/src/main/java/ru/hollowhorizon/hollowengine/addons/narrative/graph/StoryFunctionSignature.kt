@@ -57,6 +57,7 @@ data class StoryParam(
  * @param categoryColor the `#RRGGBB` nodes of the category take, or null to be given one.
  * @param returns the type of what a call gives back, or null when it gives nothing.
  * @param block whether a call takes the flow from [StoryPins.BODY] as its last argument, such as `temporary { }`.
+ * @param plainBlock whether that body is an ordinary lambda, as in `temporary { }`, where no stage can be called.
  * @param hidden whether stories that call it still work while nothing offers it for new ones.
  */
 data class StoryFunctionSignature(
@@ -70,6 +71,7 @@ data class StoryFunctionSignature(
     val categoryColor: String? = null,
     val returns: String? = null,
     val block: Boolean = false,
+    val plainBlock: Boolean = false,
     val hidden: Boolean = false,
 ) {
     /** A new call of this command. */

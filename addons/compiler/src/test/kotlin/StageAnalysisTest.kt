@@ -191,6 +191,73 @@ class StageAnalysisTest {
     }
 
     @Test
+    fun `the editor reports a local the story cannot keep past a checkpoint or a stage call`() {
+        fun errors(body: String) = diagnostics(
+            """
+            @State suspend fun step() {}
+            @State suspend fun main() {
+            $body
+            }
+        """
+        ).filter { it.severity.isError() }
+        val afterCheckpoint = errors(
+            """
+            val iterator = listOf(1).iterator()
+            checkpoint("gate")
+            log(iterator.next().toString())
+            """
+        )
+        assertTrue(afterCheckpoint.any { "'iterator' is used after checkpoint 'gate'" in it.message }, afterCheckpoint.toString())
+        val afterStage = errors(
+            """
+            val iterator = listOf(1).iterator()
+            step()
+            log(iterator.next().toString())
+            """
+        )
+        assertTrue(afterStage.any { "'iterator' is used after the call 'step'" in it.message }, afterStage.toString())
+        val inLoop = errors(
+            """
+            val iterator = listOf(1).iterator()
+            while (iterator.hasNext()) {
+                log(iterator.next().toString())
+                step()
+            }
+            """
+        )
+        assertTrue(inLoop.any { "'iterator'" in it.message }, inLoop.toString())
+        val operand = errors("""log(listOf(listOf(1).iterator(), step()).toString())""")
+        assertTrue(operand.any { "A value computed before the call 'step'" in it.message }, operand.toString())
+        val elements = errors("""for (item in listOf(Any())) step()""")
+        assertTrue(elements.any { "goes over a copy of its elements" in it.message }, elements.toString())
+    }
+
+    @Test
+    fun `a local read only where the stage does not go on after the call need not be saved`() {
+        val errors = diagnostics(
+            """
+            @State suspend fun step() {}
+            @State suspend fun main(flag: Boolean) {
+                val iterator = listOf(1).iterator()
+                if (flag) step() else log(iterator.next().toString())
+                val other = listOf(2).iterator()
+                if (flag) {
+                    step()
+                    return
+                }
+                log(other.next().toString())
+                var replaced = listOf(3).iterator()
+                step()
+                replaced = listOf(4).iterator()
+                log(replaced.next().toString())
+                for (index in 0 until 3) step()
+            }
+        """
+        ).filter { it.severity.isError() }
+        assertTrue(errors.isEmpty(), errors.toString())
+    }
+
+    @Test
     fun `the editor validates checkpoint placement and names`() {
         val errors = diagnostics(
             """
