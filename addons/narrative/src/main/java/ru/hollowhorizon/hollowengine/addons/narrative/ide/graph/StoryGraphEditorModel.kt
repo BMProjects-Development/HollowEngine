@@ -29,7 +29,7 @@ import kotlin.reflect.full.isSubclassOf
  * keeps its box, so a drag recomposes only the nodes it moves.
  */
 internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditorState) {
-    private val layout = StoryNodeLayout(graph, state, ::outputKotlin)
+    private val layout = StoryNodeLayout(graph, state, ::outputKotlin, ::inputKotlin)
     private val boxes = HashMap<String, StoryNodeBox>()
 
     /** Boxes laid out only to tell what their pins carry. */
@@ -40,10 +40,39 @@ internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditor
 
     fun at(node: StoryNode, place: StoryPoint): StoryNodeBox =
         boxes[node.id]?.takeIf { it.x == place.x && it.y == place.y }
-            ?: layout.of(node, place).also { boxes[node.id] = it }
+            ?: resolved(node.id) { layout.of(node, place) }.also { boxes[node.id] = it }
 
     /** The box [node] gets on its own, for one not in the graph yet; what its pins carry can be asked from then on. */
-    fun of(node: StoryNode): StoryNodeBox = layout.of(node, StoryPoint(0f, 0f)).also { boxes[node.id] = it }
+    fun of(node: StoryNode): StoryNodeBox =
+        resolved(node.id) { layout.of(node, StoryPoint(0f, 0f)) }.also { boxes[node.id] = it }
+
+    /** The box of [node] with the fields too rare to take up room on a node, for the inspector. */
+    fun detailed(node: StoryNode): StoryNodeBox =
+        resolved(node.id) { layout.of(node, StoryPoint(0f, 0f), detailed = true) }
+
+    /** Lays [node] out with [lay], during which no lookup lays it out again. */
+    private fun <T> resolved(node: String, lay: () -> T): T {
+        val added = resolving.add(node)
+        try {
+            return lay()
+        } finally {
+            if (added) resolving.remove(node)
+        }
+    }
+
+    /**
+     * The box of [node] as the types of other nodes are worked out; null for one being worked out already. Only a box
+     * laid out with nothing else in the works is kept, since one laid out midway missed what the others carry.
+     */
+    private fun lookup(node: StoryNode): StoryNodeBox? {
+        boxes[node.id]?.let { return it }
+        detached[node.id]?.let { return it }
+        if (node.id in resolving) return null
+        val first = resolving.isEmpty()
+        val box = resolved(node.id) { layout.of(node, StoryPoint(0f, 0f)) }
+        if (first) detached[node.id] = box
+        return box
+    }
 
     fun typeOf(pin: GraphPin): StoryPinType {
         val box = boxes[pin.node] ?: return StoryPinType.ANY
@@ -63,20 +92,13 @@ internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditor
     fun outputKotlin(node: String, pin: String): String? {
         val found = graph.node(node) ?: return null
         if (found is StoryNode.Reroute) return carried(found)?.kotlin
-        if (!resolving.add(node)) return null
-        try {
-            val box = boxes[node] ?: detached.getOrPut(node) { layout.of(found, StoryPoint(0f, 0f)) }
-            return box.kotlin(GraphPin(node, pin, true, 0f, 0f))
-        } finally {
-            resolving.remove(node)
-        }
+        return lookup(found)?.kotlin(GraphPin(node, pin, true, 0f, 0f))
     }
 
     /** The exact type the input [pin] of [node] takes. */
     fun inputKotlin(node: String, pin: String): String? {
         val found = graph.node(node) ?: return null
-        val box = boxes[node] ?: detached.getOrPut(node) { layout.of(found, StoryPoint(0f, 0f)) }
-        return box.kotlin(GraphPin(node, pin, false, 0f, 0f))
+        return lookup(found)?.kotlin(GraphPin(node, pin, false, 0f, 0f))
     }
 
     /** The pin the value passing through [reroute] comes from. */

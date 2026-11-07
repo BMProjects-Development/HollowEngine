@@ -162,11 +162,14 @@ internal fun StoryPinType.tag(): String = "gn-type-$id"
  * Lays nodes of [graph] out.
  *
  * @param sources the exact type the output of a node gives, by node and pin, which the generic pins of a block take.
+ * @param consumers the exact type the input of a node takes, by node and pin, which the generic pins of a block take
+ * when nothing linked into them says.
  */
 internal class StoryNodeLayout(
     internal val graph: StoryGraph,
     internal val state: StoryEditorState,
     private val sources: (String, String) -> String? = { _, _ -> null },
+    private val consumers: (String, String) -> String? = { _, _ -> null },
 ) {
     private val linked = graph.index.values.keys
     private val types = StoryInsight.analysis(state, state.root() ?: graph).types
@@ -255,6 +258,12 @@ internal class StoryNodeLayout(
         private var depth = 0
 
         fun bottom() = y + PADDING
+
+        /** Whether a value has more beside its field than its name, the parts of a vector or the checkbox of a flag. */
+        private var crowded = false
+
+        /** The width the rows added so far take, the same with a value linked as with its field in place. */
+        fun fitted(): Float = if (crowded) WIDE else GraphNodeMetrics.WIDTH
 
         internal fun row(
             label: String? = null,
@@ -351,6 +360,8 @@ internal class StoryNodeLayout(
             onRemove: (() -> Unit)? = null,
         ) {
             val free = (node to name) !in linked
+            val form = field?.form
+            if (form is StoryFieldForm.Vector || form == StoryFieldForm.Flag) crowded = true
             row(
                 label,
                 StoryPinSpec(name, type, kotlin),
@@ -485,7 +496,7 @@ internal class StoryNodeLayout(
                     output = StoryPinSpec(StoryPins.VALUE, type, kotlin),
                     hint = storyLang("set.result.help")
                 )
-                if (form is StoryFieldForm.Vector) WIDE else GraphNodeMetrics.WIDTH
+                fitted()
             }
 
             is StoryNode.Loop -> {
@@ -559,9 +570,7 @@ internal class StoryNodeLayout(
 
             is StoryNode.Pure -> {
                 pure(node)
-                if (StoryOperators.inputsOf(node)
-                        .any { it.type == StoryPinType.VECTOR }
-                ) WIDE else GraphNodeMetrics.WIDTH
+                fitted()
             }
 
             is StoryNode.Reroute -> GraphNodeMetrics.REROUTE
@@ -727,7 +736,8 @@ internal class StoryNodeLayout(
             if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             fun pin(output: StoryOperatorOutput): StoryPinSpec {
                 val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }
-                val kotlin = (if (output.generic) generic else null) ?: types[node.id to output.name] ?: named ?: output.kotlin
+                val shaped = if (output.generic) generic?.let { StoryGenerics.shaped(output.shape, it) } else null
+                val kotlin = shaped ?: types[node.id to output.name] ?: named ?: output.kotlin
                 return StoryPinSpec(output.name, kotlin?.let(StoryPinType::ofName) ?: output.type, kotlin)
             }
             folded(
@@ -749,10 +759,16 @@ internal class StoryNodeLayout(
          * The type `T` the generic pins of [operator] carry in [node]: that of the first value linked into one of them,
          * never missing, since one that may be is what such a pin takes as `T?`.
          */
-        private fun genericOf(node: StoryNode.Pure, operator: StoryOperator): String? =
-            operator.inputs.filter { it.generic }.firstNotNullOfOrNull { input ->
+        private fun genericOf(node: StoryNode.Pure, operator: StoryOperator): String? {
+            val given = StoryOperators.inputsOf(node).asSequence().filter { it.generic }.mapNotNull { input ->
                 graph.links.firstOrNull { it.to == node.id && it.toPin == input.name }?.let { sources(it.from, it.fromPin) }
-            }?.removeSuffix("?")?.takeUnless { it == "Any" }
+            }
+            val taken = operator.outputs.asSequence().filter { it.generic }.flatMap { output ->
+                graph.links.asSequence().filter { it.from == node.id && it.fromPin == output.name }
+                    .mapNotNull { link -> consumers(link.to, link.toPin)?.let { StoryGenerics.elementOf(output.shape, it) } }
+            }
+            return (given + taken).map { it.removeSuffix("?") }.firstOrNull(StoryGenerics::isKnown)
+        }
 
         /** A generic input as one of [type]: of its pin type, and with the field a parameter of the type has. */
         private fun StoryOperatorInput.of(type: String): StoryOperatorInput {

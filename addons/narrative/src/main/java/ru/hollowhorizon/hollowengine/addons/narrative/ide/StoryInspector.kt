@@ -45,7 +45,7 @@ private fun NodeInspector(state: StoryEditorState, selection: StorySelection) {
     }
     if (node is StoryNode.Say) FormatHint()
     val only = selection.pin?.let(StoryPins::optionIndex)
-    StoryNodeLayout(graph, state).of(node, StoryPoint(0f, 0f), detailed = true).rows.forEach { row ->
+    StoryGraphBoxes(graph, state).detailed(node).rows.forEach { row ->
         val field = row.field
         if (field != null && (only == null || field.key.substringAfterLast('-') == "$only")) {
             key(field.key) { FieldRow(state, node.id, "st-${node.id}-${field.key}", row, field) }
@@ -69,6 +69,7 @@ private fun FieldRow(state: StoryEditorState, owner: String, id: String, row: St
             Row(tags = listOf("insp-input-row")) {
                 StoryInputField(
                     id, field, insight, state.context?.readOnly == true, null, false, StoryFieldLook.INSPECTOR,
+                    state.context?.history,
                     height = INSPECTOR_HEIGHT,
                 )
                 if (field.color) ColorButton(state, id, field)

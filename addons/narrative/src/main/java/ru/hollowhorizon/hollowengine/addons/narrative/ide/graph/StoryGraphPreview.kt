@@ -265,6 +265,7 @@ private fun StoryRowView(
                 problem,
                 wrong,
                 StoryFieldLook.GRAPH,
+                state.context?.history,
                 label = row.label.takeIf { scrubs },
                 labelTags = labelTags,
                 linesHeight = row.height - 6f,

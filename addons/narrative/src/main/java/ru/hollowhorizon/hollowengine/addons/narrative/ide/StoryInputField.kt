@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFieldForm
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
@@ -32,10 +33,11 @@ internal class StoryFieldLook(
 
 /**
  * The field of a value, which works the way its type is easiest to work with and always takes Kotlin. A number is
- * dragged while it is one, and arithmetic typed into it, `20 * 60`, turns into the number it comes to. A flag gets a
- * checkbox while it is `true` or `false`. Values the field knows of, and positions at hand for a vector, are a press
- * of the arrow beside it away.
+ * dragged while it is one, a click types into it as into any other field, and arithmetic typed into it, `20 * 60`,
+ * turns into the number it comes to. A flag gets a checkbox while it is `true` or `false`. Values the field knows of,
+ * and positions at hand for a vector, are a press of the arrow beside it away.
  *
+ * @param history where a drag of a number goes as one step.
  * @param label the name of the value, which a dragged number shows inside it and other fields before them.
  * @param height the height of a field of one line; [linesHeight] that of a field of several.
  * @param modifier what places the field.
@@ -49,6 +51,7 @@ internal fun StoryInputField(
     problem: String?,
     wrong: Boolean,
     look: StoryFieldLook,
+    history: UndoHistory?,
     label: String? = null,
     labelTags: List<String> = emptyList(),
     height: Float = DEFAULT_HEIGHT,
@@ -56,7 +59,12 @@ internal fun StoryInputField(
     modifier: Modifier = Modifier,
 ) {
     val form = field.form
+    val current by rememberUpdatedState(field)
+    val focus = LocalUiFocusRequester.current
     var typing by remember(id) { mutableStateOf(false) }
+
+    /** What was typed last, which a key pressed before the field has written it reads. */
+    val typed = remember(id) { arrayOfNulls<String>(1) }
     val shown = field.value.ifBlank { field.placeholder }
     val state = (if (wrong) "error" else "warning").takeIf { problem != null }
     val tags = listOfNotNull(look.tag, state)
@@ -64,13 +72,18 @@ internal fun StoryInputField(
     if (form is StoryFieldForm.Numeric && number != null) {
         NumberField(
             number,
-            id = id,
+            id = "$id-number",
             label = label,
             whole = form.whole,
             tags = listOfNotNull(look.numberTag, state),
             modifier = modifier.size(0.px, height.px).grow(1f).tooltipOnHover(problem.orEmpty()),
-            onText = field.write,
-        ) { field.write(form.write(it)) }
+            onGestureStart = { history?.begin() },
+            onGestureEnd = { history?.commit() },
+            onEdit = {
+                typing = true
+                focus.request(id)
+            },
+        ) { current.write(form.write(it)) }
         return
     }
     label?.let { Text(it, tags = labelTags) }
@@ -83,13 +96,17 @@ internal fun StoryInputField(
     val lines = look.lines && field.lines > 1
 
     fun settle() {
-        val numeric = form as? StoryFieldForm.Numeric ?: return
-        if (numeric.read(field.value) != null) return
-        UiArithmetic.evaluate(field.value)?.let { field.write(numeric.write(it)) }
+        val numeric = current.form as? StoryFieldForm.Numeric ?: return
+        val text = typed[0] ?: current.value
+        val number = numeric.read(text) ?: UiArithmetic.evaluate(text) ?: return
+        numeric.write(number).takeIf { it != text }?.let(current.write)
     }
     TextField(
         value = field.value,
-        onChange = field.write,
+        onChange = {
+            typed[0] = it
+            current.write(it)
+        },
         mode = if (lines) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
         readOnly = readOnly,
         placeholder = field.placeholder,
@@ -98,7 +115,10 @@ internal fun StoryInputField(
         id = id,
         tags = tags + listOfNotNull(look.codeTag.takeIf { field.code && form != StoryFieldForm.Template }),
         modifier = modifier.size(0.px, (if (lines) linesHeight else height).px).grow(1f)
-            .tooltipOnHover(problem.orEmpty()).onFocus { typing = true }.onUnfocus {
+            .tooltipOnHover(problem.orEmpty()).onFocus {
+                typed[0] = null
+                typing = true
+            }.onUnfocus {
                 typing = false
                 settle()
             }.onKeyInput { input ->

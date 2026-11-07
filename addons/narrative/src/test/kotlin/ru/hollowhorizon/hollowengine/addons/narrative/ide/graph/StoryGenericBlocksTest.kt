@@ -42,6 +42,25 @@ class StoryGenericBlocksTest {
         assertEquals(shortfall, settled.operatorOf("constant"))
     }
 
+    /** Nothing goes into `select` but the constant, so its type comes from where the choice goes. */
+    @Test
+    fun `a constant takes the type a generic block gives on`() {
+        val graph = StoryGraph(
+            nodes = listOf(
+                StoryNode.Pure("parts", unpack, mapOf("value" to "result")),
+                StoryNode.Pure("same", "equal"),
+                StoryNode.Pure("choice", "select"),
+                StoryNode.Pure("constant", TypeOperators.ENUM),
+            ),
+            links = listOf(
+                StoryLink("choice", "result", "same", "a"),
+                StoryLink("parts", TypeOperators.fieldPin("Closest", "reason"), "same", "b"),
+                StoryLink("constant", TypeOperators.SUBJECT, "choice", "then"),
+            ),
+        )
+        assertEquals(shortfall, StoryGenericBlocks.settled(graph, state).operatorOf("constant"))
+    }
+
     @Test
     fun `a block linked to nothing goes back to no type`() {
         val alone = StoryGraph(nodes = listOf(StoryNode.Pure("constant", shortfall, mapOf("value" to "x"))))

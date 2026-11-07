@@ -17,8 +17,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
  * @param param the parameter of the function of a [StoryOperator.function] it passes, which says how its field is
  * written, what it offers and what it is called.
  * @param path where it sits among the sections of the block, `jumps.maxGap` under `jumps`.
- * @param generic whether it takes `T`: the type of the first value linked into such an input of the block, which every
- * such pin of the block then carries.
+ * @param generic whether it takes `T`: the type of the first value linked into such an input of the block, or else of
+ * what a generic output of the block is linked to, which every such pin of the block then carries.
  * @param takesEmpty whether it takes a value that may be missing, `T?`.
  * @param typeName whether it names a Kotlin type rather than takes a value: it has no pin, and its field goes into
  * the template as it is written, as in `$value as? $type`.
@@ -49,6 +49,7 @@ data class StoryOperatorInput(
  * @param empty what it reads with none of the inputs of a variadic operator given.
  * @param path where it sits among the sections of the block.
  * @param generic whether it gives `T`, the type the generic inputs of the block take.
+ * @param shape the type it gives when [generic], `T` standing for that type, as in `List<T>`.
  * @param typeOf the input naming the type it gives, which may be missing.
  */
 data class StoryOperatorOutput(
@@ -59,6 +60,7 @@ data class StoryOperatorOutput(
     val empty: String? = null,
     val path: String = name,
     val generic: Boolean = false,
+    val shape: String = "T",
     val typeOf: String? = null,
 )
 
@@ -288,8 +290,9 @@ object StoryOperators {
         ),
 
         operator(
-            "list", "values.list", listOf(input("a", ANY), input("b", ANY), input("c", ANY)),
-            out("list", LIST, "listOf(\$*)").copy(kotlin = "List<Any?>", empty = "emptyList<Any?>()"),
+            "list", "values.list", listOf(generic("a"), generic("b"), generic("c")),
+            outOf("list", "listOf(\$*)")
+                .copy(type = LIST, kotlin = "List<Any?>", empty = "emptyList<Any?>()", shape = "List<T>"),
         ).copy(variadic = true),
         operator(
             "range", "values.list", listOf(number("from"), number("to", "9")),

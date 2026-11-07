@@ -9,7 +9,17 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.kotlinTokenHighlighter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 
 /** The colors analysis gave the Kotlin [text] of a field. */
-internal class StoryFieldColors(val text: String, val highlights: List<UiTextHighlight>)
+internal class StoryFieldColors(val text: String, val highlights: List<UiTextHighlight>) {
+    /**
+     * How far into the analyzed [text] the [shown] text of its field starts, or null when the field shows something
+     * else by now. A constant is shown without its package, `Mood.CALM` of `a.b.Mood.CALM`, and colored as its tail.
+     */
+    fun lead(shown: String): Int? {
+        if (shown == text) return 0
+        val lead = text.length - shown.length
+        return lead.takeIf { shown.isNotEmpty() && lead > 0 && text.endsWith(shown) && text[lead - 1] == '.' }
+    }
+}
 
 /**
  * What the Kotlin compiler says of a story.
@@ -116,8 +126,9 @@ internal object StoryInsight {
      * inside of a string, a [template], is looked at inside its quotes.
      */
     private fun colors(session: Session, field: StoryFieldKey, template: Boolean) = UiSyntaxHighlighter { text ->
-        session.analysis.colors[field]?.takeIf { it.text == text }?.highlights
-            ?: if (template) templateColors(text) else tokens.highlight(text)
+        session.analysis.colors[field]?.let { colors ->
+            colors.lead(text)?.let { lead -> part(colors.highlights, lead, lead + text.length) }
+        } ?: if (template) templateColors(text) else tokens.highlight(text)
     }
 
     private fun templateColors(text: String): List<UiTextHighlight> {
@@ -164,14 +175,13 @@ internal object StoryInsight {
                 session.script.completions({ context(session, field) }) { addImport(session, it) })
         }
         val analysis = analysis(session)
+        val lead = analysis.colors[field]?.lead(text) ?: 0
         return UiCodeInsight(
             highlighter = own.highlighter,
             completions = own.completions,
             diagnostics = analysis.fields[field].orEmpty().map { problem ->
-                problem.copy(
-                    start = problem.start.coerceAtMost(text.length),
-                    end = problem.end.coerceAtMost(text.length)
-                )
+                val start = (problem.start - lead).coerceIn(0, text.length)
+                problem.copy(start = start, end = (problem.end - lead).coerceIn(start, text.length))
             },
             completionRevision = session.script.version,
             highlightRevision = analysis.revision,

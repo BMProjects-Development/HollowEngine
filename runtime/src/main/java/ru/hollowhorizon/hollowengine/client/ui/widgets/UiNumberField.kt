@@ -14,7 +14,7 @@ import kotlin.math.roundToLong
  * A number to drag, step with the arrows at its sides, or type. What is typed may be arithmetic, `20 * 60`, which
  * the field works out.
  *
- * @param onText gets what was typed when it is no number; without it such text is dropped.
+ * @param onEdit opens a field of the caller's own to type into, in place of the one the number opens on a click.
  */
 @Composable
 fun NumberField(
@@ -31,7 +31,7 @@ fun NumberField(
     modifier: Modifier = Modifier,
     onGestureStart: () -> Unit = {},
     onGestureEnd: () -> Unit = {},
-    onText: ((String) -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
     onChange: (Double) -> Unit,
 ) {
     val fieldId = id ?: remember { "number-field-${NumberFieldIds.next()}" }
@@ -67,11 +67,9 @@ fun NumberField(
     if (gesture.editing == fieldId) {
         // A field taken away while typed into does not open typed into when it comes back.
         DisposableEffect(fieldId) { onDispose { if (gesture.editing == fieldId) gesture.editing = null } }
-        NumberFieldEditor("$fieldId-edit", value, whole, onText != null, tags, modifier) { typed ->
+        NumberFieldEditor("$fieldId-edit", value, whole, tags, modifier) { typed ->
             if (gesture.editing == fieldId) gesture.editing = null
-            if (typed == null) return@NumberFieldEditor
-            val number = UiArithmetic.evaluate(typed)
-            if (number != null) commit(limit(number)) else if (typed.isNotBlank()) onText?.invoke(typed.trim())
+            typed?.let(UiArithmetic::evaluate)?.let { commit(limit(it)) }
         }
         return
     }
@@ -149,6 +147,8 @@ fun NumberField(
                             wrap?.release(gesture.onWrap)
                             gesture.dragged = null
                             onGestureEnd()
+                        } else if (onEdit != null) {
+                            onEdit()
                         } else {
                             gesture.editing = fieldId
                             focus.request("$fieldId-edit")
@@ -183,7 +183,6 @@ private fun NumberFieldEditor(
     id: String,
     value: Double,
     whole: Boolean,
-    anyText: Boolean,
     tags: List<String>,
     modifier: Modifier,
     onDone: (String?) -> Unit,
@@ -199,11 +198,7 @@ private fun NumberFieldEditor(
     TextField(
         state = text,
         id = id,
-        filter = when {
-            anyText -> UiTextInputFilter.ANY
-            whole -> UiTextInputFilter.INTEGER
-            else -> UiTextInputFilter.DECIMAL
-        },
+        filter = UiTextInputFilter.ANY,
         fontSize = 9f,
         tags = listOf("number-field", "editing") + tags,
         modifier = modifier.onUnfocus { finish(text.text) }.onKeyInput { input ->
