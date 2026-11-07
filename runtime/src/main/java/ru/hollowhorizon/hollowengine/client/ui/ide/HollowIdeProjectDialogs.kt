@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiButtonKind
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
@@ -105,7 +106,7 @@ private fun EnvironmentField(form: ProjectSettingsForm) {
             expanded = expanded,
             onExpandedChange = { expanded = it },
             items = ProjectSettingsForm.environments.map { environment ->
-                UiDropdownItem(environment.label(), checked = environment == form.environment) {
+                UiDropdownItem(environment.label(), mark = UiMenuParts.radio(environment == form.environment)) {
                     form.environment = environment
                 }
             },

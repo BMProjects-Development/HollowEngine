@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderOptionSpec
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 
 /** What the fields of a node change, and the menus they open; the editor answers them. */
 internal interface ShaderFieldActions {
@@ -70,7 +70,7 @@ internal fun OptionField(
                     listOf(UiDropdownItem(graphText("no_properties"), enabled = false))
                 } else {
                     names.map { name ->
-                        UiDropdownItem(name, mark = UiDropdownMark.RADIO, checked = name == current) {
+                        UiDropdownItem(name, mark = UiMenuParts.radio(name == current)) {
                             actions.setOption(node.id, option.name, name)
                         }
                     }

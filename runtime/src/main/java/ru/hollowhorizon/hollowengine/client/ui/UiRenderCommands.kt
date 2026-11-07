@@ -378,6 +378,7 @@ class UiCommandRenderer {
         layoutBoundsMatchVisualBounds: Boolean,
     ) {
         val style = resolved[node]
+        if (style.opacity <= 0f) return
         val layoutNode = layout[node]
         val isFramebuffer = layoutNode.needsFramebuffer
         val baseFilter = if (isFramebuffer) UiFilterChain.Empty else style.filter

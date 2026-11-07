@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorSelection
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.inspector.LocalEditorBones
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
@@ -164,16 +165,16 @@ internal object WorldObjectParts {
                     effect?.let {
                         UiDropdownItem(
                             rigText("effect_reset"),
-                            icon = PartIcons.REMOVE,
+                            mark = UiMenuParts.icon(PartIcons.REMOVE),
                             enabled = it.canReset,
                             separatorBefore = true
                         ) { it.reset() }
                     },
                     UiDropdownItem(
                         rigText("remove_attachment"),
-                        icon = PartIcons.REMOVE,
+                        mark = UiMenuParts.icon(PartIcons.REMOVE),
                         enabled = !node.inherited,
-                        shortcut = "Delete"
+                        tail = UiMenuParts.shortcut("Delete")
                     ) {
                         removeAttachment(editing, path.bone, id)
                     },
@@ -189,7 +190,7 @@ internal object WorldObjectParts {
             PartKind.MATERIAL -> {
                 val name = path.material ?: return emptyList()
                 listOf(
-                    UiDropdownItem(rigText("material_reset"), icon = PartIcons.REMOVE, enabled = !node.inherited) {
+                    UiDropdownItem(rigText("material_reset"), mark = UiMenuParts.icon(PartIcons.REMOVE), enabled = !node.inherited) {
                         editing.edit { rig -> rig.copy(materials = rig.materials - name) }
                     },
                 )
@@ -204,7 +205,7 @@ internal object WorldObjectParts {
         if (kinds.isEmpty()) return null
         return UiDropdownItem(
             rigText("attach"),
-            icon = PartIcons.ADD,
+            mark = UiMenuParts.icon(PartIcons.ADD),
             children = kinds.map { type ->
                 val create = requireNotNull(type.createDefault)
                 UiDropdownItem(type.title()) {
@@ -224,10 +225,10 @@ internal object WorldObjectParts {
         val type = instanceKinds(bone).firstOrNull { it.specClass == VfxBoneAttachmentSpec::class } ?: return null
         return UiDropdownItem(
             rigText("attach_effect_part"),
-            icon = PartIcons.EFFECT,
+            mark = UiMenuParts.icon(PartIcons.EFFECT),
             children = VfxNodeTypes.all.mapNotNull { nodeType ->
                 val create = nodeType.createDefault ?: return@mapNotNull null
-                UiDropdownItem(nodeType.titleKey.lang, icon = nodeType.icon) {
+                UiDropdownItem(nodeType.titleKey.lang, mark = UiMenuParts.icon(nodeType.icon)) {
                     val part = create()
                     val spec = VfxBoneAttachmentSpec(
                         freeAttachmentId(editing.occupied, bone, type), ownEffect = VfxEffect(nodes = listOf(part))
@@ -246,7 +247,7 @@ internal object WorldObjectParts {
     private fun visibilityItem(editing: RigEditing, bone: String): UiDropdownItem {
         val hidden = editing.occupied.bone(bone)?.hidden == true
         return UiDropdownItem(
-            rigText(if (hidden) "visible" else "hidden"), icon = if (hidden) PartIcons.VISIBLE else PartIcons.INVISIBLE
+            rigText(if (hidden) "visible" else "hidden"), mark = UiMenuParts.icon(if (hidden) PartIcons.VISIBLE else PartIcons.INVISIBLE)
         ) {
             editing.edit { rig -> rig.withBone(bone, rig.holder(bone).copy(hidden = !hidden)) }
         }

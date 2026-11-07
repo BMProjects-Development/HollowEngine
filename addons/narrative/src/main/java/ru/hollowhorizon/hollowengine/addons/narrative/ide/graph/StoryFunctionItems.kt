@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryNodeKind
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryLibrary
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
@@ -26,7 +27,7 @@ internal object StoryFunctionItems {
             val functions = StoryLibrary.functions(file).sortedBy { it.name }.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
             UiDropdownItem(
                 ScriptRegistry.display(ScriptId.parse(file, ScriptRegistry.sandboxNamespace)),
-                icon = StoryNodeKind.FUNCTION.icon,
+                mark = UiMenuParts.icon(StoryNodeKind.FUNCTION.icon),
                 children = functions.map { function ->
                     item(function.name) { add(StoryNode.Invoke(StoryGraph.newId(), function.name, file)) }
                 },
@@ -36,8 +37,7 @@ internal object StoryFunctionItems {
         if (sections.isEmpty()) return null
         return UiDropdownItem(
             storyLang("add.functions"),
-            icon = StoryNodeKind.FUNCTION.icon,
-            iconColor = StoryCategories.tint(StoryNodeKind.FUNCTION.color),
+            mark = UiMenuParts.icon(StoryNodeKind.FUNCTION.icon, StoryCategories.tint(StoryNodeKind.FUNCTION.color)),
             children = sections.flatMapIndexed { index, items ->
                 items.mapIndexed { at, item -> item.copy(separatorBefore = index > 0 && at == 0) }
             },

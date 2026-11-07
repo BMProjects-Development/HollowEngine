@@ -7,11 +7,6 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 
-enum class UiDropdownMark {
-    CHECKBOX,
-    RADIO
-}
-
 data class UiDropdownSlider(
     val value: Float,
     val min: Float = 0f,
@@ -22,27 +17,56 @@ data class UiDropdownSlider(
     val onCommit: ((Float) -> Unit)? = null,
 )
 
+/** A part of a line of a menu, drawn inside its row; [UiMenuParts] has the usual ones. */
+typealias UiMenuPart = @Composable () -> Unit
+
 /**
  * One line of a menu.
  *
- * @param iconColor what [icon] is tinted in, when it stands for something with a color of its own.
- * @param item a stack drawn in place of [icon], for a line that stands for an item.
+ * @param label what the line says, and what a search of the menu finds it by.
+ * @param mark what stands before the label: an icon, an item or a check.
+ * @param body what takes the place of the label, such as a slider; a line with one is left out of a search.
+ * @param tail what follows the label, such as a shortcut.
  */
 data class UiDropdownItem(
     val label: String,
-    val icon: String? = null,
-    val iconColor: UiColor? = null,
-    val item: ItemStack? = null,
+    val mark: UiMenuPart? = null,
+    val body: UiMenuPart? = null,
+    val tail: UiMenuPart? = null,
     val enabled: Boolean = true,
-    val checked: Boolean = false,
-    val mark: UiDropdownMark? = null,
-    val slider: UiDropdownSlider? = null,
     val closeOnClick: Boolean = true,
-    val shortcut: String? = null,
     val separatorBefore: Boolean = false,
     val children: List<UiDropdownItem>? = null,
     val onClick: () -> Unit = {},
-)
+) {
+    companion object {
+        fun slider(label: String, slider: UiDropdownSlider) =
+            UiDropdownItem(label, body = { MenuSlider(label, slider) }, closeOnClick = false)
+    }
+}
+
+/** The usual parts of a line of a menu; those of a value that may be missing are missing with it. */
+object UiMenuParts {
+    fun icon(path: String?, tint: UiColor? = null): UiMenuPart? = path?.let {
+        { Image(it, tags = listOf("dropdown-item-icon"), modifier = tint?.let { color -> Modifier.tint(color) }) }
+    }
+
+    fun item(stack: ItemStack): UiMenuPart = { Box(modifier = Modifier.size(MarkSize.px, MarkSize.px).item(stack)) }
+
+    fun check(checked: Boolean): UiMenuPart = check(checked, UiCheckboxVariant.CHECKBOX)
+
+    fun radio(checked: Boolean): UiMenuPart = check(checked, UiCheckboxVariant.RADIO)
+
+    fun shortcut(text: String?): UiMenuPart? = text?.let { { Text(it, tags = listOf("dropdown-item-shortcut")) } }
+
+    private fun check(checked: Boolean, variant: UiCheckboxVariant): UiMenuPart = {
+        Checkbox(checked, variant, tags = listOf("dropdown-item-check"), modifier = Modifier.inputTransparent())
+    }
+}
+
+val LocalUiMenuItemId = staticCompositionLocalOf { "" }
+
+private const val MarkSize = 16f
 
 @Composable
 fun UiDropdown(
@@ -110,7 +134,7 @@ fun ContextMenu(
     onBounds: (UiRect) -> Unit = {},
     onExpandedChange: (Boolean) -> Unit = {},
 ) {
-    val anyLeading = items.any { it.icon != null || it.item != null || it.mark != null }
+    val anyLeading = items.any { it.mark != null }
     val maxHeight = LocalUiViewport.current.height * MenuHeightShare
     var openSubmenu by remember { mutableStateOf<Int?>(null) }
     var anchors by remember { mutableStateOf(emptyMap<Int, UiRect>()) }
@@ -194,7 +218,7 @@ fun ContextMenu(
             LaunchedEffect(Unit) { focus.request("$id-search") }
         }
         if (found != null) {
-            val leading = found.any { it.item.icon != null || it.item.item != null }
+            val leading = found.any { it.item.mark != null }
             found.forEachIndexed { index, match ->
                 Row(
                     id = "$id-found-$index",
@@ -207,17 +231,13 @@ fun ContextMenu(
                             event.consume()
                         },
                 ) {
-                    MenuIcon(match.item, leading)
+                    MenuMark(match.item, leading)
                     Text(match.item.label, tags = listOf("dropdown-item-label"))
                     if (match.path.isNotEmpty()) Text(match.path, tags = listOf("dropdown-item-shortcut"))
                 }
             }
         } else items.forEachIndexed { index, item ->
             if (item.separatorBefore && index > 0) Box(tags = listOf("dropdown-separator"))
-            if (item.slider != null) {
-                DropdownSliderRow("$id-item-$index", item.label, item.slider) { openSubmenu = null }
-                return@forEachIndexed
-            }
             val children = item.children
             val itemAction: (UiEvent) -> Unit = { event ->
                 if (item.enabled) {
@@ -246,21 +266,11 @@ fun ContextMenu(
                     .let { if (children != null) it.onPlaced { rect -> if (anchors[index] != rect) anchors = anchors + (index to rect) } else it }
                     .onClick(itemAction)
             ) {
-                if (item.mark != null) {
-                    Checkbox(
-                        checked = item.checked,
-                        variant = when (item.mark) {
-                            UiDropdownMark.CHECKBOX -> UiCheckboxVariant.CHECKBOX
-                            UiDropdownMark.RADIO -> UiCheckboxVariant.RADIO
-                        },
-                        tags = listOf("dropdown-item-check"),
-                        modifier = Modifier.onClick(itemAction),
-                    )
-                } else {
-                    MenuIcon(item, anyLeading)
+                CompositionLocalProvider(LocalUiMenuItemId provides "$id-item-$index") {
+                    MenuMark(item, anyLeading)
+                    item.body?.invoke() ?: Text(item.label, tags = listOf("dropdown-item-label"))
+                    item.tail?.invoke()
                 }
-                Text(item.label, tags = listOf("dropdown-item-label"))
-                if (item.shortcut != null) Text(item.shortcut, tags = listOf("dropdown-item-shortcut"))
                 if (children != null) Text("›", tags = listOf("dropdown-item-shortcut", "dropdown-item-submenu-arrow"))
             }
         }
@@ -282,45 +292,34 @@ fun ContextMenu(
     }
 }
 
-/** The icon of [item] in its own color, or the room for one when [leading] says other items of the menu have one. */
+/** The mark of [item], or the room for one when [leading] says other items of the menu have one. */
 @Composable
-private fun MenuIcon(item: UiDropdownItem, leading: Boolean) {
+private fun MenuMark(item: UiDropdownItem, leading: Boolean) {
+    val mark = item.mark
     when {
-        item.item != null -> Box(modifier = Modifier.size(16.px, 16.px).item(item.item))
-
-        item.icon != null -> Image(
-            item.icon,
-            tags = listOf("dropdown-item-icon"),
-            modifier = item.iconColor?.let { Modifier.tint(it) },
-        )
-
-        leading -> Box(modifier = Modifier.size(16.px, 16.px))
+        mark != null -> mark()
+        leading -> Box(modifier = Modifier.size(MarkSize.px, MarkSize.px))
     }
 }
 
 @Composable
-private fun DropdownSliderRow(id: String, label: String, slider: UiDropdownSlider, onEnter: () -> Unit) {
+private fun MenuSlider(label: String, slider: UiDropdownSlider) {
+    val id = LocalUiMenuItemId.current
     val last = remember(id) { floatArrayOf(slider.value) }
-    Row(
-        id = id,
-        tags = listOf("dropdown-item", "dropdown-slider-item"),
-        modifier = Modifier.input(hoverable = true).alignItems(vertical = UiAlign.CENTER).onEnter { onEnter() },
-    ) {
-        NumberField(
-            value = slider.value.toDouble(),
-            id = "$id-field",
-            label = label,
-            min = slider.min.toDouble(),
-            max = slider.max.toDouble(),
-            step = slider.step.takeIf { it > 0f }?.toDouble() ?: ((slider.max - slider.min) / SliderSteps).toDouble(),
-            slider = true,
-            format = { slider.valueLabel(it.toFloat()) },
-            modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
-            onGestureEnd = { slider.onCommit?.invoke(last[0]) },
-        ) { next ->
-            last[0] = next.toFloat()
-            slider.onChange?.invoke(last[0])
-        }
+    NumberField(
+        value = slider.value.toDouble(),
+        id = "$id-field",
+        label = label,
+        min = slider.min.toDouble(),
+        max = slider.max.toDouble(),
+        step = slider.step.takeIf { it > 0f }?.toDouble() ?: ((slider.max - slider.min) / SliderSteps).toDouble(),
+        slider = true,
+        format = { slider.valueLabel(it.toFloat()) },
+        modifier = Modifier.size(0.px, UiLength.Fit).grow(1f),
+        onGestureEnd = { slider.onCommit?.invoke(last[0]) },
+    ) { next ->
+        last[0] = next.toFloat()
+        slider.onChange?.invoke(last[0])
     }
 }
 

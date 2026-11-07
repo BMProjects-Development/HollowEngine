@@ -8,7 +8,7 @@ import net.minecraft.world.Difficulty
 import net.minecraft.world.level.GameType
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimeOfDayValueFormatter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownSlider
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.network.*
@@ -85,8 +85,7 @@ internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
     fun rule(rule: WorldRule, label: String = rule.key.descriptionId.lang, separatorBefore: Boolean = false) =
         UiDropdownItem(
             label = label,
-            checked = state.rules[rule] == true,
-            mark = UiDropdownMark.CHECKBOX,
+            mark = UiMenuParts.check(state.rules[rule] == true),
             closeOnClick = false,
             separatorBefore = separatorBefore,
         ) {
@@ -97,8 +96,7 @@ internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
         UiDropdownItem(
             label = label,
             enabled = enabled,
-            checked = checked,
-            mark = UiDropdownMark.RADIO,
+            mark = UiMenuParts.radio(checked),
             closeOnClick = false,
         ) {
             if (!checked) WorldControlClient.change(change())
@@ -110,9 +108,9 @@ internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
 
     val time = buildList {
         add(
-            UiDropdownItem(
-                label = WorldLang.TIME.lang,
-                slider = UiDropdownSlider(
+            UiDropdownItem.slider(
+                WorldLang.TIME.lang,
+                UiDropdownSlider(
                     value = timeOfDay.toFloat(),
                     min = 0f,
                     max = (DayTicks - 1).toFloat(),
@@ -120,14 +118,13 @@ internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
                     valueLabel = TimeOfDayValueFormatter::format,
                     onChange = { WorldControlClient.change(WorldChange(timeOfDay = it.toLong())) },
                 ),
-                closeOnClick = false,
             ),
         )
         TimePresets.forEachIndexed { index, preset ->
             add(
                 UiDropdownItem(
                     label = preset.labelKey.lang,
-                    shortcut = TimeOfDayValueFormatter.format(preset.ticks.toFloat()),
+                    tail = UiMenuParts.shortcut(TimeOfDayValueFormatter.format(preset.ticks.toFloat())),
                     closeOnClick = false,
                     separatorBefore = index == 0,
                 ) {
@@ -153,13 +150,13 @@ internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
     }
 
     return listOf(
-        UiDropdownItem(WorldLang.TIME.lang, shortcut = TimeOfDayValueFormatter.format(timeOfDay.toFloat()), children = time),
-        UiDropdownItem(WorldLang.WEATHER.lang, shortcut = WorldLang.weather(state.weather).lang, children = weather),
-        UiDropdownItem(WorldLang.GAME_MODE.lang, shortcut = gameMode.shortDisplayName.string, children = gameModes),
+        UiDropdownItem(WorldLang.TIME.lang, tail = UiMenuParts.shortcut(TimeOfDayValueFormatter.format(timeOfDay.toFloat())), children = time),
+        UiDropdownItem(WorldLang.WEATHER.lang, tail = UiMenuParts.shortcut(WorldLang.weather(state.weather).lang), children = weather),
+        UiDropdownItem(WorldLang.GAME_MODE.lang, tail = UiMenuParts.shortcut(gameMode.shortDisplayName.string), children = gameModes),
         UiDropdownItem(
             WorldLang.DIFFICULTY.lang,
-            shortcut = difficulty.displayName.string +
-                if (state.difficultyLocked) " (" + WorldLang.DIFFICULTY_LOCKED.lang + ")" else "",
+            tail = UiMenuParts.shortcut(difficulty.displayName.string +
+                if (state.difficultyLocked) " (" + WorldLang.DIFFICULTY_LOCKED.lang + ")" else ""),
             children = difficulties,
         ),
         UiDropdownItem(WorldLang.RULES.lang, children = MenuRules.map { rule(it) }),

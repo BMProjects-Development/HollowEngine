@@ -150,7 +150,7 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
         id = "rig-generate-menu",
         anchorBounds = anchor,
         items = generators.map { entry ->
-            UiDropdownItem(entry.titleKey.lang, entry.icon) {
+            UiDropdownItem(entry.titleKey.lang, mark = UiMenuParts.icon(entry.icon)) {
                 viewer.attachment.ensureReady()
                 document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(viewer.attachment, it) }
             }

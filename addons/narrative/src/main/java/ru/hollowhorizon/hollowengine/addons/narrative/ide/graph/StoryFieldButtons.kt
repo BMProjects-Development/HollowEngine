@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphEditorController
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 private const val CodeIcon = "hollowengine:textures/gui/icons/code_editor.svg"
@@ -36,7 +36,7 @@ internal fun CodeEditorButton(state: StoryEditorState, owner: String, title: Str
 internal fun PicksButton(controller: GraphEditorController, id: String, field: StoryRowField) {
     fun open(x: Float, y: Float, held: List<String>) {
         controller.menu = GraphMenu(x, y, field.picks.map { value ->
-            UiDropdownItem(value, mark = UiDropdownMark.CHECKBOX, checked = value in held, closeOnClick = false) {
+            UiDropdownItem(value, mark = UiMenuParts.check(value in held), closeOnClick = false) {
                 val next = if (value in held) held - value else held + value
                 field.write(StoryLiterals.list(next))
                 open(x, y, next)

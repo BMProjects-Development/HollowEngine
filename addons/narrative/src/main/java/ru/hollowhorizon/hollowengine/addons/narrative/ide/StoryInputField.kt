@@ -139,7 +139,7 @@ internal fun StoryInputField(
     val vector = field.vector
     if ((field.choices.isNotEmpty() || vector != null) && !readOnly) StorySnippetsButton(id) {
         field.choices.map { value ->
-            UiDropdownItem(value, mark = UiDropdownMark.RADIO, checked = value == field.value) { field.write(value) }
+            UiDropdownItem(value, mark = UiMenuParts.radio(value == field.value)) { field.write(value) }
         } + vector?.let { vectorItems(it, field.write, separated = field.choices.isNotEmpty()) }.orEmpty()
     }
 }

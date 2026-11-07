@@ -54,12 +54,14 @@ internal fun UiLayoutPipeline.placeNodeNow(
     val overflowClip = overflowClipRect(rect, style, boxes.content)
     val clip = if (style.clip || style.scrollable) parentClip.intersect(overflowClip) else parentClip
     val opacityNeedsLayer = style.opacity < 1f && node.children.isNotEmpty()
-    val needsFramebuffer = opacityNeedsLayer ||
+    val needsFramebuffer = style.opacity > 0f && (
+        opacityNeedsLayer ||
             nodeTransform.needsFramebuffer && !node.drawsInSpace() ||
             !insideFramebuffer && node.requiresTextLayer(transform) ||
             style.filter.requiresLayer ||
             style.backdropFilter.requiresLayer ||
             style.clipShape != null && style.clip
+        )
     if (profile != null) {
         if (needsFramebuffer) profile.framebufferNodes++
         if (textLayout != null) profile.recordTextLayout(textLayout)

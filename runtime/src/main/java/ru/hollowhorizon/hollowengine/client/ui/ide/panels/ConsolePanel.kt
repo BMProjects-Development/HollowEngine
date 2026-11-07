@@ -88,7 +88,7 @@ private fun ConsoleToolbar(console: HollowIdeConsole) {
             expanded = levelMenuExpanded,
             onExpandedChange = { levelMenuExpanded = it },
             items = ConsoleLevels.map { level ->
-                UiDropdownItem(level.name, checked = level == console.minimumLevel, mark = UiDropdownMark.RADIO) {
+                UiDropdownItem(level.name, mark = UiMenuParts.radio(level == console.minimumLevel)) {
                     console.minimumLevel = level
                 }
             },
@@ -211,7 +211,7 @@ private fun ConsoleInput(console: HollowIdeConsole) {
             expanded = modeMenuExpanded,
             onExpandedChange = { modeMenuExpanded = it },
             items = ConsoleInputMode.entries.map { mode ->
-                UiDropdownItem(mode.langKey.lang, checked = mode == console.mode, mark = UiDropdownMark.RADIO) {
+                UiDropdownItem(mode.langKey.lang, mark = UiMenuParts.radio(mode == console.mode)) {
                     console.mode = mode
                 }
             },

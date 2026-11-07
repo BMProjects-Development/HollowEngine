@@ -290,7 +290,7 @@ private fun SoundCard(
                 items = SoundEntryType.entries.map { type ->
                     UiDropdownItem(
                         label = type.jsonName,
-                        checked = sound.type == type,
+                        mark = UiMenuParts.radio(sound.type == type),
                         onClick = { sound.type = type; onChanged() },
                     )
                 },

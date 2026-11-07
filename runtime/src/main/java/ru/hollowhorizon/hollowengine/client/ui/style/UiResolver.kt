@@ -130,7 +130,8 @@ class UiModifierResolver(
             // Fingerprint the transitioned + animated style, not the base: an animation on a
             // layout prop (size/padding/transform) must bump the layout revision so the frame rebuilds
             // it, while a draw-only animation (color/opacity) leaves the fingerprint and the layout untouched.
-            val needsLayer = finalStyle.filter.requiresLayer || finalStyle.opacity < 1f && node.children.isNotEmpty()
+            val needsLayer = finalStyle.opacity > 0f &&
+                (finalStyle.filter.requiresLayer || finalStyle.opacity < 1f && node.children.isNotEmpty())
             node.layoutState.updateResolvedLayoutFingerprint(31 * finalStyle.layoutFingerprint() + needsLayer.hashCode())
             val modifierRefresh = animations.isRunning(state.motion, finalStyle, nowMillis)
             if (!requiresRefresh && modifierRefresh) requiresRefresh = true

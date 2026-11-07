@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** What can be added to a story: the steps of its own and the commands stories know, under shared headings. */
@@ -174,8 +175,7 @@ internal object StoryCatalog {
         StoryOperators.all.filter(accepts).map { operator ->
             operatorCategory(operator.category) to UiDropdownItem(
                 operatorTitle(operator.id),
-                icon = operatorIcon(operator) ?: StoryNodeKind.VALUE.icon,
-                iconColor = StoryCategories.tint(operatorColor(operator)),
+                mark = UiMenuParts.icon(operatorIcon(operator) ?: StoryNodeKind.VALUE.icon, StoryCategories.tint(operatorColor(operator))),
             ) { add(StoryNode.Pure(StoryGraph.newId(), operator.id)) }
         }
 
@@ -207,14 +207,13 @@ internal object StoryCatalog {
     /** The submenu of [category], in its icon and color. */
     fun heading(category: String, children: List<UiDropdownItem>) = UiDropdownItem(
         category.lang,
-        icon = StoryCategories.icon(category),
-        iconColor = StoryCategories.tint(StoryCategories.color(category)),
+        mark = UiMenuParts.icon(StoryCategories.icon(category), StoryCategories.tint(StoryCategories.color(category))),
         children = children,
     )
 
     /** An item that adds a node of [kind], in its icon and color. */
     fun kindItem(label: String, kind: StoryNodeKind, onClick: () -> Unit) =
-        UiDropdownItem(label, icon = kind.icon, iconColor = StoryCategories.tint(kind.color), onClick = onClick)
+        UiDropdownItem(label, mark = UiMenuParts.icon(kind.icon, StoryCategories.tint(kind.color)), onClick = onClick)
 
     /**
      * A menu item per command and step of the flow, for adding a node of it; with [values], the operators too, each
@@ -240,8 +239,7 @@ internal object StoryCatalog {
     private fun item(signature: StoryFunctionSignature, add: (StoryNode) -> Unit) =
         UiDropdownItem(
             title(signature),
-            icon = icon(signature) ?: StoryNodeKind.COMMAND.icon,
-            iconColor = StoryCategories.tint(color(signature) ?: StoryNodeKind.COMMAND.color),
+            mark = UiMenuParts.icon(icon(signature) ?: StoryNodeKind.COMMAND.icon, StoryCategories.tint(color(signature) ?: StoryNodeKind.COMMAND.color)),
         ) {
             add(signature.newCall(StoryGraph.newId()))
         }

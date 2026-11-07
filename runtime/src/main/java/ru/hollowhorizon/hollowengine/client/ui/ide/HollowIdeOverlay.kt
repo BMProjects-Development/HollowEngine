@@ -974,16 +974,14 @@ object HollowIdeOverlay {
                 "ide-editor-menu", anchorBounds, listOf(
                     UiDropdownItem(
                         "$MenuLang.show_always".lang,
-                        checked = editMode == EditMode.ENABLED,
-                        mark = UiDropdownMark.RADIO,
+                        mark = UiMenuParts.radio(editMode == EditMode.ENABLED),
                     ) {
                         HollowEngineConfig.editMode = EditMode.ENABLED
                         collapsed = false
                     },
                     UiDropdownItem(
                         "$MenuLang.chat_only".lang,
-                        checked = editMode == EditMode.CHAT_ONLY,
-                        mark = UiDropdownMark.RADIO,
+                        mark = UiMenuParts.radio(editMode == EditMode.CHAT_ONLY),
                     ) {
                         HollowEngineConfig.editMode = EditMode.CHAT_ONLY
                     },

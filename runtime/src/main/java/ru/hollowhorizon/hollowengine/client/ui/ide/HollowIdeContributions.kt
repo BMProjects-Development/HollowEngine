@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoint
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockingState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensionChange
@@ -80,10 +80,12 @@ internal class HollowIdeContributions(
                 val item = registration.value
                 UiDropdownItem(
                     label = item.label.lang,
-                    icon = item.icon,
+                    mark = if (item.checkbox) {
+                        UiMenuParts.check(registration.call(false) { it.isChecked(context) })
+                    } else {
+                        UiMenuParts.icon(item.icon)
+                    },
                     enabled = registration.call(false) { it.isEnabled(context) },
-                    checked = registration.call(false) { it.isChecked(context) },
-                    mark = UiDropdownMark.CHECKBOX.takeIf { item.checkbox },
                     closeOnClick = item.closeOnClick,
                     separatorBefore = index == 0,
                 ) {

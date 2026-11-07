@@ -372,7 +372,7 @@ private fun KindPicker(value: VfxValue, onChange: (VfxValue) -> Unit) {
         id = "vfx-kind-$kind",
         anchorBounds = anchor,
         items = VfxValueKind.entries.map { entry ->
-            UiDropdownItem(vfxText(entry.key), icon = entry.icon, checked = entry == kind) {
+            UiDropdownItem(vfxText(entry.key), mark = UiMenuParts.icon(entry.icon)) {
                 onChange(value.asKind(entry))
             }
         },
@@ -394,7 +394,7 @@ internal fun VfxSourcePicker(source: VfxCurveInput, onChange: (VfxCurveInput) ->
         id = "vfx-source",
         anchorBounds = anchor,
         items = VfxCurveInput.entries.map { entry ->
-            UiDropdownItem(vfxText("source_${entry.name.lowercase()}"), checked = entry == source) { onChange(entry) }
+            UiDropdownItem(vfxText("source_${entry.name.lowercase()}"), mark = UiMenuParts.radio(entry == source)) { onChange(entry) }
         },
         onExpandedChange = { if (!it) open = false },
     )

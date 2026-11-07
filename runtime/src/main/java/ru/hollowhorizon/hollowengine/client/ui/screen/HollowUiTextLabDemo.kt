@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.text.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 
 /**
  * The text lab: every font source and every inline effect, each with its parameters editable live,
@@ -44,8 +44,7 @@ fun TextLab() {
                 items = TextLabFonts.mapIndexed { index, font ->
                     UiDropdownItem(
                         label = font.label,
-                        mark = UiDropdownMark.RADIO,
-                        checked = index == fontIndex,
+                        mark = UiMenuParts.radio(index == fontIndex),
                         onClick = { fontIndex = index },
                     )
                 },

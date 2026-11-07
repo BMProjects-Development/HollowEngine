@@ -35,7 +35,7 @@ object UiMenuSearch {
 
     /** Every item that does something when picked, with the labels of the submenus it is in. */
     private fun leaves(items: List<UiDropdownItem>, path: List<String>): List<Pair<UiDropdownItem, List<String>>> =
-        items.filter { it.enabled && it.slider == null && it.mark == null }.flatMap { item ->
+        items.filter { it.enabled && it.body == null }.flatMap { item ->
             val children = item.children
             if (children == null) listOf(item to path) else leaves(children, path + item.label)
         }

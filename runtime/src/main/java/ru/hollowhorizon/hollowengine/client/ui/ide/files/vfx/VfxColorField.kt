@@ -252,7 +252,7 @@ private fun ColorKindPicker(current: String, onChange: (VfxColorValue) -> Unit) 
         id = "vfx-color-kind",
         anchorBounds = anchor,
         items = listOf("solid", "gradient", "channels").map { kind ->
-            UiDropdownItem(vfxText("color_$kind"), icon = colorKindIcon(kind), checked = kind == current) {
+            UiDropdownItem(vfxText("color_$kind"), mark = UiMenuParts.icon(colorKindIcon(kind))) {
                 onChange(
                     when (kind) {
                         "solid" -> VfxColorValue.Solid()

@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 
 /** A material graph as [GraphEditorController] sees it, made anew for each graph drawn. */
 internal class ShaderGraphEditorModel(
@@ -198,7 +198,7 @@ internal class ShaderGraphEditorModel(
         if (box.isReroute) return emptyList()
         val shown = box.kind.showsPreview(box.node)
         return listOf(
-            UiDropdownItem(graphText("show_preview"), mark = UiDropdownMark.CHECKBOX, checked = shown) {
+            UiDropdownItem(graphText("show_preview"), mark = UiMenuParts.check(shown)) {
                 document.edit { it.withPreview(node, !shown) }
             },
         )

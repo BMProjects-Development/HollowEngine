@@ -672,7 +672,7 @@ private fun PolymorphicField(
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
                 items = alternatives.map { alternative ->
-                    UiDropdownItem(ComponentLabels.typeName(alternative), checked = alternative.serialName == current, mark = UiDropdownMark.RADIO) {
+                    UiDropdownItem(ComponentLabels.typeName(alternative), mark = UiMenuParts.radio(alternative.serialName == current)) {
                         if (alternative.serialName != current) onChange(ComponentJson.defaultOfSubclass(alternative))
                     }
                 },

@@ -22,6 +22,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import kotlin.reflect.full.isSubclassOf
 
 /**
@@ -383,7 +384,7 @@ internal class StoryGraphEditorModel(
             add = add,
         )
         val anyType = loose.takeIf { it.isNotEmpty() }?.let {
-            listOf(UiDropdownItem(storyLang("link.any"), icon = StoryNodeKind.VALUE.icon, children = it, separatorBefore = true))
+            listOf(UiDropdownItem(storyLang("link.any"), mark = UiMenuParts.icon(StoryNodeKind.VALUE.icon), children = it, separatorBefore = true))
         }.orEmpty()
         return variableItems(add) { variable -> boxFor(variable).pins.any { linkable(pending, it) } } + typed + anyType
     }
@@ -533,7 +534,7 @@ internal class StoryGraphEditorModel(
 
     override fun nodeItems(node: String): List<UiDropdownItem> {
         val target = graph.node(node)?.let(state::functionInside) ?: return emptyList()
-        return listOf(UiDropdownItem(storyLang("function.enter"), icon = ENTER_ICON) { state.scope = target })
+        return listOf(UiDropdownItem(storyLang("function.enter"), mark = UiMenuParts.icon(ENTER_ICON)) { state.scope = target })
     }
 
     /** The parameters of a function are where it starts, so a body never goes without them. */
@@ -554,8 +555,7 @@ internal class StoryGraphEditorModel(
         val heading = StoryCategories.PREFIX + "variables"
         return listOf(UiDropdownItem(
             storyLang("add.variable"),
-            icon = StoryCategories.icon(heading),
-            iconColor = StoryCategories.tint(StoryCategories.color(heading)),
+            mark = UiMenuParts.icon(StoryCategories.icon(heading), StoryCategories.tint(StoryCategories.color(heading))),
             children = children,
         ))
     }

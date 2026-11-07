@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.shadergraph
 
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /**
@@ -21,11 +21,11 @@ internal fun addNodeItems(
     if (kinds.isEmpty()) return@mapNotNull null
     UiDropdownItem(
         graphText("category.${category.name.lowercase()}"),
-        icon = category.icon(),
+        mark = UiMenuParts.icon(category.icon()),
         children = kinds.mapIndexed { index, kind ->
             UiDropdownItem(
                 kind.title(),
-                icon = kind.displayIcon(),
+                mark = UiMenuParts.icon(kind.displayIcon()),
                 separatorBefore = index > 0 && kind.group != kinds[index - 1].group,
             ) { onPick(kind) }
         },
@@ -37,8 +37,7 @@ internal fun choiceItems(option: ShaderOptionSpec, current: String, onPick: (Str
     option.values.map { value ->
         UiDropdownItem(
             optionValueTitle(option, value),
-            mark = UiDropdownMark.RADIO,
-            checked = value == current
+            mark = UiMenuParts.radio(value == current)
         ) { onPick(value) }
     }
 

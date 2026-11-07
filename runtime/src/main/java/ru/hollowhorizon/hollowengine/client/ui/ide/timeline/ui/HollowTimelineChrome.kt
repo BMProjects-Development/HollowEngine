@@ -218,24 +218,24 @@ internal fun TimelineToolbar(
             items = listOfNotNull(
                 UiDropdownItem(
                     TimelineLang.DELETE_SELECTED.lang,
-                    icon = TimelineIcons.DELETE,
+                    mark = UiMenuParts.icon(TimelineIcons.DELETE),
                     enabled = controller.selectedKeyframes.isNotEmpty(),
-                    shortcut = HollowKeys.DELETE.shortcut,
+                    tail = UiMenuParts.shortcut(HollowKeys.DELETE.shortcut),
                 ) {
                     controller.deleteSelectedKeyframes(); refresh()
                 },
                 UiDropdownItem(
                     TimelineLang.SMOOTH_SELECTED.lang,
-                    icon = TimelineIcons.SMOOTH,
+                    mark = UiMenuParts.icon(TimelineIcons.SMOOTH),
                     enabled = controller.canEditSelectedCurves,
-                    shortcut = HollowKeys.SMOOTH_KEYS.shortcut,
+                    tail = UiMenuParts.shortcut(HollowKeys.SMOOTH_KEYS.shortcut),
                 ) {
                     controller.smoothSelectedKeyframes(); refresh()
                 },
                 if (!features.cameraPreview) null else UiDropdownItem(
                     if (controller.isCameraPreviewEnabled) TimelineLang.CAMERA_PREVIEW_ON.lang
                     else TimelineLang.CAMERA_PREVIEW_OFF.lang,
-                    icon = TimelineIcons.FILM,
+                    mark = UiMenuParts.icon(TimelineIcons.FILM),
                     closeOnClick = false,
                     separatorBefore = true,
                 ) {
@@ -244,12 +244,12 @@ internal fun TimelineToolbar(
                 },
                 if (!features.storage) null else UiDropdownItem(
                     TimelineLang.SAVE.lang,
-                    icon = TimelineIcons.SAVE,
+                    mark = UiMenuParts.icon(TimelineIcons.SAVE),
                     separatorBefore = true,
                 ) { onSave() },
                 if (!features.storage) null else UiDropdownItem(
                     TimelineLang.LOAD.lang,
-                    icon = TimelineIcons.LOAD,
+                    mark = UiMenuParts.icon(TimelineIcons.LOAD),
                 ) { onLoad() },
             ),
         )
@@ -398,8 +398,7 @@ private fun TrackListingButton(listing: TrackListing, modifier: Modifier) {
         items = listOf(
             UiDropdownItem(
                 TimelineLang.TRACKS_ONLY_SELECTED.lang,
-                checked = listing.onlySelected,
-                mark = UiDropdownMark.CHECKBOX,
+                mark = UiMenuParts.check(listing.onlySelected),
             ) { listing.onlySelected = !listing.onlySelected },
             UiDropdownItem(TimelineLang.TRACKS_SHOW_ALL.lang, separatorBefore = true, onClick = listing::showAll),
             UiDropdownItem(TimelineLang.TRACKS_HIDE_UNSELECTED.lang, onClick = listing::hideUnselected),
@@ -655,7 +654,7 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
                     TimelineLang.ROTATION_MODE.lang,
                     separatorBefore = true,
                     children = RotationMode.entries.map { mode ->
-                        UiDropdownItem(rotationModeLabel(mode), checked = type.mode == mode) {
+                        UiDropdownItem(rotationModeLabel(mode), mark = UiMenuParts.radio(type.mode == mode)) {
                             controller.edit(TimelineEdits.ROTATION_BASIS) { property.setRotationMode(mode) }
                             refresh()
                         }
@@ -667,12 +666,12 @@ private fun trackMenu(controller: TimelineController, row: TimelineRow, refresh:
         val hideGroup = controller.onHideGroup
         val group = row.group
         if (property != null && controller.onHideProperty != null) {
-            add(UiDropdownItem(TimelineLang.TRACK_REMOVE.lang, icon = TimelineIcons.CLOSE, separatorBefore = true) {
+            add(UiDropdownItem(TimelineLang.TRACK_REMOVE.lang, mark = UiMenuParts.icon(TimelineIcons.CLOSE), separatorBefore = true) {
                 controller.unlist(property, row.curve.takeIf { row.kind == TimelineRowKind.CHANNEL })
                 refresh()
             })
         } else if (group != null && hideGroup != null) {
-            add(UiDropdownItem(TimelineLang.TRACK_REMOVE.lang, icon = TimelineIcons.CLOSE, separatorBefore = true) {
+            add(UiDropdownItem(TimelineLang.TRACK_REMOVE.lang, mark = UiMenuParts.icon(TimelineIcons.CLOSE), separatorBefore = true) {
                 hideGroup(group)
                 refresh()
             })

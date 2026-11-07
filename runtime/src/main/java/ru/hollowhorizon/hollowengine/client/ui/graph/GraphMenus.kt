@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.graph
 
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /**
@@ -11,8 +11,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 fun graphViewItems(): List<UiDropdownItem> = listOf(
     UiDropdownItem(
         text("snap_to_grid"),
-        mark = UiDropdownMark.CHECKBOX,
-        checked = GraphPreferences.snapToGrid,
+        mark = UiMenuParts.check(GraphPreferences.snapToGrid),
         separatorBefore = true,
     ) { GraphPreferences.snapToGrid = !GraphPreferences.snapToGrid },
 )
@@ -29,7 +28,7 @@ fun graphArrangeItem(
     if (count < 2) return null
     return UiDropdownItem(
         text("arrange"),
-        icon = ArrangeIcon,
+        mark = UiMenuParts.icon(ArrangeIcon),
         children = GraphAlignment.entries.map { alignment ->
             UiDropdownItem(
                 text("align.${alignment.name.lowercase()}"),

@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeVfxDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.SegmentLane
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackText
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
@@ -130,10 +131,10 @@ internal fun VfxNodeSpec.treeLabel(): String = if (enabled) name else "$name (${
 internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: String?): List<UiDropdownItem> {
     val add = UiDropdownItem(
         vfxText(if (id == null) "add_node" else "add_child"),
-        icon = VfxIcons.ADD,
+        mark = UiMenuParts.icon(VfxIcons.ADD),
         children = VfxNodeTypes.all.mapNotNull { type ->
             val create = type.createDefault ?: return@mapNotNull null
-            UiDropdownItem(type.titleKey.lang, icon = type.icon) { add(document, state, id, create()) }
+            UiDropdownItem(type.titleKey.lang, mark = UiMenuParts.icon(type.icon)) { add(document, state, id, create()) }
         },
     )
     val node = id?.let(document.effect::node) ?: return listOf(add)
@@ -142,17 +143,17 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
     val index = siblings.indexOfFirst { it.id == node.id }
     return listOf(
         add,
-        UiDropdownItem(vfxText("duplicate"), icon = VfxIcons.DUPLICATE, shortcut = HollowKeys.DUPLICATE.shortcut, separatorBefore = true) {
+        UiDropdownItem(vfxText("duplicate"), mark = UiMenuParts.icon(VfxIcons.DUPLICATE), tail = UiMenuParts.shortcut(HollowKeys.DUPLICATE.shortcut), separatorBefore = true) {
             duplicate(document, state, node.id)
         },
-        UiDropdownItem(vfxText("rename"), icon = VfxIcons.RENAME, shortcut = HollowKeys.RENAME.shortcut) { rename(state, node.id) },
-        UiDropdownItem(vfxText(if (node.enabled) "disable" else "enable"), icon = VfxIcons.TOGGLE) {
+        UiDropdownItem(vfxText("rename"), mark = UiMenuParts.icon(VfxIcons.RENAME), tail = UiMenuParts.shortcut(HollowKeys.RENAME.shortcut)) { rename(state, node.id) },
+        UiDropdownItem(vfxText(if (node.enabled) "disable" else "enable"), mark = UiMenuParts.icon(VfxIcons.TOGGLE)) {
             document.replace(node.withCommon(enabled = !node.enabled))
         },
-        UiDropdownItem(vfxText("move_up"), shortcut = HollowKeys.MOVE_UP.shortcut, enabled = index > 0, separatorBefore = true) {
+        UiDropdownItem(vfxText("move_up"), tail = UiMenuParts.shortcut(HollowKeys.MOVE_UP.shortcut), enabled = index > 0, separatorBefore = true) {
             document.edit { it.withShifted(node.id, -1) }
         },
-        UiDropdownItem(vfxText("move_down"), shortcut = HollowKeys.MOVE_DOWN.shortcut, enabled = index < siblings.lastIndex) {
+        UiDropdownItem(vfxText("move_down"), tail = UiMenuParts.shortcut(HollowKeys.MOVE_DOWN.shortcut), enabled = index < siblings.lastIndex) {
             document.edit { it.withShifted(node.id, 1) }
         },
         UiDropdownItem(vfxText("move_out"), enabled = document.effect.parentOf(node.id) != null) {
@@ -161,7 +162,7 @@ internal fun vfxNodeMenu(document: VfxEditing, state: VfxNodeSelection, id: Stri
             val at = (grand?.children ?: document.effect.nodes).indexOfFirst { it.id == parent.id } + 1
             document.edit { it.withMoved(node.id, grand?.id, at) }
         },
-        UiDropdownItem(vfxText("remove_node"), icon = VfxIcons.REMOVE, shortcut = HollowKeys.DELETE.shortcut, separatorBefore = true) {
+        UiDropdownItem(vfxText("remove_node"), mark = UiMenuParts.icon(VfxIcons.REMOVE), tail = UiMenuParts.shortcut(HollowKeys.DELETE.shortcut), separatorBefore = true) {
             remove(document, state, node.id)
         },
     )

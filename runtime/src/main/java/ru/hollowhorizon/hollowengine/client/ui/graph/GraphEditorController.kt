@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoKeys
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import kotlin.math.hypot
 
@@ -298,8 +299,8 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         val chosen = selection
         val own = model.nodeItems(node)
         val edits = if (!model.isRemovable(node)) emptyList() else listOf(
-            UiDropdownItem(graphEditorText("duplicate"), shortcut = HollowKeys.DUPLICATE.shortcut, onClick = ::duplicateSelection),
-            UiDropdownItem(graphEditorText("delete_node"), shortcut = HollowKeys.DELETE.shortcut, onClick = ::deleteSelection),
+            UiDropdownItem(graphEditorText("duplicate"), tail = UiMenuParts.shortcut(HollowKeys.DUPLICATE.shortcut), onClick = ::duplicateSelection),
+            UiDropdownItem(graphEditorText("delete_node"), tail = UiMenuParts.shortcut(HollowKeys.DELETE.shortcut), onClick = ::deleteSelection),
         )
         menu = GraphMenu(screenX, screenY, joinItemGroups(own, edits, organizeItems(chosen)))
     }
@@ -313,7 +314,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
             listOfNotNull(
                 UiDropdownItem(graphEditorText(if (collapsed) "expand_group" else "collapse_group")) { model.toggleGroup(group) },
                 UiDropdownItem(
-                    graphEditorText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut,
+                    graphEditorText("ungroup"), mark = UiMenuParts.icon(UngroupIcon), tail = UiMenuParts.shortcut(HollowKeys.UNGROUP.shortcut),
                 ) { select(model.ungroup(GraphSelection(members, group = group))) },
                 if (collapsed) null else arrangeItem(members),
                 UiDropdownItem(graphEditorText("delete_group_nodes"), separatorBefore = true) { deleteGroupWithNodes(group) },
@@ -327,7 +328,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
             pointer.screenX, pointer.screenY,
             listOf(
                 graphRerouteItem { select(model.addReroute(link, pointer.graphX, pointer.graphY)) },
-                UiDropdownItem(graphEditorText("delete_link"), shortcut = HollowKeys.DELETE.shortcut) {
+                UiDropdownItem(graphEditorText("delete_link"), tail = UiMenuParts.shortcut(HollowKeys.DELETE.shortcut)) {
                     model.removeLink(link)
                     select(GraphSelection.None)
                 },
@@ -391,11 +392,11 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         val grouped = nodes.any(model::isGrouped)
         return listOfNotNull(
             UiDropdownItem(
-                graphEditorText("group_nodes"), icon = GroupIcon, shortcut = HollowKeys.GROUP.shortcut,
+                graphEditorText("group_nodes"), mark = UiMenuParts.icon(GroupIcon), tail = UiMenuParts.shortcut(HollowKeys.GROUP.shortcut),
             ) { select(model.groupNodes(nodes)) }.takeIf { nodes.isNotEmpty() },
             UiDropdownItem(graphEditorText("leave_group")) { model.setMembership(nodes, null) }.takeIf { grouped },
             UiDropdownItem(
-                graphEditorText("ungroup"), icon = UngroupIcon, shortcut = HollowKeys.UNGROUP.shortcut,
+                graphEditorText("ungroup"), mark = UiMenuParts.icon(UngroupIcon), tail = UiMenuParts.shortcut(HollowKeys.UNGROUP.shortcut),
             ) { select(model.ungroup(chosen)) }.takeIf { grouped },
             arrangeItem(nodes),
         )
@@ -444,4 +445,4 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
 
 /** The item that puts a reroute where a link was dropped, or on the link that was clicked. */
 fun graphRerouteItem(onPick: () -> Unit) =
-    UiDropdownItem(graphEditorText("reroute"), icon = "hollowengine:textures/gui/icons/actions/reroute.svg", onClick = onPick)
+    UiDropdownItem(graphEditorText("reroute"), mark = UiMenuParts.icon("hollowengine:textures/gui/icons/actions/reroute.svg"), onClick = onPick)

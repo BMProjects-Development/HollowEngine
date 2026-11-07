@@ -22,6 +22,7 @@ import ru.hollowhorizon.hollowengine.client.ui.onPress
 import ru.hollowhorizon.hollowengine.client.ui.widgets.RegistryCompletions
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 /** A registry a field names an entry of: its value is written as the commands of the game take it. */
@@ -93,7 +94,7 @@ private fun registryItems(registry: StoryRegistry, write: (String) -> Unit): Lis
         when (registry) {
             StoryRegistry.ITEM -> {
                 if (held != null && registries != null) {
-                    add(UiDropdownItem(storyLang("registry.held"), item = held) {
+                    add(UiDropdownItem(storyLang("registry.held"), mark = UiMenuParts.item(held)) {
                         write(
                             StoryItemSyntax.of(
                                 held,
@@ -106,7 +107,7 @@ private fun registryItems(registry: StoryRegistry, write: (String) -> Unit): Lis
                 if (stacks.isNotEmpty() && registries != null) {
                     val written = stacks.associateBy { StoryItemSyntax.of(it, registries) }
                     add(UiDropdownItem(storyLang("registry.inventory"), children = written.map { (syntax, stack) ->
-                        UiDropdownItem(stack.hoverName.string, item = stack, shortcut = syntax) { write(syntax) }
+                        UiDropdownItem(stack.hoverName.string, mark = UiMenuParts.item(stack), tail = UiMenuParts.shortcut(syntax)) { write(syntax) }
                     }))
                 }
             }
@@ -116,7 +117,7 @@ private fun registryItems(registry: StoryRegistry, write: (String) -> Unit): Lis
                 val looked =
                     hit?.takeIf { it.type == HitResult.Type.BLOCK }?.let { minecraft.level?.getBlockState(it.blockPos) }
                 if (looked != null) {
-                    add(UiDropdownItem(storyLang("registry.looked"), item = ItemStack(looked.block.asItem())) {
+                    add(UiDropdownItem(storyLang("registry.looked"), mark = UiMenuParts.item(ItemStack(looked.block.asItem()))) {
                         write(StoryItemSyntax.of(looked))
                     })
                 }
@@ -125,7 +126,7 @@ private fun registryItems(registry: StoryRegistry, write: (String) -> Unit): Lis
                     add(
                         UiDropdownItem(
                             storyLang("registry.held"),
-                            item = held
+                            mark = UiMenuParts.item(held)
                         ) { write(StoryItemSyntax.of(block.defaultBlockState())) })
                 }
             }
@@ -133,7 +134,7 @@ private fun registryItems(registry: StoryRegistry, write: (String) -> Unit): Lis
     }
     val all = registry.entries().groupBy { it.first.substringBefore(':') }.map { (namespace, entries) ->
         UiDropdownItem(namespace, children = entries.map { (id, stack) ->
-            UiDropdownItem(stack.hoverName.string, item = stack, shortcut = id) { write(id) }
+            UiDropdownItem(stack.hoverName.string, mark = UiMenuParts.item(stack), tail = UiMenuParts.shortcut(id)) { write(id) }
         })
     }
     return near + all.mapIndexed { index, item -> item.copy(separatorBefore = index == 0 && near.isNotEmpty()) }
