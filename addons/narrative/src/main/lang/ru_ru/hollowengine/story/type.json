@@ -1,0 +1,18 @@
+{
+  "DialogueCharacter": "персонаж",
+  "Direction": "сторона",
+  "EquipmentSlot": "слот снаряжения",
+  "Facing": "куда смотреть",
+  "GameType": "режим игры",
+  "InteractionHand": "рука",
+  "InteractionResult": "итог взаимодействия",
+  "MoveOptions": "настройки движения",
+  "MoveResult": "итог движения",
+  "Shortfall": "причина остановки",
+  "StoryHit": "попадание луча",
+  "StoryItemRequest": "запрос предметов",
+  "UnavailableTargetPolicy": "если цели нет",
+  "UnreachablePolicy": "если не дойти",
+  "Weather": "погода",
+  "Zone": "зона"
+}

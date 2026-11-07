@@ -62,6 +62,17 @@ interface SuggestionSource {
 @Retention(AnnotationRetention.RUNTIME)
 annotation class SimpleAction(val id: String = "")
 
+/**
+ * A value, that story reads, such as the health of an entity. Editor shows it as a node with no flow, whose inputs are
+ * the parameters of the function and whose output is what it returns. A node reads it anew every time, so it must
+ * only read, never change the world.
+ *
+ * @param id the id the editor knows the value by, in the namespace of its script or addon; the function name when empty.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class StoryValue(val id: String = "")
+
 @DslMarker
 annotation class StoryDsl
 

@@ -118,6 +118,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
         if (scope != null) ScopeBack(state)
         state.codeField?.let { StoryCodeDialog(state, it) }
         state.colorField?.let { StoryColorDialog(state, it) }
+        state.slotField?.let { StorySlotDialog(state, it) }
     }
 }
 
@@ -287,6 +288,8 @@ private fun StoryRowView(
         val own = "${box.node.id}-${field?.key}"
         if (field != null && field.picks.isNotEmpty()) PicksButton(controller, own, field)
         if (field != null && field.color) ColorButton(state, own, field)
+        field?.registry?.let { RegistryButton(controller, own, it, field) }
+        if (field != null && field.slot) SlotButton(state, own, field)
         if (field != null && field.code && field.vector == null) CodeEditorButton(
             state,
             box.node.id,
@@ -345,7 +348,7 @@ internal fun fieldInsight(state: StoryEditorState, owner: String, field: StoryRo
     return when {
         field.code -> analyzed
         field.typeName -> StoryInsight.type(state)
-        field.hints.isNotEmpty() -> UiCodeInsight(completions = UiCompletionContributor { field.hints })
+        field.completions != null -> UiCodeInsight(completions = field.completions)
         else -> UiCodeInsight(diagnostics = analyzed.diagnostics.map { it.copy(start = 0, end = 0) })
     }
 }

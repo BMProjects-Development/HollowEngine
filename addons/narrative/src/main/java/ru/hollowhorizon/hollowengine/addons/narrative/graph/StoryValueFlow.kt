@@ -71,7 +71,8 @@ internal class StoryValueFlow(
         return found.toList()
     }
 
-    private fun StoryNode.givesResults() = this is StoryNode.Call || this is StoryNode.Code || this is StoryNode.Invoke
+    private fun StoryNode.givesResults() =
+        this is StoryNode.Call || this is StoryNode.Code || this is StoryNode.Invoke
 
     /** Where flow starts: the start of the story, and the parameters of each function. */
     private fun isEntry(node: StoryNode?) = node is StoryNode.Start || node is StoryNode.Parameters

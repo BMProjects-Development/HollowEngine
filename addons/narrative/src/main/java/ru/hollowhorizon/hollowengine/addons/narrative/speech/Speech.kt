@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.speech
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import kotlinx.coroutines.currentCoroutineContext
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.LivingEntity
@@ -55,7 +56,7 @@ class StoryAudience(val players: List<ServerPlayer>) : AbstractCoroutineContextE
  * Says [text] and returns once it is read. It is heard by [to], or else by the audience of the scene it runs in, or
  * else by the players near [speaker].
  */
-@EditorCategory("hollowengine.gui.ide.story.category.dialogue")
+@EditorCategory(StoryCategory.DIALOGUE)
 @SimpleAction("say")
 suspend fun say(speaker: DialogueCharacter?, text: String, to: List<ServerPlayer>? = null) {
     val audience = (to ?: audience() ?: speaker.listeners()).filter { !it.hasDisconnected() }

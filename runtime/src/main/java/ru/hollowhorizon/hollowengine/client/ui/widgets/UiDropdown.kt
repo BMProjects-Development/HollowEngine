@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.widgets
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
+import net.minecraft.world.item.ItemStack
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
@@ -25,11 +26,13 @@ data class UiDropdownSlider(
  * One line of a menu.
  *
  * @param iconColor what [icon] is tinted in, when it stands for something with a color of its own.
+ * @param item a stack drawn in place of [icon], for a line that stands for an item.
  */
 data class UiDropdownItem(
     val label: String,
     val icon: String? = null,
     val iconColor: UiColor? = null,
+    val item: ItemStack? = null,
     val enabled: Boolean = true,
     val checked: Boolean = false,
     val mark: UiDropdownMark? = null,
@@ -107,7 +110,7 @@ fun ContextMenu(
     onBounds: (UiRect) -> Unit = {},
     onExpandedChange: (Boolean) -> Unit = {},
 ) {
-    val anyLeading = items.any { it.icon != null || it.mark != null }
+    val anyLeading = items.any { it.icon != null || it.item != null || it.mark != null }
     val maxHeight = LocalUiViewport.current.height * MenuHeightShare
     var openSubmenu by remember { mutableStateOf<Int?>(null) }
     var anchors by remember { mutableStateOf(emptyMap<Int, UiRect>()) }
@@ -191,7 +194,7 @@ fun ContextMenu(
             LaunchedEffect(Unit) { focus.request("$id-search") }
         }
         if (found != null) {
-            val leading = found.any { it.item.icon != null }
+            val leading = found.any { it.item.icon != null || it.item.item != null }
             found.forEachIndexed { index, match ->
                 Row(
                     id = "$id-found-$index",
@@ -283,6 +286,8 @@ fun ContextMenu(
 @Composable
 private fun MenuIcon(item: UiDropdownItem, leading: Boolean) {
     when {
+        item.item != null -> Box(modifier = Modifier.size(16.px, 16.px).item(item.item))
+
         item.icon != null -> Image(
             item.icon,
             tags = listOf("dropdown-item-icon"),

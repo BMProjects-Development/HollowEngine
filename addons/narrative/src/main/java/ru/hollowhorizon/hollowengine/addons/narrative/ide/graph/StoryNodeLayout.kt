@@ -10,9 +10,11 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNodeMetrics
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import kotlin.math.ceil
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelClipPreview
+import ru.hollowhorizon.hollowengine.addons.narrative.items.INVENTORY_SLOT_WIDGET
 import ru.hollowhorizon.hollowengine.common.utils.Spelling
 
 /** A pin of a row. [kotlin] is the exact type it carries, when [type] alone does not say. */
@@ -24,12 +26,14 @@ internal data class StoryPinSpec(val name: String, val type: StoryPinType, val k
  * @param lines how many lines of text it shows; more than one makes it a multi-line field.
  * @param choices the values it takes, when it is one of a known set.
  * @param picks the values a list it holds can be put together from.
- * @param hints what it is usually given, to complete as it is typed.
+ * @param completions what it is usually given, to complete as it is typed.
  * @param typeName whether it holds the name of a Kotlin type.
  * @param color whether it holds a color, which a button next to it picks.
  * @param vector the function that writes it when it is a vector; [value] is then its Kotlin.
  * @param assets the ends of the paths of the files it can be picked from.
  * @param problem what is wrong with what it holds.
+ * @param registry the registry it names an entry of, which a button beside it picks from.
+ * @param slot whether it holds a slot of the inventory, which a picture of the inventory picks.
  * @param write gets what is typed, as the field shows it.
  */
 internal class StoryRowField(
@@ -39,13 +43,15 @@ internal class StoryRowField(
     val lines: Int = 1,
     val choices: List<String> = emptyList(),
     val picks: List<String> = emptyList(),
-    val hints: List<UiTextCompletion> = emptyList(),
+    val completions: UiCompletionContributor? = null,
     val typeName: Boolean = false,
     val color: Boolean = false,
     val code: Boolean = false,
     val vector: String? = null,
     val assets: List<String> = emptyList(),
     val problem: String? = null,
+    val registry: StoryRegistry? = null,
+    val slot: Boolean = false,
     val write: (String) -> Unit,
 )
 
@@ -140,6 +146,10 @@ internal fun StoryPinType.color(): UiColor = UiColor.fromArgb(
         StoryPinType.ENTITY -> 0xFF4FA8E0
         StoryPinType.NPC -> 0xFF4FD0D0
         StoryPinType.PLAYER -> 0xFF6F8CF0
+        StoryPinType.ITEM -> 0xFFE0A050
+        StoryPinType.BLOCK -> 0xFF9C8A6A
+        StoryPinType.NBT -> 0xFF7FB8A0
+        StoryPinType.ITEM_FILTER -> 0xFFD8B070
         StoryPinType.LIST -> 0xFFC9874A
         StoryPinType.MAP -> 0xFFB48EE0
         StoryPinType.OBJECT -> 0xFF8FA0B8
@@ -508,10 +518,10 @@ internal class StoryNodeLayout(internal val graph: StoryGraph, internal val stat
 
         private fun call(written: StoryNode.Call) {
             val node = StoryActionFunctions.resolved(written)
+            val signature = StoryCatalog.signatureOf(node)
             flow()
             if (node.block) exit(StoryPins.BODY, storyLang("loop.body"))
-            val signature = StoryCatalog.signatureOf(node)
-            val params = signature?.params.orEmpty().filter { detailed || it.group == null }
+            val params = signature?.params.orEmpty().filter { detailed || it.group == null || it.group.keyed }
             params.forEach { param ->
                 val label = StoryCatalog.paramTitle(signature!!, param)
                 val type = StoryPinType.of(param.type)
@@ -555,6 +565,8 @@ internal class StoryNodeLayout(internal val graph: StoryGraph, internal val stat
             val written = node.argument(param).orEmpty()
             val helper = StoryLiterals.vectorHelper(param.type)
             val kotlin = StoryLiterals.isKotlin(param.type)
+            val registry = StoryRegistry.of(StoryPinType.of(param.type))
+            val clips = clipHints(node, param)
             return StoryRowField(
                 param.name,
                 if (helper != null || kotlin) written else StoryLiterals.text(written, param.type),
@@ -564,7 +576,9 @@ internal class StoryNodeLayout(internal val graph: StoryGraph, internal val stat
                 code = kotlin,
                 vector = helper,
                 assets = param.assets,
-                hints = clipHints(node, param),
+                completions = StoryCompletions.of(param) ?: clips.takeIf { it.isNotEmpty() }?.let { found -> UiCompletionContributor { found } },
+                registry = registry,
+                slot = param.widget == INVENTORY_SLOT_WIDGET,
                 problem = StoryChecks.param(param, written) ?: clipProblem(node, param, written),
             ) { typed ->
                 val next = if (helper != null || kotlin) typed else StoryLiterals.expression(typed, param.type)
@@ -603,43 +617,51 @@ internal class StoryNodeLayout(internal val graph: StoryGraph, internal val stat
             val operator = StoryOperators.find(node.operator) ?: return
             val inputs = StoryOperators.inputsOf(node)
             inputs.forEachIndexed { index, input ->
-                val written = node.arguments[input.name].orEmpty()
-                val helper = StoryLiterals.vectorHelper(input.type.type)
-                val shown = if (helper != null) written else input.type.text(written)
-                val label = if (operator.variadic) "${index + 1}" else StoryCatalog.operatorPinTitle(input.name)
-                val field = StoryRowField(
-                    input.name,
-                    shown,
-                    input.type.text(input.default),
-                    vector = helper,
-                    hints = StoryCatalog.inputHints(input.name),
-                    problem = codeProblem(written),
-                ) { typed ->
-                    edit(node.id, input.name) { each ->
-                        each as StoryNode.Pure
-                        val next = if (helper != null) typed else input.type.expression(typed)
-                        each.copy(arguments = if (next.isBlank()) each.arguments - input.name else each.arguments + (input.name to next))
-                    }
-                }
+                val field = inputField(node, input)
                 value(
-                    node.id, input.name, label, input.type,
-                    field.takeUnless { input.type == StoryPinType.ENTITY && input.default.isNotEmpty() && shown.isEmpty() },
-                    StoryCatalog.operatorPinHint(operator.id, input.name),
-                    onRemove = {
-                        state.change {
-                            removeInput(
-                                node.id,
-                                index
-                            )
-                        }
-                    }.takeIf { operator.variadic && inputs.size > 1 },
+                    node.id,
+                    input.name,
+                    if (operator.variadic) "${index + 1}" else StoryCatalog.operatorInputTitle(operator, input),
+                    input.type,
+                    field.takeUnless { input.type in ENTITIES && input.default.isNotEmpty() && field.value.isEmpty() },
+                    StoryCatalog.operatorInputHint(operator, input),
+                    optional = input.param?.optional == true,
+                    kotlin = input.param?.type?.let(StoryKotlinTypes::name)?.let(StoryPinType::shortName),
+                    onRemove = { state.change { removeInput(node.id, index) } }.takeIf { operator.variadic && inputs.size > 1 },
                 )
             }
             if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             operator.outputs.forEach { output ->
                 val kotlin = types[node.id to output.name] ?: output.kotlin
                 val type = kotlin?.let(StoryPinType::ofName) ?: output.type
-                row(StoryCatalog.operatorPinTitle(output.name), output = StoryPinSpec(output.name, type, kotlin))
+                row(StoryCatalog.operatorOutputTitle(operator, output), output = StoryPinSpec(output.name, type, kotlin))
+            }
+        }
+
+        /** The field of [input] of [node]: written as the parameter it passes is, when it passes one. */
+        private fun inputField(node: StoryNode.Pure, input: StoryOperatorInput): StoryRowField {
+            val written = node.arguments[input.name].orEmpty()
+            val param = input.param
+            val helper = StoryLiterals.vectorHelper(param?.type ?: input.type.type)
+            val kotlin = param != null && StoryLiterals.isKotlin(param.type)
+            return StoryRowField(
+                input.name,
+                if (helper != null || kotlin) written else input.text(written),
+                input.text(input.default),
+                choices = param?.suggestions?.takeUnless { kotlin }.orEmpty(),
+                picks = param?.suggestions?.takeIf { kotlin }.orEmpty(),
+                code = kotlin,
+                vector = helper,
+                completions = param?.let(StoryCompletions::of) ?: StoryCompletions.of(input.type),
+                problem = param?.let { StoryChecks.param(it, written) } ?: codeProblem(written),
+                registry = StoryRegistry.of(input.type),
+                slot = param?.widget == INVENTORY_SLOT_WIDGET,
+            ) { typed ->
+                edit(node.id, input.name) { each ->
+                    each as StoryNode.Pure
+                    val next = if (helper != null || kotlin) typed else input.expression(typed)
+                    each.copy(arguments = if (next.isBlank()) each.arguments - input.name else each.arguments + (input.name to next))
+                }
             }
         }
 
@@ -649,6 +671,7 @@ internal class StoryNodeLayout(internal val graph: StoryGraph, internal val stat
     }
 
     private companion object {
+        val ENTITIES = setOf(StoryPinType.ENTITY, StoryPinType.PLAYER, StoryPinType.NPC)
         const val CLIP_CHARS = "._-:|/"
         const val PADDING = 6f
         const val WIDE = 264f

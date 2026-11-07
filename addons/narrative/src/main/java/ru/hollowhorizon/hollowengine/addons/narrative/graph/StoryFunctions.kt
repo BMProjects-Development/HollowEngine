@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryHandle
 import kotlin.reflect.typeOf
 
@@ -68,7 +69,7 @@ fun StoryFunctions.resolved(call: StoryNode.Call): StoryNode.Call {
 object StoryBuiltins {
     private const val STORY_PACKAGE = "ru.hollowhorizon.hollowengine.addons.narrative.story"
     private const val HANDLE = "$STORY_PACKAGE.StoryHandle<kotlin.Unit>"
-    private const val FLOW = "hollowengine.gui.ide.story.category.flow"
+    private const val FLOW = StoryCategory.FLOW
 
     val all: List<StoryFunctionSignature> = listOf(
         builtin("checkpoint", param("name"), flag("restart")),
@@ -89,5 +90,6 @@ object StoryBuiltins {
 
     private fun param(name: String, optional: Boolean = false) = StoryParam(name, typeOf<String>(), optional)
 
-    private fun flag(name: String) = StoryParam(name, typeOf<Boolean>(), optional = true, suggestions = listOf("true", "false"))
+    private fun flag(name: String) =
+        StoryParam(name, typeOf<Boolean>(), optional = true, suggestions = listOf("true", "false"))
 }

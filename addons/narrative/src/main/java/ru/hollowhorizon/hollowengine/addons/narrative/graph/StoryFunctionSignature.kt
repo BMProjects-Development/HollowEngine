@@ -2,8 +2,13 @@ package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
 import kotlin.reflect.KType
 
-/** What an options object such as `MoveOptions` a parameter belongs to: [parameter] of the function, built by [constructor]. */
-data class StoryParamGroup(val parameter: String, val constructor: String)
+/**
+ * What an options object such as `MoveOptions` a parameter belongs to: [parameter] of the function, built by [constructor].
+ *
+ * @param keyed whether [constructor] takes the fields as pairs `"name" to value` rather than named arguments, for an
+ * object whose fields are only known at runtime, such as a component.
+ */
+data class StoryParamGroup(val parameter: String, val constructor: String, val keyed: Boolean = false)
 
 enum class StoryParamMeaning {
     /** A clip of the model of the entity the call is made on. */
@@ -30,8 +35,9 @@ enum class StoryParamMeaning {
  * @param widget what edits it instead of a plain field, such as `color`.
  * @param assets the ends of the paths of the files it names, when it names one.
  * @param meaning what its value names, when the editor can check that.
- * @param fallback what a call that leaves it out or blank acts as having, when the editor needs to know, such as the
- * model an NPC shows.
+ * @param fallback what a call that leaves it out or blank acts as having, when the editor needs to know.
+ * @param registry the registry it names an entry of, such as `minecraft:mob_effect`, for the editor to complete.
+ * @param tags whether it takes a `#tag` of [registry] too.
  */
 data class StoryParam(
     val name: String,
@@ -47,6 +53,8 @@ data class StoryParam(
     val widget: String? = null,
     val meaning: StoryParamMeaning? = null,
     val fallback: String? = null,
+    val registry: String? = null,
+    val tags: Boolean = false,
 )
 
 /**
@@ -62,6 +70,8 @@ data class StoryParam(
  * @param block whether a call takes the flow from [StoryPins.BODY] as its last argument, such as `temporary { }`.
  * @param plainBlock whether that body is an ordinary lambda, as in `temporary { }`, where no stage can be called.
  * @param hidden whether stories that call it still work while nothing offers it for new ones.
+ * @param bound the arguments every call passes as they are, by parameter, such as the id of the component a generated
+ * command sets up.
  */
 data class StoryFunctionSignature(
     val name: String,
@@ -76,6 +86,7 @@ data class StoryFunctionSignature(
     val block: Boolean = false,
     val plainBlock: Boolean = false,
     val hidden: Boolean = false,
+    val bound: Map<String, String> = emptyMap(),
 ) {
     /** A new call of this command. */
     fun newCall(id: String) = StoryNode.Call(id, action = name)

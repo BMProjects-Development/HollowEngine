@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
 import net.minecraft.world.entity.Entity
 import kotlin.reflect.KClass
+import kotlin.reflect.KType
 import kotlin.reflect.full.isSubclassOf
 
 /**
@@ -59,10 +60,10 @@ class StoryGraphCompiler private constructor(
      * Writes of variables left out of the flow that take their value straight from a node in it, by that node: each
      * runs right after it, so a result goes into a variable without a write of its own in the flow.
      */
-    private val writes: Map<String, List<StoryNode.Assign>> = graph.nodes.filterIsInstance<StoryNode.Assign>()
-        .filter { !index.isInFlow(it.id) }
-        .mapNotNull { assign -> values[assign.id to StoryPins.VALUE]?.from?.takeIf(index::isInFlow)?.let { it to assign } }
-        .groupBy({ it.first }, { it.second })
+    private val writes: Map<String, List<StoryNode.Assign>> =
+        graph.nodes.filterIsInstance<StoryNode.Assign>().filter { !index.isInFlow(it.id) }.mapNotNull { assign ->
+                values[assign.id to StoryPins.VALUE]?.from?.takeIf(index::isInFlow)?.let { it to assign }
+            }.groupBy({ it.first }, { it.second })
     private val attached = writes.values.flatten().mapTo(HashSet()) { it.id }
 
     private val lines = ArrayList<String>()
@@ -91,9 +92,11 @@ class StoryGraphCompiler private constructor(
         index()
         val body = render()
         val classes = resultClasses()
-        val header = stories.map { "@file:Import(${literal(it)})" } +
-            listOfNotNull(location?.let { "package ${StoryPackages.of(it)}" }) +
-            imports.map { "import $it" } + graph.variables.map(::declaration) + classes + outputDeclarations()
+        val header = stories.map { "@file:Import(${literal(it)})" } + listOfNotNull(location?.let {
+            "package ${
+                StoryPackages.of(it)
+            }"
+        }) + imports.map { "import $it" } + graph.variables.map(::declaration) + classes + outputDeclarations()
         return GeneratedStory(
             code = (header + body.first).joinToString("\n", postfix = "\n"),
             nodes = header.map { null } + body.second,
@@ -113,7 +116,7 @@ class StoryGraphCompiler private constructor(
         is StoryNode.Loop -> listOf(StoryPins.ITEM)
         is StoryNode.Expression -> listOf(StoryPins.VALUE)
         is StoryNode.Code -> if (index.isInFlow(node.id)) node.outputs.keys.toList() else listOf(StoryPins.VALUE)
-        is StoryNode.Call -> if (node.returns != null) listOf(StoryPins.VALUE) else emptyList()
+        is StoryNode.Call -> listOfNotNull(StoryPins.VALUE.takeIf { node.returns != null })
         is StoryNode.Invoke -> definition(node)?.results?.map { it.name }.orEmpty()
         is StoryNode.Parameters -> owners[node.id]?.params?.map { it.name }.orEmpty()
         else -> emptyList()
@@ -121,7 +124,11 @@ class StoryGraphCompiler private constructor(
 
     private fun index() {
         graph.nodes.forEach { node ->
-            if (!IDENTIFIER_PART.matches(node.id)) problem(node.id, "bad_id", "A node id may only hold letters, digits and _")
+            if (!IDENTIFIER_PART.matches(node.id)) problem(
+                node.id,
+                "bad_id",
+                "A node id may only hold letters, digits and _"
+            )
             if (nodes.put(node.id, node) != null) problem(node.id, "shared_id", "Two nodes share this id")
         }
         graph.links.filter { it.from !in nodes || it.to !in nodes }
@@ -143,7 +150,12 @@ class StoryGraphCompiler private constructor(
         if (location != null) graph.nodes.filterIsInstance<StoryNode.Invoke>().forEach { invoke ->
             val file = invoke.file ?: return@forEach
             if (functions.reaches(file, location)) {
-                problem(invoke.id, "import_cycle", "Story '$file' already calls this one, so this one cannot call it", file)
+                problem(
+                    invoke.id,
+                    "import_cycle",
+                    "Story '$file' already calls this one, so this one cannot call it",
+                    file
+                )
             }
         }
         declared.forEach(::checkFunction)
@@ -154,15 +166,34 @@ class StoryGraphCompiler private constructor(
 
     private fun checkFunction(function: StoryNode.Function) {
         val id = function.id
-        if (!isName(function.name)) problem(id, "bad_function", "'${function.name}' is not a name of a function", function.name)
+        if (!isName(function.name)) problem(
+            id,
+            "bad_function",
+            "'${function.name}' is not a name of a function",
+            function.name
+        )
         if (function.name == MAIN || declared.count { it.name == function.name } > 1) {
             problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
-        } else if (function.results.size > 1 && declared.count { it.results.size > 1 && resultClass(it) == resultClass(function) } > 1) {
+        } else if (function.results.size > 1 && declared.count {
+                it.results.size > 1 && resultClass(it) == resultClass(
+                    function
+                )
+            } > 1) {
             problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
         }
-        if (isGenerated(function.name)) problem(id, "reserved_name", "'${function.name}' is a name the story generates for itself", function.name)
+        if (isGenerated(function.name)) problem(
+            id,
+            "reserved_name",
+            "'${function.name}' is a name the story generates for itself",
+            function.name
+        )
         (function.params + function.results).forEach { value ->
-            if (!isName(value.name)) problem(id, "bad_value_name", "'${value.name}' is not a name of a value", value.name)
+            if (!isName(value.name)) problem(
+                id,
+                "bad_value_name",
+                "'${value.name}' is not a name of a value",
+                value.name
+            )
             if (value.type.isBlank()) problem(id, "no_type", "'${value.name}' needs a type", value.name)
         }
         function.flows.forEach { flow ->
@@ -183,7 +214,8 @@ class StoryGraphCompiler private constructor(
 
     private fun render(): Pair<List<String>, List<String?>> {
         val starts = graph.nodes.filterIsInstance<StoryNode.Start>().sortedBy { it.id }
-        starts.filter { it.id in owners }.forEach { problem(it.id, "start_in_function", "A function starts at its parameters") }
+        starts.filter { it.id in owners }
+            .forEach { problem(it.id, "start_in_function", "A function starts at its parameters") }
         val main = starts.filter { it.id !in owners }
         main.drop(1).forEach { problem(it.id, "many_starts", "A story has one start") }
         main.firstOrNull()?.let { start -> stage(MAIN, start.id, null) { next(start.id, StoryPins.NEXT, 1) } }
@@ -202,8 +234,8 @@ class StoryGraphCompiler private constructor(
      */
     private fun stage(name: String, node: String, continues: StoryNode.Function?, body: () -> Unit) {
         val function = scopeOf(node)
-        val parameters = (function?.params.orEmpty().map { "${it.name}: ${it.type}" } +
-            function?.flows.orEmpty().map { "$it: $FLOW_TYPE" }).joinToString()
+        val parameters = (function?.params.orEmpty().map { "${it.name}: ${it.type}" } + function?.flows.orEmpty()
+            .map { "$it: $FLOW_TYPE" }).joinToString()
         val result = continues?.let(::resultType)?.let { ": $it" }.orEmpty()
         emit("", null)
         emit("@State", node)
@@ -218,8 +250,8 @@ class StoryGraphCompiler private constructor(
     private fun scopeOf(node: String): StoryNode.Function? = owners[node] ?: nodes[node] as? StoryNode.Function
 
     /** The parameters and flows of the function [node] is in, passed on to a stage of it. */
-    private fun passed(node: String) = scopeOf(node)?.let { function -> function.params.map { it.name } + function.flows }
-        .orEmpty().joinToString()
+    private fun passed(node: String) =
+        scopeOf(node)?.let { function -> function.params.map { it.name } + function.flows }.orEmpty().joinToString()
 
     /** Whether the flow is in the stage it began in, and not inside a block or a flow passed to a function. */
     private fun atTop() = blocks == 0 && lambdas == 0
@@ -259,7 +291,12 @@ class StoryGraphCompiler private constructor(
     private fun step(id: String, depth: Int) {
         when (val node = nodes.getValue(id)) {
             is StoryNode.Start, is StoryNode.Reroute, is StoryNode.Parameters, is StoryNode.Function -> Unit
-            is StoryNode.Expression, is StoryNode.Pure -> problem(id, "value_in_flow", "A value has no place in the flow")
+            is StoryNode.Expression, is StoryNode.Pure -> problem(
+                id,
+                "value_in_flow",
+                "A value has no place in the flow"
+            )
+
             is StoryNode.Say -> {
                 boundary(id, depth) { emit(sayOf(node), id, it) }
                 next(id, StoryPins.NEXT, depth)
@@ -352,6 +389,9 @@ class StoryGraphCompiler private constructor(
         else -> false
     }
 
+    /** Whether what [node] gives back is kept for later: it is read somewhere. */
+    private fun keepsResult(node: StoryNode.Call): Boolean = index.isRead(node.id, StoryPins.VALUE)
+
     /** Whether working out what [id] reads calls something that can suspend, which a call with no flow does where it is read. */
     private fun readsSuspending(id: String): Boolean {
         val seen = hashSetOf(id)
@@ -387,7 +427,12 @@ class StoryGraphCompiler private constructor(
 
     /** What the variable of [node] is set to. */
     private fun assigned(node: StoryNode.Assign): String {
-        if (node.variable !in variables) problem(node.id, "no_variable", "There is no variable '${node.variable}'", node.variable)
+        if (node.variable !in variables) problem(
+            node.id,
+            "no_variable",
+            "There is no variable '${node.variable}'",
+            node.variable
+        )
         val type = variables[node.variable]?.type
         val empty = isNullable(type)
         val value = argument(node.id, StoryPins.VALUE, node.value, empty)
@@ -424,8 +469,13 @@ class StoryGraphCompiler private constructor(
 
     private fun call(node: StoryNode.Call, depth: Int) {
         val call = callOf(node)
-        val assigned = if (index.isRead(node.id, StoryPins.VALUE)) {
-            if (node.returns == null) problem(node.id, "needs_return", "'${node.function}' is read later, so it needs its return type", node.function)
+        val assigned = if (keepsResult(node)) {
+            if (node.returns == null) problem(
+                node.id,
+                "needs_return",
+                "'${node.function}' is read later, so it needs its return type",
+                node.function
+            )
             "${outputName(node.id, StoryPins.VALUE)} = $call"
         } else call
         if (!node.block) {
@@ -454,7 +504,11 @@ class StoryGraphCompiler private constructor(
     /** Whether the flow is in a block such as `temporary { }`, whose body is an ordinary lambda no stage can be called in. */
     private fun inPlainBlock(node: String): Boolean {
         if (plain == 0) return false
-        if (problems.none { it.node == node && it.key == "stage_in_block" }) problem(node, "stage_in_block", "This node runs apart from the steps around it, which a block such as 'temporary' cannot hold")
+        if (problems.none { it.node == node && it.key == "stage_in_block" }) problem(
+            node,
+            "stage_in_block",
+            "This node runs apart from the steps around it, which a block such as 'temporary' cannot hold"
+        )
         return true
     }
 
@@ -465,7 +519,13 @@ class StoryGraphCompiler private constructor(
         val read = function.results.filter { index.isRead(node.id, it.name) }
         when {
             read.isEmpty() -> invocation(node, function, "", depth)
-            function.results.size == 1 -> invocation(node, function, "${outputName(node.id, read.single().name)} = ", depth)
+            function.results.size == 1 -> invocation(
+                node,
+                function,
+                "${outputName(node.id, read.single().name)} = ",
+                depth
+            )
+
             else -> {
                 val result = "result_${node.id}"
                 invocation(node, function, "val $result = ", depth)
@@ -482,7 +542,12 @@ class StoryGraphCompiler private constructor(
     private fun invocation(node: StoryNode.Invoke, function: StoryNode.Function, prefix: String, depth: Int) {
         if (function.flows.isEmpty()) return emit("$prefix${invocationOf(node, function)}", node.id, depth)
         val arguments = argumentsOf(node, function)
-        var opening = "$prefix${calleeOf(node, function)}(${arguments.joinToString(postfix = if (arguments.isEmpty()) "" else ", ")}"
+        var opening = "$prefix${
+            calleeOf(
+                node,
+                function
+            )
+        }(${arguments.joinToString(postfix = if (arguments.isEmpty()) "" else ", ")}"
         function.flows.forEach { name ->
             emit("$opening$name = {", node.id, depth)
             lambdas++
@@ -498,7 +563,12 @@ class StoryGraphCompiler private constructor(
 
     /** A call of [function] in one expression, which passes flows that do nothing: as a value, a call has no flow. */
     private fun invocationOf(node: StoryNode.Invoke, function: StoryNode.Function): String =
-        "${calleeOf(node, function)}(${(argumentsOf(node, function) + function.flows.map { "$it = {}" }).joinToString()})"
+        "${calleeOf(node, function)}(${
+            (argumentsOf(
+                node,
+                function
+            ) + function.flows.map { "$it = {}" }).joinToString()
+        })"
 
     private fun argumentsOf(node: StoryNode.Invoke, function: StoryNode.Function): List<String> =
         function.params.map { "${it.name} = ${typed(node.id, it, node.arguments[it.name])}" }
@@ -521,7 +591,11 @@ class StoryGraphCompiler private constructor(
     private fun giveBack(node: StoryNode.Return, depth: Int) {
         val function = continuing
         if (function == null || !atTop() || owners[node.id]?.id != function.id) {
-            return problem(node.id, "return_place", "A function returns only from its own flow, outside of loops and blocks")
+            return problem(
+                node.id,
+                "return_place",
+                "A function returns only from its own flow, outside of loops and blocks"
+            )
         }
         val given = function.results.map { it.name to typed(node.id, it, node.values[it.name]) }
         val result = when (given.size) {
@@ -539,13 +613,15 @@ class StoryGraphCompiler private constructor(
         else -> resultClass(function)
     }
 
-    private fun resultClass(function: StoryNode.Function) = function.name.replaceFirstChar(Char::uppercaseChar) + "Result"
+    private fun resultClass(function: StoryNode.Function) =
+        function.name.replaceFirstChar(Char::uppercaseChar) + "Result"
 
-    /** A class per function of this story that gives several results; stories save it through [StoryValues]. */
-    private fun resultClasses(): List<String> = declared.filter { it.results.size > 1 }.sortedBy { it.id }.map { function ->
-        val fields = function.results.joinToString { "val ${it.name}: ${it.type}" }
-        "data class ${resultClass(function)}($fields) : StoryRecord"
-    }
+    /** A class per function of this story that gives several results; stories save it through [ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValues]. */
+    private fun resultClasses(): List<String> =
+        declared.filter { it.results.size > 1 }.sortedBy { it.id }.map { function ->
+            val fields = function.results.joinToString { "val ${it.name}: ${it.type}" }
+            "data class ${resultClass(function)}($fields) : StoryRecord"
+        }
 
     /**
      * Emits the code of [node] with its inputs and outputs as locals. Inside a block, steps share one body, so the code
@@ -571,8 +647,7 @@ class StoryGraphCompiler private constructor(
             link != null -> value(link).present
             written.isEmpty() -> "null as String?"
             written.startsWith("{") && written.endsWith("}") -> Value(
-                written.substring(1, written.length - 1),
-                readsEmpty(written.trim('{', '}'))
+                written.substring(1, written.length - 1), readsEmpty(written.trim('{', '}'))
             ).present
 
             else -> template(written)
@@ -595,25 +670,48 @@ class StoryGraphCompiler private constructor(
         val name = node.function.substringAfterLast('.')
         if ('.' in node.function) imports += node.function
         val receiverPin = node.receiver ?: StoryPins.RECEIVER
+        val signature = functions.signature(node)
+        val keyed = signature?.params.orEmpty().filter { it.group?.keyed == true }
         val parameters = (node.arguments.keys + values.keys.filter { it.first == node.id }
-            .map { it.second }).filter { it != receiverPin }.distinct()
+            .map { it.second }).filter { it != receiverPin && keyed.none { param -> param.name == it } }.distinct()
+        val bound = signature?.bound.orEmpty().map { (parameter, value) -> "$parameter = $value" }
         val direct = parameters.map { "$it = ${parameter(node, it)}" }
-        val groups = node.groups.filterValues { it.arguments.isNotEmpty() }.map { (parameter, group) ->
+        val groups = node.groups.filterValues { it.arguments.isNotEmpty() }.filterKeys { parameter ->
+            keyed.none { it.group?.parameter == parameter }
+        }.map { (parameter, group) ->
             val fields = group.arguments.entries.joinToString { (field, value) -> "$field = $value" }
             "$parameter = ${group.constructor}($fields)"
         }
-        val arguments = (direct + groups).joinToString()
+        val keyedGroups =
+            keyed.groupBy { it.group }.mapNotNull { (group, params) -> group?.let { keyedGroupOf(node, it, params) } }
+        val arguments = (bound + direct + groups + keyedGroups).joinToString()
         val given = receiverPin in node.arguments || (node.id to receiverPin) in values
-        val implicit = functions.signature(node)?.params?.firstOrNull { it.receiver }?.implicit
+        val implicit = signature?.params?.firstOrNull { it.receiver }?.implicit
         val receiver = if (given) parameter(node, receiverPin) else implicit
         return if (receiver == null) "$name($arguments)" else "($receiver).$name($arguments)"
     }
 
-    private fun parameter(node: StoryNode.Call, name: String): String {
-        val type = functions.signature(node)?.params?.firstOrNull { it.name == name }?.type
+    /** The argument of a [StoryParamGroup.keyed] group: each field written or linked, as `"name" to value`. */
+    private fun keyedGroupOf(node: StoryNode.Call, group: StoryParamGroup, params: List<StoryParam>): String {
+        val written = node.groups[group.parameter]?.arguments.orEmpty()
+        val fields = params.filter { it.name in written || (node.id to it.name) in values }.joinToString { param ->
+            "${literal(param.name)} to ${argument(node.id, param.name, written[param.name].orEmpty(), empty = true)}"
+        }
+        return "${group.parameter} = ${group.constructor}($fields)"
+    }
+
+    private fun parameter(node: StoryNode.Call, name: String): String = typed(
+        node.id,
+        name,
+        node.arguments[name].orEmpty(),
+        functions.signature(node)?.params?.firstOrNull { it.name == name }?.type
+    )
+
+    /** What [pin] of [node] gets as a value of [type]: a linked entity cast to its class, a linked number converted. */
+    private fun typed(node: String, pin: String, written: String, type: KType?): String {
         val empty = type?.isMarkedNullable != false
-        val value = argument(node.id, name, node.arguments[name].orEmpty(), empty)
-        if ((node.id to name) !in values) return value
+        val value = argument(node, pin, written, empty)
+        if ((node to pin) !in values) return value
         val kind = type?.classifier as? KClass<*>
         if (kind != null && kind != Entity::class && kind.isSubclassOf(Entity::class)) {
             return "($value as ${kind.qualifiedName}${if (empty) "?" else ""})"
@@ -646,9 +744,7 @@ class StoryGraphCompiler private constructor(
                 is StoryNode.Loop -> Value(
                     if (detached) "(${
                         argument(
-                            id,
-                            StoryPins.ITEMS,
-                            node.items
+                            id, StoryPins.ITEMS, node.items
                         )
                     }).iterator().next()" else loopName(id)
                 )
@@ -691,7 +787,12 @@ class StoryGraphCompiler private constructor(
 
                 is StoryNode.Code -> when {
                     link.fromPin != StoryPins.VALUE -> {
-                        if (link.fromPin !in node.outputs) problem(id, "no_output", "There is no output '${link.fromPin}'", link.fromPin)
+                        if (link.fromPin !in node.outputs) problem(
+                            id,
+                            "no_output",
+                            "There is no output '${link.fromPin}'",
+                            link.fromPin
+                        )
                         output(id, link.fromPin, node.outputs[link.fromPin])
                     }
 
@@ -734,6 +835,7 @@ class StoryGraphCompiler private constructor(
             problem(node.id, "no_operator_value", "There is no value '$pin' of '${node.operator}'", pin, node.operator)
             return "error(\"no value\")"
         }
+        operator.function?.let { return valueCall(node, operator, it) }
         val inputs = StoryOperators.inputsOf(node)
         val given =
             inputs.filter { it.default.isNotEmpty() || (node.id to it.name) in values || !node.arguments[it.name].isNullOrBlank() }
@@ -744,6 +846,21 @@ class StoryGraphCompiler private constructor(
             val input = inputs.first { it.name == name }
             "(${argument(node.id, name, node.arguments[name] ?: input.default, input.type == StoryPinType.ANY)})"
         }
+    }
+
+    /** The call of the [function] of [operator]: inputs by name, and those with nothing written or linked left out. */
+    private fun valueCall(node: StoryNode.Pure, operator: StoryOperator, function: String): String {
+        imports += function
+        var receiver: String? = null
+        val arguments = ArrayList<String>()
+        operator.inputs.forEach { input ->
+            val written = node.arguments[input.name]?.takeIf { it.isNotBlank() } ?: input.default
+            if (written.isBlank() && (node.id to input.name) !in values && input.param?.optional == true) return@forEach
+            val code = typed(node.id, input.name, written, input.param?.type)
+            if (input.param?.receiver == true) receiver = code else arguments += "${input.name} = $code"
+        }
+        val call = "${function.substringAfterLast('.')}(${arguments.joinToString()})"
+        return receiver?.let { "($it).$call" } ?: call
     }
 
     /** [text] as a Kotlin string that puts in the variables it names; anything else in braces stays as it is. */
@@ -763,11 +880,26 @@ class StoryGraphCompiler private constructor(
     }
 
     private fun declaration(variable: StoryVariable): String {
-        if (!isName(variable.name)) problem(null, "bad_variable", "'${variable.name}' is not a name of a variable", variable.name)
-        if (isGenerated(variable.name)) problem(null, "reserved_name", "'${variable.name}' is a name the story generates for itself", variable.name)
+        if (!isName(variable.name)) problem(
+            null,
+            "bad_variable",
+            "'${variable.name}' is not a name of a variable",
+            variable.name
+        )
+        if (isGenerated(variable.name)) problem(
+            null,
+            "reserved_name",
+            "'${variable.name}' is a name the story generates for itself",
+            variable.name
+        )
         val type = variable.type?.let { "<$it>" }.orEmpty()
         val initial = variable.initial.ifBlank { if (isNullable(variable.type)) "null" else "" }
-        if (initial.isEmpty()) problem(null, "needs_start", "'${variable.name}' needs a value to start with", variable.name)
+        if (initial.isEmpty()) problem(
+            null,
+            "needs_start",
+            "'${variable.name}' needs a value to start with",
+            variable.name
+        )
         return "var ${variable.name} by saved$type($initial)"
     }
 
@@ -782,7 +914,13 @@ class StoryGraphCompiler private constructor(
 
             else -> emptyMap()
         }
-        outputs.filter { index.isRead(node.id, it.key) }.map { (pin, type) ->
+        val kept = outputs.filter { (pin, _) ->
+            when (node) {
+                is StoryNode.Call -> keepsResult(node)
+                else -> index.isRead(node.id, pin)
+            }
+        }
+        kept.map { (pin, type) ->
             "var ${outputName(node.id, pin)} by saved<${nullable(type ?: "Any")}>(null)"
         }
     }
@@ -815,8 +953,16 @@ class StoryGraphCompiler private constructor(
             "$NARRATIVE.speech.*",
             "$NARRATIVE.poll.*",
             "$NARRATIVE.scene.commands.*",
+            "$NARRATIVE.items.*",
+            "$NARRATIVE.entities.*",
+            "$NARRATIVE.waits.*",
+            "$NARRATIVE.world.*",
+            "$NARRATIVE.nbt.*",
+            "net.minecraft.nbt.Tag",
             "net.minecraft.server.level.ServerPlayer",
             "net.minecraft.world.entity.Entity",
+            "net.minecraft.world.item.ItemStack",
+            "net.minecraft.world.level.block.state.BlockState",
             "net.minecraft.world.phys.Vec3",
             "ru.hollowhorizon.hollowengine.common.entities.NpcEntity",
         )

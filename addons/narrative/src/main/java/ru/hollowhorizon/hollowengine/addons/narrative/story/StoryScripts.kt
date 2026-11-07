@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctions
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -97,13 +98,14 @@ internal object StoryActionFunctions : StoryFunctions {
     private fun command(call: StoryNode.Call) = call.action?.let(ActionCommands::find)?.singleOrNull()
 
     override fun signature(call: StoryNode.Call): StoryFunctionSignature? =
-        StoryFunctions.Builtin.signature(call) ?: command(call)?.signature
+        StoryFunctions.Builtin.signature(call) ?: ComponentCommands.signature(call.action) ?: command(call)?.signature
 
     override fun storyFunction(file: String, name: String): StoryNode.Function? = StoryLibrary.function(file, name)
 
     override fun storyImports(file: String): Set<String> = StoryLibrary.imports(file)
 
     override fun kind(call: StoryNode.Call): StoryCallKind {
+        if (ComponentCommands.isComponent(call.action)) return StoryCallKind.ACTION
         val action = command(call)?.action ?: return StoryCallKind.SUSPENDING
         return when {
             action.reversible -> StoryCallKind.ACTION

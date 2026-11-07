@@ -119,3 +119,11 @@ annotation class EditorModel(val default: String = "")
 /** A parameter of a story action naming, by the author's id, the NPC the action gives back. */
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorNpcId
+
+/**
+ * A field, or parameter of a story action, holding the id of an entry of [registry], such as `minecraft:mob_effect`,
+ * so the editor completes the ids it has; with [tags] it takes `#tag` too.
+ */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorRegistry(val registry: String, val tags: Boolean = false)

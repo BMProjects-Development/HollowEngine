@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.poll
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import net.minecraft.ChatFormatting
 import net.minecraft.network.chat.ClickEvent
 import net.minecraft.network.chat.Component
@@ -24,7 +25,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
  * }
  * ```
  */
-@EditorCategory("hollowengine.gui.ide.story.category.dialogue")
+@EditorCategory(StoryCategory.DIALOGUE)
 @Action("choose")
 suspend fun choose(options: List<String>, to: List<ServerPlayer>? = null): Int = action(options, to) {
     perform {

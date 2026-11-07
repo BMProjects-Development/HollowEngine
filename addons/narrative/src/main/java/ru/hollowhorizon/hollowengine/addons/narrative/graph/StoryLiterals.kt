@@ -1,10 +1,15 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
 import net.minecraft.core.BlockPos
+import net.minecraft.nbt.Tag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryLiterals.seconds
+import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -20,6 +25,10 @@ object StoryLiterals {
     private const val SECONDS = "s"
     private const val VECTOR = "vec"
     private const val BLOCK = "blockPos"
+    private const val ITEM = "itemOf"
+    private const val BLOCK_STATE = "blockOf"
+    private const val NBT = "nbt"
+    private const val FILTER = "itemsMatching"
     private const val ZERO = "Vec3.ZERO"
     private const val AXES = 3
 
@@ -27,7 +36,7 @@ object StoryLiterals {
     fun expression(text: String, type: KType?): String {
         val typed = text.trim()
         if (typed.isEmpty()) return ""
-        if (typed.startsWith("{") && typed.endsWith("}")) return typed.substring(1, typed.length - 1)
+        if (typed.startsWith("{") && typed.endsWith("}")) return typed.substring(1, typed.length - 1).ifBlank { typed }
         val kind = type?.classifier as? KClass<*> ?: return StoryGraphCompiler.literal(text)
         return when {
             kind in TEXTS -> StoryGraphCompiler.literal(text)
@@ -42,6 +51,10 @@ object StoryLiterals {
             kind == ServerLevel::class -> call("dimension", typed)
             kind == Vec3::class -> "vec(${numbers(typed)})"
             kind == BlockPos::class -> "blockPos(${numbers(typed)})"
+            kind == ItemStack::class -> call(ITEM, typed)
+            kind == BlockState::class -> call(BLOCK_STATE, typed)
+            kind.isSubclassOf(Tag::class) -> call(NBT, typed)
+            kind == StoryItemFilter::class -> call(FILTER, typed)
             kind.isSubclassOf(DialogueCharacter::class) -> call("character", typed)
             kind.isSubclassOf(Entity::class) -> call("actor", typed)
             kind.java.isEnum -> "${kind.qualifiedName}.${typed.uppercase().replace('-', '_')}"
@@ -54,6 +67,9 @@ object StoryLiterals {
     fun text(expression: String, type: KType?): String {
         val written = expression.trim()
         if (written.isEmpty()) return ""
+        if (written.startsWith("{") && written.endsWith("}") && written.substring(1, written.length - 1)
+                .isBlank()
+        ) return written
         val kind = type?.classifier as? KClass<*>
         val plain = when {
             kind == null || kind in TEXTS -> string(written)
@@ -66,8 +82,9 @@ object StoryLiterals {
             kind.java.isEnum -> written.substringAfterLast('.').takeIf { written.endsWith(it) && it.uppercase() == it }
                 ?.lowercase()?.replace('_', '-')
 
-            kind in HELPED || kind.isSubclassOf(DialogueCharacter::class) || kind.isSubclassOf(Entity::class) ->
-                helperArguments(written)
+            kind in HELPED || kind.isSubclassOf(DialogueCharacter::class) || kind.isSubclassOf(Entity::class) || kind.isSubclassOf(
+                Tag::class
+            ) -> helperArguments(written)
 
             else -> expression
         }
@@ -88,8 +105,10 @@ object StoryLiterals {
     }
 
     /** The Kotlin of a list of [values]; with none of them it is left out. */
-    fun list(values: List<String>): String =
-        if (values.isEmpty()) "" else values.joinToString(prefix = "listOf(", postfix = ")") { StoryGraphCompiler.literal(it) }
+    fun list(values: List<String>): String = if (values.isEmpty()) "" else values.joinToString(
+        prefix = "listOf(",
+        postfix = ")"
+    ) { StoryGraphCompiler.literal(it) }
 
     /** [typed] with [suffix] when it is a number; anything else is an expression and stays as it was typed. */
     private fun numeric(typed: String, suffix: String) = if (typed.toDoubleOrNull() != null) "$typed$suffix" else typed
@@ -110,7 +129,8 @@ object StoryLiterals {
         if (written.isEmpty()) return List(AXES) { "" }
         if (written == ZERO) return List(AXES) { "0" }
         if (!written.startsWith("$helper(") || !written.endsWith(")")) return null
-        return StoryKotlin.arguments(written.substring(helper.length + 1, written.length - 1))?.takeIf { it.size == AXES }
+        return StoryKotlin.arguments(written.substring(helper.length + 1, written.length - 1))
+            ?.takeIf { it.size == AXES }
     }
 
     /** The Kotlin of a vector out of its coordinates; with none of them typed it is left out. */
@@ -125,8 +145,8 @@ object StoryLiterals {
 
     private fun call(helper: String, text: String) = "$helper(${StoryGraphCompiler.literal(text)})"
 
-    private fun numbers(text: String) = text.removePrefix("[").removeSuffix("]").split(Regex("""[,\s]+"""))
-        .filter(String::isNotEmpty).joinToString()
+    private fun numbers(text: String) =
+        text.removePrefix("[").removeSuffix("]").split(Regex("""[,\s]+""")).filter(String::isNotEmpty).joinToString()
 
     /** The text of a string literal without inserts, or null for any other expression. */
     private fun string(written: String): String? {
@@ -161,5 +181,8 @@ object StoryLiterals {
     private val TEXTS = setOf(String::class, CharSequence::class, Any::class)
 
     /** Types whose fields are written through a helper function, such as `duration("2s")`. */
-    private val HELPED = setOf(Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class)
+    private val HELPED = setOf(
+        Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class, ItemStack::class,
+        BlockState::class, StoryItemFilter::class,
+    )
 }

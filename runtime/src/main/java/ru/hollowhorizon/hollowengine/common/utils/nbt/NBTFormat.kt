@@ -89,6 +89,7 @@ internal val TagModule
         contextual(ForVec3)
         contextual(ForTextComponent)
         contextual(ForItemStack)
+        contextual(ForBlockState)
         contextual(ForEntity)
         contextual(ForMatrix4f)
         contextual(ForVector3d)

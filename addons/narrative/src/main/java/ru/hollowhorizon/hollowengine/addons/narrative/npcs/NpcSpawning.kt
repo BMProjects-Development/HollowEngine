@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.npcs
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import net.minecraft.core.registries.BuiltInRegistries
@@ -31,7 +32,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
  * @param id the author's id, such as `"village:blacksmith"`. When a live NPC has it, that NPC is returned, [builder]
  * does not run, and undoing the call leaves that NPC where it is.
  */
-@EditorCategory("hollowengine.gui.ide.story.category.npc")
+@EditorCategory(StoryCategory.NPC)
 @EditorHidden
 @Action("npc")
 suspend fun ServerLevel.npc(

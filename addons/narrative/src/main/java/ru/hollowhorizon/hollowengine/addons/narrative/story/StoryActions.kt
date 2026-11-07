@@ -101,9 +101,7 @@ object StoryActions {
             .disableNestedJarScanning().ignoreParentClassLoaders()
             .overrideClassLoaders(classLoader).overrideClasspath(classes)
             .scan().use { scan ->
-                (scan.getClassesWithMethodAnnotation(Action::class.java.name).names + scan.getClassesWithMethodAnnotation(
-                    SimpleAction::class.java.name
-                ).names).distinct()
+                ANNOTATIONS.flatMap { scan.getClassesWithMethodAnnotation(it.java.name).names }.distinct()
             }
         names.filter { packagePrefix == null || it.startsWith(packagePrefix) }.forEach { name ->
             runCatching { register(Class.forName(name, false, classLoader), namespace, job) }
@@ -208,16 +206,13 @@ object StoryActions {
 
     private fun declare(method: Method, namespace: String): StoryAction? {
         val reversible = method.getAnnotation(Action::class.java)
-        val name = reversible?.id ?: method.getAnnotation(SimpleAction::class.java)?.id ?: return null
+        val value = method.getAnnotation(StoryValue::class.java)
+        val name = reversible?.id ?: method.getAnnotation(SimpleAction::class.java)?.id ?: value?.id ?: return null
         // The Kotlin name, not the JVM one: a parameter of a value class such as Duration mangles the latter.
         val id = name.ifBlank { kebabCase(method.kotlinFunction?.name ?: method.name) }
             .let { if (':' in it) it else "$namespace:$it" }
         return runCatching {
-            StoryAction(
-                id,
-                method,
-                reversible != null
-            )
+            StoryAction(id, method, reversible != null, value != null && reversible == null)
         }.onFailure {
                 HollowEngine.LOGGER.error(
                     "Action '{}' of {} cannot be used: {}",
@@ -235,6 +230,8 @@ object StoryActions {
         snapshot = byId.values.toList()
     }
 
+    private val ANNOTATIONS = listOf(Action::class, SimpleAction::class, StoryValue::class)
+
     /** `placeBlock` as `place-block`, the way scenes name commands. */
     private fun kebabCase(name: String): String =
         name.replace(Regex("(?<=[a-z0-9])(?=[A-Z])"), "-").lowercase()
@@ -243,8 +240,15 @@ object StoryActions {
 /**
  * A function registered as an action: how its receivers and parameters are written to a journal record and read
  * back to call it again.
+ *
+ * @param value whether it is a [StoryValue], which a story reads rather than performs.
  */
-class StoryAction internal constructor(val id: String, internal val method: Method, val reversible: Boolean) {
+class StoryAction internal constructor(
+    val id: String,
+    internal val method: Method,
+    val reversible: Boolean,
+    val value: Boolean = false,
+) {
     private enum class Kind { SCRIPT, OBJECT, CHECKPOINT, UNSAVED, VALUE }
 
     private class Parameter(

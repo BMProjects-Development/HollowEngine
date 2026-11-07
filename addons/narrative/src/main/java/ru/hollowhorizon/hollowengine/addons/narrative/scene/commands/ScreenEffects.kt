@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene.commands
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import net.minecraft.resources.ResourceLocation
@@ -24,7 +25,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 
 /** `@fade-in player 600ms #000000`: covers the screen of [this] with [color]. Undone, the screen is clear again. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
+@EditorCategory(StoryCategory.SCREEN)
 @Action("fade-in")
 suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget("color") color: String = BLACK) =
     action(this, time, color) {
@@ -38,7 +39,7 @@ suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget("co
     }
 
 /** Uncovers the screen [fadeIn] covered. Undone, it is covered with [color] again. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
+@EditorCategory(StoryCategory.SCREEN)
 @Action("fade-out")
 suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = BLACK) =
     action(this, time, color) {
@@ -54,7 +55,7 @@ suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = 
  * `@hide-hud player` hides the whole HUD, `except=[chat]` keeps what is listed and `only=[crosshair, hotbar]` hides
  * just those; vanilla layers go by their bare names. Undone, the HUD is as it was before.
  */
-@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
+@EditorCategory(StoryCategory.SCREEN)
 @Action("hide-hud")
 suspend fun ServerPlayer.hideHud(
     @Suggestions(HudLayerNames::class) only: List<String>? = null,
@@ -70,7 +71,7 @@ suspend fun ServerPlayer.hideHud(
 }
 
 /** Shows the HUD as it was before the scene hid it, or all of it. Undone, the HUD is as it was before. */
-@EditorCategory("hollowengine.gui.ide.story.category.effects.screen")
+@EditorCategory(StoryCategory.SCREEN)
 @Action("show-hud")
 suspend fun ServerPlayer.showHud() = action(this) {
     val before = capture { hiddenHudLayers().map(ResourceLocation::toString) }
@@ -82,7 +83,7 @@ suspend fun ServerPlayer.showHud() = action(this) {
  * `@camera player [25, 70, -171] [-158, 2] time=1500 fov=60`: moves the camera of [this] to [location] facing
  * [rotation], `[yaw, pitch]` or `[yaw, pitch, roll]` as F3 shows them. Undone, the player has their camera back.
  */
-@EditorCategory("hollowengine.gui.ide.story.category.camera")
+@EditorCategory(StoryCategory.CAMERA)
 @Action("camera")
 suspend fun ServerPlayer.moveCamera(
     location: Vec3,
@@ -107,7 +108,7 @@ suspend fun ServerPlayer.moveCamera(
 }
 
 /** Gives the player their camera back over [time]. */
-@EditorCategory("hollowengine.gui.ide.story.category.camera")
+@EditorCategory(StoryCategory.CAMERA)
 @SimpleAction("release-camera")
 suspend fun ServerPlayer.releaseCamera(time: Duration = DEFAULT_CAMERA) {
     StoryReleaseCameraPacket(time.inWholeMilliseconds).send(this)
@@ -115,7 +116,7 @@ suspend fun ServerPlayer.releaseCamera(time: Duration = DEFAULT_CAMERA) {
 }
 
 /** Plays the cutscene [name] to [this]; waits [time] when given. */
-@EditorCategory("hollowengine.gui.ide.story.category.camera")
+@EditorCategory(StoryCategory.CAMERA)
 @SimpleAction("cutscene")
 suspend fun ServerPlayer.showCutscene(name: String, time: Duration? = null) {
     ScreenEffects.borrow(this)?.cutscene = true

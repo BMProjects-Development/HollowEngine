@@ -149,3 +149,42 @@
     gap: 4px;
     align-items: center center;
 }
+
+.story-slot-grid {
+    padding: 8px;
+    gap: 2px;
+}
+
+.story-slot-title {
+    color: $text-muted;
+    margin-top: 4px;
+}
+
+.story-slot-row {
+    gap: 2px;
+}
+
+.story-slot {
+    size: 22px 22px;
+    align-items: center;
+    justify-content: center;
+    background: $bg-field;
+    border: 1px $border;
+    border-radius: $radius-small;
+}
+
+.story-slot:hover {
+    border: 1px $border-strong;
+}
+
+.story-slot.selected {
+    border: 1px $accent;
+}
+
+.story-slot-item {
+    size: 16px 16px;
+}
+
+.story-slot-gap {
+    size: 12px 22px;
+}

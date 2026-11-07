@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.npcs
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
@@ -21,10 +22,7 @@ import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-private const val NPC = "hollowengine.gui.ide.story.category.npc"
-private const val NAVIGATION = "hollowengine.gui.ide.story.category.navigation"
-
-@EditorCategory(NPC)
+@EditorCategory(StoryCategory.NPC)
 @SimpleAction("spawn-npc")
 suspend fun ServerLevel.spawnNpc(
     pos: Vec3,
@@ -36,38 +34,34 @@ suspend fun ServerLevel.spawnNpc(
     if (name.isNotEmpty()) setNameplate(name)
 }
 
-@EditorCategory(NPC)
+@EditorCategory(StoryCategory.NPC)
 @SimpleAction("despawn-npc")
 fun NpcEntity.removeFromWorld() = despawn()
 
-@EditorCategory(NPC)
+@EditorCategory(StoryCategory.NPC)
 @SimpleAction("find-npc")
 fun findNpc(@EditorNpcId id: String): NpcEntity =
     currentServer.npcs.alive(id) ?: throw StoryException("No live NPC has the id '$id'")
 
-@EditorCategory(NPC)
-@SimpleAction("teleport")
-fun teleport(who: Entity, pos: Vec3) = who.teleportTo(pos.x, pos.y, pos.z)
-
-@EditorCategory(NAVIGATION)
+@EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-moving")
 fun NpcEntity.beginMoving(pos: Vec3, options: MoveOptions = MoveOptions()) {
     startMove(pos, options)
 }
 
-@EditorCategory(NAVIGATION)
+@EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-following")
 fun NpcEntity.beginFollowing(target: Entity, options: MoveOptions = MoveOptions()) {
     startMove(with(server ?: currentServer) { target.entityRef }, options)
 }
 
-@EditorCategory(NAVIGATION)
+@EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-looking")
 fun NpcEntity.beginLooking(pos: Vec3, duration: Duration = 1.seconds, maxAngularSpeed: Float = 360f) {
     startLookingAt(pos, duration, maxAngularSpeed)
 }
 
-@EditorCategory(NAVIGATION)
+@EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-watching")
 fun NpcEntity.beginWatching(target: Entity, duration: Duration = 1.seconds, maxAngularSpeed: Float = 360f) {
     startLookingAt(with(server ?: currentServer) { target.entityRef }, duration, maxAngularSpeed)

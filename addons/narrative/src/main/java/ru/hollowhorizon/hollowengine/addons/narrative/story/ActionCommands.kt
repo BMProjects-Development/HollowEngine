@@ -1,25 +1,21 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import net.minecraft.core.BlockPos
+import net.minecraft.nbt.Tag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamMeaning
+import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
+import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemRequest
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAnimation
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
-import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
+import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
@@ -37,26 +33,25 @@ object ActionCommands {
     @Volatile
     private var built = Built(emptyList(), emptyList())
 
-    /** Every action a story can call: one whose required parameters all take values a field can hold. */
     val commands: List<StoryCommand>
         get() {
             val actions = StoryActions.all
             built.takeIf { it.actions === actions }?.let { return it.commands }
-            return Built(actions, actions.mapNotNull(StoryCommand::of)).also { built = it }.commands
+            return Built(actions, actions.filterNot { it.value }.mapNotNull(StoryCommand::of)).also {
+                built = it
+            }.commands
         }
 
-    /** The commands [name] may mean: one, unless several namespaces declare it. */
     fun find(name: String): List<StoryCommand> = commands.filter { it.answersTo(name) }
 }
 
-/** An action as a story calls it. */
 class StoryCommand private constructor(val action: StoryAction, val signature: StoryFunctionSignature) {
     val id: String get() = action.id
 
-    internal fun answersTo(written: String): Boolean = if (':' in written) id == written else id.substringAfter(':') == written
+    internal fun answersTo(written: String): Boolean =
+        if (':' in written) id == written else id.substringAfter(':') == written
 
     internal companion object {
-        /** The command [action] is, or null when a story cannot call it: one of a script is not reachable by name. */
         fun of(action: StoryAction): StoryCommand? {
             if (!Modifier.isStatic(action.method.modifiers)) return null
             val direct = ArrayList<StoryParam>()
@@ -74,7 +69,7 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 }
                 direct += param(parameter)
             }
-            // A field of an options object named like a parameter of the action is left to the parameter.
+
             val taken = direct.mapTo(HashSet()) { it.name }
             val function = action.function
             val signature = StoryFunctionSignature(
@@ -101,8 +96,9 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 name = if (receiver) receiverName(parameter) else parameter.name.orEmpty(),
                 type = parameter.type,
                 optional = parameter.isOptional || implicit,
-                suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values
-                    ?: suggestions(parameter.type),
+                suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values ?: suggestions(
+                    parameter.type
+                ),
                 title = info?.title?.ifEmpty { null },
                 description = info?.description?.ifEmpty { null },
                 receiver = receiver,
@@ -111,6 +107,8 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 widget = parameter.findAnnotation<EditorWidget>()?.id,
                 meaning = meaningOf(parameter),
                 fallback = parameter.findAnnotation<EditorModel>()?.default?.ifEmpty { null },
+                registry = parameter.findAnnotation<EditorRegistry>()?.registry,
+                tags = parameter.findAnnotation<EditorRegistry>()?.tags == true,
             )
         }
 
@@ -145,18 +143,19 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
         }
 
         /** Whether a field can hold a value of [type]. */
-        private fun isValue(type: KType): Boolean {
+        internal fun isValue(type: KType): Boolean {
             val classifier = type.classifier as? KClass<*> ?: return false
             return when {
                 classifier in VALUES || classifier.java.isEnum -> true
                 classifier.isSubclassOf(Entity::class) || classifier.isSubclassOf(DialogueCharacter::class) -> true
+                classifier.isSubclassOf(Tag::class) -> true
                 classifier in COLLECTIONS -> type.arguments.singleOrNull()?.type?.let(::isValue) == true
                 else -> false
             }
         }
 
         /** The values the editor offers for [type]: the constants of an enum, of a list of them too. */
-        private fun suggestions(type: KType): List<String> {
+        internal fun suggestions(type: KType): List<String> {
             val classifier = type.classifier as? KClass<*> ?: return emptyList()
             if (classifier in COLLECTIONS) return type.arguments.singleOrNull()?.type?.let(::suggestions).orEmpty()
             if (classifier == ServerLevel::class) return DIMENSIONS
@@ -165,7 +164,8 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
 
         private val VALUES = setOf(
             String::class, Boolean::class, Int::class, Long::class, Short::class, Byte::class, Float::class, Double::class,
-            Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class,
+            Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class, ItemStack::class,
+            BlockState::class, Any::class, StoryItemFilter::class, StoryItemRequest::class,
         )
         private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
         private val DIMENSIONS = listOf("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end")

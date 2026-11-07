@@ -8,6 +8,10 @@
 .gn-pin.gn-type-entity { border-color: #4FA8E0; }
 .gn-pin.gn-type-npc { border-color: #4FD0D0; }
 .gn-pin.gn-type-player { border-color: #6F8CF0; }
+.gn-pin.gn-type-item { border-color: #E0A050; }
+.gn-pin.gn-type-block { border-color: #9C8A6A; }
+.gn-pin.gn-type-nbt { border-color: #7FB8A0; }
+.gn-pin.gn-type-item_filter { border-color: #D8B070; }
 .gn-pin.gn-type-list { border-color: #C9874A; }
 .gn-pin.gn-type-map { border-color: #B48EE0; }
 .gn-pin.gn-type-object { border-color: #8FA0B8; }
@@ -21,6 +25,10 @@
 .gn-pin.connected.gn-type-entity { background: #4FA8E0; }
 .gn-pin.connected.gn-type-npc { background: #4FD0D0; }
 .gn-pin.connected.gn-type-player { background: #6F8CF0; }
+.gn-pin.connected.gn-type-item { background: #E0A050; }
+.gn-pin.connected.gn-type-block { background: #9C8A6A; }
+.gn-pin.connected.gn-type-nbt { background: #7FB8A0; }
+.gn-pin.connected.gn-type-item_filter { background: #D8B070; }
 .gn-pin.connected.gn-type-list { background: #C9874A; }
 .gn-pin.connected.gn-type-map { background: #B48EE0; }
 .gn-pin.connected.gn-type-object { background: #8FA0B8; }

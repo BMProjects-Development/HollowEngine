@@ -263,17 +263,20 @@ internal class StoryGraphEditorModel(
             add(node, left, y - GraphNodeMetrics.HEADER) { linked(pending, type, node) }
         }
 
-        val items =
-            if (type == StoryPinType.FLOW) addStepItems(::placed) else variableItems(::placed) + StoryCatalog.operatorItems(
-                accepts = { operator ->
-                    if (pending.fromOutput) operator.inputs.any { type.fits(it.type) } else operator.outputs.any {
-                        it.type.fits(
-                            type
-                        )
-                    }
-                },
-                add = ::placed,
-            )
+        val carried = pinOf(pending)?.takeIf { pending.fromOutput }?.let(layout::kotlinOf)?.let(StoryPinType::shortName)
+
+        fun takes(input: StoryOperatorInput): Boolean {
+            if (!type.fits(input.type)) return false
+            val expected = input.param?.type?.takeIf { input.type == StoryPinType.OBJECT } ?: return true
+            return carried == null || StoryKotlinTypes.name(expected)?.let(StoryPinType::shortName) == carried.removeSuffix("?")
+        }
+
+        val items = if (type == StoryPinType.FLOW) addStepItems(::placed) else variableItems(::placed) + StoryCatalog.operatorItems(
+            accepts = { operator ->
+                if (pending.fromOutput) operator.inputs.any(::takes) else operator.outputs.any { it.type.fits(type) }
+            },
+            add = ::placed,
+        )
         return listOf(reroute) + items.mapIndexed { index, item -> if (index == 0) item.copy(separatorBefore = true) else item }
     }
 
@@ -370,16 +373,11 @@ internal class StoryGraphEditorModel(
     override fun addItems(x: Float, y: Float): List<UiDropdownItem> {
         fun placed(node: StoryNode) = add(node, x, y)
         val functions = if (state.scope == null) listOf(functionItem(x, y)) else emptyList()
-        return addStepItems(::placed) + functions + UiDropdownItem(
-            storyLang("add.values"),
-            icon = StoryNodeKind.VALUE.icon,
-            iconColor = StoryCategories.tint(StoryNodeKind.VALUE.color),
-            children = StoryCatalog.operatorItems(add = ::placed),
-        ).let(::listOf)
+        return addStepItems(::placed, values = true) + functions
     }
 
-    /** What can be added to the flow. */
-    private fun addStepItems(add: (StoryNode) -> Unit): List<UiDropdownItem> = buildList {
+    /** What can be added to the flow; with [values], the operators that read values too. */
+    private fun addStepItems(add: (StoryNode) -> Unit, values: Boolean = false): List<UiDropdownItem> = buildList {
         add(StoryCatalog.kindItem(storyLang("add.phrase"), StoryNodeKind.PHRASE) { add(StoryNode.Say(StoryGraph.newId())) })
         add(StoryCatalog.kindItem(storyLang("add.choice"), StoryNodeKind.CHOICE) {
             add(StoryNode.Choose(StoryGraph.newId(), listOf(StoryOption(storyLang("new.option")))))
@@ -399,7 +397,7 @@ internal class StoryGraphEditorModel(
         }
         addAll(variableItems(add))
         StoryFunctionItems.of(state, add)?.let(::add)
-        addAll(StoryCatalog.items(add))
+        addAll(StoryCatalog.items(add, values))
     }
 
     /** A function and what it holds: only the story itself declares them, so none is offered inside another. */
