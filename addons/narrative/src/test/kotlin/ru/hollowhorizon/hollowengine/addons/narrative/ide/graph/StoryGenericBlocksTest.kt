@@ -72,11 +72,20 @@ class StoryGenericBlocksTest {
     }
 
     @Test
-    fun `a block linked to nothing goes back to no type`() {
+    fun `a block linked to nothing goes back to no type and keeps its fields`() {
         val alone = StoryGraph(nodes = listOf(StoryNode.Pure("constant", shortfall, mapOf("value" to "x"))))
         val settled = StoryGenericBlocks.settled(alone, state)
         assertEquals(TypeOperators.ENUM, settled.operatorOf("constant"))
-        assertEquals(emptyMap(), (settled.node("constant") as StoryNode.Pure).arguments)
+        val linked = settled.copy(
+            nodes = settled.nodes + listOf(StoryNode.Pure("parts", unpack, mapOf("value" to "result")), StoryNode.Pure("same", "equal")),
+            links = listOf(
+                StoryLink("parts", TypeOperators.fieldPin("Closest", "reason"), "same", "a"),
+                StoryLink("constant", TypeOperators.SUBJECT, "same", "b"),
+            ),
+        )
+        val typed = StoryGenericBlocks.settled(linked, state)
+        assertEquals(shortfall, typed.operatorOf("constant"))
+        assertEquals(mapOf("value" to "x"), (typed.node("constant") as StoryNode.Pure).arguments)
     }
 
     @Test

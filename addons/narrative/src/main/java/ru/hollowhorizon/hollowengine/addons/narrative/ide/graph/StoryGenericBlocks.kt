@@ -46,10 +46,9 @@ internal object StoryGenericBlocks {
         val found = StoryOperators.find(operator) ?: return this
         val inputs = found.inputs.mapTo(HashSet()) { it.name }
         val outputs = found.outputs.mapTo(HashSet()) { it.name }
+        val arguments = if (TypeOperators.isGeneric(operator)) node.arguments else node.arguments.filterKeys(inputs::contains)
         return copy(
-            nodes = nodes.map {
-                if (it.id == node.id) node.copy(operator = operator, arguments = node.arguments.filterKeys(inputs::contains)) else it
-            },
+            nodes = nodes.map { if (it.id == node.id) node.copy(operator = operator, arguments = arguments) else it },
             links = links.filter { link ->
                 (link.to != node.id || link.toPin in inputs) && (link.from != node.id || link.fromPin in outputs)
             },
