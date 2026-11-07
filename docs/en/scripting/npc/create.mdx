@@ -63,14 +63,14 @@ The `inverseHeadRotation` parameter is not applied yet. `transform` is passed to
 ## `pos()` and `rotation()` helpers
 
 ```kotlin
-val blockCenter = pos(10, 64, 10)      // Vec3(10.5, 64.0, 10.5)
-val exactPos = pos(10.0, 64.0, 10.0)  // Vec3(10.0, 64.0, 10.0)
+val corner = pos(10, 64, 10)           // Vec3(10.0, 64.0, 10.0)
+val blockCenter = pos(10.5, 64, 10.5)  // Vec3(10.5, 64.0, 10.5)
 
 val rot = rotation(90, 0)
 ```
 
-`pos(Int, Int, Int)` adds `0.5` to X/Z so the NPC spawns in the center of the block.
-`pos(Double, Double, Double)` uses exact coordinates.
+`pos(x, y, z)` takes any numbers and uses them as they are. A whole number is the corner of a block, so add `0.5` to X
+and Z to put an NPC in the center of one.
 
 ---
 

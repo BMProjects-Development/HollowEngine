@@ -39,9 +39,9 @@ object TypeOperators {
     private var found = Found(emptyList(), -1, emptyMap())
 
     private val generic: Map<String, StoryOperator> = listOf(
-        StoryOperator(UNPACK, TYPES, listOf(StoryOperatorInput(VALUE, StoryPinType.OBJECT)), emptyList()),
-        StoryOperator(PACK, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.OBJECT, ""))),
-        StoryOperator(ENUM, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.OBJECT, ""))),
+        StoryOperator(UNPACK, TYPES, listOf(StoryOperatorInput(VALUE, StoryPinType.ANY)), emptyList()),
+        StoryOperator(PACK, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.ANY, ""))),
+        StoryOperator(ENUM, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.ANY, ""))),
     ).associateBy { it.id }
 
     /** The blocks of the types, those of no type yet first. */
@@ -172,7 +172,7 @@ object TypeOperators {
     private fun inputsOf(parameters: List<KParameter>, path: String, seen: Set<KClass<*>>): List<StoryOperatorInput>? {
         val inputs = ArrayList<StoryOperatorInput>()
         parameters.forEach { parameter ->
-            if (StoryCommand.isValue(parameter.type)) {
+            if (StoryCommand.isValue(parameter.type) || StoryCommand.isContainer(parameter.type)) {
                 inputs += inputOf(parameter, path)
                 return@forEach
             }

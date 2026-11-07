@@ -43,6 +43,17 @@ class StageGraphTest : StageTest() {
         ),
     )
 
+    /** Fields of positions write `pos(x, y, z)`, which a story has to know without an import of its own. */
+    @Test
+    fun `a position a field writes compiles in a story`() = runTest {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Start("s"), log("at", "pos(1, 2.5, 3).toString()")),
+            links = listOf(next("s", "at")),
+        )
+        world("position", generate(graph).code).launch("main")
+        assertEquals(listOf("(1.0, 2.5, 3.0)"), StageTrace.take())
+    }
+
     @Test
     fun `a reroute changes nothing about the story it sits in`() {
         val plain = StoryGraph(nodes = listOf(StoryNode.Start("s"), log("a", "\"a\"")), links = listOf(next("s", "a")))

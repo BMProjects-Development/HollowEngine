@@ -32,7 +32,7 @@ internal data class StoryPinSpec(val name: String, val type: StoryPinType, val k
  * @param completions what it is usually given, to complete as it is typed.
  * @param typeName whether it holds the name of a Kotlin type.
  * @param color whether it holds a color, which a button next to it picks.
- * @param vector the function that writes it when it is a vector; [value] is then its Kotlin.
+ * @param form how it shows the Kotlin it holds: a string, a number, a flag, a vector or Kotlin as it is.
  * @param assets the ends of the paths of the files it can be picked from.
  * @param problem what is wrong with what it holds.
  * @param registry the registry it names an entry of, which a button beside it picks from.
@@ -50,13 +50,16 @@ internal class StoryRowField(
     val typeName: Boolean = false,
     val color: Boolean = false,
     val code: Boolean = false,
-    val vector: String? = null,
+    val form: StoryFieldForm = if (code) StoryFieldForm.Code else StoryFieldForm.Literal,
     val assets: List<String> = emptyList(),
     val problem: String? = null,
     val registry: StoryRegistry? = null,
     val slot: Boolean = false,
     val write: (String) -> Unit,
-)
+) {
+    /** The function that writes the vector it holds, when it holds one. */
+    val vector: String? get() = (form as? StoryFieldForm.Vector)?.helper
+}
 
 /**
  * A row of a node: a label, the field of what it edits, and the pins on its edges.
@@ -463,14 +466,17 @@ internal class StoryNodeLayout(
                         edit(node.id, "variable") { (it as StoryNode.Assign).copy(variable = typed.trim()) }
                     },
                 )
-                val helper = StoryLiterals.vectorHelper(type.type)
+                val valueType = StoryFieldForm.typeNamed(written)
+                val form = StoryFieldForm.of(valueType)
                 value(
                     node.id, StoryPins.VALUE, storyLang("set.value"), type,
                     StoryRowField(
-                        "value", node.value, "0", code = true, vector = helper,
+                        "value", form.shown(node.value, valueType), "0", code = form != StoryFieldForm.Literal,
+                        form = form,
+                        choices = form.choices,
                         problem = codeProblem(node.value),
                     ) { typed ->
-                        edit(node.id, "value") { (it as StoryNode.Assign).copy(value = typed) }
+                        edit(node.id, "value") { (it as StoryNode.Assign).copy(value = form.written(typed, valueType)) }
                     },
                     kotlin = kotlin,
                 )
@@ -479,7 +485,7 @@ internal class StoryNodeLayout(
                     output = StoryPinSpec(StoryPins.VALUE, type, kotlin),
                     hint = storyLang("set.result.help")
                 )
-                if (helper != null) WIDE else GraphNodeMetrics.WIDTH
+                if (form is StoryFieldForm.Vector) WIDE else GraphNodeMetrics.WIDTH
             }
 
             is StoryNode.Loop -> {
@@ -639,26 +645,24 @@ internal class StoryNodeLayout(
 
         private fun paramField(node: StoryNode.Call, param: StoryParam): StoryRowField {
             val written = node.argument(param).orEmpty()
-            val helper = StoryLiterals.vectorHelper(param.type)
-            val kotlin = StoryLiterals.isKotlin(param.type)
+            val form = StoryFieldForm.of(param.type)
             val registry = StoryRegistry.of(StoryPinType.of(param.type))
             val clips = clipHints(node, param)
             return StoryRowField(
                 param.name,
-                if (helper != null || kotlin) written else StoryLiterals.text(written, param.type),
-                choices = param.suggestions.takeUnless { kotlin }.orEmpty(),
-                picks = param.suggestions.takeIf { kotlin }.orEmpty(),
+                form.shown(written, param.type),
+                choices = choicesOf(form, param.suggestions),
+                picks = param.suggestions.takeIf { form == StoryFieldForm.Code }.orEmpty(),
                 color = param.widget == "color",
-                code = kotlin,
-                vector = helper,
+                code = form != StoryFieldForm.Literal,
+                form = form,
                 assets = param.assets,
                 completions = StoryCompletions.of(param) ?: clips.takeIf { it.isNotEmpty() }?.let { found -> UiCompletionContributor { found } },
                 registry = registry,
                 slot = param.widget == INVENTORY_SLOT_WIDGET,
                 problem = StoryChecks.param(param, written) ?: clipProblem(node, param, written),
             ) { typed ->
-                val next = if (helper != null || kotlin) typed else StoryLiterals.expression(typed, param.type)
-                edit(node.id, param.name) { (it as StoryNode.Call).with(param, next) }
+                edit(node.id, param.name) { (it as StoryNode.Call).with(param, form.written(typed, param.type)) }
             }
         }
 
@@ -774,16 +778,16 @@ internal class StoryNodeLayout(
         private fun inputField(node: StoryNode.Pure, input: StoryOperatorInput): StoryRowField {
             val written = node.arguments[input.name].orEmpty()
             val param = input.param
-            val helper = StoryLiterals.vectorHelper(param?.type ?: input.type.type)
-            val kotlin = param != null && StoryLiterals.isKotlin(param.type)
+            val type = param?.type ?: input.type.type
+            val form = StoryFieldForm.of(type)
             return StoryRowField(
                 input.name,
-                if (helper != null || kotlin) written else input.text(written),
-                input.text(input.default),
-                choices = param?.suggestions?.takeUnless { kotlin }.orEmpty(),
-                picks = param?.suggestions?.takeIf { kotlin }.orEmpty(),
-                code = kotlin,
-                vector = helper,
+                form.shown(written, type),
+                form.shown(input.default, type),
+                choices = choicesOf(form, param?.suggestions.orEmpty()),
+                picks = param?.suggestions?.takeIf { form == StoryFieldForm.Code }.orEmpty(),
+                code = form != StoryFieldForm.Literal,
+                form = form,
                 completions = param?.let(StoryCompletions::of) ?: StoryCompletions.of(input.type),
                 problem = param?.let { StoryChecks.param(it, written) } ?: codeProblem(written),
                 registry = StoryRegistry.of(input.type),
@@ -791,11 +795,15 @@ internal class StoryNodeLayout(
             ) { typed ->
                 edit(node.id, input.name) { each ->
                     each as StoryNode.Pure
-                    val next = if (helper != null || kotlin) typed else input.expression(typed)
+                    val next = form.written(typed, type)
                     each.copy(arguments = if (next.isBlank()) each.arguments - input.name else each.arguments + (input.name to next))
                 }
             }
         }
+
+        /** What a field of [form] offers to put in at once: its own values, or the [suggestions] of its command. */
+        private fun choicesOf(form: StoryFieldForm, suggestions: List<String>): List<String> =
+            form.choices.ifEmpty { suggestions.takeUnless { form == StoryFieldForm.Code }.orEmpty() }
 
         private fun linesOf(text: String, columns: Int): Int =
             text.split('\n').sumOf { ceil(it.length.coerceAtLeast(1) / columns.toDouble()).toInt() }

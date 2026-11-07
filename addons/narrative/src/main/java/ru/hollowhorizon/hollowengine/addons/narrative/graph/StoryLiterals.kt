@@ -23,14 +23,12 @@ import kotlin.time.Duration
 object StoryLiterals {
     private val CALL = Regex("""^(\w+)\((.*)\)$""")
     private const val SECONDS = "s"
-    private const val VECTOR = "vec"
-    private const val BLOCK = "blockPos"
+    const val POSITION = "pos"
+    const val BLOCK = "blockPos"
     private const val ITEM = "itemOf"
     private const val BLOCK_STATE = "blockOf"
     private const val NBT = "nbt"
     private const val FILTER = "itemsMatching"
-    private const val ZERO = "Vec3.ZERO"
-    private const val AXES = 3
 
     /** What is typed into a field of [type] as Kotlin. */
     fun expression(text: String, type: KType?): String {
@@ -95,9 +93,6 @@ object StoryLiterals {
     fun literal(expression: String, type: KType?): String? =
         text(expression, type).takeIf { it.isNotBlank() && it != "{${expression.trim()}}" }
 
-    /** Whether a field of [type] holds plain Kotlin, as nothing shorter says what such a value is. */
-    fun isKotlin(type: KType?): Boolean = type?.classifier in COLLECTIONS
-
     /** The strings of a `listOf` of the Kotlin [expression]; anything else holds none. */
     fun listed(expression: String): List<String> {
         val inner = expression.trim().removePrefix("listOf(").takeIf { it.endsWith(")") }?.dropLast(1).orEmpty()
@@ -115,22 +110,9 @@ object StoryLiterals {
 
     /** The function that writes a value of [type] from its coordinates, or null when it is no vector. */
     fun vectorHelper(type: KType?): String? = when (type?.classifier) {
-        Vec3::class -> VECTOR
+        Vec3::class -> POSITION
         BlockPos::class -> BLOCK
         else -> null
-    }
-
-    /**
-     * The coordinates of the Kotlin [expression], written by [helper], or null when it is some other expression.
-     * Nothing written yet is three empty coordinates.
-     */
-    fun vectorParts(expression: String, helper: String): List<String>? {
-        val written = expression.trim()
-        if (written.isEmpty()) return List(AXES) { "" }
-        if (written == ZERO) return List(AXES) { "0" }
-        if (!written.startsWith("$helper(") || !written.endsWith(")")) return null
-        return StoryKotlin.arguments(written.substring(helper.length + 1, written.length - 1))
-            ?.takeIf { it.size == AXES }
     }
 
     /** The Kotlin of a vector out of its coordinates; with none of them typed it is left out. */
@@ -150,6 +132,7 @@ object StoryLiterals {
 
     /** The text of a string literal without inserts, or null for any other expression. */
     private fun string(written: String): String? {
+        StoryTemplates.content(written).takeIf { written.startsWith(RAW) && written.endsWith(RAW) && '$' !in it }?.let { return it }
         if (written.length < 2 || !written.startsWith("\"") || !written.endsWith("\"")) return null
         val inner = written.substring(1, written.length - 1)
         return buildString {
@@ -175,7 +158,7 @@ object StoryLiterals {
     /** A number of [seconds] as a field of a duration shows it. */
     fun seconds(seconds: Float): String = seconds.toString().removeSuffix(".0") + SECONDS
 
-    private val COLLECTIONS = setOf(List::class, Collection::class, Iterable::class, Set::class)
+    private const val RAW = "\"\"\""
 
     /** Types a field takes plain text for. */
     private val TEXTS = setOf(String::class, CharSequence::class, Any::class)

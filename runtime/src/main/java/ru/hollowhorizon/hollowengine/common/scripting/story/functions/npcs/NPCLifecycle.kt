@@ -135,7 +135,7 @@ fun NpcEntity.despawn() {
     this.remove(Entity.RemovalReason.DISCARDED)
 }
 
-fun pos(x: Int, y: Int, z: Int) = Vec3(x + 0.5, y.toDouble(), z + 0.5)
-fun pos(x: Double, y: Double, z: Double) = Vec3(x, y, z)
+/** The position [x], [y], [z], whatever numbers they are. */
+fun pos(x: Number, y: Number, z: Number) = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
 fun rotation(x: Int, y: Int) = Vec2(x.toFloat(), y.toFloat())
 fun rotation(x: Float, y: Float) = Vec2(x, y)

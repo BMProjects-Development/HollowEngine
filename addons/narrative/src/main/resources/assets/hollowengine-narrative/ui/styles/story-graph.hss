@@ -16,11 +16,7 @@
     border-color: $warning;
 }
 
-.st-vector {
-    gap: 3px;
-}
-
-.st-vector-menu {
+.st-snippets {
     size: 10px 10px;
 }
 

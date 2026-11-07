@@ -1,4 +1,7 @@
 {
+  "completion.block_look": "block the player looks at",
+  "completion.block_position": "block of the player",
+  "completion.player_look": "where the player looks",
   "completion.player_position": "player position",
   "completion.held_item": "held item",
   "fix.import_declaration": "Import %s",

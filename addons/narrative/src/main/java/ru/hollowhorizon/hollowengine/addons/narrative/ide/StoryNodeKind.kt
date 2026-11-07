@@ -22,7 +22,7 @@ internal enum class StoryNodeKind(val tag: String, icon: String, name: String, c
     INVOKE("command", "command", "invoke", 0x2B8A9E),
     SET("command", "command", "set", 0x4C5566),
     CODE("block", "block", "code", 0x5F59B1),
-    VALUE("pure", "block", "code", 0x2F7D80),
+    VALUE("pure", "block", "expression", 0x2F7D80),
     LOOP("block", "block", "loop", 0x5F59B1),
     BLOCK("block", "block", "block", 0x5F59B1),
     COMMAND("command", "command", "command", 0x4C5566);

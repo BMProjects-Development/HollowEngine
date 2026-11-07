@@ -102,7 +102,7 @@ object ComponentCommands {
                 description = annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description,
                 group = GROUP,
             )
-            if (StoryCommand.isValue(propertyType)) return@flatMap listOf(param)
+            if (StoryCommand.isValue(propertyType) || StoryCommand.isContainer(propertyType)) return@flatMap listOf(param)
             val nested = propertyType.classifier as? KClass<*>
             if (nested == null || element.kind != StructureKind.CLASS) return@flatMap emptyList()
             listOf(param) + fieldsOf(key, element, nested, "$path$name.")

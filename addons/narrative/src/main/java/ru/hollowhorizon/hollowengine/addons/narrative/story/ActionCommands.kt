@@ -142,6 +142,12 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 .map { param(it).copy(optional = true, group = group) }.ifEmpty { null }
         }
 
+        /** Whether [type] is a list, a set or a map, which a field holds as Kotlin and a pin can bring whole. */
+        internal fun isContainer(type: KType): Boolean {
+            val classifier = type.classifier as? KClass<*> ?: return false
+            return classifier.isSubclassOf(Iterable::class) || classifier.isSubclassOf(Map::class)
+        }
+
         /** Whether a field can hold a value of [type]. */
         internal fun isValue(type: KType): Boolean {
             val classifier = type.classifier as? KClass<*> ?: return false

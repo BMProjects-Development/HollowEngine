@@ -14,6 +14,7 @@ internal class StoryFieldSpan(
     val start: Int,
     val end: Int,
     val to: Int,
+    val shown: String,
 )
 
 /** What goes around the Kotlin of a field for it to mean what it means on its node. */
@@ -58,13 +59,33 @@ internal object StoryFieldChecks {
     /** The start of the names of the properties that give what links go into. */
     const val PLACE = "storyPlace"
 
-    private class Entry(val field: StoryFieldKey, val type: String?, val code: String, val frame: StoryFieldFrame)
+    /**
+     * A field of the story, [code] as its field shows it.
+     *
+     * @param checked what stands for it in the script, as long as [code] and with each character where it is.
+     * @param syntax the Kotlin that has to parse for it to be checked in place.
+     */
+    private class Entry(
+        val field: StoryFieldKey,
+        val type: String?,
+        val code: String,
+        val frame: StoryFieldFrame,
+        val checked: String = code,
+        val syntax: String = code,
+    )
 
     private const val VALUE_END = "\n)"
+    private const val RAW = "\"\"\""
 
     fun variableOwner(name: String) = "variable:$name"
 
-    private fun value(owner: String, key: String, type: String?, code: String): Entry {
+    private fun value(owner: String, key: String, type: String?, code: String, form: StoryFieldForm = StoryFieldForm.Code): Entry {
+        if (form == StoryFieldForm.Template) {
+            val content = StoryTemplates.content(code)
+            val checked = StoryTemplates.analyzed(content)
+            val frame = StoryFieldFrame("val storyValue: String = $RAW", RAW)
+            return Entry(StoryFieldKey(owner, key), type, content, frame, checked, RAW + checked + RAW)
+        }
         val declared = type?.let { ": $it" }.orEmpty()
         return Entry(StoryFieldKey(owner, key), type, code, StoryFieldFrame("val storyValue$declared = (\n", VALUE_END))
     }
@@ -89,12 +110,9 @@ internal object StoryFieldChecks {
             })
 
             is StoryNode.Assign -> listOfNotNull(
-                value(
-                    node.id,
-                    "value",
-                    graph.variables.firstOrNull { it.name == node.variable }?.type,
-                    node.value
-                ).takeIf { free(StoryPins.VALUE) },
+                graph.variables.firstOrNull { it.name == node.variable }?.type.let { type ->
+                    value(node.id, "value", type, node.value, StoryFieldForm.ofName(type))
+                }.takeIf { free(StoryPins.VALUE) },
             )
 
             is StoryNode.Loop -> listOfNotNull(value(node.id, "items", "Iterable<*>", node.items).takeIf {
@@ -111,16 +129,17 @@ internal object StoryFieldChecks {
             is StoryNode.Code -> code(graph, node)
             is StoryNode.Call -> call(node, ::free)
             is StoryNode.Invoke -> StoryActionFunctions.definition(graph, node)?.params.orEmpty().filter { free(it.name) }
-                .map { value(node.id, it.name, it.type, node.arguments[it.name].orEmpty()) }
+                .map { value(node.id, it.name, it.type, node.arguments[it.name].orEmpty(), StoryFieldForm.ofName(it.type)) }
 
             is StoryNode.Return -> graph.owners()[node.id]?.results.orEmpty().filter { free(it.name) }
-                .map { value(node.id, it.name, it.type, node.values[it.name].orEmpty()) }
+                .map { value(node.id, it.name, it.type, node.values[it.name].orEmpty(), StoryFieldForm.ofName(it.type)) }
 
             is StoryNode.Pure -> StoryOperators.inputsOf(node).filter { free(it.name) }.map { input ->
                 if (input.typeName) return@map typeField(node.id, input.name, node.arguments[input.name].orEmpty())
                 val type =
                     if (input.type == StoryPinType.NUMBER) "Number" else input.type.type?.let(StoryKotlinTypes::name)
-                value(node.id, input.name, type, node.arguments[input.name].orEmpty())
+                val form = StoryFieldForm.of(input.param?.type ?: input.type.type)
+                value(node.id, input.name, type, node.arguments[input.name].orEmpty(), form)
             }
 
             else -> emptyList()
@@ -143,7 +162,7 @@ internal object StoryFieldChecks {
         val signature = StoryActionFunctions.signature(call) ?: return emptyList()
         return signature.params.filter { free(it.name) }.mapNotNull { param ->
             param.type?.let(StoryKotlinTypes::name)
-                ?.let { value(node.id, param.name, it, call.argument(param).orEmpty()) }
+                ?.let { value(node.id, param.name, it, call.argument(param).orEmpty(), StoryFieldForm.of(param.type)) }
         }
     }
 
@@ -173,15 +192,15 @@ internal object StoryFieldChecks {
         fun parameters(node: String) = owners[node]?.params.orEmpty().joinToString { "${it.name}: ${it.type}" }
 
         val variables = plain.variables.map { value(variableOwner(it.name), "initial", it.type, it.initial) }
-        val (kept, left) = (variables + plain.nodes.flatMap { nodeFields(plain, it) }).partition { reads(it.code) }
+        val (kept, left) = (variables + plain.nodes.flatMap { nodeFields(plain, it) }).partition { reads(it.syntax) }
         val text = StringBuilder(code.trimEnd())
         val length = text.length
         val spans = kept.mapIndexed { index, entry ->
             val from = text.append("\n\nsuspend fun storyCheck$index(${parameters(entry.field.owner)}) {\n").length
             val start = text.append(entry.frame.before).length
-            val end = text.append(entry.code).length
+            val end = text.append(entry.checked).length
             val to = text.append(entry.frame.after).append("\n}").length
-            StoryFieldSpan(entry.field, entry.type?.let(StoryPinType::shortName), from, start, end, to)
+            StoryFieldSpan(entry.field, entry.type?.let(StoryPinType::shortName), from, start, end, to, entry.code)
         }
         val pins = StoryGraphCompiler.pins(graph, StoryActionFunctions).filterValues(::reads).entries.withIndex()
             .associate { (index, pin) ->

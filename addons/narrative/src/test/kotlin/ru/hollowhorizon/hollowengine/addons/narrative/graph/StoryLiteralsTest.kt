@@ -5,7 +5,6 @@ import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StoryLiteralsTest {
@@ -33,11 +32,6 @@ class StoryLiteralsTest {
     @Test
     fun `a whole number is still a double in Kotlin`() {
         assertEquals("1.toDouble()", StoryLiterals.expression("1", typeOf<Double>()))
-    }
-
-    @Test
-    fun `an expression is not taken for coordinates`() {
-        assertNull(StoryLiterals.vectorParts("storyPlayer().position()", "vec"))
     }
 
     @Test

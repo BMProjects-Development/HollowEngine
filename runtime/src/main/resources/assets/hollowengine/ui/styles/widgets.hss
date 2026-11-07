@@ -51,6 +51,8 @@
 
 .number-field.labeled .number-field-value { text-align: right; }
 
+.number-field.roomy .number-field-body { padding: 0px 11px; }
+
 .number-field-arrow {
     size: 9px 100%;
     align-items: center center;

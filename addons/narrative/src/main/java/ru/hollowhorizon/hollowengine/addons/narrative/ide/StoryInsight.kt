@@ -58,6 +58,7 @@ internal class StoryAnalysis(
  */
 internal object StoryInsight {
     private const val SCRIPT = ".kts"
+    private const val RAW = "\"\"\""
     private const val IMPORT = "import "
     private const val DECLARATION = "var"
     private const val BODY_START = "\nsuspend fun storyField() {\n"
@@ -110,9 +111,18 @@ internal object StoryInsight {
     private fun addImport(session: Session, name: String) =
         session.state.change { if (name in imports) this else copy(imports = imports + name) }
 
-    /** Colors [field] by what analysis made of it, or by the look of it until analysis gets to what it holds now. */
-    private fun colors(session: Session, field: StoryFieldKey) = UiSyntaxHighlighter { text ->
-        session.analysis.colors[field]?.takeIf { it.text == text }?.highlights ?: tokens.highlight(text)
+    /**
+     * Colors [field] by what analysis made of it, or by the look of it until analysis gets to what it holds now; the
+     * inside of a string, a [template], is looked at inside its quotes.
+     */
+    private fun colors(session: Session, field: StoryFieldKey, template: Boolean) = UiSyntaxHighlighter { text ->
+        session.analysis.colors[field]?.takeIf { it.text == text }?.highlights
+            ?: if (template) templateColors(text) else tokens.highlight(text)
+    }
+
+    private fun templateColors(text: String): List<UiTextHighlight> {
+        val framed = RAW + StoryTemplates.analyzed(text) + RAW
+        return part(tokens.highlight(framed), RAW.length, RAW.length + text.length)
     }
 
     private fun part(highlights: List<UiTextHighlight>, start: Int, end: Int) =
@@ -141,12 +151,16 @@ internal object StoryInsight {
         return UiCodeInsight(highlighter = highlighter, revision = session.script.version)
     }
 
-    /** What a field of Kotlin holding [text] offers: colors, completion, and what is wrong with it. */
-    fun field(state: StoryEditorState, field: StoryFieldKey, text: String): UiCodeInsight {
+    /**
+     * What a field of Kotlin holding [text] offers: colors, completion, and what is wrong with it.
+     *
+     * @param template whether the field holds the inside of a string.
+     */
+    fun field(state: StoryEditorState, field: StoryFieldKey, text: String, template: Boolean = false): UiCodeInsight {
         val session = session(state)
         val own = session.fields.getOrPut(field) {
             FieldInsight(
-                colors(session, field),
+                colors(session, field, template),
                 session.script.completions({ context(session, field) }) { addImport(session, it) })
         }
         val analysis = analysis(session)
@@ -206,7 +220,7 @@ internal object StoryInsight {
         }
         val colors = checked.spans.associate { span ->
             span.field to StoryFieldColors(
-                checked.text.substring(span.start, span.end),
+                span.shown,
                 part(found.highlights, span.start, span.end)
             )
         }

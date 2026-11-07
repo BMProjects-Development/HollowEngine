@@ -228,6 +228,9 @@ internal object StoryCatalog {
             StoryCategory.FLOW to kindItem(storyLang("kind.code"), StoryNodeKind.CODE) {
                 add(StoryNode.Code(StoryGraph.newId(), ""))
             },
+            StoryCategory.FLOW to kindItem(storyLang("kind.expression"), StoryNodeKind.VALUE) {
+                add(StoryNode.Expression(StoryGraph.newId(), ""))
+            },
         )
         val commands = commandEntries({ true }, add)
         val operators = if (values) operatorEntries({ !TypeOperators.isTyped(it.id) }, add) else emptyList()

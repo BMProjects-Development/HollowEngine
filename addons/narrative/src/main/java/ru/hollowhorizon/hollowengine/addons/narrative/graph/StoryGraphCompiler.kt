@@ -1003,6 +1003,7 @@ class StoryGraphCompiler private constructor(
             "net.minecraft.world.level.block.state.BlockState",
             "net.minecraft.world.phys.Vec3",
             "ru.hollowhorizon.hollowengine.common.entities.NpcEntity",
+            "ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.pos",
         )
         private val IDENTIFIER_PART = Regex("[\\p{L}\\p{N}_]+")
         private val IDENTIFIER = Regex("[\\p{L}_][\\p{L}\\p{N}_]*")

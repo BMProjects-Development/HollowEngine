@@ -328,13 +328,8 @@ class StoryTopologyTest : StageTest() {
 
     @Test
     fun `the parser splits arguments the way Kotlin reads them`() {
-        assertEquals(
-            listOf("1", "", "z"), StoryLiterals.vectorParts(StoryLiterals.vector(listOf("1", "", "z"), "vec"), "vec")
-        )
-        assertEquals(
-            listOf("max(1, 2)", "\"a,b\".length", "3"),
-            StoryLiterals.vectorParts("vec(max(1, 2), \"a,b\".length, 3)", "vec")
-        )
+        assertEquals(listOf("1", "", "z"), StoryKotlin.arguments("1, , z"))
+        assertEquals(listOf("max(1, 2)", "\"a,b\".length", "3"), StoryKotlin.arguments("max(1, 2), \"a,b\".length, 3"))
         assertEquals(null, StoryKotlin.arguments("a), (b"))
     }
 

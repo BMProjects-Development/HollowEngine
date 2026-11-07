@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.impl.source.tree.LeafPsiElement
+import com.intellij.psi.tree.TokenSet
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
@@ -20,6 +21,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 
 private const val PREFIX = "fun snippet() {\n"
 private const val SUFFIX = "\n}"
+
+internal val TEMPLATE_BRACES = TokenSet.create(
+    KtTokens.LONG_TEMPLATE_ENTRY_START, KtTokens.LONG_TEMPLATE_ENTRY_END, KtTokens.SHORT_TEMPLATE_ENTRY_START,
+)
 
 /** Parses [text] as the body of a function, which takes an expression and statements alike. */
 internal fun kotlinSyntax(factory: KtPsiFactory, text: String): KotlinSyntax {
@@ -54,7 +59,8 @@ private fun tokens(body: KtBlockExpression): List<KotlinToken> = body.collectDes
     val type = when (leaf.elementType) {
         in KtTokens.KEYWORDS -> TokenType.KEYWORD
         in KtTokens.SOFT_KEYWORDS -> if (leaf.parent is KtModifierList) TokenType.KEYWORD else return@mapNotNull null
-        in KtTokens.STRINGS, KtTokens.ESCAPE_SEQUENCE -> TokenType.STRING
+        in KtTokens.STRINGS, KtTokens.ESCAPE_SEQUENCE, KtTokens.OPEN_QUOTE, KtTokens.CLOSING_QUOTE -> TokenType.STRING
+        in TEMPLATE_BRACES -> TokenType.KEYWORD
         KtTokens.INTEGER_LITERAL, KtTokens.FLOAT_LITERAL -> TokenType.NUMERIC_LITERAL
         in KtTokens.COMMENTS -> TokenType.COMMENT
         else -> return@mapNotNull null

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFieldForm
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.withGroupChanged
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNodeGroup
@@ -246,55 +247,36 @@ private fun StoryRowView(
                 modifier = Modifier.size(0.px, 20.px).grow(1f).graphField(controller, box.node.id),
             )
         }
+        val labelTags = listOfNotNull(
+            "gn-pin-label",
+            "output".takeIf { row.input == null && field == null },
+            "optional".takeIf { row.optional },
+        )
+        val scrubs = field?.form is StoryFieldForm.Numeric && !readOnly
         if (row.label != null && field == null && row.input == null) Box(modifier = Modifier.size(0.px, 1.px).grow(1f))
-        row.label?.let {
-            Text(
-                it,
-                tags = listOfNotNull(
-                    "gn-pin-label",
-                    "output".takeIf { row.input == null && field == null },
-                    "optional".takeIf { row.optional })
-            )
-        }
+        if (!scrubs) row.label?.let { Text(it, tags = labelTags) }
         row.hint?.let { FieldHelp(it) }
-        if (field != null) when {
-            field.choices.isNotEmpty() -> ChoiceField(controller, box, field)
-            field.vector != null -> StoryVectorField(
+        if (field != null) FieldWithAsset(row, field) {
+            StoryInputField(
                 "st-field-${box.node.id}-${field.key}",
-                field.value,
-                field.vector,
+                field,
+                insight!!,
                 readOnly,
                 problem,
-                listOf("gn-field"),
-                Modifier.size(0.px, 20.px).grow(1f),
-                fieldModifier = Modifier.graphField(controller, box.node.id),
-                write = field.write,
+                wrong,
+                StoryFieldLook.GRAPH,
+                label = row.label.takeIf { scrubs },
+                labelTags = labelTags,
+                linesHeight = row.height - 6f,
+                modifier = Modifier.graphField(controller, box.node.id),
             )
-
-            else -> FieldWithAsset(row, field) {
-                TextField(
-                    value = field.value,
-                    onChange = field.write,
-                    mode = if (field.lines > 1) UiTextFieldMode.MULTI_LINE else UiTextFieldMode.SINGLE_LINE,
-                    readOnly = readOnly,
-                    placeholder = field.placeholder,
-                    insight = insight!!.copy(diagnosticTooltips = false),
-                    id = "st-field-${box.node.id}-${field.key}",
-                    tags = listOfNotNull(
-                        "gn-field",
-                        "gn-expression".takeIf { field.code },
-                        (if (wrong) "error" else "warning").takeIf { problem != null }),
-                    modifier = Modifier.size(0.px, if (field.lines > 1) (row.height - 6f).px else 20.px).grow(1f)
-                        .tooltipOnHover(problem.orEmpty()).graphField(controller, box.node.id),
-                )
-            }
         }
         val own = "${box.node.id}-${field?.key}"
         if (field != null && field.picks.isNotEmpty()) PicksButton(controller, own, field)
         if (field != null && field.color) ColorButton(state, own, field)
         field?.registry?.let { RegistryButton(controller, own, it, field) }
         if (field != null && field.slot) SlotButton(state, own, field)
-        if (field != null && field.code && field.vector == null) CodeEditorButton(
+        if (field != null && field.code) CodeEditorButton(
             state,
             box.node.id,
             row.label ?: field.placeholder,
@@ -378,12 +360,23 @@ private const val SECTION_INDENT = 8f
 
 /** What the text field of [field] of the node [owner] offers, by what it holds. */
 internal fun fieldInsight(state: StoryEditorState, owner: String, field: StoryRowField): UiCodeInsight {
-    val analyzed = StoryInsight.field(state, StoryFieldKey(owner, field.key), field.value)
+    val analyzed = StoryInsight.field(state, StoryFieldKey(owner, field.key), field.value, field.form == StoryFieldForm.Template)
     return when {
-        field.code -> analyzed
+        field.code -> field.completions?.let { own -> analyzed.copy(completions = own + analyzed.completions) } ?: analyzed
         field.typeName -> StoryInsight.type(state)
         field.completions != null -> UiCodeInsight(completions = field.completions)
         else -> UiCodeInsight(diagnostics = analyzed.diagnostics.map { it.copy(start = 0, end = 0) })
+    }
+}
+
+/** What the field of a form's own completes, and then the Kotlin [other] completes. */
+private operator fun UiCompletionContributor.plus(other: UiCompletionContributor?): UiCompletionContributor {
+    if (other == null) return this
+    val own = this
+    return object : UiCompletionContributor {
+        override fun complete(context: UiCompletionContext) = own.complete(context) + other.complete(context)
+
+        override val triggerCharacters get() = other.triggerCharacters
     }
 }
 
@@ -394,31 +387,6 @@ private fun FieldWithAsset(row: StoryNodeRow, field: StoryRowField, content: @Co
     if (field.assets.isNotEmpty()) {
         AssetPickerButton(row.label.orEmpty(), field.value, { it.assets(field.assets) }, field.write)
     }
-}
-
-/** A value out of a known set: a press opens the values, and the field keeps anything else that was typed. */
-@Composable
-private fun ChoiceField(controller: GraphEditorController, box: StoryNodeBox, field: StoryRowField) {
-    Text(
-        field.value.ifEmpty { "—" },
-        id = "st-choice-${box.node.id}-${field.key}",
-        tags = listOf("gn-chip"),
-        modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).input(hoverable = true, clickable = true)
-            .onPress { event ->
-                if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
-                controller.menu = GraphMenu(
-                    event.x, event.y,
-                    field.choices.map { value ->
-                        UiDropdownItem(
-                            value,
-                            mark = UiDropdownMark.RADIO,
-                            checked = value == field.value
-                        ) { field.write(value) }
-                    },
-                )
-                event.consume()
-            },
-    )
 }
 
 /** The inspector of a group: what it is called and how it looks. */

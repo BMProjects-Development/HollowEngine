@@ -16,6 +16,7 @@ private const val RemoveIcon = "hollowengine:textures/gui/icons/remove.svg"
 private const val CodeIcon = "hollowengine:textures/gui/icons/code_editor.svg"
 private const val KotlinLine = 13
 private const val KotlinInset = 28
+private const val INSPECTOR_HEIGHT = 22f
 
 /**
  * The inspector of what is selected, or of the story itself when nothing is. Its fields read the file each time they
@@ -58,29 +59,21 @@ private fun FieldRow(state: StoryEditorState, owner: String, id: String, row: St
     val title = row.label ?: field.placeholder
     val insight = fieldInsight(state, owner, field)
     when {
-        field.vector != null -> VectorRow(state, id, title, row.hint, field.value, field.vector, field.write)
         field.assets.isNotEmpty() -> Column(tags = listOf("insp-field")) {
             FieldLabel(title, row.hint)
             AssetPathField(field.value, title, id, { it.assets(field.assets) }) { field.write(it) }
         }
 
-        else -> {
-            val key = StoryFieldKey(owner, field.key)
-            TextRow(
-                title,
-                field.value,
-                id = id,
-                help = row.hint,
-                completions = insight.completions,
-                highlighter = insight.highlighter,
-                diagnostics = insight.diagnostics,
-                highlightRevision = insight.highlightRevision,
-                trailing = when {
-                    field.color -> ({ ColorButton(state, id, field) })
-                    field.code -> ({ OpenCode(state, key, title, field.value, field.write) })
-                    else -> null
-                },
-            ) { field.write(it) }
+        else -> Column(tags = listOf("insp-field")) {
+            FieldLabel(title, row.hint)
+            Row(tags = listOf("insp-input-row")) {
+                StoryInputField(
+                    id, field, insight, state.context?.readOnly == true, null, false, StoryFieldLook.INSPECTOR,
+                    height = INSPECTOR_HEIGHT,
+                )
+                if (field.color) ColorButton(state, id, field)
+                if (field.code) OpenCode(state, StoryFieldKey(owner, field.key), title, field.value, field.write)
+            }
         }
     }
     Problems(field.problem, insight.diagnostics)
@@ -96,26 +89,6 @@ private fun OpenCode(
     write: (String) -> Unit,
 ) {
     InspectorIconButton(CodeIcon, storyLang("code.open")) { state.codeField = StoryCodeField(key, title, value, write) }
-}
-
-/** A vector with its label, the way a row of the inspector shows it. */
-@Composable
-private fun VectorRow(
-    state: StoryEditorState,
-    id: String,
-    title: String,
-    help: String?,
-    written: String,
-    helper: String,
-    write: (String) -> Unit,
-) {
-    Column(tags = listOf("insp-field")) {
-        FieldLabel(title, help)
-        StoryVectorField(
-            id, written, helper, state.context?.readOnly == true, null, listOf("insp-input"),
-            Modifier.size(100.percent, 22.px), fontSize = 9f, write = write,
-        )
-    }
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFieldForm
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
@@ -70,15 +71,29 @@ internal fun StoryNodeLayout.Rows.giveBack(node: StoryNode.Return) {
     flow(hasOutput = false)
     ownerOf(node)?.results.orEmpty().forEach { result ->
         val written = node.values[result.name].orEmpty()
-        val field = StoryRowField(result.name, written, code = true, problem = codeProblem(written)) { typed ->
+        val field = typedField(result, written) { next ->
             layout.state.editNode(node.id, result.name) { each ->
                 each as StoryNode.Return
-                each.copy(values = if (typed.isBlank()) each.values - result.name else each.values + (result.name to typed))
+                each.copy(values = if (next.isBlank()) each.values - result.name else each.values + (result.name to next))
             }
         }
         val pin = pinOf(result)
         value(node.id, result.name, result.name, pin.type, field, kotlin = pin.kotlin)
     }
+}
+
+/** The field of [value], which shows the Kotlin [written] the way its type is easiest to work with; [write] gets Kotlin. */
+private fun StoryNodeLayout.Rows.typedField(value: StoryTypedName, written: String, write: (String) -> Unit): StoryRowField {
+    val type = StoryFieldForm.typeNamed(value.type)
+    val form = StoryFieldForm.of(type)
+    return StoryRowField(
+        value.name,
+        form.shown(written, type),
+        code = form != StoryFieldForm.Literal,
+        form = form,
+        choices = form.choices,
+        problem = codeProblem(written),
+    ) { typed -> write(form.written(typed, type)) }
 }
 
 /** A call of a function: a value for each parameter, a pin for each result, and the story it is from. */
@@ -90,10 +105,10 @@ internal fun StoryNodeLayout.Rows.invoke(node: StoryNode.Invoke) {
     }
     function?.params.orEmpty().forEach { param ->
         val written = node.arguments[param.name].orEmpty()
-        val field = StoryRowField(param.name, written, code = true, problem = codeProblem(written)) { typed ->
+        val field = typedField(param, written) { next ->
             layout.state.editNode(node.id, param.name) { each ->
                 each as StoryNode.Invoke
-                each.copy(arguments = if (typed.isBlank()) each.arguments - param.name else each.arguments + (param.name to typed))
+                each.copy(arguments = if (next.isBlank()) each.arguments - param.name else each.arguments + (param.name to next))
             }
         }
         val pin = pinOf(param)

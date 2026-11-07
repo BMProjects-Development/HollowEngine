@@ -1,4 +1,7 @@
 {
+  "completion.block_look": "блок, на который смотрит игрок",
+  "completion.block_position": "блок игрока",
+  "completion.player_look": "куда смотрит игрок",
   "completion.player_position": "позиция игрока",
   "completion.held_item": "предмет в руке",
   "fix.import_declaration": "Импортировать %s",
