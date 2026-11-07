@@ -6,7 +6,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class StoryKeyedGroupTest {
-    private val group = StoryParamGroup("fields", "componentFields", keyed = true)
+    private val group = StoryParamGroup("fields", "test.componentFields", keyed = true, typed = "test.componentField")
 
     private val functions = object : StoryFunctions {
         override fun signature(call: StoryNode.Call) = StoryFunctionSignature(
@@ -41,7 +41,11 @@ class StoryKeyedGroupTest {
             links = listOf(StoryLink("text", "result", "set", "label")),
         )
         assertEquals(emptyList(), story.problems)
-        assertContains(story.code, "configureComponent(component = \"test:mover\", fields = componentFields(\"speed\" to 2.5f, \"label\" to ")
+        assertContains(
+            story.code,
+            "configureComponent(component = \"test:mover\", fields = componentFields(\"speed\" to componentField<kotlin.Float>(2.5f), \"label\" to componentField<kotlin.String>(",
+        )
+        assertEquals(true, story.code.lines().containsAll(listOf("import test.componentField", "import test.componentFields")))
         assertEquals(false, "label = " in story.code)
     }
 

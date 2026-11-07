@@ -7,8 +7,14 @@ import kotlin.reflect.KType
  *
  * @param keyed whether [constructor] takes the fields as pairs `"name" to value` rather than named arguments, for an
  * object whose fields are only known at runtime, such as a component.
+ * @param typed the function a value of a [keyed] field passes through with type of the field as its type argument.
  */
-data class StoryParamGroup(val parameter: String, val constructor: String, val keyed: Boolean = false)
+data class StoryParamGroup(
+    val parameter: String,
+    val constructor: String,
+    val keyed: Boolean = false,
+    val typed: String? = null,
+)
 
 enum class StoryParamMeaning {
     /** A clip of the model of the entity the call is made on. */

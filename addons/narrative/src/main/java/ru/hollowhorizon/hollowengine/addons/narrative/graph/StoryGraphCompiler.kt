@@ -695,10 +695,21 @@ class StoryGraphCompiler private constructor(
     /** The argument of a [StoryParamGroup.keyed] group: each field written or linked, as `"name" to value`. */
     private fun keyedGroupOf(node: StoryNode.Call, group: StoryParamGroup, params: List<StoryParam>): String {
         val written = node.groups[group.parameter]?.arguments.orEmpty()
+        val typed = group.typed?.let(::imported)
         val fields = params.filter { it.name in written || (node.id to it.name) in values }.joinToString { param ->
-            "${literal(param.name)} to ${argument(node.id, param.name, written[param.name].orEmpty(), empty = true)}"
+            val empty = param.type?.isMarkedNullable != false
+            val value = argument(node.id, param.name, written[param.name].orEmpty(), empty, StoryLiterals.zero(param.type))
+            val type = param.type?.let(StoryKotlinTypes::name)
+            "${literal(param.name)} to ${if (typed != null && type != null) "$typed<$type>($value)" else value}"
         }
-        return "${group.parameter} = ${group.constructor}($fields)"
+        return "${group.parameter} = ${imported(group.constructor)}($fields)"
+    }
+
+    /** The name [function] is called by: its own, once a qualified one is imported. */
+    private fun imported(function: String): String {
+        if ('.' !in function) return function
+        imports += function
+        return function.substringAfterLast('.')
     }
 
     private fun parameter(node: StoryNode.Call, name: String): String = typed(

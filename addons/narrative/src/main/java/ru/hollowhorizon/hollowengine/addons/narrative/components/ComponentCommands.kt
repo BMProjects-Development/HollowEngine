@@ -30,10 +30,11 @@ import kotlin.reflect.typeOf
  */
 object ComponentCommands {
     private const val PREFIX = "component/"
+    private const val COMPONENTS = "ru.hollowhorizon.hollowengine.addons.narrative.components"
     private val WORD = Regex("(?<=[a-z0-9])(?=[A-Z])")
-    private const val FUNCTION = "ru.hollowhorizon.hollowengine.addons.narrative.components.configureComponent"
+    private const val FUNCTION = "$COMPONENTS.configureComponent"
     private const val TITLE = "hollowengine.gui.ide.story.component.configure"
-    private val GROUP = StoryParamGroup("fields", "ru.hollowhorizon.hollowengine.addons.narrative.components.componentFields", keyed = true)
+    private val GROUP = StoryParamGroup("fields", "$COMPONENTS.componentFields", keyed = true, typed = "$COMPONENTS.componentField")
     private val RECEIVER = StoryParam("who", typeOf<Entity>(), receiver = true)
 
     private class Built(

@@ -23,6 +23,9 @@ import kotlin.reflect.full.memberProperties
 
 fun componentFields(vararg fields: Pair<String, Any?>): Map<String, Any?> = mapOf(*fields)
 
+/** [value] for a field of the type [T]: a story names the type of the field, so that Kotlin checks what it is given. */
+fun <T> componentField(value: T): T = value
+
 suspend fun Entity.configureComponent(component: String, fields: Map<String, Any?> = emptyMap()) =
     patchComponent(component, ComponentPatches.encode(component, fields))
 
