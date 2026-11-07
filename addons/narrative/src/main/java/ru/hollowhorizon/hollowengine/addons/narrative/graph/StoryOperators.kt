@@ -292,7 +292,7 @@ object StoryOperators {
         operator(
             "list", "values.list", listOf(generic("a"), generic("b"), generic("c")),
             outOf("list", "listOf(\$*)")
-                .copy(type = LIST, kotlin = "List<Any?>", empty = "emptyList<Any?>()", shape = "List<T>"),
+                .copy(type = LIST, empty = "emptyList<Nothing>()", shape = "List<T>"),
         ).copy(variadic = true),
         operator(
             "range", "values.list", listOf(number("from"), number("to", "9")),

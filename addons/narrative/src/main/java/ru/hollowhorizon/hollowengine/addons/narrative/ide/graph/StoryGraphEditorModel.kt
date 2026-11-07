@@ -236,8 +236,8 @@ internal class StoryGraphEditorModel(
     /** Whether a link can go from [output] to [input], whichever way it gets made. */
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
         val type = typeOf(output)
-        val from = layout.kotlinOf(output)
-        val to = layout.kotlinOf(input)
+        val from = layout.kotlinOf(output)?.takeIf(StoryGenerics::isKnown)
+        val to = layout.kotlinOf(input)?.takeIf(StoryGenerics::isKnown)
         val analysis = StoryInsight.analysis(state, state.root() ?: graph)
         if (!type.converts && from != null && to != null) analysis.fits(from, to)?.let { return it }
         if (!type.fits(typeOf(input))) return false

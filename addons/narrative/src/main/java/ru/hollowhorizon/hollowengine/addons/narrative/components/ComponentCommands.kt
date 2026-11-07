@@ -33,7 +33,7 @@ object ComponentCommands {
     private val WORD = Regex("(?<=[a-z0-9])(?=[A-Z])")
     private const val FUNCTION = "ru.hollowhorizon.hollowengine.addons.narrative.components.configureComponent"
     private const val TITLE = "hollowengine.gui.ide.story.component.configure"
-    private val GROUP = StoryParamGroup("fields", "componentFields", keyed = true)
+    private val GROUP = StoryParamGroup("fields", "ru.hollowhorizon.hollowengine.addons.narrative.components.componentFields", keyed = true)
     private val RECEIVER = StoryParam("who", typeOf<Entity>(), receiver = true)
 
     private class Built(

@@ -735,9 +735,12 @@ internal class StoryNodeLayout(
             )
             if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             fun pin(output: StoryOperatorOutput): StoryPinSpec {
+                if (output.generic) {
+                    val kotlin = StoryGenerics.shaped(output.shape, generic ?: "T")
+                    return StoryPinSpec(output.name, if (generic == null) output.type else StoryPinType.ofName(kotlin), kotlin)
+                }
                 val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }
-                val shaped = if (output.generic) generic?.let { StoryGenerics.shaped(output.shape, it) } else null
-                val kotlin = shaped ?: types[node.id to output.name] ?: named ?: output.kotlin
+                val kotlin = types[node.id to output.name] ?: named ?: output.kotlin
                 return StoryPinSpec(output.name, kotlin?.let(StoryPinType::ofName) ?: output.type, kotlin)
             }
             folded(

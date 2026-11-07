@@ -62,6 +62,16 @@ class StoryGenericBlocksTest {
     }
 
     @Test
+    fun `a generic output nothing tells the type of gives T`() {
+        val graph = StoryGraph(
+            nodes = listOf(StoryNode.Pure("items", "list"), StoryNode.Pure("choice", "select")),
+        )
+        val boxes = StoryGraphBoxes(graph, state)
+        assertEquals("List<T>", boxes.outputKotlin("items", "list"))
+        assertEquals("T", boxes.outputKotlin("choice", "result"))
+    }
+
+    @Test
     fun `a block linked to nothing goes back to no type`() {
         val alone = StoryGraph(nodes = listOf(StoryNode.Pure("constant", shortfall, mapOf("value" to "x"))))
         val settled = StoryGenericBlocks.settled(alone, state)

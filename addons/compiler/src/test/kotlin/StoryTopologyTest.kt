@@ -374,7 +374,7 @@ class StoryTopologyTest : StageTest() {
                 StoryLink("x", "list", "l", "d"),
             ),
         )
-        assertContains(compile(graph).code, "listOf((1), (2), (3), (emptyList<Any?>()))")
+        assertContains(compile(graph).code, "listOf((1), (2), (3), (emptyList<Nothing>()))")
         val shorter = graph.removeInput("l", 1)
         assertEquals(mapOf("a" to "1", "b" to "3", "c" to "4"), (shorter.node("l") as StoryNode.Pure).arguments)
         assertEquals("c", shorter.links.single { it.from == "x" }.toPin)
