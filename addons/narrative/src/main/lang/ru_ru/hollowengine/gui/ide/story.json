@@ -195,8 +195,6 @@
   "problem.no_variable": "Такой переменной нет",
   "problem.required": "Нужно заполнить",
   "problem.unreachable": "Сюда не приходит ход истории, и эта нода не выполнится",
-  "registry.held": "Из руки",
-  "registry.inventory": "Из инвентаря",
   "registry.looked": "Блок под прицелом",
   "registry.pick": "Выбрать в игре",
   "remove": "Удалить",

@@ -47,7 +47,7 @@ internal fun HollowIdeKeymapDialog(visible: Boolean, onDismiss: () -> Unit) {
     val viewport = LocalUiViewport.current
     Popup(
         anchorBounds = viewport,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "ide-keymap-dialog-popup",
         tags = listOf("dropdown-popup", "ide-keymap-dialog"),
         layer = 100,

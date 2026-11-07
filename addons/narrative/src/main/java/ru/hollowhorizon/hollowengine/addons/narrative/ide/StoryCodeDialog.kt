@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.CenteredOnViewport
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeEditor
@@ -26,7 +25,7 @@ internal fun StoryCodeDialog(state: StoryEditorState, field: StoryCodeField) {
     val expected = StoryInsight.expected(state, field.key)
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "story-code-dialog",
         tags = listOf("dropdown-popup", "story-code-dialog"),
         layer = 100,
@@ -64,7 +63,7 @@ internal fun StoryColorDialog(state: StoryEditorState, field: StoryRowField) {
     var color by remember(field.key) { mutableStateOf(storyColor(field.value)) }
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "story-color-dialog",
         tags = listOf("dropdown-popup", "story-color-dialog"),
         layer = 100,

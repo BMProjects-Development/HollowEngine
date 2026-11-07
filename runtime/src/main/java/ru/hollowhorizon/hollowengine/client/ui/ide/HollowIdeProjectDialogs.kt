@@ -298,7 +298,7 @@ private fun ImportDialog(packaging: HollowIdeProjectPackaging, form: ProjectImpo
 private fun ProjectDialog(id: String, title: String, onDismiss: () -> Unit, content: HollowUiContent) {
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "$id-popup",
         tags = listOf("dropdown-popup", "project-dialog"),
         layer = 100,

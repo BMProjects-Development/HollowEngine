@@ -6,13 +6,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiButtonKind
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
-val CenteredOnViewport = UiPopupAlignment(
-    anchorHorizontal = UiAlign.CENTER,
-    anchorVertical = UiAlign.CENTER,
-    popupHorizontal = UiAlign.CENTER,
-    popupVertical = UiAlign.CENTER,
-)
-
 @Composable
 internal fun HollowIdeHideToolbarDialog(
     visible: Boolean,
@@ -24,7 +17,7 @@ internal fun HollowIdeHideToolbarDialog(
     var doNotShowAgain by remember { mutableStateOf(false) }
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "ide-hide-toolbar-dialog-popup",
         tags = listOf("dropdown-popup", "ide-hide-toolbar-dialog"),
         layer = 100,

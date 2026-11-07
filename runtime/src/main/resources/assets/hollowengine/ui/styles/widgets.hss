@@ -637,3 +637,88 @@
     stroke: $white;
     shadow: 0px 0px 4px 0px alpha($accent, 0.72);
 }
+
+.registry-picker {
+    padding: 8px;
+    gap: 6px;
+    align-items: stretch;
+    background: $bg-raised;
+    border: 1px $border;
+    border-radius: $radius-large;
+    shadow: 0px 6px 16px 0px $shadow;
+}
+
+.registry-picker-title {
+    foreground: $caret;
+    font-size: $font-size-title;
+}
+
+.registry-picker-tabs {
+    gap: 2px;
+}
+
+.registry-picker-tab {
+    padding: 3px 8px;
+    border-radius: $radius;
+    foreground: $text-muted;
+    cursor: hand;
+    transition: background 80ms ease-out;
+}
+
+.registry-picker-tab:hover {
+    background: $bg-hover;
+}
+
+.registry-picker-tab.selected {
+    background: alpha($accent, 0.18);
+    foreground: $text-strong;
+}
+
+.registry-picker-body {
+    gap: 8px;
+}
+
+.registry-picker-list {
+    background: $bg-field;
+    border-radius: $radius;
+    padding: 3px;
+    @apply $thin-scroll;
+}
+
+.registry-picker-row.selected {
+    background: alpha($accent, 0.28);
+}
+
+.registry-picker-empty {
+    grow: 1;
+    align: center center;
+    foreground: $text-faint;
+}
+
+.registry-picker-details {
+    gap: 6px;
+    align-items: stretch;
+}
+
+.block-state-header {
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.block-state-title {
+    foreground: $text-strong;
+}
+
+.block-state-field {
+    width: 100%;
+    gap: 6px;
+}
+
+.block-state-name {
+    grow: 1;
+    foreground: $text-soft;
+}
+
+.block-state-empty {
+    foreground: $text-faint;
+}

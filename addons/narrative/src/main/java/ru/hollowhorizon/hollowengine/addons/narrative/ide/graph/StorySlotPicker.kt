@@ -7,7 +7,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.client.slots.SlotIcons
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.CenteredOnViewport
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
 private const val SLOT_ICON = "hollowengine:textures/gui/icons/box.svg"
@@ -69,7 +68,7 @@ internal fun StorySlotDialog(state: StoryEditorState, field: StoryRowField) {
 
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "story-slot-dialog",
         tags = listOf("dropdown-popup", "story-slot-dialog"),
         layer = 100,

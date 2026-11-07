@@ -195,8 +195,6 @@
   "problem.no_variable": "There is no such variable",
   "problem.required": "Fill this in",
   "problem.unreachable": "The story never gets here, so this node will not run",
-  "registry.held": "From hand",
-  "registry.inventory": "From inventory",
   "registry.looked": "Block looked at",
   "registry.pick": "Pick from the game",
   "remove": "Remove",

@@ -227,6 +227,7 @@ data class UiPopupAlignment(
     companion object {
         val BelowStart = UiPopupAlignment()
         val Cursor = UiPopupAlignment(anchorVertical = UiAlign.START, offsetX = 8f, offsetY = 8f)
+        val Centered = UiPopupAlignment(UiAlign.CENTER, UiAlign.CENTER, UiAlign.CENTER, UiAlign.CENTER)
     }
 }
 

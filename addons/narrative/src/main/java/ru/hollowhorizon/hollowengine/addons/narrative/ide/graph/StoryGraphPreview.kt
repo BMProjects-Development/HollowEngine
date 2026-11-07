@@ -274,7 +274,7 @@ private fun StoryRowView(
         val own = "${box.node.id}-${field?.key}"
         if (field != null && field.picks.isNotEmpty()) PicksButton(controller, own, field)
         if (field != null && field.color) ColorButton(state, own, field)
-        field?.registry?.let { RegistryButton(controller, own, it, field) }
+        field?.registry?.let { RegistryButton(own, it, field) }
         if (field != null && field.slot) SlotButton(state, own, field)
         if (field != null && field.code) CodeEditorButton(
             state,
