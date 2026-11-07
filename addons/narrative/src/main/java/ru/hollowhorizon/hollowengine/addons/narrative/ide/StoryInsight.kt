@@ -19,6 +19,7 @@ internal class StoryFieldColors(val text: String, val highlights: List<UiTextHig
  * @param types what the outputs worked out on the spot are, by node and pin.
  * @param fits by type of value, the types of the places that can hold it, among [places].
  * @param places the types of what links go into that analysis could tell.
+ * @param written the type the compiler reads each type written in the story or by a command as, `Int` as `kotlin.Int`.
  * @param revision moves on with each analysis.
  */
 internal class StoryAnalysis(
@@ -28,13 +29,26 @@ internal class StoryAnalysis(
     val types: Map<Pair<String, String>, String> = emptyMap(),
     val fits: Map<String, Set<String>> = emptyMap(),
     val places: Set<String> = emptySet(),
+    val written: Map<String, String> = emptyMap(),
     val revision: Long = 0L,
 ) {
     /** Whether Kotlin lets a value of the type [from] go into a place of the type [into]; what it has not told, it lets. */
-    fun takes(from: String, into: String): Boolean {
-        val place = StoryPinType.shortName(into)
-        return place !in places || fits[StoryPinType.shortName(from)]?.contains(place) != false
+    fun takes(from: String, into: String): Boolean = fits(from, into) != false
+
+    /**
+     * Whether Kotlin lets a value of the type [from] go into a place of the type [into], subtypes and aliases as it
+     * reads them; null when the analysis has not seen one of the two.
+     */
+    fun fits(from: String, into: String): Boolean? {
+        val place = compiled(into)
+        if (place !in places) return null
+        val value = compiled(from)
+        val taken = fits[value] ?: fits[value.removeSuffix("?")] ?: fits["$value?"] ?: return null
+        return place in taken
     }
+
+    /** [type] as the compiler writes it. */
+    private fun compiled(type: String): String = type.replace("!", "").let { written[it] ?: it }
 }
 
 /**
@@ -50,7 +64,7 @@ internal object StoryInsight {
     private const val BODY_END = "\n}\n"
     private const val TYPE_START = "\nval storyType: "
     private const val TYPE_END = "\n"
-    private val NO_TYPE = setOf("Nothing", "Nothing?")
+    private val NO_TYPE = setOf("kotlin.Nothing", "kotlin.Nothing?")
     private val tokens = kotlinTokenHighlighter { StoryKotlin.syntax(it)?.tokens.orEmpty() }
 
     internal class FieldInsight(val highlighter: UiSyntaxHighlighter, val completions: UiCompletionContributor)
@@ -197,12 +211,14 @@ internal object StoryInsight {
             )
         }
         val properties = found.properties
-        val places = checked.places.filterKeys { it in properties.types }
+        val written = (checked.places + checked.values).entries
+            .mapNotNull { (name, type) -> properties.types[name]?.let { type to it } }.toMap()
+        val places = checked.places.keys.mapNotNullTo(HashSet()) { properties.types[it] }
         val fits = properties.fits.entries.associate { (value, taken) ->
-            StoryPinType.shortName(properties.types.getValue(value)) to taken.mapTo(HashSet()) { places.getValue(it) }
+            properties.types.getValue(value) to taken.mapNotNullTo(HashSet()) { properties.types[it] }
         }
         return StoryAnalysis(
-            checks, fields, colors, types(session, found), fits, places.values.toSet(), session.analysis.revision + 1,
+            checks, fields, colors, types(session, found), fits, places, written, session.analysis.revision + 1,
         )
     }
 
@@ -234,7 +250,7 @@ internal object StoryInsight {
     private fun types(session: Session, found: KotlinFragmentAnalysis): Map<Pair<String, String>, String> {
         val pins = session.checked.pins
         val named = found.properties.types.entries.mapNotNull { (name, type) ->
-            pins[name]?.let { it to StoryPinType.shortName(type) }?.takeUnless { it.second in NO_TYPE }
+            pins[name]?.let { it to type }?.takeUnless { it.second in NO_TYPE }
         }
         return session.analysis.types.filterKeys { it !in pins.values } + named
     }

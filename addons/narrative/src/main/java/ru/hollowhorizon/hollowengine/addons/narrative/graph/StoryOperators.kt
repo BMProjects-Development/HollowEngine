@@ -20,6 +20,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
  * @param generic whether it takes `T`: the type of the first value linked into such an input of the block, which every
  * such pin of the block then carries.
  * @param takesEmpty whether it takes a value that may be missing, `T?`.
+ * @param typeName whether it names a Kotlin type rather than takes a value: it has no pin, and its field goes into
+ * the template as it is written, as in `$value as? $type`.
  */
 data class StoryOperatorInput(
     val name: String,
@@ -29,6 +31,7 @@ data class StoryOperatorInput(
     val path: String = name,
     val generic: Boolean = false,
     val takesEmpty: Boolean = false,
+    val typeName: Boolean = false,
 ) {
     /** What is typed into the field of this input as Kotlin. */
     fun expression(text: String): String =
@@ -46,6 +49,7 @@ data class StoryOperatorInput(
  * @param empty what it reads with none of the inputs of a variadic operator given.
  * @param path where it sits among the sections of the block.
  * @param generic whether it gives `T`, the type the generic inputs of the block take.
+ * @param typeOf the input naming the type it gives, which may be missing.
  */
 data class StoryOperatorOutput(
     val name: String,
@@ -55,6 +59,7 @@ data class StoryOperatorOutput(
     val empty: String? = null,
     val path: String = name,
     val generic: Boolean = false,
+    val typeOf: String? = null,
 )
 
 /**
@@ -177,6 +182,13 @@ object StoryOperators {
         ),
         operator(
             "is-null", "values.logic", listOf(generic("value", empty = true)), out("result", BOOL, "\$value == null"),
+        ),
+        operator(
+            "cast",
+            "values.types",
+            listOf(input("value", ANY), StoryOperatorInput("type", ANY, typeName = true)),
+            out("result", ANY, $$"($value as? $type)").copy(kotlin = "kotlin.Any?", typeOf = "type"),
+            out("is", BOOL, $$"($value is $type)"),
         ),
         operator(
             "equal",

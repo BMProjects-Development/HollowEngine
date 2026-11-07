@@ -57,27 +57,29 @@
     size: $icon $icon;
 }
 
-$section-head: #303237;
-$section-body: #2A2B2F;
+$band: #2B2D33;
+$band-line: #383B43;
+$band-nested: #32353C;
+
+.st-band {
+    background: $band;
+    border: 1px $band-line;
+    border-radius: 6px;
+}
+
+.st-band.nested {
+    background: $band-nested;
+}
 
 .st-section {
     gap: 6px;
     cursor: hand;
-    background: $section-head;
-    border-radius: $radius;
+    border-radius: 6px;
     transition: background 110ms ease-out;
-}
-
-.st-section.open {
-    border-radius: 0px;
 }
 
 .st-section:hover {
     background: $bg-pressed;
-}
-
-.st-nested {
-    background: $section-body;
 }
 
 .st-section-title {

@@ -90,6 +90,9 @@ internal class StoryNodeRow(
 /** A heading of rows that a click on it shows or hides. */
 internal class StoryRowSection(val open: Boolean, val toggle: () -> Unit)
 
+/** The card a section of pins is drawn on, from its heading to its last row, [depth] sections deep. */
+internal class StoryRowBand(val top: Float, val bottom: Float, val depth: Int)
+
 /** Where everything of one node sits, in graph units from the corner of the node. */
 internal class StoryNodeBox(
     val node: StoryNode,
@@ -103,6 +106,7 @@ internal class StoryNodeBox(
     val height: Float,
     val rows: List<StoryNodeRow>,
     val collapsed: Boolean,
+    val bands: List<StoryRowBand> = emptyList(),
 ) {
     val rect: GraphRect get() = GraphRect(x, y, width, height)
 
@@ -176,7 +180,7 @@ internal class StoryNodeLayout(
         val collapsed = node.id in graph.collapsed
         return StoryNodeBox(
             node, titleOf(node), iconOf(node), tagOf(node), colorOf(node), place.x, place.y, width,
-            if (collapsed) GraphNodeMetrics.COLLAPSED else rows.bottom(), rows.result, collapsed,
+            if (collapsed) GraphNodeMetrics.COLLAPSED else rows.bottom(), rows.result, collapsed, rows.bands,
         )
     }
 
@@ -238,6 +242,7 @@ internal class StoryNodeLayout(
         val layout: StoryNodeLayout get() = this@StoryNodeLayout
 
         val result = ArrayList<StoryNodeRow>()
+        val bands = ArrayList<StoryRowBand>()
         private var y = GraphNodeMetrics.HEADER + PADDING
 
         /** Where the heading of the folded section the rows are added in sits, while they are added in one. */
@@ -287,13 +292,16 @@ internal class StoryNodeLayout(
             content: () -> Unit,
         ) {
             val open = key in state.openSections
-            row(label, input, output, section = StoryRowSection(open) { state.toggleSection(key) })
             val outer = foldedAt
+            if (outer == null) y += SECTION_GAP
+            val top = y
+            row(label, input, output, section = StoryRowSection(open) { state.toggleSection(key) })
             if (!open && outer == null) foldedAt = result.last().top
             depth++
             content()
             depth--
             foldedAt = outer
+            if (outer == null) bands += StoryRowBand(top, y, depth)
         }
 
         /**
@@ -444,7 +452,7 @@ internal class StoryNodeLayout(
             is StoryNode.Assign -> {
                 val written = graph.variables.firstOrNull { it.name == node.variable }?.type
                 val type = StoryPinType.ofName(written)
-                val kotlin = written?.let(StoryPinType::shortName)
+                val kotlin = written
                 flow()
                 row(
                     label = storyLang("set.variable"),
@@ -583,7 +591,7 @@ internal class StoryNodeLayout(
             fun pin(param: StoryParam) = StoryPinSpec(
                 param.name,
                 StoryPinType.of(param.type),
-                param.type?.let(StoryKotlinTypes::name)?.let(StoryPinType::shortName),
+                param.type?.let(StoryKotlinTypes::name),
             )
             folded(
                 params,
@@ -624,7 +632,7 @@ internal class StoryNodeLayout(
                 output = StoryPinSpec(
                     StoryPins.VALUE,
                     StoryPinType.ofName(node.returns),
-                    StoryPinType.shortName(node.returns)
+                    node.returns
                 ),
             )
         }
@@ -687,12 +695,13 @@ internal class StoryNodeLayout(
             val inputs = StoryOperators.inputsOf(node).map { input -> generic?.let { input.of(it) } ?: input }
             fun kotlinOf(input: StoryOperatorInput) = when {
                 input.generic && generic != null -> if (input.takesEmpty) "$generic?" else generic
-                else -> input.param?.type?.let(StoryKotlinTypes::name)?.let(StoryPinType::shortName)
+                else -> input.param?.type?.let(StoryKotlinTypes::name)
             }
             folded(
                 inputs.withIndex().toList(),
                 path = { it.value.path },
-                row = { (index, input) ->
+                row = row@{ (index, input) ->
+                    if (input.typeName) return@row typeRow(node, operator, input)
                     val field = inputField(node, input)
                     value(
                         node.id,
@@ -713,7 +722,8 @@ internal class StoryNodeLayout(
             )
             if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             fun pin(output: StoryOperatorOutput): StoryPinSpec {
-                val kotlin = (if (output.generic) generic else null) ?: types[node.id to output.name] ?: output.kotlin
+                val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }
+                val kotlin = (if (output.generic) generic else null) ?: types[node.id to output.name] ?: named ?: output.kotlin
                 return StoryPinSpec(output.name, kotlin?.let(StoryPinType::ofName) ?: output.type, kotlin)
             }
             folded(
@@ -746,6 +756,18 @@ internal class StoryNodeLayout(
             val kind = (StoryPinType.classOf(type) ?: TypeOperators.qualified(type)?.let(StoryPinType::classOf))?.starProjectedType
             val param = kind?.let { StoryParam(name, it, suggestions = StoryCommand.suggestions(it)) }
             return copy(type = StoryPinType.ofName(type), param = param ?: this.param)
+        }
+
+        /** The row of [input] of [node] naming a type: a field with the types in reach, and no pin. */
+        private fun typeRow(node: StoryNode.Pure, operator: StoryOperator, input: StoryOperatorInput) {
+            val written = node.arguments[input.name].orEmpty()
+            val field = StoryRowField(input.name, written, TYPE_HINT, typeName = true) { typed ->
+                edit(node.id, input.name) { each ->
+                    each as StoryNode.Pure
+                    each.copy(arguments = if (typed.isBlank()) each.arguments - input.name else each.arguments + (input.name to typed))
+                }
+            }
+            row(StoryCatalog.operatorInputTitle(operator, input), field = field, hint = StoryCatalog.operatorInputHint(operator, input))
         }
 
         /** The field of [input] of [node]: written as the parameter it passes is, when it passes one. */
@@ -783,7 +805,9 @@ internal class StoryNodeLayout(
     private companion object {
         val ENTITIES = setOf(StoryPinType.ENTITY, StoryPinType.PLAYER, StoryPinType.NPC)
         const val CLIP_CHARS = "._-:|/"
+        const val TYPE_HINT = "NpcEntity"
         const val PADDING = 6f
+        const val SECTION_GAP = 4f
         const val WIDE = 264f
         const val CODE_WIDTH = 320f
         const val LINE = 12f

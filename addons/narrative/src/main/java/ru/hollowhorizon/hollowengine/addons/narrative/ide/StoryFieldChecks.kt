@@ -35,6 +35,7 @@ internal class StoryCheckScript(
     private val left: Map<StoryFieldKey, StoryFieldFrame>,
     val pins: Map<String, Pair<String, String>>,
     val places: Map<String, String>,
+    val values: Map<String, String>,
 ) {
     private val byField = spans.associateBy { it.field }
 
@@ -67,6 +68,10 @@ internal object StoryFieldChecks {
         val declared = type?.let { ": $it" }.orEmpty()
         return Entry(StoryFieldKey(owner, key), type, code, StoryFieldFrame("val storyValue$declared = (\n", VALUE_END))
     }
+
+    /** A field naming a type, checked as the type of a cast. */
+    private fun typeField(owner: String, key: String, code: String) =
+        Entry(StoryFieldKey(owner, key), null, code, StoryFieldFrame("val storyValue = (null as ", "?)"))
 
     /** Kotlin with [locals] in reach; what it leaves in the variables [outputs] is read after it, as the outputs of its node are. */
     private fun block(owner: String, key: String, code: String, locals: String, outputs: Set<String>): Entry {
@@ -112,6 +117,7 @@ internal object StoryFieldChecks {
                 .map { value(node.id, it.name, it.type, node.values[it.name].orEmpty()) }
 
             is StoryNode.Pure -> StoryOperators.inputsOf(node).filter { free(it.name) }.map { input ->
+                if (input.typeName) return@map typeField(node.id, input.name, node.arguments[input.name].orEmpty())
                 val type =
                     if (input.type == StoryPinType.NUMBER) "Number" else input.type.type?.let(StoryKotlinTypes::name)
                 value(node.id, input.name, type, node.arguments[input.name].orEmpty())
@@ -188,15 +194,15 @@ internal object StoryFieldChecks {
         wanted.entries.joinTo(text, "", "\n\nsuspend fun storyPlaces() {\n", "}") { (name, type) ->
             "val $name: $type = (null as $type)\n"
         }
-        values(plain).withIndex().joinTo(text, "", "\n\nsuspend fun storyValues() {\n", "}") { (index, type) ->
-            "val ${PIN}Value$index: $type = (null as $type)\n"
+        val given = values(plain).withIndex().associate { (index, type) -> "${PIN}Value$index" to type }
+        given.entries.joinTo(text, "", "\n\nsuspend fun storyValues() {\n", "}") { (name, type) ->
+            "val $name: $type = (null as $type)\n"
         }
-        val placed = wanted.mapValues { StoryPinType.shortName(it.value) }
         val frames = left.associate { entry ->
             val locals = owners[entry.field.owner]?.params.orEmpty()
                 .joinToString("") { "val ${it.name}: ${it.type} = TODO()\n" }
             entry.field to StoryFieldFrame(locals + entry.frame.before, entry.frame.after)
         }
-        return StoryCheckScript(text.toString(), length, spans, frames, pins, placed)
+        return StoryCheckScript(text.toString(), length, spans, frames, pins, wanted, given)
     }
 }

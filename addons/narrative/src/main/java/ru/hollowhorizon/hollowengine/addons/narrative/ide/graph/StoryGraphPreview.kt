@@ -202,7 +202,10 @@ private fun StoryNodeView(
         GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning, open) {
             state.change { copy(collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id) }
         }
-        if (!box.collapsed) box.rows.filterNot { it.hidden }.forEach { row -> StoryRowView(controller, state, box, row) }
+        if (!box.collapsed) {
+            box.bands.forEach { band -> SectionBand(box, band) }
+            box.rows.filterNot { it.hidden }.forEach { row -> StoryRowView(controller, state, box, row) }
+        }
         box.shownPins.forEach { pin ->
             GraphPinView(
                 controller, pin, box.x, box.y, boxes.isLinked(pin), listOf(boxes.typeOf(pin).tag()), boxes.tooltip(pin),
@@ -222,7 +225,7 @@ private fun StoryRowView(
     row.section?.let { return SectionRowView(box, row, it) }
     val readOnly = state.context?.readOnly == true
     Row(
-        tags = listOfNotNull("gn-node-row", "st-nested".takeIf { row.depth > 0 }),
+        tags = listOf("gn-node-row"),
         modifier = Modifier.rowPlace(box, row).alignItems(vertical = UiAlign.CENTER),
     ) {
         val field = row.field
@@ -330,7 +333,7 @@ private fun StoryRowView(
 private fun SectionRowView(box: StoryNodeBox, row: StoryNodeRow, section: StoryRowSection) {
     Row(
         id = "st-section-${box.node.id}-${row.top}",
-        tags = listOfNotNull("gn-node-row", "st-section", "open".takeIf { section.open }),
+        tags = listOf("gn-node-row", "st-section"),
         modifier = Modifier.rowPlace(box, row).alignItems(vertical = UiAlign.CENTER)
             .input(hoverable = true, clickable = true).onPress { event ->
                 if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) section.toggle()
@@ -342,6 +345,17 @@ private fun SectionRowView(box: StoryNodeBox, row: StoryNodeRow, section: StoryR
     }
 }
 
+/** The card of a section of pins, behind its heading and rows. */
+@Composable
+private fun SectionBand(box: StoryNodeBox, band: StoryRowBand) {
+    val inset = SECTION_BAND + band.depth * SECTION_INDENT
+    Box(
+        tags = listOfNotNull("st-band", "nested".takeIf { band.depth > 0 }),
+        modifier = Modifier.position(inset.px, band.top.px)
+            .size((box.width - inset - SECTION_BAND).px, (band.bottom - band.top).px).inputTransparent(),
+    )
+}
+
 /**
  * Where [row] of [box] sits: across the node, and inside a section on a band set in from its edges, its content
  * indented by how deep the section is.
@@ -350,8 +364,9 @@ private fun Modifier.rowPlace(box: StoryNodeBox, row: StoryNodeRow): Modifier {
     if (row.depth == 0 && row.section == null) {
         return position(0.px, row.top.px).size(box.width.px, row.height.px).padding(GraphNodeMetrics.INSET.px, 0.px)
     }
-    val inset = GraphNodeMetrics.INSET - SECTION_BAND + row.depth * SECTION_INDENT
-    return position(SECTION_BAND.px, row.top.px).size((box.width - 2 * SECTION_BAND).px, row.height.px)
+    val shift = SECTION_BAND + (row.depth - if (row.section != null) 0 else 1).coerceAtLeast(0) * SECTION_INDENT
+    val inset = GraphNodeMetrics.INSET - SECTION_BAND + if (row.section == null) SECTION_INDENT else 0f
+    return position(shift.px, row.top.px).size((box.width - shift - SECTION_BAND).px, row.height.px)
         .padding(inset.px, 0.px, (GraphNodeMetrics.INSET - SECTION_BAND).px, 0.px)
 }
 

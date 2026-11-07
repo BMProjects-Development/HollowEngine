@@ -97,7 +97,7 @@ internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditor
     }
 
     fun tooltip(pin: GraphPin): String {
-        val type = kotlinOf(pin) ?: when (val type = typeOf(pin)) {
+        val type = kotlinOf(pin)?.let(StoryPinType::shortName) ?: when (val type = typeOf(pin)) {
             StoryPinType.FLOW -> storyLang("pin.flow")
             StoryPinType.ANY, StoryPinType.OBJECT -> storyLang("pin.any")
             else -> type.label
@@ -208,11 +208,13 @@ internal class StoryGraphEditorModel(
     /** Whether a link can go from [output] to [input], whichever way it gets made. */
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
         val type = typeOf(output)
+        val from = layout.kotlinOf(output)
+        val to = layout.kotlinOf(input)
+        val analysis = StoryInsight.analysis(state, state.root() ?: graph)
+        if (!type.converts && from != null && to != null) analysis.fits(from, to)?.let { return it }
         if (!type.fits(typeOf(input))) return false
-        if (type.converts) return true
-        val from = layout.kotlinOf(output) ?: return true
-        val to = layout.kotlinOf(input) ?: return true
-        return StoryInsight.analysis(state, state.root() ?: graph).takes(from, to)
+        if (type.converts || from == null || to == null) return true
+        return analysis.takes(from, to)
     }
 
     override fun pinTooltip(pin: GraphPin): String = layout.tooltip(pin)
@@ -317,6 +319,7 @@ internal class StoryGraphEditorModel(
      */
     private fun valueItems(pending: GraphPendingLink, type: StoryPinType, add: (StoryNode) -> Unit): List<UiDropdownItem> {
         val carried = pinOf(pending)?.let(layout::kotlinOf)
+        val analysis = StoryInsight.analysis(state, state.root() ?: graph)
 
         // An object fits only a pin of its own class or, carried out, of one it is of; an untyped pin fits anything.
         fun fits(other: StoryPinType, kotlin: String?): Boolean {
@@ -324,6 +327,7 @@ internal class StoryGraphEditorModel(
             if (!fitting) return false
             if (type != StoryPinType.OBJECT || other != StoryPinType.OBJECT || carried == null || kotlin == null) return true
             val (from, to) = if (pending.fromOutput) carried to kotlin else kotlin to carried
+            analysis.fits(from, to)?.let { return it }
             val value = StoryPinType.classOf(from)
             val place = StoryPinType.classOf(to)
             if (value != null && place != null) return value.isSubclassOf(place)

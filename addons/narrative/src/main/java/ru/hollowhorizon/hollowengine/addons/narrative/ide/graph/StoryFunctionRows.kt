@@ -14,7 +14,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
 /** The pin of [value], typed as it is declared. */
 private fun pinOf(value: StoryTypedName) =
-    StoryPinSpec(value.name, StoryPinType.ofName(value.type), StoryPinType.shortName(value.type))
+    StoryPinSpec(value.name, StoryPinType.ofName(value.type), value.type)
 
 /** The function [node] belongs to, which sits in the story around the body the editor shows. */
 private fun StoryNodeLayout.Rows.ownerOf(node: StoryNode): StoryNode.Function? =

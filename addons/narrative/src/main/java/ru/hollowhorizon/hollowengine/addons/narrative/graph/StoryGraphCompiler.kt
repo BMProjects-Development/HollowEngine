@@ -849,8 +849,17 @@ class StoryGraphCompiler private constructor(
         return OPERATOR_INPUT.replace(template) { match ->
             val name = match.groupValues[1]
             val input = inputs.first { it.name == name }
+            if (input.typeName) return@replace typeName(node, name)
             "(${argument(node.id, name, node.arguments[name] ?: input.default, input.type == StoryPinType.ANY)})"
         }
+    }
+
+    /** The Kotlin type the field [name] of [node] names, as it is written. */
+    private fun typeName(node: StoryNode.Pure, name: String): String {
+        val written = node.arguments[name].orEmpty().trim()
+        if (TYPE_NAME.matches(written)) return written
+        problem(node.id, "no_type_name", "Write the Kotlin type to work with", name)
+        return "Nothing"
     }
 
     private fun givesEmpty(node: StoryNode.Pure, pin: String): Boolean =
@@ -1032,6 +1041,9 @@ class StoryGraphCompiler private constructor(
 
         /** [text] as a Kotlin string literal. */
         fun literal(text: String): String = "\"${escape(text)}\""
+
+        /** A name of a type: dotted, with type arguments and a question mark, as Kotlin writes it in `as`. */
+        private val TYPE_NAME = Regex("""[A-Za-z_][\w.]*(<[\w.<>, ?*]*>)?\??""")
 
         private fun escape(text: String): String = buildString {
             text.forEach { char ->

@@ -109,6 +109,16 @@ class StoryValueNodesTest {
     }
 
     @Test
+    fun `a value is cast to the type its field names`() {
+        val cast = read(StoryNode.Pure("c", "cast", mapOf("value" to "who", "type" to "NpcEntity")), "result")
+        assertEquals(emptyList(), cast.problems)
+        assertContains(cast.code, "((who) as? NpcEntity)")
+
+        val unnamed = read(StoryNode.Pure("c", "cast", mapOf("value" to "who")), "is")
+        assertEquals(listOf("no_type_name"), unnamed.problems.map { it.key })
+    }
+
+    @Test
     fun `the journal keeps a compound tag a command takes`() {
         val serializer = StoryValues.serializer(typeOf<CompoundTag>())
         val tag = CompoundTag().apply { putInt("a", 1) }
