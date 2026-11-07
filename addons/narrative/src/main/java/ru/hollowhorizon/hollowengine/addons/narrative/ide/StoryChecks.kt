@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryChecks.variable
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
-import kotlin.time.Duration
 
 /** Something wrong with the node [node], or with the story as a whole when it is null. [warning] lets the story run all the same. */
 internal class StoryCheck(val node: String?, val message: String, val warning: Boolean = false)
@@ -31,7 +30,6 @@ internal object StoryChecks {
         val kind = type?.classifier as? KClass<*> ?: return null
         if (shown.startsWith("{")) return null
         return when {
-            kind == Duration::class -> if (isDuration(shown)) null else problem("duration")
             kind == ResourceLocation::class || kind == ServerLevel::class -> if (LOCATION.matches(shown)) null else problem(
                 "location"
             )
@@ -41,8 +39,6 @@ internal object StoryChecks {
     }
 
     private fun isNumber(text: String) = text.toDoubleOrNull() != null && !text.endsWith('.')
-
-    private fun isDuration(text: String) = isNumber(text) || runCatching { Duration.parse(text) }.isSuccess
 
     /** What the parser finds wrong with the Kotlin [text]. */
     fun code(text: String): String? = if (StoryKotlin.syntax(text)?.valid == false) problem("code") else null

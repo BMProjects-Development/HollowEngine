@@ -11,12 +11,13 @@ class StageValueClassTest : StageTest() {
             import ru.hollowhorizon.hollowengine.addons.narrative.scene.commands.*
             import ru.hollowhorizon.hollowengine.addons.narrative.story.*
             import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+            import ru.hollowhorizon.hollowengine.common.time.sec
 
             var npc by saved<NpcEntity?>(null)
 
             @State
             suspend fun main() {
-                if ("yes".length == 2) (npc!!).lookAt(duration = duration("2"), target = storyPlayer())
+                if ("yes".length == 2) (npc!!).lookAt(duration = 2.sec, target = storyPlayer())
                 log("done")
             }
         """)

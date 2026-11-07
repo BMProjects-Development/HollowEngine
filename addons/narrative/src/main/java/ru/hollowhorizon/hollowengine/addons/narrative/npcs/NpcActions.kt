@@ -18,11 +18,11 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
 import ru.hollowhorizon.hollowengine.common.npcs.actions.Preempted
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.*
 import ru.hollowhorizon.hollowengine.common.npcs.registry.ref
+import ru.hollowhorizon.hollowengine.common.time.sec
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import kotlin.math.atan2
 import kotlin.math.sqrt
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Moves the NPC toward [target] until it is within [MoveOptions.arrivalDistance], following it while it moves.
@@ -312,4 +312,4 @@ internal class NpcRotation(val body: Float, val head: Float, val pitch: Float) {
     }
 }
 
-internal val DEFAULT_LOOK_DURATION = 1500.milliseconds
+internal val DEFAULT_LOOK_DURATION = 1.5.sec

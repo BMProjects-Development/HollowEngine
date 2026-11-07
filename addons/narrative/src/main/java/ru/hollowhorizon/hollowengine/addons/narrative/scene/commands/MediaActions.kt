@@ -14,11 +14,10 @@ import ru.hollowhorizon.hollowengine.common.scripting.story.functions.effects.pl
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.effects.stopSound
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.effects.updateSound
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities.*
+import ru.hollowhorizon.hollowengine.common.time.TICK
 import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
 import ru.hollowhorizon.hollowengine.common.vfx.VfxHandle
-import kotlin.time.Duration.Companion.milliseconds
 
-private const val TICK_MILLIS = 50L
 
 /** The effects a story started by name, for a node to stop them later: a handle cannot be saved with the story. */
 private val namedVfx = HashMap<String, VfxHandle>()
@@ -108,4 +107,4 @@ fun Entity.endAllAnimations() = stopAllAnimations()
 
 @EditorCategory(StoryCategory.WAIT)
 @SimpleAction("next-tick")
-suspend fun nextTick() = delay(TICK_MILLIS.milliseconds)
+suspend fun nextTick() = delay(TICK)

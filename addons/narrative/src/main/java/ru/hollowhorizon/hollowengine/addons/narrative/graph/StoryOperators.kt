@@ -211,7 +211,7 @@ object StoryOperators {
         operator(
             "select",
             "values.logic",
-            listOf(input("condition", BOOL, "false"), generic("then", "0"), generic("else", "0")),
+            listOf(input("condition", BOOL, "false"), generic("then"), generic("else")),
             outOf("result", $$"if ($condition) $then else $else"),
         ),
 

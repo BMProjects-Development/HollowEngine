@@ -21,7 +21,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveResult
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.faceTowards
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.rotate
-import kotlin.time.Duration.Companion.milliseconds
+import ru.hollowhorizon.hollowengine.common.time.TICK
 
 /**
  * Forces an NPC to use a block at the specified position.
@@ -140,7 +140,7 @@ private suspend fun NpcEntity.destroyBlockReaching(pos: Vec3, reach: Double, req
                 )
                 break
             }
-            delay(TICK_DURATION)
+            delay(TICK)
         }
         return level().getBlockState(blockPos).isAir
     } finally {
@@ -207,5 +207,4 @@ private fun NpcEntity.syncFakePlayer() {
     }
 }
 
-private val TICK_DURATION = 50.milliseconds
 private const val DEFAULT_INTERACTION_REACH = 3.0

@@ -4,6 +4,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.graph
 object StoryGenerics {
     private val PARAMETER = Regex("\\bT\\b")
     private val NOTHING = Regex("\\bNothing\\b")
+    private const val INTERSECTION = '&'
 
     fun shaped(shape: String, type: String): String = shape.replace(PARAMETER, type)
 
@@ -24,5 +25,5 @@ object StoryGenerics {
 
     fun isKnown(type: String): Boolean =
         type.isNotEmpty() && type.substringAfterLast('.') != "Any" && !NOTHING.containsMatchIn(type) &&
-            !PARAMETER.containsMatchIn(type)
+            !PARAMETER.containsMatchIn(type) && INTERSECTION !in type
 }

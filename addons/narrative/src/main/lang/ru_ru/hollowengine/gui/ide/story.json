@@ -150,7 +150,6 @@
   "problem.animation_unknown": "У этой модели нет анимации «%s»",
   "problem.bool": "Нужно true, false или выражение",
   "problem.code": "Выражение не закончено: проверьте скобки и кавычки",
-  "problem.duration": "Нужна длительность: 500 (мс), 2s или 1m",
   "problem.empty_text": "Реплика пуста",
   "problem.graph.bad_function": "«%s» не годится как имя функции",
   "problem.graph.bad_id": "В id ноды допустимы только буквы, цифры и _",

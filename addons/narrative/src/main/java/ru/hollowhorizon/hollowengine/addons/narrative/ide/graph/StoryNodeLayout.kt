@@ -759,18 +759,22 @@ internal class StoryNodeLayout(
         }
 
         /**
-         * The type `T` the generic pins of [operator] carry in [node]: that of the first value linked into one of them,
-         * never missing, since one that may be is what such a pin takes as `T?`.
+         * The type `T` the generic pins of [operator] carry in [node], never missing, since one that may be is what
+         * such a pin takes as `T?`.
          */
         private fun genericOf(node: StoryNode.Pure, operator: StoryOperator): String? {
+            val generics = operator.outputs.asSequence().filter { it.generic }
             val given = StoryOperators.inputsOf(node).asSequence().filter { it.generic }.mapNotNull { input ->
                 graph.links.firstOrNull { it.to == node.id && it.toPin == input.name }?.let { sources(it.from, it.fromPin) }
             }
-            val taken = operator.outputs.asSequence().filter { it.generic }.flatMap { output ->
+            val typed = generics.mapNotNull { output ->
+                types[node.id to output.name]?.let { StoryGenerics.elementOf(output.shape, it) }
+            }
+            val taken = generics.flatMap { output ->
                 graph.links.asSequence().filter { it.from == node.id && it.fromPin == output.name }
                     .mapNotNull { link -> consumers(link.to, link.toPin)?.let { StoryGenerics.elementOf(output.shape, it) } }
             }
-            return (given + taken).map { it.removeSuffix("?") }.firstOrNull(StoryGenerics::isKnown)
+            return (given + typed + taken).map { it.removeSuffix("?") }.firstOrNull(StoryGenerics::isKnown)
         }
 
         /** A generic input as one of [type]: of its pin type, and with the field a parameter of the type has. */

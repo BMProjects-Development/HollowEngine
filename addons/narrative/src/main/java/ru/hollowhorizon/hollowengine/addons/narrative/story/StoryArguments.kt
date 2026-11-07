@@ -10,13 +10,8 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
 import ru.hollowhorizon.hollowengine.addons.narrative.speech.audience
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /** What the fields of a story card compile to: values written the way a writer types them. */
-
-/** `1.5s`, `500ms`, or a bare number of milliseconds. */
-fun duration(text: String): Duration = text.toDoubleOrNull()?.milliseconds ?: Duration.parse(text)
 
 fun vec(x: Number, y: Number, z: Number) = Vec3(x.toDouble(), y.toDouble(), z.toDouble())
 

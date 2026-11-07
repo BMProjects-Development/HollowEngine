@@ -8,13 +8,11 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryLiterals.seconds
 import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubclassOf
-import kotlin.time.Duration
 
 /**
  * Values as the fields of a card show them and as Kotlin writes them. A field holds a plain value of its type, or
@@ -44,7 +42,6 @@ object StoryLiterals {
         if (name?.trim()?.endsWith("?") == true) "null" else zero(StoryFieldForm.typeNamed(name))
 
     private val CALL = Regex("""^(\w+)\((.*)\)$""")
-    private const val SECONDS = "s"
     const val POSITION = "pos"
     const val BLOCK = "blockPos"
     private const val ITEM = "itemOf"
@@ -66,7 +63,6 @@ object StoryLiterals {
             kind == Float::class -> numeric(typed, "f")
             kind == Short::class -> numeric(typed, ".toShort()")
             kind == Byte::class -> numeric(typed, ".toByte()")
-            kind == Duration::class -> call("duration", typed)
             kind == ResourceLocation::class -> call("location", typed)
             kind == ServerLevel::class -> call("dimension", typed)
             kind == Vec3::class -> "vec(${numbers(typed)})"
@@ -177,17 +173,14 @@ object StoryLiterals {
         }
     }
 
-    /** A number of [seconds] as a field of a duration shows it. */
-    fun seconds(seconds: Float): String = seconds.toString().removeSuffix(".0") + SECONDS
-
     private const val RAW = "\"\"\""
 
     /** Types a field takes plain text for. */
     private val TEXTS = setOf(String::class, CharSequence::class, Any::class)
 
-    /** Types whose fields are written through a helper function, such as `duration("2s")`. */
+    /** Types whose fields are written through a helper function, such as `location("minecraft:stone")`. */
     private val HELPED = setOf(
-        Duration::class, ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class, ItemStack::class,
+        ResourceLocation::class, ServerLevel::class, Vec3::class, BlockPos::class, ItemStack::class,
         BlockState::class, StoryItemFilter::class,
     )
 }

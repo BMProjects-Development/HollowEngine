@@ -21,6 +21,7 @@ class StoryGenericsTest {
         assertFalse(StoryGenerics.isKnown("kotlin.Any"))
         assertFalse(StoryGenerics.isKnown("List<Nothing>"))
         assertFalse(StoryGenerics.isKnown("List<T>"))
+        assertFalse(StoryGenerics.isKnown("kotlin.Comparable<*> & java.io.Serializable"))
         assertEquals("List<Int>", StoryGenerics.shaped("List<T>", "Int"))
     }
 }

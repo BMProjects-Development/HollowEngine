@@ -11,8 +11,9 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRegistry
 import ru.hollowhorizon.hollowengine.common.data.data
+import ru.hollowhorizon.hollowengine.common.time.inWholeTicks
+import ru.hollowhorizon.hollowengine.common.time.sec
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 /** Moves [who] to [pos]. Undone, it is back where it stood, facing as it faced. */
 @EditorCategory(StoryCategory.POSITION)
@@ -72,7 +73,7 @@ fun LivingEntity.damage(amount: Double) {
 @Action("effect")
 suspend fun LivingEntity.giveEffect(
     @EditorRegistry(EFFECTS) effect: ResourceLocation,
-    time: Duration = 10.seconds,
+    time: Duration = 10.sec,
     amplifier: Int = 0,
     particles: Boolean = true,
 ) = action(this, effect, time, amplifier, particles) {
@@ -84,7 +85,7 @@ suspend fun LivingEntity.giveEffect(
     }
     perform {
         val ticks =
-            if (time.isInfinite()) MobEffectInstance.INFINITE_DURATION else time.inWholeMilliseconds.toInt() / MILLIS_PER_TICK
+            if (time.isInfinite()) MobEffectInstance.INFINITE_DURATION else time.inWholeTicks.toInt()
         removeEffect(holder)
         addEffect(MobEffectInstance(holder, ticks, amplifier, false, particles))
     }
@@ -103,10 +104,10 @@ suspend fun LivingEntity.takeEffect(@EditorRegistry(EFFECTS) effect: ResourceLoc
 /** Sets [this] on fire for [time]; no time puts the fire out. Undone, it burns as long as it burned before. */
 @EditorCategory(StoryCategory.FIRE)
 @Action("ignite")
-suspend fun Entity.ignite(time: Duration = 5.seconds) = action(this, time) {
+suspend fun Entity.ignite(time: Duration = 5.sec) = action(this, time) {
     val before = capture { remainingFireTicks }
     undo { remainingFireTicks = before }
-    perform { remainingFireTicks = time.inWholeMilliseconds.toInt() / MILLIS_PER_TICK }
+    perform { remainingFireTicks = time.inWholeTicks.toInt() }
 }
 
 /** Sets the base value of the attribute [attribute] of [this]. Undone, it has the base value it had. */
@@ -144,7 +145,6 @@ suspend fun Entity.removeData(key: String) = action(this, key) {
     perform { data.remove(rawKey(key)) }
 }
 
-private const val MILLIS_PER_TICK = 50
 private const val MAX_PITCH = 90f
 private const val HELD = "value"
 

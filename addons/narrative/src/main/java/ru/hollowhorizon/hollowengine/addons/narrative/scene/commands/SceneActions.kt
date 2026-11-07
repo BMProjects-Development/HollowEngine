@@ -19,6 +19,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
+import ru.hollowhorizon.hollowengine.common.time.ms
 
 /** `@wait 2s`. A restart in the middle waits only for what was left: the deadline is kept with the call. */
 @EditorCategory(StoryCategory.WAIT)
@@ -75,5 +76,5 @@ fun Entity.stopAnimating(@EditorAnimation animation: String, fade: Duration = DE
 
 private val Duration.seconds: Double get() = inWholeMilliseconds / 1000.0
 
-private val DEFAULT_FADE = 330.milliseconds
+private val DEFAULT_FADE = 330.ms
 private const val MAX_SLEEP_MILLIS = 1_000L

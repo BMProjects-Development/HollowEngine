@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.speech.StoryAudience
 import ru.hollowhorizon.hollowengine.addons.narrative.story.*
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
+import ru.hollowhorizon.hollowengine.common.time.sec
 import ru.hollowhorizon.hollowengine.common.ui.hud.EngineHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.hud.VanillaHudLayers
 import ru.hollowhorizon.hollowengine.common.ui.net.hiddenHudLayers
@@ -20,7 +21,6 @@ import ru.hollowhorizon.hollowengine.common.ui.net.showAllHudLayers
 import java.util.UUID
 import java.util.WeakHashMap
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 
@@ -195,7 +195,7 @@ private fun parseColor(color: String): Int = color.removePrefix("#").toIntOrNull
 
 private val ALL_LAYERS: Set<ResourceLocation> get() = (VanillaHudLayers.all + EngineHudLayers.all).toSet()
 
-private val DEFAULT_FADE = 500.milliseconds
-private val DEFAULT_CAMERA = 1_000.milliseconds
+private val DEFAULT_FADE = 0.5.sec
+private val DEFAULT_CAMERA = 1.sec
 private const val DEFAULT_FOV = 70f
 private const val BLACK = "#000000"

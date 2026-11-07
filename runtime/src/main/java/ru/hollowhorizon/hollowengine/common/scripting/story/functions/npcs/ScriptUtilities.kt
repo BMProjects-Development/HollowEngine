@@ -14,16 +14,14 @@ import ru.hollowhorizon.hollowengine.common.utils.currentServerOrNull
 import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.plus
 import java.util.UUID
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
 
 /**
- * Pauses the coroutine for the specified number of ticks.
+ * Pauses the coroutine for [time], such as `1.sec` or `10.ticks`.
  *
- * @param time The number of ticks to delay.
+ * @param time how long to wait.
  */
-suspend fun wait(time: Int) {
-    delay((time * 50L).milliseconds)
-}
+suspend fun wait(time: Duration) = delay(time)
 
 fun uuid(uuid: String): UUID = UUID.fromString(uuid)
 
@@ -54,19 +52,6 @@ fun item(item: String, count: Int = 1, components: DataComponentPatch): ItemStac
         applyComponents(components)
     }
 }
-
-/**
- * A getter variable that converts seconds to ticks.
- *
- * @param this The number to be converted from ticks to seconds
- * @template
- * ```node.kts
- * 10.sec // Converts 10 seconds to ticks (10 * 20 = 200)
- * ```
- */
-val Int.sec get() = this * 20
-
-val Double.sec get() = (this * 20).toInt()
 
 /**
  * Makes an NPC "say" the text by sending a message to all players on the server.

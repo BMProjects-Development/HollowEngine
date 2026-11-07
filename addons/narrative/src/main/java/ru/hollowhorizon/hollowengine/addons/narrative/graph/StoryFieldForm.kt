@@ -6,6 +6,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.starProjectedType
+import kotlin.time.Duration
 
 
 sealed interface StoryFieldForm {
@@ -84,7 +85,7 @@ sealed interface StoryFieldForm {
                 kind == Vec3::class -> Vector(StoryLiterals.POSITION)
                 kind == BlockPos::class -> Vector(StoryLiterals.BLOCK)
                 kind.java.isEnum -> Constant(kind)
-                kind == Any::class || kind.isSubclassOf(Iterable::class) || kind.isSubclassOf(Map::class) -> Code
+                kind == Duration::class || kind == Any::class || kind.isSubclassOf(Iterable::class) || kind.isSubclassOf(Map::class) -> Code
                 else -> Literal
             }
         }

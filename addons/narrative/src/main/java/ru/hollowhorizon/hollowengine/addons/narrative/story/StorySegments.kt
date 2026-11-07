@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import kotlinx.coroutines.delay
 import kotlinx.serialization.KSerializer
 import net.minecraft.nbt.CompoundTag
+import ru.hollowhorizon.hollowengine.common.time.TICK
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import java.lang.Math.addExact
 import java.time.Instant
@@ -122,4 +123,3 @@ private const val REMEMBERED = "remembered"
 private const val GAME_TIME = "game"
 private const val REAL_TIME = "real"
 private const val MAX_REALTIME_SLEEP_MILLIS = 60_000L
-private val TICK = 50.milliseconds

@@ -28,8 +28,3 @@ class NodeBinding(
 ) {
     internal var fingerprint: ScriptFingerprint.Fingerprint? = null
 }
-
-@JvmInline
-value class Ticks(val count: Int)
-
-val Int.ticks: Ticks get() = Ticks(this)

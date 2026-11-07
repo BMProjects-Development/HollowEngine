@@ -18,9 +18,9 @@ import ru.hollowhorizon.hollowengine.common.entities.setNameplate
 import ru.hollowhorizon.hollowengine.common.npcs.navigation.MoveOptions
 import ru.hollowhorizon.hollowengine.common.npcs.registry.npcs
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.npcs.despawn
+import ru.hollowhorizon.hollowengine.common.time.sec
 import ru.hollowhorizon.hollowengine.common.utils.currentServer
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 @EditorCategory(StoryCategory.NPC)
 @SimpleAction("spawn-npc")
@@ -57,12 +57,12 @@ fun NpcEntity.beginFollowing(target: Entity, options: MoveOptions = MoveOptions(
 
 @EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-looking")
-fun NpcEntity.beginLooking(pos: Vec3, duration: Duration = 1.seconds, maxAngularSpeed: Float = 360f) {
+fun NpcEntity.beginLooking(pos: Vec3, duration: Duration = 1.sec, maxAngularSpeed: Float = 360f) {
     startLookingAt(pos, duration, maxAngularSpeed)
 }
 
 @EditorCategory(StoryCategory.NAVIGATION)
 @SimpleAction("start-watching")
-fun NpcEntity.beginWatching(target: Entity, duration: Duration = 1.seconds, maxAngularSpeed: Float = 360f) {
+fun NpcEntity.beginWatching(target: Entity, duration: Duration = 1.sec, maxAngularSpeed: Float = 360f) {
     startLookingAt(with(server ?: currentServer) { target.entityRef }, duration, maxAngularSpeed)
 }

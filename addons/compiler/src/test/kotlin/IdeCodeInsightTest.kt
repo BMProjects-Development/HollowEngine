@@ -189,7 +189,7 @@ class IdeCodeInsightTest {
             if (name == "onUpdate") {
                 assertTrue(declaration.startsWith("cfr_renamed_"), declaration)
                 assertTrue(
-                    "NodeScript" in declaration && "int" in declaration && "Function2" in declaration, declaration
+                    "NodeScript" in declaration && "long every" in declaration && "Function2" in declaration, declaration
                 )
                 assertFalse("\$default" in declaration, declaration)
             } else assertTrue(declaration.startsWith("$name("), declaration)

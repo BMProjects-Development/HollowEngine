@@ -18,8 +18,8 @@ import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractE
 import ru.hollowhorizon.hollowengine.common.events.factory.await
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.Key
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.waitKey
+import ru.hollowhorizon.hollowengine.common.time.TICK
 import java.lang.reflect.Modifier
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Waits until [this] presses [key], such as `e`, `space` or `left-shift`, and returns the key pressed; with no key
@@ -117,4 +117,3 @@ object KeyNames : SuggestionSource {
     fun name(code: Int): String = names[code] ?: code.toString()
 }
 
-private val TICK = 50.milliseconds
