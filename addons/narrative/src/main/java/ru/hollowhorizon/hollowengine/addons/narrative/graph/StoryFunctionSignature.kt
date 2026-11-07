@@ -16,52 +16,36 @@ data class StoryParamGroup(
     val typed: String? = null,
 )
 
-enum class StoryParamMeaning {
-    /** A clip of the model of the entity the call is made on. */
-    ANIMATION,
-
-    /** The model of the entity the call gives back. */
-    MODEL,
-
-    /** The author's id of the NPC the call gives back. */
-    NPC_ID,
-}
-
 /**
  * One parameter of a command as the editors fill it.
  *
  * @param type its Kotlin type, which says how a value typed into a field is written in Kotlin.
  * @param optional whether the call can leave it out.
- * @param suggestions the values it takes, when they are a known set; nothing checks against them.
  * @param title what the editor calls it instead of [name], a lang key or plain text.
  * @param description what it is for, a lang key or plain text.
  * @param receiver whether it is what the function is called on.
  * @param group the options object it is a field of.
  * @param implicit the expression it takes when nobody fills it.
- * @param widget what edits it instead of a plain field, such as `color`.
- * @param assets the ends of the paths of the files it names, when it names one.
- * @param meaning what its value names, when the editor can check that.
- * @param fallback what a call that leaves it out or blank acts as having, when the editor needs to know.
- * @param registry the registry it names an entry of, such as `minecraft:mob_effect`, for the editor to complete.
- * @param tags whether it takes a `#tag` of [registry] too.
+ * @param traits what else the editors know of it, such as the values it takes or the registry it names an entry of.
  */
 data class StoryParam(
     val name: String,
     val type: KType? = null,
     val optional: Boolean = false,
-    val suggestions: List<String> = emptyList(),
     val title: String? = null,
     val description: String? = null,
     val receiver: Boolean = false,
     val group: StoryParamGroup? = null,
     val implicit: String? = null,
-    val assets: List<String> = emptyList(),
-    val widget: String? = null,
-    val meaning: StoryParamMeaning? = null,
-    val fallback: String? = null,
-    val registry: String? = null,
-    val tags: Boolean = false,
-)
+    val traits: List<StoryParamTrait> = emptyList(),
+) {
+    inline fun <reified T : StoryParamTrait> trait(): T? = traits.firstNotNullOfOrNull { it as? T }
+
+    inline fun <reified T : StoryParamTrait> has(): Boolean = traits.any { it is T }
+
+    /** The values it takes, when they are a known set. */
+    val choices: List<String> get() = trait<StoryParamTrait.Choices>()?.values.orEmpty()
+}
 
 /**
  * A command as the editors show it.

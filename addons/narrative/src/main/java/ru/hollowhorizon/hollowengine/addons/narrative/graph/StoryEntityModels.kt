@@ -13,7 +13,7 @@ object StoryEntityModels {
         val result = HashMap<String, StoryEntityModel>()
         plain.nodes.filterIsInstance<StoryNode.Call>().forEach { call ->
             val signature = signatureOf(call) ?: return@forEach
-            if (signature.params.none { it.meaning == StoryParamMeaning.ANIMATION }) return@forEach
+            if (signature.params.none { it.has<StoryParamTrait.Animation>() }) return@forEach
             val target = signature.params.firstOrNull { it.receiver } ?: return@forEach
             val sources = Sources(plain, nodes, writers, signatureOf).into(call.id, target.name)
             sources.distinct().singleOrNull()?.let { result[call.id] = it }
@@ -42,14 +42,13 @@ object StoryEntityModels {
 
         private fun made(call: StoryNode.Call): StoryEntityModel? {
             val params = signatureOf(call)?.params ?: return null
-            fun param(meaning: StoryParamMeaning) = params.firstOrNull { it.meaning == meaning }
             fun given(param: StoryParam?) =
                 param?.let(call::argument)?.takeIf { StoryLiterals.text(it, param.type).isNotBlank() }
-            val model = param(StoryParamMeaning.MODEL)
-            val npc = param(StoryParamMeaning.NPC_ID)
+            val model = params.firstOrNull { it.has<StoryParamTrait.Model>() }
+            val npc = params.firstOrNull { it.has<StoryParamTrait.NpcId>() }
             given(model)?.let { return StoryLiterals.literal(it, model?.type)?.let(StoryEntityModel::Path) }
             given(npc)?.let { return StoryLiterals.literal(it, npc?.type)?.let(StoryEntityModel::Npc) }
-            return model?.fallback?.let(StoryEntityModel::Path)
+            return model?.trait<StoryParamTrait.Model>()?.fallback?.let(StoryEntityModel::Path)
         }
     }
 }

@@ -99,6 +99,7 @@ internal object StoryCatalog {
 
     /** What the editor calls [output] of [operator]; the parts of a type it takes apart by the names of its classes. */
     fun operatorOutputTitle(operator: StoryOperator, output: StoryOperatorOutput): String {
+        output.title?.let { return it.lang }
         if (!operator.id.startsWith(TypeOperators.UNPACK)) return operatorPinTitle(output.name)
         val type = operator.id.removePrefix(TypeOperators.UNPACK)
         val name = output.name

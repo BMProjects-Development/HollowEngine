@@ -8,12 +8,10 @@ import kotlinx.serialization.descriptors.StructureKind
 import net.minecraft.locale.Language
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCommand
+import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
@@ -21,12 +19,13 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import kotlin.reflect.KClass
+import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.typeOf
 
 /**
  * A command for every registered component, `component/hollowengine:navigation`, that sets the fields of it a call
- * fills and leaves the rest as they are. The commands follow the registry, so a component of an addon or a script
- * gets one as soon as it is registered.
+ * fills and leaves the rest as they are, and a value, `read-component/hollowengine:navigation`, that reads them. Both
+ * follow the registry, so a component of an addon or a script gets them as soon as it is registered.
  */
 object ComponentCommands {
     private const val PREFIX = "component/"
@@ -34,14 +33,24 @@ object ComponentCommands {
     private val WORD = Regex("(?<=[a-z0-9])(?=[A-Z])")
     private const val FUNCTION = "$COMPONENTS.configureComponent"
     private const val TITLE = "hollowengine.gui.ide.story.component.configure"
-    private val GROUP = StoryParamGroup("fields", "$COMPONENTS.componentFields", keyed = true, typed = "$COMPONENTS.componentField")
+    private const val READER = "read-component/"
+    private const val READ_TITLE = "hollowengine.gui.ide.story.component.read"
+    private const val HAS_TITLE = "hollowengine.gui.ide.story.component.has"
+    private const val HAS = "has"
+    private const val WHO = "who"
+    private val GROUP =
+        StoryParamGroup("fields", "$COMPONENTS.componentFields", keyed = true, typed = "$COMPONENTS.componentField")
     private val RECEIVER = StoryParam("who", typeOf<Entity>(), receiver = true)
 
     private class Built(
         val descriptors: List<ComponentDescriptor<*>>,
         val language: Language,
         val signatures: Map<String, StoryFunctionSignature>,
+        val readers: Map<String, StoryOperator>,
     )
+
+    /** A field of a component: the parameter that sets it and how a value of the component reads it. */
+    private class Field(val param: StoryParam, val read: String, val kotlin: String)
 
     private var built: Built? = null
 
@@ -52,37 +61,89 @@ object ComponentCommands {
 
     fun isComponent(action: String?): Boolean = action?.startsWith(PREFIX) == true
 
+    /** The values that read the components. */
+    val readers: Collection<StoryOperator> get() = current().readers.values
+
+    fun reader(id: String): StoryOperator? = id.takeIf { it.startsWith(READER) }?.let { current().readers[it] }
+
     private fun current(): Built {
         val descriptors = ComponentDescriptorRegistry.map { it.value }
         val language = Language.getInstance()
         built?.takeIf { it.language === language && it.descriptors.size == descriptors.size }
             ?.takeIf { it.descriptors.zip(descriptors).all { (a, b) -> a === b } }?.let { return it }
+        val shown = descriptors.filterNot { hidden(it.serializer.descriptor) }
+            .associateWith { fieldsOf(keyOf(it.id), it.serializer.descriptor, it.value, "", "", false) }
         val signatures =
-            descriptors.filterNot { hidden(it.serializer.descriptor) }.associate { PREFIX + it.id to signatureOf(it) }
-        return Built(descriptors, language, signatures).also { built = it }
+            shown.entries.associate { (component, fields) -> PREFIX + component.id to signatureOf(component, fields) }
+        val readers =
+            shown.entries.mapNotNull { (component, fields) -> readerOf(component, fields) }.associateBy { it.id }
+        return Built(descriptors, language, signatures, readers).also { built = it }
     }
 
-    private fun signatureOf(component: ComponentDescriptor<*>): StoryFunctionSignature {
+    private fun signatureOf(component: ComponentDescriptor<*>, fields: List<Field>): StoryFunctionSignature {
         val serial = component.serializer.descriptor
-        val fields = fieldsOf(keyOf(component.id), serial, component.value, "")
         return StoryFunctionSignature(
             name = PREFIX + component.id,
             function = FUNCTION,
-            params = listOf(RECEIVER) + fields,
+            params = listOf(RECEIVER) + fields.map { it.param },
             title = Language.getInstance().getOrDefault(TITLE).format(nameOf(component.id, serial)),
-            description = serial.annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description,
-            icon = serial.annotations.filterIsInstance<EditorIcon>().firstOrNull()?.icon,
+            description = descriptionOf(serial),
+            icon = iconOf(serial),
             category = StoryCategory.COMPONENTS,
             bound = mapOf("component" to StoryGraphCompiler.literal(component.id.toString())),
         )
     }
 
+    /** The value that reads [component]: whether the entity has it, all of it and each of its [fields]. */
+    private fun readerOf(component: ComponentDescriptor<*>, fields: List<Field>): StoryOperator? {
+        val type = component.value.qualifiedName ?: return null
+        val serial = component.serializer.descriptor
+        val id = StoryGraphCompiler.literal(component.id.toString())
+        val value = "$COMPONENTS.componentOf<$type>(\$$WHO, $id)"
+        val who = StoryOperatorInput(
+            WHO,
+            StoryPinType.of(RECEIVER.type),
+            ValueOperators.PLAYER,
+            RECEIVER.copy(receiver = false)
+        )
+        val outputs = listOf(
+            StoryOperatorOutput(HAS, StoryPinType.BOOL, "$COMPONENTS.hasComponent(\$$WHO, $id)", title = HAS_TITLE),
+            StoryOperatorOutput(
+                ValueOperators.VALUE,
+                StoryPinType.of(component.value.starProjectedType),
+                value,
+                kotlin = type,
+                title = nameOf(component.id, serial),
+            ),
+        ) + fields.map { field ->
+            StoryOperatorOutput(
+                field.param.name,
+                StoryPinType.of(field.param.type),
+                value + field.read,
+                kotlin = field.kotlin,
+                title = field.param.title,
+            )
+        }
+        return StoryOperator(
+            id = READER + component.id,
+            category = StoryCategory.COMPONENTS.removePrefix(StoryCategory.PREFIX),
+            inputs = listOf(who),
+            outputs = outputs,
+            title = Language.getInstance().getOrDefault(READ_TITLE).format(nameOf(component.id, serial)),
+            description = descriptionOf(serial),
+            icon = iconOf(serial),
+        )
+    }
+
+    /** The fields of [type] at [path], read from [owner], which may be null when [empty]. */
     private fun fieldsOf(
         key: String,
         serial: SerialDescriptor,
         type: KClass<*>,
         path: String,
-    ): List<StoryParam> {
+        owner: String,
+        empty: Boolean,
+    ): List<Field> {
         val language = Language.getInstance()
         val properties = ComponentPatches.propertiesOf(type)
         return (0 until serial.elementsCount).flatMap { index ->
@@ -94,23 +155,34 @@ object ComponentCommands {
                 ?: "$key.$name".takeIf(language::has)?.let(language::getOrDefault) ?: name.replace(WORD, " ")
                     .lowercase().replaceFirstChar(Char::uppercaseChar)
             val element = serial.getElementDescriptor(index)
+            val read = owner + (if (empty) "?." else ".") + name
+            val written = propertyType.toString().replace("!", "")
+            val kotlin = if (empty && !propertyType.isMarkedNullable) "$written?" else written
             val param = StoryParam(
                 name = path + name,
                 type = propertyType,
                 optional = true,
-                suggestions = StoryCommand.suggestions(propertyType),
+                traits = StoryParamTrait.choices(StoryCommand.suggestions(propertyType)),
                 title = title,
                 description = annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description,
                 group = GROUP,
             )
-            if (StoryCommand.isValue(propertyType) || StoryCommand.isContainer(propertyType)) return@flatMap listOf(param)
+            val field = Field(param, read, kotlin)
+            if (StoryCommand.isValue(propertyType) || StoryCommand.isContainer(propertyType)) return@flatMap listOf(
+                field
+            )
             val nested = propertyType.classifier as? KClass<*>
             if (nested == null || element.kind != StructureKind.CLASS) return@flatMap emptyList()
-            listOf(param) + fieldsOf(key, element, nested, "$path$name.")
+            listOf(field) + fieldsOf(key, element, nested, "$path$name.", read, empty || propertyType.isMarkedNullable)
         }
     }
 
     private fun hidden(serial: SerialDescriptor) = serial.annotations.any { it is EditorHidden }
+
+    private fun descriptionOf(serial: SerialDescriptor) =
+        serial.annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description
+
+    private fun iconOf(serial: SerialDescriptor) = serial.annotations.filterIsInstance<EditorIcon>().firstOrNull()?.icon
 
     private fun nameOf(id: ResourceLocation, serial: SerialDescriptor): String {
         val language = Language.getInstance()

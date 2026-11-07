@@ -5,6 +5,7 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
 import ru.hollowhorizon.hollowengine.addons.narrative.story.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
@@ -12,9 +13,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.cou
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.dropItem
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.giveItem
 import ru.hollowhorizon.hollowengine.common.scripting.story.functions.player.takeItems
-
-/** The widget that picks a slot of the inventory on a picture of it. */
-const val INVENTORY_SLOT_WIDGET = "inventory-slot"
 
 /**
  * Gives [this] the stack [item], as many as it holds; what does not fit falls at their feet. Undone, the inventory is
@@ -74,7 +72,7 @@ suspend fun ServerPlayer.takeRequests(requests: List<StoryItemRequest>): Boolean
  */
 @EditorCategory(StoryCategory.INVENTORY)
 @Action("set-inventory-slot")
-suspend fun ServerPlayer.putInSlot(@EditorWidget(INVENTORY_SLOT_WIDGET) slot: Int, item: ItemStack) =
+suspend fun ServerPlayer.putInSlot(@EditorWidget(StoryParamTrait.Widget.INVENTORY_SLOT) slot: Int, item: ItemStack) =
     action(this, slot, item) {
         checkSlot(this@putInSlot, slot)
         val before = capture { inventory.getItem(slot).copy() }
@@ -112,7 +110,7 @@ fun equipmentOf(who: LivingEntity, slot: EquipmentSlot): ItemStack = who.getItem
 /** The stack in the slot [slot] of the inventory of [player]. */
 @EditorCategory(StoryCategory.INVENTORY)
 @StoryValue("inventory-slot")
-fun inventorySlotOf(player: ServerPlayer, @EditorWidget(INVENTORY_SLOT_WIDGET) slot: Int): ItemStack {
+fun inventorySlotOf(player: ServerPlayer, @EditorWidget(StoryParamTrait.Widget.INVENTORY_SLOT) slot: Int): ItemStack {
     checkSlot(player, slot)
     return player.inventory.getItem(slot)
 }

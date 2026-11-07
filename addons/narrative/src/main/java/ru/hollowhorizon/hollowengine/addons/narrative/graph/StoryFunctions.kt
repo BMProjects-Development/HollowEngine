@@ -91,5 +91,5 @@ object StoryBuiltins {
     private fun param(name: String, optional: Boolean = false) = StoryParam(name, typeOf<String>(), optional)
 
     private fun flag(name: String) =
-        StoryParam(name, typeOf<Boolean>(), optional = true, suggestions = listOf("true", "false"))
+        StoryParam(name, typeOf<Boolean>(), optional = true, traits = StoryParamTrait.choices(listOf("true", "false")))
 }

@@ -182,7 +182,7 @@ dependencies {
     testRuntimeOnly(files(compilerPluginRuntimeJar.flatMap { it.archiveFile }))
     testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     testRuntimeOnly("org.apache.logging.log4j:log4j-api:2.23.1")
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.23.1")

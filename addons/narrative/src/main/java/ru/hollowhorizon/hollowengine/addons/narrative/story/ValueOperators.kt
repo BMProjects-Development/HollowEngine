@@ -9,7 +9,9 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 object ValueOperators {
     const val VALUE = "value"
     private const val DEFAULT_CATEGORY = "values"
-    private const val PLAYER = "storyPlayer()"
+
+    /** What the entity a value reads is when nothing is given: the player of the story. */
+    const val PLAYER = "storyPlayer()"
 
     private class Built(val actions: List<StoryAction>, val operators: Map<String, StoryOperator>)
 

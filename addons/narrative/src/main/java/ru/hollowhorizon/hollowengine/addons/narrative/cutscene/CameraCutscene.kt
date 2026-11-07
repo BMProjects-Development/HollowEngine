@@ -189,7 +189,7 @@ class CutscenePlaybackController {
         val type = property.type
         if (!type.isChannelSpaceLinear) return
         val size = type.channels.size
-        val linear = linearPart(type, convert, size) ?: return
+        val linear = linearPart(type, convert, size)
 
         val incoming = FloatArray(size)
         val outgoing = FloatArray(size)

@@ -11,7 +11,7 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamMeaning
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
 import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
 import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemRequest
 import ru.hollowhorizon.hollowengine.addons.narrative.scene.DialogueCharacter
@@ -96,27 +96,23 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
                 name = if (receiver) receiverName(parameter) else parameter.name.orEmpty(),
                 type = parameter.type,
                 optional = parameter.isOptional || implicit,
-                suggestions = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values ?: suggestions(
-                    parameter.type
-                ),
                 title = info?.title?.ifEmpty { null },
                 description = info?.description?.ifEmpty { null },
                 receiver = receiver,
                 implicit = if (implicit) "storyLevel()" else null,
-                assets = parameter.findAnnotation<EditorAsset>()?.extensions?.toList().orEmpty(),
-                widget = parameter.findAnnotation<EditorWidget>()?.id,
-                meaning = meaningOf(parameter),
-                fallback = parameter.findAnnotation<EditorModel>()?.default?.ifEmpty { null },
-                registry = parameter.findAnnotation<EditorRegistry>()?.registry,
-                tags = parameter.findAnnotation<EditorRegistry>()?.tags == true,
+                traits = traitsOf(parameter),
             )
         }
 
-        private fun meaningOf(parameter: KParameter): StoryParamMeaning? = when {
-            parameter.hasAnnotation<EditorAnimation>() -> StoryParamMeaning.ANIMATION
-            parameter.hasAnnotation<EditorModel>() -> StoryParamMeaning.MODEL
-            parameter.hasAnnotation<EditorNpcId>() -> StoryParamMeaning.NPC_ID
-            else -> null
+        private fun traitsOf(parameter: KParameter): List<StoryParamTrait> = buildList {
+            val choices = parameter.findAnnotation<Suggestions>()?.source?.objectInstance?.values ?: suggestions(parameter.type)
+            addAll(StoryParamTrait.choices(choices))
+            parameter.findAnnotation<EditorAsset>()?.let { add(StoryParamTrait.Asset(it.extensions.toList())) }
+            parameter.findAnnotation<EditorWidget>()?.let { add(StoryParamTrait.Widget(it.id)) }
+            parameter.findAnnotation<EditorRegistry>()?.let { add(StoryParamTrait.RegistryEntry(it.registry, it.tags)) }
+            parameter.findAnnotation<EditorModel>()?.let { add(StoryParamTrait.Model(it.default.ifEmpty { null })) }
+            if (parameter.hasAnnotation<EditorAnimation>()) add(StoryParamTrait.Animation)
+            if (parameter.hasAnnotation<EditorNpcId>()) add(StoryParamTrait.NpcId)
         }
 
         private fun receiverName(parameter: KParameter): String {

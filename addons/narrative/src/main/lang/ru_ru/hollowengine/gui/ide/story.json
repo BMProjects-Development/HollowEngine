@@ -83,6 +83,8 @@
   "color.teal": "Бирюзовый",
   "color.yellow": "Жёлтый",
   "component.configure": "Настроить: %s",
+  "component.read": "Компонент: %s",
+  "component.has": "Есть компонент",
   "function.back": "Назад к истории",
   "function.enter": "Войти внутрь",
   "function.entry": "Начало",

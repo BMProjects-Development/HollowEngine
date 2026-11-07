@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.*
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -56,6 +57,7 @@ object StoryValues {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Suppress("UNCHECKED_CAST")
     fun serializer(type: KType): KSerializer<Any?> = serializers.getOrPut(type) {
         val classifier =

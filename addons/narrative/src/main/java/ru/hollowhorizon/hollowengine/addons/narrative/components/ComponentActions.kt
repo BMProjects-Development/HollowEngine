@@ -26,6 +26,17 @@ fun componentFields(vararg fields: Pair<String, Any?>): Map<String, Any?> = mapO
 /** [value] for a field of the type [T]: a story names the type of the field, so that Kotlin checks what it is given. */
 fun <T> componentField(value: T): T = value
 
+/** Whether [who] has the component [component]. */
+fun hasComponent(who: Entity, component: String): Boolean =
+    ResourceLocation.parse(component) in AttachmentRegistry.attachments(who).components.readOnly
+
+/** The component [component] of [who] as it is, or as a new one would be when [who] has none. */
+@Suppress("UNCHECKED_CAST")
+fun <T : Any> componentOf(who: Entity, component: String): T {
+    val id = ResourceLocation.parse(component)
+    return (AttachmentRegistry.attachments(who).components.readOnly[id] ?: ComponentPatches.descriptorOf(component).create()) as T
+}
+
 suspend fun Entity.configureComponent(component: String, fields: Map<String, Any?> = emptyMap()) =
     patchComponent(component, ComponentPatches.encode(component, fields))
 

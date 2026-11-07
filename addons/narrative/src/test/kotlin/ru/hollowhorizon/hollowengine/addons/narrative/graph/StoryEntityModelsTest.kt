@@ -8,14 +8,14 @@ class StoryEntityModelsTest {
     private val text = typeOf<String>()
     private val spawn = StoryFunctionSignature(
         "spawn", "spawn", listOf(
-            StoryParam("id", text, optional = true, meaning = StoryParamMeaning.NPC_ID),
-            StoryParam("model", text, optional = true, meaning = StoryParamMeaning.MODEL, fallback = "default.glb"),
+            StoryParam("id", text, optional = true, traits = listOf(StoryParamTrait.NpcId)),
+            StoryParam("model", text, optional = true, traits = listOf(StoryParamTrait.Model("default.glb"))),
         ),
     )
     private val play = StoryFunctionSignature(
         "play", "play", listOf(
             StoryParam("who", receiver = true),
-            StoryParam("animation", text, meaning = StoryParamMeaning.ANIMATION),
+            StoryParam("animation", text, traits = listOf(StoryParamTrait.Animation)),
         ),
     )
     private val signatures = mapOf("spawn" to spawn, "play" to play)

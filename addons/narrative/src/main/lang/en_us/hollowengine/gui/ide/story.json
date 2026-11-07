@@ -83,6 +83,8 @@
   "color.teal": "Teal",
   "color.yellow": "Yellow",
   "component.configure": "Set up: %s",
+  "component.read": "Component: %s",
+  "component.has": "Has the component",
   "function.back": "Back to the story",
   "function.enter": "Go inside",
   "function.entry": "Start",

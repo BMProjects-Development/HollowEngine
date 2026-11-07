@@ -906,7 +906,7 @@ class StoryGraphCompiler private constructor(
             val kind = (input.param?.type?.classifier as? KClass<*>)?.qualifiedName
             if (!given && parts.isNotEmpty() && kind != null) {
                 val made = arguments(node, parts, input.path + ".", receive)
-                if (made.isEmpty() && input.param?.optional == true) return@forEach
+                if (made.isEmpty() && input.param.optional) return@forEach
                 imports += kind
                 arguments += "$name = ${kind.substringAfterLast('.')}(${made.joinToString()})"
                 return@forEach

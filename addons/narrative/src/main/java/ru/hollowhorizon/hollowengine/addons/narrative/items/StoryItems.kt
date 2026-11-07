@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.items
 
-import com.mojang.serialization.Codec
 import net.minecraft.commands.arguments.blocks.BlockStateParser
 import net.minecraft.core.HolderLookup
 import net.minecraft.core.component.DataComponentType
@@ -32,7 +31,7 @@ object StoryItemSyntax {
             val key = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(type) ?: return@mapNotNull null
             if (value.isEmpty) return@mapNotNull "!$key"
             @Suppress("UNCHECKED_CAST")
-            val codec = (type as DataComponentType<Any>).codec() as Codec<Any>? ?: return@mapNotNull null
+            val codec = (type as DataComponentType<Any>).codec() ?: return@mapNotNull null
             codec.encodeStart(ops, value.get()).result().map { "$key=$it" }.orElse(null)
         }
         return if (components.isEmpty()) id else components.joinToString(",", "$id[", "]")

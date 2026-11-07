@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.scene.commands
 
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -27,7 +28,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 /** `@fade-in player 600ms #000000`: covers the screen of [this] with [color]. Undone, the screen is clear again. */
 @EditorCategory(StoryCategory.SCREEN)
 @Action("fade-in")
-suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget("color") color: String = BLACK) =
+suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget(StoryParamTrait.Widget.COLOR) color: String = BLACK) =
     action(this, time, color) {
         undo { StoryClearFadePacket.send(this@fadeIn) }
         fastForward { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeIn) }

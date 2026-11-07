@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.num
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.operator
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.out
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.outOf
+import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
 
@@ -51,6 +52,7 @@ data class StoryOperatorInput(
  * @param generic whether it gives `T`, the type the generic inputs of the block take.
  * @param shape the type it gives when [generic], `T` standing for that type, as in `List<T>`.
  * @param typeOf the input naming the type it gives, which may be missing.
+ * @param title what the editor calls it instead of [name], a lang key or plain text.
  */
 data class StoryOperatorOutput(
     val name: String,
@@ -62,6 +64,7 @@ data class StoryOperatorOutput(
     val generic: Boolean = false,
     val shape: String = "T",
     val typeOf: String? = null,
+    val title: String? = null,
 )
 
 /**
@@ -364,9 +367,10 @@ object StoryOperators {
 
     private val byId = builtins.associateBy { it.id }
 
-    val all: List<StoryOperator> get() = builtins + ValueOperators.all + TypeOperators.all
+    val all: List<StoryOperator> get() = builtins + ValueOperators.all + TypeOperators.all + ComponentCommands.readers
 
-    fun find(id: String): StoryOperator? = byId[id] ?: TypeOperators.find(id) ?: ValueOperators.find(id)
+    fun find(id: String): StoryOperator? =
+        byId[id] ?: TypeOperators.find(id) ?: ComponentCommands.reader(id) ?: ValueOperators.find(id)
 
     /** The name of input at [index] of a variadic operator. */
     fun inputName(index: Int): String = if (index < LETTERS) "${'a' + index}" else "item$index"

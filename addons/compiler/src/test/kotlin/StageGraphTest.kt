@@ -10,6 +10,10 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOption
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPins
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryVariable
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
+import ru.hollowhorizon.hollowengine.common.npcs.navigation.NavigationComponent
+import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -105,6 +109,27 @@ class StageGraphTest : StageTest() {
         val world = world("for-each", generate(graph).code)
         world.launch("main")
         assertEquals(listOf("a", "b", "done"), StageTrace.take())
+    }
+
+    @Test
+    fun `a component is read whole and by its fields`() = runTest {
+        val id = "test:navigation".rl
+        ComponentDescriptorRegistry.register(ComponentDescriptor(id, NavigationComponent::class, NavigationComponent.serializer()))
+        try {
+            val reader = "read-component/$id"
+            val graph = StoryGraph(
+                nodes = listOf(StoryNode.Start("s"), StoryNode.Pure("nav", reader), call("has", "log"), call("gap", "log")),
+                links = listOf(
+                    next("s", "has"),
+                    next("has", "gap"),
+                    StoryLink("nav", "has", "has", "event"),
+                    StoryLink("nav", "jumps.maxGap", "gap", "event"),
+                ),
+            )
+            world("component-read", StoryGraphCompiler.compile(graph, TestCommands()).code)
+        } finally {
+            ComponentDescriptorRegistry.unregisterDescriptor(id)
+        }
     }
 
     /** Operators are templates of text, so nothing but compiling them says they mean anything. */

@@ -98,7 +98,7 @@ object TypeOperators {
             StoryOperatorInput(
                 VALUE,
                 StoryPinType.OBJECT,
-                param = StoryParam(VALUE, type, suggestions = StoryCommand.suggestions(type))
+                param = StoryParam(VALUE, type, traits = StoryParamTrait.choices(StoryCommand.suggestions(type)))
             )
         ),
         outputs = listOf(StoryOperatorOutput(VALUE, StoryPinType.OBJECT, $$"$$$VALUE", kotlin = name)),
@@ -191,7 +191,7 @@ object TypeOperators {
             path + parameter.name.orEmpty(),
             parameter.type,
             optional = parameter.isOptional,
-            suggestions = StoryCommand.suggestions(parameter.type),
+            traits = StoryParamTrait.choices(StoryCommand.suggestions(parameter.type)),
         )
         return StoryOperatorInput(param.name, StoryPinType.of(parameter.type), param = param)
     }

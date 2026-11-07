@@ -10,6 +10,7 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
 import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemSyntax
@@ -75,7 +76,9 @@ internal enum class StoryRegistry {
 /** What a field completes as it is typed: the ids of the registry its parameter names one of, or of its type. */
 internal object StoryCompletions {
     fun of(param: StoryParam): UiCompletionContributor? =
-        param.registry?.let(ResourceLocation::tryParse)?.let { RegistryCompletions.of(it, param.tags) } ?: of(
+        param.trait<StoryParamTrait.RegistryEntry>()?.let { entry ->
+            ResourceLocation.tryParse(entry.registry)?.let { RegistryCompletions.of(it, entry.tags) }
+        } ?: of(
             StoryPinType.of(param.type)
         )
 

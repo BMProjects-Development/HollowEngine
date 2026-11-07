@@ -60,6 +60,17 @@ class StoryPinSectionsTest {
     }
 
     @Test
+    fun `a component is read by the fields the block that sets it up has`() {
+        val reader = assertNotNull(StoryOperators.find("read-component/$id"))
+        val configured = assertNotNull(ComponentCommands.signature("component/$id")).params.drop(1).map { it.name }
+        assertEquals(listOf("has", ValueOperators.VALUE) + configured, reader.outputs.map { it.name })
+
+        val story = read(StoryNode.Pure("nav", reader.id), "jumps.maxGap")
+        assertEquals(emptyList(), story.problems)
+        assertContains(story.code, "componentOf<$navigation>((storyPlayer()), \"$id\").jumps.maxGap")
+    }
+
+    @Test
     fun `a value is taken apart into its sections and their fields`() {
         val unpack = assertNotNull(StoryOperators.find(TypeOperators.UNPACK + navigation))
         val paths = unpack.outputs.map { it.path }
