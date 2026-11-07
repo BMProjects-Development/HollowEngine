@@ -207,6 +207,8 @@ object StoryOperators {
     private val LIST = StoryPinType.LIST
     private val MAP = StoryPinType.MAP
     private val ANY = StoryPinType.ANY
+    private val PLAYER = StoryPinType.PLAYER
+    private val OBJECT = StoryPinType.OBJECT
 
     /** Two numbers into one, written over `$a` and `$b` as doubles. */
     private fun math(id: String, template: String, b: String = "0") = operator(
@@ -273,6 +275,12 @@ object StoryOperators {
         compare("less-equal", "<="),
         compare("greater", ">"),
         compare("greater-equal", ">="),
+        operator(
+            "story-context", "story", emptyList(),
+            out("player", PLAYER, "storyPlayer()"),
+            out("players", LIST, "storyPlayers()").copy(kotlin = "List<net.minecraft.server.level.ServerPlayer>"),
+            out("level", OBJECT, "storyLevel()").copy(kotlin = "net.minecraft.server.level.ServerLevel"),
+        ),
         operator("is-null", "values.logic", listOf(input("value", ANY)), out("result", BOOL, "\$value == null")),
         operator(
             "equal",

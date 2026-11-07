@@ -48,7 +48,6 @@ object StoryCategory {
     const val STATE = PREFIX + "world.entities.state"
     const val FIRE = PREFIX + "world.entities.state.fire"
     const val DATA = PREFIX + "world.entities.data"
-    const val ENTITY_NBT = PREFIX + "world.entities.nbt"
     const val EQUIPMENT = PREFIX + "world.entities.equipment"
     const val COLLIDERS = PREFIX + "world.entities.colliders"
     const val COMPONENTS = PREFIX + "world.entities.components"

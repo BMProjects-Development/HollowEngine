@@ -185,6 +185,10 @@
     size: 16px 16px;
 }
 
+.story-slot-placeholder {
+    opacity: 0.45;
+}
+
 .story-slot-gap {
     size: 12px 22px;
 }

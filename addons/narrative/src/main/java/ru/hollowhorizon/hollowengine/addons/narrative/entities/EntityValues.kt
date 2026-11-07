@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.addons.narrative.entities
 
 import net.minecraft.core.Holder
 import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
@@ -166,11 +165,6 @@ fun airOf(who: Entity): Int = who.airSupply
 @EditorCategory(StoryCategory.DATA)
 @StoryValue("entity-data")
 fun dataOf(who: Entity, key: String): Tag? = who.data[rawKey(key)]
-
-/** The NBT of [who] as `/data get entity` shows it. */
-@EditorCategory(StoryCategory.ENTITY_NBT)
-@StoryValue("entity-nbt")
-fun nbtOf(who: Entity): CompoundTag = who.saveWithoutId(CompoundTag())
 
 /** A key that reads and writes the data of an entity as it is stored, whatever it holds. */
 internal fun rawKey(key: String): DataKey<Tag> = DataKey(key, ForTag, null)

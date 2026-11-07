@@ -12,9 +12,12 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
-/** The menu of the functions a story can call: its own first, then those of every other story, a submenu per file. */
+/**
+ * The menu of the functions a story can call: [create], the item declaring a new one, then its own, then those of
+ * every other story, a submenu per file.
+ */
 internal object StoryFunctionItems {
-    fun of(state: StoryEditorState, add: (StoryNode) -> Unit): UiDropdownItem? {
+    fun of(state: StoryEditorState, add: (StoryNode) -> Unit, create: UiDropdownItem? = null): UiDropdownItem? {
         val own = state.root()?.functions.orEmpty().sortedBy { it.name }.map { function ->
             item(function.name) { add(StoryNode.Invoke(StoryGraph.newId(), function.name)) }
         }
@@ -29,12 +32,15 @@ internal object StoryFunctionItems {
                 },
             )
         }
-        if (own.isEmpty() && others.isEmpty()) return null
+        val sections = listOfNotNull(create?.let(::listOf), own.takeIf { it.isNotEmpty() }, others.takeIf { it.isNotEmpty() })
+        if (sections.isEmpty()) return null
         return UiDropdownItem(
             storyLang("add.functions"),
             icon = StoryNodeKind.FUNCTION.icon,
             iconColor = StoryCategories.tint(StoryNodeKind.FUNCTION.color),
-            children = own + others.mapIndexed { index, item -> item.copy(separatorBefore = index == 0 && own.isNotEmpty()) },
+            children = sections.flatMapIndexed { index, items ->
+                items.mapIndexed { at, item -> item.copy(separatorBefore = index > 0 && at == 0) }
+            },
         )
     }
 

@@ -7,7 +7,6 @@ import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
-import ru.hollowhorizon.hollowengine.addons.narrative.nbt.compoundOf
 import ru.hollowhorizon.hollowengine.addons.narrative.story.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRegistry
@@ -145,27 +144,9 @@ suspend fun Entity.removeData(key: String) = action(this, key) {
     perform { data.remove(rawKey(key)) }
 }
 
-/**
- * Merges the compound [nbt], such as `{NoAI:1b}`, into the NBT of [this], as `/data merge entity` does. Undone, its
- * NBT is all as it was.
- */
-@EditorCategory(StoryCategory.ENTITY_NBT)
-@Action("merge-nbt")
-suspend fun Entity.mergeNbt(nbt: Tag) = action(this, nbt) {
-    val before = capture { saveWithoutId(CompoundTag()) }
-    undo { reload(this@mergeNbt, before) }
-    perform { reload(this@mergeNbt, saveWithoutId(CompoundTag()).merge(compoundOf(nbt))) }
-}
-
 private const val MILLIS_PER_TICK = 50
 private const val MAX_PITCH = 90f
 private const val HELD = "value"
-
-private fun reload(entity: Entity, nbt: CompoundTag) {
-    val uuid = entity.uuid
-    entity.load(nbt)
-    entity.setUUID(uuid)
-}
 
 /** [tag] wrapped, as a story keeps a value that may be missing. */
 private fun held(tag: Tag?) = CompoundTag().apply { tag?.let { put(HELD, it.copy()) } }

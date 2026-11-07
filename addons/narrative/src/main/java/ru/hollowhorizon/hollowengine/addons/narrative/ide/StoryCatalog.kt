@@ -152,6 +152,17 @@ internal object StoryCatalog {
     fun operatorItems(accepts: (StoryOperator) -> Boolean = { true }, add: (StoryNode) -> Unit): List<UiDropdownItem> =
         tree(operatorEntries(accepts, add))
 
+    /** The commands [commands] and the operators [operators] let through, in one tree of their categories. */
+    fun linkItems(
+        commands: (StoryFunctionSignature) -> Boolean,
+        operators: (StoryOperator) -> Boolean,
+        add: (StoryNode) -> Unit,
+    ): List<UiDropdownItem> = tree(commandEntries(commands, add) + operatorEntries(operators, add))
+
+    private fun commandEntries(accepts: (StoryFunctionSignature) -> Boolean, add: (StoryNode) -> Unit) =
+        (ActionCommands.commands.map { it.signature } + ComponentCommands.all).filter { !it.hidden && accepts(it) }
+            .map { it.category to item(it, add) }
+
     private fun operatorEntries(accepts: (StoryOperator) -> Boolean, add: (StoryNode) -> Unit) =
         StoryOperators.all.filter(accepts).map { operator ->
             operatorCategory(operator.category) to UiDropdownItem(
@@ -211,8 +222,7 @@ internal object StoryCatalog {
                 add(StoryNode.Code(StoryGraph.newId(), ""))
             },
         )
-        val commands = (ActionCommands.commands.map { it.signature } + ComponentCommands.all).filter { !it.hidden }
-            .map { it.category to item(it, add) }
+        val commands = commandEntries({ true }, add)
         val operators = if (values) operatorEntries({ true }, add) else emptyList()
         return tree(own + commands + operators)
     }

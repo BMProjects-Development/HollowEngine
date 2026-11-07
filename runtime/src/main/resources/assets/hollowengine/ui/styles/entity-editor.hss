@@ -403,6 +403,10 @@
     layer: 2000;
 }
 
+.slot-placeholder {
+    opacity: 0.45;
+}
+
 .ee-busy {
     size: 14px 14px;
     tint: $accent;

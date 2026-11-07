@@ -43,7 +43,6 @@ object StoryCategories {
         builtin(StoryCategory.WEATHER, 0x4F8FB8, "graph/sun")
         builtin(StoryCategory.ENTITIES, 0x9A6A48, "general")
         builtin(StoryCategory.DATA, 0x7A7040, "story/category/data", NARRATIVE_ICONS)
-        builtin(StoryCategory.ENTITY_NBT, 0x5F8F80, "story/category/data", NARRATIVE_ICONS)
         builtin(StoryCategory.NBT, 0x5F8F80, "story/category/data", NARRATIVE_ICONS)
         builtin(StoryCategory.ENUMS, 0x6A7FA0, "types")
         builtin(StoryCategory.TYPES, 0x6A7FA0, "types")

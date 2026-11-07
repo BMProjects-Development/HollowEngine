@@ -35,7 +35,7 @@ class StoryValueNodesTest {
 
     @Test
     fun `commands taking blocks, tags and filters register`() {
-        listOf("set-block", "fill", "set-data", "merge-nbt", "give-item", "take-items", "set-inventory-slot").forEach { id ->
+        listOf("set-block", "fill", "set-data", "give-item", "take-items", "set-inventory-slot").forEach { id ->
             assertTrue(StoryActions.find("$namespace:$id")?.reversible == true, "$id is an undoable command")
         }
         listOf("health", "game-mode", "nbt-get", "has-items").forEach { id ->

@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryEditorState
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
+import ru.hollowhorizon.hollowengine.client.slots.SlotIcons
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.CenteredOnViewport
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
@@ -41,7 +42,7 @@ internal fun StorySlotDialog(state: StoryEditorState, field: StoryRowField) {
     val inventory = Minecraft.getInstance().player?.inventory
 
     @Composable
-    fun Slot(index: Int) {
+    fun Slot(index: Int, placeholder: String? = null) {
         val stack = inventory?.getItem(index)?.takeUnless { it.isEmpty }
         Box(
             id = "story-slot-$index",
@@ -55,7 +56,11 @@ internal fun StorySlotDialog(state: StoryEditorState, field: StoryRowField) {
                     event.consume()
                 },
         ) {
-            if (stack != null) Item(stack, tags = listOf("story-slot-item"))
+            if (stack != null) {
+                Item(stack, tags = listOf("story-slot-item"))
+            } else if (placeholder != null) {
+                Image(placeholder, tags = listOf("story-slot-item", "story-slot-placeholder"))
+            }
         }
     }
 
@@ -74,9 +79,9 @@ internal fun StorySlotDialog(state: StoryEditorState, field: StoryRowField) {
         Column(tags = listOf("story-slot-grid")) {
             Text(storyLang("slot.equipment"), tags = listOf("story-slot-title"))
             Row(tags = listOf("story-slot-row")) {
-                (ARMOR + 3 downTo ARMOR).forEach { Slot(it) }
+                (ARMOR + 3 downTo ARMOR).zip(SlotIcons.Armor).forEach { (index, icon) -> Slot(index, icon) }
                 Box(tags = listOf("story-slot-gap"))
-                Slot(OFFHAND)
+                Slot(OFFHAND, SlotIcons.SHIELD)
             }
             Text(storyLang("slot.inventory"), tags = listOf("story-slot-title"))
             (0 until 3).forEach { row -> Slots(MAIN + row * ROW until MAIN + (row + 1) * ROW) }

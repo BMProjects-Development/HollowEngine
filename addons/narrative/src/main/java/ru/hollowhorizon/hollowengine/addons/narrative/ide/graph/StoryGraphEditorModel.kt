@@ -236,12 +236,11 @@ internal class StoryGraphEditorModel(
 
     private fun boxFor(node: StoryNode) = layout.of(node)
 
-    /** Links [pending] to the first pin of the new [node] that takes it. */
+    /** Links [pending] to the pin of the new [node] that takes it, one of its very type before an untyped one. */
     private fun StoryGraph.linked(pending: GraphPendingLink, type: StoryPinType, node: StoryNode): StoryGraph {
-        val own = pinOf(pending) ?: return this
-        val target = boxFor(node).pins.firstOrNull { pin ->
-            pin.output != pending.fromOutput && (if (pin.output) takes(pin, own) else takes(own, pin))
-        } ?: return this
+        val box = boxFor(node)
+        val candidates = box.pins.filter { linkable(pending, it) }
+        val target = candidates.firstOrNull { box.type(it) == type } ?: candidates.firstOrNull() ?: return this
         return when {
             type == StoryPinType.FLOW && pending.fromOutput -> link(pending.node, pending.pin, node.id)
             type == StoryPinType.FLOW -> link(node.id, target.name, pending.node)
@@ -263,21 +262,54 @@ internal class StoryGraphEditorModel(
             add(node, left, y - GraphNodeMetrics.HEADER) { linked(pending, type, node) }
         }
 
-        val carried = pinOf(pending)?.takeIf { pending.fromOutput }?.let(layout::kotlinOf)?.let(StoryPinType::shortName)
+        val items = if (type == StoryPinType.FLOW) addStepItems(::placed) else valueItems(pending, type, ::placed)
+        return listOf(reroute) + items.mapIndexed { index, item -> if (index == 0) item.copy(separatorBefore = true) else item }
+    }
 
-        fun takes(input: StoryOperatorInput): Boolean {
-            if (!type.fits(input.type)) return false
-            val expected = input.param?.type?.takeIf { input.type == StoryPinType.OBJECT } ?: return true
-            return carried == null || StoryKotlinTypes.name(expected)?.let(StoryPinType::shortName) == carried.removeSuffix("?")
+    /**
+     * What a value link dragged from [pending] can go into, or come out of: blocks whose pins are of its very type,
+     * commands among them when it carries a value out, and those that take or give a value of any type apart, after.
+     */
+    private fun valueItems(pending: GraphPendingLink, type: StoryPinType, add: (StoryNode) -> Unit): List<UiDropdownItem> {
+        val carried = pinOf(pending)?.let(layout::kotlinOf)?.let(StoryPinType::shortName)?.removeSuffix("?")
+
+        fun fits(other: StoryPinType, kotlin: String?): Boolean {
+            val fitting = if (pending.fromOutput) type.fits(other) else other.fits(type)
+            if (!fitting) return false
+            if (type != StoryPinType.OBJECT || other != StoryPinType.OBJECT || carried == null || kotlin == null) return true
+            return StoryPinType.shortName(kotlin).removeSuffix("?") == carried
         }
 
-        val items = if (type == StoryPinType.FLOW) addStepItems(::placed) else variableItems(::placed) + StoryCatalog.operatorItems(
-            accepts = { operator ->
-                if (pending.fromOutput) operator.inputs.any(::takes) else operator.outputs.any { it.type.fits(type) }
+        fun exact(other: StoryPinType, kotlin: String?) = other != StoryPinType.ANY && fits(other, kotlin)
+        fun inputKotlin(input: StoryOperatorInput) = input.param?.type?.let(StoryKotlinTypes::name)
+
+        val operator: (StoryOperator, Boolean) -> Boolean = { operator, strict ->
+            val check = if (strict) ::exact else ::fits
+            if (pending.fromOutput) operator.inputs.any { check(it.type, inputKotlin(it)) }
+            else operator.outputs.any { check(it.type, it.kotlin) }
+        }
+        val strict = type == StoryPinType.ANY
+        val typed = StoryCatalog.linkItems(
+            commands = { signature ->
+                pending.fromOutput && signature.params.any { exact(StoryPinType.of(it.type), it.type?.let(StoryKotlinTypes::name)) }
             },
-            add = ::placed,
+            operators = { operator(it, !strict) },
+            add = add,
         )
-        return listOf(reroute) + items.mapIndexed { index, item -> if (index == 0) item.copy(separatorBefore = true) else item }
+        val loose = if (strict) emptyList() else StoryCatalog.operatorItems(
+            accepts = { !operator(it, true) && operator(it, false) },
+            add = add,
+        )
+        val anyType = loose.takeIf { it.isNotEmpty() }?.let {
+            listOf(UiDropdownItem(storyLang("link.any"), icon = StoryNodeKind.VALUE.icon, children = it, separatorBefore = true))
+        }.orEmpty()
+        return variableItems(add) { variable -> boxFor(variable).pins.any { linkable(pending, it) } } + typed + anyType
+    }
+
+    /** Whether [pin] of a new node could take the link [pending] is being dragged as. */
+    private fun linkable(pending: GraphPendingLink, pin: GraphPin): Boolean {
+        val own = pinOf(pending) ?: return false
+        return pin.output != pending.fromOutput && (if (pin.output) takes(pin, own) else takes(own, pin))
     }
 
     override fun isLinked(node: String): Boolean = graph.links.any { it.from == node || it.to == node }
@@ -372,12 +404,18 @@ internal class StoryGraphEditorModel(
 
     override fun addItems(x: Float, y: Float): List<UiDropdownItem> {
         fun placed(node: StoryNode) = add(node, x, y)
-        val functions = if (state.scope == null) listOf(functionItem(x, y)) else emptyList()
-        return addStepItems(::placed, values = true) + functions
+        return addStepItems(::placed, values = true, create = functionItem(x, y).takeIf { state.scope == null })
     }
 
-    /** What can be added to the flow; with [values], the operators that read values too. */
-    private fun addStepItems(add: (StoryNode) -> Unit, values: Boolean = false): List<UiDropdownItem> = buildList {
+    /**
+     * What can be added to the flow; with [values], the operators that read values too, and with [create], the item
+     * that declares a new function, first among the functions.
+     */
+    private fun addStepItems(
+        add: (StoryNode) -> Unit,
+        values: Boolean = false,
+        create: UiDropdownItem? = null,
+    ): List<UiDropdownItem> = buildList {
         add(StoryCatalog.kindItem(storyLang("add.phrase"), StoryNodeKind.PHRASE) { add(StoryNode.Say(StoryGraph.newId())) })
         add(StoryCatalog.kindItem(storyLang("add.choice"), StoryNodeKind.CHOICE) {
             add(StoryNode.Choose(StoryGraph.newId(), listOf(StoryOption(storyLang("new.option")))))
@@ -396,7 +434,7 @@ internal class StoryGraphEditorModel(
             add(StoryCatalog.kindItem(storyLang("add.signal", flow), StoryNodeKind.SIGNAL) { add(StoryNode.Signal(StoryGraph.newId(), flow)) })
         }
         addAll(variableItems(add))
-        StoryFunctionItems.of(state, add)?.let(::add)
+        StoryFunctionItems.of(state, add, create)?.let(::add)
         addAll(StoryCatalog.items(add, values))
     }
 
@@ -419,24 +457,24 @@ internal class StoryGraphEditorModel(
     /** The parameters of a function are where it starts, so a body never goes without them. */
     override fun isRemovable(node: String): Boolean = graph.node(node) !is StoryNode.Parameters
 
-    /** Reading and writing the variables of the story. */
-    private fun variableItems(add: (StoryNode) -> Unit): List<UiDropdownItem> {
-        if (graph.variables.isEmpty()) return emptyList()
+    /** Reading and writing the variables of the story, those of the nodes [accepts] lets through. */
+    private fun variableItems(add: (StoryNode) -> Unit, accepts: (StoryNode) -> Boolean = { true }): List<UiDropdownItem> {
+        val children = graph.variables.flatMap { variable ->
+            listOf(
+                StoryNode.Expression(StoryGraph.newId(), variable.name) to storyLang("add.variable.read").format(variable.name),
+                StoryNode.Assign(StoryGraph.newId(), variable.name) to storyLang("add.variable.write").format(variable.name),
+            )
+        }.filter { (node, _) -> accepts(node) }.map { (node, label) ->
+            val kind = if (node is StoryNode.Assign) StoryNodeKind.SET else StoryNodeKind.VALUE
+            StoryCatalog.kindItem(label, kind) { add(node) }
+        }
+        if (children.isEmpty()) return emptyList()
         val heading = StoryCategories.PREFIX + "variables"
         return listOf(UiDropdownItem(
             storyLang("add.variable"),
             icon = StoryCategories.icon(heading),
             iconColor = StoryCategories.tint(StoryCategories.color(heading)),
-            children = graph.variables.flatMap { variable ->
-                listOf(
-                    StoryCatalog.kindItem(storyLang("add.variable.read").format(variable.name), StoryNodeKind.VALUE) {
-                        add(StoryNode.Expression(StoryGraph.newId(), variable.name))
-                    },
-                    StoryCatalog.kindItem(storyLang("add.variable.write").format(variable.name), StoryNodeKind.SET) {
-                        add(StoryNode.Assign(StoryGraph.newId(), variable.name))
-                    },
-                )
-            },
+            children = children,
         ))
     }
 
