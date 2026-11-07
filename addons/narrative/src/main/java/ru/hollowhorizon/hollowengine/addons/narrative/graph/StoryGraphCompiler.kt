@@ -436,7 +436,7 @@ class StoryGraphCompiler private constructor(
         )
         val type = variables[node.variable]?.type
         val empty = isNullable(type)
-        val value = argument(node.id, StoryPins.VALUE, node.value, empty)
+        val value = argument(node.id, StoryPins.VALUE, node.value, empty, StoryLiterals.zeroNamed(type))
         return if ((node.id to StoryPins.VALUE) in values && !empty) coerced(value, type) else value
     }
 
@@ -584,7 +584,7 @@ class StoryGraphCompiler private constructor(
     /** What the input [value] of [node] gets as the type it is declared of: what is linked to it, or [written]. */
     private fun typed(node: String, value: StoryTypedName, written: String?): String {
         val empty = isNullable(value.type)
-        val given = argument(node, value.name, written.orEmpty(), empty)
+        val given = argument(node, value.name, written.orEmpty(), empty, StoryLiterals.zeroNamed(value.type))
         return if ((node to value.name) in values && !empty) coerced(given, value.type) else given
     }
 
@@ -711,7 +711,7 @@ class StoryGraphCompiler private constructor(
     /** What [pin] of [node] gets as a value of [type]: a linked entity cast to its class, a linked number converted. */
     private fun typed(node: String, pin: String, written: String, type: KType?): String {
         val empty = type?.isMarkedNullable != false
-        val value = argument(node, pin, written, empty)
+        val value = argument(node, pin, written, empty, StoryLiterals.zero(type))
         if ((node to pin) !in values) return value
         val kind = type?.classifier as? KClass<*>
         if (kind != null && kind != Entity::class && kind.isSubclassOf(Entity::class)) {
@@ -724,11 +724,15 @@ class StoryGraphCompiler private constructor(
      * What [pin] of [node] gets: what is linked to it, or the Kotlin [written] into it.
      *
      * @param empty whether it takes null. When it does not, a value that can be null is asserted to be there.
+     * @param fallback what it reads with nothing written, when its type has such a value; without one that is a problem.
      */
-    private fun argument(node: String, pin: String, written: String, empty: Boolean = false): String {
+    private fun argument(node: String, pin: String, written: String, empty: Boolean = false, fallback: String? = null): String {
         val link = values[node to pin]
         if (link != null) return value(link).let { if (empty) it.code else it.present }
-        if (written.isBlank()) problem(node, "no_value", "Pin '$pin' has no value", pin)
+        if (written.isBlank()) {
+            fallback?.let { return it }
+            problem(node, "no_value", "Pin '$pin' has no value", pin)
+        }
         return if (!empty && readsEmpty(written)) Value(written, true).present else written
     }
 
@@ -850,7 +854,9 @@ class StoryGraphCompiler private constructor(
             val name = match.groupValues[1]
             val input = inputs.first { it.name == name }
             if (input.typeName) return@replace typeName(node, name)
-            "(${argument(node.id, name, node.arguments[name] ?: input.default, input.type == StoryPinType.ANY)})"
+            val written = node.arguments[name]?.takeIf { it.isNotBlank() } ?: input.default
+            val zero = StoryLiterals.zero(input.param?.type ?: input.type.type)
+            "(${argument(node.id, name, written, input.type == StoryPinType.ANY, zero)})"
         }
     }
 

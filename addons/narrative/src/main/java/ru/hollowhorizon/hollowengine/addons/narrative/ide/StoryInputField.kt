@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFieldForm
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
-import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.style.DefaultUiFontSize
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
@@ -37,7 +36,6 @@ internal class StoryFieldLook(
  * turns into the number it comes to. A flag gets a checkbox while it is `true` or `false`. Values the field knows of,
  * and positions at hand for a vector, are a press of the arrow beside it away.
  *
- * @param history where a drag of a number goes as one step.
  * @param label the name of the value, which a dragged number shows inside it and other fields before them.
  * @param height the height of a field of one line; [linesHeight] that of a field of several.
  * @param modifier what places the field.
@@ -51,7 +49,6 @@ internal fun StoryInputField(
     problem: String?,
     wrong: Boolean,
     look: StoryFieldLook,
-    history: UndoHistory?,
     label: String? = null,
     labelTags: List<String> = emptyList(),
     height: Float = DEFAULT_HEIGHT,
@@ -65,6 +62,13 @@ internal fun StoryInputField(
 
     /** What was typed last, which a key pressed before the field has written it reads. */
     val typed = remember(id) { arrayOfNulls<String>(1) }
+
+    /**
+     * The number a drag has got to. Every write parses the story anew, so a drag writes once, as it ends, the way a
+     * drag of nodes does; the field shows the number meanwhile.
+     */
+    val dragged = remember(id) { arrayOfNulls<Double>(1) }
+    val dragging = remember(id) { booleanArrayOf(false) }
     val shown = field.value.ifBlank { field.placeholder }
     val state = (if (wrong) "error" else "warning").takeIf { problem != null }
     val tags = listOfNotNull(look.tag, state)
@@ -77,13 +81,20 @@ internal fun StoryInputField(
             whole = form.whole,
             tags = listOfNotNull(look.numberTag, state),
             modifier = modifier.size(0.px, height.px).grow(1f).tooltipOnHover(problem.orEmpty()),
-            onGestureStart = { history?.begin() },
-            onGestureEnd = { history?.commit() },
+            onGestureStart = {
+                dragging[0] = true
+                dragged[0] = null
+            },
+            onGestureEnd = {
+                dragging[0] = false
+                dragged[0]?.let { current.write(form.write(it)) }
+                dragged[0] = null
+            },
             onEdit = {
                 typing = true
                 focus.request(id)
             },
-        ) { current.write(form.write(it)) }
+        ) { next -> if (dragging[0]) dragged[0] = next else current.write(form.write(next)) }
         return
     }
     label?.let { Text(it, tags = labelTags) }

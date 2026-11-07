@@ -21,6 +21,28 @@ import kotlin.time.Duration
  * `{expression}` for anything else, so a writer never sees Kotlin they did not type.
  */
 object StoryLiterals {
+    /**
+     * What a field of [type] left empty reads: null where it may be missing, the zero of a number, `false` and an
+     * empty string; null for a type that has no such value.
+     */
+    fun zero(type: KType?): String? {
+        if (type == null) return null
+        if (type.isMarkedNullable) return "null"
+        return when (type.classifier) {
+            Int::class, Short::class, Byte::class, Number::class -> "0"
+            Long::class -> "0L"
+            Float::class -> "0f"
+            Double::class -> "0.0"
+            Boolean::class -> "false"
+            String::class, CharSequence::class -> "\"\""
+            else -> null
+        }
+    }
+
+    /** What a field of the type named [name] left empty reads, as [zero] tells. */
+    fun zeroNamed(name: String?): String? =
+        if (name?.trim()?.endsWith("?") == true) "null" else zero(StoryFieldForm.typeNamed(name))
+
     private val CALL = Regex("""^(\w+)\((.*)\)$""")
     private const val SECONDS = "s"
     const val POSITION = "pos"

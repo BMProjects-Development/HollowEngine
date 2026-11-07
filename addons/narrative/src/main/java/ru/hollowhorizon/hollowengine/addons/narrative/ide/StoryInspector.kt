@@ -69,7 +69,6 @@ private fun FieldRow(state: StoryEditorState, owner: String, id: String, row: St
             Row(tags = listOf("insp-input-row")) {
                 StoryInputField(
                     id, field, insight, state.context?.readOnly == true, null, false, StoryFieldLook.INSPECTOR,
-                    state.context?.history,
                     height = INSPECTOR_HEIGHT,
                 )
                 if (field.color) ColorButton(state, id, field)

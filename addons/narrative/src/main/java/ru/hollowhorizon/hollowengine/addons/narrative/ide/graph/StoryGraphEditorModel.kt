@@ -61,18 +61,24 @@ internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditor
     }
 
     /**
-     * The box of [node] as the types of other nodes are worked out; null for one being worked out already. Only a box
-     * laid out with nothing else in the works is kept, since one laid out midway missed what the others carry.
+     * The box of [node] as the types of other nodes are worked out; null for one being worked out already. A box is
+     * kept unless a cycle was cut while it was laid out, since such a box missed what the cut node carries.
      */
     private fun lookup(node: StoryNode): StoryNodeBox? {
         boxes[node.id]?.let { return it }
         detached[node.id]?.let { return it }
-        if (node.id in resolving) return null
-        val first = resolving.isEmpty()
+        if (node.id in resolving) {
+            cuts++
+            return null
+        }
+        val before = cuts
         val box = resolved(node.id) { layout.of(node, StoryPoint(0f, 0f)) }
-        if (first) detached[node.id] = box
+        if (cuts == before) detached[node.id] = box
         return box
     }
+
+    /** How many times a lookup met a node being worked out already. */
+    private var cuts = 0
 
     fun typeOf(pin: GraphPin): StoryPinType {
         val box = boxes[pin.node] ?: return StoryPinType.ANY

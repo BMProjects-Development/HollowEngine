@@ -330,12 +330,11 @@ class HollowUiInputController {
             return event.consumed
         }
 
-        val handled =
-            (frame.hitTest(mouseX, mouseY)?.node ?: activeNode?.takeIf { it in frame.nodes })?.let { dispatch(it) }
-                ?: false
+        val under = frame.hitTest(mouseX, mouseY)?.node ?: activeNode?.takeIf { it in frame.nodes }
+        under?.let { dispatch(it) }
 
         val releaseNode = draggingNode?.takeIf { it in frame.nodes }
-        if (!handled) releaseNode?.let { node -> dispatch(node) }
+        if (releaseNode != null && releaseNode !== under) dispatch(releaseNode)
         if (releaseNode != null && !dragMoved) {
             val hit = frame.hitTest(mouseX, mouseY)?.takeIf { it.node == releaseNode }
             dispatchClick(
