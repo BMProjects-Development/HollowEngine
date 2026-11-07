@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.edit
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGenericBlocks
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
@@ -102,7 +103,7 @@ internal open class StoryEditorState : AutoCloseable {
         val context = context?.takeUnless { it.readOnly } ?: return
         val root = root() ?: return
         val shown = root.scope(scope) ?: return
-        context.edit(root.withScope(scope, shown.change()).encode(), label, mergeKey)
+        context.edit(root.withScope(scope, StoryGenericBlocks.settled(shown.change(), this)).encode(), label, mergeKey)
     }
 
     /** Writes what [change] makes of the whole file, wherever the editor is. */

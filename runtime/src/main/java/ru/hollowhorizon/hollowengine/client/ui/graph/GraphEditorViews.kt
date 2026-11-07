@@ -81,6 +81,7 @@ fun GraphEditorCanvas(
                     key = each.key,
                     curve = curve,
                     color = each.color,
+                    dashed = each.dashed,
                     selected = selection.link == each.key || controller.insertInto == each.key,
                 )
             },
@@ -239,7 +240,10 @@ fun GraphRerouteView(
     ) {}
 }
 
-/** A pin on the edge of its node, in the color of what it carries, filled once something is linked. */
+/**
+ * A pin on the edge of its node, in the color of what it carries, filled once something is linked: [color], or the
+ * one its [tags] select in the style.
+ */
 @Composable
 fun GraphPinView(
     controller: GraphEditorController,
@@ -249,6 +253,7 @@ fun GraphPinView(
     connected: Boolean,
     tags: List<String> = emptyList(),
     tooltip: String? = null,
+    color: UiColor? = null,
 ) {
     val half = GraphNodeMetrics.PIN / 2f
     val held = remember { booleanArrayOf(false) }
@@ -257,6 +262,7 @@ fun GraphPinView(
         tags = listOf("gn-pin") + tags + listOfNotNull("connected".takeIf { connected }),
         modifier = Modifier.position((pin.x - nodeX - half).px, (pin.y - nodeY - half).px)
             .size(GraphNodeMetrics.PIN.px, GraphNodeMetrics.PIN.px)
+            .let { if (color == null) it else it.borderColor(color).let { ring -> if (connected) ring.background(color) else ring } }
             .let { if (tooltip != null) it.tooltipOnHover(tooltip) else it }
             .input(hoverable = true, clickable = true, draggable = true).onPress { event ->
                 if (event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onPress
@@ -418,6 +424,7 @@ fun GraphGroupCard(
                     connected = true,
                     tags = pinTags(pin),
                     tooltip = controller.model.pinTooltip(pin),
+                    color = controller.model.pinColor(pin),
                 )
             }
         }

@@ -22,6 +22,7 @@ internal object StoryCatalog {
     private val CAMEL = Regex("(?<=[a-z0-9])(?=[A-Z])")
     private const val HEADING = StoryCategories.PREFIX
     private const val HEX = 16
+    private const val GENERIC = "<T>"
     private const val OPAQUE = 0xFF shl 24
 
     fun signatureOf(call: StoryNode.Call): StoryFunctionSignature? = StoryActionFunctions.signature(call)
@@ -54,6 +55,9 @@ internal object StoryCatalog {
     fun operatorTitle(id: String): String {
         StoryOperators.find(id)?.title?.let { return it.lang }
         return when {
+            id == TypeOperators.ENUM -> storyLang("operator.enum", GENERIC)
+            id == TypeOperators.UNPACK -> storyLang("operator.unpack", GENERIC)
+            id == TypeOperators.PACK -> storyLang("operator.pack", GENERIC)
             id.startsWith(TypeOperators.ENUM) -> typeTitle(id.removePrefix(TypeOperators.ENUM))
             id.startsWith(TypeOperators.UNPACK) -> storyLang("operator.unpack", classTitle(id.removePrefix(TypeOperators.UNPACK)))
             id.startsWith(TypeOperators.PACK) -> storyLang("operator.pack", classTitle(id.removePrefix(TypeOperators.PACK)))
@@ -98,9 +102,10 @@ internal object StoryCatalog {
         val type = operator.id.removePrefix(TypeOperators.UNPACK)
         val name = output.name
         if (name.startsWith("is__")) return storyLang("operator.unpack.is", classTitle("$type.${name.removePrefix("is__")}"))
+        if (name.startsWith("as__")) return classTitle("$type.${name.removePrefix("as__")}")
         val case = name.substringBefore("__", "")
         if (case.isEmpty()) return fieldTitle(type, name)
-        return "${classTitle("$type.$case")}: ${fieldTitle("$type.$case", name.substringAfter("__"))}"
+        return fieldTitle("$type.$case", name.substringAfter("__"))
     }
 
     private fun isTypeOperator(id: String) =
@@ -112,9 +117,11 @@ internal object StoryCatalog {
         return known("$CASE.$short") ?: if ('.' in short) readable(short.substringAfterLast('.')) else typeTitle(short)
     }
 
-    /** What the editor calls the field [field] of the class [owner]. */
-    private fun fieldTitle(owner: String, field: String): String =
-        known("$CASE.${StoryPinType.shortName(owner)}.$field") ?: known("$PARAM.$field") ?: readable(field)
+    /** What the editor calls the field [field] of the class [owner], also one of a section, `jumps.height`. */
+    private fun fieldTitle(owner: String, field: String): String {
+        val own = field.substringAfterLast('.')
+        return known("$CASE.${StoryPinType.shortName(owner)}.$field") ?: known("$PARAM.$own") ?: readable(own)
+    }
 
     /** What the input [name] of the operator [id] takes, when that needs saying. */
     fun operatorPinHint(id: String, name: String): String? = known("$OPERATOR.$id.$name.description")
@@ -223,7 +230,7 @@ internal object StoryCatalog {
             },
         )
         val commands = commandEntries({ true }, add)
-        val operators = if (values) operatorEntries({ true }, add) else emptyList()
+        val operators = if (values) operatorEntries({ !TypeOperators.isTyped(it.id) }, add) else emptyList()
         return tree(own + commands + operators)
     }
 

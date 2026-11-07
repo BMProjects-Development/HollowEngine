@@ -8,11 +8,12 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNodeGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPoint
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
+import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
-import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewCrumb
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewCrumb
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewError
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeViewMode
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
@@ -68,7 +69,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val checks = ownChecks + analysis.checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
     state.clips = rememberStoryClips(graph)
-    val boxes = remember(graph, analysis, state.clips, state.openSections) { StoryGraphBoxes(graph, state) }
+    val boxes = remember(graph, analysis, state.clips, state.openSections, TypeOperators.revision) { StoryGraphBoxes(graph, state) }
     val model = StoryGraphEditorModel(state, graph, boxes, arranged + state.moved) { controller.select(it) }
     controller.model = model
 
@@ -201,10 +202,11 @@ private fun StoryNodeView(
         GraphNodeHeader(node.id, box.title, box.icon, box.width, box.collapsed, problem, box.color, warning, open) {
             state.change { copy(collapsed = if (node.id in collapsed) collapsed - node.id else collapsed + node.id) }
         }
-        if (!box.collapsed) box.rows.forEach { row -> StoryRowView(controller, state, box, row) }
-        box.pins.forEach { pin ->
+        if (!box.collapsed) box.rows.filterNot { it.hidden }.forEach { row -> StoryRowView(controller, state, box, row) }
+        box.shownPins.forEach { pin ->
             GraphPinView(
                 controller, pin, box.x, box.y, boxes.isLinked(pin), listOf(boxes.typeOf(pin).tag()), boxes.tooltip(pin),
+                UiColor.fromArgb(boxes.typeOf(pin).color),
             )
         }
     }
@@ -220,9 +222,8 @@ private fun StoryRowView(
     row.section?.let { return SectionRowView(box, row, it) }
     val readOnly = state.context?.readOnly == true
     Row(
-        tags = listOf("gn-node-row"),
-        modifier = Modifier.position(0.px, row.top.px).size(box.width.px, row.height.px)
-            .padding(GraphNodeMetrics.INSET.px, 0.px).alignItems(vertical = UiAlign.CENTER),
+        tags = listOfNotNull("gn-node-row", "st-nested".takeIf { row.depth > 0 }),
+        modifier = Modifier.rowPlace(box, row).alignItems(vertical = UiAlign.CENTER),
     ) {
         val field = row.field
         val insight = field?.let { fieldInsight(state, box.node.id, it) }
@@ -329,9 +330,8 @@ private fun StoryRowView(
 private fun SectionRowView(box: StoryNodeBox, row: StoryNodeRow, section: StoryRowSection) {
     Row(
         id = "st-section-${box.node.id}-${row.top}",
-        tags = listOf("gn-node-row", "st-section"),
-        modifier = Modifier.position(0.px, row.top.px).size(box.width.px, row.height.px)
-            .padding(GraphNodeMetrics.INSET.px, 0.px).alignItems(vertical = UiAlign.CENTER)
+        tags = listOfNotNull("gn-node-row", "st-section", "open".takeIf { section.open }),
+        modifier = Modifier.rowPlace(box, row).alignItems(vertical = UiAlign.CENTER)
             .input(hoverable = true, clickable = true).onPress { event ->
                 if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) section.toggle()
                 event.consume()
@@ -341,6 +341,25 @@ private fun SectionRowView(box: StoryNodeBox, row: StoryNodeRow, section: StoryR
         Text(row.label.orEmpty(), tags = listOf("gn-pin-label", "st-section-title"))
     }
 }
+
+/**
+ * Where [row] of [box] sits: across the node, and inside a section on a band set in from its edges, its content
+ * indented by how deep the section is.
+ */
+private fun Modifier.rowPlace(box: StoryNodeBox, row: StoryNodeRow): Modifier {
+    if (row.depth == 0 && row.section == null) {
+        return position(0.px, row.top.px).size(box.width.px, row.height.px).padding(GraphNodeMetrics.INSET.px, 0.px)
+    }
+    val inset = GraphNodeMetrics.INSET - SECTION_BAND + row.depth * SECTION_INDENT
+    return position(SECTION_BAND.px, row.top.px).size((box.width - 2 * SECTION_BAND).px, row.height.px)
+        .padding(inset.px, 0.px, (GraphNodeMetrics.INSET - SECTION_BAND).px, 0.px)
+}
+
+/** How far the band of a section is set in from the edges of its node. */
+private const val SECTION_BAND = 4f
+
+/** How far the rows of a section are indented per level. */
+private const val SECTION_INDENT = 8f
 
 /** What the text field of [field] of the node [owner] offers, by what it holds. */
 internal fun fieldInsight(state: StoryEditorState, owner: String, field: StoryRowField): UiCodeInsight {

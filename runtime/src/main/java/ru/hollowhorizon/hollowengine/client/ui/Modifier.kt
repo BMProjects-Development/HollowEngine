@@ -352,6 +352,9 @@ fun Modifier.border(width: UiLength, angleDegrees: Float, stops: List<UiGradient
 
 fun Modifier.borderRadius(radius: Float) = prop(UiProps.BorderRadius, radius)
 
+/** Paints the border the style gives in [color], keeping its width and radius. */
+fun Modifier.borderColor(color: UiColor) = prop(UiProps.BorderPaint, UiPaint.Color(color))
+
 /** How this inline group's decoration is drawn when wrapped across lines (slice vs clone). */
 fun Modifier.boxDecorationBreak(value: UiBoxDecorationBreak) = prop(UiProps.BoxDecorationBreak, value)
 

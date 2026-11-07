@@ -1,157 +1,34 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
-import net.minecraft.core.BlockPos
-import net.minecraft.nbt.Tag
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.player.Player
-import net.minecraft.world.item.ItemStack
-import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.generic
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.input
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.number
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.operator
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.out
-import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.outOf
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
-import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
-import kotlin.reflect.KClass
-import kotlin.reflect.KType
-import kotlin.reflect.full.isSubclassOf
-import kotlin.reflect.typeOf
-
-/** What a pin of a node carries, which says what links to it and how its field writes Kotlin. */
-enum class StoryPinType(val type: KType?) {
-    FLOW(null),
-    TEXT(typeOf<String>()),
-    NUMBER(typeOf<Double>()),
-    BOOL(typeOf<Boolean>()),
-    VECTOR(typeOf<Vec3>()),
-    ENTITY(typeOf<Entity>()),
-    NPC(typeOf<NpcEntity>()),
-    PLAYER(typeOf<ServerPlayer>()),
-    ITEM(typeOf<ItemStack>()),
-    BLOCK(typeOf<BlockState>()),
-    NBT(typeOf<Tag>()),
-    ITEM_FILTER(typeOf<StoryItemFilter>()),
-    LIST(null),
-    MAP(null),
-    /** A value of a class with no pin of its own; the pins say which, as they do not all fit each other. */
-    OBJECT(null),
-    ANY(null);
-
-    /** What a value of this type is called in Kotlin, for telling the author. */
-    val label: String
-        get() = when (this) {
-            FLOW, ANY, OBJECT -> "Any?"
-            TEXT -> "String"
-            NUMBER -> "Double"
-            BOOL -> "Boolean"
-            VECTOR -> "Vec3"
-            ENTITY -> "Entity"
-            NPC -> "NpcEntity"
-            PLAYER -> "ServerPlayer"
-            ITEM -> "ItemStack"
-            BLOCK -> "BlockState"
-            NBT -> "Tag"
-            ITEM_FILTER -> "StoryItemFilter"
-            LIST -> "List<*>"
-            MAP -> "Map<*, *>"
-        }
-
-    /** Whether a value of this type can be linked into a pin of [input]. */
-    fun fits(input: StoryPinType): Boolean =
-        this == input || (input == ENTITY && (this == NPC || this == PLAYER)) || (this != FLOW && input != FLOW && (this == ANY || input == ANY))
-
-    /** Whether a link of this type gets to the type of its place by conversion, whatever Kotlin says of the two. */
-    val converts: Boolean get() = this == NUMBER || this == ENTITY || this == NPC || this == PLAYER || this == ANY
-
-    /** What is typed into a field of this type as Kotlin. */
-    fun expression(text: String): String {
-        if (type != null) return StoryLiterals.expression(text, type)
-        val typed = text.trim()
-        return when {
-            typed.startsWith("{") && typed.endsWith("}") -> typed.substring(1, typed.length - 1).ifBlank { typed }
-            typed.isEmpty() || this != ANY -> typed
-            typed == "true" || typed == "false" || typed.toDoubleOrNull() != null -> typed
-            else -> StoryGraphCompiler.literal(text)
-        }
-    }
-
-    /** How a field of this type shows the Kotlin [expression]. */
-    fun text(expression: String): String {
-        if (type != null) return StoryLiterals.text(expression, type)
-        val written = expression.trim()
-        return when {
-            written.isEmpty() || written == "true" || written == "false" || written.toDoubleOrNull() != null -> written
-            else -> StoryLiterals.text(written, null).takeIf { this == ANY } ?: written
-        }
-    }
-
-    companion object {
-        fun ofName(name: String?): StoryPinType {
-            val simple = name?.removeSuffix("?")?.substringBefore('<')?.substringAfterLast('.') ?: return ANY
-            return when {
-                simple == "String" -> TEXT
-                simple == "Boolean" -> BOOL
-                simple in NUMBERS -> NUMBER
-                simple == "Vec3" || simple == "BlockPos" -> VECTOR
-                simple == "ItemStack" -> ITEM
-                simple == "BlockState" -> BLOCK
-                simple.endsWith("Tag") -> NBT
-                simple == "StoryItemFilter" -> ITEM_FILTER
-                simple == "NpcEntity" -> NPC
-                simple.endsWith("Player") -> PLAYER
-                simple.endsWith("Entity") -> ENTITY
-                simple == "List" || simple == "Set" -> LIST
-                simple == "Map" -> MAP
-                simple == "Any" -> ANY
-                else -> OBJECT
-            }
-        }
-
-        /** The Kotlin type written [name] with no packages, as the author reads it. */
-        fun shortName(name: String): String = PACKAGE.replace(name, "").replace("!", "")
-
-        private val PACKAGE = Regex("""\b[a-z_]\w*\.""")
-
-        private val NUMBERS = setOf("Int", "Long", "Short", "Byte", "Float", "Double")
-
-        fun of(type: KType?): StoryPinType {
-            val kind = type?.classifier as? KClass<*> ?: return ANY
-            return when {
-                kind == String::class -> TEXT
-                kind == Boolean::class -> BOOL
-                kind.isSubclassOf(Number::class) -> NUMBER
-                kind == Vec3::class || kind == BlockPos::class -> VECTOR
-                kind == ItemStack::class -> ITEM
-                kind == BlockState::class -> BLOCK
-                kind.isSubclassOf(Tag::class) -> NBT
-                kind.isSubclassOf(StoryItemFilter::class) -> ITEM_FILTER
-                kind.isSubclassOf(NpcEntity::class) -> NPC
-                kind.isSubclassOf(Player::class) -> PLAYER
-                kind.isSubclassOf(Entity::class) -> ENTITY
-                kind.isSubclassOf(Collection::class) || kind == Iterable::class -> LIST
-                kind.isSubclassOf(Map::class) -> MAP
-                kind == Any::class -> ANY
-                else -> OBJECT
-            }
-        }
-    }
-}
 
 /**
  * An input of a [StoryOperator]. [default] is the Kotlin it reads with nothing typed or linked.
  *
  * @param param the parameter of the function of a [StoryOperator.function] it passes, which says how its field is
  * written, what it offers and what it is called.
+ * @param path where it sits among the sections of the block, `jumps.maxGap` under `jumps`.
+ * @param generic whether it takes `T`: the type of the first value linked into such an input of the block, which every
+ * such pin of the block then carries.
+ * @param takesEmpty whether it takes a value that may be missing, `T?`.
  */
 data class StoryOperatorInput(
     val name: String,
     val type: StoryPinType,
     val default: String = "",
     val param: StoryParam? = null,
+    val path: String = name,
+    val generic: Boolean = false,
+    val takesEmpty: Boolean = false,
 ) {
     /** What is typed into the field of this input as Kotlin. */
     fun expression(text: String): String =
@@ -167,6 +44,8 @@ data class StoryOperatorInput(
  *
  * @param kotlin its exact type, until analysis tells it for the inputs at hand.
  * @param empty what it reads with none of the inputs of a variadic operator given.
+ * @param path where it sits among the sections of the block.
+ * @param generic whether it gives `T`, the type the generic inputs of the block take.
  */
 data class StoryOperatorOutput(
     val name: String,
@@ -174,6 +53,8 @@ data class StoryOperatorOutput(
     val template: String,
     val kotlin: String? = null,
     val empty: String? = null,
+    val path: String = name,
+    val generic: Boolean = false,
 )
 
 /**
@@ -281,17 +162,32 @@ object StoryOperators {
             out("players", LIST, "storyPlayers()").copy(kotlin = "List<net.minecraft.server.level.ServerPlayer>"),
             out("level", OBJECT, "storyLevel()").copy(kotlin = "net.minecraft.server.level.ServerLevel"),
         ),
-        operator("is-null", "values.logic", listOf(input("value", ANY)), out("result", BOOL, "\$value == null")),
+        operator(
+            "has-value", "values.logic", listOf(generic("value", empty = true)), out("result", BOOL, "\$value != null"),
+        ),
+        operator(
+            "or-default", "values.logic", listOf(generic("value", empty = true), generic("default")),
+            outOf("result", $$"($value ?: $default)"),
+        ),
+        operator(
+            "or-error",
+            "values.logic",
+            listOf(generic("value", empty = true), input("message", TEXT, "\"A value is missing\"")),
+            outOf("result", $$"($value ?: throw StoryException($message))"),
+        ),
+        operator(
+            "is-null", "values.logic", listOf(generic("value", empty = true)), out("result", BOOL, "\$value == null"),
+        ),
         operator(
             "equal",
             "values.logic",
-            listOf(input("a", ANY, "0"), input("b", ANY, "0")),
+            listOf(generic("a", "0"), generic("b", "0")),
             out("result", BOOL, $$"$a == $b")
         ),
         operator(
             "not-equal",
             "values.logic",
-            listOf(input("a", ANY, "0"), input("b", ANY, "0")),
+            listOf(generic("a", "0"), generic("b", "0")),
             out("result", BOOL, $$"$a != $b")
         ),
         logic("and", "&&"),
@@ -301,8 +197,8 @@ object StoryOperators {
         operator(
             "select",
             "values.logic",
-            listOf(input("condition", BOOL, "false"), input("then", ANY, "0"), input("else", ANY, "0")),
-            out("result", ANY, $$"if ($condition) $then else $else"),
+            listOf(input("condition", BOOL, "false"), generic("then", "0"), generic("else", "0")),
+            outOf("result", $$"if ($condition) $then else $else"),
         ),
 
         operator(

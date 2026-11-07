@@ -63,7 +63,7 @@ object ComponentCommands {
 
     private fun signatureOf(component: ComponentDescriptor<*>): StoryFunctionSignature {
         val serial = component.serializer.descriptor
-        val fields = fieldsOf(keyOf(component.id), serial, component.value, "", null)
+        val fields = fieldsOf(keyOf(component.id), serial, component.value, "")
         return StoryFunctionSignature(
             name = PREFIX + component.id,
             function = FUNCTION,
@@ -81,7 +81,6 @@ object ComponentCommands {
         serial: SerialDescriptor,
         type: KClass<*>,
         path: String,
-        section: String?,
     ): List<StoryParam> {
         val language = Language.getInstance()
         val properties = ComponentPatches.propertiesOf(type)
@@ -93,24 +92,20 @@ object ComponentCommands {
             val title = annotations.filterIsInstance<EditorName>().firstOrNull()?.name?.let(language::getOrDefault)
                 ?: "$key.$name".takeIf(language::has)?.let(language::getOrDefault) ?: name.replace(WORD, " ")
                     .lowercase().replaceFirstChar(Char::uppercaseChar)
-            val shown = section?.let { "$it: $title" } ?: title
             val element = serial.getElementDescriptor(index)
-            if (!StoryCommand.isValue(propertyType)) {
-                val nested = propertyType.classifier as? KClass<*>
-                if (nested == null || element.kind != StructureKind.CLASS) return@flatMap emptyList()
-                return@flatMap fieldsOf(key, element, nested, "$path$name.", shown)
-            }
-            listOf(
-                StoryParam(
-                    name = path + name,
-                    type = propertyType,
-                    optional = true,
-                    suggestions = StoryCommand.suggestions(propertyType),
-                    title = shown,
-                    description = annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description,
-                    group = GROUP,
-                ),
+            val param = StoryParam(
+                name = path + name,
+                type = propertyType,
+                optional = true,
+                suggestions = StoryCommand.suggestions(propertyType),
+                title = title,
+                description = annotations.filterIsInstance<EditorDescription>().firstOrNull()?.description,
+                group = GROUP,
             )
+            if (StoryCommand.isValue(propertyType)) return@flatMap listOf(param)
+            val nested = propertyType.classifier as? KClass<*>
+            if (nested == null || element.kind != StructureKind.CLASS) return@flatMap emptyList()
+            listOf(param) + fieldsOf(key, element, nested, "$path$name.")
         }
     }
 

@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
+import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import net.minecraft.world.entity.Entity
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -740,7 +741,7 @@ class StoryGraphCompiler private constructor(
         try {
             return when (val node = nodes.getValue(id)) {
                 is StoryNode.Expression -> Value("(${node.code})", readsEmpty(node.code))
-                is StoryNode.Pure -> Value(pure(node, link.fromPin))
+                is StoryNode.Pure -> Value(pure(node, link.fromPin), givesEmpty(node, link.fromPin))
                 is StoryNode.Loop -> Value(
                     if (detached) "(${
                         argument(
@@ -835,6 +836,10 @@ class StoryGraphCompiler private constructor(
             problem(node.id, "no_operator_value", "There is no value '$pin' of '${node.operator}'", pin, node.operator)
             return "error(\"no value\")"
         }
+        if (TypeOperators.isGeneric(node.operator)) {
+            problem(node.id, "untyped_block", "Link the block to a value to tell its type")
+            return "error(\"no type\")"
+        }
         operator.function?.let { return valueCall(node, operator, it) }
         val inputs = StoryOperators.inputsOf(node)
         val given =
@@ -848,19 +853,43 @@ class StoryGraphCompiler private constructor(
         }
     }
 
+    private fun givesEmpty(node: StoryNode.Pure, pin: String): Boolean =
+        isNullable(StoryOperators.find(node.operator)?.outputs?.firstOrNull { it.name == pin }?.kotlin)
+
     /** The call of the [function] of [operator]: inputs by name, and those with nothing written or linked left out. */
     private fun valueCall(node: StoryNode.Pure, operator: StoryOperator, function: String): String {
         imports += function
         var receiver: String? = null
-        val arguments = ArrayList<String>()
-        operator.inputs.forEach { input ->
-            val written = node.arguments[input.name]?.takeIf { it.isNotBlank() } ?: input.default
-            if (written.isBlank() && (node.id to input.name) !in values && input.param?.optional == true) return@forEach
-            val code = typed(node.id, input.name, written, input.param?.type)
-            if (input.param?.receiver == true) receiver = code else arguments += "${input.name} = $code"
-        }
+        val arguments = arguments(node, operator.inputs, "") { receiver = it }
         val call = "${function.substringAfterLast('.')}(${arguments.joinToString()})"
         return receiver?.let { "($it).$call" } ?: call
+    }
+
+    private fun arguments(
+        node: StoryNode.Pure,
+        inputs: List<StoryOperatorInput>,
+        path: String,
+        receive: (String) -> Unit,
+    ): List<String> {
+        val arguments = ArrayList<String>()
+        inputs.filter { it.path.startsWith(path) && '.' !in it.path.removePrefix(path) }.forEach { input ->
+            val name = input.path.removePrefix(path)
+            val written = node.arguments[input.name]?.takeIf { it.isNotBlank() } ?: input.default
+            val given = written.isNotBlank() || (node.id to input.name) in values
+            val parts = inputs.filter { it.path.startsWith(input.path + ".") }
+            val kind = (input.param?.type?.classifier as? KClass<*>)?.qualifiedName
+            if (!given && parts.isNotEmpty() && kind != null) {
+                val made = arguments(node, parts, input.path + ".", receive)
+                if (made.isEmpty() && input.param?.optional == true) return@forEach
+                imports += kind
+                arguments += "$name = ${kind.substringAfterLast('.')}(${made.joinToString()})"
+                return@forEach
+            }
+            if (!given && input.param?.optional == true) return@forEach
+            val code = typed(node.id, input.name, written, input.param?.type)
+            if (input.param?.receiver == true) receive(code) else arguments += "$name = $code"
+        }
+        return arguments
     }
 
     /** [text] as a Kotlin string that puts in the variables it names; anything else in braces stays as it is. */

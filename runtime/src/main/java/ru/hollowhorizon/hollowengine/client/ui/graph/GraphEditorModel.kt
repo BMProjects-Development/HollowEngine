@@ -56,8 +56,11 @@ data class GraphPendingLink(
  */
 data class GraphMenu(val x: Float, val y: Float, val items: List<UiDropdownItem>, val search: Boolean = false)
 
-/** A link as the canvas draws it. [key] tells it apart in a [GraphSelection] and in [GraphEditorModel]. */
-class GraphLinkView(val key: Any, val from: GraphPin, val to: GraphPin, val color: UiColor)
+/**
+ * A link as the canvas draws it. [key] tells it apart in a [GraphSelection] and in [GraphEditorModel]; a [dashed]
+ * one carries what may be missing.
+ */
+class GraphLinkView(val key: Any, val from: GraphPin, val to: GraphPin, val color: UiColor, val dashed: Boolean = false)
 
 /** An open group: the frame around its nodes and what its title bar shows. */
 class GraphFrameView(val id: String, val title: String, val color: UiColor, val rect: GraphRect)

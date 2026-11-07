@@ -60,11 +60,6 @@ suspend fun isRaining(level: ServerLevel? = null): Boolean = (level ?: storyLeve
 @StoryValue("thundering")
 suspend fun isThundering(level: ServerLevel? = null): Boolean = (level ?: storyLevel()).isThundering
 
-/** The dimension [level] names, such as `minecraft:the_nether`. */
-@EditorCategory(StoryCategory.LEVELS)
-@StoryValue("dimension")
-fun dimensionValue(level: ServerLevel): ServerLevel = level
-
 /** The id of the dimension of [level], such as `minecraft:overworld`. */
 @EditorCategory(StoryCategory.LEVELS)
 @StoryValue("dimension-id")

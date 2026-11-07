@@ -22,7 +22,6 @@ object StoryCategory {
     const val ITEM_FILTERS = PREFIX + "items.filters"
 
     const val VALUES = PREFIX + "values"
-    const val ENUMS = PREFIX + "values.enums"
     const val LIST = PREFIX + "values.list"
     const val LOGIC = PREFIX + "values.logic"
     const val MATH = PREFIX + "values.math"

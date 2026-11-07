@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 const val GraphStylesheet = "hollowengine:ui/styles/graph.hss"
@@ -44,6 +45,7 @@ data class GraphEdge(
     val color: UiColor = GraphColors.Edge,
     val arrow: Boolean = false,
     val selected: Boolean = false,
+    val dashed: Boolean = false,
 )
 
 /**
@@ -211,7 +213,7 @@ fun GraphCanvas(
                             edge.key == hovered -> GraphColors.EdgeHover
                             else -> edge.color
                         }
-                        drawCurve(edge.curve, view.zoom, color, edge.arrow)
+                        drawCurve(edge.curve, view.zoom, color, edge.arrow, edge.dashed)
                     }
                     link?.let { pending ->
                         val curve = pending.curve ?: GraphCurve(
@@ -311,11 +313,15 @@ private fun UiCanvasDrawScope.drawGrid(view: GraphViewState) {
 }
 
 /** Draws a curve as one stroke, with an arrowhead at its end when asked to. */
-private fun UiCanvasDrawScope.drawCurve(curve: GraphCurve, zoom: Float, color: UiColor, arrow: Boolean) {
+private fun UiCanvasDrawScope.drawCurve(curve: GraphCurve, zoom: Float, color: UiColor, arrow: Boolean, dashed: Boolean = false) {
     if (curve.pointCount < 2) return
     val paint = UiPaint.Color(color)
     val stroke = UiDrawStyle.Stroke((1.5f * zoom).coerceIn(1f, 3f))
-    drawShape(curve.shape, curve.bounds, paint, stroke)
+    if (dashed) {
+        curve.dashes(DASH * zoom, GAP * zoom).forEach { drawShape(it.shape, it.bounds, paint, stroke) }
+    } else {
+        drawShape(curve.shape, curve.bounds, paint, stroke)
+    }
     if (!arrow) return
 
     val points = curve.points
@@ -384,3 +390,47 @@ private const val EDGE_HIT_RADIUS = 6f
 private const val ZOOM_STEP = 1.18f
 private const val MINIMAP_WIDTH = 120f
 private const val MINIMAP_HEIGHT = 78f
+
+/** The pieces of this curve a dashed line draws: [dash] long with [gap] between, measured along the curve. */
+private fun GraphCurve.dashes(dash: Float, gap: Float): List<GraphCurve> {
+    val pieces = ArrayList<GraphCurve>()
+    val piece = ArrayList<Float>()
+    var drawing = true
+    var left = dash
+    var x = points[0]
+    var y = points[1]
+    piece += x
+    piece += y
+    for (index in 1 until pointCount) {
+        val toX = points[index * 2]
+        val toY = points[index * 2 + 1]
+        var length = hypot(toX - x, toY - y)
+        while (length > 0f) {
+            val step = minOf(left, length)
+            val t = step / length
+            x += (toX - x) * t
+            y += (toY - y) * t
+            length -= step
+            left -= step
+            if (drawing) {
+                piece += x
+                piece += y
+            }
+            if (left <= 0f) {
+                if (drawing && piece.size >= 4) pieces += GraphCurve(piece.toFloatArray())
+                piece.clear()
+                drawing = !drawing
+                left = if (drawing) dash else gap
+                if (drawing) {
+                    piece += x
+                    piece += y
+                }
+            }
+        }
+    }
+    if (drawing && piece.size >= 4) pieces += GraphCurve(piece.toFloatArray())
+    return pieces
+}
+
+private const val DASH = 6f
+private const val GAP = 4f

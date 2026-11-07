@@ -1,7 +1,9 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.story
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
+import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
@@ -9,6 +11,7 @@ import kotlin.reflect.KType
 import kotlin.reflect.full.createType
 import kotlin.reflect.full.hasAnnotation
 import kotlin.reflect.full.primaryConstructor
+import kotlin.reflect.full.starProjectedType
 
 /**
  * Operators for the types the commands and values of the running game take or give back, at any depth, such as
@@ -20,28 +23,61 @@ object TypeOperators {
     const val UNPACK = "unpack:"
     const val PACK = "pack:"
 
+    /** The pin of the value a block takes apart or gives. */
+    const val SUBJECT = "value"
+
     fun isPin(case: String) = "is__$case"
+    fun asPin(case: String) = "as__$case"
     fun fieldPin(case: String, field: String) = "${case}__$field"
 
-    private const val VALUE = "value"
-    private const val ENUMS = "values.enums"
+    private const val VALUE = SUBJECT
     private const val TYPES = "values.types"
 
-    private class Found(val actions: List<StoryAction>, val operators: Map<String, StoryOperator>)
+    private class Found(val actions: List<StoryAction>, val components: Int, val operators: Map<String, StoryOperator>)
 
     @Volatile
-    private var found = Found(emptyList(), emptyMap())
+    private var found = Found(emptyList(), -1, emptyMap())
 
-    val all: Collection<StoryOperator> get() = current().values
+    private val generic: Map<String, StoryOperator> = listOf(
+        StoryOperator(UNPACK, TYPES, listOf(StoryOperatorInput(VALUE, StoryPinType.OBJECT)), emptyList()),
+        StoryOperator(PACK, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.OBJECT, ""))),
+        StoryOperator(ENUM, TYPES, emptyList(), listOf(StoryOperatorOutput(VALUE, StoryPinType.OBJECT, ""))),
+    ).associateBy { it.id }
 
-    fun find(id: String): StoryOperator? =
-        if (id.startsWith(ENUM) || id.startsWith(UNPACK) || id.startsWith(PACK)) current()[id] else null
+    /** The blocks of the types, those of no type yet first. */
+    val all: Collection<StoryOperator> get() = generic.values + current().values
+
+    fun find(id: String): StoryOperator? = generic[id] ?: if (isTyped(id)) current()[id] else null
+
+    fun familyOf(id: String): String? = listOf(ENUM, UNPACK, PACK).firstOrNull { id.startsWith(it) }
+
+    val revision: Any get() = StoryActions.all to TagModuleRevision.current
+
+    fun qualified(type: String): String? = listOf(ENUM, UNPACK, PACK).firstNotNullOfOrNull { family ->
+        typed(family, type)?.id?.removePrefix(family)
+    }
+
+    fun isGeneric(id: String): Boolean = id in generic
+
+    fun isTyped(id: String): Boolean =
+        !isGeneric(id) && (id.startsWith(ENUM) || id.startsWith(UNPACK) || id.startsWith(PACK))
+
+    fun typed(generic: String, type: String): StoryOperator? {
+        val written = type.removeSuffix("?").substringBefore('<').replace("!", "")
+        val operators = current()
+        operators[generic + written]?.let { return it }
+        val short = StoryPinType.shortName(written)
+        return operators.values
+            .filter { it.id.startsWith(generic) && StoryPinType.shortName(it.id.removePrefix(generic)) == short }
+            .singleOrNull()
+    }
 
     private fun current(): Map<String, StoryOperator> {
         val actions = StoryActions.all
-        found.takeIf { it.actions === actions }?.let { return it.operators }
+        val components = TagModuleRevision.current
+        found.takeIf { it.actions === actions && it.components == components }?.let { return it.operators }
         val operators = collect(actions).flatMap(::operatorsOf).associateBy { it.id }
-        found = Found(actions, operators)
+        found = Found(actions, components, operators)
         return operators
     }
 
@@ -57,7 +93,7 @@ object TypeOperators {
 
     private fun enumOf(name: String, type: KType) = StoryOperator(
         id = ENUM + name,
-        category = ENUMS,
+        category = TYPES,
         inputs = listOf(
             StoryOperatorInput(
                 VALUE,
@@ -73,11 +109,15 @@ object TypeOperators {
             val caseName = case.simpleName ?: return@flatMap emptyList()
             val qualified = case.qualifiedName ?: return@flatMap emptyList()
             listOf(
+                StoryOperatorOutput(isPin(caseName), StoryPinType.BOOL, $$"($$$VALUE is $$qualified)"),
+            ) + listOfNotNull(
                 StoryOperatorOutput(
-                    isPin(caseName),
-                    StoryPinType.BOOL,
-                    $$"($$$VALUE is $$qualified)"
-                )
+                    asPin(caseName),
+                    StoryPinType.of(case.starProjectedType),
+                    $$"($$$VALUE as? $$qualified)",
+                    kotlin = "$qualified?",
+                    path = caseName,
+                ).takeIf { fieldsOf(case).isNotEmpty() },
             ) + fieldsOf(case).map { field ->
                 val fieldType = field.type.toString().replace("!", "").removeSuffix("?") + "?"
                 StoryOperatorOutput(
@@ -85,6 +125,7 @@ object TypeOperators {
                     StoryPinType.of(field.type),
                     $$"($$$VALUE as? $$qualified)?.$${field.name}",
                     kotlin = fieldType,
+                    path = "$caseName.${field.name}",
                 )
             }
         }
@@ -92,16 +133,30 @@ object TypeOperators {
     }
 
     private fun unpackData(name: String, kind: KClass<*>, type: KType): StoryOperator? {
-        val fields = fieldsOf(kind).ifEmpty { return null }
-        val outputs = fields.map { field ->
-            StoryOperatorOutput(
-                field.name!!,
-                StoryPinType.of(field.type),
-                $$"$$$VALUE.$${field.name}",
-                kotlin = field.type.toString().replace("!", ""),
-            )
-        }
+        val outputs = fieldOutputs(kind, "", $$"$$$VALUE", false, setOf(kind)).ifEmpty { return null }
         return StoryOperator(UNPACK + name, TYPES, listOf(subject(type)), outputs)
+    }
+
+    private fun fieldOutputs(
+        kind: KClass<*>,
+        path: String,
+        owner: String,
+        empty: Boolean,
+        seen: Set<KClass<*>>,
+    ): List<StoryOperatorOutput> = fieldsOf(kind).flatMap { field ->
+        val name = path + field.name
+        val read = owner + (if (empty) "?." else ".") + field.name
+        val written = field.type.toString().replace("!", "")
+        val kotlin = if (empty && !written.endsWith("?")) "$written?" else written
+        val own = StoryOperatorOutput(name, StoryPinType.of(field.type), read, kotlin = kotlin)
+        val nested = sectionOf(field.type)?.takeIf { it !in seen } ?: return@flatMap listOf(own)
+        listOf(own) + fieldOutputs(nested, "$name.", read, empty || field.type.isMarkedNullable, seen + nested)
+    }
+
+    private fun sectionOf(type: KType): KClass<*>? {
+        val kind = type.classifier as? KClass<*> ?: return null
+        if (!kind.isData || StoryCommand.isValue(type) || kind.hasAnnotation<EditorHidden>()) return null
+        return kind.takeIf { fieldsOf(it).isNotEmpty() }
     }
 
     private fun packOf(kind: KClass<*>): StoryOperator? {
@@ -110,14 +165,30 @@ object TypeOperators {
         val output = listOf(StoryOperatorOutput(VALUE, StoryPinType.of(kind.createType()), name, kotlin = name))
         if (kind.objectInstance != null) return StoryOperator(PACK + name, TYPES, emptyList(), output)
         val constructor = kind.primaryConstructor ?: return null
-        if (constructor.parameters.any { !it.isOptional && !StoryCommand.isValue(it.type) }) return null
-        val inputs = constructor.parameters.filter { StoryCommand.isValue(it.type) }.map(::inputOf)
+        val inputs = inputsOf(constructor.parameters, "", setOf(kind)) ?: return null
         return StoryOperator(PACK + name, TYPES, inputs, output.map { it.copy(template = "") }, function = name)
     }
 
-    private fun inputOf(parameter: KParameter): StoryOperatorInput {
+    private fun inputsOf(parameters: List<KParameter>, path: String, seen: Set<KClass<*>>): List<StoryOperatorInput>? {
+        val inputs = ArrayList<StoryOperatorInput>()
+        parameters.forEach { parameter ->
+            if (StoryCommand.isValue(parameter.type)) {
+                inputs += inputOf(parameter, path)
+                return@forEach
+            }
+            val nested = sectionOf(parameter.type)?.takeIf { it !in seen }
+            val parts = nested?.primaryConstructor?.let { inputsOf(it.parameters, "$path${parameter.name}.", seen + nested) }
+            when {
+                parts != null -> inputs += listOf(inputOf(parameter, path)) + parts
+                !parameter.isOptional -> return null
+            }
+        }
+        return inputs
+    }
+
+    private fun inputOf(parameter: KParameter, path: String): StoryOperatorInput {
         val param = StoryParam(
-            parameter.name.orEmpty(),
+            path + parameter.name.orEmpty(),
             parameter.type,
             optional = parameter.isOptional,
             suggestions = StoryCommand.suggestions(parameter.type),
@@ -150,6 +221,7 @@ object TypeOperators {
             action.function.parameters.forEach { visit(it.type) }
             visit(action.function.returnType)
         }
+        ComponentDescriptorRegistry.forEach { visit(it.value.value.starProjectedType) }
         return types.values
     }
 }
