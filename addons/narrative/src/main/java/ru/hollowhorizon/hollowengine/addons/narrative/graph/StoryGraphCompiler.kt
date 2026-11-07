@@ -93,11 +93,9 @@ class StoryGraphCompiler private constructor(
         index()
         val body = render()
         val classes = resultClasses()
-        val header = stories.map { "@file:Import(${literal(it)})" } + listOfNotNull(location?.let {
-            "package ${
-                StoryPackages.of(it)
-            }"
-        }) + imports.map { "import $it" } + graph.variables.map(::declaration) + classes + outputDeclarations()
+        val header = stories.map { "@file:Import(${literal(it)})" } +
+            listOfNotNull(location?.let { "package ${StoryPackages.of(it)}" }) +
+            imports.map { "import $it" } + graph.variables.map(::declaration) + classes + outputDeclarations()
         return GeneratedStory(
             code = (header + body.first).joinToString("\n", postfix = "\n"),
             nodes = header.map { null } + body.second,
@@ -124,93 +122,8 @@ class StoryGraphCompiler private constructor(
     }
 
     private fun index() {
-        graph.nodes.forEach { node ->
-            if (!IDENTIFIER_PART.matches(node.id)) problem(
-                node.id,
-                "bad_id",
-                "A node id may only hold letters, digits and _"
-            )
-            if (nodes.put(node.id, node) != null) problem(node.id, "shared_id", "Two nodes share this id")
-        }
-        graph.links.filter { it.from !in nodes || it.to !in nodes }
-            .forEach { problem(null, "missing_node", "A link joins a missing node: $it", "$it") }
-        graph.links.filter { it.isFlow }.groupBy { it.from to it.fromPin }.filterValues { it.size > 1 }
-            .forEach { (pin, _) ->
-                problem(pin.first, "many_next", "Pin '${pin.second}' continues to several nodes", pin.second)
-            }
-        graph.links.filter { !it.isFlow }.groupBy { it.to to it.toPin }.filterValues { it.size > 1 }
-            .forEach { (pin, _) ->
-                problem(pin.first, "many_values", "Pin '${pin.second}' reads several values", pin.second)
-            }
-        graph.nodes.filterIsInstance<StoryNode.Call>().filter { it.function.isEmpty() }.forEach { call ->
-            problem(call.id, "no_command", "There is no command '${call.action}'", call.action.orEmpty())
-        }
-        graph.nodes.filterIsInstance<StoryNode.Invoke>().filter { definition(it) == null }.forEach { invoke ->
-            problem(invoke.id, "no_function", "There is no function '${invoke.function}'", invoke.function)
-        }
-        if (location != null) graph.nodes.filterIsInstance<StoryNode.Invoke>().forEach { invoke ->
-            val file = invoke.file ?: return@forEach
-            if (functions.reaches(file, location)) {
-                problem(
-                    invoke.id,
-                    "import_cycle",
-                    "Story '$file' already calls this one, so this one cannot call it",
-                    file
-                )
-            }
-        }
-        declared.forEach(::checkFunction)
-        problems += StoryValueFlow(graph, index) { invoke, pin ->
-            definition(invoke)?.results?.firstOrNull { it.name == pin }?.type
-        }.problems()
-    }
-
-    private fun checkFunction(function: StoryNode.Function) {
-        val id = function.id
-        if (!isName(function.name)) problem(
-            id,
-            "bad_function",
-            "'${function.name}' is not a name of a function",
-            function.name
-        )
-        if (function.name == MAIN || declared.count { it.name == function.name } > 1) {
-            problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
-        } else if (function.results.size > 1 && declared.count {
-                it.results.size > 1 && resultClass(it) == resultClass(
-                    function
-                )
-            } > 1) {
-            problem(id, "shared_function", "Another function is called '${function.name}'", function.name)
-        }
-        if (isGenerated(function.name)) problem(
-            id,
-            "reserved_name",
-            "'${function.name}' is a name the story generates for itself",
-            function.name
-        )
-        (function.params + function.results).forEach { value ->
-            if (!isName(value.name)) problem(
-                id,
-                "bad_value_name",
-                "'${value.name}' is not a name of a value",
-                value.name
-            )
-            if (value.type.isBlank()) problem(id, "no_type", "'${value.name}' needs a type", value.name)
-        }
-        function.flows.forEach { flow ->
-            if (!isName(flow)) problem(id, "bad_value_name", "'$flow' is not a name of a value", flow)
-        }
-        val reserved = listOf(StoryPins.IN, StoryPins.NEXT)
-        val named = listOf(
-            function.params.map { it.name } + function.flows,
-            function.results.map { it.name } + function.flows + reserved,
-        )
-        named.flatMapTo(LinkedHashSet()) { names -> names.groupBy { it }.filterValues { it.size > 1 }.keys }.forEach {
-            problem(id, "shared_value_name", "Two values are called '$it'", it)
-        }
-        if (function.body.nodes.count { it is StoryNode.Parameters } != 1) {
-            problem(id, "function_entry", "A function needs one block of its parameters to start from")
-        }
+        graph.nodes.forEach { nodes[it.id] = it }
+        problems += StoryGraphChecks(graph, index, functions, location).problems()
     }
 
     private fun render(): Pair<List<String>, List<String?>> {
@@ -292,11 +205,7 @@ class StoryGraphCompiler private constructor(
     private fun step(id: String, depth: Int) {
         when (val node = nodes.getValue(id)) {
             is StoryNode.Start, is StoryNode.Reroute, is StoryNode.Parameters, is StoryNode.Function -> Unit
-            is StoryNode.Expression, is StoryNode.Pure -> problem(
-                id,
-                "value_in_flow",
-                "A value has no place in the flow"
-            )
+            is StoryNode.Expression, is StoryNode.Pure -> problem(id, "value_in_flow", "A value has no place in the flow")
 
             is StoryNode.Say -> {
                 boundary(id, depth) { emit(sayOf(node), id, it) }
@@ -428,12 +337,9 @@ class StoryGraphCompiler private constructor(
 
     /** What the variable of [node] is set to. */
     private fun assigned(node: StoryNode.Assign): String {
-        if (node.variable !in variables) problem(
-            node.id,
-            "no_variable",
-            "There is no variable '${node.variable}'",
-            node.variable
-        )
+        if (node.variable !in variables) {
+            problem(node.id, "no_variable", "There is no variable '${node.variable}'", node.variable)
+        }
         val type = variables[node.variable]?.type
         val empty = isNullable(type)
         val value = argument(node.id, StoryPins.VALUE, node.value, empty, StoryLiterals.zeroNamed(type))
@@ -471,12 +377,9 @@ class StoryGraphCompiler private constructor(
     private fun call(node: StoryNode.Call, depth: Int) {
         val call = callOf(node)
         val assigned = if (keepsResult(node)) {
-            if (node.returns == null) problem(
-                node.id,
-                "needs_return",
-                "'${node.function}' is read later, so it needs its return type",
-                node.function
-            )
+            if (node.returns == null) {
+                problem(node.id, "needs_return", "'${node.function}' is read later, so it needs its return type", node.function)
+            }
             "${outputName(node.id, StoryPins.VALUE)} = $call"
         } else call
         if (!node.block) {
@@ -520,12 +423,7 @@ class StoryGraphCompiler private constructor(
         val read = function.results.filter { index.isRead(node.id, it.name) }
         when {
             read.isEmpty() -> invocation(node, function, "", depth)
-            function.results.size == 1 -> invocation(
-                node,
-                function,
-                "${outputName(node.id, read.single().name)} = ",
-                depth
-            )
+            function.results.size == 1 -> invocation(node, function, "${outputName(node.id, read.single().name)} = ", depth)
 
             else -> {
                 val result = "result_${node.id}"
@@ -543,12 +441,7 @@ class StoryGraphCompiler private constructor(
     private fun invocation(node: StoryNode.Invoke, function: StoryNode.Function, prefix: String, depth: Int) {
         if (function.flows.isEmpty()) return emit("$prefix${invocationOf(node, function)}", node.id, depth)
         val arguments = argumentsOf(node, function)
-        var opening = "$prefix${
-            calleeOf(
-                node,
-                function
-            )
-        }(${arguments.joinToString(postfix = if (arguments.isEmpty()) "" else ", ")}"
+        var opening = "$prefix${calleeOf(node, function)}(${arguments.joinToString(postfix = if (arguments.isEmpty()) "" else ", ")}"
         function.flows.forEach { name ->
             emit("$opening$name = {", node.id, depth)
             lambdas++
@@ -564,12 +457,7 @@ class StoryGraphCompiler private constructor(
 
     /** A call of [function] in one expression, which passes flows that do nothing: as a value, a call has no flow. */
     private fun invocationOf(node: StoryNode.Invoke, function: StoryNode.Function): String =
-        "${calleeOf(node, function)}(${
-            (argumentsOf(
-                node,
-                function
-            ) + function.flows.map { "$it = {}" }).joinToString()
-        })"
+        "${calleeOf(node, function)}(${(argumentsOf(node, function) + function.flows.map { "$it = {}" }).joinToString()})"
 
     private fun argumentsOf(node: StoryNode.Invoke, function: StoryNode.Function): List<String> =
         function.params.map { "${it.name} = ${typed(node.id, it, node.arguments[it.name])}" }
@@ -592,11 +480,7 @@ class StoryGraphCompiler private constructor(
     private fun giveBack(node: StoryNode.Return, depth: Int) {
         val function = continuing
         if (function == null || !atTop() || owners[node.id]?.id != function.id) {
-            return problem(
-                node.id,
-                "return_place",
-                "A function returns only from its own flow, outside of loops and blocks"
-            )
+            return problem(node.id, "return_place", "A function returns only from its own flow, outside of loops and blocks")
         }
         val given = function.results.map { it.name to typed(node.id, it, node.values[it.name]) }
         val result = when (given.size) {
@@ -614,8 +498,7 @@ class StoryGraphCompiler private constructor(
         else -> resultClass(function)
     }
 
-    private fun resultClass(function: StoryNode.Function) =
-        function.name.replaceFirstChar(Char::uppercaseChar) + "Result"
+    private fun resultClass(function: StoryNode.Function) = StoryScriptNames.resultClass(function)
 
     /** A class per function of this story that gives several results; stories save it through [ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValues]. */
     private fun resultClasses(): List<String> =
@@ -758,11 +641,7 @@ class StoryGraphCompiler private constructor(
                 is StoryNode.Expression -> Value("(${node.code})", readsEmpty(node.code))
                 is StoryNode.Pure -> Value(pure(node, link.fromPin), givesEmpty(node, link.fromPin))
                 is StoryNode.Loop -> Value(
-                    if (detached) "(${
-                        argument(
-                            id, StoryPins.ITEMS, node.items
-                        )
-                    }).iterator().next()" else loopName(id)
+                    if (detached) "(${argument(id, StoryPins.ITEMS, node.items)}).iterator().next()" else loopName(id)
                 )
 
                 is StoryNode.Assign -> {
@@ -803,12 +682,9 @@ class StoryGraphCompiler private constructor(
 
                 is StoryNode.Code -> when {
                     link.fromPin != StoryPins.VALUE -> {
-                        if (link.fromPin !in node.outputs) problem(
-                            id,
-                            "no_output",
-                            "There is no output '${link.fromPin}'",
-                            link.fromPin
-                        )
+                        if (link.fromPin !in node.outputs) {
+                            problem(id, "no_output", "There is no output '${link.fromPin}'", link.fromPin)
+                        }
                         output(id, link.fromPin, node.outputs[link.fromPin])
                     }
 
@@ -935,26 +811,8 @@ class StoryGraphCompiler private constructor(
     }
 
     private fun declaration(variable: StoryVariable): String {
-        if (!isName(variable.name)) problem(
-            null,
-            "bad_variable",
-            "'${variable.name}' is not a name of a variable",
-            variable.name
-        )
-        if (isGenerated(variable.name)) problem(
-            null,
-            "reserved_name",
-            "'${variable.name}' is a name the story generates for itself",
-            variable.name
-        )
         val type = variable.type?.let { "<$it>" }.orEmpty()
         val initial = variable.initial.ifBlank { if (isNullable(variable.type)) "null" else "" }
-        if (initial.isEmpty()) problem(
-            null,
-            "needs_start",
-            "'${variable.name}' needs a value to start with",
-            variable.name
-        )
         return "var ${variable.name} by saved$type($initial)"
     }
 
@@ -998,7 +856,7 @@ class StoryGraphCompiler private constructor(
     }
 
     companion object {
-        private const val MAIN = "main"
+        private const val MAIN = StoryScriptNames.MAIN
         private const val FLOW_TYPE = "@State suspend () -> Unit"
         private const val PLAYER = "player"
         private const val NARRATIVE = "ru.hollowhorizon.hollowengine.addons.narrative"
@@ -1024,23 +882,6 @@ class StoryGraphCompiler private constructor(
             "ru.hollowhorizon.hollowengine.common.time.*",
             "kotlin.time.Duration",
         )
-        private val IDENTIFIER_PART = Regex("[\\p{L}\\p{N}_]+")
-        private val IDENTIFIER = Regex("[\\p{L}_][\\p{L}\\p{N}_]*")
-
-        /** Words of Kotlin that cannot name anything. */
-        private val KEYWORDS = setOf(
-            "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "is",
-            "null", "object", "package", "return", "super", "this", "throw", "true", "try", "typealias", "typeof",
-            "val", "var", "when", "while",
-        )
-
-        /** What names of stages, outputs and loop items the generated script starts with. */
-        private val GENERATED = listOf("step_", "block_", "out_", "item_", "result_")
-
-        /** Whether [name] can name a function, a value or a variable in the generated script. */
-        private fun isName(name: String) = IDENTIFIER.matches(name) && name !in KEYWORDS
-
-        private fun isGenerated(name: String) = GENERATED.any(name::startsWith)
         private val NAME_IN_BRACES = Regex("\\{([\\p{L}_][\\p{L}\\p{N}_]*)}")
         private val OPERATOR_INPUT = Regex("\\$(\\w+)")
 
