@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import net.minecraft.world.item.ItemStack
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /**
@@ -123,19 +122,27 @@ fun RegistryPicker(
 
 @Composable
 private fun EntryRow(id: String, entry: UiRegistryEntry, chosen: Boolean, onChoose: () -> Unit) {
+    var hovered by remember(id) { mutableStateOf(false) }
     Row(
         id = id,
         tags = listOfNotNull("dropdown-item", "registry-picker-row", "selected".takeIf { chosen }),
         modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND)
             .alignItems(vertical = UiAlign.CENTER)
+            .onEnter { hovered = true }
+            .onExit { hovered = false }
             .onClick { event ->
                 onChoose()
                 event.consume()
             },
     ) {
         Box(modifier = Modifier.size(ItemSize.px, ItemSize.px).item(entry.stack))
-        Text(entry.title, tags = listOf("dropdown-item-label"), modifier = Modifier.textWrap(false).textOverflow(UiTextOverflow.DOTS))
-        Text(entry.value, tags = listOf("dropdown-item-shortcut"), modifier = Modifier.textWrap(false).textOverflow(UiTextOverflow.DOTS))
+        Marquee(
+            active = hovered || chosen,
+            tags = listOf("registry-picker-text"),
+            tail = { Text(entry.value, tags = listOf("registry-picker-value")) },
+        ) {
+            Text(entry.title, tags = listOf("registry-picker-title-text"))
+        }
     }
 }
 

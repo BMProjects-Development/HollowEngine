@@ -275,6 +275,11 @@ fun parseColor(value: String): UiColor {
         val opacity = args[1].trim().let { if (it.endsWith("%")) it.dropLast(1).toFloat() / 100f else it.toFloat() }
         return UiColor(base.red, base.green, base.blue, base.alpha * opacity)
     }
+    if (cleaned.startsWith("over(")) {
+        val args = functionArgs(cleaned, "over")
+        require(args.size == 2) { "Expected over(top, base), got '$value'" }
+        return parseColor(args[0]).over(parseColor(args[1]))
+    }
     if (cleaned.startsWith("rgba(")) {
         val args = functionArgs(cleaned, "rgba").map { it.trim().toFloat() }
         return UiColor(args[0] / 255f, args[1] / 255f, args[2] / 255f, args.getOrElse(3) { 1f })

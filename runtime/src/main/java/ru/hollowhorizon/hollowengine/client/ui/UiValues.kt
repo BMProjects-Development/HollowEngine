@@ -414,6 +414,13 @@ data class UiColor(
         return UiColor(channel(red, to.red), channel(green, to.green), channel(blue, to.blue), mixedAlpha)
     }
 
+    fun over(base: UiColor): UiColor {
+        val mixedAlpha = alpha + base.alpha * (1f - alpha)
+        if (mixedAlpha <= MinPremultipliedAlpha) return Transparent
+        fun channel(top: Float, bottom: Float) = (top * alpha + bottom * base.alpha * (1f - alpha)) / mixedAlpha
+        return UiColor(channel(red, base.red), channel(green, base.green), channel(blue, base.blue), mixedAlpha)
+    }
+
     fun toArgb(): Int {
         fun channel(value: Float) = (value.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
         return (channel(alpha) shl 24) or (channel(red) shl 16) or (channel(green) shl 8) or channel(blue)
