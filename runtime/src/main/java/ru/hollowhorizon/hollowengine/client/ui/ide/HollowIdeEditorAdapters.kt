@@ -21,7 +21,6 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class HollowIdeEditorSession(
     private val path: String,
     private val typedProperties: String? = null,
-    private val placeProperties: String? = null,
     private val onUpdated: () -> Unit,
 ) {
     private val languageService = languageServiceForPath(path)
@@ -363,7 +362,7 @@ internal class HollowIdeEditorSession(
                     EditorStructure()
                 },
                 propertyTypes = typedProperties?.let { prefix ->
-                    runCatching { analyzer.propertyTypes(path, text, prefix, placeProperties) }.getOrElse { failure ->
+                    runCatching { analyzer.propertyTypes(path, text, prefix) }.getOrElse { failure ->
                         reportAnalysisFailure("types", failure)
                         KotlinPropertyTypes()
                     }

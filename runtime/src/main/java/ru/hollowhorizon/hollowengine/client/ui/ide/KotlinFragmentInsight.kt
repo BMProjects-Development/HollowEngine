@@ -38,11 +38,10 @@ fun kotlinTokenHighlighter(tokens: (String) -> List<KotlinToken>) = UiSyntaxHigh
  *
  * @param path the name analysis knows the text by; its extension picks the language.
  * @param typedProperties the start of the names of the properties to tell the types of.
- * @param placeProperties the start of the names of the properties to tell whether those fit.
  */
-class KotlinFragmentInsight(path: String, typedProperties: String? = null, placeProperties: String? = null) : AutoCloseable {
+class KotlinFragmentInsight(path: String, typedProperties: String? = null) : AutoCloseable {
     private var revision by mutableLongStateOf(0L)
-    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties, placeProperties) { revision = session.revision }
+    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties) { revision = session.revision }
 
     /** Moves on with analysis, for telling a field to read it again. */
     val version: Long get() = revision

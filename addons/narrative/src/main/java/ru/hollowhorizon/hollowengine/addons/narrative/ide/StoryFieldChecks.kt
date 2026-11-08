@@ -21,13 +21,27 @@ internal class StoryFieldSpan(
 internal class StoryFieldFrame(val before: String, val after: String)
 
 /**
+ * A value given to a generic input of a block, which `T` of the block is worked out from.
+ *
+ * @param empty whether the input takes `T?`, so that what can be null still says only `T`.
+ */
+internal sealed interface StoryGenericValue {
+    val empty: Boolean
+
+    data class Linked(val node: String, val pin: String, override val empty: Boolean) : StoryGenericValue
+    data class Written(val field: StoryFieldKey, override val empty: Boolean) : StoryGenericValue
+}
+
+/**
  * The script of a story, whose first [length] characters it generated, followed by every field as its own function and
  * a property per output worked out on the spot.
  *
  * @param spans the fields it holds.
  * @param left the fields left out of it, empty or broken as they are, for completing what is typed there.
  * @param pins the node and pin behind the name of each such property.
- * @param places the type behind the name of each property that stands for what links go into.
+ * @param written type behind the name of each property that stands for a type written in the story or by a command.
+ * @param arguments the field behind the name of each property that holds what a generic input is given in its field.
+ * @param generics by block, the values given to its generic inputs.
  */
 internal class StoryCheckScript(
     val text: String,
@@ -35,8 +49,9 @@ internal class StoryCheckScript(
     val spans: List<StoryFieldSpan>,
     private val left: Map<StoryFieldKey, StoryFieldFrame>,
     val pins: Map<String, Pair<String, String>>,
-    val places: Map<String, String>,
-    val values: Map<String, String>,
+    val written: Map<String, String>,
+    val arguments: Map<String, StoryFieldKey>,
+    val generics: Map<String, List<StoryGenericValue>>,
 ) {
     private val byField = spans.associateBy { it.field }
 
@@ -53,17 +68,17 @@ internal class StoryCheckScript(
  * so they get their colors, problems and types at once, on nodes the flow does not reach too.
  */
 internal object StoryFieldChecks {
-    /** The start of the names of the properties that give the types of pins. */
+    /** The start of the names of the properties that give the types of pins, and of the types written. */
     const val PIN = "storyPin"
 
-    /** The start of the names of the properties that give what links go into. */
-    const val PLACE = "storyPlace"
+    private const val ARGUMENT = "Argument"
 
     /**
      * A field of the story, [code] as its field shows it.
      *
      * @param checked what stands for it in the script, as long as [code] and with each character where it is.
      * @param syntax the Kotlin that has to parse for it to be checked in place.
+     * @param typed whether the type of what it holds is wanted, as that of a field of a generic input is.
      */
     private class Entry(
         val field: StoryFieldKey,
@@ -72,6 +87,7 @@ internal object StoryFieldChecks {
         val frame: StoryFieldFrame,
         val checked: String = code,
         val syntax: String = code,
+        val typed: Boolean = false,
     )
 
     private const val VALUE_END = "\n)"
@@ -89,6 +105,9 @@ internal object StoryFieldChecks {
         val declared = type?.let { ": $it" }.orEmpty()
         return Entry(StoryFieldKey(owner, key), type, code, StoryFieldFrame("val storyValue$declared = (\n", VALUE_END))
     }
+
+    private fun typed(owner: String, key: String, code: String) =
+        Entry(StoryFieldKey(owner, key), null, code, StoryFieldFrame("val storyValue = (\n", VALUE_END), typed = true)
 
     /** A field naming a type, checked as the type of a cast. */
     private fun typeField(owner: String, key: String, code: String) =
@@ -136,6 +155,7 @@ internal object StoryFieldChecks {
 
             is StoryNode.Pure -> StoryOperators.inputsOf(node).filter { free(it.name) }.map { input ->
                 if (input.typeName) return@map typeField(node.id, input.name, node.arguments[input.name].orEmpty())
+                if (input.generic) return@map typed(node.id, input.name, node.arguments[input.name].orEmpty())
                 val type =
                     if (input.type == StoryPinType.NUMBER) "Number" else input.type.type?.let(StoryKotlinTypes::name)
                 val form = StoryFieldForm.of(input.param?.type ?: input.type.type)
@@ -168,20 +188,19 @@ internal object StoryFieldChecks {
 
     private fun reads(code: String) = code.isNotBlank() && StoryKotlin.syntax(code)?.valid == true
 
-    /** The types the nodes of [graph] and those a wire can make for its variables want what is linked to them to be of. */
-    private fun places(graph: StoryGraph): Set<String> = (graph.nodes.filterIsInstance<StoryNode.Call>().flatMap { node ->
+    /**
+     * The types written in [graph] or by what its nodes call, and those of what a wire can make that is not in it yet.
+     */
+    private fun written(graph: StoryGraph): Set<String> = (graph.nodes.filterIsInstance<StoryNode.Call>().flatMap { node ->
         StoryActionFunctions.signature(StoryActionFunctions.resolved(node))?.params.orEmpty()
             .mapNotNull { it.type?.let(StoryKotlinTypes::name) }
     } + graph.nodes.filterIsInstance<StoryNode.Invoke>().flatMap { node ->
         StoryActionFunctions.definition(graph, node)?.params.orEmpty().map { it.type }
-    } + graph.functions.flatMap { function -> function.results.map { it.type } } + graph.variables.mapNotNull { it.type })
+    } + graph.nodes.filterIsInstance<StoryNode.Pure>().flatMap { node ->
+        StoryOperators.inputsOf(node).mapNotNull { input -> input.param?.type?.let(StoryKotlinTypes::name) }
+    } + graph.functions.flatMap { function -> (function.params + function.results).map { it.type } } +
+        graph.variables.mapNotNull { it.type } + StoryOperators.all.flatMap { it.outputs }.mapNotNull { it.kotlin })
         .filterTo(LinkedHashSet()) { reads("null as $it") }
-
-    /** The types of what a wire can make that is not in [graph] yet can give. */
-    private fun values(graph: StoryGraph): Set<String> =
-        (graph.variables.mapNotNull { it.type } + StoryOperators.all.flatMap { it.outputs }.mapNotNull { it.kotlin } +
-            graph.functions.flatMap { function -> (function.params + function.results).map { it.type } })
-            .toSet().filterTo(LinkedHashSet()) { reads("null as $it") }
 
     /** [code], the script generated from [graph], with what is checked added. Broken Kotlin stays out, not to break the rest. */
     fun script(graph: StoryGraph, code: String): StoryCheckScript {
@@ -195,9 +214,12 @@ internal object StoryFieldChecks {
         val (kept, left) = (variables + plain.nodes.flatMap { nodeFields(plain, it) }).partition { reads(it.syntax) }
         val text = StringBuilder(code.trimEnd())
         val length = text.length
+        val arguments = HashMap<String, StoryFieldKey>()
         val spans = kept.mapIndexed { index, entry ->
             val from = text.append("\n\nsuspend fun storyCheck$index(${parameters(entry.field.owner)}) {\n").length
-            val start = text.append(entry.frame.before).length
+            val name = "$PIN$ARGUMENT$index".takeIf { entry.typed }
+            name?.let { arguments[it] = entry.field }
+            val start = text.append(name?.let { "val $it = (\n" } ?: entry.frame.before).length
             val end = text.append(entry.checked).length
             val to = text.append(entry.frame.after).append("\n}").length
             StoryFieldSpan(entry.field, entry.type?.let(StoryPinType::shortName), from, start, end, to, entry.code)
@@ -209,12 +231,8 @@ internal object StoryFieldChecks {
                     .append("\n)\n}")
                 "$PIN$index" to pin.key
             }
-        val wanted = places(plain).withIndex().associate { (index, type) -> "$PLACE$index" to type }
-        wanted.entries.joinTo(text, "", "\n\nsuspend fun storyPlaces() {\n", "}") { (name, type) ->
-            "val $name: $type = (null as $type)\n"
-        }
-        val given = values(plain).withIndex().associate { (index, type) -> "${PIN}Value$index" to type }
-        given.entries.joinTo(text, "", "\n\nsuspend fun storyValues() {\n", "}") { (name, type) ->
+        val written = written(plain).withIndex().associate { (index, type) -> "${PIN}Type$index" to type }
+        written.entries.joinTo(text, "", "\n\nsuspend fun storyTypes() {\n", "}") { (name, type) ->
             "val $name: $type = (null as $type)\n"
         }
         val frames = left.associate { entry ->
@@ -222,6 +240,18 @@ internal object StoryFieldChecks {
                 .joinToString("") { "val ${it.name}: ${it.type} = TODO()\n" }
             entry.field to StoryFieldFrame(locals + entry.frame.before, entry.frame.after)
         }
-        return StoryCheckScript(text.toString(), length, spans, frames, pins, wanted, given)
+        return StoryCheckScript(text.toString(), length, spans, frames, pins, written, arguments, generics(plain))
     }
+
+    private fun generics(graph: StoryGraph): Map<String, List<StoryGenericValue>> =
+        graph.nodes.filterIsInstance<StoryNode.Pure>().associate { node ->
+            node.id to StoryOperators.inputsOf(node).filter { it.generic }.mapNotNull { input ->
+                val link = graph.index.valuesInto(node.id).firstOrNull { it.toPin == input.name }
+                when {
+                    link != null -> StoryGenericValue.Linked(link.from, link.fromPin, input.takesEmpty)
+                    node.arguments[input.name].isNullOrBlank() -> null
+                    else -> StoryGenericValue.Written(StoryFieldKey(node.id, input.name), input.takesEmpty)
+                }
+            }
+        }.filterValues { it.isNotEmpty() }
 }

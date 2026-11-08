@@ -4,15 +4,11 @@ import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.tree.TokenSet
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
-import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelector
-import org.jetbrains.kotlin.types.Variance
 import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinName
 import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinPropertyTypes
 import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinSyntax
@@ -35,23 +31,13 @@ internal fun kotlinSyntax(factory: KtPsiFactory, text: String): KotlinSyntax {
     return KotlinSyntax(valid, arguments(body, text), names(body), tokens(body))
 }
 
-/** The properties of [file] named from [values] and from [places], and which of the latter can hold each of the former. */
-@OptIn(KaExperimentalApi::class)
-internal fun propertyTypes(file: KtFile, values: String, places: String?): KotlinPropertyTypes = analyze(file) {
-    fun named(prefix: String?) = file.collectDescendantsOfType<KtProperty> { prefix != null && it.name?.startsWith(prefix) == true }
-        .mapNotNull { property -> property.symbol.returnType.takeUnless { it is KaErrorType }?.let { property.name!! to it } }
+/** The types of the properties of [file] whose names start with [prefix], with the classes they take. */
+internal fun propertyTypes(file: KtFile, prefix: String): KotlinPropertyTypes = analyze(file) {
+    val reader = KotlinTypeReader(this)
+    val types = file.collectDescendantsOfType<KtProperty> { it.name?.startsWith(prefix) == true }
+        .mapNotNull { property -> reader.declared(property.symbol.returnType)?.let { property.name!! to it } }
         .toMap()
-    val found = named(values)
-    val wanted = named(places)
-    KotlinPropertyTypes(
-        types = (found + wanted).mapValues { (_, type) ->
-            type.render(KaTypeRendererForSource.WITH_QUALIFIED_NAMES, Variance.INVARIANT)
-        },
-        fits = found.mapValues { (_, type) ->
-            val value = type.withNullability(false)
-            wanted.filterValues { value.isSubtypeOf(it) }.keys
-        },
-    )
+    KotlinPropertyTypes(types, reader.classes())
 }
 
 /** The leaves of [body] that have a color of their own. */

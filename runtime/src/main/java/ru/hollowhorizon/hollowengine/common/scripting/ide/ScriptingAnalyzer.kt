@@ -54,9 +54,8 @@ interface ScriptingAnalyzer {
     /** How the Kotlin [text], statements or an expression, reads on its own. Null when the language cannot parse Kotlin. */
     fun kotlinSyntax(text: String): KotlinSyntax? = null
 
-    /** The properties of the file whose names start with [values] and [places]; those that do not compile are left out. */
-    fun propertyTypes(name: String, text: String, values: String, places: String? = null): KotlinPropertyTypes =
-        KotlinPropertyTypes()
+    /** The types of the properties of the file whose names start with [prefix]; those that do not compile are left out. */
+    fun propertyTypes(name: String, text: String, prefix: String): KotlinPropertyTypes = KotlinPropertyTypes()
 
     /** Lets go of what is kept for the file [name], which nothing has open any more. */
     fun forget(name: String) = Unit
@@ -98,12 +97,12 @@ interface ScriptingAnalyzer {
 /**
  * What analysis says of named properties.
  *
- * @param types what each of them is, as Kotlin writes it with packages.
- * @param fits by value, the places that can hold it. Null does not count: links unwrap what can be null.
+ * @param types what each of them is.
+ * @param classes the classes those types name, with their supertypes and the classes of their arguments, all the way up.
  */
 data class KotlinPropertyTypes(
-    val types: Map<String, String> = emptyMap(),
-    val fits: Map<String, Set<String>> = emptyMap(),
+    val types: Map<String, KotlinType> = emptyMap(),
+    val classes: Map<String, KotlinClassInfo> = emptyMap(),
 )
 
 /**

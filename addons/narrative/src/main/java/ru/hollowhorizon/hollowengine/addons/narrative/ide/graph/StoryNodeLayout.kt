@@ -625,6 +625,7 @@ internal class StoryNodeLayout(
          * such a pin takes as `T?`.
          */
         private fun genericOf(node: StoryNode.Pure, operator: StoryOperator): String? {
+            StoryInsight.generic(state, node.id)?.let { return it.nullable(false).render() }
             val generics = operator.outputs.asSequence().filter { it.generic }
             val given = StoryOperators.inputsOf(node).asSequence().filter { it.generic }.mapNotNull { input ->
                 graph.links.firstOrNull { it.to == node.id && it.toPin == input.name }?.let { sources(it.from, it.fromPin) }

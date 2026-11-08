@@ -4,6 +4,8 @@ import org.junit.jupiter.api.TestInstance
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinType
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -55,10 +57,13 @@ class StageAnalysisTest {
                 val other = 1
             }
         """.trimIndent()
-        val types = compiler.environment.analyzer.propertyTypes("types.stage.kts", source, "storyPin").types
+        val types = compiler.environment.analyzer.propertyTypes(
+            "types.stage.kts",
+            source,
+            "storyPin"
+        ).types.mapValues { it.value.render() }
         assertEquals(
-            mapOf("storyPin0" to "kotlin.collections.List<kotlin.String>", "storyPin1" to "kotlin.String"),
-            types
+            mapOf("storyPin0" to "kotlin.collections.List<kotlin.String>", "storyPin1" to "kotlin.String"), types
         )
     }
 
@@ -69,19 +74,58 @@ class StageAnalysisTest {
                 val storyPin0 = listOf("x")
                 val storyPin1 = listOf(1)
                 val storyPin2 = listOf<String?>()
-                val storyPin3: String? = null
-                val storyPlace0: List<String> = listOf()
-                val storyPlace1: Iterable<*> = listOf<Int>()
-                val storyPlace2: String = ""
-                val storyPlace3: Missing = ""
+                val storyPin3 = ArrayList<StringBuilder>()
+                val storyPin4: List<String> = listOf()
+                val storyPin5 = if (true) 1 else "x"
+                val storyPin6: Iterable<*> = listOf<Int>()
+                val storyPin7: Missing = ""
+                val storyPin8: List<Missing> = listOf()
             }
         """.trimIndent()
-        val found = compiler.environment.analyzer.propertyTypes("fits.stage.kts", source, "storyPin", "storyPlace")
-        assertEquals(setOf("storyPlace0", "storyPlace1"), found.fits["storyPin0"])
-        assertEquals(setOf("storyPlace1"), found.fits["storyPin1"])
-        assertEquals(setOf("storyPlace1"), found.fits["storyPin2"])
-        assertEquals(setOf("storyPlace2"), found.fits["storyPin3"])
-        assertTrue("storyPlace3" !in found.types)
+        val found = compiler.environment.analyzer.propertyTypes("fits.stage.kts", source, "storyPin")
+        val system = KotlinTypeSystem(found.classes)
+        fun fits(from: Int, into: Int) =
+            system.isSubtype(found.types.getValue("storyPin$from"), found.types.getValue("storyPin$into"))
+        assertEquals(true, fits(0, 4))
+        assertEquals(true, fits(1, 6))
+        assertEquals(false, fits(1, 4))
+        assertEquals(false, fits(2, 4))
+        assertEquals(true, fits(3, 6), "a Java class reaches Kotlin's collections through its supertypes")
+        assertEquals(false, fits(3, 4))
+        assertEquals(
+            "java.util.ArrayList<java.lang.StringBuilder>",
+            found.types.getValue("storyPin3").render(),
+            "an alias is the type it stands for"
+        )
+        assertTrue(found.types.getValue("storyPin5") is KotlinType.Class, "a type with no name of its own is made one")
+        assertTrue("storyPin7" !in found.types && "storyPin8" !in found.types)
+    }
+
+    @Test
+    fun `values of one generic block have a type in common only when their classes share one`() {
+        val source = """
+            data class Cost(val block: String, val cost: Int)
+            suspend fun check() {
+                val storyPin0 = Cost("a", 1)
+                val storyPin1 = (3.0f)
+                val storyPin2 = StringBuilder()
+                val storyPin3 = "x"
+            }
+        """.trimIndent()
+        val found = compiler.environment.analyzer.propertyTypes("generic.stage.kts", source, "storyPin")
+        val system = KotlinTypeSystem(found.classes)
+        val universal = setOf(
+            "java.io.Serializable",
+            "kotlin.Comparable",
+            "java.lang.constant.Constable",
+            "java.lang.constant.ConstantDesc"
+        )
+
+        fun common(vararg pins: Int) =
+            system.commonSupertype(pins.map { found.types.getValue("storyPin$it") }, universal)?.render()
+        assertEquals("kotlin.Any", common(0, 1))
+        assertEquals("kotlin.Any", common(1, 3), "a number and a string share only what every value has")
+        assertEquals("kotlin.CharSequence", common(2, 3))
     }
 
     @Test
@@ -107,7 +151,8 @@ class StageAnalysisTest {
             "\nsuspend fun storyPinOf$index() {\nval storyPin$index = (\n${pin.value}\n)\n}"
         }
         val found = compiler.environment.analyzer.propertyTypes("graph.stage.kts", script, "storyPin").types
-        val types = found.mapKeys { (name, _) -> pins[name.removePrefix("storyPin").toInt()].key }
+        val types =
+            found.entries.associate { (name, type) -> pins[name.removePrefix("storyPin").toInt()].key to type.render() }
         assertEquals("kotlin.String", types["text" to StoryPins.VALUE])
         assertEquals("kotlin.Int", types["sum" to StoryPins.VALUE])
         assertEquals("kotlin.collections.List<kotlin.String>", types["list" to "list"])
@@ -200,6 +245,7 @@ class StageAnalysisTest {
             }
         """
         ).filter { it.severity.isError() }
+
         val afterCheckpoint = errors(
             """
             val iterator = listOf(1).iterator()
@@ -207,7 +253,10 @@ class StageAnalysisTest {
             log(iterator.next().toString())
             """
         )
-        assertTrue(afterCheckpoint.any { "'iterator' is used after checkpoint 'gate'" in it.message }, afterCheckpoint.toString())
+        assertTrue(
+            afterCheckpoint.any { "'iterator' is used after checkpoint 'gate'" in it.message },
+            afterCheckpoint.toString()
+        )
         val afterStage = errors(
             """
             val iterator = listOf(1).iterator()
@@ -286,10 +335,7 @@ class StageAnalysisTest {
         """
         )
         listOf(
-            "Two stages",
-            "must be the body of an @Action",
-            "'lock' cannot be saved",
-            "needs one"
+            "Two stages", "must be the body of an @Action", "'lock' cannot be saved", "needs one"
         ).forEach { expected ->
             assertTrue(errors.any { expected in it.message }, "$expected: $errors")
         }
@@ -366,10 +412,7 @@ class StageAnalysisTest {
         """.trimIndent()
         val items = ArrayList<String>()
         compiler.environment.analyzer.completions(
-            "names.stage.kts",
-            source,
-            source.indexOf("\"ar\")") + 3,
-            CompletionSink { batch ->
+            "names.stage.kts", source, source.indexOf("\"ar\")") + 3, CompletionSink { batch ->
                 batch.forEach { items += it.show }
                 true
             })

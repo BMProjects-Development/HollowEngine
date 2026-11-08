@@ -7,6 +7,8 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentInsight
 import ru.hollowhorizon.hollowengine.client.ui.ide.kotlinTokenHighlighter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinType
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeSystem
 
 /** The colors analysis gave the Kotlin [text] of a field. */
 internal class StoryFieldColors(val text: String, val highlights: List<UiTextHighlight>) {
@@ -26,10 +28,10 @@ internal class StoryFieldColors(val text: String, val highlights: List<UiTextHig
  *
  * @param checks what is wrong with its nodes.
  * @param fields what it says of its fields, where they are written.
- * @param types what the outputs worked out on the spot are, by node and pin.
- * @param fits by type of value, the types of the places that can hold it, among [places].
- * @param places the types of what links go into that analysis could tell.
+ * @param types what the outputs worked out on the spot are, by node and pin, in the canonical text of [KotlinType].
  * @param written the type the compiler reads each type written in the story or by a command as, `Int` as `kotlin.Int`.
+ * @param system the classes those types and the types of pins take, for telling which of them fit which.
+ * @param generics by block, what `T` of its generic inputs is.
  * @param revision moves on with each analysis.
  */
 internal class StoryAnalysis(
@@ -37,9 +39,9 @@ internal class StoryAnalysis(
     val fields: Map<StoryFieldKey, List<UiTextDiagnostic>> = emptyMap(),
     val colors: Map<StoryFieldKey, StoryFieldColors> = emptyMap(),
     val types: Map<Pair<String, String>, String> = emptyMap(),
-    val fits: Map<String, Set<String>> = emptyMap(),
-    val places: Set<String> = emptySet(),
-    val written: Map<String, String> = emptyMap(),
+    val written: Map<String, KotlinType> = emptyMap(),
+    val system: KotlinTypeSystem = KotlinTypeSystem.EMPTY,
+    val generics: Map<String, StoryGeneric> = emptyMap(),
     val revision: Long = 0L,
 ) {
     /** Whether Kotlin lets a value of the type [from] go into a place of the type [into]; what it has not told, it lets. */
@@ -47,18 +49,29 @@ internal class StoryAnalysis(
 
     /**
      * Whether Kotlin lets a value of the type [from] go into a place of the type [into], subtypes and aliases as it
-     * reads them; null when the analysis has not seen one of the two.
+     * reads them. A value that can be null fits too, as links unwrap it. Null when the analysis cannot tell one of the two.
      */
     fun fits(from: String, into: String): Boolean? {
-        val place = compiled(into)
-        if (place !in places) return null
-        val value = compiled(from)
-        val taken = fits[value] ?: fits[value.removeSuffix("?")] ?: fits["$value?"] ?: return null
-        return place in taken
+        val value = typeOf(from) ?: return null
+        val place = typeOf(into) ?: return null
+        return system.isSubtype(value.nullable(false), place)
     }
 
-    /** [type] as the compiler writes it. */
-    private fun compiled(type: String): String = type.replace("!", "").let { written[it] ?: it }
+    /** What the compiler reads the type written as [text] as: one written in the story, or a canonical one it knows. */
+    fun typeOf(text: String): KotlinType? = written[text] ?: KotlinType.parse(text)?.takeIf(system::knows)
+}
+
+/**
+ * What `T` of a generic block is: the nearest type all that its generic inputs are [given] has, as Kotlin infers it.
+ *
+ * @param values what those inputs were given, for telling whether the block still has them.
+ */
+internal class StoryGeneric(val type: KotlinType, val given: List<KotlinType>, val values: List<StoryGenericValue>) {
+    val mismatched: Boolean
+        get() {
+            val kinds = given.map { it.nullable(false) }.distinct()
+            return (type as? KotlinType.Class)?.name == KotlinType.ANY && kinds.size > 1 && kinds.none { (it as? KotlinType.Class)?.name == KotlinType.ANY }
+        }
 }
 
 /**
@@ -75,14 +88,21 @@ internal object StoryInsight {
     private const val BODY_END = "\n}\n"
     private const val TYPE_START = "\nval storyType: "
     private const val TYPE_END = "\n"
-    private val NO_TYPE = setOf("kotlin.Nothing", "kotlin.Nothing?")
     private val tokens = kotlinTokenHighlighter { StoryKotlin.syntax(it)?.tokens.orEmpty() }
+
+    /**
+     * Interfaces nearly every value of the JDK has, numbers and strings alike, so that values of one block sharing
+     * nothing else are of different types all the same.
+     */
+    private val UNIVERSAL = setOf(
+        "java.io.Serializable", "kotlin.Comparable", "java.lang.constant.Constable", "java.lang.constant.ConstantDesc",
+    )
 
     internal class FieldInsight(val highlighter: UiSyntaxHighlighter, val completions: UiCompletionContributor)
 
     /** What analysis has of the story in [state], which goes when the file closes. */
     internal class Session(val state: StoryEditorState, path: String) : AutoCloseable {
-        val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN, StoryFieldChecks.PLACE)
+        val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN)
         val fields = HashMap<StoryFieldKey, FieldInsight>()
         var graph: StoryGraph? = null
         lateinit var story: GeneratedStory
@@ -95,8 +115,7 @@ internal object StoryInsight {
         val types: UiCompletionContributor by lazy {
             script.completions({ KotlinFragmentContext(current().story.code + TYPE_START, TYPE_END) }) {
                 addImport(
-                    this,
-                    it
+                    this, it
                 )
             }
         }
@@ -147,8 +166,7 @@ internal object StoryInsight {
             ?.let { return KotlinFragmentContext(checked.text.substring(0, it.start), checked.text.substring(it.end)) }
         val frame = checked.frame(field)
         return KotlinFragmentContext(
-            checked.text + BODY_START + frame?.before.orEmpty(),
-            frame?.after.orEmpty() + BODY_END
+            checked.text + BODY_START + frame?.before.orEmpty(), frame?.after.orEmpty() + BODY_END
         )
     }
 
@@ -220,8 +238,7 @@ internal object StoryInsight {
                 span != null -> {
                     ofField(problem, span)?.let { fields.getOrPut(span.field) { ArrayList() } += it }
                     if (error) checks += StoryCheck(
-                        span.field.owner.takeUnless { it.startsWith("variable:") },
-                        problem.message
+                        span.field.owner.takeUnless { it.startsWith("variable:") }, problem.message
                     )
                 }
 
@@ -230,20 +247,46 @@ internal object StoryInsight {
         }
         val colors = checked.spans.associate { span ->
             span.field to StoryFieldColors(
-                span.shown,
-                part(found.highlights, span.start, span.end)
+                span.shown, part(found.highlights, span.start, span.end)
             )
         }
         val properties = found.properties
-        val written = (checked.places + checked.values).entries
-            .mapNotNull { (name, type) -> properties.types[name]?.let { type to it } }.toMap()
-        val places = checked.places.keys.mapNotNullTo(HashSet()) { properties.types[it] }
-        val fits = properties.fits.entries.associate { (value, taken) ->
-            properties.types.getValue(value) to taken.mapNotNullTo(HashSet()) { properties.types[it] }
+        val written =
+            checked.written.entries.mapNotNull { (name, text) -> properties.types[name]?.let { text to it } }.toMap()
+        val system = KotlinTypeSystem(properties.classes)
+        val types = types(session, found)
+        val generics = generics(checked, properties.types, types, system)
+        generics.filterValues { it.mismatched }.forEach { (node, generic) ->
+            val named = generic.given.map { StoryPinType.shortName(it.nullable(false).render()) }.distinct()
+            checks += StoryCheck(node, storyLang("problem.generic_mismatch", named.joinToString(", ")))
         }
-        return StoryAnalysis(
-            checks, fields, colors, types(session, found), fits, places, written, session.analysis.revision + 1,
-        )
+        return StoryAnalysis(checks, fields, colors, types, written, system, generics, session.analysis.revision + 1)
+    }
+
+    private fun generics(
+        checked: StoryCheckScript,
+        properties: Map<String, KotlinType>,
+        pins: Map<Pair<String, String>, String>,
+        system: KotlinTypeSystem,
+    ): Map<String, StoryGeneric> {
+        val fields =
+            checked.arguments.entries.mapNotNull { (name, field) -> properties[name]?.let { field to it } }.toMap()
+        return checked.generics.mapNotNull { (node, values) ->
+            val given = values.map { value ->
+                val type = when (value) {
+                    is StoryGenericValue.Linked -> pins[value.node to value.pin]?.let(KotlinType::parse)
+                    is StoryGenericValue.Written -> fields[value.field]
+                } ?: return@mapNotNull null
+                if (value.empty) type.nullable(false) else type
+            }
+            system.commonSupertype(given, UNIVERSAL)?.let { node to StoryGeneric(it, given, values) }
+        }.toMap()
+    }
+
+    fun generic(state: StoryEditorState, node: String): KotlinType? {
+        val session = session(state)
+        val generic = analysis(session).generics[node] ?: return null
+        return generic.type.takeIf { generic.values == session.checked.generics[node] }
     }
 
     /**
@@ -261,9 +304,7 @@ internal object StoryInsight {
             )
 
             problem.severity == UiTextDiagnosticSeverity.ERROR -> problem.copy(
-                start = 0,
-                end = length,
-                fixes = emptyList()
+                start = 0, end = length, fixes = emptyList()
             )
 
             else -> null
@@ -274,7 +315,8 @@ internal object StoryInsight {
     private fun types(session: Session, found: KotlinFragmentAnalysis): Map<Pair<String, String>, String> {
         val pins = session.checked.pins
         val named = found.properties.types.entries.mapNotNull { (name, type) ->
-            pins[name]?.let { it to type }?.takeUnless { it.second in NO_TYPE }
+            pins[name]?.takeUnless { (type as? KotlinType.Class)?.name == KotlinType.NOTHING }
+                ?.let { it to type.render() }
         }
         return session.analysis.types.filterKeys { it !in pins.values } + named
     }
@@ -287,8 +329,7 @@ internal object StoryInsight {
         val text = code.substring(code.lastIndexOf('\n', (start - 1).coerceAtLeast(0)) + 1, start)
         if (session.story.problems.any { !it.warning }) return null
         return session.story.nodeAt(line)?.let { StoryCheck(it, problem.message) } ?: StoryCheck(
-            null,
-            problem.message
+            null, problem.message
         ).takeIf { text.startsWith(IMPORT) || text.trim() == DECLARATION }
     }
 }
