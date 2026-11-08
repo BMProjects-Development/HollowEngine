@@ -12,11 +12,10 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
  * nothing at all goes back to `<T>`. A block keeps its type while something still hangs on its other pins.
  */
 internal object StoryGenericBlocks {
-    private const val ROUNDS = 4
-
     fun settled(graph: StoryGraph, state: StoryEditorState): StoryGraph {
         var current = graph
-        repeat(ROUNDS) {
+        val seen = HashSet<StoryGraph>()
+        while (seen.add(current)) {
             val boxes = StoryGraphBoxes(current, state)
             val next = current.nodes.filterIsInstance<StoryNode.Pure>().fold(current) { each, node ->
                 val family = TypeOperators.familyOf(node.operator) ?: return@fold each

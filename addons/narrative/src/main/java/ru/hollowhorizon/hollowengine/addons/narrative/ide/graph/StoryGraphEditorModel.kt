@@ -29,8 +29,8 @@ import kotlin.reflect.full.isSubclassOf
  * The boxes of one analyzed graph, and what can be read off them wherever they stand. A node that stays where it was
  * keeps its box, so a drag recomposes only the nodes it moves.
  */
-internal class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditorState) {
-    private val layout = StoryNodeLayout(graph, state, ::outputKotlin, ::inputKotlin)
+class StoryGraphBoxes(private val graph: StoryGraph, state: StoryEditorState) {
+    private val layout = StoryNodeLayout(graph, state)
     private val boxes = HashMap<String, StoryNodeBox>()
 
     /** Boxes laid out only to tell what their pins carry. */
@@ -236,10 +236,10 @@ internal class StoryGraphEditorModel(
 
     /** Whether a link can go from [output] to [input], whichever way it gets made. */
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
-        val type = typeOf(output)
-        val from = layout.kotlinOf(output)?.takeIf(StoryGenerics::isKnown)
-        val to = layout.kotlinOf(input)?.takeIf(StoryGenerics::isKnown)
         val analysis = StoryInsight.analysis(state, state.root() ?: graph)
+        val from = layout.kotlinOf(output)?.takeIf { analysis.known(it) != null }
+        val to = layout.kotlinOf(input)?.takeIf { analysis.known(it) != null }
+        val type = typeOf(output)
         if (!type.converts && from != null && to != null) analysis.fits(from, to)?.let { return it }
         if (!type.fits(typeOf(input))) return false
         if (type.converts || from == null || to == null) return true

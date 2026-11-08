@@ -4,8 +4,6 @@ import org.junit.jupiter.api.TestInstance
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionSink
 import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinType
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -57,11 +55,7 @@ class StageAnalysisTest {
                 val other = 1
             }
         """.trimIndent()
-        val types = compiler.environment.analyzer.propertyTypes(
-            "types.stage.kts",
-            source,
-            "storyPin"
-        ).types.mapValues { it.value.render() }
+        val types = compiler.environment.analyzer.propertyTypes("types.stage.kts", source, "storyPin").types
         assertEquals(
             mapOf("storyPin0" to "kotlin.collections.List<kotlin.String>", "storyPin1" to "kotlin.String"), types
         )
@@ -80,52 +74,123 @@ class StageAnalysisTest {
                 val storyPin6: Iterable<*> = listOf<Int>()
                 val storyPin7: Missing = ""
                 val storyPin8: List<Missing> = listOf()
+                val storyPin9: String? = null
+                val storyPin10 = System.getProperty("a")
+                val storyPin11 = "x"
             }
         """.trimIndent()
         val found = compiler.environment.analyzer.propertyTypes("fits.stage.kts", source, "storyPin")
-        val system = KotlinTypeSystem(found.classes)
         fun fits(from: Int, into: Int) =
-            system.isSubtype(found.types.getValue("storyPin$from"), found.types.getValue("storyPin$into"))
+            found.types.getValue("storyPin$into") in found.fits.getValue(found.types.getValue("storyPin$from"))
         assertEquals(true, fits(0, 4))
         assertEquals(true, fits(1, 6))
         assertEquals(false, fits(1, 4))
         assertEquals(false, fits(2, 4))
         assertEquals(true, fits(3, 6), "a Java class reaches Kotlin's collections through its supertypes")
         assertEquals(false, fits(3, 4))
+        assertEquals(true, fits(9, 11), "a value that can be null fits once it is not")
+        assertEquals(true, fits(0, 0), "a type fits itself")
         assertEquals(
             "java.util.ArrayList<java.lang.StringBuilder>",
-            found.types.getValue("storyPin3").render(),
+            found.types.getValue("storyPin3"),
             "an alias is the type it stands for"
         )
-        assertTrue(found.types.getValue("storyPin5") is KotlinType.Class, "a type with no name of its own is made one")
+        assertEquals("kotlin.String", found.types.getValue("storyPin10"), "a platform type is read as not null")
+        assertTrue(found.types.getValue("storyPin5").startsWith("kotlin."), "a type with no name of its own is made one")
         assertTrue("storyPin7" !in found.types && "storyPin8" !in found.types)
     }
 
     @Test
-    fun `values of one generic block have a type in common only when their classes share one`() {
+    fun `a field is checked against the type a linked value has, as analysis names it`() {
         val source = """
             data class Cost(val block: String, val cost: Int)
             suspend fun check() {
                 val storyPin0 = Cost("a", 1)
-                val storyPin1 = (3.0f)
-                val storyPin2 = StringBuilder()
-                val storyPin3 = "x"
+                val storyPin1 = listOf(Cost("a", 1))
             }
         """.trimIndent()
-        val found = compiler.environment.analyzer.propertyTypes("generic.stage.kts", source, "storyPin")
-        val system = KotlinTypeSystem(found.classes)
-        val universal = setOf(
-            "java.io.Serializable",
-            "kotlin.Comparable",
-            "java.lang.constant.Constable",
-            "java.lang.constant.ConstantDesc"
-        )
+        val found = compiler.environment.analyzer.propertyTypes("declared.stage.kts", source, "storyPin").types
+        val cost = found.getValue("storyPin0")
+        val list = found.getValue("storyPin1")
 
-        fun common(vararg pins: Int) =
-            system.commonSupertype(pins.map { found.types.getValue("storyPin$it") }, universal)?.render()
-        assertEquals("kotlin.Any", common(0, 1))
-        assertEquals("kotlin.Any", common(1, 3), "a number and a string share only what every value has")
-        assertEquals("kotlin.CharSequence", common(2, 3))
+        fun errors(type: String, code: String) = diagnostics(
+            "$source\nsuspend fun storyCheck0() {\nval storyValue: $type = (\n$code\n)\n}"
+        ).filter { it.severity.isError() }
+        assertEquals(emptyList(), errors(cost, "Cost(\"b\", 2)"), "a class of the script is named so the script reads it")
+        assertEquals(emptyList(), errors(list, "listOf(Cost(\"b\", 2))"))
+        assertTrue(errors(cost, "1f").isNotEmpty(), "a value of another type is an error in its field")
+    }
+
+    /**
+     * A generic block is checked as a call of functions written for it: the first values linked in fix its type
+     * parameters, or the place its output goes into does, and the rest of its inputs are checked against them.
+     */
+    @Test
+    fun `a generic block is typed the way Kotlin infers a call`() {
+        val source = """
+            data class Cost(val block: String, val cost: Int)
+            class StorySink<in X>
+            fun <X> storySink(): StorySink<X> = StorySink()
+            class StoryBlock0<T> {
+                fun call(p0: T, p1: T) {}
+                fun pin0(): T = TODO()
+                fun pin2(): List<T> = TODO()
+            }
+            fun <T> storyFix0(p0: T): StoryBlock0<T> = StoryBlock0()
+            suspend fun storyFixed0() = storyFix0((Cost("a", 1))!!)
+            suspend fun storyBlock0() {
+                val storyLinked0 = (Cost("a", 1))!!
+                storyFix0(storyLinked0).call(p0 = storyLinked0, p1 = (
+                1f
+                ))
+                val storyPinFix0 = storyFixed0().pin0()
+                val storyPinFix1 = storyFixed0().pin2()
+            }
+            class StoryBlock1<T> {
+                fun call(p0: T) {}
+                fun pin0(): T = TODO()
+            }
+            fun <T> storyPlace1(into: StorySink<List<T>>): StoryBlock1<T> = StoryBlock1()
+            suspend fun storyFixed1() = storyPlace1(storySink<Iterable<Cost>>())
+            suspend fun storyBlock1() {
+                storyFixed1().call(p0 = (
+                1
+                ))
+                val storyPinFix2 = storyFixed1().pin0()
+            }
+            suspend fun storyFixed2() = storyPlace1(storySink<Iterable<*>>())
+            suspend fun storyBlock2() {
+                storyFixed2().call(p0 = (
+                1
+                ))
+                val storyPinFix3 = storyFixed2().pin0()
+            }
+            class StoryBlock3<V> {
+                fun <K> call(p0: K, p1: V) {}
+                fun pin1(): V = TODO()
+            }
+            fun <V> storyPlace3(into: StorySink<V>): StoryBlock3<V> = StoryBlock3()
+            suspend fun storyFixed3() = storyPlace3(storySink<Cost>())
+            suspend fun storyBlock3() {
+                storyFixed3().call(p0 = (
+                "key"
+                ), p1 = (
+                2
+                ))
+                val storyPinFix5 = storyFixed3().pin1()
+            }
+        """.trimIndent()
+        val lines = source.lines()
+        val errors = diagnostics(source).filter { it.severity.isError() }
+            .map { lines[it.range.start.line].trim() to it.message }
+        val found = compiler.environment.analyzer.propertyTypes("generic.stage.kts", source, "storyPin").types
+        assertEquals("Cost", found["storyPinFix0"]?.substringAfterLast('.'), "the first value linked in tells the type")
+        assertTrue(found["storyPinFix1"].orEmpty().endsWith("List<Cost>"), found.toString())
+        assertEquals("Cost", found["storyPinFix2"]?.substringAfterLast('.'), "the place an output goes into tells the type")
+        assertTrue("storyPinFix3" !in found, "a place that tells nothing fixes nothing")
+        assertEquals("Cost", found["storyPinFix5"]?.substringAfterLast('.'), "a place fixes the parameters its output has")
+        val inBlocks = errors.filter { (line, _) -> line == "1f" || line == "1" || line == "2" || ".call(" in line }
+        assertEquals(listOf("1", "1f", "2"), inBlocks.map { it.first }.sorted(), errors.toString())
     }
 
     @Test
@@ -152,7 +217,7 @@ class StageAnalysisTest {
         }
         val found = compiler.environment.analyzer.propertyTypes("graph.stage.kts", script, "storyPin").types
         val types =
-            found.entries.associate { (name, type) -> pins[name.removePrefix("storyPin").toInt()].key to type.render() }
+            found.entries.associate { (name, type) -> pins[name.removePrefix("storyPin").toInt()].key to type }
         assertEquals("kotlin.String", types["text" to StoryPins.VALUE])
         assertEquals("kotlin.Int", types["sum" to StoryPins.VALUE])
         assertEquals("kotlin.collections.List<kotlin.String>", types["list" to "list"])

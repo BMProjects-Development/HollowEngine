@@ -16,7 +16,7 @@ private const val CHANNEL = 255f
 private const val CloseIcon = "hollowengine:textures/gui/icons/close.png"
 
 /** Kotlin of a field opened in a full editor. */
-internal class StoryCodeField(val key: StoryFieldKey, val title: String, val value: String, val write: (String) -> Unit)
+class StoryCodeField(val key: StoryFieldKey, val title: String, val value: String, val write: (String) -> Unit)
 
 /** The full editor of [field], with line numbers and everything analysis knows. Every change is written at once. */
 @Composable

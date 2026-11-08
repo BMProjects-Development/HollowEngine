@@ -1,14 +1,15 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
-import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.LIST_OF
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.MAP_OF
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.generic
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.input
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.number
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.operator
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.out
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.outOf
-import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.typed
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
 
@@ -18,9 +19,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
  * @param param the parameter of the function of a [StoryOperator.function] it passes, which says how its field is
  * written, what it offers and what it is called.
  * @param path where it sits among the sections of the block, `jumps.maxGap` under `jumps`.
- * @param generic whether it takes `T`: the type of the first value linked into such an input of the block, or else of
- * what a generic output of the block is linked to, which every such pin of the block then carries.
- * @param takesEmpty whether it takes a value that may be missing, `T?`.
+ * @param shape the exact type it takes, written with the type parameters of the block, as `List<T>` or `T?`; what is
+ * given to such inputs and taken from such outputs tells what those parameters are.
  * @param typeName whether it names a Kotlin type rather than takes a value: it has no pin, and its field goes into
  * the template as it is written, as in `$value as? $type`.
  */
@@ -30,10 +30,11 @@ data class StoryOperatorInput(
     val default: String = "",
     val param: StoryParam? = null,
     val path: String = name,
-    val generic: Boolean = false,
-    val takesEmpty: Boolean = false,
+    val shape: String? = null,
     val typeName: Boolean = false,
 ) {
+    val generic: Boolean get() = shape?.let(StoryOperatorDsl::parametersOf)?.isNotEmpty() == true
+
     /** What is typed into the field of this input as Kotlin. */
     fun expression(text: String): String =
         param?.let { StoryLiterals.expression(text, it.type) } ?: type.expression(text)
@@ -49,8 +50,7 @@ data class StoryOperatorInput(
  * @param kotlin its exact type, until analysis tells it for the inputs at hand.
  * @param empty what it reads with none of the inputs of a variadic operator given.
  * @param path where it sits among the sections of the block.
- * @param generic whether it gives `T`, the type the generic inputs of the block take.
- * @param shape the type it gives when [generic], `T` standing for that type, as in `List<T>`.
+ * @param shape the type it gives, written with the type parameters of the block, as `List<T>`.
  * @param typeOf the input naming the type it gives, which may be missing.
  * @param title what the editor calls it instead of [name], a lang key or plain text.
  */
@@ -61,11 +61,12 @@ data class StoryOperatorOutput(
     val kotlin: String? = null,
     val empty: String? = null,
     val path: String = name,
-    val generic: Boolean = false,
-    val shape: String = "T",
+    val shape: String? = null,
     val typeOf: String? = null,
     val title: String? = null,
-)
+) {
+    val generic: Boolean get() = shape?.let(StoryOperatorDsl::parametersOf)?.isNotEmpty() == true
+}
 
 /**
  * A value worked out on the spot: no flow goes through it, and every node reading it reads it anew.
@@ -196,16 +197,10 @@ object StoryOperators {
             out("is", BOOL, $$"($value is $type)"),
         ),
         operator(
-            "equal",
-            "values.logic",
-            listOf(generic("a", "0"), generic("b", "0")),
-            out("result", BOOL, $$"$a == $b")
+            "equal", "values.logic", listOf(generic("a", "0"), generic("b", "0")), out("result", BOOL, $$"$a == $b")
         ),
         operator(
-            "not-equal",
-            "values.logic",
-            listOf(generic("a", "0"), generic("b", "0")),
-            out("result", BOOL, $$"$a != $b")
+            "not-equal", "values.logic", listOf(generic("a", "0"), generic("b", "0")), out("result", BOOL, $$"$a != $b")
         ),
         logic("and", "&&"),
         logic("or", "||"),
@@ -264,10 +259,7 @@ object StoryOperators {
             out("result", TEXT, $$"$format.format($a, $b, $c, $d)"),
         ),
         operator(
-            "to-text",
-            "values.text",
-            listOf(input("value", ANY, "\"\"")),
-            out("result", TEXT, $$"$value.toString()")
+            "to-text", "values.text", listOf(input("value", ANY, "\"\"")), out("result", TEXT, $$"$value.toString()")
         ),
         operator(
             "to-number",
@@ -294,73 +286,69 @@ object StoryOperators {
 
         operator(
             "list", "values.list", listOf(generic("a"), generic("b"), generic("c")),
-            outOf("list", "listOf(\$*)")
-                .copy(type = LIST, empty = "emptyList<Nothing>()", shape = "List<T>"),
+            outOf("list", "listOf(\$*)", LIST_OF, LIST).copy(empty = "emptyList<Nothing>()"),
         ).copy(variadic = true),
         operator(
             "range", "values.list", listOf(number("from"), number("to", "9")),
             out("list", LIST, $$"($from.toInt()..$to.toInt()).toList()").copy(kotlin = "List<Int>"),
         ),
         operator(
-            "list-size",
-            "values.list",
-            listOf(input("list", LIST)),
-            out("size", NUMBER, $$"$list.size.toDouble()")
+            "list-size", "values.list", listOf(input("list", LIST)), out("size", NUMBER, $$"$list.size.toDouble()")
         ),
         operator(
             "list-get",
             "values.list",
-            listOf(input("list", LIST), number("index")),
-            out("item", ANY, $$"$list[$index.toInt()]")
+            listOf(typed("list", LIST_OF, LIST), number("index")),
+            outOf("item", $$"$list[$index.toInt()]")
         ),
         operator(
             "list-contains",
             "values.list",
-            listOf(input("list", LIST), input("item", ANY)),
+            listOf(typed("list", LIST_OF, LIST), generic("item")),
             out("result", BOOL, $$"$item in $list")
         ),
         operator(
             "list-add",
             "values.list",
-            listOf(input("list", LIST), input("item", ANY)),
-            out("list", LIST, $$"$list + $item")
+            listOf(typed("list", LIST_OF, LIST), generic("item")),
+            outOf("list", $$"$list + $item", LIST_OF, LIST)
         ),
         operator(
             "list-remove",
             "values.list",
-            listOf(input("list", LIST), input("item", ANY)),
-            out("list", LIST, $$"$list - $item")
+            listOf(typed("list", LIST_OF, LIST), generic("item")),
+            outOf("list", $$"$list - $item", LIST_OF, LIST)
         ),
 
         operator(
             "map-get",
             "values.list",
-            listOf(input("map", MAP), input("key", ANY)),
-            out("value", ANY, $$"$map[$key]")
+            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
+            outOf("value", $$"$map[$key]", "V?")
         ),
         operator(
             "map-has",
             "values.list",
-            listOf(input("map", MAP), input("key", ANY)),
+            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
             out("result", BOOL, $$"$key in $map")
         ),
         operator(
             "map-put",
             "values.list",
-            listOf(input("map", MAP), input("key", ANY), input("value", ANY)),
-            out("map", MAP, $$"$map + ($key to $value)")
+            listOf(typed("map", MAP_OF, MAP), typed("key", "K"), typed("value", "V")),
+            outOf("map", $$"$map + ($key to $value)", MAP_OF, MAP)
         ),
         operator(
             "map-remove",
             "values.list",
-            listOf(input("map", MAP), input("key", ANY)),
-            out("map", MAP, $$"$map - $key")
+            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
+            outOf("map", $$"$map - $key", MAP_OF, MAP)
         ),
         operator(
             "map-keys",
             "values.list",
-            listOf(input("map", MAP)),
-            out("keys", LIST, $$"$map.keys.toList()").copy(kotlin = "List<Any?>"),
+            listOf(typed("map", MAP_OF, MAP)),
+            outOf("keys", $$"$map.keys.toList()", "kotlin.collections.List<K>", LIST),
             out("size", NUMBER, $$"$map.size.toDouble()"),
         ),
     )

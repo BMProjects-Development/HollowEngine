@@ -10,7 +10,7 @@ import ru.hollowhorizon.hollowengine.client.ui.graph.GraphRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 
 /** A pin of a row. [kotlin] is the exact type it carries, when [type] alone does not say. */
-internal data class StoryPinSpec(val name: String, val type: StoryPinType, val kotlin: String? = null)
+data class StoryPinSpec(val name: String, val type: StoryPinType, val kotlin: String? = null)
 
 /**
  * The value a row edits in place.
@@ -28,7 +28,7 @@ internal data class StoryPinSpec(val name: String, val type: StoryPinType, val k
  * @param slot whether it holds a slot of the inventory, which a picture of the inventory picks.
  * @param write gets what is typed, as the field shows it.
  */
-internal class StoryRowField(
+class StoryRowField(
     val key: String,
     val value: String,
     val placeholder: String = "",
@@ -60,7 +60,7 @@ internal class StoryRowField(
  * @param hidden whether a folded section hides the row: its pins then sit on the heading, and nothing of it is drawn.
  * @param depth how many sections the row is inside.
  */
-internal class StoryNodeRow(
+class StoryNodeRow(
     val top: Float,
     val height: Float,
     val label: String? = null,
@@ -78,11 +78,11 @@ internal class StoryNodeRow(
     val depth: Int = 0,
 )
 
-internal class StoryRowSection(val open: Boolean, val toggle: () -> Unit)
-internal class StoryRowBand(val top: Float, val bottom: Float, val depth: Int)
+class StoryRowSection(val open: Boolean, val toggle: () -> Unit)
+class StoryRowBand(val top: Float, val bottom: Float, val depth: Int)
 
 /** Where everything of one node sits, in graph units from the corner of the node. */
-internal class StoryNodeBox(
+class StoryNodeBox(
     val node: StoryNode,
     val title: String,
     val icon: String?,

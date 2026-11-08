@@ -34,7 +34,7 @@ data class GeneratedStory(val code: String, val nodes: List<String?>, val proble
  * never counts twice.
  */
 class StoryGraphCompiler private constructor(
-    source: StoryGraph,
+    private val source: StoryGraph,
     private val functions: StoryFunctions,
     private val detached: Boolean = false,
     private val location: String? = null,
@@ -93,6 +93,7 @@ class StoryGraphCompiler private constructor(
         index()
         val body = render()
         val classes = resultClasses()
+        importDetached()
         val header = stories.map { "@file:Import(${literal(it)})" } +
             listOfNotNull(location?.let { "package ${StoryPackages.of(it)}" }) +
             imports.map { "import $it" } + graph.variables.map(::declaration) + classes + outputDeclarations()
@@ -101,6 +102,17 @@ class StoryGraphCompiler private constructor(
             nodes = header.map { null } + body.second,
             problems = problems,
         )
+    }
+
+    /**
+     * Imports what the outputs worked out on the spot name, those of nodes left out of the flow too: the editor checks
+     * them all against this script, and a class it cannot see there is of no type at all.
+     */
+    private fun importDetached() {
+        val detached = StoryGraphCompiler(source, functions, detached = true, location = location)
+        detached.pinValues()
+        imports += detached.imports
+        stories += detached.stories
     }
 
     /** What each output worked out on the spot reads, in Kotlin that stands on its own outside of the flow. */

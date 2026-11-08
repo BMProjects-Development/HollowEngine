@@ -97,12 +97,12 @@ interface ScriptingAnalyzer {
 /**
  * What analysis says of named properties.
  *
- * @param types what each of them is.
- * @param classes the classes those types name, with their supertypes and the classes of their arguments, all the way up.
+ * @param types what each of them is, as Kotlin writes it with every class named in full: `kotlin.collections.List<a.B?>`.
+ * @param fits for each of those types, the ones among them a value of it goes into once it is not null, itself too.
  */
 data class KotlinPropertyTypes(
-    val types: Map<String, KotlinType> = emptyMap(),
-    val classes: Map<String, KotlinClassInfo> = emptyMap(),
+    val types: Map<String, String> = emptyMap(),
+    val fits: Map<String, Set<String>> = emptyMap(),
 )
 
 /**

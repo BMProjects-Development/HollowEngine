@@ -67,6 +67,7 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val arranged = remember(graph) { arrange(graph) }
     val ownChecks = remember(root) { StoryChecks.all(root) }
     val analysis = StoryInsight.analysis(state, root)
+    SideEffect { state.settle(analysis.revision) }
     val checks = ownChecks + analysis.checks
     val problems = remember(checks) { checks.filter { it.node != null }.groupBy { it.node!! } }
     state.clips = rememberStoryClips(graph)

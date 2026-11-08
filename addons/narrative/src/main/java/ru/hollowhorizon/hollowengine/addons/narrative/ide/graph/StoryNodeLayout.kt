@@ -18,20 +18,17 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.common.utils.Spelling
 
 /**
- * Lays the nodes of [graph] out with the fields that edit them in [state].
- *
- * @param sources the exact type the output of a node gives, by node and pin, which the generic pins of a block take.
- * @param consumers the exact type the input of a node takes, by node and pin, which the generic pins of a block take
- * when nothing linked into them says.
+ * Lays the nodes of [graph] out with the fields that edit them in [state]. The types of generic pins are what the
+ * analysis of the story fixed them to.
  */
 internal class StoryNodeLayout(
     internal val graph: StoryGraph,
     internal val state: StoryEditorState,
-    private val sources: (String, String) -> String? = { _, _ -> null },
-    private val consumers: (String, String) -> String? = { _, _ -> null },
 ) {
     private val linked = graph.index.values.keys
-    private val types = StoryInsight.analysis(state, state.root() ?: graph).types
+    private val analysis = StoryInsight.analysis(state, state.root() ?: graph)
+    private val types = analysis.types
+    private val fixed = analysis.fixed
 
     /**
      * The box of [node], with its corner at [place].
@@ -563,10 +560,9 @@ internal class StoryNodeLayout(
 
         private fun pure(node: StoryNode.Pure) {
             val operator = StoryOperators.find(node.operator) ?: return
-            val generic = genericOf(node, operator)
-            val inputs = StoryOperators.inputsOf(node).map { input -> generic?.let { input.of(it) } ?: input }
+            val inputs = StoryOperators.inputsOf(node).map { input -> fixed[node.id to input.name]?.let { input.of(it) } ?: input }
             fun kotlinOf(input: StoryOperatorInput) = when {
-                input.generic && generic != null -> if (input.takesEmpty) "$generic?" else generic
+                input.generic -> fixed[node.id to input.name] ?: input.shape?.let { StoryOperatorDsl.starred(it) ?: it }
                 else -> input.param?.type?.let(StoryKotlinTypes::name)
             }
             folded(
@@ -594,12 +590,11 @@ internal class StoryNodeLayout(
             )
             if (operator.variadic) row(onAdd = { state.change { addInput(node.id) } })
             fun pin(output: StoryOperatorOutput): StoryPinSpec {
-                if (output.generic) {
-                    val analyzed = types[node.id to output.name]?.takeIf {
-                        generic != null && StoryGenerics.elementOf(output.shape, it)?.removeSuffix("?") == generic
-                    }
-                    val kotlin = analyzed ?: StoryGenerics.shaped(output.shape, generic ?: "T")
-                    return StoryPinSpec(output.name, if (generic == null) output.type else StoryPinType.ofName(kotlin), kotlin)
+                val shape = output.shape
+                if (shape != null && output.generic) {
+                    val solved = fixed[node.id to output.name]
+                    val kotlin = solved ?: types[node.id to output.name] ?: shape
+                    return StoryPinSpec(output.name, if (solved == null) output.type else StoryPinType.ofName(solved), kotlin)
                 }
                 val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }
                 val kotlin = types[node.id to output.name] ?: named ?: output.kotlin
@@ -621,31 +616,15 @@ internal class StoryNodeLayout(
         }
 
         /**
-         * The type `T` the generic pins of [operator] carry in [node], never missing, since one that may be is what
-         * such a pin takes as `T?`.
+         * A generic input of a block that fixed it to [type]: one taking a bare parameter, as `T`, gets the pin type and
+         * the field of a parameter of that type.
          */
-        private fun genericOf(node: StoryNode.Pure, operator: StoryOperator): String? {
-            StoryInsight.generic(state, node.id)?.let { return it.nullable(false).render() }
-            val generics = operator.outputs.asSequence().filter { it.generic }
-            val given = StoryOperators.inputsOf(node).asSequence().filter { it.generic }.mapNotNull { input ->
-                graph.links.firstOrNull { it.to == node.id && it.toPin == input.name }?.let { sources(it.from, it.fromPin) }
-            }
-            val typed = generics.mapNotNull { output ->
-                types[node.id to output.name]?.let { StoryGenerics.elementOf(output.shape, it) }
-            }
-            val taken = generics.flatMap { output ->
-                graph.links.asSequence().filter { it.from == node.id && it.fromPin == output.name }
-                    .mapNotNull { link -> consumers(link.to, link.toPin)?.let { StoryGenerics.elementOf(output.shape, it) } }
-            }
-            return (given + typed + taken).map { it.removeSuffix("?") }.firstOrNull(StoryGenerics::isKnown)
-        }
-
-        /** A generic input as one of [type]: of its pin type, and with the field a parameter of the type has. */
         private fun StoryOperatorInput.of(type: String): StoryOperatorInput {
-            if (!generic) return this
-            val kind = (StoryPinType.classOf(type) ?: TypeOperators.qualified(type)?.let(StoryPinType::classOf))?.starProjectedType
+            shape?.removeSuffix("?")?.takeIf { StoryOperatorDsl.parametersOf(it) == listOf(it) } ?: return this
+            val named = type.removeSuffix("?")
+            val kind = (StoryPinType.classOf(named) ?: TypeOperators.qualified(named)?.let(StoryPinType::classOf))?.starProjectedType
             val param = kind?.let { StoryParam(name, it, traits = StoryParamTrait.choices(StoryCommand.suggestions(it))) }
-            return copy(type = StoryPinType.ofName(type), param = param ?: this.param)
+            return copy(type = StoryPinType.ofName(named), param = param ?: this.param)
         }
 
         /** The row of [input] of [node] naming a type: a field with the types in reach, and no pin. */

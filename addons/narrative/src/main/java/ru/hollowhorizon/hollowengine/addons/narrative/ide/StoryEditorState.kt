@@ -34,10 +34,10 @@ internal object StoryUndo {
 }
 
 /** A node of a story, or the branch of it that leaves by [pin]. */
-internal data class StorySelection(val node: String, val pin: String? = null)
+data class StorySelection(val node: String, val pin: String? = null)
 
 /** What the editors of a `.story` share: the file as a graph and what is selected. Every edit is written to the file. */
-internal open class StoryEditorState : AutoCloseable {
+open class StoryEditorState : AutoCloseable {
     /** The file drawn now; the inspector, drawn elsewhere, reads and writes through it. */
     var context: HollowIdePreviewContext? = null
 
@@ -66,7 +66,7 @@ internal open class StoryEditorState : AutoCloseable {
     /** Whether the inspector shows the Kotlin of the story. */
     var showsKotlin by mutableStateOf(false)
 
-    /** The id of the function the editor is inside of, or null while it shows the story itself. */
+    /** The id of the function the editor is inside, or null while it shows the story itself. */
     var scope by mutableStateOf<String?>(null)
 
     /** The parts of function signatures shown unfolded, by the id of the function and the part; the rest stay folded. */
@@ -80,10 +80,10 @@ internal open class StoryEditorState : AutoCloseable {
     /** The whole file, the functions with their bodies. */
     fun root(): StoryGraph? = context?.let { model.read(it.text).getOrNull() }
 
-    /** What the editor shows: the story, or the body of the function it is inside of. */
+    /** What the editor shows: the story, or the body of the function it is inside. */
     fun read(): StoryGraph? = root()?.scope(scope)
 
-    /** The function the editor is inside of. */
+    /** The function the editor is inside. */
     fun function(): StoryNode.Function? = scope?.let { root()?.node(it) as? StoryNode.Function }
 
     /** The function going inside [node] leads to: the function itself, or the one of this story a call is of. */
@@ -100,17 +100,41 @@ internal open class StoryEditorState : AutoCloseable {
      * @param mergeKey folds the step into the one just before with the same key, as for the letters typed into a field.
      */
     fun change(label: UndoLabel = StoryUndo.EDIT, mergeKey: String? = null, change: StoryGraph.() -> StoryGraph) {
-        val context = context?.takeUnless { it.readOnly } ?: return
         val root = root() ?: return
         val shown = root.scope(scope) ?: return
-        context.edit(root.withScope(scope, StoryGenericBlocks.settled(shown.change(), this)).encode(), label, mergeKey)
+        write(root.withScope(scope, StoryGenericBlocks.settled(shown.change(), this)), label, mergeKey)
     }
 
     /** Writes what [change] makes of the whole file, wherever the editor is. */
     fun changeRoot(label: UndoLabel = StoryUndo.EDIT, mergeKey: String? = null, change: StoryGraph.() -> StoryGraph) {
-        val context = context?.takeUnless { it.readOnly } ?: return
         val root = root() ?: return
-        context.edit(root.change().encode(), label, mergeKey)
+        write(root.change(), label, mergeKey)
+    }
+
+    private class Step(val label: UndoLabel, val key: String, val text: String)
+
+    private var last: Step? = null
+    private var steps = 0
+    private var settledRevision = -1L
+
+    private fun write(root: StoryGraph, label: UndoLabel, mergeKey: String?) {
+        val context = context?.takeUnless { it.readOnly } ?: return
+        val key = mergeKey ?: "story-step-${steps++}"
+        context.edit(root.encode(), label, key)
+        last = Step(label, key, context.text)
+    }
+
+    fun settle(revision: Long) {
+        if (revision == settledRevision) return
+        settledRevision = revision
+        val step = last ?: return
+        val context = context?.takeUnless { it.readOnly || it.text != step.text } ?: return
+        val root = root() ?: return
+        val shown = root.scope(scope) ?: return
+        val settled = StoryGenericBlocks.settled(shown, this)
+        if (settled == shown) return
+        context.edit(root.withScope(scope, settled).encode(), step.label, step.key)
+        last = Step(step.label, step.key, context.text)
     }
 
     /** Changes the node [id]; typing into [field] of it is one step of the history. */

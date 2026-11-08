@@ -31,13 +31,13 @@ internal fun kotlinSyntax(factory: KtPsiFactory, text: String): KotlinSyntax {
     return KotlinSyntax(valid, arguments(body, text), names(body), tokens(body))
 }
 
-/** The types of the properties of [file] whose names start with [prefix], with the classes they take. */
+/** The types of the properties of [file] whose names start with [prefix], and which of them go into which. */
 internal fun propertyTypes(file: KtFile, prefix: String): KotlinPropertyTypes = analyze(file) {
-    val reader = KotlinTypeReader(this)
+    val texts = KotlinTypeTexts(this)
     val types = file.collectDescendantsOfType<KtProperty> { it.name?.startsWith(prefix) == true }
-        .mapNotNull { property -> reader.declared(property.symbol.returnType)?.let { property.name!! to it } }
+        .mapNotNull { property -> texts.declared(property.symbol.returnType)?.let { property.name!! to it } }
         .toMap()
-    KotlinPropertyTypes(types, reader.classes())
+    KotlinPropertyTypes(types, texts.fits())
 }
 
 /** The leaves of [body] that have a color of their own. */

@@ -10,9 +10,9 @@ import ru.hollowhorizon.hollowengine.client.editor.WorldNpcModels
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 
-internal data class StoryNodeClips(val model: String, val names: List<String>?)
+data class StoryNodeClips(val model: String, val names: List<String>?)
 
-internal data class StoryClips(private val byNode: Map<String, StoryNodeClips>) {
+data class StoryClips(private val byNode: Map<String, StoryNodeClips>) {
     fun of(node: String): StoryNodeClips? = byNode[node]
 
     companion object {

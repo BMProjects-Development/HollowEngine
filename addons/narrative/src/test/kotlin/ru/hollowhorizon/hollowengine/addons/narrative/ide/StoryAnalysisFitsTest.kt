@@ -1,8 +1,5 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinClassInfo
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinType
-import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,12 +10,11 @@ class StoryAnalysisFitsTest {
     private val npc = "ru.hollowhorizon.hollowengine.common.npcs.NpcEntity"
     private val entity = "net.minecraft.world.entity.Entity"
     private val analysis = StoryAnalysis(
-        written = mapOf("NpcEntity" to KotlinType.Class(npc)),
-        system = KotlinTypeSystem(
-            mapOf(
-                entity to KotlinClassInfo(entity, supertypes = listOf(KotlinType.Class(KotlinType.ANY))),
-                npc to KotlinClassInfo(npc, supertypes = listOf(KotlinType.Class(entity))),
-            ),
+        written = mapOf("NpcEntity" to npc),
+        relations = mapOf(
+            entity to setOf(entity),
+            npc to setOf(npc, entity, "$npc?"),
+            "$npc?" to setOf(npc, entity, "$npc?"),
         ),
     )
 

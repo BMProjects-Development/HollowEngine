@@ -22,7 +22,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 /** A registry a field names an entry of: its value is written as the commands of the game take it. */
-internal enum class StoryRegistry {
+enum class StoryRegistry {
     ITEM, BLOCK;
 
     /** Every entry, by id, with the stack that shows it. */

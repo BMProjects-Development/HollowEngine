@@ -10,7 +10,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 /** Something wrong with the node [node], or with the story as a whole when it is null. [warning] lets the story run all the same. */
-internal class StoryCheck(val node: String?, val message: String, val warning: Boolean = false)
+class StoryCheck(val node: String?, val message: String, val warning: Boolean = false)
 
 /** What the editors can tell is wrong with a story before it is compiled. Every answer is a line for the author. */
 internal object StoryChecks {

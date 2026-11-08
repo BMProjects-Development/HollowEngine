@@ -175,6 +175,10 @@ object StoryLiterals {
 
     private const val RAW = "\"\"\""
 
+    fun hasPlainForm(kind: KClass<*>): Boolean =
+        kind in TEXTS || kind in HELPED || kind.java.isEnum || kind.isSubclassOf(Tag::class) ||
+            kind.isSubclassOf(DialogueCharacter::class) || kind.isSubclassOf(Entity::class)
+
     /** Types a field takes plain text for. */
     private val TEXTS = setOf(String::class, CharSequence::class, Any::class)
 
