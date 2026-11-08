@@ -37,7 +37,7 @@ internal fun propertyTypes(file: KtFile, prefix: String): KotlinPropertyTypes = 
     val types = file.collectDescendantsOfType<KtProperty> { it.name?.startsWith(prefix) == true }
         .mapNotNull { property -> texts.declared(property.symbol.returnType)?.let { property.name!! to it } }
         .toMap()
-    KotlinPropertyTypes(types, texts.fits())
+    KotlinPropertyTypes(types, texts.fits(), texts.details())
 }
 
 /** The leaves of [body] that have a color of their own. */

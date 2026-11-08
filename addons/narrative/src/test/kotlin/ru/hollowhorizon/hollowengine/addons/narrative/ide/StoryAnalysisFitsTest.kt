@@ -4,6 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
 
 /** Links are checked by what the Kotlin compiler says of the types, whichever way they are written. */
 class StoryAnalysisFitsTest {
@@ -31,5 +33,16 @@ class StoryAnalysisFitsTest {
         assertNull(analysis.fits(npc, "Vec3"))
         assertNull(analysis.fits("a.Unknown", npc))
         assertTrue(analysis.takes("a.Unknown", npc))
+    }
+
+    @Test
+    fun `menu candidates and connections use generic relations before pin colors`() {
+        val strings = "kotlin.collections.List<kotlin.String>"
+        val numbers = "kotlin.collections.List<kotlin.Int>"
+        val analysis = StoryAnalysis(relations = mapOf(strings to setOf(strings), numbers to setOf(numbers)))
+        assertFalse(analysis.accepts(StoryPinType.LIST, strings, StoryPinType.LIST, numbers))
+        assertTrue(analysis.accepts(StoryPinType.LIST, strings, StoryPinType.LIST, strings))
+        assertFalse(analysis.accepts(StoryPinType.FLOW, null, StoryPinType.ANY, null))
+        assertTrue(analysis.accepts(StoryPinType.NUMBER, "kotlin.Double", StoryPinType.NUMBER, "kotlin.Int"))
     }
 }

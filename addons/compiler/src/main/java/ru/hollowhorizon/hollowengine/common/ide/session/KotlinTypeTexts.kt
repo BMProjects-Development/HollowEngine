@@ -2,9 +2,17 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.renderer.types.KaExpandedTypeRenderingMode
+import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
+import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
+import org.jetbrains.kotlin.analysis.api.renderer.types.renderers.KaFlexibleTypeRenderer
+import org.jetbrains.kotlin.analysis.api.symbols.KaClassKind
+import org.jetbrains.kotlin.analysis.api.symbols.KaEnumEntrySymbol
 import org.jetbrains.kotlin.analysis.api.types.*
+import org.jetbrains.kotlin.analysis.utils.printer.PrettyPrinter
 import org.jetbrains.kotlin.name.ClassIdBasedLocality
 import org.jetbrains.kotlin.types.Variance
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeInfo
 
 /** Types analysis resolved, written the way Kotlin writes them with every class named in full, and which go into which. */
 internal class KotlinTypeTexts(private val session: KaSession) {
@@ -15,7 +23,7 @@ internal class KotlinTypeTexts(private val session: KaSession) {
         val platform = (type.fullyExpandedType as? KaFlexibleType)?.lowerBound?.isMarkedNullable == false
         val approximated = type.approximateToDenotableSupertypeOrSelf(allowLocalDenotableTypes = false)
         val denotable = if (platform) approximated.withNullability(false) else approximated
-        text(denotable)?.also { found.putIfAbsent(it, denotable) }
+        denotable.takeIf(::usable)?.render(RENDERER, Variance.INVARIANT)?.also { found.putIfAbsent(it, denotable) }
     }
 
     fun fits(): Map<String, Set<String>> = with(session) {
@@ -25,34 +33,70 @@ internal class KotlinTypeTexts(private val session: KaSession) {
         }
     }
 
-    @OptIn(ClassIdBasedLocality::class)
-    private fun text(type: KaType): String? = with(session) {
-        when (val expanded = type.fullyExpandedType) {
-            is KaFlexibleType -> text(expanded.upperBound)?.removeSuffix("?")
-                ?.plus(if (expanded.lowerBound.isMarkedNullable) "?" else "")
+    fun details(): Map<String, KotlinTypeInfo> = found.mapValues { (_, type) -> info(type) }
 
-            is KaDefinitelyNotNullType -> text(expanded.original)?.removeSuffix("?")
-            is KaTypeParameterType -> expanded.name.asString() + if (expanded.isMarkedNullable) "?" else ""
-            is KaClassType -> {
-                val id = expanded.classId.takeUnless { it.isLocal } ?: return null
-                val arguments = expanded.typeArguments.map { argument ->
-                    when (argument) {
-                        is KaStarTypeProjection -> "*"
-                        is KaTypeArgumentWithVariance -> keyword(argument.variance) + (text(argument.type)
-                            ?: return null)
-                    }
-                }
-                val listed = if (arguments.isEmpty()) "" else arguments.joinToString(prefix = "<", postfix = ">")
-                id.asFqNameString() + listed + if (expanded.isMarkedNullable) "?" else ""
+    private fun info(type: KaType): KotlinTypeInfo = with(session) {
+        val simple = when (val expanded = type.fullyExpandedType) {
+            is KaFlexibleType -> expanded.lowerBound
+            is KaDefinitelyNotNullType -> expanded.original
+            else -> expanded
+        }
+        val classifier = (simple as? KaClassType)?.classId?.asFqNameString()
+        val parents = LinkedHashSet<String>()
+        fun visit(current: KaType) {
+            val symbol = current.expandedSymbol ?: return
+            val name = symbol.classId?.asFqNameString() ?: return
+            if (parents.add(name)) symbol.superTypes.forEach(::visit)
+        }
+        visit(simple)
+        fun containsNothing(current: KaType): Boolean = when (val value = current.fullyExpandedType) {
+            is KaFlexibleType -> containsNothing(value.lowerBound)
+            is KaDefinitelyNotNullType -> containsNothing(value.original)
+            is KaClassType -> value.classId.asFqNameString() == "kotlin.Nothing" || value.typeArguments.any {
+                (it as? KaTypeArgumentWithVariance)?.type?.let(::containsNothing) == true
             }
 
-            else -> null
+            else -> false
+        }
+
+        val symbol = simple.expandedSymbol
+        val entries =
+            symbol?.takeIf { it.classKind == KaClassKind.ENUM_CLASS }?.staticDeclaredMemberScope?.callables?.filterIsInstance<KaEnumEntrySymbol>()
+                ?.map { it.name.asString() }?.toList()
+        KotlinTypeInfo(classifier, parents, type.isMarkedNullable, containsNothing(type), entries)
+    }
+
+    @OptIn(ClassIdBasedLocality::class)
+    private fun usable(type: KaType): Boolean = with(session) {
+        when (val expanded = type.fullyExpandedType) {
+            is KaFlexibleType -> usable(expanded.lowerBound) && usable(expanded.upperBound)
+            is KaDefinitelyNotNullType -> usable(expanded.original)
+            is KaTypeParameterType -> true
+            is KaClassType -> !expanded.classId.isLocal && expanded.typeArguments.all {
+                (it as? KaTypeArgumentWithVariance)?.type?.let(::usable) != false
+            }
+
+            else -> false
         }
     }
 
-    private fun keyword(variance: Variance) = when (variance) {
-        Variance.INVARIANT -> ""
-        Variance.IN_VARIANCE -> "in "
-        Variance.OUT_VARIANCE -> "out "
+    private companion object {
+        val RENDERER = KaTypeRendererForSource.WITH_QUALIFIED_NAMES_WITHOUT_PARAMETER_NAMES.with {
+            expandedTypeRenderingMode = KaExpandedTypeRenderingMode.RENDER_EXPANDED_TYPE
+            flexibleTypeRenderer = object : KaFlexibleTypeRenderer {
+                override fun renderType(
+                    analysisSession: KaSession,
+                    type: KaFlexibleType,
+                    typeRenderer: KaTypeRenderer,
+                    printer: PrettyPrinter,
+                ) = with(analysisSession) {
+                    typeRenderer.renderType(
+                        this,
+                        type.upperBound.withNullability(type.lowerBound.isMarkedNullable),
+                        printer
+                    )
+                }
+            }
+        }
     }
 }

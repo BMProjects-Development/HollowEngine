@@ -2,52 +2,47 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperators
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryTypeShape
 
 class StoryBlockSpan(val node: String, val from: Int, val to: Int)
 
+/** A parameter inferred by K2 from one linked input, independently of the other parameters of its shape. */
+data class StoryGenericKey(val node: String, val pin: String, val parameter: String)
+
 /**
- * The checks of generic blocks, written for the compiler to infer their type parameters the way it infers those of a
- * call.
- *
- * @param graph the story with its functions and reroutes dissolved.
- * @param values the Kotlin each output reads, by node and pin, for the values linked in.
- * @param typeless outputs whose type tells nothing, as `Nothing` or a list of it: a value of such a type fixes nothing.
- * @param parameters the parameters of the function a node is in, as a declaration lists them.
- * @param reads whether Kotlin parses, for leaving out what would break the rest of the script.
+ * Writes Kotlin constraints for generic pins. The first informative link fixes each parameter independently;
+ * output destinations supply parameters the links did not fix. Fields are checked after those choices, so they
+ * cannot widen a linked type. K2 performs extraction from shapes and checking, including inherited generics.
  */
 internal class StoryGenericChecks(
     private val graph: StoryGraph,
     private val values: Map<Pair<String, String>, String>,
-    private val typeless: Set<Pair<String, String>>,
+    private val unknown: Set<StoryGenericKey>,
     private val parameters: (String) -> List<Pair<String, String>>,
     private val reads: (String) -> Boolean,
 ) {
-    private class Slot(val index: Int, val pin: String, val shape: String) {
-        val parameters = StoryOperatorDsl.parametersOf(shape)
+    private class Slot(val index: Int, val pin: String, val shape: StoryTypeShape) {
+        val parameters = shape.parameters
     }
 
     private class Block(val index: Int, val node: StoryNode.Pure, val inputs: List<Slot>, val outputs: List<Slot>) {
         val slots get() = inputs + outputs
     }
 
-    private sealed interface Fix {
-        val parameters: List<String>
-
-        class Linked(val slots: List<Slot>, override val parameters: List<String>) : Fix
-        class Placed(val slot: Slot, val into: String, override val parameters: List<String>) : Fix
+    private class Binding(val slot: Slot, val into: String? = null)
+    private class Fix(val bindings: Map<String, Binding>) {
+        val parameters get() = bindings.keys.toList()
     }
 
-    private val blocks: Map<String, Block> = graph.nodes.filterIsInstance<StoryNode.Pure>().mapNotNull { node ->
+    private val blocks = graph.nodes.filterIsInstance<StoryNode.Pure>().mapNotNull { node ->
         val operator = StoryOperators.find(node.operator) ?: return@mapNotNull null
         val inputs = StoryOperators.inputsOf(node).filter { it.generic }.map { it.name to it.shape!! }
         val outputs = operator.outputs.filter { it.generic }.map { it.name to it.shape!! }
         if (inputs.isEmpty() && outputs.isEmpty()) return@mapNotNull null
         val slots = (inputs + outputs).mapIndexed { index, (pin, shape) -> Slot(index, pin, shape) }
-        node to slots
-    }.mapIndexed { index, (node, slots) ->
-        val inputs = StoryOperators.inputsOf(node).count { it.generic }
+        Triple(node, slots, inputs.size)
+    }.mapIndexed { index, (node, slots, inputs) ->
         node.id to Block(index, node, slots.take(inputs), slots.drop(inputs))
     }.toMap()
 
@@ -58,30 +53,26 @@ internal class StoryGenericChecks(
     private fun source(block: Block, slot: Slot) =
         links[block.node.id to slot.pin]?.let { it.from to it.fromPin }?.takeIf { it in values }
 
-    private fun linked(block: Block): Fix.Linked? {
-        val told = LinkedHashSet<String>()
-        val slots = block.inputs.filter { slot ->
-            val source = source(block, slot)
-            source != null && source !in typeless && told.addAll(slot.parameters)
-        }
-        return if (slots.isEmpty()) null else Fix.Linked(slots, told.toList())
-    }
-
     private fun fix(block: Block): Fix? {
         if (block.node.id in fixes) return fixes[block.node.id]
         if (!fixing.add(block.node.id)) return null
-        val found = linked(block) ?: placed(block)
+        val bindings = LinkedHashMap<String, Binding>()
+        block.inputs.filter { source(block, it) != null }.forEach { slot ->
+            slot.parameters.filter { StoryGenericKey(block.node.id, slot.pin, it) !in unknown }.forEach { name ->
+                bindings.putIfAbsent(name, Binding(slot))
+            }
+        }
+        graph.links.filter { it.from == block.node.id }.forEach { link ->
+            val slot = block.outputs.firstOrNull { it.pin == link.fromPin } ?: return@forEach
+            if (bindings.keys.containsAll(slot.parameters)) return@forEach
+            val into = sinkOf(link.to, link.toPin) ?: return@forEach
+            slot.parameters.forEach { bindings.putIfAbsent(it, Binding(slot, into)) }
+        }
         fixing -= block.node.id
+        val found = bindings.takeIf { it.isNotEmpty() }?.let(::Fix)
         fixes[block.node.id] = found
         return found
     }
-
-    private fun placed(block: Block): Fix.Placed? = graph.links.asSequence().mapNotNull { link ->
-        if (link.from != block.node.id) return@mapNotNull null
-        val slot = block.outputs.firstOrNull { it.pin == link.fromPin } ?: return@mapNotNull null
-        val into = sinkOf(link.to, link.toPin) ?: return@mapNotNull null
-        Fix.Placed(slot, into, slot.parameters)
-    }.firstOrNull()
 
     private fun sinkOf(node: String, pin: String): String? {
         val target = graph.node(node) ?: return null
@@ -91,41 +82,48 @@ internal class StoryGenericChecks(
             return StoryFieldChecks.place(graph, target, pin)?.takeIf { reads("null as $it") }?.let { "storySink<$it>()" }
         }
         val fix = fix(block) ?: return null
-        if (fix is Fix.Linked && slot in fix.slots) return null
+        if (fix.bindings.values.any { it.slot == slot && it.into == null }) return null
         if (!fix.parameters.containsAll(slot.parameters)) return null
         return "${fixed(block)}.sink${slot.index}()"
     }
 
-    private fun fixed(block: Block) =
-        "storyFixed${block.index}(${parameters(block.node.id).joinToString { it.first }})"
+    private fun arguments(block: Block) = parameters(block.node.id).joinToString { it.first }
+    private fun owner(block: Block) = parameters(block.node.id).joinToString { "${it.first}: ${it.second}" }
+    private fun fixed(block: Block) = "storyFixed${block.index}(${arguments(block)})"
+    private fun shapeIndex(block: Block, slot: Slot) = block.slots.first { it.shape == slot.shape }.index
+    private fun shape(block: Block, slot: Slot) = "StoryShape${block.index}_${shapeIndex(block, slot)}"
+    private fun read(block: Block, slot: Slot) = "storyRead${block.index}_${shapeIndex(block, slot)}"
+    private fun place(block: Block, slot: Slot) = "storyPlace${block.index}_${shapeIndex(block, slot)}"
+    private fun typeParameters(names: List<String>) = if (names.isEmpty()) "" else names.joinToString(prefix = "<", postfix = ">")
 
     private fun typedSource(block: Block, slot: Slot): String? {
         val source = source(block, slot) ?: return null
         val from = blocks[source.first]
         val fix = from?.let(::fix)
         val out = from?.outputs?.firstOrNull { it.pin == source.second }
-        if (fix is Fix.Linked && out != null && fix.parameters.containsAll(out.parameters)) {
+        if (fix != null && out != null && fix.parameters.containsAll(out.parameters)) {
             return "${fixed(from)}.pin${out.index}()"
         }
         return values.getValue(source)
     }
 
-    /**
-     * Writes the checks into [text], each field of a generic input in its place among the arguments.
-     *
-     * @param span tells where a field went: its key, what it shows, and where its argument and its Kotlin start and end.
-     * @param left tells of a field that does not parse and stays out.
-     * @return where each check is, and the node and pin of each property telling the type of a fixed pin.
-     */
+    class Written(
+        val blocks: List<StoryBlockSpan>,
+        val fixed: Map<String, Pair<String, String>>,
+        val evidence: Map<String, StoryGenericKey>,
+    )
+
+    /** Writes checks and properties carrying inferred pins and individual parameter evidence. */
     fun write(
         text: StringBuilder,
         span: (StoryFieldKey, String, IntArray) -> Unit,
         left: (StoryFieldKey) -> Unit,
-    ): Pair<List<StoryBlockSpan>, Map<String, Pair<String, String>>> {
-        if (blocks.isEmpty()) return emptyList<StoryBlockSpan>() to emptyMap()
-        text.append("\n\nclass StorySink<in X>\nfun <X> storySink(): StorySink<X> = StorySink()")
+    ): Written {
+        if (blocks.isEmpty()) return Written(emptyList(), emptyMap(), emptyMap())
+        text.append("\n\nclass StorySink<in X>\nfun <X> storySink(): StorySink<X> = StorySink()\nclass StoryType<X>")
         val spans = ArrayList<StoryBlockSpan>()
         val fixed = LinkedHashMap<String, Pair<String, String>>()
+        val evidence = LinkedHashMap<String, StoryGenericKey>()
         blocks.values.forEach { block ->
             val fix = fix(block)
             val linked = block.inputs.mapNotNull { slot -> typedSource(block, slot)?.let { slot to it } }.toMap()
@@ -139,17 +137,19 @@ internal class StoryGenericChecks(
                 }
             }
             declare(text, block, fix, given)
-            val owner = parameters(block.node.id).joinToString { "${it.first}: ${it.second}" }
-            text.append("\n\nsuspend fun storyBlock${block.index}($owner) {\n")
-            linked.forEach { (slot, source) -> text.append("val storyLinked${slot.index} = ($source)!!\n") }
-            val from = text.length
-            when (fix) {
-                is Fix.Linked -> text.append("storyFix${block.index}(")
-                    .append(fix.slots.joinToString { "storyLinked${it.index}" }).append(").call(")
-
-                is Fix.Placed -> text.append("${fixed(block)}.call(")
-                null -> text.append("storyCall${block.index}(")
+            text.append("\n\nsuspend fun storyBlock${block.index}(${owner(block)}) {\n")
+            linked.forEach { (slot, expression) ->
+                text.append("val storyLinked${slot.index} = ($expression)!!\n")
+                slot.parameters.forEachIndexed { index, parameter ->
+                    val name = "${StoryFieldChecks.PIN}Evidence${block.index}_${slot.index}_$index"
+                    // Original expressions keep evidence independent of the previous pass's fixed pins.
+                    val original = values.getValue(source(block, slot)!!)
+                    text.append("val $name = ${read(block, slot)}(($original)!!).pin$index()\n")
+                    evidence[name] = StoryGenericKey(block.node.id, slot.pin, parameter)
+                }
             }
+            val from = text.length
+            if (fix == null) text.append("storyCall${block.index}(") else text.append("${fixed(block)}.call(")
             given.forEachIndexed { index, slot ->
                 if (index > 0) text.append(", ")
                 text.append("p${slot.index} = ")
@@ -174,40 +174,45 @@ internal class StoryGenericChecks(
             }
             text.append("\n}")
         }
-        return spans to fixed
+        return Written(spans, fixed, evidence)
     }
 
     private fun declare(text: StringBuilder, block: Block, fix: Fix?, given: List<Slot>) {
         val n = block.index
-        fun typeParameters(names: List<String>) = if (names.isEmpty()) "" else names.joinToString(prefix = "<", postfix = "> ")
-        fun slots(slots: List<Slot>) = slots.joinToString { "p${it.index}: ${it.shape}" }
+        fun slots(slots: List<Slot>) = slots.joinToString { "p${it.index}: ${it.shape.kotlin}" }
+        block.slots.distinctBy { it.shape }.forEach { slot ->
+            val own = typeParameters(slot.parameters)
+            val shape = shape(block, slot) + own
+            text.append("\nclass $shape {\n")
+            slot.parameters.forEachIndexed { index, parameter ->
+                text.append("fun pin$index(): $parameter = TODO()\n")
+                text.append("fun type$index(): StoryType<$parameter> = StoryType()\n")
+            }
+            text.append("}\nfun $own ${read(block, slot)}(value: ${slot.shape.kotlin}): $shape = ${shape(block, slot)}()")
+            text.append("\nfun $own ${place(block, slot)}(into: StorySink<${slot.shape.nonNullable.kotlin}>): $shape = ${shape(block, slot)}()\n")
+        }
         val told = given.flatMap { it.parameters }.distinct()
         if (fix == null) {
-            text.append("\n\nfun ${typeParameters(told)}storyCall$n(${slots(given)}) {}")
+            text.append("\nfun ${typeParameters(told)} storyCall$n(${slots(given)}) {}")
             return
         }
         val fixed = fix.parameters
-        val own = typeParameters(fixed).trimEnd()
-        text.append("\n\nclass StoryBlock$n$own {\n")
-        text.append("fun ${typeParameters(told - fixed.toSet())}call(${slots(given)}) {}\n")
+        val own = typeParameters(fixed)
+        text.append("\nclass StoryBlock$n$own {\n")
+        text.append("fun ${typeParameters(told - fixed.toSet())} call(${slots(given)}) {}\n")
         block.slots.filter { fixed.containsAll(it.parameters) }.forEach { slot ->
-            text.append("fun pin${slot.index}(): ${slot.shape} = TODO()\n")
-            if (slot in block.inputs) text.append("fun sink${slot.index}(): StorySink<${slot.shape}> = StorySink()\n")
+            text.append("fun pin${slot.index}(): ${slot.shape.kotlin} = TODO()\n")
+            if (slot in block.inputs) text.append("fun sink${slot.index}(): StorySink<${slot.shape.kotlin}> = StorySink()\n")
         }
-        text.append("}")
-        val made = "StoryBlock$n$own = StoryBlock$n()"
-        val owner = parameters(block.node.id).joinToString { "${it.first}: ${it.second}" }
-        when (fix) {
-            is Fix.Linked -> {
-                text.append("\nfun $own storyFix$n(${slots(fix.slots)}): $made")
-                val sources = fix.slots.joinToString { "(${typedSource(block, it)})!!" }
-                text.append("\nsuspend fun storyFixed$n($owner) = storyFix$n($sources)")
-            }
-
-            is Fix.Placed -> {
-                text.append("\nfun $own storyPlace$n(into: StorySink<${fix.slot.shape.removeSuffix("?")}>): $made")
-                text.append("\nsuspend fun storyFixed$n($owner) = storyPlace$n(${fix.into})")
-            }
+        text.append("}\nfun $own storyFix$n(")
+        text.append(fixed.mapIndexed { index, name -> "t$index: StoryType<$name>" }.joinToString())
+        text.append("): StoryBlock$n$own = StoryBlock$n()")
+        val sources = fix.bindings.map { (name, binding) ->
+            val slot = binding.slot
+            val expression = if (binding.into == null) "${read(block, slot)}((${typedSource(block, slot)})!!)"
+                else "${place(block, slot)}(${binding.into})"
+            "$expression.type${slot.parameters.indexOf(name)}()"
         }
+        text.append("\nsuspend fun storyFixed$n(${owner(block)}) = storyFix$n(${sources.joinToString()})")
     }
 }

@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentInsight
 import ru.hollowhorizon.hollowengine.client.ui.ide.kotlinTokenHighlighter
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeInfo
 
 /** The colors analysis gave the Kotlin [text] of a field. */
 class StoryFieldColors(val text: String, val highlights: List<UiTextHighlight>) {
@@ -41,6 +42,7 @@ class StoryAnalysis(
     val written: Map<String, String> = emptyMap(),
     val relations: Map<String, Set<String>> = emptyMap(),
     val revision: Long = 0L,
+    val details: Map<String, KotlinTypeInfo> = emptyMap(),
 ) {
     /** The type [text] stands for when it says what fits it: one the analysis knows, other than `Any`. */
     fun known(text: String): String? = typeOf(text)?.takeUnless { it == ANY }
@@ -55,11 +57,24 @@ class StoryAnalysis(
     fun fits(from: String, into: String): Boolean? {
         val value = typeOf(from) ?: return null
         val place = typeOf(into) ?: return null
-        return place in relations.getValue(value)
+        return relations[value]?.contains(place)
     }
 
     /** What the compiler reads the type written as [text] as: one written in the story, or one it saw written in full. */
     fun typeOf(text: String): String? = written[text] ?: text.takeIf { it in relations }
+
+    fun info(text: String?): KotlinTypeInfo? = text?.let { details[typeOf(it) ?: it] }
+
+    fun pinType(text: String?): StoryPinType = StoryPinType.ofName(text, info(text))
+
+    fun fieldForm(text: String?): StoryFieldForm = StoryFieldForm.ofName(text, info(text))
+
+    /** Shared by existing wires and the menu for adding a node to a wire. */
+    fun accepts(output: StoryPinType, from: String?, input: StoryPinType, into: String?): Boolean {
+        if (output == StoryPinType.FLOW || input == StoryPinType.FLOW) return output == input
+        if (!output.converts && from != null && into != null) fits(from, into)?.let { return it }
+        return output.fits(input)
+    }
 
     private companion object {
         const val ANY = "kotlin.Any"
@@ -93,6 +108,7 @@ object StoryInsight {
         lateinit var checked: StoryCheckScript
         var found: KotlinFragmentAnalysis? = null
 
+        // Field highlighters read this snapshot on Dispatchers.Default; graph analysis replaces it on the UI thread.
         @Volatile
         var analysis = StoryAnalysis()
 
@@ -104,20 +120,20 @@ object StoryInsight {
             }
         }
 
-        private var typeless: Set<Pair<String, String>> = emptySet()
+        private var unknown: Set<StoryGenericKey> = emptySet()
 
         fun of(graph: StoryGraph) = apply {
             if (graph == this.graph) return@apply
             this.graph = graph
             story = StoryGraphCompiler.compile(graph, StoryActionFunctions)
-            checked = StoryFieldChecks.script(graph, story.code, typeless)
+            checked = StoryFieldChecks.script(graph, story.code, unknown)
         }
 
-        fun typeless(typeless: Set<Pair<String, String>>): Boolean {
+        fun inferred(unknown: Set<StoryGenericKey>): Boolean {
             val graph = graph ?: return false
-            if (typeless == this.typeless) return false
-            this.typeless = typeless
-            checked = StoryFieldChecks.script(graph, story.code, typeless)
+            if (unknown == this.unknown) return false
+            this.unknown = unknown
+            checked = StoryFieldChecks.script(graph, story.code, unknown)
             return true
         }
 
@@ -225,12 +241,12 @@ object StoryInsight {
     /**
      * Takes what analysis [found] in the script of [session] as what the compiler says of the story.
      *
-     * @return whether that changed which outputs tell no type, so the script changed and is to be analyzed again.
+     * @return whether individual parameter evidence changed, requiring analysis of the updated constraints.
      */
     fun take(session: Session, found: KotlinFragmentAnalysis): Boolean {
         session.found = found
         session.analysis = analyzed(session, found)
-        return session.typeless(session.checked.typeless(found.properties.types))
+        return session.inferred(session.checked.unknown(found.properties))
     }
 
     private fun analyzed(session: Session, found: KotlinFragmentAnalysis): StoryAnalysis {
@@ -264,6 +280,7 @@ object StoryInsight {
         val fixed = checked.fixed.entries.mapNotNull { (name, pin) -> properties.types[name]?.let { pin to it } }.toMap()
         return StoryAnalysis(
             checks, fields, colors, types(session, found), fixed, written, properties.fits, session.analysis.revision + 1,
+            properties.details,
         )
     }
 
@@ -293,7 +310,7 @@ object StoryInsight {
     private fun types(session: Session, found: KotlinFragmentAnalysis): Map<Pair<String, String>, String> {
         val pins = session.checked.pins
         val named = found.properties.types.entries.mapNotNull { (name, type) ->
-            pins[name]?.takeUnless { StoryCheckScript.tellsNothing(type) }?.let { it to type }
+            pins[name]?.takeUnless { found.properties.details[type]?.containsNothing == true }?.let { it to type }
         }
         return session.analysis.types.filterKeys { it !in pins.values } + named
     }

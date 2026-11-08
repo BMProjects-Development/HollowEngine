@@ -7,6 +7,9 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StoryAnalysis
 
 /** Narrative constraints must be visible before code generation in the built-in IDE. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -22,6 +25,58 @@ class StageAnalysisTest {
     fun close() = compiler.close()
     private fun diagnostics(source: String): List<Diagnostic> =
         compiler.environment.analyzer.diagnostic("editing.stage.kts", source.trimIndent())
+
+    @Test
+    fun `type facts include source-only classes aliases and enum constants without loading classes`() {
+        val source = """
+            class SourceOnly : ArrayList<String>()
+            typealias Names = List<String?>
+            enum class SourceMood { CALM, ANGRY }
+            suspend fun inspect() {
+                val storyPinList = SourceOnly()
+                val storyPinAlias: Names = emptyList()
+                val storyPinEnum = SourceMood.CALM
+                val storyPinBottom = emptyMap<String, Nothing>()
+                val storyPinError: List<Missing> = emptyList()
+            }
+        """.trimIndent()
+        val found = compiler.environment.analyzer.propertyTypes("facts.stage.kts", source, "storyPin")
+        val analysis = StoryAnalysis(relations = found.fits, details = found.details)
+        fun type(pin: String) = found.types.getValue("storyPin$pin")
+        assertEquals(StoryPinType.LIST, analysis.pinType(type("List")))
+        assertEquals("kotlin.collections.List<kotlin.String?>", type("Alias"))
+        assertEquals(listOf("CALM", "ANGRY"), found.details.getValue(type("Enum")).enumEntries)
+        assertTrue(found.details.getValue(type("Bottom")).containsNothing)
+        assertFalse(found.details.getValue(type("Alias")).containsNothing)
+        assertNull(found.types["storyPinError"])
+        val form = analysis.fieldForm(type("Enum"))
+        assertTrue(form is StoryFieldForm.Constant)
+        assertTrue(form.choices.all { it.endsWith(".CALM") || it.endsWith(".ANGRY") })
+    }
+
+    @Test
+    fun `inner generic classes and suspend receiver functions are named as legal Kotlin types`() {
+        val source = """
+            class Outer<A> { inner class Inner<B> }
+            suspend fun inspect(
+                inner: Outer<String>.Inner<Int>,
+                function: (suspend String.(Int) -> List<String?>)?,
+            ) {
+                val storyPinInner = inner
+                val storyPinFunction = function
+            }
+        """.trimIndent()
+        val analyzer = compiler.environment.analyzer
+        val found = analyzer.propertyTypes("complex-types.stage.kts", source, "storyPin")
+        val inner = found.types.getValue("storyPinInner")
+        val function = found.types.getValue("storyPinFunction")
+        assertTrue(inner.contains("Outer<kotlin.String>.Inner<kotlin.Int>"), inner)
+        assertTrue(function.contains("suspend"), function)
+        val checks = found.types.values.mapIndexed { index, type -> "val verify$index: $type = TODO()" }.joinToString("\n")
+        val errors = analyzer.diagnostic("complex-types.stage.kts", "$source\nsuspend fun verify() {\n$checks\n}")
+            .filter { it.severity.isError() }
+        assertEquals(emptyList(), errors.map { it.message })
+    }
 
     @Test
     fun `the editor locates an enclosing local helper at its call`() {

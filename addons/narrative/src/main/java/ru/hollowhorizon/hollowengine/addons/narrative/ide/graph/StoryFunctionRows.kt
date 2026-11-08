@@ -14,8 +14,8 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
 /** The pin of [value], typed as it is declared. */
-private fun pinOf(value: StoryTypedName) =
-    StoryPinSpec(value.name, StoryPinType.ofName(value.type), value.type)
+private fun StoryNodeLayout.Rows.pinOf(value: StoryTypedName) =
+    StoryPinSpec(value.name, layout.analysis.pinType(value.type), value.type)
 
 /** The function [node] belongs to, which sits in the story around the body the editor shows. */
 private fun StoryNodeLayout.Rows.ownerOf(node: StoryNode): StoryNode.Function? =
@@ -84,8 +84,8 @@ internal fun StoryNodeLayout.Rows.giveBack(node: StoryNode.Return) {
 
 /** The field of [value], which shows the Kotlin [written] the way its type is easiest to work with; [write] gets Kotlin. */
 private fun StoryNodeLayout.Rows.typedField(value: StoryTypedName, written: String, write: (String) -> Unit): StoryRowField {
-    val type = StoryFieldForm.typeNamed(value.type)
-    val form = StoryFieldForm.of(type)
+    val type = StoryFieldForm.typeNamed(layout.analysis.info(value.type)?.classifier ?: value.type)
+    val form = layout.analysis.fieldForm(value.type)
     return StoryRowField(
         value.name,
         form.shown(written, type),

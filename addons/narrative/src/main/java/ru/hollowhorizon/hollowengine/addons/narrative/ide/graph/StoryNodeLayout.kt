@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 
 import kotlin.math.ceil
-import kotlin.reflect.full.starProjectedType
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.addInput
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.removeInput
@@ -26,7 +25,7 @@ internal class StoryNodeLayout(
     internal val state: StoryEditorState,
 ) {
     private val linked = graph.index.values.keys
-    private val analysis = StoryInsight.analysis(state, state.root() ?: graph)
+    internal val analysis = StoryInsight.analysis(state, state.root() ?: graph)
     private val types = analysis.types
     private val fixed = analysis.fixed
 
@@ -321,7 +320,7 @@ internal class StoryNodeLayout(
 
             is StoryNode.Assign -> {
                 val written = graph.variables.firstOrNull { it.name == node.variable }?.type
-                val type = StoryPinType.ofName(written)
+                val type = analysis.pinType(written)
                 val kotlin = written
                 flow()
                 row(
@@ -333,8 +332,8 @@ internal class StoryNodeLayout(
                         edit(node.id, "variable") { (it as StoryNode.Assign).copy(variable = typed.trim()) }
                     },
                 )
-                val valueType = StoryFieldForm.typeNamed(written)
-                val form = StoryFieldForm.of(valueType)
+                val valueType = StoryFieldForm.typeNamed(analysis.info(written)?.classifier ?: written)
+                val form = analysis.fieldForm(written)
                 value(
                     node.id, StoryPins.VALUE, storyLang("set.value"), type,
                     StoryRowField(
@@ -365,7 +364,7 @@ internal class StoryNodeLayout(
                 )
                 exit(StoryPins.BODY, storyLang("loop.body"))
                 val item = types[node.id to StoryPins.ITEM]
-                row(storyLang("loop.item"), output = StoryPinSpec(StoryPins.ITEM, StoryPinType.ofName(item), item))
+                row(storyLang("loop.item"), output = StoryPinSpec(StoryPins.ITEM, analysis.pinType(item), item))
                 GraphNodeMetrics.WIDTH
             }
 
@@ -401,13 +400,13 @@ internal class StoryNodeLayout(
                     val type = types[node.id to StoryPins.VALUE]
                     row(
                         storyLang("call.result"),
-                        output = StoryPinSpec(StoryPins.VALUE, StoryPinType.ofName(type), type)
+                        output = StoryPinSpec(StoryPins.VALUE, analysis.pinType(type), type)
                     )
                 }
                 node.outputs.forEach { (name, type) ->
                     row(
                         name,
-                        output = StoryPinSpec(name, StoryPinType.ofName(type), type)
+                        output = StoryPinSpec(name, analysis.pinType(type), type)
                     )
                 }
                 CODE_WIDTH
@@ -416,7 +415,7 @@ internal class StoryNodeLayout(
             is StoryNode.Expression -> {
                 val type = types[node.id to StoryPins.VALUE]
                 row(
-                    output = StoryPinSpec(StoryPins.VALUE, StoryPinType.ofName(type), type),
+                    output = StoryPinSpec(StoryPins.VALUE, analysis.pinType(type), type),
                     field = StoryRowField("code", node.code, storyLang("code.text"), code = true) { typed ->
                         edit(node.id, "code") { (it as StoryNode.Expression).copy(code = typed) }
                     },
@@ -502,7 +501,7 @@ internal class StoryNodeLayout(
                 storyLang("call.result"),
                 output = StoryPinSpec(
                     StoryPins.VALUE,
-                    StoryPinType.ofName(node.returns),
+                    analysis.pinType(node.returns),
                     node.returns
                 ),
             )
@@ -562,8 +561,8 @@ internal class StoryNodeLayout(
             val operator = StoryOperators.find(node.operator) ?: return
             val inputs = StoryOperators.inputsOf(node).map { input -> fixed[node.id to input.name]?.let { input.of(it) } ?: input }
             fun kotlinOf(input: StoryOperatorInput) = when {
-                input.generic -> fixed[node.id to input.name] ?: input.shape?.let { StoryOperatorDsl.starred(it) ?: it }
-                else -> input.param?.type?.let(StoryKotlinTypes::name)
+                input.generic -> fixed[node.id to input.name] ?: input.shape?.let { it.starred ?: it.kotlin }
+                else -> input.shape?.kotlin ?: input.param?.type?.let(StoryKotlinTypes::name)
             }
             folded(
                 inputs.withIndex().toList(),
@@ -593,12 +592,12 @@ internal class StoryNodeLayout(
                 val shape = output.shape
                 if (shape != null && output.generic) {
                     val solved = fixed[node.id to output.name]
-                    val kotlin = solved ?: types[node.id to output.name] ?: shape
-                    return StoryPinSpec(output.name, if (solved == null) output.type else StoryPinType.ofName(solved), kotlin)
+                    val inferred = solved ?: types[node.id to output.name]
+                    return StoryPinSpec(output.name, inferred?.let(analysis::pinType) ?: output.type, inferred ?: shape.kotlin)
                 }
                 val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }
                 val kotlin = types[node.id to output.name] ?: named ?: output.kotlin
-                return StoryPinSpec(output.name, kotlin?.let(StoryPinType::ofName) ?: output.type, kotlin)
+                return StoryPinSpec(output.name, kotlin?.let(analysis::pinType) ?: output.type, kotlin)
             }
             folded(
                 operator.outputs,
@@ -620,11 +619,9 @@ internal class StoryNodeLayout(
          * the field of a parameter of that type.
          */
         private fun StoryOperatorInput.of(type: String): StoryOperatorInput {
-            shape?.removeSuffix("?")?.takeIf { StoryOperatorDsl.parametersOf(it) == listOf(it) } ?: return this
-            val named = type.removeSuffix("?")
-            val kind = (StoryPinType.classOf(named) ?: TypeOperators.qualified(named)?.let(StoryPinType::classOf))?.starProjectedType
-            val param = kind?.let { StoryParam(name, it, traits = StoryParamTrait.choices(StoryCommand.suggestions(it))) }
-            return copy(type = StoryPinType.ofName(named), param = param ?: this.param)
+            val parameter = (shape as? StoryTypeShape.Nullable)?.type ?: shape
+            if (parameter !is StoryTypeShape.Parameter) return this
+            return copy(type = analysis.pinType(type))
         }
 
         /** The row of [input] of [node] naming a type: a field with the types in reach, and no pin. */
@@ -643,8 +640,9 @@ internal class StoryNodeLayout(
         private fun inputField(node: StoryNode.Pure, input: StoryOperatorInput): StoryRowField {
             val written = node.arguments[input.name].orEmpty()
             val param = input.param
-            val type = param?.type ?: input.type.type
-            val form = StoryFieldForm.of(type)
+            val named = fixed[node.id to input.name]
+            val type = param?.type ?: StoryFieldForm.typeNamed(analysis.info(named)?.classifier) ?: input.type.type
+            val form = if (named != null) analysis.fieldForm(named) else StoryFieldForm.of(type)
             return StoryRowField(
                 input.name,
                 form.shown(written, type),

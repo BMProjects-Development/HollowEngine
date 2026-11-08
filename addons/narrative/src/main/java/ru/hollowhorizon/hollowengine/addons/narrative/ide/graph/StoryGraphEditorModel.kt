@@ -23,7 +23,6 @@ import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
-import kotlin.reflect.full.isSubclassOf
 
 /**
  * The boxes of one analyzed graph, and what can be read off them wherever they stand. A node that stays where it was
@@ -237,13 +236,7 @@ internal class StoryGraphEditorModel(
     /** Whether a link can go from [output] to [input], whichever way it gets made. */
     private fun takes(output: GraphPin, input: GraphPin): Boolean {
         val analysis = StoryInsight.analysis(state, state.root() ?: graph)
-        val from = layout.kotlinOf(output)?.takeIf { analysis.known(it) != null }
-        val to = layout.kotlinOf(input)?.takeIf { analysis.known(it) != null }
-        val type = typeOf(output)
-        if (!type.converts && from != null && to != null) analysis.fits(from, to)?.let { return it }
-        if (!type.fits(typeOf(input))) return false
-        if (type.converts || from == null || to == null) return true
-        return analysis.takes(from, to)
+        return analysis.accepts(typeOf(output), layout.kotlinOf(output), typeOf(input), layout.kotlinOf(input))
     }
 
     override fun pinTooltip(pin: GraphPin): String = layout.tooltip(pin)
@@ -350,21 +343,13 @@ internal class StoryGraphEditorModel(
         val carried = pinOf(pending)?.let(layout::kotlinOf)
         val analysis = StoryInsight.analysis(state, state.root() ?: graph)
 
-        // An object fits only a pin of its own class or, carried out, of one it is of; an untyped pin fits anything.
         fun fits(other: StoryPinType, kotlin: String?): Boolean {
-            val fitting = if (pending.fromOutput) type.fits(other) else other.fits(type)
-            if (!fitting) return false
-            if (type != StoryPinType.OBJECT || other != StoryPinType.OBJECT || carried == null || kotlin == null) return true
-            val (from, to) = if (pending.fromOutput) carried to kotlin else kotlin to carried
-            analysis.fits(from, to)?.let { return it }
-            val value = StoryPinType.classOf(from)
-            val place = StoryPinType.classOf(to)
-            if (value != null && place != null) return value.isSubclassOf(place)
-            return StoryPinType.shortName(kotlin).removeSuffix("?") == StoryPinType.shortName(carried).removeSuffix("?")
+            return if (pending.fromOutput) analysis.accepts(type, carried, other, kotlin)
+                else analysis.accepts(other, kotlin, type, carried)
         }
 
         fun exact(other: StoryPinType, kotlin: String?) = other != StoryPinType.ANY && fits(other, kotlin)
-        fun inputKotlin(input: StoryOperatorInput) = input.param?.type?.let(StoryKotlinTypes::name)
+        fun inputKotlin(input: StoryOperatorInput) = input.shape?.starred ?: input.param?.type?.let(StoryKotlinTypes::name)
 
         val operator: (StoryOperator, Boolean) -> Boolean = { operator, strict ->
             val check = if (strict) ::exact else ::fits

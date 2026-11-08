@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.items.StoryItemFilter
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeInfo
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.KTypeProjection
@@ -114,43 +115,18 @@ class StoryPinType(
             return registered.filter { it.holds(kind) }.maxByOrNull { it.depth } ?: OBJECT
         }
 
-        fun ofName(name: String?): StoryPinType {
-            val written = name?.removeSuffix("?")?.substringBefore('<')?.replace("!", "") ?: return ANY
-            if (written.substringAfterLast('.') == "Any") return ANY
-            val kind = classOf(written) ?: SHORT[written.substringAfterLast('.')]
-                ?: return ANY_NAMED.firstOrNull { (suffix, _) -> written.endsWith(suffix) }?.second ?: OBJECT
-            return of(kind)
-        }
-
-        fun classOf(name: String): KClass<*>? {
-            val written = name.removeSuffix("?").substringBefore('<').replace("!", "")
-            if ('.' !in written) return SHORT[written]
-            return loaded.getOrPut(written) { load(written) }
-        }
-
-        private fun load(name: String): KClass<*>? {
-            var binary = name
-            while (true) {
-                runCatching { return Class.forName(binary).kotlin }
-                val dot = binary.lastIndexOf('.')
-                if (dot < 0) return null
-                binary = binary.substring(0, dot) + '$' + binary.substring(dot + 1)
-            }
+        /** Classifies a type using the hierarchy resolved by K2, without loading the named class. */
+        fun ofName(name: String?, info: KotlinTypeInfo? = null): StoryPinType {
+            if (name == null) return ANY
+            if (info == null) return StoryRuntimeTypes.named(name)?.let(::of) ?: OBJECT
+            if (info.classifier == "kotlin.Any") return ANY
+            return registered.filter { type ->
+                (listOfNotNull(type.kind) + type.classes).any { StoryKotlinTypes.className(it) in info.supertypes }
+            }.maxByOrNull { it.depth } ?: OBJECT
         }
 
         fun shortName(name: String): String = PACKAGE.replace(name, "").replace("!", "")
 
-        private val loaded = HashMap<String, KClass<*>?>()
-
         private val PACKAGE = Regex("""\b[a-z_]\w*\.""")
-
-        private val SHORT: Map<String, KClass<*>> = mapOf(
-            "String" to String::class, "Boolean" to Boolean::class, "Int" to Int::class, "Long" to Long::class,
-            "Short" to Short::class, "Byte" to Byte::class, "Float" to Float::class, "Double" to Double::class,
-            "List" to List::class, "MutableList" to List::class, "Set" to Set::class, "Collection" to Collection::class,
-            "Iterable" to Iterable::class, "Map" to Map::class, "MutableMap" to Map::class,
-        )
-
-        private val ANY_NAMED get() = listOf("Player" to PLAYER, "Entity" to ENTITY, "Tag" to NBT)
     }
 }

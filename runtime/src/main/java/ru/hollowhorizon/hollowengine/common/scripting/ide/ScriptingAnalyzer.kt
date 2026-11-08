@@ -103,6 +103,15 @@ interface ScriptingAnalyzer {
 data class KotlinPropertyTypes(
     val types: Map<String, String> = emptyMap(),
     val fits: Map<String, Set<String>> = emptyMap(),
+    val details: Map<String, KotlinTypeInfo> = emptyMap(),
+)
+
+data class KotlinTypeInfo(
+    val classifier: String?,
+    val supertypes: Set<String> = emptySet(),
+    val nullable: Boolean = false,
+    val containsNothing: Boolean = false,
+    val enumEntries: List<String>? = null,
 )
 
 /**

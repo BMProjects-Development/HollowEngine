@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinPropertyTypes
 
 /** A field of Kotlin in a story: [key] of the node or variable [owner]. */
 data class StoryFieldKey(val owner: String, val key: String)
@@ -32,7 +33,7 @@ class StoryFieldFrame(val before: String, val after: String)
  * @param blocks where the check of each generic block is.
  * @param fixed the node and pin behind the name of each property telling what a pin of a generic block is once the
  * type parameters it turns on are fixed.
- * @param typeless the outputs taken as telling no type, which fix nothing in a generic block they are linked into.
+ * @param evidence properties extracting each individual parameter from a linked input shape.
  */
 class StoryCheckScript(
     val graph: StoryGraph,
@@ -44,7 +45,7 @@ class StoryCheckScript(
     val written: Map<String, String>,
     val blocks: List<StoryBlockSpan>,
     val fixed: Map<String, Pair<String, String>>,
-    val typeless: Set<Pair<String, String>>,
+    val evidence: Map<String, StoryGenericKey> = emptyMap(),
 ) {
     private val byField = spans.associateBy { it.field }
 
@@ -57,19 +58,11 @@ class StoryCheckScript(
     /** The generic block whose check [offset] is in. */
     fun block(offset: Int): StoryBlockSpan? = blocks.firstOrNull { offset >= it.from && offset < it.to }
 
-    /**
-     * The outputs whose type tells nothing by the [types] analysis found for the properties of this script: one with
-     * an error, `Nothing`, or something of it, as an empty `List<Nothing>`.
-     */
-    fun typeless(types: Map<String, String>): Set<Pair<String, String>> =
-        pins.entries.filter { (name, _) -> types[name]?.let(::tellsNothing) ?: true }.mapTo(HashSet()) { it.value }
-
-    companion object {
-        private val NOTHING = Regex("""(?<![\w.])kotlin\.Nothing(?![\w.])""")
-
-        /** Whether a value of [type] tells nothing of what it is: `Nothing`, or something of it, as `List<Nothing>`. */
-        fun tellsNothing(type: String): Boolean = NOTHING.containsMatchIn(type)
-    }
+    /** Parameters for which K2 found no usable evidence, independently of other parameters of the same input. */
+    fun unknown(properties: KotlinPropertyTypes): Set<StoryGenericKey> = evidence.entries.filter { (name, _) ->
+        val type = properties.types[name]
+        type == null || properties.details[type]?.containsNothing == true
+    }.mapTo(HashSet()) { it.value }
 }
 
 /**
@@ -123,7 +116,8 @@ object StoryFieldChecks {
     }
 
     private fun inputType(input: StoryOperatorInput): String? =
-        if (input.type == StoryPinType.NUMBER) "Number" else input.type.type?.let(StoryKotlinTypes::name)
+        if (input.type == StoryPinType.NUMBER) "Number" else input.shape?.kotlin
+            ?: (input.param?.type ?: input.type.type)?.let(StoryKotlinTypes::name)
 
     /**
      * The type a value linked into [pin] of [node] has to be, when that does not turn on what is linked.
@@ -221,7 +215,12 @@ object StoryFieldChecks {
     } + graph.nodes.filterIsInstance<StoryNode.Pure>().flatMap { node ->
         StoryOperators.inputsOf(node).mapNotNull { input -> input.param?.type?.let(StoryKotlinTypes::name) }
     } + graph.functions.flatMap { function -> (function.params + function.results).map { it.type } } +
-        graph.variables.mapNotNull { it.type } + StoryOperators.all.flatMap { it.outputs }.mapNotNull { it.kotlin }
+        graph.variables.mapNotNull { it.type } + graph.nodes.filterIsInstance<StoryNode.Code>().flatMap { it.outputs.values } +
+        graph.nodes.filterIsInstance<StoryNode.Pure>().flatMap { node ->
+            StoryOperators.inputsOf(node).filter { it.typeName }.mapNotNull { node.arguments[it.name] }
+        } + StoryOperators.all.flatMap { operator ->
+            operator.inputs.mapNotNull { it.param?.type?.let(StoryKotlinTypes::name) } + operator.outputs.mapNotNull { it.kotlin }
+        } + StoryPinType.all.mapNotNull { it.type?.let(StoryKotlinTypes::name) }
 
     /** The places the generic outputs of blocks go into, for their types to be read as the parameters are worked out. */
     private fun places(graph: StoryGraph): List<String> = graph.nodes.filterIsInstance<StoryNode.Pure>().flatMap { node ->
@@ -233,14 +232,18 @@ object StoryFieldChecks {
     /** The classes of the generic inputs and outputs of blocks, with stars for their parameters, as `List<*>`. */
     private fun shapes(): List<String> = StoryOperators.all.flatMap { operator ->
         operator.inputs.mapNotNull { it.shape } + operator.outputs.mapNotNull { it.shape }
-    }.mapNotNull(StoryOperatorDsl::starred)
+    }.mapNotNull { it.starred }
 
     /**
      * [code], the script generated from [graph], with what is checked added. Broken Kotlin stays out, not to break the rest.
      *
-     * @param typeless outputs an analysis before found to tell no type.
+     * @param unknown linked parameters an earlier analysis found no usable evidence for.
      */
-    fun script(graph: StoryGraph, code: String, typeless: Set<Pair<String, String>> = emptySet()): StoryCheckScript {
+    fun script(
+        graph: StoryGraph,
+        code: String,
+        unknown: Set<StoryGenericKey> = emptySet(),
+    ): StoryCheckScript {
         val plain = graph.flattened().dissolved()
         val owners = graph.owners()
 
@@ -268,8 +271,8 @@ object StoryFieldChecks {
                 .append("\n)\n}")
             "$PIN$index" to pin.key
         }
-        val generic = StoryGenericChecks(plain, values, typeless, ::declared, ::reads)
-        val (blocks, fixed) = generic.write(
+        val generic = StoryGenericChecks(plain, values, unknown, ::declared, ::reads)
+        val generics = generic.write(
             text,
             span = { field, shown, at -> spans += StoryFieldSpan(field, null, at[0], at[1], at[2], at[3], shown) },
             left = { field -> left[field] = StoryFieldFrame("val storyValue = (\n", VALUE_END) },
@@ -283,6 +286,9 @@ object StoryFieldChecks {
             val locals = declared(field.owner).joinToString("") { "val ${it.first}: ${it.second} = TODO()\n" }
             StoryFieldFrame(locals + frame.before, frame.after)
         }
-        return StoryCheckScript(plain, text.toString(), length, spans, frames, pins, written, blocks, fixed, typeless)
+        return StoryCheckScript(
+            plain, text.toString(), length, spans, frames, pins, written,
+            generics.blocks, generics.fixed, generics.evidence,
+        )
     }
 }

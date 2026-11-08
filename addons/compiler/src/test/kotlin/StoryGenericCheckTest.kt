@@ -275,6 +275,54 @@ class StoryGenericCheckTest {
         assertEquals(emptyList(), opened.inField("add", "item") + opened.ofBlock("add"))
     }
 
+    @Test
+    fun `a map link fixes keys and values independently`() {
+        val opened = Opened(StoryGraph(
+            nodes = listOf(
+                StoryNode.Expression("map", "emptyMap<String, Nothing>()"),
+                StoryNode.Pure("put", "map-put", mapOf("key" to "1", "value" to "2")),
+            ),
+            links = listOf(StoryLink("map", StoryPins.VALUE, "put", "map")),
+        ))
+        assertEquals("kotlin.String", opened.fixed("put", "key"))
+        assertNull(opened.fixed("put", "value"))
+        assertTrue(opened.inField("put", "key").isNotEmpty())
+        assertEquals(emptyList(), opened.inField("put", "value"))
+    }
+
+    @Test
+    fun `a link fixes one map parameter and its output place fixes the other`() {
+        val opened = Opened(StoryGraph(
+            variables = listOf(StoryVariable("entries", "emptyMap()", "Map<String, Int>")),
+            nodes = listOf(
+                StoryNode.Expression("key", "\"key\""),
+                StoryNode.Pure("put", "map-put", mapOf("map" to "emptyMap()", "value" to "\"bad\"")),
+                StoryNode.Assign("set", "entries"),
+            ),
+            links = listOf(
+                StoryLink("key", StoryPins.VALUE, "put", "key"),
+                StoryLink("put", "map", "set", StoryPins.VALUE),
+            ),
+        ))
+        assertEquals("kotlin.String", opened.fixed("put", "key"))
+        assertEquals("kotlin.Int", opened.fixed("put", "value"))
+        assertTrue(opened.inField("put", "value").isNotEmpty())
+    }
+
+    @Test
+    fun `nullable map results take their type from the place after link unwrapping`() {
+        val opened = Opened(StoryGraph(
+            variables = listOf(StoryVariable("number", "0", "Int")),
+            nodes = listOf(
+                StoryNode.Pure("get", "map-get", mapOf("map" to "mapOf(\"x\" to 1)", "key" to "\"x\"")),
+                StoryNode.Assign("set", "number"),
+            ),
+            links = listOf(StoryLink("get", "value", "set", StoryPins.VALUE)),
+        ))
+        assertEquals("kotlin.Int?", opened.fixed("get", "value"))
+        assertEquals(emptyList(), opened.ofBlock("get") + opened.inField("get", "map"))
+    }
+
     private companion object {
         const val FILE = "generic.stage.kts"
     }

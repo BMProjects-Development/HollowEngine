@@ -1,8 +1,9 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
 import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.LIST_OF
-import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.MAP_OF
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.K
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.T
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.V
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.generic
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.input
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.number
@@ -12,6 +13,8 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.out
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperatorDsl.typed
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.story.ValueOperators
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryTypeShape.Companion.listOf as listType
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryTypeShape.Companion.mapOf as mapType
 
 /**
  * An input of a [StoryOperator]. [default] is the Kotlin it reads with nothing typed or linked.
@@ -30,10 +33,10 @@ data class StoryOperatorInput(
     val default: String = "",
     val param: StoryParam? = null,
     val path: String = name,
-    val shape: String? = null,
+    val shape: StoryTypeShape? = null,
     val typeName: Boolean = false,
 ) {
-    val generic: Boolean get() = shape?.let(StoryOperatorDsl::parametersOf)?.isNotEmpty() == true
+    val generic: Boolean get() = shape?.parameters?.isNotEmpty() == true
 
     /** What is typed into the field of this input as Kotlin. */
     fun expression(text: String): String =
@@ -61,11 +64,11 @@ data class StoryOperatorOutput(
     val kotlin: String? = null,
     val empty: String? = null,
     val path: String = name,
-    val shape: String? = null,
+    val shape: StoryTypeShape? = null,
     val typeOf: String? = null,
     val title: String? = null,
 ) {
-    val generic: Boolean get() = shape?.let(StoryOperatorDsl::parametersOf)?.isNotEmpty() == true
+    val generic: Boolean get() = shape?.parameters?.isNotEmpty() == true
 }
 
 /**
@@ -286,7 +289,7 @@ object StoryOperators {
 
         operator(
             "list", "values.list", listOf(generic("a"), generic("b"), generic("c")),
-            outOf("list", "listOf(\$*)", LIST_OF, LIST).copy(empty = "emptyList<Nothing>()"),
+            outOf("list", "listOf(\$*)", listType(T), LIST).copy(empty = "emptyList<Nothing>()"),
         ).copy(variadic = true),
         operator(
             "range", "values.list", listOf(number("from"), number("to", "9")),
@@ -298,57 +301,57 @@ object StoryOperators {
         operator(
             "list-get",
             "values.list",
-            listOf(typed("list", LIST_OF, LIST), number("index")),
+            listOf(typed("list", listType(T), LIST), number("index")),
             outOf("item", $$"$list[$index.toInt()]")
         ),
         operator(
             "list-contains",
             "values.list",
-            listOf(typed("list", LIST_OF, LIST), generic("item")),
+            listOf(typed("list", listType(T), LIST), generic("item")),
             out("result", BOOL, $$"$item in $list")
         ),
         operator(
             "list-add",
             "values.list",
-            listOf(typed("list", LIST_OF, LIST), generic("item")),
-            outOf("list", $$"$list + $item", LIST_OF, LIST)
+            listOf(typed("list", listType(T), LIST), generic("item")),
+            outOf("list", $$"$list + $item", listType(T), LIST)
         ),
         operator(
             "list-remove",
             "values.list",
-            listOf(typed("list", LIST_OF, LIST), generic("item")),
-            outOf("list", $$"$list - $item", LIST_OF, LIST)
+            listOf(typed("list", listType(T), LIST), generic("item")),
+            outOf("list", $$"$list - $item", listType(T), LIST)
         ),
 
         operator(
             "map-get",
             "values.list",
-            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
-            outOf("value", $$"$map[$key]", "V?")
+            listOf(typed("map", mapType(K, V), MAP), typed("key", K)),
+            outOf("value", $$"$map[$key]", V.nullable)
         ),
         operator(
             "map-has",
             "values.list",
-            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
+            listOf(typed("map", mapType(K, V), MAP), typed("key", K)),
             out("result", BOOL, $$"$key in $map")
         ),
         operator(
             "map-put",
             "values.list",
-            listOf(typed("map", MAP_OF, MAP), typed("key", "K"), typed("value", "V")),
-            outOf("map", $$"$map + ($key to $value)", MAP_OF, MAP)
+            listOf(typed("map", mapType(K, V), MAP), typed("key", K), typed("value", V)),
+            outOf("map", $$"$map + ($key to $value)", mapType(K, V), MAP)
         ),
         operator(
             "map-remove",
             "values.list",
-            listOf(typed("map", MAP_OF, MAP), typed("key", "K")),
-            outOf("map", $$"$map - $key", MAP_OF, MAP)
+            listOf(typed("map", mapType(K, V), MAP), typed("key", K)),
+            outOf("map", $$"$map - $key", mapType(K, V), MAP)
         ),
         operator(
             "map-keys",
             "values.list",
-            listOf(typed("map", MAP_OF, MAP)),
-            outOf("keys", $$"$map.keys.toList()", "kotlin.collections.List<K>", LIST),
+            listOf(typed("map", mapType(K, V), MAP)),
+            outOf("keys", $$"$map.keys.toList()", listType(K), LIST),
             out("size", NUMBER, $$"$map.size.toDouble()"),
         ),
     )

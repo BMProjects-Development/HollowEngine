@@ -2,9 +2,9 @@ package ru.hollowhorizon.hollowengine.addons.narrative.graph
 
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
+import ru.hollowhorizon.hollowengine.common.scripting.ide.KotlinTypeInfo
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
-import kotlin.reflect.full.starProjectedType
 import kotlin.time.Duration
 
 
@@ -54,10 +54,12 @@ sealed interface StoryFieldForm {
 
     data class Vector(val helper: String) : StoryFieldForm
 
-    data class Constant(val kind: KClass<*>) : StoryFieldForm {
-        private val qualified = kind.qualifiedName.orEmpty()
-        private val short = qualified.removePrefix(kind.java.packageName + ".")
-        private val names = kind.java.enumConstants.orEmpty().map { (it as Enum<*>).name }
+    data class Constant(val qualified: String, val short: String, val names: List<String>) : StoryFieldForm {
+        constructor(kind: KClass<*>) : this(
+            StoryKotlinTypes.className(kind).orEmpty(),
+            kind.qualifiedName.orEmpty().removePrefix(kind.java.packageName + "."),
+            kind.java.enumConstants.orEmpty().map { (it as Enum<*>).name },
+        )
 
         override val choices: List<String> get() = names.map { "$short.$it" }
 
@@ -90,16 +92,16 @@ sealed interface StoryFieldForm {
             }
         }
 
-        fun ofName(name: String?): StoryFieldForm = of(typeNamed(name))
-
-        fun typeNamed(name: String?): KType? {
-            val written = name?.removeSuffix("?") ?: return null
-            val kind = StoryPinType.classOf(written)
-                ?: written.takeIf { it.startsWith(KOTLIN) }?.let { StoryPinType.classOf(it.substringAfterLast('.')) }
-            return kind?.starProjectedType
+        fun ofName(name: String?, info: KotlinTypeInfo? = null): StoryFieldForm {
+            val classifier = info?.classifier
+            val entries = info?.enumEntries
+            if (classifier != null && entries != null) {
+                return Constant(classifier, StoryPinType.shortName(classifier), entries)
+            }
+            return of(typeNamed(classifier ?: name))
         }
 
-        private const val KOTLIN = "kotlin."
+        fun typeNamed(name: String?): KType? = StoryRuntimeTypes.named(name)
     }
 }
 
