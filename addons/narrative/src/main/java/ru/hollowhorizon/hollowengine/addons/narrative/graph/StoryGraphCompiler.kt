@@ -621,7 +621,7 @@ class StoryGraphCompiler private constructor(
         if ((node to pin) !in values) return value
         val kind = type?.classifier as? KClass<*>
         if (kind != null && kind != Entity::class && kind.isSubclassOf(Entity::class)) {
-            return "($value as ${kind.qualifiedName}${if (empty) "?" else ""})"
+            return "($value as ${StoryKotlinTypes.className(kind)}${if (empty) "?" else ""})"
         }
         return if (empty) value else coerced(value, kind?.simpleName)
     }
@@ -791,7 +791,7 @@ class StoryGraphCompiler private constructor(
             val written = node.arguments[input.name]?.takeIf { it.isNotBlank() } ?: input.default
             val given = written.isNotBlank() || (node.id to input.name) in values
             val parts = inputs.filter { it.path.startsWith(input.path + ".") }
-            val kind = (input.param?.type?.classifier as? KClass<*>)?.qualifiedName
+            val kind = (input.param?.type?.classifier as? KClass<*>)?.let(StoryKotlinTypes::className)
             if (!given && parts.isNotEmpty() && kind != null) {
                 val made = arguments(node, parts, input.path + ".", receive)
                 if (made.isEmpty() && input.param.optional) return@forEach

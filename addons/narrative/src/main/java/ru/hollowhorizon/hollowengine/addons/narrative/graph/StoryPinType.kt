@@ -34,10 +34,14 @@ class StoryPinType(
     val id: String,
     val kind: KClass<*>?,
     val color: Int,
-    val label: String = kind?.simpleName ?: "Any?",
+    label: String? = null,
     val converts: Boolean = false,
     private val classes: List<KClass<*>> = emptyList(),
 ) {
+    private val ownLabel = label
+
+    val label: String get() = ownLabel ?: kind?.let(StoryKotlinTypes::shortName) ?: "Any?"
+
     val type: KType? = kind?.let { it.createType(it.typeParameters.map { KTypeProjection.STAR }) }
 
     /** How far down the classes [kind] is: a pin of a deeper class is the closer match of a value. */

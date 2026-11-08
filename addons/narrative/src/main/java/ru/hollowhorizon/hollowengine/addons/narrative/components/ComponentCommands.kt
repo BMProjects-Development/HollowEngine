@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import kotlin.reflect.KClass
 import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.typeOf
@@ -47,6 +48,7 @@ object ComponentCommands {
         val language: Language,
         val signatures: Map<String, StoryFunctionSignature>,
         val readers: Map<String, StoryOperator>,
+        val mappings: Mappings,
     )
 
     /** A field of a component: the parameter that sets it and how a value of the component reads it. */
@@ -69,7 +71,8 @@ object ComponentCommands {
     private fun current(): Built {
         val descriptors = ComponentDescriptorRegistry.map { it.value }
         val language = Language.getInstance()
-        built?.takeIf { it.language === language && it.descriptors.size == descriptors.size }
+        val mappings = StoryKotlinTypes.mappings()
+        built?.takeIf { it.language === language && it.mappings === mappings && it.descriptors.size == descriptors.size }
             ?.takeIf { it.descriptors.zip(descriptors).all { (a, b) -> a === b } }?.let { return it }
         val shown = descriptors.filterNot { hidden(it.serializer.descriptor) }
             .associateWith { fieldsOf(keyOf(it.id), it.serializer.descriptor, it.value, "", "", false) }
@@ -77,7 +80,7 @@ object ComponentCommands {
             shown.entries.associate { (component, fields) -> PREFIX + component.id to signatureOf(component, fields) }
         val readers =
             shown.entries.mapNotNull { (component, fields) -> readerOf(component, fields) }.associateBy { it.id }
-        return Built(descriptors, language, signatures, readers).also { built = it }
+        return Built(descriptors, language, signatures, readers, mappings).also { built = it }
     }
 
     private fun signatureOf(component: ComponentDescriptor<*>, fields: List<Field>): StoryFunctionSignature {
@@ -96,7 +99,7 @@ object ComponentCommands {
 
     /** The value that reads [component]: whether the entity has it, all of it and each of its [fields]. */
     private fun readerOf(component: ComponentDescriptor<*>, fields: List<Field>): StoryOperator? {
-        val type = component.value.qualifiedName ?: return null
+        val type = StoryKotlinTypes.className(component.value) ?: return null
         val serial = component.serializer.descriptor
         val id = StoryGraphCompiler.literal(component.id.toString())
         val value = "$COMPONENTS.componentOf<$type>(\$$WHO, $id)"
@@ -156,7 +159,7 @@ object ComponentCommands {
                     .lowercase().replaceFirstChar(Char::uppercaseChar)
             val element = serial.getElementDescriptor(index)
             val read = owner + (if (empty) "?." else ".") + name
-            val written = propertyType.toString().replace("!", "")
+            val written = StoryKotlinTypes.name(propertyType) ?: return@flatMap emptyList()
             val kotlin = if (empty && !propertyType.isMarkedNullable) "$written?" else written
             val param = StoryParam(
                 name = path + name,

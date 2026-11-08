@@ -73,7 +73,7 @@ object StoryLiterals {
             kind == StoryItemFilter::class -> call(FILTER, typed)
             kind.isSubclassOf(DialogueCharacter::class) -> call("character", typed)
             kind.isSubclassOf(Entity::class) -> call("actor", typed)
-            kind.java.isEnum -> "${kind.qualifiedName}.${typed.uppercase().replace('-', '_')}"
+            kind.java.isEnum -> "${StoryKotlinTypes.className(kind)}.${typed.uppercase().replace('-', '_')}"
 
             else -> text
         }

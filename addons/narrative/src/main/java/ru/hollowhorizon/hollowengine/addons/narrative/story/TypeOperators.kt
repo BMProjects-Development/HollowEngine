@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.story
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
@@ -33,10 +34,15 @@ object TypeOperators {
     private const val VALUE = SUBJECT
     private const val TYPES = "values.types"
 
-    private class Found(val actions: List<StoryAction>, val components: Int, val operators: Map<String, StoryOperator>)
+    private class Found(
+        val actions: List<StoryAction>,
+        val components: Int,
+        val mappings: Mappings,
+        val operators: Map<String, StoryOperator>,
+    )
 
     @Volatile
-    private var found = Found(emptyList(), -1, emptyMap())
+    private var found = Found(emptyList(), -1, Mappings.EMPTY, emptyMap())
 
     private val generic: Map<String, StoryOperator> = listOf(
         StoryOperator(UNPACK, TYPES, listOf(StoryOperatorInput(VALUE, StoryPinType.ANY)), emptyList()),
@@ -75,14 +81,17 @@ object TypeOperators {
     private fun current(): Map<String, StoryOperator> {
         val actions = StoryActions.all
         val components = TagModuleRevision.current
-        found.takeIf { it.actions === actions && it.components == components }?.let { return it.operators }
+        // The ids hold class names as scripts write them, which change once the mappings of the game are read.
+        val mappings = StoryKotlinTypes.mappings()
+        found.takeIf { it.actions === actions && it.components == components && it.mappings === mappings }
+            ?.let { return it.operators }
         val operators = collect(actions).flatMap(::operatorsOf).associateBy { it.id }
-        found = Found(actions, components, operators)
+        found = Found(actions, components, mappings, operators)
         return operators
     }
 
     private fun operatorsOf(kind: KClass<*>): List<StoryOperator> {
-        val name = kind.qualifiedName ?: return emptyList()
+        val name = StoryKotlinTypes.className(kind) ?: return emptyList()
         val type = kind.createType()
         return when {
             kind.java.isEnum -> listOf(enumOf(name, type))
@@ -107,7 +116,7 @@ object TypeOperators {
     private fun unpackSealed(name: String, kind: KClass<*>, type: KType): StoryOperator {
         val outputs = kind.sealedSubclasses.flatMap { case ->
             val caseName = case.simpleName ?: return@flatMap emptyList()
-            val qualified = case.qualifiedName ?: return@flatMap emptyList()
+            val qualified = StoryKotlinTypes.className(case) ?: return@flatMap emptyList()
             listOf(
                 StoryOperatorOutput(isPin(caseName), StoryPinType.BOOL, $$"($$$VALUE is $$qualified)"),
             ) + listOfNotNull(
@@ -119,7 +128,7 @@ object TypeOperators {
                     path = caseName,
                 ).takeIf { fieldsOf(case).isNotEmpty() },
             ) + fieldsOf(case).map { field ->
-                val fieldType = field.type.toString().replace("!", "").removeSuffix("?") + "?"
+                val fieldType = StoryKotlinTypes.name(field.type)?.removeSuffix("?")?.plus("?")
                 StoryOperatorOutput(
                     fieldPin(caseName, field.name!!),
                     StoryPinType.of(field.type),
@@ -146,8 +155,8 @@ object TypeOperators {
     ): List<StoryOperatorOutput> = fieldsOf(kind).flatMap { field ->
         val name = path + field.name
         val read = owner + (if (empty) "?." else ".") + field.name
-        val written = field.type.toString().replace("!", "")
-        val kotlin = if (empty && !written.endsWith("?")) "$written?" else written
+        val written = StoryKotlinTypes.name(field.type)
+        val kotlin = written?.let { if (empty && !it.endsWith("?")) "$it?" else it }
         val own = StoryOperatorOutput(name, StoryPinType.of(field.type), read, kotlin = kotlin)
         val nested = sectionOf(field.type)?.takeIf { it !in seen } ?: return@flatMap listOf(own)
         listOf(own) + fieldOutputs(nested, "$name.", read, empty || field.type.isMarkedNullable, seen + nested)
@@ -160,7 +169,7 @@ object TypeOperators {
     }
 
     private fun packOf(kind: KClass<*>): StoryOperator? {
-        val name = kind.qualifiedName ?: return null
+        val name = StoryKotlinTypes.className(kind) ?: return null
         if (kind.hasAnnotation<EditorHidden>() || Modifier.isAbstract(kind.java.modifiers)) return null
         val output = listOf(StoryOperatorOutput(VALUE, StoryPinType.of(kind.createType()), name, kotlin = name))
         if (kind.objectInstance != null) return StoryOperator(PACK + name, TYPES, emptyList(), output)
@@ -210,9 +219,9 @@ object TypeOperators {
             val kind = type.classifier as? KClass<*> ?: return
             if (!seen.add(kind) || kind.java.isPrimitive || kind.qualifiedName?.startsWith("kotlin.") == true) return
             if (kind.hasAnnotation<EditorHidden>()) return
-            if (kind.java.isEnum) kind.qualifiedName?.let { types[it] = kind }
+            if (kind.java.isEnum) StoryKotlinTypes.className(kind)?.let { types[it] = kind }
             if (!kind.java.isAnnotationPresent(Metadata::class.java)) return
-            if (kind.isSealed || kind.isData) kind.qualifiedName?.let { types[it] = kind }
+            if (kind.isSealed || kind.isData) StoryKotlinTypes.className(kind)?.let { types[it] = kind }
             val classes = if (kind.isSealed) kind.sealedSubclasses else listOf(kind)
             classes.forEach { each -> fieldsOf(each).forEach { visit(it.type) } }
         }

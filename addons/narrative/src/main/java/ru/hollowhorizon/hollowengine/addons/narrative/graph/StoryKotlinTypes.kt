@@ -34,24 +34,31 @@ object StoryKotlinTypes {
     private val namesLock = Any()
     private var names = Names(Mappings.EMPTY, emptyMap())
 
+    internal var mappings: () -> Mappings = { ScriptingEnvironment.currentOrNull()?.mappings ?: Mappings.EMPTY }
+
     /** Names a known runtime class on the compiler's named classpath, including nested classes. */
-    fun className(kind: KClass<*>): String? =
-        className(kind, ScriptingEnvironment.currentOrNull()?.mappings ?: Mappings.EMPTY)
+    fun className(kind: KClass<*>): String? = className(kind, mappings())
+
+    /** The name of [kind] without its package, `Outer.Inner` for a nested class, as scripts write it. */
+    fun shortName(kind: KClass<*>): String? = className(kind)?.let(StoryPinType::shortName)
 
     internal fun className(kind: KClass<*>, mappings: Mappings): String? {
         val qualified = kind.qualifiedName ?: return null
         val cached = synchronized(namesLock) {
             names.takeIf { it.mappings === mappings } ?: run {
-                val target = mappings.namespaces.indexOf("named")
-                val classes = if (target < 0) emptyMap() else buildMap {
-                    mappings.classes.forEach { type ->
-                        val named = type.names[target].replace('/', '.').replace('$', '.')
-                        type.names.forEach { put(it.replace('/', '.').replace('$', '.'), named) }
-                    }
+                val runtime = mappings.namespaces.indexOf(RUNTIME)
+                val target = mappings.namespaces.indexOf(NAMED)
+                val classes = if (runtime < 0 || target < 0) emptyMap() else mappings.classes.associate { type ->
+                    dotted(type.names[runtime]) to dotted(type.names[target])
                 }
                 Names(mappings, classes).also { names = it }
             }
         }
         return cached.classes[qualified] ?: qualified
     }
+
+    private fun dotted(name: String) = name.replace('/', '.').replace('$', '.')
+
+    private const val RUNTIME = "intermediary"
+    private const val NAMED = "named"
 }

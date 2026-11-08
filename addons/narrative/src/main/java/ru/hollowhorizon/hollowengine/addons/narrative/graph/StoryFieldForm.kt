@@ -57,7 +57,7 @@ sealed interface StoryFieldForm {
     data class Constant(val qualified: String, val short: String, val names: List<String>) : StoryFieldForm {
         constructor(kind: KClass<*>) : this(
             StoryKotlinTypes.className(kind).orEmpty(),
-            kind.qualifiedName.orEmpty().removePrefix(kind.java.packageName + "."),
+            StoryKotlinTypes.shortName(kind).orEmpty(),
             kind.java.enumConstants.orEmpty().map { (it as Enum<*>).name },
         )
 

@@ -43,5 +43,27 @@ class StoryKotlinTypesTest {
         )
     }
 
+    @Test
+    fun `generated code and labels name runtime classes as scripts do`() {
+        val previous = StoryKotlinTypes.mappings
+        val mapped = object : Mappings {
+            override val namespaces = listOf("intermediary", "named")
+            override val classes = listOf(MappedClass(
+                listOf(Mode::class.java.name.replace('.', '/'), "game/GameMode"), emptyList(), emptyList(), emptyList(),
+            ))
+        }
+        StoryKotlinTypes.mappings = { mapped }
+        try {
+            assertEquals("game.GameMode.SURVIVAL", StoryLiterals.expression("survival", typeOf<Mode>()))
+            assertEquals("kotlin.collections.List<game.GameMode?>", StoryKotlinTypes.name(typeOf<List<Mode?>>()))
+            assertEquals("GameMode", StoryPinType("mode", Mode::class, 0).label)
+            assertEquals(StoryFieldForm.Constant("game.GameMode", "GameMode", listOf("SURVIVAL")), StoryFieldForm.of(typeOf<Mode>()))
+        } finally {
+            StoryKotlinTypes.mappings = previous
+        }
+    }
+
     class Nested
+
+    enum class Mode { SURVIVAL }
 }

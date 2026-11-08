@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctionSignature
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryKotlinTypes
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParam
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
@@ -133,7 +134,7 @@ class StoryCommand private constructor(val action: StoryAction, val signature: S
             val type = parameter.type.classifier as? KClass<*> ?: return null
             val constructor = type.primaryConstructor ?: return null
             if (constructor.parameters.any { !it.isOptional }) return null
-            val group = StoryParamGroup(parameter.name ?: return null, type.qualifiedName ?: return null)
+            val group = StoryParamGroup(parameter.name ?: return null, StoryKotlinTypes.className(type) ?: return null)
             return constructor.parameters.filter { it.name != null && isValue(it.type) }
                 .map { param(it).copy(optional = true, group = group) }.ifEmpty { null }
         }
