@@ -151,8 +151,31 @@ class StageAnalysisTest {
             "an alias is the type it stands for"
         )
         assertEquals("kotlin.String", found.types.getValue("storyPin10"), "a platform type is read as not null")
-        assertTrue(found.types.getValue("storyPin5").startsWith("kotlin."), "a type with no name of its own is made one")
+        assertTrue(found.types.getValue("storyPin5").contains("java.io.Serializable"), "the inferred intersection is preserved")
         assertTrue("storyPin7" !in found.types && "storyPin8" !in found.types)
+    }
+
+    @Test
+    fun `different inferred intersections retain their identities and subtype relations`() {
+        val source = """
+            suspend fun inspect() {
+                val storyPinNumbers = listOf(4f, 3)
+                val storyPinMixed = listOf(1, "text")
+                val storyPinNumber: List<Number> = emptyList()
+                val storyPinComparable: List<Comparable<*>> = emptyList()
+                val storyPinSerializable: List<java.io.Serializable> = emptyList()
+            }
+        """.trimIndent()
+        val found = compiler.environment.analyzer.propertyTypes("intersection.stage.kts", source, "storyPin")
+        fun type(name: String) = found.types.getValue("storyPin$name")
+        val numeric = type("Numbers")
+        val mixed = type("Mixed")
+        assertTrue(numeric != mixed, "$numeric / $mixed")
+        assertTrue(type("Number") in found.fits.getValue(numeric), numeric)
+        assertTrue(type("Comparable") in found.fits.getValue(numeric), numeric)
+        assertTrue(type("Serializable") in found.fits.getValue(numeric), numeric)
+        assertFalse(type("Number") in found.fits.getValue(mixed), mixed)
+        assertTrue(type("Serializable") in found.fits.getValue(mixed), mixed)
     }
 
     @Test

@@ -32,6 +32,7 @@ class StoryFieldColors(val text: String, val highlights: List<UiTextHighlight>) 
  * @param written the type the compiler reads each type written in the story or by a command as, `Int` as `kotlin.Int`.
  * @param relations for each type the analysis saw, the ones among them a value of it goes into once it is not null.
  * @param revision moves on with each analysis.
+ * @param inferred pin types inferred from the current call, including fields. These describe values without fixing future edits.
  */
 class StoryAnalysis(
     val checks: List<StoryCheck> = emptyList(),
@@ -43,6 +44,7 @@ class StoryAnalysis(
     val relations: Map<String, Set<String>> = emptyMap(),
     val revision: Long = 0L,
     val details: Map<String, KotlinTypeInfo> = emptyMap(),
+    val inferred: Map<Pair<String, String>, String> = emptyMap(),
 ) {
     /** The type [text] stands for when it says what fits it: one the analysis knows, other than `Any`. */
     fun known(text: String): String? = typeOf(text)?.takeUnless { it == ANY }
@@ -278,9 +280,12 @@ object StoryInsight {
         val written =
             checked.written.entries.mapNotNull { (name, text) -> properties.types[name]?.let { text to it } }.toMap()
         val fixed = checked.fixed.entries.mapNotNull { (name, pin) -> properties.types[name]?.let { pin to it } }.toMap()
+        val inferred = checked.inferred.entries.mapNotNull { (name, pin) ->
+            properties.types[name]?.takeUnless { properties.details[it]?.containsNothing == true }?.let { pin to it }
+        }.toMap()
         return StoryAnalysis(
             checks, fields, colors, types(session, found), fixed, written, properties.fits, session.analysis.revision + 1,
-            properties.details,
+            properties.details, inferred,
         )
     }
 

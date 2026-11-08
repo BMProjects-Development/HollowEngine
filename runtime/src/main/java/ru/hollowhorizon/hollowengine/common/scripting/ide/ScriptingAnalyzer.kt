@@ -97,7 +97,7 @@ interface ScriptingAnalyzer {
 /**
  * What analysis says of named properties.
  *
- * @param types what each of them is, as Kotlin writes it with every class named in full: `kotlin.collections.List<a.B?>`.
+ * @param types exact inferred types with qualified names, including intersections. These are presentations, not source declarations.
  * @param fits for each of those types, the ones among them a value of it goes into once it is not null, itself too.
  */
 data class KotlinPropertyTypes(

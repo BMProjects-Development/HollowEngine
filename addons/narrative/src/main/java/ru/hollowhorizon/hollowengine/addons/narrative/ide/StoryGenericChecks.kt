@@ -111,6 +111,7 @@ internal class StoryGenericChecks(
         val blocks: List<StoryBlockSpan>,
         val fixed: Map<String, Pair<String, String>>,
         val evidence: Map<String, StoryGenericKey>,
+        val inferred: Map<String, Pair<String, String>>,
     )
 
     /** Writes checks and properties carrying inferred pins and individual parameter evidence. */
@@ -119,11 +120,12 @@ internal class StoryGenericChecks(
         span: (StoryFieldKey, String, IntArray) -> Unit,
         left: (StoryFieldKey) -> Unit,
     ): Written {
-        if (blocks.isEmpty()) return Written(emptyList(), emptyMap(), emptyMap())
+        if (blocks.isEmpty()) return Written(emptyList(), emptyMap(), emptyMap(), emptyMap())
         text.append("\n\nclass StorySink<in X>\nfun <X> storySink(): StorySink<X> = StorySink()\nclass StoryType<X>")
         val spans = ArrayList<StoryBlockSpan>()
         val fixed = LinkedHashMap<String, Pair<String, String>>()
         val evidence = LinkedHashMap<String, StoryGenericKey>()
+        val inferred = LinkedHashMap<String, Pair<String, String>>()
         blocks.values.forEach { block ->
             val fix = fix(block)
             val linked = block.inputs.mapNotNull { slot -> typedSource(block, slot)?.let { slot to it } }.toMap()
@@ -148,6 +150,7 @@ internal class StoryGenericChecks(
                     evidence[name] = StoryGenericKey(block.node.id, slot.pin, parameter)
                 }
             }
+            text.append("val storyInferred = ")
             val from = text.length
             if (fix == null) text.append("storyCall${block.index}(") else text.append("${fixed(block)}.call(")
             given.forEachIndexed { index, slot ->
@@ -165,6 +168,12 @@ internal class StoryGenericChecks(
             }
             text.append(")")
             spans += StoryBlockSpan(block.node.id, from, text.length)
+            val known = given.flatMap { it.parameters } + fix?.parameters.orEmpty()
+            block.slots.filter { known.containsAll(it.parameters) }.forEach { slot ->
+                val name = "${StoryFieldChecks.PIN}Inferred${block.index}_${slot.index}"
+                text.append("\nval $name = storyInferred.pin${slot.index}()")
+                inferred[name] = block.node.id to slot.pin
+            }
             fix?.let { found ->
                 block.slots.filter { found.parameters.containsAll(it.parameters) }.forEach { slot ->
                     val name = "${StoryFieldChecks.PIN}Fix${block.index}_${slot.index}"
@@ -174,7 +183,7 @@ internal class StoryGenericChecks(
             }
             text.append("\n}")
         }
-        return Written(spans, fixed, evidence)
+        return Written(spans, fixed, evidence, inferred)
     }
 
     private fun declare(text: StringBuilder, block: Block, fix: Fix?, given: List<Slot>) {
@@ -192,14 +201,21 @@ internal class StoryGenericChecks(
             text.append("\nfun $own ${place(block, slot)}(into: StorySink<${slot.shape.nonNullable.kotlin}>): $shape = ${shape(block, slot)}()\n")
         }
         val told = given.flatMap { it.parameters }.distinct()
+        val known = (fix?.parameters.orEmpty() + told).distinct()
+        val inferredType = "StoryInferred$n${typeParameters(known)}"
+        text.append("\nclass $inferredType {\n")
+        block.slots.filter { known.containsAll(it.parameters) }.forEach { slot ->
+            text.append("fun pin${slot.index}(): ${slot.shape.kotlin} = TODO()\n")
+        }
+        text.append("}\n")
         if (fix == null) {
-            text.append("\nfun ${typeParameters(told)} storyCall$n(${slots(given)}) {}")
+            text.append("\nfun ${typeParameters(told)} storyCall$n(${slots(given)}): $inferredType = StoryInferred$n()")
             return
         }
         val fixed = fix.parameters
         val own = typeParameters(fixed)
         text.append("\nclass StoryBlock$n$own {\n")
-        text.append("fun ${typeParameters(told - fixed.toSet())} call(${slots(given)}) {}\n")
+        text.append("fun ${typeParameters(told - fixed.toSet())} call(${slots(given)}): $inferredType = StoryInferred$n()\n")
         block.slots.filter { fixed.containsAll(it.parameters) }.forEach { slot ->
             text.append("fun pin${slot.index}(): ${slot.shape.kotlin} = TODO()\n")
             if (slot in block.inputs) text.append("fun sink${slot.index}(): StorySink<${slot.shape.kotlin}> = StorySink()\n")

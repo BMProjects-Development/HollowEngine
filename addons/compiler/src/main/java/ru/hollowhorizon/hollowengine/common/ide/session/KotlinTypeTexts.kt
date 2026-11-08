@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
 import org.jetbrains.kotlin.analysis.api.KaSession
+import org.jetbrains.kotlin.analysis.api.renderer.declarations.KaRendererTypeApproximator
 import org.jetbrains.kotlin.analysis.api.renderer.types.KaExpandedTypeRenderingMode
 import org.jetbrains.kotlin.analysis.api.renderer.types.KaTypeRenderer
 import org.jetbrains.kotlin.analysis.api.renderer.types.impl.KaTypeRendererForSource
@@ -21,9 +22,11 @@ internal class KotlinTypeTexts(private val session: KaSession) {
     @OptIn(KaExperimentalApi::class)
     fun declared(type: KaType): String? = with(session) {
         val platform = (type.fullyExpandedType as? KaFlexibleType)?.lowerBound?.isMarkedNullable == false
-        val approximated = type.approximateToDenotableSupertypeOrSelf(allowLocalDenotableTypes = false)
-        val denotable = if (platform) approximated.withNullability(false) else approximated
-        denotable.takeIf(::usable)?.render(RENDERER, Variance.INVARIANT)?.also { found.putIfAbsent(it, denotable) }
+        val resolved = if (platform) type.withNullability(false) else type
+        val presented = resolved.takeIf(::usable)
+            ?: resolved.approximateToDenotableSupertypeOrSelf(allowLocalDenotableTypes = false).takeIf(::usable)
+            ?: return null
+        presented.render(RENDERER, Variance.INVARIANT).also { found.putIfAbsent(it, presented) }
     }
 
     fun fits(): Map<String, Set<String>> = with(session) {
@@ -44,6 +47,10 @@ internal class KotlinTypeTexts(private val session: KaSession) {
         val classifier = (simple as? KaClassType)?.classId?.asFqNameString()
         val parents = LinkedHashSet<String>()
         fun visit(current: KaType) {
+            if (current is KaIntersectionType) {
+                current.conjuncts.forEach(::visit)
+                return
+            }
             val symbol = current.expandedSymbol ?: return
             val name = symbol.classId?.asFqNameString() ?: return
             if (parents.add(name)) symbol.superTypes.forEach(::visit)
@@ -52,6 +59,7 @@ internal class KotlinTypeTexts(private val session: KaSession) {
         fun containsNothing(current: KaType): Boolean = when (val value = current.fullyExpandedType) {
             is KaFlexibleType -> containsNothing(value.lowerBound)
             is KaDefinitelyNotNullType -> containsNothing(value.original)
+            is KaIntersectionType -> value.conjuncts.any(::containsNothing)
             is KaClassType -> value.classId.asFqNameString() == "kotlin.Nothing" || value.typeArguments.any {
                 (it as? KaTypeArgumentWithVariance)?.type?.let(::containsNothing) == true
             }
@@ -71,6 +79,7 @@ internal class KotlinTypeTexts(private val session: KaSession) {
         when (val expanded = type.fullyExpandedType) {
             is KaFlexibleType -> usable(expanded.lowerBound) && usable(expanded.upperBound)
             is KaDefinitelyNotNullType -> usable(expanded.original)
+            is KaIntersectionType -> expanded.conjuncts.all(::usable)
             is KaTypeParameterType -> true
             is KaClassType -> !expanded.classId.isLocal && expanded.typeArguments.all {
                 (it as? KaTypeArgumentWithVariance)?.type?.let(::usable) != false
@@ -83,6 +92,7 @@ internal class KotlinTypeTexts(private val session: KaSession) {
     private companion object {
         val RENDERER = KaTypeRendererForSource.WITH_QUALIFIED_NAMES_WITHOUT_PARAMETER_NAMES.with {
             expandedTypeRenderingMode = KaExpandedTypeRenderingMode.RENDER_EXPANDED_TYPE
+            typeApproximator = KaRendererTypeApproximator.NO_APPROXIMATION
             flexibleTypeRenderer = object : KaFlexibleTypeRenderer {
                 override fun renderType(
                     analysisSession: KaSession,

@@ -50,22 +50,32 @@ class StoryGenericCheckTest {
         compiler.close()
     }
 
-    private inner class Opened(private val graph: StoryGraph) {
+    private inner class Opened(private var graph: StoryGraph) {
         val state = StoryEditorState()
-        val analysis: StoryAnalysis
+        lateinit var analysis: StoryAnalysis
+            private set
+        private val session = StoryInsight.Session(state, "").also { state.insight = it }
 
         init {
-            val session = StoryInsight.Session(state, "").also { state.insight = it }.of(graph)
             session.close()
+            update(graph)
+        }
+
+        fun update(graph: StoryGraph) {
+            this.graph = graph
+            session.of(graph)
             while (StoryInsight.take(session, analyzed(session.checked.text))) Unit
             analysis = session.analysis
         }
 
-        private val boxes by lazy { StoryGraphBoxes(graph, state) }
+        private val boxes get() = StoryGraphBoxes(graph, state)
 
         fun output(node: String, pin: String): String? = boxes.outputKotlin(node, pin)
 
         fun input(node: String, pin: String): String? = boxes.inputKotlin(node, pin)
+
+        fun inputType(node: String, pin: String): StoryPinType =
+            boxes.of(graph.node(node)!!).rows.firstNotNullOf { it.input?.takeIf { it.name == pin } }.type
 
         fun fixed(node: String, pin: String): String? = analysis.fixed[node to pin]
 
@@ -133,8 +143,8 @@ class StoryGenericCheckTest {
             )
         )
         assertNull(opened.fixed("list", "a"))
-        assertEquals("kotlin.collections.List<kotlin.Any>", opened.output("list", "list"))
-        assertEquals("T", opened.input("list", "a"), "a field of no fixed type is not made one of what it holds")
+        assertTrue(opened.output("list", "list")!!.contains("java.io.Serializable"))
+        assertTrue(opened.input("list", "a")!!.contains("java.io.Serializable"))
         assertEquals(StoryFieldForm.Code, opened.field("list", "b").form)
         assertEquals(emptyList(), opened.inField("list", "a") + opened.inField("list", "b") + opened.ofBlock("list"))
     }
@@ -321,6 +331,44 @@ class StoryGenericCheckTest {
         ))
         assertEquals("kotlin.Int?", opened.fixed("get", "value"))
         assertEquals(emptyList(), opened.ofBlock("get") + opened.inField("get", "map"))
+    }
+
+    @Test
+    fun `fields infer input pins including empty inputs without fixing later edits`() {
+        fun graph(value: String) = StoryGraph(nodes = listOf(
+            StoryNode.Pure("list", "list", mapOf("a" to value), count = 2),
+        ))
+        val int = Opened(graph("1"))
+        assertEquals("kotlin.Int", int.input("list", "a"))
+        assertEquals("kotlin.Int", int.input("list", "b"))
+        assertEquals(StoryPinType.NUMBER, int.inputType("list", "a"))
+        assertEquals("kotlin.collections.List<kotlin.Int>", int.output("list", "list"))
+        assertNull(int.fixed("list", "a"))
+        assertEquals(StoryFieldForm.Code, int.field("list", "a").form)
+        int.update(graph("4f"))
+        assertEquals("kotlin.Float", int.input("list", "a"))
+        assertEquals("kotlin.Float", int.input("list", "b"))
+        assertEquals(emptyList(), int.ofBlock("list"))
+        int.update(graph(""))
+        assertEquals("T", int.input("list", "a"))
+        assertEquals(StoryPinType.ANY, int.inputType("list", "a"))
+        assertEquals("kotlin.collections.List<T>", int.output("list", "list"))
+    }
+
+    @Test
+    fun `different numeric fields keep K2 intersection types on every pin`() {
+        val opened = Opened(StoryGraph(nodes = listOf(
+            StoryNode.Pure("list", "list", mapOf("a" to "4f", "b" to "3"), count = 2),
+        )))
+        val element = opened.input("list", "a")!!
+        assertTrue(element.contains("kotlin.Number"), element)
+        assertTrue(element.contains("kotlin.Comparable"), element)
+        assertEquals(element, opened.input("list", "b"))
+        assertEquals(StoryPinType.NUMBER, opened.inputType("list", "a"))
+        val output = opened.output("list", "list")!!
+        assertTrue(output.contains("kotlin.Number"), output)
+        assertTrue(output.contains("kotlin.Comparable"), output)
+        assertEquals(emptyList(), opened.ofBlock("list") + opened.inField("list", "a") + opened.inField("list", "b"))
     }
 
     private companion object {

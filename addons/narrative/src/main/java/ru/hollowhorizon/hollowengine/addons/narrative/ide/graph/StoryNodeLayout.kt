@@ -561,9 +561,13 @@ internal class StoryNodeLayout(
             val operator = StoryOperators.find(node.operator) ?: return
             val inputs = StoryOperators.inputsOf(node).map { input -> fixed[node.id to input.name]?.let { input.of(it) } ?: input }
             fun kotlinOf(input: StoryOperatorInput) = when {
-                input.generic -> fixed[node.id to input.name] ?: input.shape?.let { it.starred ?: it.kotlin }
+                input.generic -> fixed[node.id to input.name] ?: analysis.inferred[node.id to input.name]
+                    ?: input.shape?.let { it.starred ?: it.kotlin }
                 else -> input.shape?.kotlin ?: input.param?.type?.let(StoryKotlinTypes::name)
             }
+            fun pinType(input: StoryOperatorInput): StoryPinType =
+                if (input.generic) kotlinOf(input)?.takeIf { analysis.info(it) != null }?.let(analysis::pinType)
+                    ?: input.type else input.type
             folded(
                 inputs.withIndex().toList(),
                 path = { it.value.path },
@@ -574,7 +578,7 @@ internal class StoryNodeLayout(
                         node.id,
                         input.name,
                         if (operator.variadic) "${index + 1}" else StoryCatalog.operatorInputTitle(operator, input),
-                        input.type,
+                        pinType(input),
                         field.takeUnless { input.type in ENTITIES && input.default.isNotEmpty() && field.value.isEmpty() },
                         StoryCatalog.operatorInputHint(operator, input),
                         optional = input.param?.optional == true,
@@ -583,7 +587,7 @@ internal class StoryNodeLayout(
                     )
                 },
                 heading = { (_, input), content ->
-                    val pin = StoryPinSpec(input.name, input.type, kotlinOf(input))
+                    val pin = StoryPinSpec(input.name, pinType(input), kotlinOf(input))
                     section(sectionKey(node.id, input.path), StoryCatalog.operatorInputTitle(operator, input), pin, content = content)
                 },
             )
@@ -592,7 +596,7 @@ internal class StoryNodeLayout(
                 val shape = output.shape
                 if (shape != null && output.generic) {
                     val solved = fixed[node.id to output.name]
-                    val inferred = solved ?: types[node.id to output.name]
+                    val inferred = solved ?: analysis.inferred[node.id to output.name] ?: types[node.id to output.name]
                     return StoryPinSpec(output.name, inferred?.let(analysis::pinType) ?: output.type, inferred ?: shape.kotlin)
                 }
                 val named = output.typeOf?.let { node.arguments[it] }?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it?" }

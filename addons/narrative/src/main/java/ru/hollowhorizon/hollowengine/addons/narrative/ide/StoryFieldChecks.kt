@@ -34,6 +34,7 @@ class StoryFieldFrame(val before: String, val after: String)
  * @param fixed the node and pin behind the name of each property telling what a pin of a generic block is once the
  * type parameters it turns on are fixed.
  * @param evidence properties extracting each individual parameter from a linked input shape.
+ * @param inferred properties reporting all pin shapes after K2 infers the call's remaining parameters from fields.
  */
 class StoryCheckScript(
     val graph: StoryGraph,
@@ -46,6 +47,7 @@ class StoryCheckScript(
     val blocks: List<StoryBlockSpan>,
     val fixed: Map<String, Pair<String, String>>,
     val evidence: Map<String, StoryGenericKey> = emptyMap(),
+    val inferred: Map<String, Pair<String, String>> = emptyMap(),
 ) {
     private val byField = spans.associateBy { it.field }
 
@@ -288,7 +290,7 @@ object StoryFieldChecks {
         }
         return StoryCheckScript(
             plain, text.toString(), length, spans, frames, pins, written,
-            generics.blocks, generics.fixed, generics.evidence,
+            generics.blocks, generics.fixed, generics.evidence, generics.inferred,
         )
     }
 }
