@@ -91,7 +91,7 @@
   "function.flow.add": "Добавить выход",
   "function.flow.heading": "Выходы хода",
   "function.name": "Имя",
-  "function.open": "Двойной клик — войти внутрь",
+  "function.open": "Двойной клик, чтобы войти внутрь",
   "function.param.add": "Добавить параметр",
   "function.param.heading": "Параметры",
   "function.result.add": "Добавить результат",
