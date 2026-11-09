@@ -284,11 +284,9 @@ tasks.named<Sync>("buildAndCollect") {
 
     val compilerJar = project(":addons:compiler").tasks.named<Jar>("addonJar")
     val mcpJar = project(":addons:mcp").tasks.named<Jar>("addonJar")
-    val narrativeJar = project(":addons:narrative").tasks.named<Jar>("addonJar")
 
     from(compilerJar.flatMap { it.archiveFile })
     from(mcpJar.flatMap { it.archiveFile })
-    from(narrativeJar.flatMap { it.archiveFile })
 }
 
 val buildAddons = tasks.register<Sync>("buildAddons") {
