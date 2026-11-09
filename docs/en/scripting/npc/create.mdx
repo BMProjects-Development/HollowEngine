@@ -9,7 +9,7 @@ Create an NPC, then choose its name, model, dimension, and other settings.
 
 ---
 
-The examples use a server `.node.kts`: `npc`, `pos`, `rotation`, and `@State` are already imported. For the complete `main` example, create `hollowengine/scripts/examples/create_npc.node.kts` and run `/he scripting run scripts/examples/create_npc.node.kts main`. Choose coordinates with solid ground in a loaded chunk.
+The examples use a server `.node.kts`: `npc`, `pos`, and `rotation` are already imported. For the complete `onStart` example, create `hollowengine/scripts/examples/create_npc.node.kts` and run `/he scripting run scripts/examples/create_npc.node.kts`. Choose coordinates with solid ground in a loaded chunk.
 
 ## `npc()`
 
@@ -21,6 +21,8 @@ val guide = npc(
     name = "Guide",
 )
 ```
+
+To configure a new NPC directly in a particular dimension, call the engine's `ServerLevel.npc(pos, id) { ... }` overload. The builder runs before the NPC is added to the world. If a living NPC already has that ID, the call returns it and skips the builder. In a Narrative stage, the addon also provides a journaled overload that can undo a spawn.
 
 ## Signature
 
@@ -79,8 +81,7 @@ and Z to put an NPC in the center of one.
 ### Minimal NPC
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val npc = npc(pos(0, 64, 0))
     npc.say("Hello!")
 }
@@ -91,8 +92,7 @@ suspend fun main() {
 Prepare `hollowengine/assets/project/models/entity/trader.gltf` and its textures for this example. The identifier `project:models/entity/trader.gltf` refers to that file. Choose an existing dimension; this example uses the Overworld. If you do not have a custom resource yet, keep the default built-in model.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val trader = npc(
         pos = pos(120.0, 70.0, -32.0),
         name = "Trader",

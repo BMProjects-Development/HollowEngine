@@ -80,8 +80,7 @@ if (paid == 5) merchant.transferItems(player, itemTag("minecraft:swords"), 1)
 ## Пример: сдача квеста
 
 ```kotlin
-@State
-suspend fun onInteract(player: ServerPlayer) {
+suspend fun turnIn(player: ServerPlayer) {
     val logs = itemTag("minecraft:logs")
 
     if (!player.hasItems(logs.request(10))) {
@@ -98,8 +97,7 @@ suspend fun onInteract(player: ServerPlayer) {
 ## Пример: снарядить игрока перед боем
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     player.giveItems(
         listOf(
             item("minecraft:iron_sword"),

@@ -20,8 +20,7 @@ order: 3
 Если передать в `npc()` параметр `id`, вызов работает как "получить или создать":
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val smith = npc(
         pos = pos(10, 64, 10),
         name = "Кузнец",

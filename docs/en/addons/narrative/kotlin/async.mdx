@@ -1,0 +1,39 @@
+---
+title: Asynchronous Actions
+order: 2
+---
+
+<center><h1>Asynchronous Actions</h1></center>
+
+Run several activities while a story waits. Named branches belong to the [Narrative addon](/docs/hollowengine/addons/narrative) and save their progress with the parent run.
+
+## Story branches and `async`
+
+In a [Kotlin stage](/docs/hollowengine/addons/narrative/kotlin), give each branch a stable name, as in the following example.
+
+```kotlin
+@State
+suspend fun main() {
+    val bell = async("bell") {
+        wait(40, "before-bell")
+        println("Bell")
+    }
+    val gate = async("gate") {
+        wait(100, "before-gate")
+        println("Gate opens")
+    }
+    all(bell, gate)
+}
+```
+
+`async` returns a handle immediately. After restoration the same call finds its existing branch. When the stage that started a branch returns, any of its branches still running are stopped. Call `cancel()` on a handle before reusing its name for a different branch.
+
+| Call | What it waits for |
+| --- | --- |
+| `handle.await()` | Returns the branch result, or throws if it failed or stopped. |
+| `handle.join()` | Waits for the branch to end. |
+| `all(a, b)` | Waits for all supplied branches. |
+| `race(a, b)` | Returns the first finished branch and cancels the others. |
+| `any(2, a, b, c)` | Returns the first two distinct branches to finish and cancels the rest. |
+
+For background work that only needs to live with an ordinary node, use Kotlin coroutines in the node's scope. Their execution position is not saved with the world.

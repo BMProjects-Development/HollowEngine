@@ -37,7 +37,7 @@ Open **Project settings** and fill in the mod metadata.
 | **Authors** | The project authors. |
 | **License** | The terms under which the project is distributed. A license is usually required for publishing on CurseForge or Modrinth. |
 | **Icon** | A path to a PNG file inside the project, such as `icon.png`. |
-| **Addon dependencies** | Additional HollowEngine modules required by the project. |
+| **Depends on addons** | Addons required by the project. If it uses `.story` graphs or Narrative's Kotlin API, include `hollowengine-narrative`. |
 
 ![Project settings window](/hollowengine/pictures/project-export/settings.webp)
 
@@ -60,12 +60,12 @@ When **Include script sources** is enabled, the archive can later be imported ba
 
 When it is disabled, the JAR contains compiled scripts only. Importing it back and recovering the exact source project structure will not be available. This is useful for a public build, but it is not a substitute for keeping a backup of the source project.
 
-HollowEngine compiles all scripts during export. If a script cannot be compiled, the build ends with an error. After a successful build, the engine displays the path to the resulting file and offers to reveal it in the file explorer.
+HollowEngine compiles scripts and Narrative graphs during export. If a script cannot be compiled, the build ends with an error. After a successful build, the engine displays the path to the resulting file and offers to reveal it in the file explorer.
 
 ![Successful export message](/hollowengine/pictures/project-export/export-success.webp)
 
 The finished archive contains resources, data, loader metadata, and compiled scripts. It is a normal mod JAR, so it can be sent to another player or published on a mod distribution platform.
-For now, cutscenes aren't supported during export because they aren't tied to a specific add-on; you'll likely have to move your cutscenes to a different section later on.
+Cutscene files from `hollowengine/cutscenes/` are outside the exported resources. Copy that folder separately when distributing a project that plays cutscenes.
 
 ![Contents of an exported JAR](/hollowengine/pictures/project-export/jar-contents.webp)
 

@@ -1,0 +1,38 @@
+---
+title: Stories and dialogues
+order: 1
+---
+
+<center><h1>Stories and dialogues</h1></center>
+
+Build a conversation in the IDE and test it in the game. A story can also move NPCs, wait for a player to enter an area, or change the world.
+
+## Your first story
+
+1. Install the [Narrative addon](/docs/hollowengine/addons/narrative) and the [Kotlin compiler addon](/docs/hollowengine/addons/compiler). Add `hollowengine-narrative` to the project's dependencies.
+2. In the **Project** window, right-click the `scripts` folder and choose **New Script > Dialogue**. Name the file `greeting.story`. Open it to see **Start** connected to a **Phrase**.
+3. Edit the speaker and text on the **Phrase** node. Try `Guide` and `Welcome to the village!`.
+4. Save the file. Enter a world with operator permissions and run the command below as a player.
+
+```mcfunction
+/he story entity @s start "greeting.story" greeting
+```
+
+The player sees the line in the dialogue overlay. The default overlay advances automatically after a reading delay. Press `Enter` to reveal the full line or move on. `/he dialogue advance` moves on immediately. The story ends when there is no next step.
+
+## Add an answer
+
+Right-click empty space in the graph and add **Choice**. Connect the phrase's flow output to the choice's flow input. Add two options, then connect each option to a different **Phrase**. Save and run the same command again. Each answer now leads to its own line. Press a number key to vote, or use the arrows to highlight an answer and `Enter` to confirm.
+
+Several answers can also lead to the same line. In the example below, three options lead to two different lines.
+
+![The greeting.story graph with Start, a phrase, and a choice with three options](/hollowengine/pictures/narrative/greeting-graph.png)
+
+## In this section
+
+- [The node system](/docs/hollowengine/addons/narrative/stories/graph) explains pins, fields, variables, and text formatting.
+- [Branches and functions](/docs/hollowengine/addons/narrative/stories/control-flow) shows how to split and reuse parts of the graph.
+- [Built-in blocks](/docs/hollowengine/addons/narrative/stories/blocks) covers actions and values for NPCs, players, and the world.
+- [Custom blocks](/docs/hollowengine/addons/narrative/stories/custom-blocks) shows how to add blocks in Kotlin.
+- [Launching and saving progress](/docs/hollowengine/addons/narrative/stories/playback) covers player audiences, persistence, and testing commands.
+- [Start a dialogue from an NPC](/docs/hollowengine/addons/narrative/stories/npc-interaction) connects a graph to a right-click interaction.

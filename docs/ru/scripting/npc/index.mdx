@@ -7,9 +7,11 @@ order: 1
 
 Создавайте персонажей для своей карты: NPC могут разговаривать, ходить к цели, пользоваться предметами и участвовать в сюжетных сценах.
 
-Начните с файла `.node.kts` в `hollowengine/scripts`. В нём уже доступны функции `npc()`, `pos()`, `move()` и другие помощники для NPC. Методы сервера `MinecraftServer` тоже можно вызывать прямо из скрипта.
+Начните с файла `.node.kts` в `hollowengine/scripts`. В нём уже доступны функции `npc()`, `pos()` и другие помощники для NPC. Методы сервера `MinecraftServer` тоже можно вызывать прямо из скрипта.
 
 NPC - это обычная Minecraft-сущность `NpcEntity`, поэтому с ней можно работать и через HollowEngine helpers (`npc()`, `move`, `lookAt`, `say`), и через стандартный API `Entity` / `LivingEntity` / `PathfinderMob`.
+
+Скриптовые функции движения, взгляда и взаимодействия в этих примерах входят в [Narrative](/docs/hollowengine/addons/narrative). Перед их использованием добавьте `hollowengine-narrative` в зависимости проекта.
 
 ## Разделы
 
@@ -30,17 +32,16 @@ NPC - это обычная Minecraft-сущность `NpcEntity`, поэтом
 ## Быстрый пример
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val guide = npc(
         pos = pos(0, 64, 0),
         name = "Guide",
         model = "hollowengine:models/entity/player_model.gltf",
     )
 
-    val player = playerList.players.firstOrNull() ?: return
+    val player = playerList.players.firstOrNull() ?: return@onStart
 
-    guide.lookAt(player)
+    guide.lookAt(target = player)
     guide.say("Welcome!")
     guide.move(player, dist = 2.0, speed = 1.0)
 }
@@ -49,26 +50,25 @@ suspend fun main() {
 Этот пример делает всё по очереди, и для простых сцен этого вполне достаточно. Но NPC также умеет **одновременно** идти, оглядываться по сторонам и работать руками, сам собирать предметы, носить инвентарь и запоминать свои данные - подробнее об этом в [Действиях и параллельности](/docs/hollowengine/scripting/npc/actions).
 
 :::advice
-`move(...)`, `lookAt(...)`, `useBlock(...)` и `destroyBlock(...)` - `suspend`-функции. Вызывайте их из `@State suspend fun`, `async { ... }` или другой корутины.
+`move(...)`, `lookAt(...)`, `useBlock(...)` и `destroyBlock(...)` - `suspend`-функции. Вызывайте их из suspend-обработчика, например `onInteract` или `onStart`.
 :::
 
 ## Жизненный цикл
 
-Обычно NPC создают внутри стейта ноды:
+Обычно NPC создают в обработчике `onStart` ноды:
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val npc = npc(pos(10, 64, 10), name = "Guard")
     npc.say("Stay close.")
 }
 ```
 
-NPC переживает чанк, в котором стоит: он остаётся в [реестре NPC](/docs/hollowengine/scripting/npc/registry), пока не умрёт или не будет удалён. Чтобы найти его снова после перезагрузки мира или скриптов, задайте ему `id` в `npc(...)` или сохраните UUID через `stateTag()` и найдите его через `npcs[uuid]`.
+NPC переживает чанк, в котором стоит: он остаётся в [реестре NPC](/docs/hollowengine/scripting/npc/registry), пока не умрёт или не будет удалён. Чтобы найти его снова после перезагрузки мира или скриптов, задайте ему `id` в `npc(...)` или сохраните UUID в данных ноды и найдите его через `npcs[uuid]`.
 
 ## Прикрепление постоянного поведения
 
-Для поведения, которое должно жить вместе с самим NPC, а не с сюжетным стейтом, прикрепите [node-скрипт](/docs/hollowengine/scripting/node) прямо к сущности через `@file:Attach`:
+Для поведения, которое должно жить вместе с самим NPC, прикрепите [node-скрипт](/docs/hollowengine/scripting/node) прямо к сущности через `@file:Attach`:
 
 ```kotlin
 @file:Attach(NpcEntity::class)

@@ -9,7 +9,9 @@ order: 5
 
 It's recommended to read [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions) first: every function here comes in a `suspend` form (waits for you) and a `startX` form (runs in the background and gives you a handle), and each one uses one of the `MOVEMENT`, `LOOK`, or `HANDS` channels.
 
-The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside a suspend handler such as `onStart` or `onInteract`.
+
+The scripted movement, look, and interaction helpers used here come from [Narrative](/docs/hollowengine/addons/narrative). Add `hollowengine-narrative` to your project's dependencies before using them.
 
 ## Moving to an entity or a position
 
@@ -20,13 +22,15 @@ npc move pos(10, 64, 10)                      // to a position, default distance
 npc.move(pos(10, 64, 10), dist = 0.5)         // to a position, custom distance
 ```
 
-`npc move player` and `npc.move(player)` are the same call, `move` is declared as a Kotlin `infix` function for the simple case, so the dot is optional. All of these are `suspend` functions: the script waits until the NPC arrives (or gives up). Every one of them also has a `startMove(...)` twin that returns immediately with an `NpcAction<MoveResult>` handle, exactly as described in [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions).
+`npc move player` and `npc.move(entity = player)` are the same call, `move` is declared as a Kotlin `infix` function for the simple case, so the dot is optional. All of these are `suspend` functions: the script waits until the NPC arrives (or gives up). Every one of them also has a `startMove(...)` twin that returns immediately with an `NpcAction<MoveResult>` handle, exactly as described in [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions).
 
 ```kotlin
-val walking = npc.startMove(player) // does not wait
+val walking = npc.startMove(player.entityRef) // does not wait
 // ... do other things ...
 val result = walking.await()
 ```
+
+Movement keeps chunks around the NPC loaded until it finishes or is cancelled. For entity targets, `startMove` takes a reference such as `player.entityRef`.
 
 ### What `move` gives you back
 
@@ -40,7 +44,7 @@ Movement functions return a `MoveResult`, so you can tell what actually happened
 | `MoveResult.Closest(reason, distance)` | The NPC stopped as close to the point as it got, `distance` blocks from it. `reason` says why (see [Getting as close as it can](#getting-as-close-as-it-can)). |
 
 ```kotlin
-val result = npc.move(player)
+val result = npc.move(entity = player)
 if (result != MoveResult.Arrived) {
     npc.say("I can't reach you!")
 }
@@ -68,11 +72,10 @@ npc.move(
 | Field | Default | Meaning |
 |-------|---------|---------|
 | `speed` | `1.0` | Pathfinding movement speed. |
-| `arrivalDistance` | `1.5` | How close counts as "arrived". The NPC brakes to stop there. `0` walks it right onto the point, as close as it gets. |
+| `arrivalDistance` | `0.0` | How close counts as "arrived". The NPC brakes to stop there. `0` walks it right onto the point, as close as it gets. |
 | `facing` | `Facing.Path` | Which way the NPC faces while it walks; see [Which way the NPC faces](#which-way-the-npc-faces). |
 | `passDistance` | `1.0` | How close a point the move passes through, rather than ends at, counts as passed; see [Walking through several points](#walking-through-several-points). |
 | `avoid` | none | Zones this move keeps out of; see [Keeping out of zones](#keeping-out-of-zones). |
-| `navigation` | none | Changes the NPC's [navigation settings](/docs/hollowengine/scripting/npc/navigation) for this move only. |
 | `repathIntervalTicks` | `10` | How often the NPC recalculates its path while walking. |
 | `targetMoveThreshold` | `1.0` | If a moving target (like a player) moves further than this since the last path, the NPC repaths immediately instead of waiting for the next interval. |
 | `stuckTimeoutTicks` | `60` | If the NPC hasn't made progress for this many ticks, it is considered stuck and forces a repath. |
@@ -177,14 +180,14 @@ Cancels whatever the NPC is currently walking toward and stops its navigation im
 ## Looking at something
 
 ```kotlin
-npc.lookAt(pos(0, 64, 0))
+npc.lookAt(position = pos(0, 64, 0), duration = 1.sec)
 npc.lookAt(player)
 ```
 
 Smoothly turns the NPC's head and body toward a position or entity over about 1.5 seconds (this is the `suspend`, waiting form). While the NPC walks, it turns its body to what it looks at and walks on sideways or backward, see [Which way the NPC faces](#which-way-the-npc-faces). Use `startLookingAt(...)` for the background form, and `clearLookTarget()` to cancel it early:
 
 ```kotlin
-npc.startLookingAt(player)  // does not wait
+npc.startLookingAt(player.entityRef)  // does not wait
 npc.clearLookTarget()       // cancel it
 ```
 

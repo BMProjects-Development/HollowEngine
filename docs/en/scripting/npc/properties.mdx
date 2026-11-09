@@ -111,19 +111,22 @@ For animations, see [Animations](/docs/hollowengine/models/animations).
 
 Do not persist the `NpcEntity` object itself across reloads. Store its UUID:
 
-```kotlin
-val tag = stateTag()
-tag.putUUID("guide", npc.uuid)
-```
-
-After loading, use `entityRef<NpcEntity>(uuid)` (the type parameter is required):
+For a node, you can save the UUID as a string and resolve it later from a suspend handler:
 
 ```kotlin
-val guideRef = entityRef<NpcEntity>(tag.getUUID("guide"))
-val guide = guideRef.resolve()
+import java.util.UUID
+
+var guideId by persisted("guideId") { "" }
+
+// Save the ID when you obtain the NPC.
+guideId = npc.uuid.toString()
+
+// Read it in a suspend handler when you need the entity.
+val guide = guideId.takeIf { it.isNotEmpty() }
+    ?.let { entityRef<NpcEntity>(UUID.fromString(it)).resolve() }
 ```
 
-This is safer than keeping a direct entity reference because Minecraft can unload or recreate entities. `entityRef` waits until the body is loaded; to reach an NPC whose chunk is unloaded, use `npcs[uuid]` or its id instead, see [NPCs Outside the World](/docs/hollowengine/scripting/npc/registry).
+To find an NPC whose chunk is unloaded, use its UUID or registered ID in the [NPC registry](/docs/hollowengine/scripting/npc/registry).
 
 ---
 

@@ -1,0 +1,57 @@
+---
+title: Resumable story stages
+order: 1
+---
+
+<center><h1>Resumable story stages</h1></center>
+
+Use a Kotlin stage for a sequence that should continue after the world is reopened. Install the compiler and add the [Narrative dependency](/docs/hollowengine/addons/narrative). Ordinary [node event handlers](/docs/hollowengine/scripting/node) are available in the engine by itself.
+
+## Define and start a stage
+
+Annotate a top-level suspend function with `@State`. The function name becomes the stage name unless you supply one in the annotation. Keep that name stable when renaming the Kotlin function.
+
+Save this as `hollowengine/scripts/examples/arrival.node.kts` and run `/he scripting run "examples/arrival.node.kts" main`.
+
+```kotlin
+@State
+suspend fun main() {
+    println("Waiting for the arrival")
+    checkpoint("arrival")
+    wait(100, "before-bell")
+    announce()
+}
+
+@State
+suspend fun announce() {
+    println("Arrival complete")
+}
+```
+
+Starting a node with an entry stage launches the stage in a run with the key `main`. Attach an entity node with an entry stage using `/he scripting attach <entity> <path> <stage>`, or call `launchStory("key") { ... }` from a handler. You can also launch a run on a server or entity.
+
+## Calls and checkpoints
+
+Calling another stage is a regular nested call. When it returns, the caller continues after the call. A run keeps its call stack, plus the arguments and locals it still needs at resume points. Those values must be serializable. Entities are stored as references, and the story can wait for a referenced entity to load.
+
+A checkpoint marks a resume point and a target for rewind. Call `checkpoint("name")` directly in a stage and use unique names within that stage. Work after the last saved boundary can run again after a restart. Use a journaled action where a world change needs to be replayed or undone. See [Custom story blocks](/docs/hollowengine/addons/narrative/stories/custom-blocks).
+
+## Store progress
+
+| API | What it keeps |
+| --- | --- |
+| `var trust by saved(0)` | Declare this at script level. Each story run has its own value, shared by its branches. |
+| `segmentTag()` | Raw NBT for the current segment between resume boundaries. The next segment starts with an empty tag. |
+| `once("key") { ... }` | Skips a completed block when the segment repeats, including after rewind. |
+| `remember("key") { ... }` | Reuses the first serializable result when the segment repeats. |
+| `forget("key")` | Removes entries from `once` and `remember` for that key in the current segment. |
+
+Use a distinct key for each repetition in a loop, for example `"reward-$index"`. Keep data about the node or entity itself in [node persistence](/docs/hollowengine/scripting/node) or [entity data](/docs/hollowengine/scripting/npc/data).
+
+## Wait across restarts
+
+- `wait(100, "gate")` waits for 100 game ticks. Time with the server stopped does not count.
+- `wait(5.sec, "gate")` uses a real-time deadline. Time with the server stopped counts.
+- `wait(instant, "gate")` waits for a `java.time.Instant`.
+
+Each of these calls remembers its deadline while waiting. Give each distinct wait within a segment its own name. Use [asynchronous actions](/docs/hollowengine/addons/narrative/kotlin/async) to run several story branches at once.

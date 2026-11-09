@@ -22,7 +22,7 @@ See [World objects](/docs/hollowengine/world/objects) for placement and [NPC scr
 
 ## What a model brings with it
 
-A model file (`.gltf`, `.glb`, Blockbench `.geo.json`, or `.obj`) lives in the usual asset structure and is specified by its resource location:
+A model file (`.gltf`, `.glb`, `.fbx`, `.bbmodel`, `.geo.json`, or `.obj`) lives in the usual asset structure and is specified by its resource location:
 
 ```kotlin
 val guide = npc(
@@ -59,6 +59,8 @@ cape = "material_3"
 | `[materials]` | New names for the model's materials, see below. |
 
 ---
+
+You can load Blockbench project files (`.bbmodel`, project format versions 4 and 5) directly. The importer reads the model, its textures, and animations. FBX files can carry animation clips as well. Check their names in the model preview or with `/he model info` before using them in a script.
 
 ## Material names
 

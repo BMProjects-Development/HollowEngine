@@ -13,7 +13,7 @@ order: 10
 Про выдачу, изъятие и сбор предметов смотрите в разделе [Инвентарь и сбор предметов](/docs/hollowengine/scripting/npc/inventory).
 Про поиск игроков, NPC и предметов рядом смотрите в разделе [Поиск сущностей и предметов](/docs/hollowengine/scripting/npc/search).
 
-Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в `onStart`, `onInteract` или `@State suspend fun`.
+Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в suspend-обработчик, например `onStart` или `onInteract`.
 
 ## `npc.dropItem(item)`
 
@@ -104,7 +104,7 @@ wait(20)      // 1 секунда
 wait(5.sec)  // 5 секунд
 ```
 
-Для ожиданий, которые должны продолжать отсчёт даже после перезапуска сервера, смотрите раздел "Ожидание, переживающее перезапуск" в [Стейтах и корутинах](/docs/hollowengine/scripting/node/states#waiting-that-survives-a-restart).
+Для ожиданий, которые должны продолжать отсчёт даже после перезапуска сервера, смотрите [Ожидание между перезапусками](/docs/hollowengine/addons/narrative/kotlin#wait-across-restarts).
 
 ### `Int.sec` / `Double.sec`
 

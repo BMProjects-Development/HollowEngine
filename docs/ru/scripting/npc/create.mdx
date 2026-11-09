@@ -9,7 +9,7 @@ order: 2
 
 ---
 
-Примеры используют серверный `.node.kts`: функции `npc`, `pos` и `rotation`, а также `@State` уже импортированы. Для полного примера с `main` создайте файл `hollowengine/scripts/examples/create_npc.node.kts` и запустите `/he scripting run scripts/examples/create_npc.node.kts main`. Координаты замените на точку с опорой под ногами в загруженном чанке.
+Примеры используют серверный `.node.kts`: функции `npc`, `pos` и `rotation` уже импортированы. Для полного примера с `onStart` создайте файл `hollowengine/scripts/examples/create_npc.node.kts` и запустите `/he scripting run scripts/examples/create_npc.node.kts`. Координаты замените на точку с опорой под ногами в загруженном чанке.
 
 ## `npc()`
 
@@ -21,6 +21,8 @@ val guide = npc(
     name = "Guide",
 )
 ```
+
+Чтобы настроить нового NPC в конкретном измерении, используйте перегрузку движка `ServerLevel.npc(pos, id) { ... }`. Блок настройки выполняется перед добавлением NPC в мир. Если живой NPC с таким ID уже есть, вызов возвращает его и пропускает блок. Для этапов Narrative аддон также предоставляет перегрузку с журналом, которая умеет отменять создание NPC.
 
 ## Сигнатура
 
@@ -79,8 +81,7 @@ val rot = rotation(90, 0)
 ### Минимальный NPC
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val npc = npc(pos(0, 64, 0))
     npc.say("Hello!")
 }
@@ -91,8 +92,7 @@ suspend fun main() {
 Для этого примера подготовьте модель `hollowengine/assets/project/models/entity/trader.gltf` и её текстуры. Идентификатор `project:models/entity/trader.gltf` указывает на этот файл. Выберите существующее измерение; пример использует обычный мир. Если своего ресурса пока нет, оставьте встроенную модель по умолчанию.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val trader = npc(
         pos = pos(120.0, 70.0, -32.0),
         name = "Trader",

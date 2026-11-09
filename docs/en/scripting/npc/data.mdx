@@ -7,7 +7,7 @@ order: 9
 
 Store player reputation, NPC stock, or whether characters have met directly on an entity. The engine saves this data with its owner and restores it when loaded.
 
-The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside a suspend handler such as `onStart` or `onInteract`.
 
 ## `.data`: data that belongs to the entity itself
 
@@ -41,7 +41,7 @@ player.data.update(VISITS) { it + 1 }
 ```
 
 :::advice
-Because `.data` lives on the entity itself, it works from anywhere: a `@State` scene, an `onInteract`/`onHurt` handler on a [node script attached to the entity](/docs/hollowengine/scripting/node), or a plain `.reload.kts` event handler. It does not need a running story or an active `@State`.
+Entity data is available to ordinary node and reload handlers as well as to Narrative stages.
 :::
 
 ## Syncing to the client
@@ -110,32 +110,8 @@ A path that is not set, or that holds text rather than a number, reads as `0`, l
 
 An entity that never touches its own `.data` keeps no backing storage and adds nothing to its saved NBT, so most mobs in a world that never read or write it pay no extra cost.
 
-## The state-scoped equivalent: `stateGet` / `stateSet`
+## Story progress and entity data
 
-[States and Coroutines](/docs/hollowengine/scripting/node/states) already introduced `stateTag()`, a raw NBT container tied to the *currently running state*. The same `DataKey` idea works there too, as a typed shortcut instead of calling `tag.putInt(...)` / `tag.getInt(...)` by hand:
+Keep reputation, stock, or unlocked dialogue in `.data` when it belongs to the entity. Use `persisted(...)` or `onSave` and `onLoad` for data that belongs to a specific node attachment.
 
-```kotlin
-val VISITS = dataKey<Int>("visits") { 0 }
-
-@State
-suspend fun main() {
-    val visits = stateGetOrPut(VISITS)
-    stateSet(VISITS, visits + 1)
-
-    if (visits == 0) {
-        npc.say("We haven't met before!")
-    }
-}
-```
-
-`stateGet`, `stateGetOrPut`, `stateSet`, `stateUpdate`, `stateContains`, and `stateRemove` all mirror the `.data` functions above one for one, they just read and write `stateTag()` instead of the entity's own storage. They must be called from a `suspend` function running inside a `@State`, exactly like `stateTag()` itself.
-
-## Where should I store what?
-
-| Storage | Lifetime | Needs an active `@State`? |
-|---------|----------|----------------------------|
-| `.data` (`npc.data`, `player.data`, ...) | Lives with the entity forever, including across death (players) and dimension changes. | No, works anywhere. |
-| `stateGet` / `stateSet` / `stateTag()` | Lives with the current state, and is cleared or replaced the way [States and Coroutines](/docs/hollowengine/scripting/node/states#saving-state-data) describes. | Yes. |
-| `onSave` / `onLoad` or `persisted(...)` on a [node script](/docs/hollowengine/scripting/node) | Lives with that specific node script's own attachment. | No, it's a separate lifecycle entirely. |
-
-As a rule of thumb: if the data describes the entity itself (reputation, known players, unlocked dialogue), use `.data`. If it describes progress through a specific scene or quest step, use `stateTag()` / `stateGet` / `stateSet`.
+For progress that belongs to one Narrative run, use a [saved story variable](/docs/hollowengine/addons/narrative/kotlin#store-progress). For example, `var visits by saved(0)` declares a counter for each run. A stage can increment it with `visits++`. Use `segmentTag()` when you need raw NBT for the current segment.

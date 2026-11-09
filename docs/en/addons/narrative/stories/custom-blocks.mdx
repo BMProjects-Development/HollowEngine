@@ -1,0 +1,50 @@
+---
+title: Custom story blocks
+order: 5
+---
+
+<center><h1>Custom story blocks</h1></center>
+
+Add your own actions and values to the story node system using Kotlin.
+
+## Declare blocks in an addon
+
+Create a [Kotlin addon](/docs/hollowengine/addons/creating) that depends on `hollowengine-narrative` and add Narrative to its compile classpath. Put the following top-level functions in a regular Kotlin source file (`.kt`) in the addon.
+
+```kotlin
+import net.minecraft.server.level.ServerPlayer
+import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValue
+import ru.hollowhorizon.hollowengine.common.utils.literal
+
+@SimpleAction("quest-note")
+fun ServerPlayer.questNote(message: String) {
+    sendSystemMessage(message.literal)
+}
+
+@StoryValue("can-fight")
+fun canFight(player: ServerPlayer): Boolean = player.health >= 10f
+```
+
+Build and install the addon on the server and clients, then add its ID to the story project's dependencies. Narrative scans the addon when it loads. The action sends a message to the supplied player. The value block reads the player's health and returns a Boolean that can drive a condition.
+
+The node catalog uses static Kotlin functions, such as the top-level functions above. Function parameters become inputs, including the receiver of an extension function. Kotlin defaults make inputs optional. Keep a `@StoryValue` function read-only because the node system can call it each time its value is requested. Keep annotation IDs stable once you use the blocks in a story.
+
+## Actions that can be rewound
+
+Use `@Action` for a change the story needs to undo. Within `action { ... }`, use `capture` to record the previous value, `undo` to restore it, and `perform` to apply the change.
+
+Put this example in a running server `.node.kts` and call the function from one of its `@State` stages. The script compiler supplies the arguments for `action { ... }`.
+
+```kotlin
+import net.minecraft.server.level.ServerPlayer
+
+@Action("set-quest-level")
+suspend fun ServerPlayer.setQuestLevel(level: Int) = action {
+    val previous = capture { experienceLevel }
+    undo { setExperienceLevels(previous) }
+    perform { setExperienceLevels(level) }
+}
+```
+
+Narrative registers annotated top-level functions from running server `.node.kts` and `.reload.kts` scripts. These functions can be called from Kotlin stages. For a searchable block in the node catalog, use the compiled-addon setup above. Running a standalone `.kts` with `/he scripting run` does not register it with Narrative. A shared `.kts` can instead be imported by a running script.

@@ -5,11 +5,11 @@ order: 4
 
 <center><h1>Свойства в редакторе</h1></center>
 
-Добавьте скрипту поля в редакторе сущности: радиус патруля, приветствие или файл диалога. Один и тот же скрипт сможет работать с разными настройками у разных NPC.
+Добавьте скрипту поля в редакторе сущности: радиус патруля, приветствие или модель. Один и тот же скрипт сможет работать с разными настройками у разных NPC.
 
 ## Зачем
 
-Ноде, прикреплённой к сущности, часто нужны одно-два значения, принадлежащие именно этой сущности: какой диалог запускает этот НПС, как далеко патрулирует стражник, ограничен ли товар у торговца.
+Ноде, прикреплённой к сущности, часто нужны одно-два значения, принадлежащие именно этой сущности: как NPC приветствует игрока, как далеко патрулирует стражник, ограничен ли товар у торговца.
 Захардкодить их - значит держать по копии скрипта на каждого НПС. `editor` позволяет объявить их один раз и передать редактирование в редактор сущностей, где их легко менять не лезя в код.
 
 Каждое значение принадлежит одному скрипту: две сущности с одним и тем же скриптом хранят свои собственные значения, они сохраняются вместе с сущностью и восстанавливаются вместе с ней.
@@ -17,18 +17,14 @@ order: 4
 ```kotlin
 @file:Attach(NpcEntity::class)
 
-import net.minecraft.server.level.ServerPlayer
+editor.name("Приветствие")
+editor.description("Приветствует игрока, который нажал на NPC.")
+editor.icon("hollowengine:textures/gui/icons/file_kts.svg")
 
-editor.name("Диалог при взаимодействии")
-editor.description("Запускает диалог для игрока, который взаимодействовал с этой сущностью.")
-editor.icon("hollowengine:textures/gui/dialogues/simple.png")
-
-val dialogue by editor.property<String>("Путь к диалогу", assets = listOf("story")) { "stories/example.story" }
+val greeting by editor.property<String>("Приветствие") { "Добро пожаловать!" }
 
 onInteract { event ->
-    val player = event.player as? ServerPlayer ?: return@onInteract
-    val controller = DialogueController(dialogue.removePrefix("scripts/"))
-    controller.start(player)
+    event.player.send(greeting)
 }
 ```
 
@@ -126,15 +122,15 @@ val script by editor.property<String>("Вложенная нода", assets = li
 Для этого есть `restart` и `onChange`:
 
 ```kotlin
-// После изменения скрипт выполняется заново, поэтому `controller` пересоздаётся
-val dialogue by editor.property<String>("Диалог", restart = true) { "stories/hello.story" }
-val controller = DialogueController(dialogue) // без restart этот объект сам не пересоберётся.
+// Нода перезапускается и пересчитывает интервал
+val interval by editor.property<Int>("Интервал (тики)", restart = true) { 20 }
+val updateEvery = interval.ticks
 
 // Или оставить ноду работать и отреагировать вручную
 val radius by editor.property<Double>("Радиус", onChange = { rebuildPatrol(it) }) { 8.0 }
 ```
 
-Перезапуск сохраняет всё, что у ноды было записано - `persisted`-значения, значения редактора, текущий стейт - и стартует уже с них, ровно как при перезагрузке мира.
+Перезапуск сохраняет всё, что у ноды было записано - `persisted`-значения и значения редактора - и стартует уже с них, ровно как при перезагрузке мира.
 
 :::advice
 Значения редактора хранятся отдельно от [`persisted`](/docs/hollowengine/scripting/node), поэтому одно и то же имя можно спокойно использовать в обоих.

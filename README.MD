@@ -17,7 +17,7 @@
 
 ## Introduction
 
-HollowEngine is a content creation engine for Minecraft. It combines Kotlin scripting, a visual programming, and tools for building NPCs, events, gameplay systems, and interactive experiences.
+HollowEngine is a content creation engine for Minecraft. It combines Kotlin scripting, visual programming, and tools for building NPCs, events, gameplay systems, and interactive experiences.
 
 ### Contact & Links
 
@@ -30,8 +30,8 @@ HollowEngine is a content creation engine for Minecraft. It combines Kotlin scri
 
 - In-game IDE with syntax highlighting, code analysis, dockable tool windows, an embedded game viewport, a console (commands and Kotlin), and file previews
 - Kotlin Scripting with full access to the game's classes without having to re-enter the game, including client/server-side scripts, startup scripts, shared scripts, and `.mixin.kts` mixin scripts
-- A custom language for writing dialogues in the style of Ink / Yarn Spinner
-- Advanced model system (.gltf, .obj, .fbx, .geo.json)
+- Optional Narrative addon with visual story graphs, dialogues, resumable Kotlin stages, and cutscenes
+- Advanced model system (.gltf, .glb, .obj, .fbx, .bbmodel, .geo.json)
 - Animator with layers and a visual state graph editor
 - VFX system with a particle editor, renderers, sub-emitters, glow, and sky effects
 - Shader graph: node-based `.material` editor connected to VFX and previews
@@ -57,13 +57,15 @@ HollowEngine is a content creation engine for Minecraft. It combines Kotlin scri
 - `bootstrap-fabric/`: Fabric bootstrap implementation
 - `bootstrap-neoforge/`: NeoForge bootstrap implementation
 - `addons/compiler/`: scripting compiler addon
+- `addons/narrative/`: story graphs, dialogue, and cutscene addon
 
 ## Quick Start
 
 1. Install the HollowEngine jar into your `mods/` folder. One jar covers both Fabric and NeoForge.
 2. If you use scripting, install `HollowEngineCompiler-*.jar` as well. Addons work from `mods/` like any other mod, or from `hollowengine/addons/` if you prefer to keep them apart. If both folders contain the same addon id, the newest version is selected at startup.
-3. Start Minecraft.
-4. Open the in-game editor and begin creating content.
+3. For stories and cutscenes, install `HollowEngineNarrative-*.jar` and add `hollowengine-narrative` to **Depends on addons** in the project settings.
+4. Start Minecraft.
+5. Open the in-game editor and begin creating content.
 
 ## Build From Source
 

@@ -43,8 +43,10 @@ val finished = entity.playAndWait("wave") // suspend: waits for the clip to actu
 
 `playAndWait` is a plain `suspend` function: your script pauses until the clip finishes. On an `NpcEntity` there is also a background form, `startAnimation(...)`, which runs on the `ANIMATION` channel described in [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions), so it can play at the same time as movement and looking:
 
+The movement in this example uses the [Narrative addon](/docs/hollowengine/addons/narrative).
+
 ```kotlin
-val walking = npc.startMove(player)
+val walking = npc.startMove(player.entityRef)
 npc.startAnimation("walk_wave") // plays in parallel with the walk above
 walking.await()
 ```

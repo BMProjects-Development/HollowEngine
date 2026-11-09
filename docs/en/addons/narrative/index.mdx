@@ -1,0 +1,36 @@
+---
+title: Narrative addon
+order: 1
+---
+
+<center><h1>Narrative addon</h1></center>
+
+Build branching stories, show dialogue, and play camera sequences with HollowEngine Narrative.
+
+## What it adds
+
+- A visual editor for [`.story` graphs](/docs/hollowengine/addons/narrative/stories) with choices, typed links, custom functions, and Kotlin expressions.
+- Server-side stories that [save progress and rewind to checkpoints](/docs/hollowengine/addons/narrative/stories/playback). You can also define [resumable stages](/docs/hollowengine/addons/narrative/kotlin) in Kotlin scripts.
+- Dialogue and choice overlays, blocks for NPCs and the world, and [cutscenes](/docs/hollowengine/addons/narrative/cutscenes) with a camera timeline.
+
+NPCs, navigation, action channels, and `.node.kts` event handlers are part of HollowEngine. Narrative provides scripting helpers such as `move`, `lookAt`, and `useBlock`.
+
+## Install and connect it
+
+Put `HollowEngineNarrative-*.jar` in `mods/` or `hollowengine/addons/` on both the server and clients. Install the matching Kotlin compiler addon so the node system can compile your stories.
+
+Add `hollowengine-narrative` under **Depends on addons** in the IDE's project settings. The equivalent entry in `hollowengine/META-INF/plugin.properties` is shown below.
+
+```properties
+dependsOn=hollowengine-narrative
+```
+
+![Project settings with hollowengine-narrative checked in the addon dependencies](/hollowengine/pictures/narrative/project-dependency.png)
+
+## Move a project from an earlier version
+
+The `.story` extension now identifies a JSON graph. Rebuild old text stories by hand in the node editor. Use **Phrase** for dialogue lines and **Choice** for answers.
+
+Replace `DialogueController` calls with `launchStory("key") { scene(...) }` or start the file with `/he story`. The run keeps its own progress. The [NPC interaction example](/docs/hollowengine/addons/narrative/stories/npc-interaction) starts a separate run for each player.
+
+Port old node states to Narrative stages. A stage call now returns to its caller. Use `checkpoint("name")` to mark where execution should resume, `segmentTag()` for NBT between resume points, and `saved(...)` for values shared across a run. Replace `runOnce(...)` with `once(...)`. Test the migrated story with a new run.

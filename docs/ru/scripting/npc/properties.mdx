@@ -111,19 +111,23 @@ npc.set(BodyComponent(mode = BodyMode.BLOCKING))
 
 Не сохраняйте сам объект `NpcEntity` между перезагрузками. Сохраняйте UUID:
 
-```kotlin
-val tag = stateTag()
-tag.putUUID("guide", npc.uuid)
-```
-
-После загрузки используйте `entityRef<NpcEntity>(uuid)` (параметр типа обязателен):
+В ноде можно сохранить UUID как строку и позднее получить сущность из suspend-обработчика:
 
 ```kotlin
-val guideRef = entityRef<NpcEntity>(tag.getUUID("guide"))
-val guide = guideRef.resolve()
+import java.util.UUID
+
+var guideId by persisted("guideId") { "" }
+
+// Сохраните ID, когда получите NPC.
+guideId = npc.uuid.toString()
+
+// Прочитайте его из suspend-обработчика, когда понадобится NPC.
+val guide = guideId.takeIf { it.isNotEmpty() }
+    ?.let { entityRef<NpcEntity>(UUID.fromString(it)).resolve() }
 ```
 
-Это безопаснее, чем держать прямую ссылку на сущность, потому что Minecraft может выгрузить или пересоздать entity. `entityRef` ждёт, пока тело загрузится; чтобы добраться до NPC в выгруженном чанке, используйте `npcs[uuid]` или его id, см. [NPC вне мира](/docs/hollowengine/scripting/npc/registry).
+Чтобы найти NPC в выгруженном чанке, используйте UUID или зарегистрированный ID в [реестре NPC](/docs/hollowengine/scripting/npc/registry).
+
 ---
 
 ## Неймплейты

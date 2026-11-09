@@ -1,0 +1,46 @@
+---
+title: Branches and functions
+order: 3
+---
+
+<center><h1>Branches and functions</h1></center>
+
+## Conditions and loops
+
+**Condition** selects a path based on a Boolean value. In this example, `trust` is a `Float` that starts at `0.0f`. Declare it in the inspector under **Variables**. See [Variables and expressions](/docs/hollowengine/addons/narrative/stories/graph#variables-and-expressions).
+
+![The inspector shows trust as a Float with an initial value of 0.0f](/hollowengine/pictures/narrative/trust-variable.png)
+
+**Set variable** stores the result of `trust + 1`. **Condition** then checks `trust > 10` and picks one of two lines.
+
+![The graph adds one to trust and branches on trust > 10](/hollowengine/pictures/narrative/trust-branch.png)
+
+**For each** repeats a sequence for every item in a list. The current item is available inside the loop. The story continues after the last item.
+
+## Choices
+
+**Choice** takes a different path for each answer. An option's **Shown if** expression can hide it when a condition is false. If several players are watching the scene, they vote in a shared poll.
+
+When branches come back together, a later step can only read an action's output if that action ran on every path leading there. Use a saved variable when the paths produce the same piece of information in different ways.
+
+## Functions
+
+A **Function** turns a sequence into a reusable part of a story. It can take typed parameters, return results, and expose named flows. A **Call** runs the function and makes its results available to the caller. **Run flow** lets a function run a sequence supplied by the caller before continuing its own work.
+
+Functions can be called from the same story or from another `.story` file. The editor manages imports for calls across files and reports circular dependencies.
+
+This function takes a player and a text string. Its **Code** block uses both parameters to show a notification with `sendToast`.
+
+![Function body with player and text parameters used by a Code block](/hollowengine/pictures/narrative/function-body.png)
+
+At the call site, **Story context** supplies the player and the call sets the message.
+
+![Function call with the player from Story context and a message in the text field](/hollowengine/pictures/narrative/function-call.png)
+
+## Parallel story branches
+
+In the node editor, **In parallel** starts a movement task while the main flow continues to a **Phrase**. After the phrase, **Cancel task** receives the result of **In parallel** and stops the movement task.
+
+![Parallel movement branch with a phrase followed by cancellation in the main flow](/hollowengine/pictures/narrative/parallel-movement.png)
+
+Kotlin stages can start named branches that resume after a restart. Use `async("name") { ... }` to start one and `all`, `race`, or `any` to coordinate them. See [Asynchronous actions](/docs/hollowengine/addons/narrative/kotlin/async).

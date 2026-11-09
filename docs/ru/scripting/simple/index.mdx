@@ -96,14 +96,13 @@ fun Player.reward(item: Item, count: Int = 1) {
 }
 ```
 
-В `hollowengine/scripts/quests/first_quest.node.kts` импортируем функцию и выдадим награду игроку `Steve`. Замените это имя своим. `playerRef` дождётся входа игрока; запускайте состояние `main` командой `/he scripting run scripts/quests/first_quest.node.kts main`. Каждый повторный запуск снова выдаст награду.
+В `hollowengine/scripts/quests/first_quest.node.kts` импортируем функцию и выдадим награду игроку `Steve`. Замените это имя своим. `playerRef` дождётся входа игрока; прикрепите ноду командой `/he scripting run scripts/quests/first_quest.node.kts`. Каждый повторный запуск снова выдаст награду.
 
 ```kotlin
 @file:Import("../common/rewards.kts")
 import net.minecraft.world.item.Items
 
-@State
-suspend fun main() {
+onStart {
     playerRef("Steve").update {
         reward(Items.DIAMOND, 3)
     }
