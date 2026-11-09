@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.inspector
 
 import androidx.compose.runtime.*
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.rememberScrollState
@@ -21,6 +22,7 @@ class InspectorTarget(
     val icon: String? = null,
     val subtitle: String? = null,
     val styles: List<String> = emptyList(),
+    val history: UndoHistory? = null,
     val content: HollowUiContent,
 )
 

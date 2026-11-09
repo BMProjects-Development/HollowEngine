@@ -228,7 +228,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.named("classes") {
-    dependsOn(embedRuntimeJar)
+    dependsOn(embedRuntimeJar, rootProject.tasks.named("buildAddons"))
 }
 
 tasks.named<ShadowJar>("shadowJar") {

@@ -1,0 +1,83 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+.gn-pin.gn-type-flow { border-radius: 2px; }
+
+.graph-node.gn-reroute.gn-type-flow { background: #E6E8EE; border-radius: 2px; }
+
+.gn-pin-label.optional {
+    foreground: $text-faint;
+}
+
+.gn-field.error, .insp-input.error {
+    border-color: $danger;
+}
+
+.gn-field.warning {
+    border-color: $warning;
+}
+
+.st-snippets {
+    size: 10px 10px;
+}
+
+.st-row-button {
+    size: 12px 12px;
+    cursor: hand;
+    opacity: 0.6;
+    transition: opacity 110ms ease-out;
+}
+
+.st-row-button:hover {
+    opacity: 1;
+}
+
+.st-row-add {
+    gap: 4px;
+    cursor: hand;
+}
+
+.st-scope-back {
+    padding: 6px;
+    align-items: center center;
+    background: $bg-raised;
+    border-radius: $radius;
+    cursor: hand;
+    transition: background 110ms ease-out;
+}
+
+.st-scope-back:hover {
+    background: $bg-hover;
+}
+
+.st-scope-back-icon {
+    size: $icon $icon;
+}
+
+$band: #2B2D33;
+$band-line: #383B43;
+$band-nested: #32353C;
+
+.st-band {
+    background: $band;
+    border: 1px $band-line;
+    border-radius: 6px;
+}
+
+.st-band.nested {
+    background: $band-nested;
+}
+
+.st-section {
+    gap: 6px;
+    cursor: hand;
+    border-radius: 6px;
+    transition: background 110ms ease-out;
+}
+
+.st-section:hover {
+    background: $bg-pressed;
+}
+
+.st-section-title {
+    foreground: $text-soft;
+}

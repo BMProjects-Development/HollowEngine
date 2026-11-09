@@ -9,7 +9,7 @@ Create an NPC, then choose its name, model, dimension, and other settings.
 
 ---
 
-The examples use a server `.node.kts`: `npc`, `pos`, `rotation`, and `@State` are already imported. For the complete `main` example, create `hollowengine/scripts/examples/create_npc.node.kts` and run `/he scripting run scripts/examples/create_npc.node.kts main`. Choose coordinates with solid ground in a loaded chunk.
+The examples use a server `.node.kts`: `npc`, `pos`, and `rotation` are already imported. For the complete `onStart` example, create `hollowengine/scripts/examples/create_npc.node.kts` and run `/he scripting run scripts/examples/create_npc.node.kts`. Choose coordinates with solid ground in a loaded chunk.
 
 ## `npc()`
 
@@ -21,6 +21,8 @@ val guide = npc(
     name = "Guide",
 )
 ```
+
+To configure a new NPC directly in a particular dimension, call the engine's `ServerLevel.npc(pos, id) { ... }` overload. The builder runs before the NPC is added to the world. If a living NPC already has that ID, the call returns it and skips the builder. In a Narrative stage, the addon also provides a journaled overload that can undo a spawn.
 
 ## Signature
 
@@ -63,14 +65,14 @@ The `inverseHeadRotation` parameter is not applied yet. `transform` is passed to
 ## `pos()` and `rotation()` helpers
 
 ```kotlin
-val blockCenter = pos(10, 64, 10)      // Vec3(10.5, 64.0, 10.5)
-val exactPos = pos(10.0, 64.0, 10.0)  // Vec3(10.0, 64.0, 10.0)
+val corner = pos(10, 64, 10)           // Vec3(10.0, 64.0, 10.0)
+val blockCenter = pos(10.5, 64, 10.5)  // Vec3(10.5, 64.0, 10.5)
 
 val rot = rotation(90, 0)
 ```
 
-`pos(Int, Int, Int)` adds `0.5` to X/Z so the NPC spawns in the center of the block.
-`pos(Double, Double, Double)` uses exact coordinates.
+`pos(x, y, z)` takes any numbers and uses them as they are. A whole number is the corner of a block, so add `0.5` to X
+and Z to put an NPC in the center of one.
 
 ---
 
@@ -79,8 +81,7 @@ val rot = rotation(90, 0)
 ### Minimal NPC
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val npc = npc(pos(0, 64, 0))
     npc.say("Hello!")
 }
@@ -91,8 +92,7 @@ suspend fun main() {
 Prepare `hollowengine/assets/project/models/entity/trader.gltf` and its textures for this example. The identifier `project:models/entity/trader.gltf` refers to that file. Choose an existing dimension; this example uses the Overworld. If you do not have a custom resource yet, keep the default built-in model.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val trader = npc(
         pos = pos(120.0, 70.0, -32.0),
         name = "Trader",

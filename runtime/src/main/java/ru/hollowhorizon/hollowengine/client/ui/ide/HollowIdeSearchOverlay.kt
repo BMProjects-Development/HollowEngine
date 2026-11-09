@@ -286,9 +286,8 @@ internal fun HollowIdeSearchDialog(
                 },
             )
         }
-        LaunchedEffect(Unit) {
-            Minecraft.getInstance().execute { HollowIdeOverlay.focusSurface(SearchOverlayInputId) }
-        }
+        val focus = LocalUiFocusRequester.current
+        LaunchedEffect(Unit) { focus.request(SearchOverlayInputId) }
         if (controller.results.isNotEmpty()) {
             Column(tags = listOf("ide-search-results"), modifier = Modifier.scrollable()) {
                 controller.results.forEachIndexed { index, result ->

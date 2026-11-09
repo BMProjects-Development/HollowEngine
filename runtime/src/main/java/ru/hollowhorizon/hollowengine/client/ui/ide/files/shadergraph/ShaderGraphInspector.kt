@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.client.shadergraph.*
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphGroupColors
+import ru.hollowhorizon.hollowengine.client.ui.graph.GraphSelection
+import ru.hollowhorizon.hollowengine.client.ui.graph.graphEditorText
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeShaderGraphDocument
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
@@ -20,18 +22,18 @@ private const val GroupIcon = "hollowengine:textures/gui/icons/actions/group.svg
  */
 internal fun shaderGraphInspectorTarget(
     document: HollowIdeShaderGraphDocument,
-    selection: ShaderGraphSelection,
+    selection: GraphSelection,
     state: ShaderGraphEditorState,
 ): InspectorTarget {
     selection.group?.let(document.graph::group)?.let { group ->
-        return InspectorTarget(id = "shadergraph-group-${group.id}", title = graphText("group"), subtitle = group.id, icon = GroupIcon) {
+        return InspectorTarget(id = "shadergraph-group-${group.id}", title = graphEditorText("group"), subtitle = group.id, icon = GroupIcon) {
             document.graph.group(group.id)?.let { GroupFields(document, it) }
         }
     }
     val selected = selection.single?.let(document.graph::node)
     val selectedKind = selected?.let { ShaderNodeTypes.of(it.type) }
     if (selected != null && selectedKind?.id == ShaderNodeLibrary.REROUTE) {
-        return InspectorTarget(id = "shadergraph-node-${selected.id}", title = graphText("reroute"), subtitle = selected.id, icon = GraphIcon) {
+        return InspectorTarget(id = "shadergraph-node-${selected.id}", title = graphEditorText("reroute"), subtitle = selected.id, icon = GraphIcon) {
             Hint(graphText("reroute_hint"))
         }
     }
@@ -56,7 +58,7 @@ private fun NodeFields(document: HollowIdeShaderGraphDocument, node: ShaderGraph
             kind.options.forEach { option ->
                 val current = node.options[option.name] ?: option.default
                 fun set(value: String) = document.edit { it.withOption(node.id, option.name, value) }
-                val id = "sg-inspector-option-${node.id}-${option.name}"
+                val id = "gn-inspector-option-${node.id}-${option.name}"
                 when (option.kind) {
                     ShaderOptionKind.CHOICE -> {
                         Label(optionTitle(option))
@@ -107,13 +109,13 @@ private fun NodeFields(document: HollowIdeShaderGraphDocument, node: ShaderGraph
 @Composable
 private fun GroupFields(document: HollowIdeShaderGraphDocument, group: ShaderGraphGroup) {
     fun change(update: (ShaderGraphGroup) -> ShaderGraphGroup) = document.edit { it.withGroupChanged(group.id, update) }
-    Section(graphText("group")) {
-        TextRow(graphText("group_title"), group.title, id = "sg-group-title-${group.id}") { title -> change { it.copy(title = title) } }
+    Section(graphEditorText("group")) {
+        TextRow(graphText("group_title"), group.title, id = "gn-group-title-${group.id}") { title -> change { it.copy(title = title) } }
         Label(graphText("group_color"))
         val current = group.color.takeIf { it in GraphGroupColors.all } ?: GraphGroupColors.all.keys.first()
         Pills(GraphGroupColors.all.keys.toList(), current, { graphText("color.$it") }) { color -> change { it.copy(color = color) } }
-        ToggleRow(graphText("collapse_group"), group.collapsed) { collapsed -> change { it.copy(collapsed = collapsed) } }
-        InspectorButton(graphText("ungroup")) { document.edit { it.withoutGroup(group.id) } }
+        ToggleRow(graphEditorText("collapse_group"), group.collapsed) { collapsed -> change { it.copy(collapsed = collapsed) } }
+        InspectorButton(graphEditorText("ungroup")) { document.edit { it.withoutGroup(group.id) } }
     }
 }
 
@@ -157,16 +159,16 @@ private fun GraphFields(document: HollowIdeShaderGraphDocument, problems: List<S
                 ToggleRow(graphText("preview_rotate"), preview.rotate) { rotate ->
                     document.edit { it.withPreviewSettings(preview.copy(rotate = rotate)) }
                 }
-                TextRow(graphText("preview_texture"), preview.texture, id = "sg-preview-texture") { texture ->
+                TextRow(graphText("preview_texture"), preview.texture, id = "gn-preview-texture") { texture ->
                     document.edit { it.withPreviewSettings(preview.copy(texture = texture)) }
                 }
             }
 
             ShaderTarget.POST -> {
-                TextRow(graphText("preview_scene"), preview.scene, id = "sg-preview-scene") { scene ->
+                TextRow(graphText("preview_scene"), preview.scene, id = "gn-preview-scene") { scene ->
                     document.edit { it.withPreviewSettings(preview.copy(scene = scene)) }
                 }
-                TextRow(graphText("preview_scene_depth"), preview.sceneDepth, id = "sg-preview-scene-depth") { depth ->
+                TextRow(graphText("preview_scene_depth"), preview.sceneDepth, id = "gn-preview-scene-depth") { depth ->
                     document.edit { it.withPreviewSettings(preview.copy(sceneDepth = depth)) }
                 }
             }
@@ -193,7 +195,7 @@ private fun PropertyFields(document: HollowIdeShaderGraphDocument, index: Int, p
     fun change(next: ShaderGraphProperty) = document.edit { it.withPropertyChanged(property.name, next) }
     Row(tags = listOf("insp-input-row")) {
         Row(modifier = Modifier.size(0.px).grow(1f)) {
-            NameRow("", property.name, id = "sg-property-$index") { name -> change(property.copy(name = name)) }
+            NameRow("", property.name, id = "gn-property-$index") { name -> change(property.copy(name = name)) }
         }
         InspectorIconButton(RemoveIcon, graphText("remove_property"), tags = listOf("insp-inline-icon", "danger")) {
             document.edit { it.withoutProperty(property.name) }
@@ -201,7 +203,7 @@ private fun PropertyFields(document: HollowIdeShaderGraphDocument, index: Int, p
     }
     Pills(ShaderType.entries, property.type, { it.glsl }) { type -> change(property.copy(type = type)) }
     if (property.type == ShaderType.TEXTURE) {
-        TextRow(graphText("texture"), property.texture, id = "sg-property-texture-$index") { texture ->
+        TextRow(graphText("texture"), property.texture, id = "gn-property-texture-$index") { texture ->
             change(property.copy(texture = texture))
         }
     } else {

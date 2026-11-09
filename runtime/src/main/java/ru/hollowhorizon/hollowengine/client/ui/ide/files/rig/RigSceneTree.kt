@@ -4,6 +4,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
@@ -104,7 +105,7 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
     val node = bone?.let { state.viewer.nodes.findBone(it) }
     val kinds = attachableKinds(bone)
     return listOfNotNull(
-        UiDropdownItem(rigText("add_bone"), icon = AddIcon) {
+        UiDropdownItem(rigText("add_bone"), mark = UiMenuParts.icon(AddIcon)) {
             val existing = state.viewer.nodes.flatMap { it.walk() }.map(RuntimeNode::name)
             var added: String? = null
             document.edit { rig -> rig.freeBoneName(existing).let { name -> added = name; rig.withAddedBone(name, bone) } }
@@ -113,7 +114,7 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
         }.takeIf { addsBones },
         UiDropdownItem(
             rigText("attach"),
-            icon = AddIcon,
+            mark = UiMenuParts.icon(AddIcon),
             children = kinds.map { type ->
                 val create = requireNotNull(type.createDefault)
                 UiDropdownItem(type.title()) {
@@ -129,7 +130,7 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
         node?.let {
             UiDropdownItem(
                 rigText(if (it.isVisible) "hide_in_preview" else "show_in_preview"),
-                icon = if (it.isVisible) InvisibleIcon else VisibleIcon,
+                mark = UiMenuParts.icon(if (it.isVisible) InvisibleIcon else VisibleIcon),
                 separatorBefore = kinds.isNotEmpty(),
             ) { state.viewer.toggleNodeVisibility(it) }
         },

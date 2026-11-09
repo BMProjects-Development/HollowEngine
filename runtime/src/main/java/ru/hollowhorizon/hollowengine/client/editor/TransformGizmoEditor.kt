@@ -27,6 +27,7 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.style.UiShadow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.common.attachments.binding.*
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
@@ -452,15 +453,15 @@ object TransformGizmoEditor {
     }
 
     private fun contextMenuItems(entryId: GizmoEntryId): List<UiDropdownItem> = listOf(
-        UiDropdownItem("Reset Transform", icon = "hollowengine:textures/gui/icons/general.svg") {
+        UiDropdownItem("Reset Transform", mark = UiMenuParts.icon("hollowengine:textures/gui/icons/general.svg")) {
             resetTransform(entryId)
         },
-        UiDropdownItem("Copy Snapshot ID", icon = "hollowengine:textures/gui/icons/copy.svg") {
+        UiDropdownItem("Copy Snapshot ID", mark = UiMenuParts.icon("hollowengine:textures/gui/icons/copy.svg")) {
             Minecraft.getInstance().keyboardHandler.clipboard = entryId.snapshotId.toString()
             Minecraft.getInstance().player?.displayClientMessage(Component.literal("Snapshot id copied"), true)
             contextMenuState = null
         },
-        UiDropdownItem("Clear Selection", icon = "hollowengine:textures/gui/icons/remove.svg") {
+        UiDropdownItem("Clear Selection", mark = UiMenuParts.icon("hollowengine:textures/gui/icons/remove.svg")) {
             clearSelection()
         },
     )

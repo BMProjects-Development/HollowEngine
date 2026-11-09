@@ -6,6 +6,7 @@ import net.minecraft.nbt.CompoundTag
 import ru.hollowhorizon.hollowengine.client.slots.ClientSlots
 import ru.hollowhorizon.hollowengine.client.slots.PlayerInventory
 import ru.hollowhorizon.hollowengine.client.slots.SlotGrid
+import ru.hollowhorizon.hollowengine.client.slots.SlotIcons
 import ru.hollowhorizon.hollowengine.client.slots.Slots
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
@@ -63,7 +64,7 @@ internal fun InventoryDialog(session: EntityEditorSession) {
                 Column(tags = listOf("ee-slot-groups")) {
                     if (slotZoneExists(sessionId, EntityEditorSlots.EQUIPMENT)) {
                         Text(EntityEditorLang.equipment, tags = listOf("ee-section-title"))
-                        SlotGrid(EntityEditorSlots.EQUIPMENT, columns = SlotsPerRow)
+                        SlotGrid(EntityEditorSlots.EQUIPMENT, columns = SlotsPerRow, placeholders = SlotIcons.Equipment)
                     }
                     if (slotZoneExists(sessionId, EntityEditorSlots.INVENTORY)) {
                         Text(EntityEditorLang.carried, tags = listOf("ee-section-title"))

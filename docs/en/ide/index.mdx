@@ -60,7 +60,7 @@ Right-clicking the `scripts` folder or any folder inside it shows the **New Scri
 | **Node Script**          | `.node.kts`                           | start, stop, and once-a-second handlers            |
 | **UI Script**            | `.ui.kts`                             | a simple screen                                    |
 | **Mixin Script**         | `.mixin.kts`                          | a script mixin starter                             |
-| **Dialogue**             | `.story`                              | a dialogue with two answers                        |
+| **Dialogue** | `.story` | Visual story graph. Requires the Narrative addon. |
 
 Then enter the file name. The extension can be omitted, the IDE adds it. The new file opens in the editor right away with a working example to start from.
 
@@ -70,9 +70,11 @@ The item is only offered inside `scripts`, because the engine loads scripts and 
 
 ## Code editor
 
-Buttons in the gutter fold code blocks and mark overrides, suspend calls and event handlers. Navigation markers help reach the corresponding declaration. Supported scripts also show **Run** and **Stop** controls; `@State` functions can be started individually. Running saves an edited file first; availability depends on server permissions and script type.
+Narrative opens `.story` files in the [node editor](/docs/hollowengine/addons/narrative/stories/graph).
 
-Opening `.kts`, `.story`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics appear in the editor and in the **Problems** tab of the **Console** window. Its **Logs** tab shows log output, filters by severity and text, and accepts commands.
+Buttons in the gutter fold code blocks and mark overrides, suspend calls and event handlers. Navigation markers help reach the corresponding declaration. Supported scripts also show **Run** and **Stop** controls; [Narrative stages](/docs/hollowengine/addons/narrative/kotlin) can be started individually in server nodes. Running saves an edited file first; availability depends on server permissions and script type.
+
+Opening `.kts`, `.hss`, and other supported text files starts the built-in editor. Depending on the file type, it provides syntax highlighting, diagnostics, completion, signature help, inlay hints, and navigation. Diagnostics appear in the editor and in the **Problems** tab of the **Console** window. Its **Logs** tab shows log output, filters by severity and text, and accepts commands.
 
 
 ![Kotlin script completion in the code editor](/hollowengine/pictures/ide/code-editor.webp)
@@ -99,9 +101,11 @@ Useful editor shortcuts:
 
 Place library and mod source archives (`*-sources.jar`, or `.zip`) in `hollowengine/sources`. Subdirectories are supported, and archives can be added or replaced while the game runs. Navigation reads attached sources before using the decompiler and matches the declaration's owner and parameter types. Java files support PSI-based navigation, hover information, reference highlighting, and syntax diagnostics when the compiler addon is installed.
 
+Press `F2` with the caret on a Kotlin symbol declared in your project to rename it and update references across scripts. Files edited while the rename is being calculated are skipped. The editor also reloads open text files when they change on disk. Save local edits before editing the same file in another app.
+
 ### Custom completion
 
-`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. It is posted once per caret position. Its `path`, `text`, and `caret` identify the request; `items` starts with the engine's context snippets and accepts additional `UiTextCompletion` entries. The language service's own results are computed in the background and shown next to them. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
+`IdeCompletionEvent` is posted on the client thread, where handlers may read the player and world. It is posted once per caret position. Its `path`, `text`, and `caret` identify the request; `items` starts with the engine's context snippets, offered only where an expression of their type may go: `pos(...)` at the player's position and where the player looks, `BlockPos(...)` of the block the player stands in and of the block they look at, and `item(...)` for the held item. Coordinates are rounded to hundredths of a block. Handlers can add their own `UiTextCompletion` entries to it. The language service's own results are computed in the background and shown next to them. Each entry can specify insertion text, `filterText`, `caretOffset`, and `importFqName`.
 
 ```kotlin
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
@@ -133,7 +137,7 @@ Some file types open in a dedicated editor instead of the text editor:
 | `.rig` | Bone aliases, attachments, and the physical skeleton. See [Rig Editor](/docs/hollowengine/models/rig-editor). |
 | `.montage` | Clips, bone keys, temporary attachments and events. See [Montages](/docs/hollowengine/models/montages). |
 | `.ogg`, `.wav` and Media formats | Waveform, playback and seeking. See [Sounds](/docs/hollowengine/scripting/sounds). |
-| `.gltf`, `.glb`, `.fbx`, `.geo.json` | Model viewer. |
+| `.gltf`, `.glb`, `.fbx`, `.bbmodel`, `.geo.json` | Model viewer. |
 | `.png`, `.jpg`, `.jpeg` | Image viewer. |
 | `.mp4` | Video player (needs the [Media addon](/docs/hollowengine/addons/media)). |
 
@@ -150,7 +154,7 @@ Saving a file writes it to the `hollowengine` directory. What must be reloaded d
 - `.startup.kts` changes only apply after restarting the game;
 - ordinary `.kts` scripts are started explicitly with `/hollowengine scripting run <path>`.
 
-Server resource reload also replaces changed `.node.kts` instances on the server and loaded entities, restoring saved data and active states. See [Node scripts](/docs/hollowengine/scripting/node).
+Server resource reload also replaces changed `.node.kts` instances on the server and loaded entities, restoring saved node data. See [Node scripts](/docs/hollowengine/scripting/node).
 
 The compiler addon is required to compile edited scripts. A modpack can instead ship scripts that were compiled ahead of time.
 

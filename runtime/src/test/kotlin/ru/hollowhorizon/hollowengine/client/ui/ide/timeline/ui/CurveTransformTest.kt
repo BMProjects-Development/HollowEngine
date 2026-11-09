@@ -12,6 +12,26 @@ class CurveTransformTest {
     /** A hundred pixels a second and a hundred a unit of value, the value 0 in the middle of a 200 px graph. */
     private val view = CurveView(pxPerSec = 100f, start = 0f, center = 0f, span = 2f, height = 200f)
 
+    @Test
+    fun `switching modes restores keys and starts at the current pointer`() {
+        val controller = TimelineController()
+        val key = Keyframe(1f, 0.5f)
+        curve(controller, key)
+        controller.select(listOf(key), additive = false)
+        var transform = assertNotNull(CurveTransform.start(controller, GizmoEditMode.TRANSLATE, view, 200f, 100f))
+        for (mode in listOf(GizmoEditMode.ROTATE, GizmoEditMode.SCALE, GizmoEditMode.TRANSLATE)) {
+            transform.update(300f, 150f)
+            transform = transform.switchMode(mode)
+            assertEquals(mode, transform.mode)
+            assertEquals(1f, key.time)
+            assertEquals(0.5f, key.value)
+            transform.update(300f, 150f)
+            assertEquals(1f, key.time, 1e-4f)
+            assertEquals(0.5f, key.value, 1e-4f)
+        }
+        transform.key(GLFW.GLFW_KEY_ESCAPE, 0)
+    }
+
     private fun curve(controller: TimelineController, vararg keys: Keyframe): ChannelCurve {
         controller.workAreaEnd = 10f
         val property = controller.addProperty(listOf("Test"), AnimProperty("test.value", "Value", FloatPropertyType(), 0f))

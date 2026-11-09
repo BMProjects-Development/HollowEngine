@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.analysis.api.scopes.KaTypeScope
 import org.jetbrains.kotlin.analysis.api.signatures.KaCallableSignature
 import org.jetbrains.kotlin.analysis.api.symbols.*
 import org.jetbrains.kotlin.analysis.api.symbols.markers.KaDeclarationContainerSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaErrorType
 import org.jetbrains.kotlin.analysis.api.types.KaType
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -56,7 +57,7 @@ fun ScriptingAnalyzerImpl.createCompletions(file: KtFile, offset: Int, sink: Com
     }
 }
 
-private fun ScriptingAnalyzerImpl.createFileForCompletion(original: KtFile, offset: Int): KtFile {
+internal fun ScriptingAnalyzerImpl.createFileForCompletion(original: KtFile, offset: Int): KtFile {
     val safeOffset = offset.coerceIn(0, original.textLength)
     val textWithInsertedFakeIdentifier = original.text.replaceRange(safeOffset, safeOffset, COMPLETION_FAKE_IDENTIFIER)
     val copyKtFile = KtPsiFactory(original.project, markGenerated = true, eventSystemEnabled = true).createFile(
@@ -337,30 +338,30 @@ private fun CompletionItemsCollector.completeAfterDot(
         is KaPackageSymbol -> {
             phase(CompletionCloseness.SCOPE)
             completePackage(file, receiverTarget.fqName, nameFilter, onlyPackages)
+            return@with
         }
 
-        else -> {
-            val receiverType = position.receiver.expressionType
+        else -> Unit
+    }
 
-            if (receiverType == null || receiverType is org.jetbrains.kotlin.analysis.api.types.KaErrorType) return@with
+    val receiverType = position.receiver.expressionType
+    if (receiverType == null || receiverType is KaErrorType) return@with
 
-            phase(CompletionCloseness.MEMBER)
-            receiverType.scope?.let { completeTypeScope(it) }
+    phase(CompletionCloseness.MEMBER)
+    receiverType.scope?.let { completeTypeScope(it) }
 
-            if (position.prefix != null) {
-                phase(CompletionCloseness.SCOPE)
-                val scopeContext = file.scopeContext(element)
-                for (scope in scopeContext.scopes) {
-                    add(scope.scope.callables(nameFilter).filterShadowedJavaFields().filter { it.isExtension })
-                }
-            }
-
-            phase(CompletionCloseness.IMPORTED)
-            add(getKotlinDeclarationsFromIndex(file, nameFilter).filter { symbol ->
-                symbol is KaCallableSymbol && symbol.isExtension
-            }) { withImport() }
+    if (position.prefix != null) {
+        phase(CompletionCloseness.SCOPE)
+        val scopeContext = file.scopeContext(element)
+        for (scope in scopeContext.scopes) {
+            add(scope.scope.callables(nameFilter).filterShadowedJavaFields().filter { it.isExtension })
         }
     }
+
+    phase(CompletionCloseness.IMPORTED)
+    add(getKotlinDeclarationsFromIndex(file, nameFilter).filter { symbol ->
+        symbol is KaCallableSymbol && symbol.isExtension
+    }) { withImport() }
 }
 
 context(kaSession: KaSession)
@@ -550,7 +551,7 @@ private fun CompletionItemsCollector.completeScope(scope: KaScope) {
 }
 
 context(_: KaSession)
-private fun getPosition(element: KtElement): CompletionPosition? {
+internal fun getPosition(element: KtElement): CompletionPosition? {
     // Проверка, находимся ли мы в директиве package или import
     val importDirective = element.parentOfType<KtImportDirective>(withSelf = true)
     val packageDirective = element.parentOfType<KtPackageDirective>(withSelf = true)
@@ -699,7 +700,7 @@ fun KtUserType.isAnnotation(): Boolean {
     return constructor.parent is KtAnnotationEntry
 }
 
-private sealed interface CompletionPosition {
+internal sealed interface CompletionPosition {
     val prefix: String?
 
     class Identifier(override val prefix: String) : CompletionPosition

@@ -7,6 +7,14 @@
     border-radius: $radius;
 }
 
+.viewport-transform-hint {
+    padding: 4px 6px;
+    background: alpha($bg-window, 0.86);
+    foreground: $text-strong;
+    font-size: $font-size;
+    border-radius: $radius;
+}
+
 /* A state of a controller graph; the frame is the graph node's. */
 .animator-state {
     padding: 6px 8px;

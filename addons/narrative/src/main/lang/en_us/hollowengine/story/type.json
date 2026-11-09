@@ -1,0 +1,18 @@
+{
+  "DialogueCharacter": "character",
+  "Direction": "direction",
+  "EquipmentSlot": "equipment slot",
+  "Facing": "facing",
+  "GameType": "game mode",
+  "InteractionHand": "hand",
+  "InteractionResult": "interaction result",
+  "MoveOptions": "move options",
+  "MoveResult": "move result",
+  "Shortfall": "why the move stopped",
+  "StoryHit": "ray hit",
+  "StoryItemRequest": "item request",
+  "UnavailableTargetPolicy": "when the target is gone",
+  "UnreachablePolicy": "when unreachable",
+  "Weather": "weather",
+  "Zone": "zone"
+}

@@ -9,15 +9,16 @@ order: 4
 
 Let the NPC walk to a player while turning its head toward them. Then learn how to wait for movement, cancel it, and resolve conflicting orders. The same rules apply to inventory and search actions.
 
-The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside a suspend handler such as `onStart` or `onInteract`.
+
+The scripted movement, look, and interaction helpers used here come from [Narrative](/docs/hollowengine/addons/narrative). Add `hollowengine-narrative` to your project's dependencies before using them.
 
 ## What this is and why
 
 You already know functions like `wait(...)` or `npc.lookAt(...)`: they are `suspend` functions, meaning your script pauses on that line and continues once the action is done, without freezing the whole game while it waits (other players keep playing, other scripts keep running).
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     npc.lookAt(player)   // the script waits here until the NPC finishes turning
     npc.move(player)     // then it waits here until the NPC arrives
 }
@@ -25,7 +26,7 @@ suspend fun main() {
 
 This works fine, but it has a limit: the script does one thing at a time. If you want the NPC to **walk toward the player while also looking around and swinging its arm**, a plain sequence of `suspend` calls cannot do that, because each line waits for the previous one to finish before starting the next.
 
-You could reach for `async` instead (see [Asynchronous Actions](/docs/hollowengine/scripting/node/async)), but that opens a different problem: several `async` blocks can end up fighting each other, for example two of them telling the NPC to walk in two different directions at the same time.
+You could reach for `async` instead (see [Asynchronous Actions](/docs/hollowengine/addons/narrative/kotlin/async)), but that opens a different problem: several `async` blocks can end up fighting each other, for example two of them telling the NPC to walk in two different directions at the same time.
 
 The action system solves both problems: it lets an NPC run several things **at once**, safely, without you having to manage threads, locks, or "what is the NPC busy with right now, and how do I give it a new task without breaking the current ones?" checks yourself.
 
@@ -58,10 +59,9 @@ Every action function (movement, looking, using a block, and so on) comes in a p
 - **The `startX` version** - call it like `npc.startMove(target)`. Your script does **not** wait. It immediately gets back a handle you can use later, and moves on to the next line right away.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     // Start walking, but don't wait for it - keep going immediately.
-    val walking = npc.startMove(player)
+    val walking = npc.startMove(player.entityRef)
 
     // While the NPC is walking, do something else at the same time.
     npc.startAnimation("wave")
@@ -85,7 +85,7 @@ Every `startX` function returns an object that represents "a thing currently hap
 | `.status` | One of `RUNNING`, `COMPLETED`, `CANCELLED`, `PREEMPTED` (taken by another owner, see [Priorities](#priorities)), `FAILED`. |
 
 ```kotlin
-val walking = npc.startMove(player)
+val walking = npc.startMove(player.entityRef)
 
 if (walking.isActive) {
     println("Still on the way")
@@ -116,8 +116,7 @@ npc.actions.cancelAll() // stop absolutely everything the NPC is doing
 ## A worked example: walk, look, and wave at the same time
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val playerRef = player.entityRef
 
     // Start walking toward the player, don't wait.
@@ -145,7 +144,7 @@ All three channels run independently, so the NPC can perform several actions at 
 Because channels are shared across your whole script (and across other scripts and node handlers attached to the same NPC), a plain `suspend` call like `npc.move(...)` can still be interrupted from somewhere else.
 
 :::warning
-If an `onInteract`, `onHurt`, or any other handler from an [attached node script](/docs/hollowengine/scripting/node) starts a new `MOVEMENT` action on the same NPC while your `@State` is in the middle of `npc.move(...)`, that call gets cancelled, exactly as if you had called `stopMoving()` yourself. This is expected: the last action to start on a channel always wins. If two different pieces of your logic keep restarting the same channel, they will keep interrupting each other. When one of them should always win, give it a higher [priority](#priorities).
+If an `onInteract`, `onHurt`, or any other handler from an [attached node script](/docs/hollowengine/scripting/node) starts a new `MOVEMENT` action on the same NPC while your script is waiting in `npc.move(...)`, that call gets cancelled, exactly as if you had called `stopMoving()` yourself. This is expected: the last action to start on a channel always wins. If two different pieces of your logic keep restarting the same channel, they will keep interrupting each other. When one of them should always win, give it a higher [priority](#priorities).
 :::
 
 ## Priorities
@@ -193,12 +192,12 @@ try {
 `Preempted` is a kind of cancellation. When nobody catches it, the coroutine that called the action simply stops, the same way it would after `stopMoving()`.
 :::
 
-## Several actions as one: `perform` and `queue`
+## Several actions as one: `bundle` and `queue`
 
-`perform` makes several actions one bundle:
+`bundle` makes several actions one bundle:
 
 ```kotlin
-npc.perform {
+npc.bundle {
     move(player)
     lookAt(player)
     say("Hello!")

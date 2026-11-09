@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoint
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockingState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensionChange
@@ -25,6 +25,7 @@ internal class HollowIdeContributions(
     private val dock: DockingState,
     private val context: HollowIdeContext,
     private val onLanguagesChanged: () -> Unit,
+    private val onPreviewsChanged: () -> Unit,
 ) {
     /** Read by compositions that list contributions, so they are rebuilt when an addon comes or goes. */
     var revision by mutableIntStateOf(0)
@@ -46,6 +47,7 @@ internal class HollowIdeContributions(
         HollowIdeExtensionPoints.MENU_ITEMS.observeOnClient {}
         HollowIdeExtensionPoints.PROJECT_ACTIONS.observeOnClient {}
         HollowIdeExtensionPoints.LANGUAGES.observeOnClient { onLanguagesChanged() }
+        HollowIdeExtensionPoints.PREVIEWS.observeOnClient { onPreviewsChanged() }
         HollowIdeExtensionPoints.FILE_TYPES.registrations.forEach(::installFileType)
     }
 
@@ -78,10 +80,12 @@ internal class HollowIdeContributions(
                 val item = registration.value
                 UiDropdownItem(
                     label = item.label.lang,
-                    icon = item.icon,
+                    mark = if (item.checkbox) {
+                        UiMenuParts.check(registration.call(false) { it.isChecked(context) })
+                    } else {
+                        UiMenuParts.icon(item.icon)
+                    },
                     enabled = registration.call(false) { it.isEnabled(context) },
-                    checked = registration.call(false) { it.isChecked(context) },
-                    mark = UiDropdownMark.CHECKBOX.takeIf { item.checkbox },
                     closeOnClick = item.closeOnClick,
                     separatorBefore = index == 0,
                 ) {

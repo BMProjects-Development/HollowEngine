@@ -4,18 +4,15 @@ import androidx.compose.runtime.Composable
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
-import net.minecraft.core.registries.BuiltInRegistries
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
+import ru.hollowhorizon.hollowengine.client.ui.widgets.RegistryCompletions
 import ru.hollowhorizon.hollowengine.client.ui.widgets.itemTooltip
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonRuntimeEnvironment
 
 private const val RemoveIcon = "hollowengine:textures/gui/icons/remove.svg"
-private const val MaxCompletions = 60
 private const val MaxCount = 99
 
 /**
@@ -154,18 +151,4 @@ private fun ResultInspector(session: RecipeEditorSession, binding: RecipeSlotBin
 }
 
 /** Item ids, or with [tag], item tag ids, starting with what is typed. */
-private fun idCompletions(tag: Boolean) = UiCompletionContributor { context ->
-    val prefix = context.text.take(context.caret.coerceIn(0, context.text.length)).removePrefix("#").lowercase()
-    val ids = if (tag) {
-        BuiltInRegistries.ITEM.getTagNames().map { it.location().toString() }.toList()
-    } else {
-        ItemIds
-    }
-    ids.asSequence()
-        .filter { prefix.isEmpty() || it.startsWith(prefix) || it.substringAfter(':').startsWith(prefix) }
-        .take(MaxCompletions)
-        .map { UiTextCompletion(label = it, insertText = it, itemIcon = it.takeUnless { tag }) }
-        .toList()
-}
-
-private val ItemIds: List<String> by lazy { BuiltInRegistries.ITEM.keySet().map { it.toString() }.sorted() }
+private fun idCompletions(tag: Boolean) = if (tag) RegistryCompletions.itemTags else RegistryCompletions.items

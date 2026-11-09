@@ -279,4 +279,11 @@ class ShaderGraphCompilerTest {
         val graph = ShaderNodeLibrary.defaultSurface().copy(properties = listOf(ShaderGraphProperty("Speed", default = listOf(2f))))
         assertEquals(graph, ShaderGraphFormat.read(ShaderGraphFormat.write(graph)))
     }
+
+    @Test
+    fun `a link from a node the graph does not have is pointed at`() {
+        val code = ShaderGraphCompiler.compile(graph(links = listOf(ShaderGraphLink("missing", "Out", "out", SurfaceOutputs.COLOR))))
+
+        assertEquals(listOf(ShaderDiagnostic(ShaderProblem.MISSING_NODE, "out", "missing")), code.diagnostics)
+    }
 }

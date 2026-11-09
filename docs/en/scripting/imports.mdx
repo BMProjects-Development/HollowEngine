@@ -50,7 +50,7 @@ Several scripts go into one annotation rather than several in a row (`@file:Impo
 
 An imported script also runs its top-level code. If it creates an object or prints a message outside a function, importing it performs that action. Its variables, functions, and classes then become available to the importing script.
 
-Create the two files below. `sayLine` receives a player parameter, while the calling node waits for the player `Steve` to join. Replace the name with yours and run the `main` state.
+Create the two files below. `sayLine` receives a player parameter, while the calling node waits for the player `Steve` to join. Replace the name with yours and attach the node to the server.
 
 ```kotlin
 // common/dialogue.kts
@@ -68,8 +68,7 @@ fun sayLine(player: Player, text: String) {
 // quest/intro.node.kts
 @file:Import("../common/dialogue.kts")
 
-@State
-suspend fun main() {
+onStart {
     playerRef("Steve").update {
         sayLine(this, "The bridge is closed.")
     }

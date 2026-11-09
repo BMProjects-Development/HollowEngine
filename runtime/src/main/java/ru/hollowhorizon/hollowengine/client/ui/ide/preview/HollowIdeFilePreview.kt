@@ -1,9 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.preview
 
 import androidx.compose.runtime.Composable
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextDiagnostic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.history.UndoHistory
+import ru.hollowhorizon.hollowengine.client.history.UndoLabel
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeExtensionPoints
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 
 private const val ModeLang = "hollowengine.gui.ide.preview.mode"
@@ -17,11 +21,14 @@ enum class HollowIdeViewMode(val icon: String, val tooltip: String) {
 }
 
 /**
- * A visual view of a text file, shown beside or instead of its text the way IDEA shows Markdown.
+ * A visual view of a text file, shown beside or instead of its text the way IDEA shows Markdown. A file can have
+ * several, each with its own button in the tab bar: [icon] and [title], which may be a translation key.
  */
 class HollowIdeFilePreview(
     val id: String,
     val defaultMode: HollowIdeViewMode = HollowIdeViewMode.SPLIT,
+    val icon: String = HollowIdeViewMode.PREVIEW.icon,
+    val title: String = HollowIdeViewMode.PREVIEW.tooltip,
     private val matcher: (path: String) -> Boolean,
     val content: @Composable (HollowIdePreviewContext) -> Unit,
 ) {
@@ -33,49 +40,90 @@ class HollowIdeFilePreview(
     fun matches(path: String): Boolean = matcher(path)
 }
 
-/** Previews by file path. Kept apart from file types so read-only assets get the same preview. */
+/**
+ * Previews by file path: the IDE's own, then those addons contribute. Kept apart from file types so read-only
+ * assets get the same preview.
+ */
 class HollowIdePreviewRegistry {
     private val previews = mutableListOf<HollowIdeFilePreview>()
 
-    @Synchronized
     fun register(preview: HollowIdeFilePreview) {
         require(previews.none { it.id == preview.id }) { "Preview '${preview.id}' is already registered" }
         previews += preview
     }
 
-    @Synchronized
-    fun find(path: String): HollowIdeFilePreview? = previews.firstOrNull { it.matches(path) }
+    fun find(path: String): List<HollowIdeFilePreview> =
+        (previews + HollowIdeExtensionPoints.PREVIEWS.registrations.map { it.value }).filter { it.matches(path) }
 }
 
-/** What one open file remembers about its preview while it stays open. */
-class HollowIdeFileView internal constructor(val preview: HollowIdeFilePreview) {
-    var mode by mutableStateOf(preview.defaultMode)
+/** Something wrong with a file that a preview has found, and how to show it there. */
+class HollowIdePreviewProblem(val diagnostic: UiTextDiagnostic, val reveal: () -> Unit = {})
+
+/** A step of where a preview is inside its file, shown after the file in the status bar; [onClick] goes back to it. */
+class HollowIdePreviewCrumb(val label: String, val icon: String? = null, val onClick: (() -> Unit)? = null)
+
+/** What one open file remembers about its previews while it stays open. */
+class HollowIdeFileView internal constructor(val previews: List<HollowIdeFilePreview>) {
+    var mode by mutableStateOf(previews.first().defaultMode)
+
+    /** The preview shown in [HollowIdeViewMode.PREVIEW] and beside the text in [HollowIdeViewMode.SPLIT]. */
+    var preview by mutableStateOf(previews.first())
+
+    /** What the preview shown now says is wrong with the file. */
+    var problems by mutableStateOf(emptyList<HollowIdePreviewProblem>())
+        internal set
+
+    /** Where the preview shown now is inside the file, such as a function of a graph it was opened into. */
+    var crumbs by mutableStateOf(emptyList<HollowIdePreviewCrumb>())
+        internal set
 
     /** The text's share of the width in [HollowIdeViewMode.SPLIT]. */
     var split by mutableStateOf(0.5f)
         internal set
 
-    private var state: Any? = null
+    private val states = HashMap<String, Any>()
 
-    /** State the preview keeps across tab switches, made on first use. */
+    /** State [preview] keeps across tab switches, made on first use. */
     @Suppress("UNCHECKED_CAST")
-    fun <T : Any> state(create: () -> T): T = (state as? T) ?: create().also { state = it }
+    internal fun <T : Any> state(preview: HollowIdeFilePreview, create: () -> T): T =
+        (states[preview.id] as? T) ?: create().also { states[preview.id] = it }
+
+    /** Lets go of what the previews keep, as the file closes. */
+    internal fun close() = states.values.filterIsInstance<AutoCloseable>().forEach(AutoCloseable::close)
 }
 
 class HollowIdePreviewContext internal constructor(
     val file: HollowIdeOpenFile,
     val view: HollowIdeFileView,
-    private val write: (String) -> Unit,
+    private val preview: HollowIdeFilePreview,
+    /** The history of the file's text, which the preview's edits go into. */
+    val history: UndoHistory,
+    private val write: (next: String, label: UndoLabel?, mergeKey: String?) -> Unit,
 ) {
     val text: String get() = file.text
     val readOnly: Boolean get() = file.readOnly
 
-    /** Replaces the whole text; the editor diffs it into one undoable step. */
-    fun edit(next: String) {
-        if (!readOnly && next != text) write(next)
+    /**
+     * Replaces the whole text as one undoable step.
+     *
+     * @param label what the step is called in the history window.
+     * @param mergeKey folds the step into the one just before with the same key, as for typing into one field.
+     */
+    fun edit(next: String, label: UndoLabel? = null, mergeKey: String? = null) {
+        if (!readOnly && next != text) write(next, label, mergeKey)
     }
 
-    fun <T : Any> state(create: () -> T): T = view.state(create)
+    fun <T : Any> state(create: () -> T): T = view.state(preview, create)
+
+    /** Tells the corner of the tab and the Problems page what is wrong with the file. */
+    fun publishProblems(problems: List<HollowIdePreviewProblem>) {
+        view.problems = problems
+    }
+
+    /** Tells the status bar where in the file the preview is, after the path of the file. */
+    fun publishCrumbs(crumbs: List<HollowIdePreviewCrumb>) {
+        view.crumbs = crumbs
+    }
 }
 
 /**

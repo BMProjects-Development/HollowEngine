@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.client.editor.WorldToScreenProjector
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiKeyInput
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -253,7 +254,7 @@ internal object WorldObjectScene {
             onExpandedChange = { scopeMenuOpen = it },
             tags = listOf("panel-dropdown"),
             items = WorldSceneScope.entries.map { option ->
-                UiDropdownItem("$LANG.${option.key}".lang, checked = option == current) {
+                UiDropdownItem("$LANG.${option.key}".lang, mark = UiMenuParts.radio(option == current)) {
                     scope = option
                     dirty = true
                     scopeMenuOpen = false
@@ -307,19 +308,19 @@ internal object WorldObjectScene {
             return listOf(
                 UiDropdownItem(
                     "$LANG.create_empty".lang,
-                    icon = WorldObjectEditing.EMPTY_ICON
+                    mark = UiMenuParts.icon(WorldObjectEditing.EMPTY_ICON)
                 ) { WorldObjectEditing.spawnEmpty(null) },
             )
         }
         objectOf(id)?.let { return WorldObjectEditing.menu(it, inScene = true) }
         val bookmarked = favoriteUuid(id)?.takeIf { it !in byId } ?: return emptyList()
         return listOf(
-            UiDropdownItem("$LANG.go_to".lang, icon = WorldObjectEditing.WORLD_ICON) {
+            UiDropdownItem("$LANG.go_to".lang, mark = UiMenuParts.icon(WorldObjectEditing.WORLD_ICON)) {
                 WorldObjectEditing.goTo(
                     bookmarked
                 )
             },
-            UiDropdownItem("$LANG.favorite_remove".lang, icon = WorldObjectEditing.FAVORITE_ICON) {
+            UiDropdownItem("$LANG.favorite_remove".lang, mark = UiMenuParts.icon(WorldObjectEditing.FAVORITE_ICON)) {
                 WorldObjectEditing.setFavorite(bookmarked, false)
             },
         )

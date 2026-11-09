@@ -70,6 +70,7 @@ internal class MontageTimelineSession(
 
     /** What is selected in the scene now, as group keys, or the key of a lane picked there. */
     private var selection: Set<String> = emptySet()
+    private var pickedGroup: String? = null
     private var onlySelectedState by mutableStateOf(false)
 
     override var onlySelected: Boolean
@@ -259,17 +260,19 @@ internal class MontageTimelineSession(
 
     /** Opens [lane], picked in the scene in place of a bone, as what is selected now. */
     fun selectLane(lane: SegmentLane) {
+        pickedGroup = null
         selection = setOf(laneKey(lane))
         lane.isListed = true
         applyListing()
     }
 
     /** Opens the rows of what is selected in the scene: [bone], or the root, and the attachments [attachments] on it. */
-    fun select(bone: String?, attachments: Collection<String>) {
+    fun select(bone: String?, attachments: Collection<String>, selectedAttachment: String? = null) {
+        pickedGroup = selectedAttachment?.let { attachmentKey(bone, it) } ?: bone?.let(::boneKey)
         selection = attachments.mapTo(listOfNotNull(bone?.let(::boneKey)).toMutableSet()) { attachmentKey(bone, it) }
         bone?.let(::touchBone)
         attachments.forEach { touchAttachment(bone, it) }
-        if (onlySelectedState) applyListing()
+        applyListing()
     }
 
     override fun showAll() {
@@ -572,6 +575,7 @@ internal class MontageTimelineSession(
     }
 
     private fun applyListing(group: TrackGroup) {
+        group.isSelected = pickedGroup != null && groupKeys[group] == pickedGroup
         group.children.forEach(::applyListing)
         val key = groupKeys[group]
         val shown = key == null || !onlySelectedState || key in selection

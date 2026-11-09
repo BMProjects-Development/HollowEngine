@@ -210,10 +210,24 @@ data class UiPopupAlignment(
     val popupVertical: UiAlign = UiAlign.START,
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
+    val flipsHorizontally: Boolean = false,
 ) {
+    fun mirrored(): UiPopupAlignment = copy(
+        anchorHorizontal = anchorHorizontal.mirrored(),
+        popupHorizontal = popupHorizontal.mirrored(),
+        offsetX = -offsetX,
+    )
+
+    private fun UiAlign.mirrored() = when (this) {
+        UiAlign.START -> UiAlign.END
+        UiAlign.END -> UiAlign.START
+        else -> this
+    }
+
     companion object {
         val BelowStart = UiPopupAlignment()
         val Cursor = UiPopupAlignment(anchorVertical = UiAlign.START, offsetX = 8f, offsetY = 8f)
+        val Centered = UiPopupAlignment(UiAlign.CENTER, UiAlign.CENTER, UiAlign.CENTER, UiAlign.CENTER)
     }
 }
 
@@ -400,6 +414,13 @@ data class UiColor(
         return UiColor(channel(red, to.red), channel(green, to.green), channel(blue, to.blue), mixedAlpha)
     }
 
+    fun over(base: UiColor): UiColor {
+        val mixedAlpha = alpha + base.alpha * (1f - alpha)
+        if (mixedAlpha <= MinPremultipliedAlpha) return Transparent
+        fun channel(top: Float, bottom: Float) = (top * alpha + bottom * base.alpha * (1f - alpha)) / mixedAlpha
+        return UiColor(channel(red, base.red), channel(green, base.green), channel(blue, base.blue), mixedAlpha)
+    }
+
     fun toArgb(): Int {
         fun channel(value: Float) = (value.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
         return (channel(alpha) shl 24) or (channel(red) shl 16) or (channel(green) shl 8) or channel(blue)
@@ -529,6 +550,22 @@ class UiMatrix4(private val values: FloatArray) {
                 }
                 result[row * 4 + column] = sum
             }
+        }
+        return UiMatrix4(result)
+    }
+
+    /** Whether both matrices hold the same values. */
+    fun sameAs(other: UiMatrix4): Boolean = this === other || values.contentEquals(other.values)
+
+    /** [translation] by these amounts applied after this matrix, in one array. */
+    fun shifted(x: Float, y: Float, z: Float = 0f): UiMatrix4 {
+        if (x == 0f && y == 0f && z == 0f) return this
+        val result = values.copyOf()
+        for (column in 0 until 4) {
+            val w = values[12 + column]
+            result[column] += x * w
+            result[4 + column] += y * w
+            result[8 + column] += z * w
         }
         return UiMatrix4(result)
     }

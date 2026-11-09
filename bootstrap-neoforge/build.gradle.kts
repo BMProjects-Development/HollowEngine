@@ -219,7 +219,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 tasks.named("classes") {
-    dependsOn(embedRuntimeJar)
+    dependsOn(embedRuntimeJar, rootProject.tasks.named("buildAddons"))
 }
 
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {

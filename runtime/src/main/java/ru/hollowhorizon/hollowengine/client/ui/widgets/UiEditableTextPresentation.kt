@@ -12,6 +12,7 @@ internal fun rememberEditableTextPresentation(
     inlayHints: List<UiInlayHint>,
     inlayHintsProvider: UiInlayHintsProvider?,
     inlayRevision: Long,
+    highlightRevision: Long = 0L,
 ): EditableTextPresentation {
     val cache = remember { EditableTextPresentationCache() }
     val safeCaret = normalizePresentationCaret(caret, text.length)
@@ -32,7 +33,7 @@ internal fun rememberEditableTextPresentation(
     val visible =
         if (completed.matches(text, safeCaret, highlighter, inlayHintsProvider, inlayRevision)) completed else immediate
 
-    LaunchedEffect(text, analysisCaretKey, highlighter, inlayHints, inlayHintsProvider, inlayRevision) {
+    LaunchedEffect(text, analysisCaretKey, highlighter, highlightRevision, inlayHints, inlayHintsProvider, inlayRevision) {
         val reusableInlays = cache.reusableInlays(text, inlayHintsProvider, inlayRevision)
         val analyzed = withContext(Dispatchers.Default) {
             val analysis = when {

@@ -57,6 +57,8 @@ object ScriptCache {
     /** Shared script classes are located next to the root artifact of that same script, under this suffix. */
     const val SHARED_ARTIFACT_SUFFIX = ".shared.jar"
 
+    private const val GENERATED_SUFFIX = ".kts"
+
     fun artifact(id: ScriptId): File = artifactIn(cacheDirectory(id), id)
 
     /** Classes of one shared script, referenced by every artifact that imports it. */
@@ -68,6 +70,9 @@ object ScriptCache {
      * The location in the [directory] where the shared script classes should be located.
      */
     fun sharedArtifactIn(directory: File, id: ScriptId): File = directory.resolve(id.path + SHARED_ARTIFACT_SUFFIX)
+
+    /** Where the Kotlin generated for the script [id] is kept, see `ScriptTranslators`. */
+    fun generatedSource(id: ScriptId): File = cacheDirectory(id).resolve(id.path + GENERATED_SUFFIX)
 
     private fun cacheDirectory(id: ScriptId): File = DirectoryManager.SCRIPT_CACHE.resolve(id.namespace)
 

@@ -12,7 +12,7 @@ enum class HssValueKind(val display: String, val candidates: List<String> = empt
     PIXELS("px", listOf("0px", "2px", "4px", "8px", "16px")),
     NUMBER("number", listOf("0", "0.5", "1")),
     INTEGER("int", listOf("0", "1", "2")),
-    COLOR("color", listOf("#FFFFFF", "#000000", "transparent", "white", "black", "rgba(255, 255, 255, 1)", "alpha(#FFFFFF, 0.5)")),
+    COLOR("color", listOf("#FFFFFF", "#000000", "transparent", "white", "black", "rgba(255, 255, 255, 1)", "alpha(#FFFFFF, 0.5)", "over(alpha(#FFFFFF, 0.1), #000000)")),
     PAINT(
         "paint",
         listOf(

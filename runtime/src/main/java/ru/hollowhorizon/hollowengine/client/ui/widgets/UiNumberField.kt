@@ -10,6 +10,12 @@ import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
 
+/**
+ * A number to drag, step with the arrows at its sides, or type. What is typed may be arithmetic, `20 * 60`, which
+ * the field works out.
+ *
+ * @param onEdit opens a field of the caller's own to type into, in place of the one the number opens on a click.
+ */
 @Composable
 fun NumberField(
     value: Double,
@@ -25,6 +31,7 @@ fun NumberField(
     modifier: Modifier = Modifier,
     onGestureStart: () -> Unit = {},
     onGestureEnd: () -> Unit = {},
+    onEdit: (() -> Unit)? = null,
     onChange: (Double) -> Unit,
 ) {
     val fieldId = id ?: remember { "number-field-${NumberFieldIds.next()}" }
@@ -33,6 +40,7 @@ fun NumberField(
     val wrap = LocalUiPointerWrap.current
     val viewport = LocalUiViewport.current
     val width = remember(fieldId) { floatArrayOf(0f) }
+    var roomy by remember(fieldId) { mutableStateOf(false) }
     val bounded = min.isFinite() && max.isFinite() && min < max
     val isSlider = slider && bounded
     val unit = step ?: if (whole) 1.0 else DEFAULT_STEP
@@ -61,7 +69,7 @@ fun NumberField(
         DisposableEffect(fieldId) { onDispose { if (gesture.editing == fieldId) gesture.editing = null } }
         NumberFieldEditor("$fieldId-edit", value, whole, tags, modifier) { typed ->
             if (gesture.editing == fieldId) gesture.editing = null
-            typed?.let { commit(limit(it)) }
+            typed?.let(UiArithmetic::evaluate)?.let { commit(limit(it)) }
         }
         return
     }
@@ -71,12 +79,17 @@ fun NumberField(
         add("number-field")
         if (isSlider) add("slider")
         if (label != null) add("labeled")
+        if (roomy && !isSlider) add("roomy")
         addAll(tags)
     }
     Box(
         id = fieldId,
         tags = rootTags,
-        modifier = modifier.input(hoverable = true).onPlaced { width[0] = it.width },
+        modifier = modifier.input(hoverable = true).onPlaced {
+            width[0] = it.width
+            val fits = it.width >= ROOMY_WIDTH
+            if (fits != roomy) roomy = fits
+        },
     ) {
         Box(mode = UiBoxMode.STACK, tags = listOf("number-field-frame")) {
             if (isSlider) Box(
@@ -134,6 +147,8 @@ fun NumberField(
                             wrap?.release(gesture.onWrap)
                             gesture.dragged = null
                             onGestureEnd()
+                        } else if (onEdit != null) {
+                            onEdit()
                         } else {
                             gesture.editing = fieldId
                             focus.request("$fieldId-edit")
@@ -170,11 +185,11 @@ private fun NumberFieldEditor(
     whole: Boolean,
     tags: List<String>,
     modifier: Modifier,
-    onDone: (Double?) -> Unit,
+    onDone: (String?) -> Unit,
 ) {
     val text = remember(id) { TextFieldState(initialText = formatUiNumber(value, whole, EDIT_PLACES)).also { it.selectAll() } }
     val finished = remember(id) { booleanArrayOf(false) }
-    fun finish(typed: Double?) {
+    fun finish(typed: String?) {
         if (finished[0]) return
         finished[0] = true
         onDone(typed)
@@ -183,12 +198,12 @@ private fun NumberFieldEditor(
     TextField(
         state = text,
         id = id,
-        filter = if (whole) UiTextInputFilter.INTEGER else UiTextInputFilter.DECIMAL,
+        filter = UiTextInputFilter.ANY,
         fontSize = 9f,
         tags = listOf("number-field", "editing") + tags,
-        modifier = modifier.onUnfocus { finish(text.text.toDoubleOrNull()) }.onKeyInput { input ->
+        modifier = modifier.onUnfocus { finish(text.text) }.onKeyInput { input ->
             when (input.key) {
-                GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> finish(text.text.toDoubleOrNull())
+                GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> finish(text.text)
                 GLFW.GLFW_KEY_ESCAPE -> finish(null)
                 else -> return@onKeyInput
             }
@@ -270,6 +285,9 @@ private const val PIXELS_PER_STEP = 8.0
 private const val FINE_FACTOR = 0.1
 private const val COARSE_FACTOR = 10.0
 private const val DRAG_THRESHOLD = 3f
+
+/** How wide a field has to be for its value to keep clear of the arrows at its sides. */
+private const val ROOMY_WIDTH = 64f
 
 private const val LeftIcon = "hollowengine:textures/gui/icons/chevron_left.svg"
 private const val RightIcon = "hollowengine:textures/gui/icons/chevron_right.svg"

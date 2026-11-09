@@ -5,6 +5,9 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.time.inWholeTicks
+import ru.hollowhorizon.hollowengine.common.time.ticks
+import kotlin.time.Duration
 
 /** Runs [block] once when the node starts (after `onLoad` has restored persisted state). */
 context(script: NodeScript)
@@ -30,13 +33,12 @@ fun onLoad(block: (SerializationContext) -> Unit) {
     script.onLoadHandlers += block
 }
 
-/**
- * Runs [block] every [every] server ticks while the node is alive.
- */
+/** Runs [block] once in every [every] of server ticks while the node is alive, `20.ticks` or `1.sec` alike. */
 context(script: NodeScript)
-fun onUpdate(every: Ticks = 1.ticks, block: suspend CoroutineScope.() -> Unit) {
-    require(every.count > 0) { "onUpdate interval must be > 0, got ${every.count}" }
+fun onUpdate(every: Duration = 1.ticks, block: suspend CoroutineScope.() -> Unit) {
+    val ticks = every.inWholeTicks
+    require(ticks > 0) { "onUpdate interval must last a tick at least, got $every" }
     TickEvent.Server.subscribe(script) {
-        if (TickHandler.serverTick % every.count == 0) script.launch { block() }
+        if (TickHandler.serverTick % ticks == 0L) script.launch { block() }
     }
 }

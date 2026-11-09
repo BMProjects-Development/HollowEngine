@@ -66,6 +66,7 @@ internal data class TimelineRow(
     val locked: Boolean = false,
     val visible: Boolean = true,
     val color: Color? = null,
+    val selected: Boolean = false,
 ) {
     val curves: List<ChannelCurve>
         get() = when {
@@ -115,6 +116,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
             height = TimelineGroupRowHeight,
             kind = TimelineRowKind.GROUP,
             group = group,
+            selected = group.isSelected,
             locked = locked,
             visible = visible,
         )
@@ -143,6 +145,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
                     locked = propertyLocked,
                     visible = propertyVisible && singleCurve.isVisible,
                     color = singleCurve.color,
+                    selected = group.isSelected,
                 )
                 y += TimelinePropertyRowHeight
                 return@forEach
@@ -162,6 +165,7 @@ internal fun timelineRows(controller: TimelineController, curveEditorOnly: Boole
                     locked = propertyLocked,
                     visible = propertyVisible && curve.isVisible,
                     color = curve.color,
+                    selected = group.isSelected,
                 )
                 y += TimelineChannelRowHeight
             }
@@ -278,7 +282,7 @@ internal fun UiColor.withAlpha(multiplier: Float) =
  * What the lanes, keys and curves are drawn with: the IDE palette of docking.hss, so the timeline
  * reads as part of the IDE. The chrome around them takes the same colors from timeline.hss.
  */
-internal object TimelineColors {
+object TimelineColors {
     val Background = UiColor(0.110f, 0.118f, 0.133f, 1f)
     val Panel = UiColor(0.110f, 0.118f, 0.133f, 1f)
     val Row = UiColor(0.118f, 0.125f, 0.141f, 1f)

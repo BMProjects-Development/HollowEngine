@@ -9,7 +9,7 @@ Give an NPC items, equip it, and ask it to gather loot. Learn how to check its i
 
 ![NPC inventory editor](/hollowengine/pictures/npc/inventory.webp)
 
-The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside a suspend handler such as `onStart` or `onInteract`.
 
 ## The NPC's inventory
 
@@ -124,8 +124,7 @@ val need2 = itemRequest(item("minecraft:bread", 5)) // 5 bread, amount taken fro
 This is a ready-made background job: point the NPC at a list of requests, and it will **walk around by itself, pick up matching dropped items, and come back**, all without you writing a manual loop.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val result = npc.collectItems(
         listOf(itemTag("minecraft:logs").request(10)),
         CollectOptions(radius = 20.0),
@@ -196,13 +195,12 @@ onInteract { event ->
 }
 ```
 
-`transferItems` accepts a player as the target, so the bread leaves the NPC's stock and arrives in the player's inventory in one step, and a player with no free slot simply gets nothing instead of the item vanishing. The player side of this has its own functions, see [Player Inventory](/docs/hollowengine/scripting/player). If you write this inside a `@State` scene instead, where the NPC is a local variable, use `npc.hasItems(...)`, `npc.takeItems(...)`, and `npc.giveItem(...)` exactly like the rest of this page.
+`transferItems` accepts a player as the target, so the bread leaves the NPC's stock and arrives in the player's inventory in one step, and a player with no free slot simply gets nothing instead of the item vanishing. The player side of this has its own functions, see [Player Inventory](/docs/hollowengine/scripting/player). If you write this in a stage or a handler, where the NPC is a local variable, use `npc.hasItems(...)`, `npc.takeItems(...)`, and `npc.giveItem(...)` exactly like the rest of this page.
 
 ## Example: equip the best weapon on hand
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     npc.giveItems(
         listOf(
             item("minecraft:wooden_sword"),

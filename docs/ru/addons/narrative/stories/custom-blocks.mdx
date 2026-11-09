@@ -1,0 +1,50 @@
+---
+title: Собственные блоки истории
+order: 5
+---
+
+<center><h1>Собственные блоки истории</h1></center>
+
+Добавляем свои функции из Kotlin в нодовую систему.
+
+## Объявление блоков в аддоне
+
+Создайте [аддон на Kotlin](/docs/hollowengine/addons/creating) с зависимостью от `hollowengine-narrative`. Подключите Narrative для компиляции. Добавьте в обычный файл Kotlin (`.kt`) аддона следующие функции верхнего уровня.
+
+```kotlin
+import net.minecraft.server.level.ServerPlayer
+import ru.hollowhorizon.hollowengine.addons.narrative.story.SimpleAction
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryValue
+import ru.hollowhorizon.hollowengine.common.utils.literal
+
+@SimpleAction("quest-note")
+fun ServerPlayer.questNote(message: String) {
+    sendSystemMessage(message.literal)
+}
+
+@StoryValue("can-fight")
+fun canFight(player: ServerPlayer): Boolean = player.health >= 10f
+```
+
+Соберите и установите аддон на сервере и клиентах, затем добавьте его ID в зависимости проекта истории. Narrative сканирует аддон при загрузке. Действие из примера отправляет сообщение выбранному игроку. Блок значения читает здоровье игрока и возвращает булево значение для условия.
+
+В каталог блоков попадают статические функции, например функции верхнего уровня из этого примера. Входы соответствуют параметрам функции, включая получателя функции-расширения. Значения по умолчанию в Kotlin делают входы необязательными. Функция `@StoryValue` должна только читать данные, поскольку она может выполняться при каждом запросе значения. Сохраняйте ID аннотаций, которые уже используются в историях.
+
+## Действия с откатом
+
+Используйте `@Action` для изменения, которое история должна уметь отменить. В теле `action { ... }` сохраните предыдущее значение в `capture { ... }`, восстановите его в `undo { ... }` и примените изменение в `perform { ... }`. Журнал сохраняет аргументы и снятые значения. При откате или повторном применении он может снова войти в тело функции, поэтому меняйте мир внутри соответствующих блоков.
+
+Поместите этот пример в серверный `.node.kts` и вызовите функцию из его этапа `@State`. Аргументы для `action { ... }` в скрипте подставит компилятор.
+
+```kotlin
+import net.minecraft.server.level.ServerPlayer
+
+@Action("set-quest-level")
+suspend fun ServerPlayer.setQuestLevel(level: Int) = action {
+    val previous = capture { experienceLevel }
+    undo { setExperienceLevels(previous) }
+    perform { setExperienceLevels(level) }
+}
+```
+
+Narrative регистрирует функции верхнего уровня с аннотациями при запуске серверного `.node.kts` или `.reload.kts`. Их можно вызывать из этапов Kotlin. Для блока в каталоге используйте скомпилированный аддон. Обычный `.kts`, запущенный через `/he scripting run`, проходит без регистрации в Narrative. Общий `.kts` можно подключить импортом из запущенного скрипта.

@@ -18,6 +18,7 @@ import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
 import ru.hollowhorizon.hollowengine.client.ui.entity.EntityEditorClient
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ROOT_COMPONENT_ID
@@ -170,11 +171,11 @@ object WorldObjectEditing {
         add(
             UiDropdownItem(
                 "$LANG.duplicate".lang,
-                icon = COPY_ICON,
-                shortcut = HollowKeys.DUPLICATE.shortcut
+                mark = UiMenuParts.icon(COPY_ICON),
+                tail = UiMenuParts.shortcut(HollowKeys.DUPLICATE.shortcut)
             ) { duplicate(target) })
-        add(UiDropdownItem("$LANG.create_child".lang, icon = EMPTY_ICON) { spawnEmpty(target) })
-        if (target.parentId != null) add(UiDropdownItem("$LANG.unparent".lang, icon = WORLD_ICON) {
+        add(UiDropdownItem("$LANG.create_child".lang, mark = UiMenuParts.icon(EMPTY_ICON)) { spawnEmpty(target) })
+        if (target.parentId != null) add(UiDropdownItem("$LANG.unparent".lang, mark = UiMenuParts.icon(WORLD_ICON)) {
             setParent(
                 target,
                 null
@@ -184,26 +185,26 @@ object WorldObjectEditing {
         add(
             UiDropdownItem(
                 "$LANG.reset_transform".lang,
-                icon = RESET_ICON,
+                mark = UiMenuParts.icon(RESET_ICON),
                 separatorBefore = true
             ) { resetRotationAndScale(target) })
-        add(UiDropdownItem("$LANG.drop_to_ground".lang, icon = DROP_ICON) { dropToGround(target) })
-        if (inScene) add(UiDropdownItem("$LANG.go_to".lang, icon = GO_TO_ICON) { goTo(target.uuid) })
+        add(UiDropdownItem("$LANG.drop_to_ground".lang, mark = UiMenuParts.icon(DROP_ICON)) { dropToGround(target) })
+        if (inScene) add(UiDropdownItem("$LANG.go_to".lang, mark = UiMenuParts.icon(GO_TO_ICON)) { goTo(target.uuid) })
 
         val favorite = isFavorite(target.uuid)
         add(
             UiDropdownItem(
                 if (favorite) "$LANG.favorite_remove".lang else "$LANG.favorite_add".lang,
-                icon = FAVORITE_ICON,
+                mark = UiMenuParts.icon(FAVORITE_ICON),
                 separatorBefore = true,
             ) { setFavorite(target.uuid, !favorite) })
-        add(UiDropdownItem("$LANG.copy_id".lang, icon = LINK_ICON) { copyId(target.uuid) })
+        add(UiDropdownItem("$LANG.copy_id".lang, mark = UiMenuParts.icon(LINK_ICON)) { copyId(target.uuid) })
         add(
             UiDropdownItem(
                 "$LANG.delete".lang,
-                icon = DELETE_ICON,
+                mark = UiMenuParts.icon(DELETE_ICON),
                 separatorBefore = true,
-                shortcut = HollowKeys.DELETE.shortcut
+                tail = UiMenuParts.shortcut(HollowKeys.DELETE.shortcut)
             ) { delete(listOf(target)) })
     }
 

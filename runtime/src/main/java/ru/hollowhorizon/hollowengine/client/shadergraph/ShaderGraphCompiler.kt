@@ -4,6 +4,7 @@ package ru.hollowhorizon.hollowengine.client.shadergraph
 enum class ShaderProblem {
     UNKNOWN_NODE,
     UNKNOWN_PIN,
+    MISSING_NODE,
     NO_OUTPUT_NODE,
     SECOND_OUTPUT_NODE,
     CYCLE,
@@ -270,6 +271,8 @@ private class ResolvedGraph(private val graph: ShaderGraph, private val values: 
             }
         }
         graph.links.forEach { link ->
+            if (graph.node(link.from) == null) diagnostics += ShaderDiagnostic(ShaderProblem.MISSING_NODE, link.to, link.from)
+            if (graph.node(link.to) == null) diagnostics += ShaderDiagnostic(ShaderProblem.MISSING_NODE, link.from, link.to)
             val from = kinds[link.from]
             val to = graph.node(link.to)?.let { node -> kinds[node.id]?.let { node to it } }
             if (from != null && from.output(link.output) == null) {

@@ -1,0 +1,39 @@
+---
+title: Node system
+order: 2
+---
+
+<center><h1>Node system</h1></center>
+
+## Nodes and links
+
+A `.story` file stores the nodes and links you edit in the IDE. A graph has one **Start** node. HollowEngine compiles the graph to Kotlin and follows the flow links from there.
+
+- **Flow links** decide which step runs next. A choice or condition can have several exits.
+- **Value links** pass data such as an NPC, a position, or a number to an input. A value block such as a comparison is evaluated every time its value is requested. A value produced by an action is available on paths that have already run that action.
+
+Right-click the canvas to add a block by name or category. Drag from a pin into empty space to find blocks that fit the connection. Double-click a link to add a reroute point. Reroutes and groups help arrange the graph without changing how it runs.
+
+## Dialogue text
+
+A **Phrase** has a speaker and a line of text. Leave the speaker blank for narration, enter a name, or link an entity to use it as the speaker. You can also supply the line as a string through a value link.
+
+### Formatting
+
+Use markup such as `<b>Bold</b>`, `<color=#ff8800>Orange</color>`, `<wave>Moving text</wave>`, or `<br>` for a line break. **Choice** options support the same markup.
+
+## Variables and expressions
+
+Use **Variables** in the inspector to declare a saved value for a run. Give it a name, a Kotlin type, and an initial expression. For example, declare `trust` as `Float` with an initial value of `0.0f`. **Set variable** updates it. Read it through a value link or in an expression such as `trust > 10`.
+
+The inspector below shows a variable named `npc`. Its type is `NpcEntity?`, so its initial value can be left empty.
+
+![Story inspector showing the npc variable, its nullable type, and the imports list](/hollowengine/pictures/narrative/story-variables.png)
+
+Kotlin fields accept expressions of the expected type, such as `true` for a condition or `listOf(1, 2)` for a list. Add names from outside the default imports under **Imports**. A nullable type such as `String?` can hold an empty value. Check for a value or provide a fallback if the next block requires one.
+
+Generic blocks infer types from their inputs and links. For example, **For each** gives an `Int` item when it receives a list of integers. If the editor cannot infer the type you intend, use a more specific input, an explicit type, or a cast.
+
+## Diagnosing a graph
+
+Select a story diagnostic in **Console > Problems** to locate the corresponding node. Common errors include missing inputs, incompatible types, and values read before their action has run. Unreachable steps can appear as warnings. Validation errors stop the story from compiling.

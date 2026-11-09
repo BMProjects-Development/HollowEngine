@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorButton
 import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ExpressionEditing
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextFieldMode
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Coercions
 import ru.hollowhorizon.hollowengine.common.utils.expressions.Declarations
@@ -78,9 +79,11 @@ internal fun PreviewDataSection(preview: PlaybackPreview) {
             value = preview.script,
             id = "playback-preview-data",
             mode = UiTextFieldMode.MULTI_LINE,
-            completionContributor = PlaybackPreviewData.editing.completions,
-            syntaxHighlighter = PlaybackPreviewData.editing.highlighter,
-            diagnostics = PlaybackPreviewData.editing.diagnostics(preview.script),
+            insight = UiCodeInsight(
+                completions = PlaybackPreviewData.editing.completions,
+                highlighter = PlaybackPreviewData.editing.highlighter,
+                diagnostics = PlaybackPreviewData.editing.diagnostics(preview.script),
+            ),
             placeholder = "d.waiting = true;",
             fontSize = 9f,
             onChange = preview::edit,

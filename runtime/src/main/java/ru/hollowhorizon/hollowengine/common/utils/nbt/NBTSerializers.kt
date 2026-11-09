@@ -10,6 +10,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeStructure
 import net.minecraft.client.Minecraft
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.core.BlockPos
 import net.minecraft.nbt.*
 import net.minecraft.network.chat.Component
@@ -17,6 +18,7 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.monster.Zombie
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3d
@@ -39,6 +41,16 @@ object ForResourceLocation : KSerializer<ResourceLocation> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Identifier", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: ResourceLocation) = encoder.encodeString(value.toString())
     override fun deserialize(decoder: Decoder): ResourceLocation = decoder.decodeString().rl
+}
+
+/** A block state as the game writes it to NBT: the block and its properties. */
+object ForBlockState : KSerializer<BlockState> {
+    override val descriptor: SerialDescriptor = ForCompoundNBT.descriptor
+    override fun serialize(encoder: Encoder, value: BlockState) =
+        encoder.encodeSerializableValue(ForCompoundNBT, NbtUtils.writeBlockState(value))
+
+    override fun deserialize(decoder: Decoder): BlockState =
+        NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), decoder.decodeSerializableValue(ForCompoundNBT))
 }
 
 object ForByteNBT : KSerializer<ByteTag> {

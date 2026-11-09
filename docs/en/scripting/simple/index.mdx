@@ -96,14 +96,13 @@ fun Player.reward(item: Item, count: Int = 1) {
 }
 ```
 
-Import the function in `hollowengine/scripts/quests/first_quest.node.kts` and reward the player `Steve`. Replace that name with yours. `playerRef` waits for the player to join; start the `main` state with `/he scripting run scripts/quests/first_quest.node.kts main`. Each run gives the reward again.
+Import the function in `hollowengine/scripts/quests/first_quest.node.kts` and reward the player `Steve`. Replace that name with yours. `playerRef` waits for the player to join; attach the node with `/he scripting run scripts/quests/first_quest.node.kts`. Each run gives the reward again.
 
 ```kotlin
 @file:Import("../common/rewards.kts")
 import net.minecraft.world.item.Items
 
-@State
-suspend fun main() {
+onStart {
     playerRef("Steve").update {
         reward(Items.DIAMOND, 3)
     }

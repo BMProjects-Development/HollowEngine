@@ -51,6 +51,8 @@
 
 .number-field.labeled .number-field-value { text-align: right; }
 
+.number-field.roomy .number-field-body { padding: 0px 11px; }
+
 .number-field-arrow {
     size: 9px 100%;
     align-items: center center;
@@ -189,6 +191,34 @@
 
 .dropdown-item.disabled {
     opacity: 0.42;
+}
+
+.dropdown-search {
+    width: 100%;
+    gap: 5px;
+    margin: 0px 0px 3px 0px;
+    padding: 0px 6px;
+    background: $bg-field;
+    border: 1px $border;
+    border-radius: $radius;
+}
+
+.dropdown-search-icon {
+    size: 12px 12px;
+    tint: $text-soft;
+}
+
+.dropdown-search-input {
+    height: 22px;
+    min-width: 180px;
+    background: transparent;
+    caret-color: $caret;
+    selection-color: $selection;
+}
+
+/* What Enter would pick of what the search found. */
+.dropdown-item.picked {
+    background: alpha($accent, 0.28);
 }
 
 .tree-view {
@@ -451,6 +481,10 @@
     clip: true;
 }
 
+.ide-completion-preview {
+    padding: 4px;
+}
+
 .ide-completion-divider {
     background: $bg-hover;
 }
@@ -515,10 +549,14 @@
     align-items: start center;
 }
 
-.ide-completion-text {
-    gap: 0px;
-    align-items: start center;
-}
+.ide-completion-row .marquee-fade.end { background: linear-gradient(to right, alpha($bg-raised, 0) 0%, $bg-raised 82%); }
+.ide-completion-row .marquee-fade.start { background: linear-gradient(to left, alpha($bg-raised, 0) 0%, $bg-raised 82%); }
+.ide-completion-row:hover .marquee-fade.end { background: linear-gradient(to right, alpha($bg-raised, 0) 0%, over(alpha($white, 0.05), $bg-raised) 82%); }
+.ide-completion-row:hover .marquee-fade.start { background: linear-gradient(to left, alpha($bg-raised, 0) 0%, over(alpha($white, 0.05), $bg-raised) 82%); }
+.ide-completion-row.selected .marquee-fade.end { background: linear-gradient(to right, alpha($bg-raised, 0) 0%, over(alpha($accent, 0.24), $bg-raised) 82%); }
+.ide-completion-row.selected .marquee-fade.start { background: linear-gradient(to left, alpha($bg-raised, 0) 0%, over(alpha($accent, 0.24), $bg-raised) 82%); }
+.ide-completion-row.selected:hover .marquee-fade.end { background: linear-gradient(to right, alpha($bg-raised, 0) 0%, over(alpha($accent, 0.3), $bg-raised) 82%); }
+.ide-completion-row.selected:hover .marquee-fade.start { background: linear-gradient(to left, alpha($bg-raised, 0) 0%, over(alpha($accent, 0.3), $bg-raised) 82%); }
 
 .ide-completion-label {
     foreground: $text-strong;
@@ -602,4 +640,133 @@
     scale: 1.12;
     stroke: $white;
     shadow: 0px 0px 4px 0px alpha($accent, 0.72);
+}
+
+.marquee {
+    align-items: start center;
+}
+
+.marquee-text {
+    align-items: start center;
+}
+
+.registry-picker {
+    padding: 8px;
+    gap: 6px;
+    align-items: stretch;
+    background: $bg-raised;
+    border: 1px $border;
+    border-radius: $radius-large;
+    shadow: 0px 6px 16px 0px $shadow;
+}
+
+.registry-picker-title {
+    foreground: $caret;
+    font-size: $font-size-title;
+}
+
+.registry-picker-tabs {
+    gap: 2px;
+}
+
+.registry-picker-tab {
+    padding: 3px 8px;
+    border-radius: $radius;
+    foreground: $text-muted;
+    cursor: hand;
+    transition: background 80ms ease-out;
+}
+
+.registry-picker-tab:hover {
+    background: $bg-hover;
+}
+
+.registry-picker-tab.selected {
+    background: alpha($accent, 0.18);
+    foreground: $text-strong;
+}
+
+.registry-picker-body {
+    gap: 8px;
+}
+
+.registry-picker-list {
+    background: $bg-field;
+    border-radius: $radius;
+    padding: 3px;
+    @apply $thin-scroll;
+}
+
+.registry-picker-row {
+    padding-horizontal: 6px;
+}
+
+.registry-picker-row.selected {
+    background: alpha($accent, 0.28);
+}
+
+.registry-picker-text {
+    grow: 1;
+}
+
+.registry-picker-title-text {
+    foreground: $text;
+}
+
+.registry-picker-value {
+    font-size: 10px;
+    foreground: $text-muted;
+}
+
+.registry-picker-row .marquee-fade.end { background: linear-gradient(to right, alpha($bg-field, 0) 0%, $bg-field 82%); }
+.registry-picker-row .marquee-fade.start { background: linear-gradient(to left, alpha($bg-field, 0) 0%, $bg-field 82%); }
+.registry-picker-row:hover .marquee-fade.end { background: linear-gradient(to right, alpha($bg-field, 0) 0%, over(alpha($accent, 0.18), $bg-field) 82%); }
+.registry-picker-row:hover .marquee-fade.start { background: linear-gradient(to left, alpha($bg-field, 0) 0%, over(alpha($accent, 0.18), $bg-field) 82%); }
+.registry-picker-row.selected .marquee-fade.end { background: linear-gradient(to right, alpha($bg-field, 0) 0%, over(alpha($accent, 0.28), $bg-field) 82%); }
+.registry-picker-row.selected .marquee-fade.start { background: linear-gradient(to left, alpha($bg-field, 0) 0%, over(alpha($accent, 0.28), $bg-field) 82%); }
+
+.registry-picker-empty {
+    grow: 1;
+    align: center center;
+    foreground: $text-faint;
+}
+
+.registry-picker-details {
+    padding: 6px;
+    gap: 2px;
+    align-items: stretch;
+    background: $bg-field;
+    border-radius: $radius;
+}
+
+.block-state-header {
+    gap: 6px;
+    padding: 2px 4px;
+    margin-bottom: 4px;
+}
+
+.block-state-title {
+    foreground: $text-strong;
+}
+
+.block-state-field {
+    width: 100%;
+    gap: 6px;
+    padding-left: 6px;
+    border-radius: $radius;
+    background: alpha($white, 0.03);
+}
+
+.block-state-value {
+    height: 20px;
+    padding: 0px 6px;
+}
+
+.block-state-name {
+    grow: 1;
+    foreground: $text-soft;
+}
+
+.block-state-empty {
+    foreground: $text-faint;
 }

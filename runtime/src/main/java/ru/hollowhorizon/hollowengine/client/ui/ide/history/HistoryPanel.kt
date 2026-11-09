@@ -11,7 +11,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val LANG = UndoLabel.LANG
@@ -53,7 +53,7 @@ private fun HistoryHeader(histories: IdeHistories, contexts: List<HistoryContext
             expanded = expanded,
             onExpandedChange = { expanded = it },
             items = contexts.map { candidate ->
-                UiDropdownItem(candidate.title, candidate.icon, checked = candidate === context, mark = UiDropdownMark.RADIO) {
+                UiDropdownItem(candidate.title, mark = UiMenuParts.radio(candidate === context)) {
                     histories.choose(candidate)
                 }
             },

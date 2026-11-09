@@ -80,8 +80,7 @@ Nothing is ever lost in between: whatever the receiving side has no room for goe
 ## Example: a quest turn-in
 
 ```kotlin
-@State
-suspend fun onInteract(player: ServerPlayer) {
+suspend fun turnIn(player: ServerPlayer) {
     val logs = itemTag("minecraft:logs")
 
     if (!player.hasItems(logs.request(10))) {
@@ -98,8 +97,7 @@ suspend fun onInteract(player: ServerPlayer) {
 ## Example: arming the player for a fight
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     player.giveItems(
         listOf(
             item("minecraft:iron_sword"),

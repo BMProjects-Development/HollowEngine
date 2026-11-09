@@ -21,7 +21,7 @@ public class SoundEngineMixin {
     @Shadow @Final private Map<SoundInstance, ChannelAccess.ChannelHandle> instanceToChannel;
     @Shadow @Final private SoundEngineExecutor executor;
 
-    @Inject(method = "updateSource", at = @At("TAIL"))
+    @Inject(method = "updateSource", at = @At("RETURN"))
     private void hollowengine$frame(Camera camera, CallbackInfo ci) {
         BootstrapRuntimeManager.bridge().onSoundFrame(instanceToChannel, executor);
     }

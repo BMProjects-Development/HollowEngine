@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.shadergraph
 
+import org.junit.jupiter.api.assertTimeoutPreemptively
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -47,8 +49,8 @@ class ShaderGraphEditsTest {
 
     @Test
     fun `deleting reroutes joins the link back up, however many of them are taken out at once`() {
-        val once = graph.withLink("a", "Out", "c", "A").withReroute(0, "r1", 0f, 0f)
-        val rerouted = once.withReroute(once.links.indexOfFirst { it.to == "c" }, "r2", 0f, 0f)
+        val once = graph.withLink("a", "Out", "c", "A").withReroute(ShaderGraphLink("a", "Out", "c", "A"), "r1", 0f, 0f)
+        val rerouted = once.withReroute(once.links.first { it.to == "c" }, "r2", 0f, 0f)
         assertEquals(3, rerouted.links.size)
 
         assertEquals(listOf(ShaderGraphLink("a", "Out", "c", "A")), rerouted.withoutNodes(setOf("r1", "r2")).links)
@@ -77,5 +79,26 @@ class ShaderGraphEditsTest {
 
         assertEquals(listOf("Rate"), renamed.properties.map { it.name })
         assertEquals("Rate", renamed.node("p")?.options?.get("property"))
+    }
+
+    @Test
+    fun `deleting reroutes that feed each other in a loop ends`() {
+        val looped = ShaderGraph(
+            nodes = listOf(
+                ShaderGraphNode("r1", ShaderNodeLibrary.REROUTE),
+                ShaderGraphNode("r2", ShaderNodeLibrary.REROUTE),
+                ShaderGraphNode("a", "hollowengine:math/add"),
+            ),
+            links = listOf(
+                ShaderGraphLink("r2", ShaderNodeLibrary.REROUTE_OUTPUT, "r1", ShaderNodeLibrary.REROUTE_INPUT),
+                ShaderGraphLink("r1", ShaderNodeLibrary.REROUTE_OUTPUT, "r2", ShaderNodeLibrary.REROUTE_INPUT),
+                ShaderGraphLink("r1", ShaderNodeLibrary.REROUTE_OUTPUT, "a", "A"),
+            ),
+        )
+
+        val left = assertTimeoutPreemptively(Duration.ofSeconds(5)) { looped.withoutNodes(setOf("r1", "r2")) }
+
+        assertEquals(listOf("a"), left.nodes.map { it.id })
+        assertEquals(emptyList(), left.links)
     }
 }

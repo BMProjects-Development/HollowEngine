@@ -1,0 +1,36 @@
+---
+title: Start a dialogue from an NPC
+order: 7
+---
+
+<center><h1>Start a dialogue from an NPC</h1></center>
+
+Give an NPC a dialogue that opens on right-click. Install Narrative and the Kotlin compiler, and add the Narrative dependency to the project. Use an NPC you can safely approach and interact with. [Installing Narrative](/docs/hollowengine/addons/narrative#install-and-connect-it)
+
+In `scripts/examples`, create `npc_dialogue.story` with **New Script > Dialogue**. Set the first phrase's speaker to `Guide` and its text to `Hello! Would you like to hear about this village?` Connect it to a **Choice** with two answers, then connect each answer to its own **Phrase**. See [Your first story](/docs/hollowengine/addons/narrative/stories#your-first-story) for the steps in the graph editor.
+
+Add this node script as `hollowengine/scripts/examples/npc_dialogue.node.kts`.
+
+```kotlin
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+val story by editor.property<String>("Story file", assets = listOf("story")) {
+    "scripts/examples/npc_dialogue.story"
+}
+
+onInteract { event ->
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    val path = story.removePrefix("scripts/")
+    player.launchStory("guide-greeting") {
+        scene(path)
+    }
+}
+```
+
+The asset field lets you choose a different story in the NPC editor. The picker can include the `scripts/` prefix, which the handler removes before calling `scene`. The interacting player owns the run. While that player's greeting is active, right-clicking the NPC again keeps the same run. Other players get their own progress.
+
+Attach the new node in the NPC's **Scripts** tab. Right-click the NPC with an empty hand, advance the opening line, and choose an answer. The story follows the link for that answer.
+
+![Dialogue in Minecraft with the NPC's line and two answers](/hollowengine/pictures/narrative/dialogue-in-game.png)

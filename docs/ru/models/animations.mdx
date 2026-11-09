@@ -43,8 +43,10 @@ val finished = entity.playAndWait("wave") // suspend: ждёт реальног�
 
 `playAndWait` - обычная `suspend`-функция: скрипт стоит, пока клип не доиграет. У `NpcEntity` есть ещё фоновая форма `startAnimation(...)`, которая работает на канале `ANIMATION` (см. [Действия и конкурентность](/docs/hollowengine/scripting/npc/actions)), поэтому может играть одновременно с движением и взглядом:
 
+Движение в этом примере использует [аддон Narrative](/docs/hollowengine/addons/narrative).
+
 ```kotlin
-val walking = npc.startMove(player)
+val walking = npc.startMove(player.entityRef)
 npc.startAnimation("walk_wave") // играет параллельно с ходьбой выше
 walking.await()
 ```

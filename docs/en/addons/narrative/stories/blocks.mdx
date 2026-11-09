@@ -1,0 +1,21 @@
+---
+title: Built-in story blocks
+order: 4
+---
+
+<center><h1>Built-in story blocks</h1></center>
+
+Right-click the canvas to search for a block by name or browse by category. An action runs when the story reaches it. A value link supplies data to an input.
+
+For example, connect **Start** to **Spawn NPC**, then connect **Spawn NPC** to **Reach point** with two links. The flow link starts movement after the NPC spawns. The value link passes the spawned NPC to the movement block.
+
+![A white flow link and a turquoise NPC value link connect Spawn NPC to Reach point](/hollowengine/pictures/narrative/npc-flow-and-value-links.png)
+
+- **Dialogue**, **Flow**, and **Waiting** cover conversations, checkpoints, and waits for time, movement, or player interaction.
+- **World** includes blocks for terrain, weather, NPCs, players, inventories, and entity components. For example, you can change a block, move an NPC, give a player an item, or read whether an entity has a component and what its fields contain.
+- **Camera**, **Animation**, and **Effects** cover cutscenes, animations, sound, and particles.
+- **Values** includes comparisons, list operations, type conversions, and NBT.
+
+When you fill in the animation field, the editor can suggest clips from the NPC's model and show a preview of the highlighted clip.
+
+![Animation completion offers the hello clip and previews it on the NPC model](/hollowengine/pictures/narrative/animation-preview.png)

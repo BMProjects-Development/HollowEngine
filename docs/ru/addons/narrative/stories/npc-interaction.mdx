@@ -1,0 +1,36 @@
+---
+title: Диалог при взаимодействии с NPC
+order: 7
+---
+
+<center><h1>Диалог при взаимодействии с NPC</h1></center>
+
+Добавьте NPC диалог, который запускается по нажатию правой кнопкой. Установите Narrative и компилятор Kotlin, затем добавьте зависимость Narrative в проект. Выберите NPC, к которому можно безопасно подойти и обратиться. [Установка Narrative](/docs/hollowengine/addons/narrative#install-and-connect-it)
+
+В папке `scripts/examples` создайте `npc_dialogue.story` через **New Script > Dialogue**. В первой фразе укажите говорящего `Проводник` и текст `Привет! Хотите узнать об этой деревне?` Подключите фразу к узлу **Выбор** с двумя ответами, затем соедините каждый ответ со своей **Фразой**. Действия в редакторе описаны в разделе [Первая история](/docs/hollowengine/addons/narrative/stories#your-first-story).
+
+Сохраните следующий скрипт в `hollowengine/scripts/examples/npc_dialogue.node.kts`.
+
+```kotlin
+@file:Attach(NpcEntity::class)
+
+import net.minecraft.server.level.ServerPlayer
+
+val story by editor.property<String>("Файл истории", assets = listOf("story")) {
+    "scripts/examples/npc_dialogue.story"
+}
+
+onInteract { event ->
+    val player = event.player as? ServerPlayer ?: return@onInteract
+    val path = story.removePrefix("scripts/")
+    player.launchStory("guide-greeting") {
+        scene(path)
+    }
+}
+```
+
+Поле ресурса позволяет выбрать другую историю в редакторе NPC. Выбранный путь может начинаться с `scripts/`, поэтому обработчик убирает этот префикс перед вызовом `scene`. Запуск принадлежит игроку, который нажал на NPC. Пока его приветствие активно, повторное нажатие продолжает тот же запуск. У других игроков свой прогресс.
+
+Прикрепите новую ноду во вкладке **Скрипты** у NPC. Нажмите на него правой кнопкой с пустой рукой, продвиньте первую реплику и выберите ответ. История пойдёт по связи этого ответа.
+
+![Реплика NPC и два варианта ответа в Minecraft](/hollowengine/pictures/narrative/dialogue-in-game.png)

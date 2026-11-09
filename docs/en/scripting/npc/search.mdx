@@ -7,7 +7,7 @@ order: 8
 
 *Ask an NPC what is around it: players, other NPCs, any entity, or dropped items.*
 
-The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside `onStart`, `onInteract`, or an `@State suspend fun`.
+The examples below are fragments of a server `.node.kts` script. `npc` is a character returned by `npc(...)` or `this@NpcEntity` in an [attached node](/docs/hollowengine/scripting/node). `player` represents the server player from an interaction handler. Put calls that wait for completion inside a suspend handler such as `onStart` or `onInteract`.
 
 ## Quick helpers
 
@@ -26,7 +26,7 @@ val nearestBread = npc.findNearestItem(itemFilter(item("minecraft:bread")), radi
 | `findItems(filter, radius, limit)` | Dropped items matching an [`ItemFilter`](/docs/hollowengine/scripting/npc/inventory), nearest first. |
 | `findNearestItem(filter, radius)` | Just the single nearest matching dropped item, or `null` if there is none. |
 
-Every result is a `Ref<T>`, the same reference type used for [remembering entities across a story](/docs/hollowengine/scripting/node/states#story-logic), not the raw entity. That is on purpose: by the time you actually use the result, the entity might have moved to another chunk, or even unloaded, and a `Ref` knows how to wait for it and re-find it safely.
+Every result is a `Ref<T>`, the same reference type used for [saving NPC references](/docs/hollowengine/scripting/npc/properties#saving-npc-references), not the raw entity. That is on purpose: by the time you actually use the result, the entity might have moved to another chunk, or even unloaded, and a `Ref` knows how to wait for it and re-find it safely.
 
 ```kotlin
 val playerRef = npc.findPlayers(radius = 10.0).firstOrNull() ?: return

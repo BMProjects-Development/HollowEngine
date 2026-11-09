@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutNode
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutPipeline
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiLayoutResult
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.layout.shownRect
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollOffset
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollState
@@ -25,6 +26,7 @@ data class HollowUiFrame(
     val nowMillis: Long = 0L,
 ) {
     internal var profile: UiProfileFrame? = null
+    internal var visibleHits = UiVisibleHitCache()
 
     private val nodesByIdentifier: Map<String, UiNode> by lazy {
         val index = HashMap<String, UiNode>(nodes.size * 2)
@@ -38,21 +40,30 @@ data class HollowUiFrame(
     fun hitTest(x: Float, y: Float): UiHit? = UiHitTester().hitTest(root, layout, x, y)
 
     /** Whether visible, input-opaque UI geometry is under the point (blocks click-through). */
-    fun hitsVisible(x: Float, y: Float): Boolean = UiHitTester().hitsVisible(root, layout, x, y)
+    fun hitsVisible(x: Float, y: Float): Boolean =
+        visibleHits.getOrPut(x, y) { UiHitTester().hitsVisible(root, layout, x, y) }
 
     /** The node the wheel scrolls: the deepest one under the point that has room to move. */
     fun scrollTargetAt(x: Float, y: Float): UiNode? = wheelChainAt(x, y).scrollTarget()
 
-    /** Node that wheel scrolls. */
-    internal fun List<UiNode>.scrollTarget(): UiNode? {
+    /**
+     * Node that wheel scrolls. A plain [vertical] notch leaves a node that only moves sideways to whatever moves
+     * up and down around it, the way a page keeps scrolling over a wide table.
+     */
+    internal fun List<UiNode>.scrollTarget(vertical: Boolean = false): UiNode? {
         var fallback: UiNode? = null
+        var sideways: UiNode? = null
         for (node in this) {
             if (!node.resolvedSnapshot.scrollable) continue
             val range = layout[node].scrollRange
-            if (range.x > ScrollTargetRangeEpsilon || range.y > ScrollTargetRangeEpsilon) return node
+            if (range.y > ScrollTargetRangeEpsilon) return node
+            if (range.x > ScrollTargetRangeEpsilon) {
+                if (!vertical) return node
+                if (sideways == null) sideways = node
+            }
             if (fallback == null) fallback = node
         }
-        return fallback
+        return sideways ?: fallback
     }
 
     /**
@@ -151,6 +162,22 @@ private sealed interface ScrollTargetTask {
     ) : ScrollTargetTask
 }
 
+/** The last answer for a point, passed along while frames change nothing that could alter it. */
+internal class UiVisibleHitCache {
+    private var x = Float.NaN
+    private var y = Float.NaN
+    private var hit = false
+
+    inline fun getOrPut(x: Float, y: Float, compute: () -> Boolean): Boolean {
+        if (x != this.x || y != this.y) {
+            hit = compute()
+            this.x = x
+            this.y = y
+        }
+        return hit
+    }
+}
+
 fun UiRect?.intersect(other: UiRect?): UiRect? {
     if (this == null) return other
     if (other == null) return this
@@ -178,6 +205,7 @@ class HollowUiRuntime(
     private val layoutPipeline = UiLayoutPipeline()
     private val input = HollowUiInputController()
     private val placedBounds = WeakHashMap<UiNode, UiRect>()
+    private val shownBounds = WeakHashMap<UiNode, UiRect>()
     private val reportedTextLayouts = WeakHashMap<UiNode, UiTextLayout>()
     private val reportedStyles = WeakHashMap<UiNode, UiComputedStyle>()
     private var lastLayout: UiLayoutResult? = null
@@ -240,7 +268,7 @@ class HollowUiRuntime(
     }
 
     internal fun prepareFrame(nowMillis: Long) {
-        lastLayout?.let(::applyPendingScrollRequests)
+        applyPendingScrollRequests()
         scrollState.update(nowMillis)
         preparedAtMillis = nowMillis
     }
@@ -263,7 +291,8 @@ class HollowUiRuntime(
             subtreeLayoutRevision = root.layoutState.subtreeLayoutRevision,
         )
 
-        val layoutReused = lastLayout != null && layoutKey == lastLayoutKey
+        val previousLayout = lastLayout
+        val layoutReused = previousLayout != null && layoutKey == lastLayoutKey
         val layout = when {
             layoutReused -> {
                 if (profile != null) profile.layoutReuses++
@@ -272,23 +301,37 @@ class HollowUiRuntime(
 
             else -> scrolledOnly(layoutKey)?.let { previous ->
                 layoutPipeline.rescroll(root, previous, scrollState, profile)
-            } ?: layoutPipeline.compute(root, width, height, scrollState, profile)
+            } ?: layoutPipeline.compute(root, width, height, scrollState, profile, reusableLayout(root, layoutKey))
         }.let { placed ->
             if (scrollState.takeSettled()) layoutPipeline.rescroll(root, placed, scrollState, profile) ?: placed else placed
         }
         lastLayout = layout
         lastLayoutKey = layoutKey
-        dispatchPlacementCallbacks(layout)
-        dispatchTextLayoutCallbacks(layout)
-        dispatchResolvedStyleCallbacks(layout)
-        publishScrollGeometry(layout)
+        val unchanged = resolver.lastResolveReused && layout === previousLayout
+        if (!unchanged) {
+            val observed = resolver.observedNodes
+            dispatchPlacementCallbacks(layout, observed)
+            dispatchTextLayoutCallbacks(layout, observed)
+            dispatchResolvedStyleCallbacks(observed)
+            publishScrollGeometry(layout, observed)
+        }
 
         return HollowUiFrame(
             root = root,
             nodes = nodes,
             layout = layout,
             nowMillis = nowMillis,
-        ).also { it.profile = profile }
+        ).also { frame ->
+            frame.profile = profile
+            if (unchanged) lastFrame?.let { frame.visibleHits = it.visibleHits }
+        }
+    }
+
+    private fun reusableLayout(root: UiNode, next: FrameLayoutKey): UiLayoutResult? {
+        val previousKey = lastLayoutKey ?: return null
+        if (next.width != previousKey.width || next.height != previousKey.height) return null
+        if (next.scrollRevision != previousKey.scrollRevision) return null
+        return lastLayout?.takeIf { it.root === root }
     }
 
     private fun scrolledOnly(next: FrameLayoutKey): UiLayoutResult? {
@@ -354,7 +397,8 @@ class HollowUiRuntime(
         val horizontalModifier =
             input.modifiers and GLFW.GLFW_MOD_SHIFT != 0 || input.modifiers == 0 && horizontalScrollModifierDown()
         val chain = frame.wheelChainAt(input.mouseX, input.mouseY)
-        val target = with(frame) { chain.scrollTarget() } ?: this.input.focusedScrollableNode(frame)
+        val vertical = !horizontalModifier && input.scrollX == 0f
+        val target = with(frame) { chain.scrollTarget(vertical) } ?: this.input.focusedScrollableNode(frame)
 
         for (node in chain) {
             if (node.listensToScroll()) {
@@ -407,15 +451,16 @@ class HollowUiRuntime(
      * Drains the requests queued on each container's [UiScrollHandle] before layout runs, so the
      * bumped scroll revision forces a fresh pass that places content at the requested offset.
      */
-    private fun applyPendingScrollRequests(layout: UiLayoutResult) {
-        for (node in layout.nodes.keys) {
+    private fun applyPendingScrollRequests() {
+        for (node in resolver.observedNodes) {
             scrollState.applyPendingRequests(node.scrollHandle() ?: continue)
         }
     }
 
-    private fun publishScrollGeometry(layout: UiLayoutResult) {
-        for ((node, layoutNode) in layout.nodes) {
+    private fun publishScrollGeometry(layout: UiLayoutResult, observed: List<UiNode>) {
+        for (node in observed) {
             val handle = node.scrollHandle() ?: continue
+            val layoutNode = layout.nodes[node] ?: continue
             handle.viewport = layoutNode.content
             handle.range = layoutNode.scrollRange
             handle.screenTransform = layoutNode.inputTransform
@@ -429,21 +474,29 @@ class HollowUiRuntime(
      * when they changed since the last report. The change guard keeps a callback that writes state
      * (e.g. a popup anchor) from looping: once the bounds settle, it stops firing.
      */
-    private fun dispatchPlacementCallbacks(layout: UiLayoutResult) {
-        for (node in layout.traversalOrder) {
+    private fun dispatchPlacementCallbacks(layout: UiLayoutResult, observed: List<UiNode>) {
+        for (node in observed) {
+            val placed = layout.nodes[node] ?: continue
             var rect: UiRect? = null
-            val modifiers = node.resolvedModifiers
+            val modifiers = node.resolvedReports
             for (index in modifiers.indices) {
                 val modifier = modifiers[index]
                 if (modifier is UiDropTargetModifier) {
-                    val placed = layout[node]
                     modifier.target.bounds = placed.rect
                     modifier.target.clip = placed.outerClip ?: placed.clip
                     continue
                 }
+                if (modifier is OnShownModifier) {
+                    val shown = placed.shownRect()
+                    if (shownBounds[node] != shown) {
+                        shownBounds[node] = shown
+                        modifier.callback(shown)
+                    }
+                    continue
+                }
                 if (modifier !is OnPlacedModifier) continue
                 if (rect == null) {
-                    val current = layout[node].rect
+                    val current = placed.rect
                     if (placedBounds[node] == current) continue
                     placedBounds[node] = current
                     rect = current
@@ -454,10 +507,10 @@ class HollowUiRuntime(
     }
 
     /** After resolve, hands every [OnResolvedStyleModifier] its node's computed style, once per change. */
-    private fun dispatchResolvedStyleCallbacks(layout: UiLayoutResult) {
-        for (node in layout.traversalOrder) {
+    private fun dispatchResolvedStyleCallbacks(observed: List<UiNode>) {
+        for (node in observed) {
             var style: UiComputedStyle? = null
-            val modifiers = node.resolvedModifiers
+            val modifiers = node.resolvedReports
             for (index in modifiers.indices) {
                 val modifier = modifiers[index]
                 if (modifier !is OnResolvedStyleModifier) continue
@@ -472,15 +525,16 @@ class HollowUiRuntime(
         }
     }
 
-    private fun dispatchTextLayoutCallbacks(layout: UiLayoutResult) {
-        for (node in layout.traversalOrder) {
+    private fun dispatchTextLayoutCallbacks(layout: UiLayoutResult, observed: List<UiNode>) {
+        for (node in observed) {
+            val placed = layout.nodes[node] ?: continue
             var textLayout: UiTextLayout? = null
-            val modifiers = node.resolvedModifiers
+            val modifiers = node.resolvedReports
             for (index in modifiers.indices) {
                 val modifier = modifiers[index]
                 if (modifier !is OnTextLayoutModifier) continue
                 if (textLayout == null) {
-                    val current = layout[node].textLayout ?: break
+                    val current = placed.textLayout ?: break
                     if (reportedTextLayouts[node] == current) break
                     reportedTextLayouts[node] = current
                     textLayout = current

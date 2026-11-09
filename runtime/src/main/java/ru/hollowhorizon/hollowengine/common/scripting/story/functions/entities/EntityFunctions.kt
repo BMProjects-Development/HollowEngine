@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.story.functions.entities
 
 import kotlinx.coroutines.delay
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAnimation
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.npcs.NpcAnimationRuntime
@@ -10,7 +11,7 @@ import ru.hollowhorizon.hollowengine.common.npcs.actions.NpcActionKeys
 import kotlin.time.Duration.Companion.milliseconds
 
 fun Entity.play(
-    animation: String,
+    @EditorAnimation animation: String,
     playMode: AnimationPlayMode = AnimationPlayMode.Once,
     fadeIn: Double = 0.33,
     fadeOut: Double = 0.33,
@@ -26,12 +27,12 @@ fun Entity.play(
     )
 }
 
-infix fun Entity.playOnce(animation: String) = play(animation)
-infix fun Entity.playLooped(animation: String) = play(animation, playMode = AnimationPlayMode.Loop)
-infix fun Entity.playClamped(animation: String) = play(animation, playMode = AnimationPlayMode.ClampForever)
-infix fun Entity.playPingPong(animation: String) = play(animation, playMode = AnimationPlayMode.PingPong)
+infix fun Entity.playOnce(@EditorAnimation animation: String) = play(animation)
+infix fun Entity.playLooped(@EditorAnimation animation: String) = play(animation, playMode = AnimationPlayMode.Loop)
+infix fun Entity.playClamped(@EditorAnimation animation: String) = play(animation, playMode = AnimationPlayMode.ClampForever)
+infix fun Entity.playPingPong(@EditorAnimation animation: String) = play(animation, playMode = AnimationPlayMode.PingPong)
 
-fun Entity.stopAnimation(animation: String, fadeOut: Double = 0.33) {
+fun Entity.stopAnimation(@EditorAnimation animation: String, fadeOut: Double = 0.33) {
     NpcAnimationRuntime.apply(
         entity = this,
         from = animation,
@@ -42,7 +43,7 @@ fun Entity.stopAnimation(animation: String, fadeOut: Double = 0.33) {
 }
 
 suspend fun Entity.playAndWait(
-    animation: String,
+    @EditorAnimation animation: String,
     fadeIn: Double = 0.33,
     fadeOut: Double = 0.33,
 ): Boolean {
@@ -59,7 +60,7 @@ suspend fun Entity.playAndWait(
 }
 
 fun NpcEntity.startAnimation(
-    animation: String,
+    @EditorAnimation animation: String,
     fadeIn: Double = 0.33,
     fadeOut: Double = 0.33,
 ): NpcAction<Boolean> = actions.startConcurrent(NpcActionKeys.ANIMATION) {

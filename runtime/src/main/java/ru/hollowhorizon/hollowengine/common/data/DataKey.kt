@@ -4,6 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 
 /**
@@ -83,6 +84,7 @@ fun <T : Any> CompoundTag.write(key: DataKey<T>, value: T) {
 fun <T : Any> DataKey<T>.encode(value: T): Tag = NBTFormat.serialize(serializer, value)
 
 /** Deserializes [tag] with [key]'s serializer. */
-fun <T : Any> DataKey<T>.decode(tag: Tag): T? = runCatching { NBTFormat.deserialize(serializer, tag) }.getOrNull()
+fun <T : Any> DataKey<T>.decode(tag: Tag): T? = runCatching { NBTFormat.deserialize(serializer, tag) }
+    .onFailure { HollowEngine.LOGGER.warn("Failed to decode $this", it) }.getOrNull()
 
 internal fun <T : Any> DataKey<T>.default(): T? = defaultValue?.invoke()

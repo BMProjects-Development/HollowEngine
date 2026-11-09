@@ -9,7 +9,7 @@ order: 7
 
 ![Редактор инвентаря NPC](/hollowengine/pictures/npc/inventory.webp)
 
-Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в `onStart`, `onInteract` или `@State suspend fun`.
+Примеры ниже - фрагменты серверного `.node.kts`. `npc` - персонаж, полученный через `npc(...)` или `this@NpcEntity` у [прикреплённой ноды](/docs/hollowengine/scripting/node). `player` в примерах - серверный игрок из обработчика взаимодействия. Вызовы, которые ждут завершения, помещайте в suspend-обработчик, например `onStart` или `onInteract`.
 
 ## Инвентарь NPC
 
@@ -124,8 +124,7 @@ val need2 = itemRequest(item("minecraft:bread", 5)) // 5 хлеба, колич�
 Это готовая фоновая задача: вы указываете NPC список запросов, и он **сам ходит вокруг, подбирает подходящие выпавшие предметы и возвращается назад**.
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val result = npc.collectItems(
         listOf(itemTag("minecraft:logs").request(10)),
         CollectOptions(radius = 20.0),
@@ -196,13 +195,12 @@ onInteract { event ->
 }
 ```
 
-`transferItems` принимает игрока в качестве цели, так что хлеб уходит из запасов NPC и попадает в инвентарь игрока за один шаг, а игрок без свободного слота просто ничего не получит, вместо того чтобы предмет исчез. У стороны игрока есть свои функции, см. [Инвентарь игрока](/docs/hollowengine/scripting/player). Если пишете это внутри сцены `@State`, где NPC - локальная переменная, используйте `npc.hasItems(...)`, `npc.takeItems(...)` и `npc.giveItem(...)`, как и везде на этой странице.
+`transferItems` принимает игрока в качестве цели, так что хлеб уходит из запасов NPC и попадает в инвентарь игрока за один шаг, а игрок без свободного слота просто ничего не получит, вместо того чтобы предмет исчез. У стороны игрока есть свои функции, см. [Инвентарь игрока](/docs/hollowengine/scripting/player). Если пишете это внутри этапа или обработчика, где NPC - локальная переменная, используйте `npc.hasItems(...)`, `npc.takeItems(...)` и `npc.giveItem(...)`, как и везде на этой странице.
 
 ## Пример: надеть лучшее оружие из имеющегося
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     npc.giveItems(
         listOf(
             item("minecraft:wooden_sword"),

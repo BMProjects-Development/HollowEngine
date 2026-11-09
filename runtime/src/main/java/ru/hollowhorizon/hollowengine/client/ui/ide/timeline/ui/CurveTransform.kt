@@ -122,6 +122,11 @@ internal class CurveTransform private constructor(
 
     fun click(button: Int): GizmoKeyResult = finish(confirm = button != GLFW.GLFW_MOUSE_BUTTON_RIGHT)
 
+    fun switchMode(mode: GizmoEditMode): CurveTransform {
+        finish(confirm = false)
+        return CurveTransform(controller, mode, view, pointerX, pointerY, keys, handles)
+    }
+
     private fun constrain(index: Int): GizmoKeyResult {
         axis = if (axis == index) null else index
         update(pointerX, pointerY)
@@ -306,6 +311,11 @@ internal class CurveTransformHost {
     /** A key on the timeline: the keys of the transform under way, or G, R or S starting one over the graph. */
     fun key(controller: TimelineController, key: Int, modifiers: Int): Boolean {
         active?.let { transform ->
+            val mode = CurveTransform.modeFor(key, modifiers)
+            if (mode != null && mode != transform.mode) {
+                active = transform.switchMode(mode)
+                return true
+            }
             // Nothing else on the timeline acts while a transform holds the keys.
             if (transform.key(key, modifiers)
                     .let { it == GizmoKeyResult.CONFIRMED || it == GizmoKeyResult.CANCELLED }

@@ -5,8 +5,10 @@ uniform isamplerBuffer SegmentIndexBuffer;
 uniform isamplerBuffer TileBuffer;
 uniform samplerBuffer PaintBuffer;
 uniform samplerBuffer StopBuffer;
+uniform samplerBuffer ClipBuffer;
 
 in vec2 localPosition;
+in vec2 clipPosition;
 flat in int tileIndex;
 
 layout(location = 0) out vec4 fragColor;
@@ -146,6 +148,11 @@ void main() {
     vec2 pixelX = dFdx(localPosition);
     vec2 pixelY = dFdy(localPosition);
     if (style.x < 0) discard;
+    vec4 clip = texelFetch(ClipBuffer, tile.z);
+    if (clipPosition.x < clip.x || clipPosition.y < clip.y ||
+        clipPosition.x > clip.z || clipPosition.y > clip.w) {
+        discard;
+    }
     float coverage = pathCoverage(tile, style, pixelX, pixelY);
     if (coverage <= 0.0) discard;
     fragColor = samplePaint(tile.z);

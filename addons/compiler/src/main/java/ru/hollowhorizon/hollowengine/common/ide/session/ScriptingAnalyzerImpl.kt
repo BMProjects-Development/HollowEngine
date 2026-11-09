@@ -13,7 +13,12 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
+import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.animationNameCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.editorClips
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
+import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
@@ -27,14 +32,17 @@ import ru.hollowhorizon.hollowengine.common.ide.session.insight.findSignatureHel
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaKotlinSourceModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaRekotLibraryModule
 import ru.hollowhorizon.hollowengine.common.ide.session.modules.KaScriptModule
+import ru.hollowhorizon.hollowengine.common.ide.session.rename.SymbolRename
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.editorStructure
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.kotlinGutterTargets
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.searchSymbols
 import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptImportError
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -51,6 +59,9 @@ class ScriptingAnalyzerImpl internal constructor(
     val project: Project
         get() = kotlinCoreProjectEnvironment.project
     private val factory = KtPsiFactory(project, eventSystemEnabled = true)
+
+    /** Parses for fields as they are typed: on files of its own, so it never waits for analysis to finish. */
+    private val snippetFactory = KtPsiFactory(project, eventSystemEnabled = false)
 
     internal val fileCache = object : LinkedHashMap<String, CachedFile>(5, 0.75f, true) {
         override fun removeEldestEntry(entry: MutableMap.MutableEntry<String, CachedFile>?): Boolean {
@@ -124,8 +135,7 @@ class ScriptingAnalyzerImpl internal constructor(
                 updateLibrarySourcesModule()
             } else {
                 projectStructureProvider.setModule(
-                    file,
-                    KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
+                    file, KaKotlinSourceModule(project, listOf(file), sourceDependencies, classpath)
                 )
             }
             return file
@@ -210,7 +220,7 @@ class ScriptingAnalyzerImpl internal constructor(
                     return@argumentLoop
                 }
 
-                val importedName = editorPathOf(source)
+                val importedName = editorPathOf(source) + if (ScriptTranslators.translates(imported)) TRANSLATED else ""
                 if (importedName in activeFiles) {
                     diagnostics += importDiagnostic(
                         file,
@@ -222,8 +232,8 @@ class ScriptingAnalyzerImpl internal constructor(
                 if (!importedNames.add(importedName)) return@argumentLoop
 
                 val importedText = try {
-                    source.readText().withUnixLineSeparators()
-                } catch (exception: IOException) {
+                    ScriptTranslators.kotlinText(imported, source).withUnixLineSeparators()
+                } catch (exception: Exception) {
                     diagnostics += importDiagnostic(
                         file,
                         expression,
@@ -231,7 +241,11 @@ class ScriptingAnalyzerImpl internal constructor(
                     )
                     return@argumentLoop
                 }
-                importedFiles += createPsiFile(importedName, importedText, files, activeFiles)
+                val importedFile = createPsiFile(importedName, importedText, files, activeFiles)
+                if (file.isSharedScript() && !importedFile.isSharedScript()) {
+                    diagnostics += importDiagnostic(file, expression, sharedScriptImportError(file.name, importedName))
+                }
+                importedFiles += importedFile
             }
         }
         return ImportResolution(importedFiles, diagnostics)
@@ -254,6 +268,8 @@ class ScriptingAnalyzerImpl internal constructor(
 
     /** The path [HollowIdeModel][ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel] opens files by. */
     private fun editorPathOf(file: File): String {
+        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }
+            ?.let { return it.qualified }
         val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
         val path = file.toPath().toAbsolutePath().normalize()
         if (!path.startsWith(root)) return file.name
@@ -302,7 +318,10 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
-        createCompletions(getOrCreateFile(name, text), offset, sink)
+        val file = getOrCreateFile(name, text)
+        val names = checkpointNameCompletions(file, offset) ?: animationNameCompletions(file, offset, editorClips)
+        if (names != null) sink.emit(names) else createCompletions(file, offset, sink)
+        Unit
     }
 
     override fun definition(name: String, text: String, offset: Int): DefinitionLocation? = synchronized(lock) {
@@ -315,7 +334,70 @@ class ScriptingAnalyzerImpl internal constructor(
 
     override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> =
         synchronized(lock) {
-            kotlinGutterTargets(getOrCreateFile(name, text), offset)
+            kotlinGutterTargets(getOrCreateFile(name, text), name, offset)
+        }
+
+    override fun acceptedExpressionTypes(name: String, text: String, offset: Int, types: List<String>): List<String>? =
+        synchronized(lock) { findAcceptedExpressionTypes(getOrCreateFile(name, text), offset, types) }
+
+    override fun kotlinSyntax(text: String): KotlinSyntax = kotlinSyntax(snippetFactory, text.withUnixLineSeparators())
+
+    override fun propertyTypes(name: String, text: String, prefix: String): KotlinPropertyTypes =
+        synchronized(lock) { propertyTypes(getOrCreateFile(name, text), prefix) }
+
+    override fun forget(name: String) = synchronized(lock) {
+        fileCache.remove(name)?.let { cleanupFiles(it.relatedFiles) }
+        Unit
+    }
+
+    override fun renameTarget(name: String, text: String, offset: Int): RenameTarget? = synchronized(lock) {
+        SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }?.target
+    }
+
+    override fun rename(
+        name: String,
+        text: String,
+        offset: Int,
+        newName: String,
+        documents: Map<String, String>,
+    ): List<FileRename> = synchronized(lock) {
+        if (!SymbolRename.accepts(newName)) return emptyList()
+        val renamed = SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }
+            ?: return emptyList()
+        if (renamed.name == newName) return emptyList()
+        val texts = LinkedHashMap<String, String>()
+        texts[name] = text
+        if (renamed.key.project) {
+            projectScripts().forEach { (path, file) ->
+                texts.getOrPut(path) {
+                    documents[path] ?: file.readTextOrNull() ?: return@forEach
+                }
+            }
+        } else if (renamed.key.path != name) {
+            val declaring = renamed.key.path
+            documents[declaring]?.let { texts[declaring] = it } ?: declaring.fromReadablePath().readTextOrNull()
+                ?.let { texts[declaring] = it }
+        }
+        val word = Regex("(?<![A-Za-z0-9_])${Regex.escape(renamed.name)}(?![A-Za-z0-9_])")
+        texts.mapNotNull { (path, source) ->
+            val normalized = source.withUnixLineSeparators()
+            if (!word.containsMatchIn(normalized)) return@mapNotNull null
+            if (!renamed.key.project && path != renamed.key.path) return@mapNotNull null
+            val edits = SymbolRename.edits(getOrCreateFile(path, normalized), renamed.key, renamed.name, newName)
+            edits.takeIf { it.isNotEmpty() }?.let { FileRename(path, normalized, it) }
+        }
+    }
+
+    /** Whether the script the editor opens as [path] is a file of the project, not one shipped by an addon. */
+    private fun isProjectScript(path: String): Boolean {
+        val file = runCatching { path.fromReadablePath() }.getOrNull() ?: return false
+        return file.isFile && projectScripts().any { it.second == file.absoluteFile.normalize() }
+    }
+
+    /** The scripts of the project, by the path the editor opens them with. */
+    private fun projectScripts(): List<Pair<String, File>> =
+        ScriptRegistry.listIn(ScriptRegistry.sandboxNamespace, ".kts").mapNotNull { id ->
+            ScriptRegistry.artifacts(id)?.sourceFile?.absoluteFile?.normalize()?.let { editorPathOf(it) to it }
         }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
@@ -347,6 +429,9 @@ class ScriptingAnalyzerImpl internal constructor(
     private companion object {
         /** An empty sandbox script, so name lookups see the classpath the project's own scripts compile against. */
         val SymbolLookupScript = "${SandboxScriptSource.SCRIPTS_DIRECTORY}/.symbol-lookup.kts"
+
+        /** What the name of a translated script gets to be read as the Kotlin it is translated into. */
+        const val TRANSLATED = ".generated.kts"
     }
 }
 
@@ -354,6 +439,12 @@ private fun removeFromPsiManager(file: KtFile) {
     val psiManager = PsiManager.getInstance(file.project) as? PsiManagerEx ?: return
     val fileManager = psiManager.fileManager
     fileManager.setViewProvider(file.virtualFile, null)
+}
+
+private fun File.readTextOrNull(): String? = try {
+    readText()
+} catch (_: IOException) {
+    null
 }
 
 private fun String.withUnixLineSeparators(): String = replace("\r\n", "\n").replace('\r', '\n')

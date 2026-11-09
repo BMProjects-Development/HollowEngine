@@ -150,10 +150,63 @@ class EditorStructureTest {
         assertTrue(analyzer.structure("example.kt", "fun call() {}").runTargets.isEmpty())
         assertTrue(analyzer.structure("example.ui.kts", "").runTargets.isEmpty())
         val text =
-            "import ru.hollowhorizon.hollowengine.common.scripting.annotations.State as Entry\n" + "object Names { const val ENTRY = \"Begin\" }\n@Entry(Names.ENTRY) suspend fun first() {}\n" + "@Entry suspend fun second() {}\n@Entry fun invalid() {}"
+            "import ru.hollowhorizon.hollowengine.addons.narrative.story.State as Entry\n" + "object Names { const val ENTRY = \"Begin\" }\n@Entry(Names.ENTRY) suspend fun first() {}\n" + "@Entry suspend fun second() {}\n@Entry fun invalid() {}"
         val targets = analyzer.structure("states.node.kts", text).runTargets
         assertEquals(listOf(null, "Begin", "second"), targets.map { it.state })
         assertEquals(0, targets.first().offset)
+    }
+
+    @Test
+    fun `story stages mark their boundaries, checkpoints and actions in the gutter`() {
+        val source = """
+            import ru.hollowhorizon.hollowengine.addons.narrative.story.*
+            @Action suspend fun place(name: String) = action { perform { } }
+            @State suspend fun step() {}
+            @State suspend fun main() {
+                step()
+                checkpoint("arena")
+                place("x")
+                listOf(1).forEach { place("y") }
+            }
+        """.trimIndent()
+        val markers = analyzer.structure("Story.kts", source).markers
+        assertEquals(GutterMarkerKind.ACTION, markers.single { it.offset == source.indexOf("place(name") }.kind)
+        val stage = markers.single { it.kind == GutterMarkerKind.STAGE }
+        assertEquals(source.indexOf("    step()") + 4, stage.offset)
+        assertEquals(listOf("step"), stage.args)
+        assertEquals(listOf("arena"), markers.single { it.kind == GutterMarkerKind.CHECKPOINT }.args)
+        assertEquals(GutterMarkerKind.ACTION_CALL, markers.single { it.offset == source.indexOf("place(\"x") }.kind)
+        assertEquals(GutterMarkerKind.COROUTINE, markers.single { it.offset == source.indexOf("place(\"y") }.kind, "in a lambda it is no boundary")
+    }
+
+    @Test
+    fun `rewind and temporary take the color of the checkpoint they lead to`() {
+        val source = """
+            import ru.hollowhorizon.hollowengine.addons.narrative.story.*
+            @State suspend fun main() {
+                rewind()
+                checkpoint("arena")
+                temporary { }
+                rewind()
+                temporary(until = "boss") { }
+                rewind("arena")
+                checkpoint("boss")
+            }
+        """.trimIndent()
+        val markers = analyzer.structure("Colors.kts", source).markers
+        fun at(text: String, from: Int = 0) = markers.single { it.offset == source.indexOf(text, from) }
+        val arena = at("checkpoint(\"arena").color
+        val boss = at("checkpoint(\"boss").color
+        assertEquals(GutterMarkerKind.REWIND_START, at("rewind()").kind)
+        assertNotEquals(arena, boss)
+        assertEquals(boss, at("temporary {").color, "a temporary without until goes at the next checkpoint")
+        assertEquals(arena, at("rewind()", source.indexOf("temporary {")).color, "rewind goes to the checkpoint before it")
+        assertEquals(boss, at("temporary(until").color)
+        assertEquals(arena, at("rewind(\"arena").color)
+
+        fun target(text: String) = analyzer.gutterTargets("Colors.kts", source, source.indexOf(text)).single().location.offset
+        assertEquals(source.indexOf("checkpoint(\"boss"), target("temporary(until"))
+        assertEquals(source.indexOf("checkpoint(\"arena"), target("rewind(\"arena"))
     }
 
     @Test

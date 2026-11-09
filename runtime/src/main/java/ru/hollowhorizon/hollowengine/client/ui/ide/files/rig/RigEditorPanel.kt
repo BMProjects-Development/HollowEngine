@@ -123,7 +123,7 @@ private fun Toolbar(
         IconButton(ColliderIcon, rigText("toggle_colliders"), iconSize = 12f, active = state.showColliders) {
             state.showColliders = !state.showColliders
         }
-        if (state.partSelection != null) GizmoToolbarButtons()
+        if (state.partSelection != null) GizmoToolbarButtons("rig-gizmo-${System.identityHashCode(state)}")
         if (RigPreviews.isAvailable) {
             IconButton(
                 icon = if (preview == null) PhysicsIcon else StopIcon,
@@ -150,7 +150,7 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
         id = "rig-generate-menu",
         anchorBounds = anchor,
         items = generators.map { entry ->
-            UiDropdownItem(entry.titleKey.lang, entry.icon) {
+            UiDropdownItem(entry.titleKey.lang, mark = UiMenuParts.icon(entry.icon)) {
                 viewer.attachment.ensureReady()
                 document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(viewer.attachment, it) }
             }

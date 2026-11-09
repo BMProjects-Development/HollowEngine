@@ -102,6 +102,7 @@ fun Project.configureHollowAddon() {
         add("modCompileOnly", "net.fabricmc:fabric-loader:$fabricLoaderVersion")
         add("compileOnly", project(path = ":runtime", configuration = "namedElements"))
         add("testImplementation", project(path = ":runtime", configuration = "namedElements"))
+        add("testImplementation", project(path = ":bridge", configuration = "namedElements"))
         add("compileOnly", "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
         add("compileOnly", "org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
@@ -115,7 +116,7 @@ fun Project.configureHollowAddon() {
 
     tasks.named<Jar>("jar") {
         archiveClassifier.set("classes-named")
-        include("**/*.class")
+        include("**/*.class", "META-INF/*.kotlin_module")
     }
     tasks.named<RemapJarTask>("remapJar") {
         enabled = false
@@ -225,6 +226,7 @@ subprojects {
         extensions.configure<LoomGradleExtensionAPI> {
             runs.configureEach {
                 jvmArguments.add("-Dhollowengine.ide.sourceRoots=${rootProject.layout.buildDirectory.file("ide/source-roots.txt").get().asFile.absolutePath}")
+                jvmArguments.add("-Dhollowengine.devAddons=${rootProject.layout.buildDirectory.dir("addon-jars").get().asFile.absolutePath}")
             }
         }
     }

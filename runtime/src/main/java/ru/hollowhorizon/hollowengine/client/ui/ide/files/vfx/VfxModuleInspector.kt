@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxModuleTypes
@@ -68,7 +69,7 @@ private fun AddModuleButton(document: VfxEditing, emitter: VfxEmitterSpec) {
         id = "vfx-add-module",
         anchorBounds = anchor,
         items = addable.map { type ->
-            UiDropdownItem(type.titleKey.lang, icon = moduleIcon(type.specClass)) {
+            UiDropdownItem(type.titleKey.lang, mark = UiMenuParts.icon(moduleIcon(type.specClass))) {
                 type.createDefault?.invoke()?.let { document.addModule(emitter, it) }
             }
         },

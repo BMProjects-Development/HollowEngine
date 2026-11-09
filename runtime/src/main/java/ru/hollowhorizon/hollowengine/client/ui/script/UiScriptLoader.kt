@@ -4,7 +4,6 @@ import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ReloadListener
-import ru.hollowhorizon.hollowengine.client.dialogue.DialogueScreenUi
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
 import ru.hollowhorizon.hollowengine.common.scripting.UI_SCRIPT_EXTENSION
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -23,7 +22,6 @@ object UiScriptLoader : ResourceManagerReloadListener {
 
     fun reload() {
         UiDefinitionRegistry.clear()
-        DialogueScreenUi.register(UiDefinitionRegistry::register)
         ScriptRegistry.list(".$UI_SCRIPT_EXTENSION").forEach { id ->
             ScriptLoader.execute<UiScript>(id).onFailure { error ->
                 HollowEngine.LOGGER.error("Failed to execute UI script: {}", ScriptRegistry.display(id), error)

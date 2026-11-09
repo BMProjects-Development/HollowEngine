@@ -7,8 +7,9 @@ import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderGraphNode
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderOptionKind
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderOptionSpec
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
-import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownMark
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 
 /** What the fields of a node change, and the menus they open; the editor answers them. */
 internal interface ShaderFieldActions {
@@ -28,10 +29,10 @@ internal fun OptionField(
     actions: ShaderFieldActions,
 ) {
     val current = node.options[option.name] ?: option.default
-    val id = "sg-option-${node.id}-${option.name}"
+    val id = "gn-option-${node.id}-${option.name}"
     when (option.kind) {
         ShaderOptionKind.TOGGLE -> Row(
-            tags = listOf("sg-toggle"),
+            tags = listOf("gn-toggle"),
             modifier = Modifier.size(0.px, UiLength.Auto).grow(1f).alignItems(vertical = UiAlign.CENTER)
                 .input(hoverable = true, clickable = true).onClick { event ->
                     if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) actions.setOption(
@@ -45,16 +46,16 @@ internal fun OptionField(
             Checkbox(
                 checked = current == "true",
                 id = "$id-box",
-                tags = listOf("sg-checkbox"),
+                tags = listOf("gn-checkbox"),
                 onCheckedChange = { checked -> actions.setOption(node.id, option.name, checked.toString()) },
             )
-            Text(optionTitle(option), tags = listOf("sg-pin-label"))
+            Text(optionTitle(option), tags = listOf("gn-pin-label"))
         }
 
         ShaderOptionKind.CHOICE -> {
             Text(
                 optionTitle(option),
-                tags = listOf("sg-pin-label"),
+                tags = listOf("gn-pin-label"),
                 modifier = Modifier.size(0.px, UiLength.Auto).grow(1f)
             )
             Chip(id, optionValueTitle(option, current)) { x, y ->
@@ -69,7 +70,7 @@ internal fun OptionField(
                     listOf(UiDropdownItem(graphText("no_properties"), enabled = false))
                 } else {
                     names.map { name ->
-                        UiDropdownItem(name, mark = UiDropdownMark.RADIO, checked = name == current) {
+                        UiDropdownItem(name, mark = UiMenuParts.radio(name == current)) {
                             actions.setOption(node.id, option.name, name)
                         }
                     }
@@ -81,14 +82,14 @@ internal fun OptionField(
         ShaderOptionKind.TEXT -> {
             Text(
                 optionTitle(option),
-                tags = listOf("sg-pin-label"),
+                tags = listOf("gn-pin-label"),
                 modifier = Modifier.size(0.px, UiLength.Auto).grow(1f)
             )
             TextField(
                 value = current,
                 id = id,
                 fontSize = 9f,
-                tags = listOf("sg-field"),
+                tags = listOf("gn-field"),
                 modifier = Modifier.size(FieldsWidth.px, FieldHeight.px),
                 onChange = { actions.setOption(node.id, option.name, it) },
             )
@@ -98,10 +99,12 @@ internal fun OptionField(
             value = current,
             id = id,
             fontSize = 9f,
-            syntaxHighlighter = ShaderExpressionEditing.highlighter,
-            completionContributor = ShaderExpressionEditing.completions,
-            diagnostics = ShaderExpressionEditing.diagnostics(current),
-            tags = listOf("sg-field", "sg-expression"),
+            insight = UiCodeInsight(
+                highlighter = ShaderExpressionEditing.highlighter,
+                completions = ShaderExpressionEditing.completions,
+                diagnostics = ShaderExpressionEditing.diagnostics(current),
+            ),
+            tags = listOf("gn-field", "gn-expression"),
             modifier = Modifier.size(0.px, ExpressionHeight.px).grow(1f),
             onChange = { actions.setOption(node.id, option.name, it) },
         )
@@ -114,7 +117,7 @@ private fun Chip(id: String, text: String, onOpen: (Float, Float) -> Unit) {
     Text(
         text,
         id = id,
-        tags = listOf("sg-chip"),
+        tags = listOf("gn-chip"),
         modifier = Modifier.size(FieldsWidth.px, UiLength.Auto).input(hoverable = true, clickable = true)
             .onPress { event ->
                 if (event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT) onOpen(event.x, event.y)

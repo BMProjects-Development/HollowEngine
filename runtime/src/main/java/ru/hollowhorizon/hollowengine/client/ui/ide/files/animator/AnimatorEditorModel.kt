@@ -14,8 +14,8 @@ sealed interface AnimatorSelection {
 
     data class State(val layerId: String, val stateId: String) : AnimatorSelection
 
-    /** Transitions have no id of their own, so they are addressed by position in their layer. */
-    data class Transition(val layerId: String, val index: Int) : AnimatorSelection
+    /** Transitions have no id of their own, so they are addressed by the two states they join. */
+    data class Transition(val layerId: String, val from: String, val to: String) : AnimatorSelection
 }
 
 object AnimatorColors {

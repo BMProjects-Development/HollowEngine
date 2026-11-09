@@ -20,8 +20,7 @@ This gives you three things:
 Give `npc()` an `id`, and the call becomes "get it or create it":
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val smith = npc(
         pos = pos(10, 64, 10),
         name = "Blacksmith",

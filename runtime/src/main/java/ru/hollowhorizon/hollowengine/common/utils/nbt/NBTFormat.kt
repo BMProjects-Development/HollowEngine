@@ -39,6 +39,9 @@ val NBT_TAGS = HashMap<KClass<*>, MutableList<KClass<*>>>()
 internal val TagModule
     get() = SerializersModule {
         contextual(Tag::class, PolymorphicSerializer(Tag::class))
+        contextual(CompoundTag::class, ForCompoundNBT)
+        contextual(ListTag::class, ForNbtList)
+        contextual(StringTag::class, ForStringNBT)
 
         polymorphic(Component::class) {
             ComponentDescriptorRegistry.map { it.value }.forEach {
@@ -89,6 +92,7 @@ internal val TagModule
         contextual(ForVec3)
         contextual(ForTextComponent)
         contextual(ForItemStack)
+        contextual(ForBlockState)
         contextual(ForEntity)
         contextual(ForMatrix4f)
         contextual(ForVector3d)

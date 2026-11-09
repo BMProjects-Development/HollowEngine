@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.Button
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiButtonKind
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
@@ -40,6 +41,8 @@ internal fun HollowIdeProjectDialogs(packaging: HollowIdeProjectPackaging) {
 @Composable
 private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSettingsForm) {
     ProjectDialog("project-settings", "$LANG.settings.title".lang, packaging::cancelSettings) {
+        val focus = LocalUiFocusRequester.current
+        LaunchedEffect(Unit) { focus.request("project-settings-id") }
         val viewport = LocalUiViewport.current
         Column(
             id = "project-settings-fields",
@@ -103,7 +106,7 @@ private fun EnvironmentField(form: ProjectSettingsForm) {
             expanded = expanded,
             onExpandedChange = { expanded = it },
             items = ProjectSettingsForm.environments.map { environment ->
-                UiDropdownItem(environment.label(), checked = environment == form.environment) {
+                UiDropdownItem(environment.label(), mark = UiMenuParts.radio(environment == form.environment)) {
                     form.environment = environment
                 }
             },
@@ -190,6 +193,8 @@ private fun ExportDialog(packaging: HollowIdeProjectPackaging, form: ProjectExpo
             val blocked = properties.id == DEFAULT_SANDBOX_NAMESPACE
             Paragraph("${properties.displayName} (${properties.id})")
             Field("$LANG.field.version".lang, form.version, "project-export-version") { form.version = it }
+            val focus = LocalUiFocusRequester.current
+            LaunchedEffect(Unit) { focus.request("project-export-version") }
             Row(
                 tags = listOf("project-dialog-checkbox-row"),
                 modifier = Modifier.alignItems(vertical = UiAlign.CENTER),
@@ -293,7 +298,7 @@ private fun ImportDialog(packaging: HollowIdeProjectPackaging, form: ProjectImpo
 private fun ProjectDialog(id: String, title: String, onDismiss: () -> Unit, content: HollowUiContent) {
     Popup(
         anchorBounds = LocalUiViewport.current,
-        alignment = CenteredOnViewport,
+        alignment = UiPopupAlignment.Centered,
         id = "$id-popup",
         tags = listOf("dropdown-popup", "project-dialog"),
         layer = 100,

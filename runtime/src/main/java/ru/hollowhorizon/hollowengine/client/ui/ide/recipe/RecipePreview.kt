@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.PublishInspector
 import ru.hollowhorizon.hollowengine.client.ui.scroll.UiScrollHandle
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdown
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import kotlin.time.Duration.Companion.seconds
 
@@ -98,7 +99,7 @@ private fun TypeSwitch(recipe: RecipeEditing, session: RecipeEditorSession, curr
         items = RecipeEditors.point.extensions.map { editor ->
             UiDropdownItem(
                 label = editor.title?.lang ?: editor.type.toString(),
-                checked = editor === current,
+                mark = UiMenuParts.radio(editor === current),
                 onClick = { if (editor !== current) session.pendingType = editor },
             )
         },

@@ -12,7 +12,9 @@ data class UiTextLayout(
     val width: Float,
     val height: Float,
     val maxNaturalLineWidth: Float = lines.maxOfOrNull { it.naturalWidth } ?: width,
-)
+) {
+    fun hasInlineImages(): Boolean = lines.any { line -> line.fragments.any { it is UiInlineImageRun } }
+}
 
 data class UiTextLine(
     val text: String,

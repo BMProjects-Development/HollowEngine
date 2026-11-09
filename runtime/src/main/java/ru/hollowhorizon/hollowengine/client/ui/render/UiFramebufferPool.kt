@@ -10,6 +10,10 @@ import kotlin.math.min
 private const val BackdropWorkspaceGrowthLimit = 256
 private const val BackdropWorkspaceAlignment = 64
 private const val BackdropWorkspaceShrinkFrames = 300
+private const val AtlasGrowthStep = 128
+private const val AtlasShrinkFrames = 300
+private const val AtlasShrinkRatio = 4L
+private const val AtlasKeptArea = 1L shl 20
 
 internal fun alignFramebufferAxis(required: Int, maxTextureSize: Int): Int {
     require(required > 0 && maxTextureSize > 0)
@@ -31,41 +35,94 @@ internal fun growFramebufferAxis(required: Int, current: Int, maxTextureSize: In
     return alignFramebufferAxis(grown, maxTextureSize)
 }
 
+/** The size to give an atlas for [layerRequests]: at least [current], with little more room than they take. */
+internal fun atlasSizeFor(layerRequests: List<UiLayerRequest>, current: UiAtlasSize?, maxTextureSize: Int): UiAtlasSize {
+    var requiredWidth = current?.width ?: 1
+    var requiredHeight = current?.height ?: 1
+    layerRequests.forEach {
+        requiredWidth = max(requiredWidth, it.width + UiAtlasGuardPixels * 2)
+        requiredHeight = max(requiredHeight, it.height + UiAtlasGuardPixels * 2)
+    }
+    var width = growFramebufferAxis(requiredWidth.coerceAtMost(maxTextureSize), current?.width ?: 0, maxTextureSize)
+    var height = growFramebufferAxis(requiredHeight.coerceAtMost(maxTextureSize), current?.height ?: 0, maxTextureSize)
+    while (!layersFit(layerRequests, width, height)) {
+        val canGrowWidth = width < maxTextureSize
+        val canGrowHeight = height < maxTextureSize
+        if (!canGrowWidth && !canGrowHeight) break
+        if (width <= height && canGrowWidth || !canGrowHeight) {
+            width = min(width + AtlasGrowthStep, maxTextureSize)
+        } else {
+            height = min(height + AtlasGrowthStep, maxTextureSize)
+        }
+    }
+    return UiAtlasSize(width, height)
+}
+
+/** Whether an atlas of [width]x[height] holds several times more than [layerRequests] need. */
+internal fun isAtlasOversized(layerRequests: List<UiLayerRequest>, width: Int, height: Int): Boolean {
+    val area = width.toLong() * height
+    val used = layerRequests.sumOf {
+        (it.width + UiAtlasGuardPixels * 2L) * (it.height + UiAtlasGuardPixels * 2L)
+    }
+    return area > AtlasKeptArea && used * AtlasShrinkRatio < area
+}
+
+private fun layersFit(layerRequests: List<UiLayerRequest>, width: Int, height: Int): Boolean {
+    val testAllocator = UiAtlasAllocator(width, height)
+    return layerRequests.all {
+        testAllocator.allocate(
+            it.width + UiAtlasGuardPixels * 2,
+            it.height + UiAtlasGuardPixels * 2,
+        ) != null
+    }
+}
+
 internal class UiFramebufferPool {
     private val scratchFramebuffers = mutableListOf<UiFramebuffer>()
     private val retiredAtlases = mutableListOf<RetiredUiFramebuffer>()
     private var atlas: UiFramebuffer? = null
     private var allocator = UiAtlasAllocator(1, 1)
-    private var atlasBaseWidth = 0
-    private var atlasBaseHeight = 0
+    private var atlasOversizedFrames = 0
     private var backdropWorkspace: UiBackdropBlurWorkspace? = null
     private var backdropRequestedWidth = 0
     private var backdropRequestedHeight = 0
     private var backdropUnderusedFrames = 0
 
-    fun beginFrame(layerRequests: List<UiLayerRequest>, minimumWidth: Int, minimumHeight: Int) {
+    fun beginFrame(layerRequests: List<UiLayerRequest>) {
         retireOldAtlases()
         maintainBackdropWorkspace()
+        val shrink = shouldShrinkAtlas(layerRequests)
         if (layerRequests.isEmpty()) {
             allocator = UiAtlasAllocator(1, 1)
+            if (shrink) replaceAtlas(null)
             return
         }
-        val width = minimumWidth.coerceAtLeast(1)
-        val height = minimumHeight.coerceAtLeast(1)
         val current = atlas
-        val windowChanged = width != atlasBaseWidth || height != atlasBaseHeight
-        val size = if (current != null && !windowChanged && fits(layerRequests, current.width, current.height)) {
+        val size = if (current != null && !shrink && layersFit(layerRequests, current.width, current.height)) {
             UiAtlasSize(current.width, current.height)
         } else {
-            atlasSizeFor(layerRequests, width, height, if (windowChanged) null else current)
+            val kept = current?.takeUnless { shrink }?.let { UiAtlasSize(it.width, it.height) }
+            atlasSizeFor(layerRequests, kept, GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE).coerceAtLeast(1))
         }
         if (current == null || current.width != size.width || current.height != size.height) {
-            current?.let { retiredAtlases += RetiredUiFramebuffer(it) }
-            atlas = UiFramebuffer(size.width, size.height)
+            replaceAtlas(UiFramebuffer(size.width, size.height))
         }
-        atlasBaseWidth = width
-        atlasBaseHeight = height
         allocator = UiAtlasAllocator(size.width, size.height)
+    }
+
+    /** True once the atlas has stayed oversized for a while, so that one big layer does not hold it for good. */
+    private fun shouldShrinkAtlas(layerRequests: List<UiLayerRequest>): Boolean {
+        val current = atlas
+        val oversized = current != null && isAtlasOversized(layerRequests, current.width, current.height)
+        atlasOversizedFrames = if (oversized) atlasOversizedFrames + 1 else 0
+        if (atlasOversizedFrames < AtlasShrinkFrames) return false
+        atlasOversizedFrames = 0
+        return true
+    }
+
+    private fun replaceAtlas(next: UiFramebuffer?) {
+        atlas?.let { retiredAtlases += RetiredUiFramebuffer(it) }
+        atlas = next
     }
 
     fun acquireLayer(width: Int, height: Int): UiLayerFramebuffer {
@@ -128,8 +185,7 @@ internal class UiFramebufferPool {
     fun close() {
         atlas?.close()
         atlas = null
-        atlasBaseWidth = 0
-        atlasBaseHeight = 0
+        atlasOversizedFrames = 0
         backdropWorkspace?.close()
         backdropWorkspace = null
         backdropRequestedWidth = 0
@@ -189,44 +245,6 @@ internal class UiFramebufferPool {
         ).also { backdropWorkspace = it }
     }
 
-    private fun atlasSizeFor(
-        layerRequests: List<UiLayerRequest>,
-        minimumWidth: Int,
-        minimumHeight: Int,
-        current: UiFramebuffer?,
-    ): UiAtlasSize {
-        val maxTextureSize = GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE).coerceAtLeast(1)
-        var width = max(minimumWidth, current?.width ?: 0).coerceAtMost(maxTextureSize)
-        var height = max(minimumHeight, current?.height ?: 0).coerceAtMost(maxTextureSize)
-
-        layerRequests.forEach {
-            width = max(width, it.width + UiAtlasGuardPixels * 2).coerceAtMost(maxTextureSize)
-            height = max(height, it.height + UiAtlasGuardPixels * 2).coerceAtMost(maxTextureSize)
-        }
-
-        while (!fits(layerRequests, width, height)) {
-            val canGrowWidth = width < maxTextureSize
-            val canGrowHeight = height < maxTextureSize
-            if (!canGrowWidth && !canGrowHeight) break
-            if (width <= height && canGrowWidth || !canGrowHeight) {
-                width = min(width * 2, maxTextureSize)
-            } else {
-                height = min(height * 2, maxTextureSize)
-            }
-        }
-
-        return UiAtlasSize(reserveAtlasAxis(width, maxTextureSize), reserveAtlasAxis(height, maxTextureSize))
-    }
-
-    private fun fits(layerRequests: List<UiLayerRequest>, width: Int, height: Int): Boolean {
-        val testAllocator = UiAtlasAllocator(width, height)
-        return layerRequests.all {
-            testAllocator.allocate(
-                it.width + UiAtlasGuardPixels * 2,
-                it.height + UiAtlasGuardPixels * 2,
-            ) != null
-        }
-    }
 }
 
 private class RetiredUiFramebuffer(
@@ -425,15 +443,10 @@ private data class UiPackedRect(
                 other.y + other.height <= y + height
 }
 
-private data class UiAtlasSize(
+internal data class UiAtlasSize(
     val width: Int,
     val height: Int,
 )
 
-private fun reserveAtlasAxis(value: Int, maxTextureSize: Int): Int =
-    min(max(value * UiAtlasGrowthMultiplier, value + UiAtlasGrowthReservePixels), maxTextureSize)
-
 private const val UiAtlasGuardPixels = 2
-private const val UiAtlasGrowthMultiplier = 2
-private const val UiAtlasGrowthReservePixels = 512
 private const val RetiredAtlasFrames = 3

@@ -7,9 +7,11 @@ order: 1
 
 Create characters for your map: NPCs can talk, walk to a destination, use items, and take part in story scenes.
 
-Start with a `.node.kts` file under `hollowengine/scripts`. It already provides `npc()`, `pos()`, `move()`, and other NPC helpers. You can also call `MinecraftServer` methods directly from the script.
+Start with a `.node.kts` file under `hollowengine/scripts`. It already provides `npc()`, `pos()`, and other engine helpers. You can also call `MinecraftServer` methods directly from the script.
 
 An NPC is a regular Minecraft entity of type `NpcEntity`, so you can work with it through HollowEngine helpers (`npc()`, `move`, `lookAt`, `say`) and through the standard `Entity` / `LivingEntity` / `PathfinderMob` API.
+
+The scripted movement, look, and interaction helpers used here come from [Narrative](/docs/hollowengine/addons/narrative). Add `hollowengine-narrative` to your project's dependencies before using them.
 
 ## Sections
 
@@ -30,17 +32,16 @@ An NPC is a regular Minecraft entity of type `NpcEntity`, so you can work with i
 ## Quick example
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val guide = npc(
         pos = pos(0, 64, 0),
         name = "Guide",
         model = "hollowengine:models/entity/player_model.gltf",
     )
 
-    val player = playerList.players.firstOrNull() ?: return
+    val player = playerList.players.firstOrNull() ?: return@onStart
 
-    guide.lookAt(player)
+    guide.lookAt(target = player)
     guide.say("Welcome!")
     guide.move(player, dist = 2.0, speed = 1.0)
 }
@@ -49,26 +50,25 @@ suspend fun main() {
 This example does one thing at a time, which is perfectly fine for simple scenes. An NPC can also walk, look around, and use its hands **at the same time**, gather items on its own, carry an inventory, and remember its own data, see [Actions and Concurrency](/docs/hollowengine/scripting/npc/actions) for the mental model behind that.
 
 :::advice
-`move(...)`, `lookAt(...)`, `useBlock(...)`, and `destroyBlock(...)` are `suspend` functions. Call them from `@State suspend fun`, `async { ... }`, or another coroutine.
+`move(...)`, `lookAt(...)`, `useBlock(...)`, and `destroyBlock(...)` are `suspend` functions. Call them from a suspend handler such as `onInteract` or `onStart`.
 :::
 
 ## Lifecycle
 
-NPCs are usually created inside a node state:
+NPCs are usually created inside a node's `onStart` handler:
 
 ```kotlin
-@State
-suspend fun main() {
+onStart {
     val npc = npc(pos(10, 64, 10), name = "Guard")
     npc.say("Stay close.")
 }
 ```
 
-An NPC outlives the chunk it stands in: it stays in the [NPC registry](/docs/hollowengine/scripting/npc/registry) until it dies or is despawned. To find it again after a world or script reload, give it an `id` in `npc(...)`, or store its UUID through `stateTag()` and look it up with `npcs[uuid]`.
+An NPC outlives the chunk it stands in: it stays in the [NPC registry](/docs/hollowengine/scripting/npc/registry) until it dies or is despawned. To find it again after a world or script reload, give it an `id` in `npc(...)`, or store its UUID in the node's saved data and look it up with `npcs[uuid]`.
 
 ## Attaching persistent behavior
 
-For behavior that should live with the NPC itself instead of a story state, attach a [node script](/docs/hollowengine/scripting/node) directly to the entity with `@file:Attach`:
+For behavior that should live with the NPC itself, attach a [node script](/docs/hollowengine/scripting/node) directly to the entity with `@file:Attach`:
 
 ```kotlin
 @file:Attach(NpcEntity::class)

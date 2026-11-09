@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files
 
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
-import ru.hollowhorizon.hollowengine.common.scripting.ide.story.StoryScriptingAnalyzer
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.HssScriptingAnalyzer
 
 interface EditorLanguageService {
@@ -15,7 +14,6 @@ fun EditorLanguageService(extension: String): EditorLanguageService {
         "java" -> JavaEditorLanguageService
         "json" -> JsonEditorLanguageService
         "hss" -> HssEditorLanguageService
-        "story" -> StoryEditorLanguageService
         else -> error("Unsupported language: $extension")
     }
 }
@@ -43,11 +41,6 @@ object JsonEditorLanguageService : EditorLanguageService {
 object HssEditorLanguageService : EditorLanguageService {
     override val analyzer: ScriptingAnalyzer
         get() = HssScriptingAnalyzer
-}
-
-object StoryEditorLanguageService : EditorLanguageService {
-    override val analyzer: ScriptingAnalyzer
-        get() = StoryScriptingAnalyzer
 }
 
 /**

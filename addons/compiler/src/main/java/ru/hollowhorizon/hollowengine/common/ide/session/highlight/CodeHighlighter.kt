@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import ru.hollowhorizon.hollowengine.client.HighlightTheme
+import ru.hollowhorizon.hollowengine.common.ide.session.TEMPLATE_BRACES
 import ru.hollowhorizon.hollowengine.common.ide.session.inlays.provideHints
 import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
 import ru.hollowhorizon.hollowengine.common.scripting.ide.OccurrenceRange
@@ -204,6 +205,7 @@ private fun LineBuilder.SpanBuilder.renderPsiElement(
         when {
             psi is KtAnnotationEntry || parent is KtAnnotationEntry -> tokenType = TokenType.ANNOTATION
             elementType in KtTokens.KEYWORDS || elementType in KtTokens.SOFT_KEYWORDS -> tokenType = TokenType.KEYWORD
+            elementType in TEMPLATE_BRACES -> tokenType = TokenType.KEYWORD
             elementType in KtTokens.STRINGS || elementType == KtTokens.OPEN_QUOTE || elementType == KtTokens.CLOSING_QUOTE -> tokenType = TokenType.STRING
             parent is KtConstantExpression && !isEnumConstant(parent) -> tokenType = TokenType.NUMERIC_LITERAL
             elementType == KtTokens.MINUS && psi.isUnaryNumericMinus() -> tokenType = TokenType.NUMERIC_LITERAL

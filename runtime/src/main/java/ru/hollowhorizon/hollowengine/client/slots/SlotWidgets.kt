@@ -74,11 +74,27 @@ fun UiScope.Slots(
     }
 }
 
+/** The outlines vanilla draws in an empty slot that holds one kind of thing, such as a helmet or a shield. */
+object SlotIcons {
+    const val HEAD = "minecraft:textures/item/empty_armor_slot_helmet.png"
+    const val CHEST = "minecraft:textures/item/empty_armor_slot_chestplate.png"
+    const val LEGS = "minecraft:textures/item/empty_armor_slot_leggings.png"
+    const val FEET = "minecraft:textures/item/empty_armor_slot_boots.png"
+    const val SHIELD = "minecraft:textures/item/empty_armor_slot_shield.png"
+
+    /** Armor from the head down, as an armor zone lays it out. */
+    val Armor = listOf(HEAD, CHEST, LEGS, FEET)
+
+    /** Armor, then the main hand and the off hand, as the equipment of an entity lays it out. */
+    val Equipment = Armor + listOf(null, SHIELD)
+}
+
 /**
  * One slot of [zone].
  *
  * An ordinary `Box` holding an [Item], so padding, size and hover effects are all reachable through HSS on
- * the `slot` and `slot-item` tags. [content] replaces the look while keeping the behavior.
+ * the `slot` and `slot-item` tags. [content] replaces the look while keeping the behavior; [placeholder] is the
+ * texture shown while the slot is empty, one of [SlotIcons] for a slot of armor.
  */
 @Composable
 fun Slot(
@@ -88,6 +104,7 @@ fun Slot(
     tags: Iterable<String> = emptyList(),
     modifier: Modifier? = null,
     size: UiLength = DefaultSlotSize,
+    placeholder: String? = null,
     content: (@Composable (ItemStack) -> Unit)? = null,
 ) {
     val context = LocalSlots.current ?: return
@@ -115,7 +132,7 @@ fun Slot(
             .onRelease { interaction.release() }
             .then(modifier ?: Modifier),
     ) {
-        if (content != null) content(stack) else SlotContents(stack)
+        if (content != null) content(stack) else SlotContents(stack, placeholder)
     }
 }
 
@@ -123,7 +140,7 @@ fun Slot(
  * Every slot of [zone] laid out in rows of [columns].
  *
  * A thin wrapper over [Slot]: the zone's size comes from the layout the server sent, so a screen never
- * restates how many slots an inventory has.
+ * restates how many slots an inventory has. [placeholders] are those of the slots by index.
  */
 @Composable
 fun SlotGrid(
@@ -135,6 +152,7 @@ fun SlotGrid(
     gap: UiLength = DefaultSlotGap,
     slotSize: UiLength = DefaultSlotSize,
     range: IntRange? = null,
+    placeholders: List<String?> = emptyList(),
 ) {
     require(columns > 0) { "A slot grid needs at least one column" }
     val context = LocalSlots.current ?: return
@@ -149,7 +167,7 @@ fun SlotGrid(
     ) {
         indices.chunked(columns).forEach { row ->
             Row(modifier = Modifier.gap(gap)) {
-                row.forEach { index -> Slot(zone, index, size = slotSize) }
+                row.forEach { index -> Slot(zone, index, size = slotSize, placeholder = placeholders.getOrNull(index)) }
             }
         }
     }
@@ -183,7 +201,7 @@ fun PlayerInventory(
         modifier = Modifier.gap(gap).alignItems(UiAlign.START, UiAlign.START).then(modifier ?: Modifier),
     ) {
         if (layout.zone(PlayerSlotZones.ARMOR) != null) {
-            SlotGrid(PlayerSlotZones.ARMOR, columns = 1, gap = gap, slotSize = slotSize)
+            SlotGrid(PlayerSlotZones.ARMOR, columns = 1, gap = gap, slotSize = slotSize, placeholders = SlotIcons.Armor)
         }
         if (storage != null) {
             Column(modifier = Modifier.gap(rowGap)) {
@@ -198,7 +216,9 @@ fun PlayerInventory(
             }
         }
         if (layout.zone(PlayerSlotZones.OFFHAND) != null) {
-            SlotGrid(PlayerSlotZones.OFFHAND, columns = 1, gap = gap, slotSize = slotSize)
+            SlotGrid(
+                PlayerSlotZones.OFFHAND, columns = 1, gap = gap, slotSize = slotSize, placeholders = listOf(SlotIcons.SHIELD),
+            )
         }
     }
 }
@@ -208,19 +228,22 @@ fun PlayerInventory(
  * decorations, so an item here carries the same badges it does in a vanilla slot.
  */
 @Composable
-private fun SlotContents(stack: ItemStack) {
-    if (stack.isEmpty) return
+private fun SlotContents(stack: ItemStack, placeholder: String?) {
+    if (stack.isEmpty) {
+        if (placeholder != null) {
+            Image(placeholder, tags = listOf("slot-placeholder"), modifier = Modifier.size(ItemSize, ItemSize).inputTransparent())
+        }
+        return
+    }
     Item(stack, tags = listOf("slot-item"), modifier = Modifier.size(ItemSize, ItemSize).inputTransparent())
 }
 
 /**
  * The stack on the cursor, following the pointer above everything else.
  *
- * `Modifier.position` offsets a node from where layout put it, not from the surface origin, so the layer
- * reports its own laid-out rect and the offset is taken relative to that. Without the correction the stack
- * lands wherever the host's alignment happened to place it, far from the cursor.
- *
- * Input-transparent throughout, or it would shadow the slot under the pointer and make every click miss.
+ * An overlay rather than a child of the window: a positioned child still counts toward the size of a parent that
+ * fits its content, so a stack dragged past the edge of the slots would stretch them. Input-transparent, or it
+ * would shadow the slot under the pointer and make every click miss.
  */
 @Composable
 private fun CarriedStack() {
@@ -230,37 +253,28 @@ private fun CarriedStack() {
     val pointer = LocalPointer.current
     if (!pointer.isKnown) return
 
-    var origin by remember { mutableStateOf(UiRect.Zero) }
-    Box(
+    Popup(
+        anchorBounds = UiRect(pointer.x, pointer.y, 0f, 0f),
+        alignment = CarriedAlignment,
+        layer = OverlayLayer,
+        tags = listOf("slot-carried"),
         modifier = Modifier
-            .position(0.px, 0.px)
-            .size(UiLength.Fill, UiLength.Fill)
-            .alignItems(UiAlign.START, UiAlign.START)
-            .layer(OverlayLayer)
-            .inputTransparent()
-            .onPlaced { origin = it },
+            .size(DefaultSlotSize, DefaultSlotSize)
+            .alignItems(UiAlign.CENTER, UiAlign.CENTER)
+            .inputTransparent(),
+        dismissOnOutside = false,
+        animated = false,
     ) {
-        Box(
-            tags = listOf("slot-carried"),
-            modifier = Modifier
-                .position(
-                    (pointer.x - origin.x - CarriedHalfSize).px,
-                    (pointer.y - origin.y - CarriedHalfSize).px,
-                )
-                .size(DefaultSlotSize, DefaultSlotSize)
-                .alignItems(UiAlign.CENTER, UiAlign.CENTER)
-                .inputTransparent(),
-        ) {
-            Item(
-                carried,
-                tags = listOf("slot-item"),
-                modifier = Modifier.size(ItemSize, ItemSize).inputTransparent(),
-            )
-        }
+        Item(carried, tags = listOf("slot-item"), modifier = Modifier.size(ItemSize, ItemSize).inputTransparent())
     }
 }
 
 private const val CarriedHalfSize = 9f
+private val CarriedAlignment = UiPopupAlignment(
+    anchorVertical = UiAlign.START,
+    offsetX = -CarriedHalfSize,
+    offsetY = -CarriedHalfSize,
+)
 private val DefaultSlotSize: UiLength = 18.px
 private val DefaultSlotGap: UiLength = 2.px
 private val DefaultHotbarGap: UiLength = 6.px

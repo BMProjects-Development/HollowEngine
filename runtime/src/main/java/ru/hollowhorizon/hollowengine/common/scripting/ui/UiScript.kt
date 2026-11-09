@@ -166,20 +166,75 @@ class UiScreenBuilder internal constructor(id: ResourceLocation) : UiHostBuilder
 }
 
 /**
+ * What every host that can be an overlay has: where it draws and whether it takes input.
+ */
+sealed class UiOverlayHostBuilder(id: ResourceLocation) : UiHostBuilder(id) {
+    private var anchors: List<OverlayAnchor> = listOf(after(VanillaHudLayers.HOTBAR.toString()))
+
+    /**
+     * Whether this overlay takes pointer/keyboard input. Draw-only ([OverlayInput.NONE]) is the
+     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks.
+     */
+    var input: OverlayInput = OverlayInput.NONE
+
+    /** Shorthand for `input = OverlayInput.INTERACTIVE`. */
+    fun interactive() {
+        input = OverlayInput.INTERACTIVE
+    }
+
+    /**
+     * Where the overlay draws, in priority; after the hotbar by default:
+     *
+     * ```kotlin
+     * anchor(after("chat"), over(ChatScreen::class))
+     * ```
+     *
+     * While a screen is open the first [over] that accepts it wins; otherwise the overlay stays in the HUD at its
+     * [after] or [before], under the screen. At most one HUD anchor is allowed.
+     */
+    fun anchor(vararg anchors: OverlayAnchor) {
+        require(anchors.isNotEmpty()) { "UI overlay '$id' needs an anchor" }
+        this.anchors = anchors.toList()
+    }
+
+    /** In the HUD after the vanilla [layer]; see [VanillaHudLayers]. Bare names such as `"crosshair"` are accepted. */
+    fun after(layer: String) = OverlayAnchor.HudLayer(VanillaHudLayers.parse(layer), HudPlacement.AFTER)
+
+    /** In the HUD before the vanilla [layer]; see [after]. */
+    fun before(layer: String) = OverlayAnchor.HudLayer(VanillaHudLayers.parse(layer), HudPlacement.BEFORE)
+
+    /** On top of any open screen. */
+    fun over(level: ScreenLevel = ScreenLevel.CONTENT) = OverlayAnchor.OnScreen(ScreenMatch.AnyScreen, level)
+
+    /** On top of an open [screen], or of one of its subclasses unless [subclasses] is off. */
+    fun over(screen: KClass<out Screen>, level: ScreenLevel = ScreenLevel.CONTENT, subclasses: Boolean = true) =
+        over(screen.java.name, level, subclasses)
+
+    /** On top of a screen named by its binary class name, for a class this script cannot import. */
+    fun over(screen: String, level: ScreenLevel = ScreenLevel.CONTENT, subclasses: Boolean = true) =
+        OverlayAnchor.OnScreen(ScreenMatch.OfType(screen, subclasses), level)
+
+    protected fun overlayDefinition(content: UiContent, autoShow: Boolean) = UiOverlayDefinition(
+        id = id,
+        anchors = anchors,
+        autoShow = autoShow,
+        input = input,
+        rebuildEveryFrame = rebuildEveryFrame,
+        exitDuration = exitDuration,
+        content = content,
+    )
+}
+
+/**
  * Declares a surface that switches between an overlay and a screen. It carries both option sets,
  * the overlay's anchor and the screen's title, escape handling and scale, because the same surface
  * really is both at different moments.
  */
-class UiSurfaceBuilder internal constructor(id: ResourceLocation) : UiHostBuilder(id) {
+class UiSurfaceBuilder internal constructor(id: ResourceLocation) : UiOverlayHostBuilder(id) {
     var title: String = id.path
     var closeOnEscape: Boolean = true
     var pausesGame: Boolean = false
     var guiScale: UiGuiScale = UiGuiScale.Inherit
-
-    var anchor: String = VanillaHudLayers.HOTBAR.toString()
-    var placement: HudPlacement = HudPlacement.AFTER
-    var aboveScreens: Boolean = false
-    var input: OverlayInput = OverlayInput.NONE
 
     private var mode: ((UiData) -> UiSurfaceKind)? = null
 
@@ -189,11 +244,6 @@ class UiSurfaceBuilder internal constructor(id: ResourceLocation) : UiHostBuilde
      */
     fun mode(selector: (UiData) -> UiSurfaceKind) {
         mode = selector
-    }
-
-    /** Shorthand for `input = OverlayInput.INTERACTIVE`; only matters while it is an overlay. */
-    fun interactive() {
-        input = OverlayInput.INTERACTIVE
     }
 
     internal fun build(): UiSurfaceDefinition {
@@ -210,32 +260,13 @@ class UiSurfaceBuilder internal constructor(id: ResourceLocation) : UiHostBuilde
                 exitDuration = exitDuration,
                 content = body,
             ),
-            overlay = UiOverlayDefinition(
-                id = id,
-                anchor = VanillaHudLayers.parse(anchor),
-                placement = placement,
-                autoShow = false,
-                input = input,
-                aboveScreens = aboveScreens,
-                rebuildEveryFrame = rebuildEveryFrame,
-                exitDuration = exitDuration,
-                content = body,
-            ),
+            overlay = overlayDefinition(body, autoShow = false),
             mode = mode ?: error("UI surface '$id' declares no mode { } block"),
         )
     }
 }
 
-class UiOverlayBuilder internal constructor(id: ResourceLocation) : UiHostBuilder(id) {
-    /**
-     * The HUD layer this overlay draws next to; see [VanillaHudLayers]. Accepts bare vanilla names
-     * (`"crosshair"`) as well as fully qualified ids.
-     */
-    var anchor: String = VanillaHudLayers.HOTBAR.toString()
-
-    /** Whether this overlay draws before or after its [anchor]. */
-    var placement: HudPlacement = HudPlacement.AFTER
-
+class UiOverlayBuilder internal constructor(id: ResourceLocation) : UiOverlayHostBuilder(id) {
     /**
      * Shows the overlay as soon as the script loads, without waiting for the server. This is the
      * mode for client-owned HUD, a hint about the block under the crosshair has no business
@@ -243,32 +274,5 @@ class UiOverlayBuilder internal constructor(id: ResourceLocation) : UiHostBuilde
      */
     var autoShow: Boolean = false
 
-    /**
-     * Whether this overlay takes pointer/keyboard input. Draw-only ([OverlayInput.NONE]) is the
-     * default; set [OverlayInput.INTERACTIVE] for an overlay the player clicks.
-     */
-    var input: OverlayInput = OverlayInput.NONE
-
-    /**
-     * Whether the overlay also draws (and takes input, if interactive) on top of an open screen,
-     * rather than only over the in-game HUD. Use it for things that must stay visible above a menu.
-     */
-    var aboveScreens: Boolean = false
-
-    /** Shorthand for `input = OverlayInput.INTERACTIVE`. */
-    fun interactive() {
-        input = OverlayInput.INTERACTIVE
-    }
-
-    internal fun build(): UiOverlayDefinition = UiOverlayDefinition(
-        id = id,
-        anchor = VanillaHudLayers.parse(anchor),
-        placement = placement,
-        autoShow = autoShow,
-        input = input,
-        aboveScreens = aboveScreens,
-        rebuildEveryFrame = rebuildEveryFrame,
-        exitDuration = exitDuration,
-        content = requireContent("overlay"),
-    )
+    internal fun build(): UiOverlayDefinition = overlayDefinition(requireContent("overlay"), autoShow)
 }

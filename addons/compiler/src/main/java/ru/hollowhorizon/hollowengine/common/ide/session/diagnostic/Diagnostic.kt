@@ -9,33 +9,35 @@ import org.jetbrains.kotlin.analysis.api.components.KaDiagnosticCheckerFilter
 import org.jetbrains.kotlin.analysis.api.diagnostics.KaSeverity
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Position
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Range
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
 fun diagnosticCode(file: KtFile): List<Diagnostic> {
     val document = file.fileDocument
     val analysisDiagnostics = analyze(file) {
         file.collectDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS).map { diagnostic ->
-                val severity = when (diagnostic.severity) {
-                    KaSeverity.INFO -> Severity.INFO
-                    KaSeverity.ERROR -> Severity.ERROR
-                    KaSeverity.WARNING -> Severity.WARNING
-                }
-                val range = diagnostic.textRanges.firstOrNull() ?: diagnostic.psi.textRange
-                val property = diagnostic.psi as? KtProperty
-                val fixes = if (diagnostic.factoryName == "UNUSED_VARIABLE" && property != null) {
-                    listOfNotNull(unusedVariableFix(property))
-                } else emptyList()
-                Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
+            val severity = when (diagnostic.severity) {
+                KaSeverity.INFO -> Severity.INFO
+                KaSeverity.ERROR -> Severity.ERROR
+                KaSeverity.WARNING -> Severity.WARNING
             }
-    }
-    val inspections = listOf(::unusedImportDiagnostics, ::subscribeEventDiagnostics).flatMap { inspection ->
-            runCatching {
-                inspection(file)
-            }.getOrDefault(emptyList())
+            val range = diagnostic.textRanges.firstOrNull() ?: diagnostic.psi.textRange
+            val property = diagnostic.psi as? KtProperty
+            val fixes = if (diagnostic.factoryName == "UNUSED_VARIABLE" && property != null) {
+                listOfNotNull(unusedVariableFix(property))
+            } else emptyList()
+            Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
         }
+    }
+    val clips = editorClips
+    val inspections = listOf(
+        ::unusedImportDiagnostics,
+        ::subscribeEventDiagnostics,
+        { it: KtFile -> animationNameDiagnostics(it, clips) },
+    ).flatMap { inspection ->
+        runCatching {
+            inspection(file)
+        }.getOrDefault(emptyList())
+    }
     return (analysisDiagnostics + syntaxDiagnostics(file) + inspections).distinctBy { diagnostic ->
         Triple(diagnostic.range, diagnostic.severity, diagnostic.message)
     }

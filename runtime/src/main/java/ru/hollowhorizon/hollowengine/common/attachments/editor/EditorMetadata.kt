@@ -9,27 +9,31 @@ import kotlinx.serialization.SerialInfo
  * What the component editor knows about a component beyond its serial form.
  */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION)
 annotation class EditorName(val name: String)
 
 /** The line under a field, or under a component's header. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorDescription(val description: String)
 
-/** A `namespace:textures/...` icon shown beside the component or field. */
+/** A `namespace:textures/...` icon shown beside the component, field or story action. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorIcon(val icon: String)
 
-/** Groups a component under a heading in the "add component" list. */
+/**
+ * Groups a component under a heading in the "add component" list, or a story action in the "add command" one.
+ *
+ * @param color the `#RRGGBB` the things of the category are told apart by; left empty, the category is given one.
+ */
 @SerialInfo
-@Target(AnnotationTarget.CLASS)
-annotation class EditorCategory(val category: String)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+annotation class EditorCategory(val category: String, val color: String = "")
 
-/** Kept in the data, never shown. For fields gameplay owns and a human should not type into. */
+/** Kept in the data, never shown. For fields gameplay owns and a human should not type into, or actions nothing offers. */
 @SerialInfo
-@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION)
 annotation class EditorHidden
 
 /**
@@ -60,9 +64,12 @@ annotation class EditorDefault(val json: String)
 @Target(AnnotationTarget.PROPERTY)
 annotation class EditorBone
 
-/** Edits the field with the editor registered under [id] instead of the one its type would get. */
+/**
+ * Edits the field with the editor registered under [id] instead of the one its type would get; on a story action,
+ * draws its rows with the widget registered under [id].
+ */
 @SerialInfo
-@Target(AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.FUNCTION, AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorWidget(val id: String)
 
 /** The field editors the engine registers, by the id [EditorWidget] names them with. */
@@ -86,9 +93,37 @@ object EditorWidgets {
 annotation class EditorMultiline
 
 /**
- * A string field holding a path to an asset, so the editor can offer what exists instead of asking the
- * user to remember it. [extensions] is matched against the end of the path (`gltf`, `node.kts`, `png`).
+ * A string field, or parameter of a story action, holding a path to an asset, so the editor can offer what exists instead
+ * of asking the user to remember it. [extensions] is matched against the end of the path (`gltf`, `node.kts`, `png`).
  */
 @SerialInfo
-@Target(AnnotationTarget.PROPERTY)
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.VALUE_PARAMETER)
 annotation class EditorAsset(vararg val extensions: String)
+
+/**
+ * A parameter of a story action naming a clip of the model of the entity the action is called on, so the editor offers
+ * the clips of that model and warns about one it lacks, when it can tell which model that is.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorAnimation
+
+/**
+ * A parameter of a story action naming the model of the entity the action gives back. On a builder of the entity it is
+ * the model a call inside the builder names through such a parameter of its own, such as `set(Model("..."))`.
+ *
+ * @param default the model the entity shows when the parameter is left out or blank, or the builder names none.
+ */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorModel(val default: String = "")
+
+/** A parameter of a story action naming, by the author's id, the NPC the action gives back. */
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorNpcId
+
+/**
+ * A field, or parameter of a story action, holding the id of an entry of [registry], such as `minecraft:mob_effect`,
+ * so the editor completes the ids it has; with [tags] it takes `#tag` too.
+ */
+@SerialInfo
+@Target(AnnotationTarget.PROPERTY, AnnotationTarget.VALUE_PARAMETER)
+annotation class EditorRegistry(val registry: String, val tags: Boolean = false)

@@ -9,8 +9,23 @@ import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 class MontageRigEditingTest {
+    @Test
+    fun `picking a bone updates track highlights without filtering the track list`() {
+        val (_, session) = session(recording = false)
+        session.select("Body", emptyList())
+        val body = session.timeline.groups.single { it.isSelected }
+        session.select("Arm", emptyList())
+        val arm = session.timeline.groups.single { it.isSelected }
+        assertTrue(body !== arm)
+        assertTrue(body.isListed)
+        assertTrue(!body.isSelected)
+        session.select(null, emptyList())
+        assertEquals(0, session.timeline.groups.count { it.isSelected })
+    }
+
     private fun session(recording: Boolean): Pair<MontageRigEditing, MontageTimelineSession> {
         val document = HollowIdeMontageDocument("{\"duration\": 2.0}".toByteArray())
         val rigs = MontageRigEditing(document) { ModelRig() }

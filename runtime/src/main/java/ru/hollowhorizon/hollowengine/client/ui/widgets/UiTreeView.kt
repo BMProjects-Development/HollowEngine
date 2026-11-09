@@ -44,12 +44,12 @@ data class UiTreeReveal(val itemId: String, val revision: Int)
  * For each row, whether the guide of each of its levels runs on below it: level `L` does while a
  * later row sits at depth `L + 1` before anything shallower closes that subtree.
  */
-internal fun <T> treeGuideContinuations(items: List<UiTreeItem<T>>): List<BooleanArray> {
-    val maxDepth = items.maxOfOrNull { it.depth } ?: 0
+fun treeGuideContinuations(depths: List<Int>): List<BooleanArray> {
+    val maxDepth = depths.maxOrNull() ?: 0
     val later = BooleanArray(maxDepth + 2)
-    val result = arrayOfNulls<BooleanArray>(items.size)
-    for (index in items.indices.reversed()) {
-        val depth = items[index].depth
+    val result = arrayOfNulls<BooleanArray>(depths.size)
+    for (index in depths.indices.reversed()) {
+        val depth = depths[index]
         result[index] = BooleanArray(depth) { level -> later[level + 1] }
         later[depth] = true
         for (deeper in depth + 1 until later.size) later[deeper] = false
@@ -85,7 +85,7 @@ fun <T> UiTreeView(
             onRevealed?.invoke()
         }
     }
-    val continuations = remember(items) { treeGuideContinuations(items) }
+    val continuations = remember(items) { treeGuideContinuations(items.map { it.depth }) }
     Column(
         tags = listOf("tree-view") + tags,
         modifier = modifier.focus().onKeyInput(FilterShortcutPriority) { input ->

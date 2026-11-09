@@ -22,8 +22,9 @@ import java.net.URLClassLoader
 internal class HollowAddonRuntime(
     private val sources: List<File>,
     cacheDirectory: File,
+    private val addonsDirectory: File,
+    private val modsDirectory: File,
 ) {
-    private val addonsDirectory = sources.first()
     private val mutex = Mutex()
     private val runtimeJob = SupervisorJob()
     private val runtimeScope = CoroutineScope(Dispatchers.IO + runtimeJob + CoroutineName("HollowEngine addons"))
@@ -501,6 +502,9 @@ internal class HollowAddonRuntime(
                 HollowAddonEventRegistrar.register(
                     candidate.classesFile, classLoader, descriptor.id, entrypoint, addonScope, embeddedPackage
                 )
+                HollowAddonLoadedEvent.post(
+                    HollowAddonLoadedEvent(descriptor.id, candidate.classesFile, classLoader, addonScope, embeddedPackage)
+                )
             }
             registerScripts(candidate, classLoader, libraries)
             loadedAddons[descriptor.id] = LoadedHollowAddon(
@@ -529,9 +533,10 @@ internal class HollowAddonRuntime(
     }
 
     /**
-     * Publishes the addon's `scripts/` directory as a namespace of its own. The addon jar and its
-     * bundled libraries go on the compilation classpath and its classloader becomes the parent of the
-     * compiled scripts, so an addon can move part of its own logic into scripts.
+     * Publishes the addon as a namespace of its own, with its `scripts/` directory if it has one. The addon jar
+     * and its bundled libraries go on the compilation classpath and its classloader becomes the parent of the
+     * compiled scripts, so an addon can move part of its own logic into scripts. An addon without scripts is
+     * published too: projects that list it in `dependsOn` reach its classes through it.
      */
     private fun registerScripts(
         candidate: HollowAddonCandidate,
@@ -548,7 +553,6 @@ internal class HollowAddonRuntime(
             fingerprint = descriptor.version,
             storageKey = candidate.fingerprint,
         )
-        if (source.list().isEmpty()) return
         ScriptSourceLifecycle.install()
         ScriptRegistry.register(source)
     }
@@ -616,11 +620,13 @@ internal class HollowAddonRuntime(
 
     private fun refreshSnapshot() {
         loadedSnapshot = loadedAddons.values.map { it.candidate.descriptor }
-        val addonsFolder = addonsDirectory.canonicalFile
+        val modsFolder = modsDirectory.canonicalFile
         resourcePackSnapshot = loadedAddons.values.toList().asReversed()
             .map(LoadedHollowAddon::candidate)
             .filter { candidate ->
-                (candidate.hasAssets || candidate.hasData) && candidate.sourceFile.parentFile?.canonicalFile == addonsFolder
+                // The mod loader already serves mods and the addons embedded in them.
+                (candidate.hasAssets || candidate.hasData) && candidate.embeddedModId == null &&
+                    candidate.sourceFile.parentFile?.canonicalFile != modsFolder
             }
             .map { candidate ->
                 HollowAddonResourcePack(
@@ -641,7 +647,11 @@ internal class HollowAddonRuntime(
         } finally {
             refreshEnabledSnapshot()
             mutex.unlock()
-            if (loadedSnapshot !== loadedBefore) reloadRunningServers()
+            if (loadedSnapshot !== loadedBefore) {
+                runCatching { HollowAddonsChangedEvent.post(HollowAddonsChangedEvent()) }
+                    .onFailure { HollowEngine.LOGGER.error("Failed to apply the changed set of addons", it) }
+                reloadRunningServers()
+            }
             if (started && assetsOf(packsBefore) != assetsOf(resourcePackSnapshot)) reloadClientResources()
         }
     }

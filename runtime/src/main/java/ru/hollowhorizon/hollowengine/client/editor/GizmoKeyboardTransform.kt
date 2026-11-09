@@ -1,5 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import net.minecraft.world.phys.Vec3
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
@@ -19,6 +22,10 @@ enum class GizmoKeyResult {
 
     /** Done: put back [GizmoKeyboardTransform.start]. */
     CANCELLED,
+}
+
+enum class GizmoRotationMode {
+    VIEW_ALIGNED, TRACKBALL,
 }
 
 /**
@@ -43,6 +50,11 @@ class GizmoKeyboardTransform(
     var orientation: GizmoOrientation? = null
         private set
 
+    var rotationMode by mutableStateOf(GizmoRotationMode.VIEW_ALIGNED)
+        private set
+
+    private val trackball = manipulator.trackball(start, startX, startY)
+
     private val primary = if (mode == GizmoEditMode.SCALE) GizmoOrientation.LOCAL else GizmoSettings.orientation
 
     private lateinit var handle: GizmoHandle
@@ -53,11 +65,24 @@ class GizmoKeyboardTransform(
     }
 
     /** Where the pointer at ([x], [y]) takes the object, or null while it cannot tell. */
-    fun update(x: Float, y: Float, modifiers: Int): GizmoTransformValues? = manipulator.update(drag, x, y, modifiers)
+    fun update(x: Float, y: Float, modifiers: Int): GizmoTransformValues? =
+        if (mode == GizmoEditMode.ROTATE && rotationMode == GizmoRotationMode.TRACKBALL) {
+            trackball.update(x, y, modifiers)
+        } else manipulator.update(drag, x, y, modifiers)
 
     fun key(key: Int, modifiers: Int): GizmoKeyResult {
         val axis = AXIS_ACTIONS.indexOfFirst { it.matches(key, modifiers) }
         return when {
+            mode == GizmoEditMode.ROTATE && HollowKeys.ROTATE.matches(key, modifiers) -> {
+                rotationMode = if (rotationMode == GizmoRotationMode.VIEW_ALIGNED) {
+                    GizmoRotationMode.TRACKBALL
+                } else GizmoRotationMode.VIEW_ALIGNED
+                this.axis = null
+                orientation = null
+                restart()
+                GizmoKeyResult.CHANGED
+            }
+
             axis >= 0 -> {
                 constrain(axis)
                 GizmoKeyResult.CHANGED
@@ -74,6 +99,7 @@ class GizmoKeyboardTransform(
 
     /** The line of the axis it is held to, and the angle swept while rotating. */
     fun draw(scope: UiCanvasDrawScope) {
+        if (mode == GizmoEditMode.ROTATE && rotationMode == GizmoRotationMode.TRACKBALL) return
         GizmoRenderer.drawRotationSector(scope, geometry, projector, drag)
         GizmoRenderer.drawHandles(scope, listOf(handle), null, null)
     }
@@ -83,6 +109,7 @@ class GizmoKeyboardTransform(
      * over from where it began, so motion along the old axis does not carry over.
      */
     private fun constrain(index: Int) {
+        rotationMode = GizmoRotationMode.VIEW_ALIGNED
         when {
             axis != index -> {
                 axis = index

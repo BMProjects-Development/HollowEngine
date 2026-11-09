@@ -1,0 +1,62 @@
+---
+title: Launching and saving progress
+order: 6
+---
+
+<center><h1>Launching and saving progress</h1></center>
+
+## Launching from Kotlin
+
+In a server `.node.kts` with the [Narrative dependency](/docs/hollowengine/addons/narrative), start a story on the player who should see it. Here `player` is a `ServerPlayer`, for example the player who clicked an NPC.
+
+```kotlin
+player.launchStory("arrival") {
+    scene("quests/arrival.story")
+}
+```
+
+Paths are relative to `scripts/`. Use `addon-id:quests/arrival.story` for a file in a dependency's namespace. The default entry is `main`, generated from **Start**.
+
+`launchStory` returns immediately with a handle. Calling it again for the same owner and key while the run is active returns the existing handle. Use `await()` to wait for the result or `cancel()` to stop it. A completed run can be started again.
+
+## Owners and audiences
+
+The owner determines where progress is saved and when the story can run. A server story lives with the world, an entity story with the entity, and a node story with its running node. A player-owned story can wait for the player to return.
+
+The audience determines who sees a scene. A player-owned run uses that player by default. Pass the audience explicitly for a server, NPC, or other non-player owner.
+
+```kotlin
+npc.launchStory("arrival-${player.uuid}") {
+    scene("quests/arrival.story", with = listOf(player))
+}
+```
+
+This example uses a separate key for each interacting player. Pass several players in the list for a shared scene. Any participant can advance a shared phrase. In a poll, the answer with the most votes wins once everyone still online has voted. A tie is decided at random.
+
+## Checkpoints and rewind
+
+Place a **Checkpoint** before a decision or another meaningful step and give it a stable name. The run saves its progress. A **Rewind** block or the `rewind` command can return it to a checkpoint and undo journaled actions that happened later. Ordinary effects, such as chat messages, stay applied. A checkpoint with `restart = true` also sends the run back there on restoration while that is its latest checkpoint.
+
+Use [resumable Kotlin stages](/docs/hollowengine/addons/narrative/kotlin) for the same behavior in scripts. Preserve stable stage names and node IDs when editing a story that already has saved runs. A layout change such as moving a node leaves the story's execution unchanged.
+
+## Commands for testing
+
+Operators can inspect and control runs. The owner part of the command is `server`, `entity <entity>`, or `node <path>` for a node running on the server itself.
+
+```mcfunction
+/he story entity @s start "quests/arrival.story" arrival
+/he story entity @s list
+/he story entity @s checkpoints arrival
+/he story entity @s rewind arrival
+/he story entity @s stop arrival
+```
+
+Add a checkpoint name after the key to rewind to a particular checkpoint. Starting a file with the same owner and key by command replaces the active run. For a scene, the audience is the owner when it is a player, otherwise the player running the command.
+
+Players can use `/he dialogue advance` to advance a phrase and `/he dialogue choose <n>` to vote in their latest open poll. The command uses zero-based indices. The first option is `0`.
+
+## Custom speech and choices
+
+In a Kotlin script, use `say` for a line of dialogue and `choose` for a poll. They accept an explicit player list through `to`. Inside a scene they can use its audience. `SayEvent` and `ChoiceEvent` allow addons to replace the default overlay with another presentation, such as chat.
+
+To change only the presentation, declare a [UI overlay](/docs/hollowengine/scripting/ui/ui-files) with the ID `hollowengine-narrative:speech` or `hollowengine-narrative:choice`. Use `SpeechUiKeys` or `ChoiceUiKeys` to read the session data and send advance or vote events.

@@ -7,6 +7,7 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.NumberField
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeInsight
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCompletion
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
@@ -49,7 +50,7 @@ internal fun EntityAttributesEditor(scope: ComponentEditorScope) {
                 value = query,
                 placeholder = EntityEditorLang.search,
                 id = "ee-attribute-search",
-                completionContributor = completions,
+                insight = UiCodeInsight(completions = completions),
                 fontSize = 9f,
                 onChange = { query = it },
                 tags = listOf("insp-input", "ee-attribute-search"),

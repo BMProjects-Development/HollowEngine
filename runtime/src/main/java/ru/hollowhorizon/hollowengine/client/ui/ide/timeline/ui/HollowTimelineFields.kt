@@ -10,8 +10,8 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiPaint
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 internal fun rotationModeLabel(mode: RotationMode): String = when (mode) {
-    RotationMode.EULER -> CutsceneLang.ROTATION_EULER.lang
-    RotationMode.QUATERNION -> CutsceneLang.ROTATION_QUATERNION.lang
+    RotationMode.EULER -> TimelineLang.ROTATION_EULER.lang
+    RotationMode.QUATERNION -> TimelineLang.ROTATION_QUATERNION.lang
 }
 
 /** The shape of one easing preset, drawn so a curve can be picked by eye rather than by name. */

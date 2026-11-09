@@ -3,6 +3,8 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.HollowEngineBuild
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFileView
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeViewMode
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
@@ -72,9 +74,10 @@ internal fun fileStatus(
     file: HollowIdeOpenFile,
     editor: TextFieldState?,
     navigation: HollowIdeStatusNavigation,
+    view: HollowIdeFileView? = null,
 ): HollowIdeStatus {
     val icon = IconHelper.forPath(file.path, false).toString()
-    val crumbs = if (file.virtual) {
+    val path = if (file.virtual) {
         val resources = HollowIdeCrumb(StatusLang.RESOURCES.lang, AssetManagerIcon) {
             navigation.showWindow(HollowIdeToolWindows.AssetManager)
         }
@@ -82,6 +85,8 @@ internal fun fileStatus(
     } else {
         pathCrumbs(project, file.path, icon, navigation.revealInProject)
     }
+    val inside = view?.takeIf { it.mode != HollowIdeViewMode.TEXT }?.crumbs.orEmpty()
+    val crumbs = path + inside.map { HollowIdeCrumb(it.label, it.icon, it.onClick) }
     val details = buildList {
         if (editor != null && file.textOrNull != null) add(caretLabel(editor.text, editor.caret))
         if (file.readOnly) add(StatusLang.READ_ONLY.lang)
