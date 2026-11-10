@@ -3,23 +3,29 @@ package ru.hollowhorizon.hollowengine.client.discord
 import net.minecraft.Util
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.level.Level
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.utils.langOrDefault
+import ru.hollowhorizon.hollowengine.client.utils.mc
 import ru.hollowhorizon.hollowengine.common.config.DiscordPresenceConfig
 
 private const val EngineApplicationId = "1563554195993526342"
 private const val EngineRepositoryUrl = "https://github.com/HollowHorizon/HollowEngine"
 
 object EngineDiscordPresenceProvider : DiscordPresenceProvider {
+    val isInWorld get() = mc.level != null
+    val isSingleplayer get() = mc.hasSingleplayerServer()
+    val isPaused get() = mc.isPaused
+
     override fun presence(context: DiscordPresenceContext): DiscordPresence {
         val mode = when {
-            context.editorOpen -> text("editor", "Working in IDE")
-            !context.inWorld -> text("details", "Using HollowEngine")
-            context.singleplayer -> text("singleplayer", "Playing singleplayer")
+            context.editorOpen -> editorInfo()
+            !isInWorld -> text("details", "Using HollowEngine")
+            isSingleplayer -> text("singleplayer", "Playing singleplayer")
             else -> text("multiplayer", "Playing multiplayer")
         }
-        val details = if (context.inWorld && context.paused) text("paused", "%s (paused)", mode) else mode
+        val details = if (isInWorld && isPaused) text("paused", "%s (paused)", mode) else mode
         val state = when {
-            context.inWorld -> worldLocation(context)
+            isInWorld -> worldLocation()
             context.loading -> text("loading", "Loading Minecraft")
             else -> text("menu", "In the main menu")
         }
@@ -33,11 +39,23 @@ object EngineDiscordPresenceProvider : DiscordPresenceProvider {
         )
     }
 
-    private fun worldLocation(context: DiscordPresenceContext): String {
-        val dimension = context.dimension?.let(::dimensionName) ?: return text("in_world", "Exploring the world")
-        val biome = context.biome?.let { Util.makeDescriptionId("biome", it).langOrDefault(it.toString()) }
+    private fun worldLocation(): String {
+        val level = mc.level ?: return text("in_world", "Exploring the world")
+        val player = mc.player
+        val dimension = level.dimension().location().let(::dimensionName)
+        val biome = player?.let {
+            level.getBiome(it.blockPosition()).unwrapKey().orElse(null)?.location()
+        }
         return if (biome == null) text("dimension", "In %s", dimension)
         else text("location", "%s (%s)", dimension, biome)
+    }
+
+    private fun editorInfo(): String {
+        return HollowIdeOverlay.focusedFile()?.path?.takeIf { it.isNotEmpty() && DiscordPresenceConfig.fileEditingEnabled }
+            ?.let {
+                text("editing", "Editing %s", it.substringAfterLast('/'))
+            }
+            ?: text("editor", "Working in IDE")
     }
 
     private fun dimensionName(id: ResourceLocation): String {

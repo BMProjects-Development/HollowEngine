@@ -5,6 +5,10 @@ object DiscordPresenceConfig : Config() {
     @PropertyComment("Show Discord Rich Presence on the local desktop client")
     var enabled by property(true)
 
+    @PropertyComment("Show now editing files on the local desktop client")
+    @PropertyName("file_editing_enabled")
+    var fileEditingEnabled by property(true)
+
     @PropertyComment("Optional Discord Application ID override")
     @PropertyName("application_id")
     var applicationId by nullableProperty<String>()

@@ -11,5 +11,6 @@
   "location": "%s (%s)",
   "overworld": "Обычный мир",
   "nether": "Незер",
-  "end": "Энд"
+  "end": "Энд",
+  "editing": "Редактирует %s"
 }

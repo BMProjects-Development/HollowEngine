@@ -11,5 +11,6 @@
   "location": "%s (%s)",
   "overworld": "Overworld",
   "nether": "The Nether",
-  "end": "The End"
+  "end": "The End",
+  "editing": "Editing %s"
 }

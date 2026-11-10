@@ -1754,7 +1754,7 @@ object HollowIdeOverlay {
         return DockTarget.Root
     }
 
-    private fun focusedFile(): HollowIdeOpenFile? {
+    fun focusedFile(): HollowIdeOpenFile? {
         val focused = dock.focusedItemId ?: return null
         return model.files.values.firstOrNull { it.id == focused }
     }

@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.discord
 
 import net.minecraft.client.Minecraft
-import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.LOGGER
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.common.config.DiscordPresenceConfig
@@ -10,17 +9,6 @@ import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 private val SnapshotInterval = 1.seconds
-
-data class DiscordPresenceContext(
-    val startedAtSeconds: Long,
-    val inWorld: Boolean,
-    val singleplayer: Boolean,
-    val editorOpen: Boolean,
-    val dimension: ResourceLocation? = null,
-    val biome: ResourceLocation? = null,
-    val paused: Boolean = false,
-    val loading: Boolean = false,
-)
 
 /** Runs on the Minecraft client thread. Returning null disconnects and hides presence. */
 fun interface DiscordPresenceProvider {
@@ -53,21 +41,12 @@ object DiscordRichPresence {
             return
         }
         try {
-            val level = minecraft.level
-            val player = minecraft.player?.takeIf { it.level() === level }
             rpc.update(
                 provider.presence(
                     DiscordPresenceContext(
                         startedAtSeconds = startedAtSeconds,
-                        inWorld = level != null,
-                        singleplayer = minecraft.hasSingleplayerServer(),
                         editorOpen = HollowIdeOverlay.isExpanded(),
-                        dimension = level?.dimension()?.location(),
-                        biome = player?.let {
-                            level?.getBiome(it.blockPosition())?.unwrapKey()?.orElse(null)?.location()
-                        },
-                        paused = minecraft.isPaused,
-                        loading = level == null && minecraft.overlay != null,
+                        loading = minecraft.level == null && minecraft.overlay != null,
                     )
                 )
             )
