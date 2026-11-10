@@ -161,10 +161,10 @@ internal class HollowIdeNativeWindow(
             val logicalWidth = ceil(framebufferWidth / scale)
             val logicalHeight = ceil(framebufferHeight / scale)
             pointerScale = HollowIdeOverlayPoint(logicalWidth / width[0], logicalHeight / height[0])
-            if (pressedButton != null || hovered) {
-                pointer = cursorPosition(handle, ::localPointer)
+            pointer = if (pressedButton != null || hovered) {
+                cursorPosition(handle, ::localPointer)
             } else {
-                pointer = HollowIdeOverlayPoint(-1f, -1f)
+                HollowIdeOverlayPoint(-1f, -1f)
             }
             val now = System.nanoTime()
             val frame = PipelinedUiFrameBuilder.buildSerialized {
