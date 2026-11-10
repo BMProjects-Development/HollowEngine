@@ -174,6 +174,15 @@ class DockingState {
         return close(item.id)
     }
 
+    internal fun closeDetachedWindow(windowId: String, beforeClose: (List<DockItem>) -> Boolean) {
+        val index = floatingWindows.indexOfFirst { it.id == windowId && it.detached }
+        if (index < 0) return
+        val items = floatingWindows[index].stack.items
+        if (!beforeClose(items)) return
+        floatingWindows.removeAt(index)
+        if (items.any { it.id == focusedItemId }) focusedItemId = firstItemId()
+    }
+
     fun focus(itemId: String): Boolean {
         if (isPinned(itemId)) return expand(itemId)
         if (!contains(itemId)) return false

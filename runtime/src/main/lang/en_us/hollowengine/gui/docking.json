@@ -17,7 +17,7 @@
   "window_minimize": "Minimize",
   "window_maximize": "Maximize",
   "window_restore": "Restore Window Size",
-  "window_close": "Close Window and Return Tabs to IDE",
+  "window_close": "Close Window",
   "close": "Close",
   "hide_stripes": "Hide Side Bars",
   "show_stripes": "Side Bars"

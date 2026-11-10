@@ -14,6 +14,9 @@ typealias HollowIdeFileEditor = @Composable (HollowIdeOpenFile) -> Unit
 interface HollowIdeFileDocument : AutoCloseable {
     val readOnly: Boolean
 
+    /** Live modification state for documents that track their own edits. */
+    val isModified: Boolean get() = false
+
     fun encode(): ByteArray
 
     fun reload(bytes: ByteArray) = Unit

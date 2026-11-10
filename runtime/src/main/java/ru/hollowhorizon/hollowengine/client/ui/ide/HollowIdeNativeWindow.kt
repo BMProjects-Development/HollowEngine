@@ -27,7 +27,12 @@ internal class HollowIdeNativeWindow(
     private var pointer = HollowIdeOverlayPoint(-1f, -1f)
     private var pointerScale = HollowIdeOverlayPoint(1f, 1f)
 
-    val shouldClose: Boolean get() = GLFW.glfwWindowShouldClose(handle)
+    fun consumeCloseRequest(): Boolean {
+        if (!GLFW.glfwWindowShouldClose(handle)) return false
+        GLFW.glfwSetWindowShouldClose(handle, false)
+        return true
+    }
+
     val focused: Boolean get() = GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE
     val hovered: Boolean get() = GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_HOVERED) == GLFW.GLFW_TRUE
 

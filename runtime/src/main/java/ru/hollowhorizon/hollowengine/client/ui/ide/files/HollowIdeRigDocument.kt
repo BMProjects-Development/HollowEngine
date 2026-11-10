@@ -26,7 +26,7 @@ class HollowIdeRigDocument(bytes: ByteArray) : HollowIdeFileDocument, RigEditing
     override var rig by mutableStateOf(decode(bytes))
         private set
 
-    var isModified by mutableStateOf(false)
+    override var isModified by mutableStateOf(false)
         private set
 
     var revision by mutableStateOf(0)

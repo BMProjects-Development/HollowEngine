@@ -12,9 +12,9 @@ private const val ChromeLang = "hollowengine.gui.docking"
 private const val ChromeIcons = "hollowengine:textures/gui/icons"
 
 @Composable
-internal fun HollowIdeWindowControls(id: String, chrome: GlfwDockWindowChrome) {
+internal fun HollowIdeWindowControls(id: String, chrome: GlfwDockWindowChrome, onReturn: () -> Unit) {
     if (!chrome.custom) {
-        Button(DockLang.ReturnToIde, id = "$id-return", onClick = chrome::requestClose)
+        Button(DockLang.ReturnToIde, id = "$id-return", onClick = onReturn)
         return
     }
     WindowControl(id, "minimize", chrome::minimize)

@@ -27,7 +27,7 @@ class HollowIdeVfxDocument(bytes: ByteArray) : HollowIdeFileDocument, VfxEditing
 
     override val readOnly: Boolean get() = error != null
 
-    var isModified by mutableStateOf(false)
+    override var isModified by mutableStateOf(false)
         private set
 
     var revision by mutableStateOf(0)

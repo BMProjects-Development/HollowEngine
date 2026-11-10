@@ -17,7 +17,7 @@
   "window_minimize": "Свернуть",
   "window_maximize": "Развернуть",
   "window_restore": "Восстановить размер окна",
-  "window_close": "Закрыть окно и вернуть вкладки в IDE",
+  "window_close": "Закрыть окно",
   "close": "Закрыть",
   "hide_stripes": "Скрыть боковые полоски",
   "show_stripes": "Боковые полоски"

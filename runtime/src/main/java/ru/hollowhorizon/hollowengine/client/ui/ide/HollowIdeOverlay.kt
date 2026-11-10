@@ -128,6 +128,7 @@ object HollowIdeOverlay {
     private val detachedWindows = HollowIdeDetachedWindows(
         dock = dock,
         beforeInput = pipeline::await,
+        beforeClose = { tabs -> model.saveModifiedFiles(tabs.mapNotNull { fileDockItemPath(it.id) }) },
         onFocus = {
             gameCaptureRequested = false
             surface.runtime.unfocus()
@@ -906,7 +907,7 @@ object HollowIdeOverlay {
                     titleDrag = window.chrome.takeIf { it.custom }?.let { chrome ->
                         windowTitleDrag(chrome) { detachedWindows.startNativeDrag(id, DockTransferSource.Window(id)) }
                     },
-                    chrome = { HollowIdeWindowControls(id, window.chrome) },
+                    chrome = { HollowIdeWindowControls(id, window.chrome) { detachedWindows.returnToIde(id) } },
                     resizeHandles = { HollowIdeWindowResizeHandles(id, window.chrome) },
                     content = { DockContent(it) },
                 )

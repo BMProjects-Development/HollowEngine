@@ -1,15 +1,69 @@
 package ru.hollowhorizon.hollowengine.client.gui.scripting
 
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileNode
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFileOperationResult
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel
+import ru.hollowhorizon.hollowengine.client.ui.ide.*
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import java.nio.file.Files
+import kotlin.test.*
 
 class HollowIdeModelTests {
+    @Test
+    fun `saving window tabs writes only their modified files including edits not yet reflected by the UI`() {
+        val root = Files.createTempDirectory(DirectoryManager.HOLLOW_ENGINE, "ide-save-window-").toFile()
+        val script = root.resolve("script.kts")
+        val asset = root.resolve("asset.fixture")
+        val other = root.resolve("other.kts")
+        try {
+            listOf(script, asset, other).forEach { it.writeText("initial") }
+            val types = testFileTypes().apply {
+                register(
+                    HollowIdeFileType.extensions(
+                        id = "tracked-fixture",
+                        extensions = listOf("fixture"),
+                        loader = { _, bytes -> TrackedDocument(bytes.decodeToString()) },
+                        editor = {},
+                    )
+                )
+            }
+            val model = HollowIdeModel(types)
+            fun open(name: String) = assertIs<HollowIdeOpenResult.File>(model.openFile("${root.name}/$name")).file
+            val scriptTab = open(script.name)
+            val assetTab = open(asset.name)
+            val otherTab = open(other.name)
+            scriptTab.update("script edit")
+            assertIs<TrackedDocument>(assetTab.document).edit("asset edit")
+            otherTab.update("other edit")
+            assertFalse(assetTab.dirty)
+
+            assertTrue(model.saveModifiedFiles(listOf(scriptTab.path, assetTab.path)))
+
+            assertEquals("script edit", script.readText())
+            assertEquals("asset edit", asset.readText())
+            assertEquals("initial", other.readText())
+            assertFalse(assetTab.document.isModified)
+            assertTrue(otherTab.dirty)
+        } finally {
+            listOf(script, asset, other).forEach { it.delete() }
+            root.delete()
+        }
+    }
+
+    private class TrackedDocument(private var text: String) : HollowIdeFileDocument {
+        override val readOnly = false
+        override var isModified = false
+            private set
+
+        fun edit(text: String) {
+            this.text = text
+            isModified = true
+        }
+
+        override fun encode(): ByteArray = text.encodeToByteArray()
+
+        override fun markSaved() {
+            isModified = false
+        }
+    }
+
     @Test
     fun `focus selection keeps existing multi selection when target is selected`() {
         val model = HollowIdeModel(testFileTypes())

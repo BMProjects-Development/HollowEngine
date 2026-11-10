@@ -33,7 +33,7 @@ class HollowIdeAnimatorDocument(bytes: ByteArray) : HollowIdeFileDocument, UndoO
 
     override val readOnly: Boolean get() = error != null
 
-    var isModified by mutableStateOf(false)
+    override var isModified by mutableStateOf(false)
         private set
 
     /** Bumped on every accepted edit, for anything that wants to react without diffing the animator. */

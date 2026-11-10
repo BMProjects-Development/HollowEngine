@@ -32,7 +32,7 @@ internal class HollowIdeImageDocument(
         "hollowide-image-${NextTextureId.incrementAndGet()}",
         texture,
     )
-    val isModified: Boolean get() = !history.isAtSaved
+    override val isModified: Boolean get() = !history.isAtSaved
     fun beginEdit() = HollowIdeImageEdit()
 
     fun colorAt(x: Int, y: Int): UiColor? {

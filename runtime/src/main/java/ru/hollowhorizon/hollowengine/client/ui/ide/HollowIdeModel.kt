@@ -451,6 +451,16 @@ internal class HollowIdeModel(
         return count
     }
 
+    internal fun saveModifiedFiles(paths: Iterable<String>): Boolean {
+        var allSaved = true
+        for (path in paths) {
+            val file = files[path] ?: continue
+            if (file.readOnly || (!file.dirty && !file.document.isModified)) continue
+            if (!save(path)) allSaved = false
+        }
+        return allSaved
+    }
+
     /** Saves and closes every file opened with [type], whose addon is unloading. */
     fun closeFilesUsing(type: HollowIdeFileType) {
         files.values.filter { file -> file.type === type }.map(HollowIdeOpenFile::path).forEach { path ->

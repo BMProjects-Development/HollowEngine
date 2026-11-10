@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 internal class HollowIdeDetachedWindows(
     private val dock: DockingState,
     private val beforeInput: () -> Unit,
+    private val beforeClose: (List<DockItem>) -> Boolean,
     private val onFocus: () -> Unit,
     private val onUnhandledKey: (Int, Int) -> Unit,
     private val onFailure: (String) -> Unit,
@@ -152,7 +153,7 @@ internal class HollowIdeDetachedWindows(
         var changed = layoutChanged
         layoutChanged = false
         for ((id, window) in windows.toMap()) {
-            if (window.shouldClose) returnToIde(id)
+            if (window.consumeCloseRequest()) dock.closeDetachedWindow(id, beforeClose)
             if (dock.floatingWindows.none { it.id == id && it.detached }) {
                 closeWindow(id)
                 changed = true

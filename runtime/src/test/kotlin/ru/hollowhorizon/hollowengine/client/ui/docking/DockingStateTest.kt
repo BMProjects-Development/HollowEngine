@@ -5,6 +5,34 @@ import kotlin.test.*
 
 class DockingStateTest {
     @Test
+    fun `closing a detached window removes its tabs and restores focus to the dock`() {
+        val state = DockingState()
+        val editor = DockItem("editor", "Editor")
+        val root = assertNotNull(state.newStack(listOf(editor)))
+        val first = DockItem("first", "First")
+        val second = DockItem("second", "Second")
+        val stack = assertNotNull(state.newStack(listOf(first, second)))
+        val window = state.newWindow(stack, 0f, 0f, 320f, 220f)
+        state.applyLayout(root, listOf(window), focused = second.id)
+        assertTrue(state.setWindowDetached(window.id, true))
+
+        state.closeDetachedWindow(window.id) { items ->
+            assertEquals(listOf(first, second), items)
+            false
+        }
+        assertTrue(state.isDetached(first.id))
+        assertEquals(second, state.focusedItem())
+
+        state.closeDetachedWindow(window.id) { true }
+
+        assertEquals(root, state.root)
+        assertTrue(state.floatingWindows.isEmpty())
+        assertFalse(state.contains(first.id))
+        assertFalse(state.contains(second.id))
+        assertEquals(editor, state.focusedItem())
+    }
+
+    @Test
     fun `moving a tab between detached windows preserves its metadata and siblings`() {
         val state = DockingState()
         val sourceTab = DockItem("source", "Source", dirty = true)
