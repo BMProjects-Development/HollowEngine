@@ -181,6 +181,8 @@ fun isHostProvidedAddonLibrary(fileName: String): Boolean = listOf(
     "kotlin-stdlib",
     "kotlin-reflect",
     "kotlinx-coroutines",
+    "kotlinx-serialization-core-jvm-",
+    "kotlinx-serialization-json-jvm-",
     "koin-core",
     "slf4j-",
     "log4j-",

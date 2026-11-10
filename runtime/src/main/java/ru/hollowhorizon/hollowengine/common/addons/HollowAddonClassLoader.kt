@@ -23,6 +23,7 @@ internal class HollowAddonClassLoader(
         "kotlin.contracts.",
         "kotlin.coroutines.",
         "kotlinx.coroutines.",
+        "kotlinx.serialization.",
         "kotlin.enums.",
         "kotlin.experimental.",
         "kotlin.internal.",
