@@ -1,8 +1,9 @@
 package ru.hollowhorizon.hollowengine.addons.mcp
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.mcp.client.screenshotTool
@@ -18,8 +19,9 @@ import ru.hollowhorizon.hollowengine.common.events.registry.RegisterCommandsEven
 import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 
 class HollowMcpAddon : HollowAddonEntrypoint {
-    @Volatile
-    private var server: McpServer? = null
+    private lateinit var server: McpServer
+    private lateinit var scope: CoroutineScope
+    private val configLock = Mutex()
 
     /** Why the server is not running, when it is not. */
     @Volatile
@@ -27,19 +29,8 @@ class HollowMcpAddon : HollowAddonEntrypoint {
         "hollowengine_mcp.command.status.starting", "The MCP server has not started yet",
     )
 
-    private val command = McpCommand(server = { server }, status = { status })
-
     override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) {
-        McpConfig.initialize()
-        if (!McpConfig.enabled) {
-            status = Component.translatableWithFallback(
-                "hollowengine_mcp.command.status.disabled",
-                "The server is off: set enabled = true in config/hollowengine-mcp.toml and restart the game",
-            )
-            HollowEngine.LOGGER.info("The MCP server is off in config/hollowengine-mcp.toml")
-            return
-        }
-
+        this.scope = scope
         val docs = DocsLibrary.load(context.classLoader, DOCS_ROOT)
         val tools = buildList {
             add(runCommandTool())
@@ -49,35 +40,73 @@ class HollowMcpAddon : HollowAddonEntrypoint {
             if (isPhysicalClient) add(screenshotTool())
         }
         val instructions = McpInstructions(context.classLoader)
-        val mcp = McpServer(context.descriptor.version, tools, instructions::render)
-        val port = McpConfig.port
-        val started = withContext(Dispatchers.IO) {
-            runCatching { mcp.start(port, McpConfig.ensureToken(), context.classLoader) }
+        server = McpServer(context.descriptor.version, tools, instructions::render)
+        try {
+            withContext(Dispatchers.IO) { applyConfig(createIfMissing = true) }
+        } catch (error: CancellationException) {
+            try {
+                stopServer()
+            } catch (cleanupError: Exception) {
+                error.addSuppressed(cleanupError)
+            }
+            throw error
         }
-        started.onFailure { error ->
-            status = Component.translatableWithFallback(
-                "hollowengine_mcp.command.status.port_taken",
-                "Port %s is taken; pick another in config/hollowengine-mcp.toml and restart the game",
-                port,
-            )
-            HollowEngine.LOGGER.error("The MCP server could not listen on port {}", port, error)
-            return
-        }
-        server = mcp
-        HollowEngine.LOGGER.info("MCP server listening on {}; /he mcp copies the connection for an agent", mcp.url)
     }
 
-    override suspend fun unload(context: HollowAddonContext) {
-        withContext(Dispatchers.IO) { server?.stop() }
-        server = null
+    private suspend fun applyConfig(createIfMissing: Boolean): Component? = configLock.withLock {
+        try {
+            val settings = loadMcpSettings(defaultEnabled = isPhysicalClient, createIfMissing = createIfMissing)
+            server.reconfigure(settings)
+            if (settings == null) {
+                status = Component.translatableWithFallback(
+                    "hollowengine_mcp.command.status.disabled",
+                    "MCP is off. Set enabled = true in config/hollowengine-mcp.toml and run /he mcp reload",
+                )
+                HollowEngine.LOGGER.info("The MCP server is off in config/hollowengine-mcp.toml")
+            }
+            null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            val failure = Component.translatableWithFallback(
+                "hollowengine_mcp.command.status.config_failed",
+                "MCP could not apply its configuration. See the game log for details.",
+            )
+            status = failure
+            HollowEngine.LOGGER.error("Could not apply the MCP configuration", error)
+            failure
+        }
     }
+
+    private fun reload(source: CommandSourceStack): Int {
+        scope.launch(Dispatchers.IO) {
+            val failure = applyConfig(createIfMissing = false)
+            source.server.execute {
+                if (failure == null) {
+                    source.sendSuccess({
+                        Component.translatableWithFallback(
+                            "hollowengine_mcp.command.reloaded", "MCP configuration reloaded",
+                        )
+                    }, false)
+                } else {
+                    source.sendFailure(failure)
+                }
+            }
+        }
+        return 1
+    }
+
+    override suspend fun unload(context: HollowAddonContext) = stopServer()
+
+    private suspend fun stopServer() =
+        withContext(Dispatchers.IO + NonCancellable) { configLock.withLock { server.reconfigure(null) } }
 
     @SubscribeEvent(-1)
     fun registerCommands(event: RegisterCommandsEvent) {
         val root = requireNotNull(event.dispatcher.root.getChild("hollowengine")) {
             "The HollowEngine root command must be registered before addon commands"
         }
-        command.register(root)
+        McpCommand(server, status = { status }, reload = ::reload).register(root)
     }
 
     private companion object {

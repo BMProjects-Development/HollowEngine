@@ -14,10 +14,13 @@ import ru.hollowhorizon.hollowengine.common.utils.isPhysicalClient
 /**
  * `/he mcp` shows whether the server runs and offers the connection for each [AgentClient];
  * `/he mcp copy <client>` puts it on the clipboard. The connection carries the token, so it never
- * appears in chat or in the log: only the host of a local world can copy it, straight into this
- * game's clipboard, since the server listens on this computer alone.
+ * appears in chat or in the log. Only the host of a local world can copy it into the game's clipboard.
  */
-internal class McpCommand(private val server: () -> McpServer?, private val status: () -> Component) {
+internal class McpCommand(
+    private val server: McpServer,
+    private val status: () -> Component,
+    private val reload: (CommandSourceStack) -> Int,
+) {
     fun register(root: CommandNode<CommandSourceStack>) {
         val copy = Commands.literal("copy")
         AgentClient.entries.forEach { client ->
@@ -27,16 +30,17 @@ internal class McpCommand(private val server: () -> McpServer?, private val stat
             .requires { source -> isHost(source) || source.hasPermission(4) }
             .executes { context -> show(context.source) }
             .then(copy)
+            .then(Commands.literal("reload").executes { context -> reload(context.source) })
         root.addChild(command.build())
     }
 
     private fun show(source: CommandSourceStack): Int {
-        val mcp = server()
-        val url = mcp?.url
+        val urls = server.urls
         val rows = buildList {
-            add(title(running = url != null, url))
+            add(title(urls.isNotEmpty()))
+            urls.forEach { add(Component.literal(it).withStyle(ChatFormatting.DARK_GRAY)) }
             when {
-                url == null -> add(status().copy().withStyle(ChatFormatting.GRAY))
+                urls.isEmpty() -> add(status().copy().withStyle(ChatFormatting.GRAY))
                 isHost(source) -> {
                     add(text("copy", "Copy the connection for your agent:").withStyle(ChatFormatting.GRAY))
                     add(buttons())
@@ -44,22 +48,22 @@ internal class McpCommand(private val server: () -> McpServer?, private val stat
                 else -> add(
                     text(
                         "elsewhere",
-                        "Agents connect on the machine this game runs on, with the token from config/hollowengine-mcp.toml",
+                        "Agents connect with the token from config/hollowengine-mcp.toml",
                     ).withStyle(ChatFormatting.GRAY)
                 )
             }
         }
         source.sendSystemMessage(panel(rows))
-        return if (url != null) 1 else 0
+        return if (urls.isNotEmpty()) 1 else 0
     }
 
     private fun copy(source: CommandSourceStack, client: AgentClient): Int {
         if (!isHost(source)) {
-            source.sendFailure(text("host_only", "Only the host of a local world can copy the connection: agents reach it on this computer alone"))
+            source.sendFailure(text("host_only", "Only the host of a local world can copy the connection"))
             return 0
         }
-        val url = server()?.url ?: return 0.also { source.sendFailure(status()) }
-        copyToClipboard(client.connection(url, McpConfig.token))
+        val connection = server.connection(client) ?: return 0.also { source.sendFailure(status()) }
+        copyToClipboard(connection)
         source.player?.displayClientMessage(
             text("copied", "Copied the connection for %s", client.title).withStyle(ChatFormatting.GREEN),
             true,
@@ -74,12 +78,11 @@ internal class McpCommand(private val server: () -> McpServer?, private val stat
         return source.server.isSingleplayerOwner(player.gameProfile)
     }
 
-    private fun title(running: Boolean, url: String?): MutableComponent {
+    private fun title(running: Boolean): MutableComponent {
         val state = if (running) text("running", "running") else text("stopped", "stopped")
         return Component.literal("HollowEngine MCP").withStyle(ChatFormatting.BOLD, ChatFormatting.WHITE)
             .append(Component.literal("  ● ").withStyle(if (running) ChatFormatting.GREEN else ChatFormatting.RED))
             .append(state.withStyle(if (running) ChatFormatting.GREEN else ChatFormatting.RED))
-            .apply { if (url != null) append(Component.literal("  $url").withStyle(ChatFormatting.DARK_GRAY)) }
     }
 
     private fun buttons(): MutableComponent {

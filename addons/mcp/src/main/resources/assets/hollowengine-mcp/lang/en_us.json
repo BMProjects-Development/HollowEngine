@@ -4,8 +4,8 @@
   "hollowengine_mcp.command.running": "running",
   "hollowengine_mcp.command.stopped": "stopped",
   "hollowengine_mcp.command.copy": "Copy the connection for your agent:",
-  "hollowengine_mcp.command.elsewhere": "Agents connect on the machine this game runs on, with the token from config/hollowengine-mcp.toml",
-  "hollowengine_mcp.command.host_only": "Only the host of a local world can copy the connection: agents reach it on this computer alone",
+  "hollowengine_mcp.command.elsewhere": "Agents connect with the token from config/hollowengine-mcp.toml",
+  "hollowengine_mcp.command.host_only": "Only the host of a local world can copy the connection",
   "hollowengine_mcp.command.copied": "Copied the connection for %s",
   "hollowengine_mcp.command.hint_token": "Carries the access token",
   "hollowengine_mcp.command.hint.claude": "A terminal command that adds this server to Claude Code",
@@ -13,6 +13,7 @@
   "hollowengine_mcp.command.hint.json": "An mcpServers entry for Cursor and other clients that read one",
   "hollowengine_mcp.command.hint.token": "The access token alone",
   "hollowengine_mcp.command.status.starting": "The MCP server has not started yet",
-  "hollowengine_mcp.command.status.disabled": "The server is off: set enabled = true in config/hollowengine-mcp.toml and restart the game",
-  "hollowengine_mcp.command.status.port_taken": "Port %s is taken; pick another in config/hollowengine-mcp.toml and restart the game"
+  "hollowengine_mcp.command.status.disabled": "MCP is off. Set enabled = true in config/hollowengine-mcp.toml and run /he mcp reload",
+  "hollowengine_mcp.command.status.config_failed": "MCP could not apply its configuration. See the game log for details.",
+  "hollowengine_mcp.command.reloaded": "MCP configuration reloaded"
 }

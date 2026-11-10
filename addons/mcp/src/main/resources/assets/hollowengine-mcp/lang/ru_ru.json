@@ -4,8 +4,8 @@
   "hollowengine_mcp.command.running": "работает",
   "hollowengine_mcp.command.stopped": "остановлен",
   "hollowengine_mcp.command.copy": "Скопировать подключение для агента:",
-  "hollowengine_mcp.command.elsewhere": "Агенты подключаются на той машине, где запущена игра, с токеном из config/hollowengine-mcp.toml",
-  "hollowengine_mcp.command.host_only": "Скопировать подключение может только хост локального мира: агенты подключаются только на этом компьютере",
+  "hollowengine_mcp.command.elsewhere": "Для подключения используйте токен из config/hollowengine-mcp.toml",
+  "hollowengine_mcp.command.host_only": "Скопировать подключение может только хост локального мира",
   "hollowengine_mcp.command.copied": "Подключение для %s скопировано",
   "hollowengine_mcp.command.hint_token": "Содержит токен доступа",
   "hollowengine_mcp.command.hint.claude": "Команда для терминала, добавляющая сервер в Claude Code",
@@ -13,6 +13,7 @@
   "hollowengine_mcp.command.hint.json": "Запись mcpServers для Cursor и других клиентов",
   "hollowengine_mcp.command.hint.token": "Только токен доступа",
   "hollowengine_mcp.command.status.starting": "MCP-сервер ещё не запущен",
-  "hollowengine_mcp.command.status.disabled": "Сервер выключен: поставьте enabled = true в config/hollowengine-mcp.toml и перезапустите игру",
-  "hollowengine_mcp.command.status.port_taken": "Порт %s занят: выберите другой в config/hollowengine-mcp.toml и перезапустите игру"
+  "hollowengine_mcp.command.status.disabled": "MCP выключен. Поставьте enabled = true в config/hollowengine-mcp.toml и выполните /he mcp reload",
+  "hollowengine_mcp.command.status.config_failed": "Не удалось применить настройки MCP. Подробности в журнале игры.",
+  "hollowengine_mcp.command.reloaded": "Настройки MCP перечитаны"
 }

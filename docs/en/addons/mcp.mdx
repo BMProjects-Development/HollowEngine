@@ -28,7 +28,7 @@ The addon is new. Treat what an agent writes as a draft, and read scripts before
 
 4. Paste it into your agent's terminal or config.
 
-Only the host of a local world can copy the connection, because the server listens on the computer running the game.
+The copy buttons are available to the host of a local world. On a dedicated server, `/he mcp` shows where MCP is listening, and the configuration file holds the token.
 
 ## Configuration
 
@@ -37,10 +37,20 @@ Only the host of a local world can copy the connection, because the server liste
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | on for a client, off on a dedicated server | Starts the server. |
-| `port` | `25590` | The port it listens on. It always binds to `127.0.0.1`. |
-| `token` | generated | The bearer token agents send as `Authorization: Bearer <token>`. Clear it and restart to issue a new one. |
+| `port` | `25590` | The HTTP server port. |
+| `hosts` | `["127.0.0.1"]` | Addresses on the machine running HollowEngine where the server listens. Add its LAN address to allow LAN connections. `0.0.0.0` listens on all IPv4 interfaces. |
+| `allowlist` | `[]` | Client IPs and CIDR ranges. For example, `["127.0.0.1", "192.168.1.42", "fd00:1234::/64"]`. An empty list allows any IP. |
+| `token` | generated | The bearer token agents send as `Authorization: Bearer <token>`. Clear it and reload the config to issue a new one. |
 
-The server is reachable from your machine only, and every request needs the token. Do not share the token or commit `hollowengine-mcp.toml`.
+After editing the file, run `/he mcp reload` as the local world host, a level 4 operator, or from the dedicated server console. The IP list and token take effect on subsequent requests. Changing the bind addresses or port reopens the listening sockets, so agents need to reconnect. If a new address or port is in use, MCP attempts to restore the previous listeners and logs the error.
+
+To connect from another device, use the HollowEngine machine's IP in the agent's URL, for example `http://192.168.1.10:25590/mcp`. The allowlist must match the peer IP the server sees. Behind a proxy, that is the proxy's address. The server ignores `X-Forwarded-For`.
+
+:::warning
+Expose MCP to the network at your own risk, and only if you know who can reach it. The addon can run commands and Kotlin code, and plain HTTP sends the token unencrypted. Keep MCP disabled in production. The server logs a warning if it listens beyond loopback with an empty allowlist. Every request still requires the token.
+:::
+
+Do not share the token or commit `hollowengine-mcp.toml`.
 
 ## Tools
 

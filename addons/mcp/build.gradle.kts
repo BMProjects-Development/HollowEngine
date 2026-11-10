@@ -1,3 +1,7 @@
+plugins {
+    kotlin("plugin.serialization")
+}
+
 base {
     archivesName.set("HollowEngineMcp")
 }
@@ -6,6 +10,8 @@ val mcpSdkVersion = "0.15.0"
 val ktorVersion = "3.5.1"
 
 dependencies {
+    compileOnly("net.peanuuutz.tomlkt:tomlkt:0.5.0")
+    testImplementation("net.peanuuutz.tomlkt:tomlkt:0.5.0")
     add("addonLibraries", "io.modelcontextprotocol:kotlin-sdk-server:$mcpSdkVersion")
     add("addonLibraries", "io.ktor:ktor-server-cio:$ktorVersion")
 }
