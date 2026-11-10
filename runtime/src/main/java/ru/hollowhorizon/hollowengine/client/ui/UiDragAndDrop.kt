@@ -119,7 +119,7 @@ val LocalDragAndDrop = staticCompositionLocalOf<UiDragAndDropState?> { null }
 fun Modifier.dragSource(state: UiDragAndDropState?, item: () -> UiDragItem?): Modifier {
     if (state == null) return this
     return input(draggable = true).onDrag { event ->
-            if (!event.isLeftClick()) return@onDrag
+            if (!event.isLeftButton()) return@onDrag
             if (state.isDragging) {
                 state.move(event.rootLocalX, event.rootLocalY)
                 event.consume()

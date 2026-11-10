@@ -139,7 +139,7 @@ private fun PaletteTab(state: RecipePaletteState, tab: RecipePaletteTab, label: 
         id = "recipe-palette-tab-${tab.name.lowercase()}",
         tags = listOfNotNull("recipe-palette-tab", "selected".takeIf { state.tab == tab }),
         modifier = Modifier.input(hoverable = true, clickable = true).cursor(UiCursorShape.HAND).onClick { event ->
-            if (event.isLeftClick()) state.tab = tab
+            if (event.isLeftButton()) state.tab = tab
             event.consume()
         },
     ) {
@@ -202,7 +202,7 @@ private fun PaletteCell(session: RecipeEditorSession, entry: PaletteEntry) {
                 dragged[0] = true
                 UiDragItem(payload = entry.pick, label = entry.name)
             }.onRelease { event ->
-                if (!dragged[0] && event.isLeftClick()) session.pick(entry.pick, add = event.isShiftDown())
+                if (!dragged[0] && event.isLeftButton()) session.pick(entry.pick, add = event.isShiftDown())
                 event.consume()
             }
     InlineWidget(

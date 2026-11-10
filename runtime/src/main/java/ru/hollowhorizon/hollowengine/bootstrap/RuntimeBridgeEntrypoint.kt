@@ -595,6 +595,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientStopping(client: Minecraft) {
+        HollowIdeOverlay.closeDetachedWindows()
         DiscordRichPresence.stop()
         RuntimeDispatcherState.stopClient(client)
     }

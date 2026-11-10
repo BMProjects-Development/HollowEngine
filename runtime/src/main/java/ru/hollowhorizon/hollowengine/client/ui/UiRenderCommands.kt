@@ -896,8 +896,17 @@ data class UiHit(
 )
 
 class UiHitTester {
-    fun hitTest(resolved: UiNode, layout: UiLayoutResult, x: Float, y: Float): UiHit? {
-        return findTopmost(resolved.root, null, layout, x, y) { current, layoutNode ->
+    fun hitTest(resolved: UiNode, layout: UiLayoutResult, x: Float, y: Float): UiHit? =
+        hitTest(resolved, layout, x, y, skipSubtree = null)
+
+    internal fun hitTest(
+        resolved: UiNode,
+        layout: UiLayoutResult,
+        x: Float,
+        y: Float,
+        skipSubtree: ((UiNode) -> Boolean)?,
+    ): UiHit? {
+        return findTopmost(resolved.root, null, layout, x, y, skipSubtree) { current, layoutNode ->
             val style = resolved[current]
             if (style.inputTransparent) return@findTopmost null
             if (!style.hoverable && !style.clickable && !style.focusable && !style.draggable && !style.scrollable) {
@@ -925,21 +934,23 @@ class UiHitTester {
         layout: UiLayoutResult,
         x: Float,
         y: Float,
+        skipSubtree: ((UiNode) -> Boolean)? = null,
         probe: (UiNode, UiLayoutNode) -> T?,
     ): T? {
+        if (skipSubtree?.invoke(node) == true) return null
         val layoutNode = layout.nodes[node] ?: return null
         layout.scrollbars[node]?.let { scrollbars ->
             for (index in scrollbars.indices.reversed()) {
                 val scrollbar = scrollbars[index]
                 if (scrollbar !in layout.nodes) continue
-                findTopmost(scrollbar, ancestorClip, layout, x, y, probe)?.let { return it }
+                findTopmost(scrollbar, ancestorClip, layout, x, y, skipSubtree, probe)?.let { return it }
             }
         }
         val clip = ancestorClip.intersect(layoutNode.clip)
         if (clip == null || clip.contains(x, y)) {
             val children = layout.childrenOf(node)
             for (index in children.indices.reversed()) {
-                findTopmost(children[index], clip, layout, x, y, probe)?.let { return it }
+                findTopmost(children[index], clip, layout, x, y, skipSubtree, probe)?.let { return it }
             }
         }
         if (ancestorClip != null && !ancestorClip.contains(x, y)) return null

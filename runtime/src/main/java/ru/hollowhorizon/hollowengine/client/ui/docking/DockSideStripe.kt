@@ -161,13 +161,13 @@ private fun DockStripeButton(pinned: DockPinnedItem, state: DockingState, stripe
             .onPress { event ->
                 // A drag whose release never arrived (the window lost focus mid-gesture) ends here.
                 state.stripeDrag = null
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     menu = true
                     event.consume()
                 }
             }
             .onDrag { event ->
-                if (event.isRightClick()) return@onDrag
+                if (event.isRightButton()) return@onDrag
                 val held = state.stripeDrag?.itemId == item.id
                 if (!held && hypot(event.dragTotalX, event.dragTotalY) < DragThreshold) return@onDrag
                 event.consume()
@@ -205,7 +205,7 @@ private fun DockStripeButton(pinned: DockPinnedItem, state: DockingState, stripe
                 event.consume()
                 val dragged = state.stripeDrag?.itemId == item.id
                 state.stripeDrag = null
-                if (!dragged && !event.isRightClick()) state.togglePinned(item.id)
+                if (!dragged && !event.isRightButton()) state.togglePinned(item.id)
             },
     ) {
         item.icon?.let { icon ->
@@ -236,6 +236,9 @@ private fun stripeMenuItems(pinned: DockPinnedItem, state: DockingState): List<U
         }
         add(UiDropdownItem(label = DockLang.pinTo(pinned.side.opposite)) { state.pin(itemId, pinned.side.opposite, pinned.group) })
         add(UiDropdownItem(label = DockLang.Undock) { state.unpin(itemId) })
+        state.onDetachItem?.takeIf { state.canDetachItem(pinned.item) }?.let { detach ->
+            add(UiDropdownItem(label = DockLang.Detach) { detach(pinned.item) })
+        }
         if (pinned.item.closable) {
             add(UiDropdownItem(label = DockLang.Close) { state.close(itemId) })
         }
@@ -500,6 +503,8 @@ internal object DockLang {
     val PinLeftSplit: String get() = "$Root.pin_left_split".lang
     val PinRightSplit: String get() = "$Root.pin_right_split".lang
     val Undock: String get() = "$Root.undock".lang
+    val Detach: String get() = "$Root.detach".lang
+    val ReturnToIde: String get() = "$Root.return_to_ide".lang
     val Close: String get() = "$Root.close".lang
     val HideStripes: String get() = "$Root.hide_stripes".lang
     val ShowStripes: String get() = "$Root.show_stripes".lang

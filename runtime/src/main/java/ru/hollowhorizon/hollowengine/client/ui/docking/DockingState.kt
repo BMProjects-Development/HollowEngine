@@ -10,6 +10,9 @@ class DockingState {
     private val ids = DockIdGenerator()
 
     var onTabContextMenu: ((DockItem, UiEvent) -> Unit)? = null
+    internal var canDetachItem: (DockItem) -> Boolean = { true }
+    internal var onDetachItem: ((DockItem) -> Unit)? = null
+    internal var onDetachedFocus: ((String) -> Unit)? = null
 
     var root: DockNode? by mutableStateOf(null)
         private set
@@ -83,10 +86,10 @@ class DockingState {
 
     fun openFloating(
         item: DockItem,
-        x: Float = 32f,
-        y: Float = 32f,
-        width: Float = 320f,
-        height: Float = 220f,
+        x: Float = DefaultFloatingOffset,
+        y: Float = DefaultFloatingOffset,
+        width: Float = DefaultFloatingWidth,
+        height: Float = DefaultFloatingHeight,
     ) {
         if (contains(item.id)) {
             focus(item.id)
@@ -180,6 +183,7 @@ class DockingState {
         if (index >= 0) {
             val window = floatingWindows.removeAt(index)
             floatingWindows += window.copy(stack = window.stack.copy(selectedItemId = itemId))
+            if (window.detached) onDetachedFocus?.invoke(itemId)
         }
         return true
     }
@@ -200,6 +204,9 @@ class DockingState {
     /** Whether the window holding [itemId] floats over the dock instead of being docked in it. */
     fun isFloating(itemId: String): Boolean =
         floatingWindows.any { window -> window.stack.items.any { it.id == itemId } }
+
+    internal fun isDetached(itemId: String): Boolean =
+        floatingWindows.any { it.detached && it.stack.containsItem(itemId) }
 
     /** Leaves every window unfocused, for when the focus has gone somewhere outside the dock. */
     fun unfocus() {
@@ -227,13 +234,16 @@ class DockingState {
         itemId: String,
         x: Float,
         y: Float,
-        width: Float = 320f,
-        height: Float = 220f,
+        width: Float = DefaultFloatingWidth,
+        height: Float = DefaultFloatingHeight,
     ): DockWindowDragStart? {
         val existingWindow = floatingWindows.firstOrNull { window -> window.stack.items.any { it.id == itemId } }
         if (existingWindow != null) {
-            draggedWindowId = existingWindow.id
-            return DockWindowDragStart(existingWindow.id, created = false)
+            if (existingWindow.detached) return null
+            if (existingWindow.stack.items.size == 1) {
+                draggedWindowId = existingWindow.id
+                return DockWindowDragStart(existingWindow.id, created = false)
+            }
         }
         val item = removeItemForDock(itemId) ?: return null
         val window = FloatingDockWindow(
@@ -292,7 +302,7 @@ class DockingState {
         spaceHeight = height
         for (index in floatingWindows.indices) {
             val window = floatingWindows[index]
-            if (window.id == draggedWindowId) continue
+            if (window.id == draggedWindowId || window.detached) continue
             val kept = window.keptInSpace()
             if (kept != window) floatingWindows[index] = kept
         }
@@ -305,6 +315,29 @@ class DockingState {
             x = x.coerceIn(0f, (spaceWidth - width).coerceAtLeast(0f)),
             y = y.coerceIn(0f, (spaceHeight - height).coerceAtLeast(0f)),
         )
+    }
+
+    internal fun setWindowDetached(windowId: String, detached: Boolean): Boolean {
+        val index = floatingWindows.indexOfFirst { it.id == windowId }
+        if (index < 0) return false
+        val current = floatingWindows[index]
+        if (detached && !current.stack.items.all(canDetachItem)) return false
+        val window = current.copy(detached = detached, dragKey = null)
+        floatingWindows[index] = window.keptInSpace()
+        return true
+    }
+
+    internal fun detachItem(itemId: String, window: FloatingDockWindow): Boolean {
+        val item = item(itemId) ?: return false
+        if (!canDetachItem(item) || window.stack.items.singleOrNull()?.id != itemId) return false
+        if (isPinned(itemId)) {
+            close(itemId)
+        } else if (removeItemForDock(itemId) == null) {
+            return false
+        }
+        floatingWindows += window.copy(detached = true).keptInSpace()
+        focus(itemId)
+        return true
     }
 
     fun dockDraggedWindow(target: DockTarget): Boolean {
@@ -549,7 +582,7 @@ class DockingState {
         return root?.firstItemId() ?: floatingWindows.firstOrNull()?.stack?.items?.firstOrNull()?.id
     }
 
-    private fun defaultStackTarget(target: DockTarget): DockTarget {
+    internal fun defaultStackTarget(target: DockTarget): DockTarget {
         if (target.anchorId != null || target.placement != DockPlacement.CENTER) return target
         val anchor = focusedItemId
             ?.let { root?.findStackWithItem(it)?.id }

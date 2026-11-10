@@ -85,7 +85,7 @@ internal fun TimelineCurveGraph(
                 }
                 guides.forEach { drawShape(it, UiPaint.Color(TimelineColors.Handle), UiDrawStyle.Stroke(1f)) }
             }.panCurveOnDrag(controller, scroll, pxPerValue, pan, refresh).onPress { event ->
-                if (!event.isLeftClick()) {
+                if (!event.isLeftButton()) {
                     marquee = null
                     return@onPress
                 }
@@ -94,13 +94,13 @@ internal fun TimelineCurveGraph(
                 if (!event.isAdditiveSelection()) controller.clearSelection()
                 refresh()
             }.onDrag { event ->
-                if (!event.isLeftClick()) return@onDrag
+                if (!event.isLeftButton()) return@onDrag
                 val band = marquee ?: return@onDrag
                 marquee = band.copy(toX = event.localX, toY = event.localY)
                 event.consume()
                 refresh()
             }.onRelease { event ->
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     if (pan.release()) {
                         val time = controller.timelineTimeAt(pan.pressLocalX, pxPerSec)
                         menu = TimelineMenuState(pan.pressX, pan.pressY, null, time, locked = false)
@@ -218,14 +218,14 @@ private fun CurveKeyPoint(
             .cursor(if (lane.locked) UiCursorShape.DEFAULT else UiCursorShape.MOVE).shape(TimelineDiamondShape)
             .shapeFill(keyframeColor(lane.color, selected, visible = true)).onPress { event ->
                 if (lane.locked) return@onPress
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     if (!selected) controller.select(listOf(keyframe), additive = false)
                     onContextMenu(event, lane.curve, keyframe.time)
                     event.consume()
                     refresh()
                     return@onPress
                 }
-                if (!event.isLeftClick()) return@onPress
+                if (!event.isLeftButton()) return@onPress
                 event.consume()
                 press.begin(keyframe, event.modifiers, controller) {
                     stackedInGraph(controller, lanes, keyframe, pxPerSec, center, span, height)
@@ -278,7 +278,7 @@ private fun CurveHandle(
         modifier = Modifier.position((x - half).px, (y - half).px).size(CurveHandleSize.px, CurveHandleSize.px)
             .background(color.withAlpha(if (active || picked) 1f else 0.4f)).borderRadius(half)
             .cursor(UiCursorShape.MOVE).onPress { event ->
-                if (!event.isLeftClick()) return@onPress
+                if (!event.isLeftButton()) return@onPress
                 val inSelection = picked || controller.isSelected(keyframe)
                 if (!inSelection || event.isAdditiveSelection()) {
                     controller.selectHandle(keyframe, side, event.isAdditiveSelection())
@@ -498,7 +498,7 @@ private fun Modifier.panCurveOnDrag(
 
 /** The keymap's pan drag, or the right button, which pans the graph too and opens its menu on a click. */
 private fun isPanPress(event: UiEvent): Boolean =
-    event.isRightClick() || HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
+    event.isRightButton() || HollowKeys.DRAG_PAN.matchesMouse(event.button, event.modifiers)
 
 private fun keysInCurveMarquee(
     controller: TimelineController,

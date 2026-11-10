@@ -93,8 +93,8 @@ fun RecipeEditing.Slot(binding: RecipeSlotBinding, large: Boolean = binding.kind
         },
     ).onClick { event ->
         when {
-            event.isLeftClick() -> session.select(binding)
-            event.isRightClick() -> session.write(binding, null)
+            event.isLeftButton() -> session.select(binding)
+            event.isRightButton() -> session.write(binding, null)
         }
         event.consume()
     }

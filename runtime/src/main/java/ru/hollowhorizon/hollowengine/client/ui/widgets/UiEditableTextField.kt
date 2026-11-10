@@ -12,7 +12,6 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiCaretBlinkPeriodMillis
 import ru.hollowhorizon.hollowengine.client.ui.style.UiComputedStyle
 import ru.hollowhorizon.hollowengine.client.ui.style.margin
 import ru.hollowhorizon.hollowengine.client.ui.text.*
-import ru.hollowhorizon.hollowengine.common.scripting.ide.CodeFold
 import kotlin.math.abs
 
 /** One logical line of the field's text: its offset in the document and its text (no newline). */
@@ -634,15 +633,15 @@ fun EditableTextField(
                 pointerState.beginPress(state.text, hit.offset, clickCount, altPressed)
                 handleEditableFieldPress(
                     state, hit.offset, clickCount, event.modifiers, pointerState, hit.inlayAffinity,
-                    allowSelectionMove = event.isLeftClick(),
+                    allowSelectionMove = event.isLeftButton(),
                 )
             }.onDrag { event ->
-                if (!event.isLeftClick()) return@onDrag
+                if (!event.isLeftButton()) return@onDrag
                 if (pointerState.movingSelection && abs(event.dragTotalX) < 3f && abs(event.dragTotalY) < 3f) return@onDrag
                 handleEditableFieldDrag(state, clickOffset(event, layout, gutterWidth), pointerState)
                 if (pointerState.movingSelection) state.previewDropAt(event.rootLocalX, event.rootLocalY)
             }.onRelease { event ->
-                if (!event.isLeftClick()) return@onRelease
+                if (!event.isLeftButton()) return@onRelease
                 val offset = state.offsetAtPoint?.invoke(event.rootLocalX, event.rootLocalY) ?: state.caret
                 val hit = event.frame?.hitTest(event.x, event.y)?.node
                 val inside = generateSequence(hit) { it.layoutState.parentNode }.any { it === event.node }

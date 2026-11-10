@@ -5,6 +5,24 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 
+private const val DropOverlayId = "dock-drop-overlay"
+
+@Composable
+internal fun DockStackDropPreview(
+    id: String,
+    modifier: Modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER),
+    size: Float = MaxSplitZoneSize,
+) {
+    Box(
+        id = "$id-drop-preview",
+        mode = UiBoxMode.STACK,
+        tags = listOf(DockTags.DropZone, DockTags.Active),
+        modifier = modifier.size(size.px, size.px).layer(10_000).inputTransparent(),
+    ) {
+        DropZoneGlyph(DockPlacement.CENTER)
+    }
+}
+
 @Composable
 internal fun FloatingResizeHandle(window: FloatingDockWindow, state: DockingState) {
     DockResizeEdge.entries.forEach { edge ->
@@ -32,38 +50,75 @@ internal fun DockDropOverlay(
     leftInset: Float = 0f,
     rightInset: Float = 0f,
     bottomInset: Float = 0f,
+    incoming: DockIncomingDrop? = null,
 ) {
     var bounds by remember { mutableStateOf(UiRect.Zero) }
+    var hoveredStackId by remember { mutableStateOf<String?>(null) }
+    val target = if (incoming == null) state.previewTarget else (incoming.target as? DockDropTarget.Pane)?.target
     Box(
-        id = "dock-drop-overlay",
+        id = DropOverlayId,
         tags = listOf(DockTags.DropOverlay),
         modifier = Modifier.size(100.percent, 100.percent).padding(leftInset.px, 0.px, rightInset.px, bottomInset.px)
-            .layer(10_000).onPlaced { bounds = it }) {
+            .layer(10_000).onPlaced { bounds = it }
+            .then(if (incoming == null) localDropReceiver(state) { hoveredStackId = it } else Modifier),
+    ) {
         val root = state.root
         val layouts = DockLayoutCalculator.layout(root, DockBounds)
-        DockDropPreview(
-            state,
-            layouts,
-            width = bounds.width - leftInset - rightInset,
-            height = bounds.height - bottomInset,
-        )
-        if (root == null) {
-            DockPlusDropZones(state, DockTarget.Root, DockBounds, 1)
-            return@Box
+        if (target?.placement == DockPlacement.CENTER) {
+            if (incoming != null) {
+                dockPreviewRect(target, layouts, DockBounds)?.let { pane ->
+                    val size = pane.splitZoneSize()
+                    DockStackDropPreview(
+                        "dock-center",
+                        Modifier.position(pane.centerDropX(size), pane.centerDropY(size)),
+                        size,
+                    )
+                }
+            }
+        } else {
+            DockDropPreview(
+                target,
+                layouts,
+                width = bounds.width - leftInset - rightInset,
+                height = bounds.height - bottomInset,
+            )
         }
-        layouts.filter { it.stack }.forEach { layout ->
-            DockPlusDropZones(state, DockTarget(anchorId = layout.nodeId), layout.rect, 1)
+        val anchor = target?.anchorId ?: hoveredStackId
+        val floating = state.floatingWindows.firstOrNull { incoming == null && !it.detached && it.stack.id == anchor }
+        if (floating != null) {
+            val size = minOf(MaxSplitZoneSize, floating.width, floating.height)
+            val x = (floating.x - leftInset + (floating.width - size) / 2f).px
+            val y = (floating.y + (floating.height - size) / 2f).px
+            DockDropZone(state, DockTarget(floating.stack.id), x, y, size.px, size.px, 1, null)
+        } else {
+            val stackId = (root as? DockNode.Stack)?.id ?: anchor
+            layouts.firstOrNull { it.stack && it.nodeId == stackId }?.let { layout ->
+                DockPaneDropZones(state, layout, incoming)
+            }
+            if (root == null && incoming == null) DockCenterDropZone(state, DockTarget.Root, DockBounds)
         }
-        DockRootDropZones(state)
+        if (root is DockNode.Split) DockRootDropZones(state, incoming)
     }
+}
+
+private fun localDropReceiver(state: DockingState, onHoverStack: (String?) -> Unit): Modifier =
+    Modifier.input(hoverable = true, clickable = true).onHover { event -> onHoverStack(event.stackUnderDrag(state)) }
+        .onRelease { event ->
+            if (event.isLeftButton()) state.finishDraggingWindow()
+        }
+
+private fun UiEvent.stackUnderDrag(state: DockingState): String? {
+    val sourceId = state.draggedWindowId ?: return null
+    val destination = frame?.dockDropTargetAt(x, y) { node -> node.id == DropOverlayId || node.id == sourceId }
+    return (destination as? DockDropTarget.Pane)?.target?.anchorId
 }
 
 /**
  * Outlines where the dragged window would land.
  */
 @Composable
-private fun DockDropPreview(state: DockingState, layouts: List<DockNodeLayout>, width: Float, height: Float) {
-    val target = state.previewTarget?.let { dockPreviewRect(it, layouts, DockBounds) }
+private fun DockDropPreview(preview: DockTarget?, layouts: List<DockNodeLayout>, width: Float, height: Float) {
+    val target = preview?.let { dockPreviewRect(it, layouts, DockBounds) }
     val last = remember { arrayOfNulls<DockRect>(1) }
     if (target != null) last[0] = target
     val rect = target ?: last[0] ?: return
@@ -74,73 +129,85 @@ private fun DockDropPreview(state: DockingState, layouts: List<DockNodeLayout>, 
         id = "dock-drop-preview",
         tags = listOfNotNull(DockTags.DropPreview, "visible".takeIf { target != null }),
         modifier = Modifier.position(0.px, 0.px).size(
-                (rect.width * scaleX - DropPreviewInset * 2f).coerceAtLeast(0f).px,
-                (rect.height * scaleY - DropPreviewInset * 2f).coerceAtLeast(0f).px
-            ).translate(rect.x * scaleX + DropPreviewInset, rect.y * scaleY + DropPreviewInset).inputTransparent(),
+            (rect.width * scaleX - DropPreviewInset * 2f).coerceAtLeast(0f).px,
+            (rect.height * scaleY - DropPreviewInset * 2f).coerceAtLeast(0f).px
+        ).translate(rect.x * scaleX + DropPreviewInset, rect.y * scaleY + DropPreviewInset).inputTransparent(),
     )
 }
 
 @Composable
-private fun DockRootDropZones(state: DockingState) {
-    DockDropZone(state, DockTarget(placement = DockPlacement.LEFT), width = 25.px, height = 125.px, layer = 2)
-    DockDropZone(state, DockTarget(placement = DockPlacement.RIGHT), width = 25.px, height = 125.px, layer = 2)
-    DockDropZone(state, DockTarget(placement = DockPlacement.TOP), width = 125.px, height = 25.px, layer = 2)
-    DockDropZone(state, DockTarget(placement = DockPlacement.BOTTOM), width = 125.px, height = 25.px, layer = 2)
+private fun DockRootDropZones(state: DockingState, incoming: DockIncomingDrop?) {
+    for (placement in listOf(DockPlacement.LEFT, DockPlacement.RIGHT, DockPlacement.TOP, DockPlacement.BOTTOM)) {
+        val vertical = placement == DockPlacement.LEFT || placement == DockPlacement.RIGHT
+        DockDropZone(
+            state, DockTarget(placement = placement),
+            width = if (vertical) 25.px else 125.px, height = if (vertical) 125.px else 25.px,
+            layer = 2, incoming = incoming,
+        )
+    }
 }
 
 @Composable
-private fun DockPlusDropZones(state: DockingState, baseTarget: DockTarget, rect: DockRect, layer: Int) {
-    val cell = minOf(rect.width, rect.height) * 0.6f
+private fun DockPaneDropZones(state: DockingState, layout: DockNodeLayout, incoming: DockIncomingDrop?) {
+    val rect = layout.rect
+    val cell = rect.splitZoneSize()
     val gap = cell * 0.18f
-    val centerX = (rect.x + rect.width * 0.5f).percent - (cell * 0.5f).px
-    val centerY = (rect.y + rect.height * 0.5f).percent - (cell * 0.5f).px
+    val centerX = rect.centerDropX(cell)
+    val centerY = rect.centerDropY(cell)
 
+    if (incoming == null) DockCenterDropZone(state, DockTarget(layout.nodeId), rect)
+    val distance = (cell + gap).px
     DockDropZone(
         state,
-        baseTarget.copy(placement = DockPlacement.CENTER),
-        centerX,
+        DockTarget(layout.nodeId, DockPlacement.LEFT),
+        centerX - distance,
         centerY,
         cell.px,
         cell.px,
-        layer,
+        1,
+        incoming
     )
     DockDropZone(
         state,
-        baseTarget.copy(placement = DockPlacement.LEFT),
-        centerX - cell.px - gap.px,
+        DockTarget(layout.nodeId, DockPlacement.RIGHT),
+        centerX + distance,
         centerY,
         cell.px,
         cell.px,
-        layer,
+        1,
+        incoming
     )
     DockDropZone(
         state,
-        baseTarget.copy(placement = DockPlacement.RIGHT),
-        centerX + cell.px + gap.px,
-        centerY,
-        cell.px,
-        cell.px,
-        layer,
-    )
-    DockDropZone(
-        state,
-        baseTarget.copy(placement = DockPlacement.TOP),
+        DockTarget(layout.nodeId, DockPlacement.TOP),
         centerX,
-        centerY - cell.px - gap.px,
+        centerY - distance,
         cell.px,
         cell.px,
-        layer,
+        1,
+        incoming
     )
     DockDropZone(
         state,
-        baseTarget.copy(placement = DockPlacement.BOTTOM),
+        DockTarget(layout.nodeId, DockPlacement.BOTTOM),
         centerX,
-        centerY + cell.px + gap.px,
+        centerY + distance,
         cell.px,
         cell.px,
-        layer,
+        1,
+        incoming
     )
 }
+
+@Composable
+private fun DockCenterDropZone(state: DockingState, target: DockTarget, rect: DockRect) {
+    val cell = rect.splitZoneSize()
+    DockDropZone(state, target, rect.centerDropX(cell), rect.centerDropY(cell), cell.px, cell.px, 1, null)
+}
+
+private fun DockRect.splitZoneSize(): Float = (minOf(width, height) * 0.6f).coerceAtMost(MaxSplitZoneSize)
+private fun DockRect.centerDropX(size: Float): UiLength = (x + width * 0.5f).percent - (size * 0.5f).px
+private fun DockRect.centerDropY(size: Float): UiLength = (y + height * 0.5f).percent - (size * 0.5f).px
 
 @Composable
 private fun DockDropZone(
@@ -151,20 +218,24 @@ private fun DockDropZone(
     width: UiLength,
     height: UiLength,
     layer: Int,
+    incoming: DockIncomingDrop?,
 ) {
-    val active = state.previewTarget == target
+    val destination = DockDropTarget.Pane(target)
+    val active = if (incoming != null) incoming.target == destination else state.previewTarget == target
     Box(
         id = "dock-drop-${target.anchorId ?: "root"}-${target.placement.name.lowercase()}",
         mode = UiBoxMode.STACK,
         tags = listOfNotNull(DockTags.DropZone, DockTags.Active.takeIf { active }),
         modifier = Modifier.size(width, height).layer(layer).input(hoverable = true, clickable = true)
-            .cursor(UiCursorShape.HAND).onHover {
-                state.previewDock(target)
+            .then(DockDropZoneMarker(destination)).cursor(UiCursorShape.HAND).onHover {
+                if (incoming == null) state.previewDock(target)
             }.onExit {
-                if (state.previewTarget == target) state.previewDock(null)
+                if (incoming == null && state.previewTarget == target) state.previewDock(null)
             }.onRelease { event ->
-                state.dockDraggedWindow(target)
-                event.consume()
+                if (incoming != null || !event.isLeftButton()) return@onRelease
+                val id = state.draggedWindowId ?: return@onRelease
+                if (state.transfer(DockTransferSource.Window(id), destination)) event.consume()
+                state.finishDraggingWindow()
             }.then(
                 if (x == null || y == null) {
                     if (target.placement == DockPlacement.LEFT || target.placement == DockPlacement.RIGHT) {
@@ -201,7 +272,7 @@ private fun DropZoneGlyph(placement: DockPlacement) {
     )
 }
 
-private fun Modifier.resizeHandleModifier(edge: DockResizeEdge): Modifier {
+internal fun Modifier.resizeHandleModifier(edge: DockResizeEdge): Modifier {
     val thickness = 2.px
     val corner = 6.px
     val layer = if (edge.isCorner) layer(1) else layer(0)
@@ -219,10 +290,10 @@ private fun Modifier.resizeHandleModifier(edge: DockResizeEdge): Modifier {
     )
 }
 
-private val DockResizeEdge.isCorner: Boolean
+internal val DockResizeEdge.isCorner: Boolean
     get() = this == DockResizeEdge.TOP_LEFT || this == DockResizeEdge.TOP_RIGHT || this == DockResizeEdge.BOTTOM_LEFT || this == DockResizeEdge.BOTTOM_RIGHT
 
-private val DockResizeEdge.cursorShape: UiCursorShape
+internal val DockResizeEdge.cursorShape: UiCursorShape
     get() = when (this) {
         DockResizeEdge.LEFT,
         DockResizeEdge.RIGHT,
@@ -242,7 +313,7 @@ private val DockResizeEdge.cursorShape: UiCursorShape
     }
 
 @Composable
-internal fun DockStripeDropZones(state: DockingState) {
+internal fun DockStripeDropZones(state: DockingState, incoming: DockIncomingDrop?) {
     var hovered by remember { mutableStateOf<DockAnchor?>(null) }
     Box(
         id = "dock-stripe-drop-zones",
@@ -250,7 +321,8 @@ internal fun DockStripeDropZones(state: DockingState) {
         modifier = Modifier.size(100.percent, 100.percent).layer(10_001).inputTransparent(),
     ) {
         DockAnchor.all.forEach { anchor ->
-            val active = hovered == anchor
+            val destination = DockDropTarget.Stripe(anchor)
+            val active = if (incoming != null) incoming.target == destination else hovered == anchor
             val horizontal = if (anchor.side == DockSide.LEFT) UiAlign.START else UiAlign.END
             val vertical = when (anchor.group) {
                 DockStripeGroup.TOP -> UiAlign.START
@@ -262,9 +334,12 @@ internal fun DockStripeDropZones(state: DockingState) {
                 tags = listOfNotNull(DockTags.DropZone, DockTags.Active.takeIf { active }),
                 modifier = Modifier.size(StripeDropWidth.px, StripeDropHeight.percent).align(horizontal, vertical)
                     .input(hoverable = true, clickable = true).tooltipOnHover(DockLang.ParkHere)
-                    .onHover { hovered = anchor }.onExit { if (hovered == anchor) hovered = null }.onRelease { event ->
-                        state.pinDraggedWindow(anchor)
-                        event.consume()
+                    .then(DockDropZoneMarker(destination)).onHover { if (incoming == null) hovered = anchor }
+                    .onExit { if (hovered == anchor) hovered = null }.onRelease { event ->
+                        if (incoming == null) {
+                            state.pinDraggedWindow(anchor)
+                            event.consume()
+                        }
                     },
             )
         }
@@ -276,6 +351,7 @@ private const val StripeDropWidth = 28f
 private const val StripeDropHeight = 32f
 private val DockBounds = DockRect(0f, 0f, 100f, 100f)
 private const val DropPreviewInset = 3f
+private const val MaxSplitZoneSize = 36f
 
 internal fun DockingState.bottomAreaHeight(): Float {
     val open = DockSide.entries.any { side -> expandedIn(DockAnchor(side, DockStripeGroup.BOTTOM)) != null }

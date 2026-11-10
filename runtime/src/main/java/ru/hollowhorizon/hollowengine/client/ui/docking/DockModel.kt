@@ -59,6 +59,9 @@ data class DockPinnedItem(
 /** Width a tool window's panel takes the first time it is pinned. */
 const val DefaultPinnedWidth = 260f
 const val DefaultBottomHeight = 220f
+internal const val DefaultFloatingOffset = 32f
+internal const val DefaultFloatingWidth = 320f
+internal const val DefaultFloatingHeight = 220f
 
 sealed interface DockNode {
     val id: String
@@ -89,6 +92,7 @@ data class FloatingDockWindow(
     val width: Float,
     val height: Float,
     val dragKey: String? = null,
+    val detached: Boolean = false,
 )
 
 data class DockTabDragState(
@@ -282,7 +286,7 @@ private fun DockNode.replace(nodeId: String, transform: (DockNode) -> DockNode):
     }
 }
 
-private fun DockNode.Stack.merge(newItems: List<DockItem>, tabIndex: Int?): DockNode.Stack {
+internal fun DockNode.Stack.merge(newItems: List<DockItem>, tabIndex: Int?): DockNode.Stack {
     val uniqueItems = newItems.filter { item -> items.none { it.id == item.id } }
     if (uniqueItems.isEmpty()) return this
     val insertionIndex = tabIndex?.coerceIn(0, items.size) ?: items.size

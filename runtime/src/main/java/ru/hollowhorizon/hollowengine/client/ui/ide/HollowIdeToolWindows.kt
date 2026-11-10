@@ -21,12 +21,13 @@ internal class HollowIdeToolWindow(
     val minHeight: Float = 32f,
     val closable: Boolean = true,
     val titleInToolbar: Boolean = false,
+    val detachable: Boolean = true,
 ) {
     val title: String get() = titleKey.lang
 
     fun dockItem(): DockItem = DockItem(
         id = id,
-        title = title,
+        title = titleKey,
         icon = icon,
         closable = closable,
         minWidth = minWidth,
@@ -99,6 +100,7 @@ internal object HollowIdeToolWindows {
         anchors = listOf(HollowIdePanelAnchor.TIMELINE, HollowIdePanelAnchor.EDITORS, HollowIdePanelAnchor.PROJECT),
         minWidth = 160f,
         minHeight = 90f,
+        detachable = false,
     )
     val History = HollowIdeToolWindow(
         id = HistoryId,

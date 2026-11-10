@@ -44,6 +44,13 @@ object HollowIdeScale {
     fun scaledHeight(): Float =
         ceil(HollowIdeGameViewport.windowHeight().toDouble() / factor()).toFloat().coerceAtLeast(1f)
 
+    internal fun detachedFactor(width: Int, height: Int): Float {
+        val fits = min(width / MinLogicalWidth, height / MinLogicalHeight).coerceAtLeast(1f)
+        if (guiScale >= MinScale) return guiScale.coerceAtMost(fits)
+        val auto = fits.toInt()
+        return (if (Minecraft.getInstance().isEnforceUnicode && auto % 2 != 0) auto + 1 else auto).toFloat()
+    }
+
     /** What the slider shows: whole steps, with the configured fraction spelled out as it is. */
     fun label(scale: Float): String = when {
         scale < MinScale -> "Auto"

@@ -188,7 +188,7 @@ internal fun AssetManagerPanel(
                     if (expanding && remoteServer) RemoteServerAssetState.requestDirectory(item.payload)
                 },
                 onSelect = { item, event ->
-                    if (!event.isLeftClick()) return@UiTreeView
+                    if (!event.isLeftButton()) return@UiTreeView
                     selectDirectory(item.payload)
                     if (state.treeClicks.isDoubleClick(item.id)) {
                         val key = scope.expandedKey(item.payload.key)
@@ -301,7 +301,7 @@ private fun AssetScopeTabs(selected: AssetResourceScope, onSelect: (AssetResourc
             Box(
                 tags = if (scope == selected) listOf("asset-tab", "selected") else listOf("asset-tab"),
                 modifier = Modifier.size(0.px, 17.px).grow(1f).cursor(UiCursorShape.HAND).onClick { event ->
-                    if (event.isLeftClick()) onSelect(scope)
+                    if (event.isLeftButton()) onSelect(scope)
                     event.consume()
                 },
             ) { Text(scope.labelKey.lang, tags = listOf("asset-tab-label")) }

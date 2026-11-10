@@ -125,6 +125,26 @@ object HollowIdeOverlay {
     private val surface = HollowUiSurface()
     private val renderer = MinecraftUiRenderer()
     private val pipeline = PipelinedUiFrameBuilder()
+    private val detachedWindows = HollowIdeDetachedWindows(
+        dock = dock,
+        beforeInput = pipeline::await,
+        onFocus = {
+            gameCaptureRequested = false
+            surface.runtime.unfocus()
+        },
+        onUnhandledKey = ::historyKey,
+        onFailure = { statusText = it },
+        mainRuntime = surface.runtime,
+        revealMainDock = {
+            if (isVisible()) {
+                collapsed = false
+                true
+            } else {
+                false
+            }
+        },
+        content = { id, window -> DetachedContent(id, window) },
+    )
 
     private const val PIPELINE_FRAMES = true
     private var initialized = false
@@ -139,16 +159,18 @@ object HollowIdeOverlay {
         model = model,
         focusProjectTree = {
             dock.focus(ProjectTreeId)
-            if (surface.runtime.focusedKey != ProjectFilterInputId) surface.runtime.unfocus()
+            val runtime = activeRuntime()
+            if (runtime.focusedKey != ProjectFilterInputId) runtime.unfocus()
         },
         shortcutsActive = {
-            dock.focusedItemId == ProjectTreeId && surface.runtime.focusedKey != ProjectFilterInputId && !packaging.hasOpenDialog
+            dock.focusedItemId == ProjectTreeId && activeRuntime().focusedKey != ProjectFilterInputId &&
+                    !packaging.hasOpenDialog
         },
         closeDockItem = { dock.close(it) },
         openFile = { openFileDockItem(it) },
         setStatus = { statusText = it },
-        pointerX = { surface.runtime.mouseX },
-        pointerY = { surface.runtime.mouseY },
+        pointerX = { activeRuntime().mouseX },
+        pointerY = { activeRuntime().mouseY },
     )
     private val packaging = HollowIdeProjectPackaging(model) { statusText = it }
     private val console = HollowIdeConsole()
@@ -447,7 +469,18 @@ object HollowIdeOverlay {
             }
 
             GLFW.GLFW_RELEASE -> {
+                val draggedWindow = dock.draggedWindowId
+                val detach = button == GLFW.GLFW_MOUSE_BUTTON_LEFT && activeButton == button &&
+                        draggedWindow != null &&
+                        detachedWindows.dropFromMain(draggedWindow)
                 activeButton = null
+                if (detach) {
+                    surface.runtime.cancelPointerInput()
+                    dock.finishDraggingWindow()
+                    endGesture(PointerOwner.EDITOR)
+                    settleGesture()
+                    return true
+                }
                 when (endGesture(pointerOwnerAt(point))) {
                     PointerOwner.GAME -> false
                     PointerOwner.EDITOR -> surface.runtime.mouseReleased(
@@ -593,19 +626,39 @@ object HollowIdeOverlay {
             WindowsFileDragSource.runPending(event.minecraft.window.window)
         }
         externalFiles.update(event.minecraft.window.window, isVisible() && !collapsed)
-        if (!isVisible()) return
+        if (detachedWindows.active) {
+            pipeline.await()
+            if (!useHollowUiOverlay || HollowEngineConfig.editMode == EditMode.DISABLED) {
+                detachedWindows.close()
+                pipeline.reset()
+            } else if (detachedWindows.prepare()) {
+                pipeline.reset()
+            }
+        }
+        if (!isVisible() && !detachedWindows.active) return
         if (!externalFiles.active && refreshFilesRequested.getAndSet(false)) {
             pipeline.await()
             model.refreshExternalFiles()
         }
         AssetManagerLifecycle.observe(event.minecraft)
-        renderOverlay(currentBlitTarget())
+        if (isVisible()) renderOverlay(currentBlitTarget())
+        detachedWindows.render()
+        if (isVisible() && PIPELINE_FRAMES) scheduleOverlayFrame()
+    }
+
+    internal fun closeDetachedWindows() {
+        if (!detachedWindows.active) return
+        pipeline.await()
+        detachedWindows.close()
     }
 
     private fun initialize() {
         if (initialized) return
         initialized = true
         dock.onTabContextMenu = ::openFileContextMenu
+        dock.canDetachItem = { item -> toolWindow(item.id)?.detachable != false }
+        dock.onDetachItem = detachedWindows::detach
+        dock.onDetachedFocus = detachedWindows::requestFocus
         model.onFileRemoved = ::forgetFile
         contributions.start()
         restoreLayout()
@@ -717,7 +770,16 @@ object HollowIdeOverlay {
             y = event.y,
             actions = fileContextMenuActions(context).map { action ->
                 FileContextMenuEntry(action, enabled = action.isEnabled(context))
-            },
+            } + listOfNotNull(
+                if (!dock.canDetachItem(item) || dock.isDetached(item.id)) null else FileContextMenuEntry(
+                    HollowIdeFileAction(
+                        id = "detach",
+                        label = DockLang.Detach,
+                        separatorBefore = true,
+                    ) { detachedWindows.detach(item) },
+                    enabled = true,
+                ),
+            ),
         )
     }
 
@@ -795,26 +857,8 @@ object HollowIdeOverlay {
         WatchTextFiles()
         Box(
             id = "ide-root",
-            modifier = Modifier.style("hollowengine:ui/styles/widgets.hss").style("hollowengine:ui/styles/ide.hss")
-                .size(100.percent, 100.percent).focusScope().onKeyInput { input ->
-                    val handled =
-                        !input.repeat && (input.key == GLFW.GLFW_KEY_ESCAPE && packaging.closeDialogs() || input.key == GLFW.GLFW_KEY_ESCAPE && closeFileContextMenu() || input.key == GLFW.GLFW_KEY_ESCAPE && closeKeymap() || handleHollowIdeSearchKey(
-                            search, input.key, input.modifiers, ::openSearchResult
-                        ) || project.handleNameDialogKey(input.key) || handleSearchOverlayShortcut(
-                            input.key, input.modifiers
-                        ) || handleProjectFilterShortcut(
-                            input.key, input.modifiers
-                        ) || project.handleShortcut(input.key, input.modifiers) || handleStripeShortcut(
-                            input.key, input.modifiers
-                        ) || handleDockShortcut(
-                            input.key, input.modifiers
-                        ) || handleEditorShortcut(
-                            input.key, input.modifiers
-                        ))
-                    if (handled) input.consume()
-                }) {
-            IdeInspectorHost.pending?.let { request -> AssetPickerDialog(request) { IdeInspectorHost.pending = null } }
-            codeRename.Dialog()
+            modifier = workspaceModifier(),
+        ) {
             CompositionLocalProvider(LocalDragAndDrop provides dragAndDrop) {
                 if (collapsed) {
                     GearButton()
@@ -825,36 +869,16 @@ object HollowIdeOverlay {
                             state = dock,
                             id = "ide-dock",
                             modifier = Modifier.size(100.percent, 0.px).grow(1f),
-                            tabBarActions = { item ->
-                                when (item.id) {
-                                    SceneId -> SceneHeaderActions()
-                                    ProjectTreeId -> HollowIdeProjectActions(packaging)
-                                    else -> fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
-                                }
-                            },
+                            tabBarActions = { DockActions(it) },
+                            incoming = detachedWindows.incoming(null),
                             content = { item -> DockContent(item) },
                         )
                         StatusBar()
                     }
-                    HollowIdeFileContextMenu(
-                        menu = fileContextMenu,
-                        onAction = ::runFileAction,
-                        onDismiss = { fileContextMenu = null },
-                    )
-                    HollowIdeSearchDialog(search, ::openSearchResult)
-                    HollowIdeProjectDialogs(packaging)
                     HollowIdeKeymapDialog(keymapVisible) { keymapVisible = false }
-                    EditorColorPickerPopup()
-                    if (gutterNavigation.isNotEmpty()) ContextMenu(
-                        id = "ide-gutter-navigation",
-                        anchorBounds = UiRect(lastMouseX, lastMouseY, 0f, 0f),
-                        items = gutterNavigation.map { (label, location) ->
-                            UiDropdownItem(label = label, onClick = { openDefinition(location) })
-                        },
-                        onExpandedChange = { if (!it) gutterNavigation = emptyList() },
-                    )
                     UiDragGhost(dragAndDrop)
                 }
+                if (detachedWindows.focusedWindowId == null) WorkspaceDialogs(surface.runtime, expanded = !collapsed)
                 HollowIdeHideToolbarDialog(
                     visible = hideToolbarConfirmationVisible,
                     onConfirm = ::hideToolbar,
@@ -862,6 +886,76 @@ object HollowIdeOverlay {
                 )
             }
         }
+    }
+
+    @Composable
+    private fun DetachedContent(id: String, window: HollowIdeNativeWindow) {
+        val panel = dock.floatingWindows.firstOrNull { it.id == id && it.detached } ?: return
+        Box(id = "ide-root", modifier = workspaceModifier()) {
+            CompositionLocalProvider(LocalDragAndDrop provides window.dragAndDrop) {
+                DetachedDockSpace(
+                    panel,
+                    dock,
+                    tabBarActions = { DockActions(it) },
+                    incoming = detachedWindows.incoming(id),
+                    onTearOff = if (window.chrome.custom) {
+                        { item -> detachedWindows.startNativeDrag(id, DockTransferSource.Tab(item.id)) }
+                    } else {
+                        null
+                    },
+                    titleDrag = window.chrome.takeIf { it.custom }?.let { chrome ->
+                        windowTitleDrag(chrome) { detachedWindows.startNativeDrag(id, DockTransferSource.Window(id)) }
+                    },
+                    chrome = { HollowIdeWindowControls(id, window.chrome) },
+                    resizeHandles = { HollowIdeWindowResizeHandles(id, window.chrome) },
+                    content = { DockContent(it) },
+                )
+                if (detachedWindows.focusedWindowId == id) WorkspaceDialogs(window.surface.runtime, expanded = true)
+                UiDragGhost(window.dragAndDrop)
+            }
+        }
+    }
+
+    private fun workspaceModifier(): Modifier =
+        Modifier.style("hollowengine:ui/styles/widgets.hss").style("hollowengine:ui/styles/ide.hss")
+            .size(100.percent, 100.percent).focusScope().onKeyInput { input ->
+                if (!input.repeat && handleWorkspaceKey(input.key, input.modifiers)) input.consume()
+            }
+
+    private fun handleWorkspaceKey(key: Int, modifiers: Int): Boolean =
+        key == GLFW.GLFW_KEY_ESCAPE && (packaging.closeDialogs() || closeFileContextMenu() || closeKeymap()) ||
+                handleHollowIdeSearchKey(search, key, modifiers, ::openSearchResult) ||
+                project.handleNameDialogKey(key) || handleSearchOverlayShortcut(key, modifiers) ||
+                handleProjectFilterShortcut(key, modifiers) || project.handleShortcut(key, modifiers) ||
+                handleStripeShortcut(key, modifiers) || handleDockShortcut(key, modifiers) ||
+                handleEditorShortcut(key, modifiers)
+
+    @Composable
+    private fun DockActions(item: DockItem) {
+        when (item.id) {
+            SceneId -> SceneHeaderActions()
+            ProjectTreeId -> HollowIdeProjectActions(packaging)
+            else -> fileView(item.id)?.let { view -> HollowIdeViewModeSwitch(view, item.id) }
+        }
+    }
+
+    @Composable
+    private fun WorkspaceDialogs(runtime: HollowUiRuntime, expanded: Boolean) {
+        IdeInspectorHost.pending?.let { request -> AssetPickerDialog(request) { IdeInspectorHost.pending = null } }
+        codeRename.Dialog()
+        if (!expanded) return
+        HollowIdeFileContextMenu(fileContextMenu, ::runFileAction, onDismiss = { fileContextMenu = null })
+        HollowIdeSearchDialog(search, ::openSearchResult)
+        HollowIdeProjectDialogs(packaging)
+        EditorColorPickerPopup()
+        if (gutterNavigation.isNotEmpty()) ContextMenu(
+            id = "ide-gutter-navigation",
+            anchorBounds = UiRect(runtime.mouseX, runtime.mouseY, 0f, 0f),
+            items = gutterNavigation.map { (label, location) ->
+                UiDropdownItem(label = label, onClick = { openDefinition(location) })
+            },
+            onExpandedChange = { if (!it) gutterNavigation = emptyList() },
+        )
     }
 
     @Composable
@@ -956,11 +1050,11 @@ object HollowIdeOverlay {
         var popup by remember { mutableStateOf(false) }
         var anchorBounds by remember { mutableStateOf(UiRect.Zero) }
         Box(id = "ide-logo", modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-            if (event.isLeftClick()) {
+            if (event.isLeftButton()) {
                 collapsed = !collapsed
                 openDropdown = null
                 event.consume()
-            } else if (event.isRightClick()) {
+            } else if (event.isRightButton()) {
                 popup = true
             }
         }.onPlaced {
@@ -1138,7 +1232,8 @@ object HollowIdeOverlay {
     @Composable
     private fun ProjectTree() {
         val rootDrop = "ide-project-root-drop"
-        val rootHighlighted = dragAndDrop.hoveredTargetId == rootDrop && dragAndDrop.canDrop
+        val drag = LocalDragAndDrop.current
+        val rootHighlighted = drag?.hoveredTargetId == rootDrop && drag.canDrop
         Column(
             tags = listOfNotNull("ide-panel", "project-tree-panel", "drop-target".takeIf { rootHighlighted }),
             modifier = Modifier.size(100.percent, 100.percent).dropTarget(
@@ -1486,8 +1581,10 @@ object HollowIdeOverlay {
     /** Moves the keyboard focus to [nodeId] once the pending frame has been built. */
     internal fun focusSurface(nodeId: String) {
         pipeline.await()
-        surface.runtime.focus(nodeId)
+        activeRuntime().requestFocus(nodeId)
     }
+
+    private fun activeRuntime(): HollowUiRuntime = detachedWindows.focusedRuntime ?: surface.runtime
 
     /** Defers focus until the asynchronous composition that created [nodeId] has completed. */
     private fun requestSurfaceFocus(nodeId: String) {
@@ -1508,7 +1605,8 @@ object HollowIdeOverlay {
         HollowKeys.DEFINITION.matches(key, modifiers) -> goToDefinition()
         HollowKeys.RENAME.matches(key, modifiers) -> focusedEditorFile()?.let { file ->
             val caret = editorStates[file.path]?.caret ?: return@let false
-            codeRename.start(file, caret, surface.runtime.mouseX, surface.runtime.mouseY)
+            val runtime = activeRuntime()
+            codeRename.start(file, caret, runtime.mouseX, runtime.mouseY)
         } == true
 
         HollowKeys.KEYMAP.matches(key, modifiers) -> true.also { keymapVisible = true }
@@ -1725,7 +1823,7 @@ object HollowIdeOverlay {
             start = action.start,
             end = action.end,
             color = color,
-            x = surface.runtime.mouseX,
+            x = activeRuntime().mouseX,
             y = surface.runtime.mouseY,
         )
     }
@@ -1811,12 +1909,15 @@ object HollowIdeOverlay {
             owner = this,
             shape = surface.runtime.cursor.takeIf { overIde },
         )
-        if (PIPELINE_FRAMES) {
-            val mouseX = lastMouseX
-            val mouseY = lastMouseY
-            pipeline.schedule(frameWidth, frameHeight) {
-                surface.frame(frameWidth, frameHeight, mouseX, mouseY, System.nanoTime())
-            }
+    }
+
+    private fun scheduleOverlayFrame() {
+        val frameWidth = HollowIdeScale.scaledWidth()
+        val frameHeight = HollowIdeScale.scaledHeight()
+        val mouseX = lastMouseX
+        val mouseY = lastMouseY
+        pipeline.schedule(frameWidth, frameHeight) {
+            surface.frame(frameWidth, frameHeight, mouseX, mouseY, System.nanoTime())
         }
     }
 

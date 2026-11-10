@@ -72,7 +72,7 @@ private fun VanillaModelToggle(icon: String, tooltip: String, active: Boolean, o
     Box(
         tags = if (active) listOf("model-chip", "selected") else listOf("model-chip"),
         modifier = Modifier.cursor(UiCursorShape.HAND).onClick { event ->
-            if (event.isLeftClick()) onToggle()
+            if (event.isLeftButton()) onToggle()
             event.consume()
         }.tooltipOnHover(tooltip),
     ) {

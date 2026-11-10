@@ -116,13 +116,13 @@ private fun Block(
     fun press(event: UiEvent, grip: SegmentGrip): Boolean {
         if (row.locked) return false
         controller.selectSegment(lane, segment)
-        if (event.isRightClick()) {
+        if (event.isRightButton()) {
             onMenu(event, segment)
             event.consume()
             refresh()
             return false
         }
-        if (!event.isLeftClick()) return false
+        if (!event.isLeftButton()) return false
         drag.begin(segment, grip)
         event.consume()
         refresh()
@@ -130,7 +130,7 @@ private fun Block(
     }
 
     fun move(event: UiEvent) {
-        if (row.locked || !event.isLeftClick()) return
+        if (row.locked || !event.isLeftButton()) return
         var wanted: Int? = null
         if (lane.arranged && drag.grip == SegmentGrip.MOVE && (drag.acrossRows || abs(event.dragTotalY) > RowDragThreshold)) {
             drag.acrossRows = true
@@ -298,18 +298,18 @@ private fun Marker(
             .onPress { event ->
                 if (row.locked) return@onPress
                 controller.selectSegment(lane, segment)
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     onMenu(event, segment)
                     event.consume()
                     refresh()
                     return@onPress
                 }
-                if (!event.isLeftClick()) return@onPress
+                if (!event.isLeftButton()) return@onPress
                 drag.begin(segment, SegmentGrip.MOVE)
                 event.consume()
                 refresh()
             }.onDrag { event ->
-                if (row.locked || !event.isLeftClick()) return@onDrag
+                if (row.locked || !event.isLeftButton()) return@onDrag
                 drag(
                     drag,
                     segment,

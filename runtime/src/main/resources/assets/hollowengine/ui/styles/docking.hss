@@ -10,6 +10,24 @@
     background: $bg-window;
 }
 
+.detached-dock-window {
+    border: 1px $bg-selected;
+}
+
+.detached-dock-control {
+    size: 24px 22px;
+    align-items: center center;
+}
+
+.detached-dock-control .button-icon {
+    size: $icon $icon;
+    tint: $text-soft;
+}
+
+.detached-dock-control.close:hover {
+    background: $danger-soft;
+}
+
 .dock-tab {
     background: transparent;
     foreground: $text-muted;

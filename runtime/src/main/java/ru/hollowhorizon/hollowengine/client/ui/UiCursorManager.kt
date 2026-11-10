@@ -53,6 +53,11 @@ object UiCursorManager {
         glfwSetCursor(window, cursorHandle(shape))
     }
 
+    /** A dedicated window has no competing cursor owners. */
+    internal fun setWindowCursor(window: Long, shape: UiCursorShape) {
+        glfwSetCursor(window, cursorHandle(shape))
+    }
+
     private fun cursorHandle(shape: UiCursorShape): Long {
         if (shape == UiCursorShape.DEFAULT) return 0L // 0 = window's default arrow cursor
         return cursors.getOrPut(shape) { glfwCreateStandardCursor(standardCursor(shape)) }

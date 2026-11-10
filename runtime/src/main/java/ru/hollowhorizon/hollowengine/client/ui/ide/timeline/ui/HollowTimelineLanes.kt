@@ -34,13 +34,13 @@ internal fun TimelineLanes(
 
     val canvas = object : LaneCanvas {
         override fun onPress(event: UiEvent, row: TimelineRow) {
-            if (event.isRightClick() || event.isMiddleClick()) {
+            if (event.isRightButton() || event.isMiddleButton()) {
                 marquee = null
                 pan.begin(event, controller, scroll, 0f)
                 event.consume()
                 return
             }
-            if (!event.isLeftClick()) return
+            if (!event.isLeftButton()) return
             val x = event.contentX()
             val y = event.contentY(row)
             marquee = TimelineMarquee(x, y, x, y, event.isAdditiveSelection())
@@ -49,7 +49,7 @@ internal fun TimelineLanes(
         }
 
         override fun onDrag(event: UiEvent, row: TimelineRow) {
-            if (event.isRightClick() || event.isMiddleClick()) {
+            if (event.isRightButton() || event.isMiddleButton()) {
                 if (!pan.advance(event)) return
                 scroll.scrollTo(
                     x = pan.scrollX(controller, event),
@@ -66,7 +66,7 @@ internal fun TimelineLanes(
         }
 
         override fun onRelease(event: UiEvent, row: TimelineRow) {
-            if (event.isRightClick()) {
+            if (event.isRightButton()) {
                 if (pan.release()) {
                     val time = controller.timelineTimeAt(pan.pressLocalX, pxPerSec)
                     menu = TimelineMenuState(pan.pressX, pan.pressY, row.curve, time, row.locked, row.lane)
@@ -270,14 +270,14 @@ private fun TimelineKeyframe(
         modifier = Modifier.position(x.px, y.px).size((leftHalfWidth + rightHalfWidth).px, TimelineKeyframeSize.px)
             .cursor(if (row.locked) UiCursorShape.DEFAULT else UiCursorShape.MOVE).onPress { event ->
                 if (row.locked) return@onPress
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     if (!selected) controller.select(listOf(keyframe), additive = false)
                     onContextMenu(event, curve, keyframe.time)
                     event.consume()
                     refresh()
                     return@onPress
                 }
-                if (!event.isLeftClick()) return@onPress
+                if (!event.isLeftButton()) return@onPress
                 event.consume()
                 press.begin(keyframe, event.modifiers, controller) { stackedOnLane(keys, keyframe, pxPerSec) }
                 refresh()

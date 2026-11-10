@@ -165,9 +165,9 @@ data class UiEvent(
     }
 }
 
-fun UiEvent.isLeftClick(): Boolean = button == 0
-fun UiEvent.isRightClick(): Boolean = button == 1
-fun UiEvent.isMiddleClick(): Boolean = button == 2
+fun UiEvent.isLeftButton(): Boolean = button == 0
+fun UiEvent.isRightButton(): Boolean = button == 1
+fun UiEvent.isMiddleButton(): Boolean = button == 2
 
 fun UiEvent.isCtrlDown(): Boolean = modifiers and GLFW.GLFW_MOD_CONTROL != 0
 fun UiEvent.isShiftDown(): Boolean = modifiers and GLFW.GLFW_MOD_SHIFT != 0

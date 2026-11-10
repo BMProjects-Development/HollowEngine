@@ -450,7 +450,7 @@ private fun TimelineHeaderRow(
                 event.consume()
                 return@onClick
             }
-            if (!event.isLeftClick()) return@onClick
+            if (!event.isLeftButton()) return@onClick
             val now = event.frame?.nowMillis ?: return@onClick
             if (clicks.click(now)) {
                 controller.selectTrackKeys(row.curves, additive = event.isAdditiveSelection())

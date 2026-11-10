@@ -93,7 +93,7 @@ private fun AssetTile(
         modifier = Modifier.size(TileWidth.px, TileHeight.px).cursor(UiCursorShape.HAND)
             .onPress { event ->
                 dragged[0] = false
-                if (event.isRightClick()) {
+                if (event.isRightButton()) {
                     onContext(event.x, event.y)
                     event.consume()
                 }
@@ -108,7 +108,7 @@ private fun AssetTile(
                 )
             }
             .onRelease { event ->
-                if (!dragged[0] && event.isLeftClick()) onClick()
+                if (!dragged[0] && event.isLeftButton()) onClick()
                 event.consume()
             },
     ) {

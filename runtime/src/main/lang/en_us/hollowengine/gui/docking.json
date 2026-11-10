@@ -11,6 +11,13 @@
   "swap_panels": "Swap with the Other Panel",
   "park_here": "Pin Here",
   "undock": "Unpin",
+  "detach": "Open in Separate Window",
+  "return_to_ide": "Return to IDE",
+  "detach_failed": "Could not open a separate window.",
+  "window_minimize": "Minimize",
+  "window_maximize": "Maximize",
+  "window_restore": "Restore Window Size",
+  "window_close": "Close Window and Return Tabs to IDE",
   "close": "Close",
   "hide_stripes": "Hide Side Bars",
   "show_stripes": "Side Bars"

@@ -58,8 +58,12 @@ class PipelinedUiFrameBuilder {
         pending = null
     }
 
-    private companion object {
-        val Executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+    internal companion object {
+        /** Builds a surface without a frame of latency while still sharing the layout thread. */
+        fun buildSerialized(build: () -> HollowUiFrame): HollowUiFrame =
+            CompletableFuture.supplyAsync(build, Executor).join()
+
+        private val Executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "HollowEngine UI Frame Builder").apply { isDaemon = true }
         }
     }

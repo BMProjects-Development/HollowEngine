@@ -43,8 +43,9 @@ internal sealed interface QueuedUiInput {
  * The GLFW modifier bits (shift/ctrl/alt/super) currently held, queried from the game window.
  * Mouse callbacks don't carry modifiers the way key callbacks do, so entry points ask for them here.
  */
-fun currentUiKeyModifiers(): Int {
-    val window = Minecraft.getInstance().window.window
+fun currentUiKeyModifiers(): Int = currentUiKeyModifiers(Minecraft.getInstance().window.window)
+
+internal fun currentUiKeyModifiers(window: Long): Int {
     fun down(vararg keys: Int) = keys.any { GLFW.glfwGetKey(window, it) == GLFW.GLFW_PRESS }
     var modifiers = 0
     if (down(GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT)) modifiers = modifiers or GLFW.GLFW_MOD_SHIFT
