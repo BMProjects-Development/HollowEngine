@@ -12,11 +12,16 @@ internal class HollowAddonWatcher(
     private val scope: CoroutineScope,
 ) {
     private val tracked = ConcurrentHashMap<String, HollowAddonCandidate>()
-    private val failedFingerprints = ConcurrentHashMap<String, String>()
+    private val unreadableStamps = ConcurrentHashMap<String, String>()
     private val foreignStamps = ConcurrentHashMap<String, String>()
 
-    fun start(initialCandidates: Collection<HollowAddonCandidate>): Job {
-        initialCandidates.forEach { candidate -> tracked[candidate.sourceFile.canonicalPath] = candidate }
+    /** Stamps seen on the previous scan: a jar is read once it has stopped changing, not while it is copied. */
+    private val settlingStamps = ConcurrentHashMap<String, String>()
+
+    /** [unreadable] are the jars of this directory the startup has already failed to read and reported. */
+    fun start(initialCandidates: Collection<HollowAddonCandidate>, unreadable: Collection<File> = emptyList()): Job {
+        initialCandidates.forEach { candidate -> tracked[candidate.key] = candidate }
+        unreadable.forEach { file -> unreadableStamps[file.canonicalPath] = stampOf(file) }
         return scope.launch(Dispatchers.IO) {
             while (isActive) {
                 runCatching { scan() }
@@ -26,67 +31,59 @@ internal class HollowAddonWatcher(
         }
     }
 
-    private suspend fun scan() {
+    internal suspend fun scan() {
+        // A directory that is gone has lost all of its addons, the same as an empty one.
         val files = directory.listFiles { file ->
             file.isFile && file.extension.equals("jar", ignoreCase = true)
-        } ?: return
+        }.orEmpty()
         val filesByPath = files.filter(::isAddon).associateBy { it.canonicalPath }
 
         filesByPath.forEach { (path, file) ->
             val oldCandidate = tracked[path]
-            val sourceStamp = file.length().toString() + ':' + file.lastModified()
+            val stamp = stampOf(file)
             if (
                 oldCandidate != null &&
                 oldCandidate.sourceLength == file.length() &&
                 oldCandidate.sourceModifiedAt == file.lastModified()
             ) {
+                settlingStamps.remove(path)
                 return@forEach
             }
-            if (failedFingerprints[path] == sourceStamp) return@forEach
+            if (unreadableStamps[path] == stamp) return@forEach
+            if (settlingStamps.put(path, stamp) != stamp) return@forEach
+            settlingStamps.remove(path)
+
             val staged = runCatching { artifactStore.stage(file) }
                 .onFailure { error ->
-                    if (failedFingerprints.put(path, sourceStamp) != sourceStamp) {
-                        HollowEngine.LOGGER.error("Cannot inspect addon jar '{}'", file.name, error)
-                    }
+                    unreadableStamps[path] = stamp
+                    HollowEngine.LOGGER.error("Cannot inspect addon jar '{}'", file.name, error)
+                    runtime.reportUnreadable(file, error)
                 }
                 .getOrNull() ?: return@forEach
 
-            if (oldCandidate?.fingerprint == staged.fingerprint) {
-                tracked[path] = staged
-                failedFingerprints.remove(path)
-                return@forEach
-            }
-
-            val accepted = if (oldCandidate == null) {
-                runtime.addCandidate(staged)
-            } else {
-                runtime.replaceCandidate(oldCandidate, staged)
-            }
-            if (accepted) {
-                tracked[path] = staged
-                failedFingerprints.remove(path)
-            } else {
-                failedFingerprints[path] = sourceStamp
-            }
+            unreadableStamps.remove(path)
+            tracked[path] = staged
+            if (oldCandidate?.fingerprint == staged.fingerprint) runtime.reportUnreadable(file, null)
+            else runtime.install(staged)
         }
 
         (tracked.keys - filesByPath.keys).forEach { deletedPath ->
             val deleted = tracked.remove(deletedPath) ?: return@forEach
-            failedFingerprints.remove(deletedPath)
-            foreignStamps.remove(deletedPath)
-            runtime.removeCandidate(deleted)
-            tracked.values
-                .filter { it.descriptor.id == deleted.descriptor.id }
-                .singleOrNull()
-                ?.let { replacement -> runtime.addCandidate(replacement) }
+            runtime.remove(deleted)
         }
+        (unreadableStamps.keys - filesByPath.keys).forEach { deletedPath ->
+            unreadableStamps.remove(deletedPath)
+            runtime.reportUnreadable(File(deletedPath), null)
+        }
+        settlingStamps.keys.retainAll(filesByPath.keys)
+        foreignStamps.keys.retainAll(files.mapTo(HashSet()) { it.canonicalPath })
     }
 
     private fun isAddon(file: File): Boolean {
         val path = file.canonicalPath
-        if (tracked.containsKey(path)) return true
+        if (tracked.containsKey(path) || unreadableStamps.containsKey(path)) return true
 
-        val stamp = file.length().toString() + ':' + file.lastModified()
+        val stamp = stampOf(file)
         if (foreignStamps[path] == stamp) return false
         if (HollowAddonProbe.isAddonJar(file)) {
             foreignStamps.remove(path)
@@ -96,6 +93,8 @@ internal class HollowAddonWatcher(
         foreignStamps[path] = stamp
         return false
     }
+
+    private fun stampOf(file: File): String = file.length().toString() + ':' + file.lastModified()
 
     private companion object {
         const val SCAN_INTERVAL_MILLIS = 2_000L

@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonPlatform
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 
 private const val LANG = "hollowengine.gui.ide.project"
@@ -55,6 +56,7 @@ private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSe
             Field("$LANG.field.name".lang, form.name, "project-settings-name", form.id) { form.name = it }
             Field("$LANG.field.version".lang, form.version, "project-settings-version") { form.version = it }
             EnvironmentField(form)
+            PlatformField(form)
             Field("$LANG.field.description".lang, form.description, "project-settings-description") {
                 form.description = it
             }
@@ -116,6 +118,28 @@ private fun EnvironmentField(form: ProjectSettingsForm) {
 }
 
 private fun HollowAddonEnvironment.label(): String = "$LANG.environment.${name.lowercase()}".lang
+
+@Composable
+private fun PlatformField(form: ProjectSettingsForm) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(tags = listOf("project-dialog-field"), modifier = Modifier.size(100.percent, UiLength.Fit)) {
+        Text("$LANG.field.platform".lang, tags = listOf("project-dialog-label"))
+        UiDropdown(
+            id = "project-settings-platform",
+            label = form.platform.label(),
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            items = ProjectSettingsForm.platforms.map { platform ->
+                UiDropdownItem(platform.label(), mark = UiMenuParts.radio(platform == form.platform)) {
+                    form.platform = platform
+                }
+            },
+            tags = listOf("project-dialog-dropdown"),
+        )
+    }
+}
+
+private fun HollowAddonPlatform.label(): String = "$LANG.platform.${name.lowercase()}".lang
 
 @Composable
 private fun ModDependenciesField(form: ProjectSettingsForm) {

@@ -1,4 +1,5 @@
 import org.junit.jupiter.api.io.TempDir
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonDescriptorReader
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.source.*
@@ -225,7 +226,9 @@ class ScriptSourceTests {
             jar.closeEntry()
         }
 
-        val failure = assertFailsWith<IllegalArgumentException> { HollowAddonDescriptorReader.read(archive) }
+        val failure = assertFailsWith<IllegalArgumentException> {
+            HollowAddonDescriptorReader.read(archive, platform = RuntimePlatform.NEOFORGE)
+        }
         assertTrue(DEFAULT_SANDBOX_NAMESPACE in failure.message.orEmpty())
     }
 

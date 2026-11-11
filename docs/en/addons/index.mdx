@@ -7,7 +7,7 @@ order: 1
 
 *Extend HollowEngine with your own code, scripts, and resources, or install ones other people made.*
 
-An addon is a jar that HollowEngine loads on its own, next to the engine. It can add commands, events, editors, libraries, scripts, and assets. The same jar works on Fabric and NeoForge.
+An addon is a jar that HollowEngine loads on its own, next to the engine. It can add commands, events, editors, libraries, scripts, and assets. An addon that uses only Minecraft and the engine works on Fabric and NeoForge from the same jar; one written against a loader's own API [says so](/docs/hollowengine/addons/creating) and runs only there.
 
 ## Bundled addons
 
@@ -28,7 +28,7 @@ Copy the addon jar to either directory:
 - `mods/` is the usual choice for distributed addons and modpacks;
 - `hollowengine/addons/` is useful during development or when you want to keep addons apart from mods.
 
-HollowEngine scans and watches both directories. If the same addon id is present in both at startup, the newest version wins; when the versions are equal, the copy in `hollowengine/addons/` has priority. Do not keep duplicates unless you are deliberately testing version selection.
+HollowEngine scans and watches both directories. When several copies of one addon are installed, those made for the running loader and side compete: the newest version wins, and between equal versions the copy in `hollowengine/addons/` has priority. The rule is the same at startup and while the game runs, so the result never depends on when a jar was copied: a newer copy dropped in takes over, and removing the running copy starts the one that is left. The copies that lost are listed as `duplicate`.
 
 An addon without native libraries can be copied in and loaded while Minecraft is running. An addon that bundles libraries which load native code (Physics and Video do) is deliberately not hot-loaded: the log asks for a restart and the addon becomes available on the next launch.
 
@@ -38,14 +38,30 @@ Operators (permission level 2) manage addons with commands:
 
 ```text
 /he addons list
+/he addons info <addon-id>
 /he addons enable <addon-id>
 /he addons disable <addon-id>
 /he addons reload <addon-id>
 ```
 
-`list` shows each addon's id, version, state, and file name. Disabled ids are remembered in `hollowengine/addons/.disabled-addons`.
+`list` shows each addon's id, version, state, and file name, and for every state other than `loaded` the reason. `info` adds the loader, the side and the dependencies. Disabled ids are remembered in `hollowengine/addons/.disabled-addons`.
 
-Enabling, disabling, or reloading an addon starts or stops its code, commands, and scripts. The datapacks of every running server are reloaded so its commands appear or disappear, and if the addon carries `assets/`, the client's resources reload too.
+| State | Meaning |
+| --- | --- |
+| `loaded` | Running. |
+| `disabled` | Switched off with `/he addons disable`. |
+| `inactive` | Made for the other side: a client addon on a dedicated server, or the reverse. |
+| `incompatible` | Made for the other mod loader. |
+| `missing mods` | A mod it requires is not installed. |
+| `waiting for dependencies` | An addon it depends on is not running; the reason is given for each. |
+| `restart required` | Starts with the next launch: it has native libraries, startup or mixin scripts. |
+| `rejected` | Its bundled libraries conflict with the game's or another addon's. |
+| `failed` | Its code threw while loading; the error is shown and logged. |
+| `duplicate` | Another copy of the same addon is used. |
+
+A jar that carries an addon descriptor but cannot be read is listed as `unreadable` with the error.
+
+Enabling, disabling, or reloading an addon starts or stops its code, commands, and scripts. Addons that depend on it stop and start with it, and the answer to the command names them. The datapacks of every running server are reloaded so its commands appear or disappear, and if the addon carries `assets/`, the client's resources reload too.
 
 Disabling an addon that lives in `mods/` stops its code and scripts, but not its resources: the mod loader owns those and keeps serving them until the jar is removed.
 

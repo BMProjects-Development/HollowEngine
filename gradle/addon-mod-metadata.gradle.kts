@@ -35,6 +35,33 @@ fun tomlString(value: String): String = buildString {
     append('"')
 }
 
+/**
+ * Loaders whose API the addon is written against, from `platform` of its descriptor: none for a common
+ * addon, which knows only Minecraft and the engine, otherwise the loaders it names, as in
+ * `platform=fabric,neoforge`. Kept in step with AddonTargets.normalizePlatform.
+ */
+val hollowAddonLoaderApis: List<String> = run {
+    val loaders = listOf("fabric", "neoforge")
+    val declared = (addonDescriptorProperty("platform")?.lowercase() ?: "common")
+        .split(',').map(String::trim).filter(String::isNotEmpty)
+    when {
+        declared == listOf("common") -> emptyList()
+        declared.isNotEmpty() && declared.all(loaders::contains) -> loaders.filter(declared::contains)
+        else -> error(
+            "Addon '${addonDescriptorProperty("id") ?: project.name}' has unknown platform '${declared.joinToString(",")}', " +
+                "use common, fabric, neoforge or fabric,neoforge"
+        )
+    }
+}
+extra["hollowAddonLoaderApis"] = hollowAddonLoaderApis
+
+/**
+ * Loaders the addon runs on. A loader it is not made for gets no descriptor, so that loader does not
+ * list the jar as a mod it could run.
+ */
+val hollowAddonPlatforms: List<String> = hollowAddonLoaderApis.ifEmpty { listOf("fabric", "neoforge") }
+extra["hollowAddonPlatforms"] = hollowAddonPlatforms
+
 // Kept in step with the metadata the in-game project export writes, see HollowModMetadata.
 val generateAddonModMetadata = tasks.register("generateAddonModMetadata") {
     group = "build"
@@ -66,6 +93,7 @@ val generateAddonModMetadata = tasks.register("generateAddonModMetadata") {
     inputs.property("authors", authors)
     inputs.property("icon", icon.orEmpty())
     inputs.property("environment", environment)
+    inputs.property("platforms", hollowAddonPlatforms)
     inputs.property("engineModId", engineModId)
     inputs.property("license", license)
     inputs.property("resourcePackFormat", resourcePackFormat)
@@ -89,9 +117,9 @@ val generateAddonModMetadata = tasks.register("generateAddonModMetadata") {
             "depends" to mapOf(engineModId to "*"),
         )
         if (icon != null) fabric["icon"] = icon
-        root.resolve("fabric.mod.json").writeText(JsonOutput.prettyPrint(JsonOutput.toJson(fabric)) + "\n")
+        if ("fabric" in hollowAddonPlatforms) root.resolve("fabric.mod.json").writeText(JsonOutput.prettyPrint(JsonOutput.toJson(fabric)) + "\n")
 
-        root.resolve("META-INF/neoforge.mods.toml").writeText(
+        if ("neoforge" in hollowAddonPlatforms) root.resolve("META-INF/neoforge.mods.toml").writeText(
             buildString {
                 appendLine("modLoader = \"lowcodefml\"")
                 appendLine("loaderVersion = \"[1,)\"")

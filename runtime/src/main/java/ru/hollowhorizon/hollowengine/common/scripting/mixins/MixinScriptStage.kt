@@ -72,8 +72,7 @@ internal object MixinScriptStage {
     private class Addons {
         val store = HollowAddonArtifactStore(HollowAddonManager.cacheDirectory)
         private val directories = HollowAddonManager.defaultSources()
-        private val disabled =
-            HollowAddonActivationStore(HollowAddonManager.addonsDirectory.resolve(".disabled-addons")).load()
+        private val disabled = HollowAddonActivationStore(HollowAddonManager.addonsDirectory).load()
         private val jars =
             directories.mapIndexed { priority, directory -> priority to HollowAddonProbe.listAddonJars(directory) }
 
@@ -99,8 +98,7 @@ internal object MixinScriptStage {
 
         fun projectDependencies(): EarlyMixinCompilation.Dependencies {
             val project = HollowProject.properties()
-            val enabled = jars.flatMap { (_, files) -> files }.mapNotNull(::descriptorOf)
-                .filter { it.id !in disabled && it.environment.supports(RuntimeFlags.physicalClient) }
+            val enabled = jars.flatMap { (_, files) -> files }.mapNotNull(::descriptorOf).filter(::runsHere)
             val byId = enabled.associateBy { it.id }
             val wanted = LinkedHashSet<String>()
             fun visit(id: String) {
@@ -109,7 +107,8 @@ internal object MixinScriptStage {
             project.dependsOn.forEach(::visit)
 
             val addons = chosen(stage { jar -> descriptorOf(jar)?.id in wanted }).map { it.classesFile }
-            val mods = (project.modDependencies + enabled.flatMap { it.modDependencies }).distinct()
+            val mods = (project.modRequirements + enabled.flatMap { it.modRequirements })
+                .present(ru.hollowhorizon.hollowengine.common.utils.ModList::isLoaded).distinct()
             return EarlyMixinCompilation.Dependencies(mods, addons)
         }
 
@@ -130,17 +129,20 @@ internal object MixinScriptStage {
                 }
             }
 
+        /** The copies the addon runtime is going to run: it makes the same choice once the game is up. */
         private fun chosen(staged: List<Pair<Int, HollowAddonCandidate>>): List<HollowAddonCandidate> =
-            staged.groupBy { (_, candidate) -> candidate.descriptor.id }.values.map { copies ->
-                copies.sortedWith(
-                    Comparator<Pair<Int, HollowAddonCandidate>> { left, right ->
-                        AddonVersions.compare(right.second.descriptor.version, left.second.descriptor.version)
-                    }.thenBy { (priority, _) -> priority },
-                ).first().second
-            }.filter { candidate ->
-                val descriptor = candidate.descriptor
-                descriptor.id !in disabled && descriptor.environment.supports(RuntimeFlags.physicalClient)
-            }
+            staged.filter { (_, candidate) -> runsHere(candidate.descriptor) }
+                .groupBy { (_, candidate) -> candidate.descriptor.id }.values.map { copies ->
+                    copies.minWith { left, right ->
+                        AddonVersions.compareCopies(
+                            left.second.descriptor.version, left.first, right.second.descriptor.version, right.first,
+                        )
+                    }.second
+                }
+
+        private fun runsHere(descriptor: HollowAddonDescriptor): Boolean = descriptor.id !in disabled &&
+            descriptor.environment.supports(RuntimeFlags.physicalClient) &&
+            descriptor.platform.supports(HollowAddonRuntimeEnvironment.platform)
 
         private fun hasMixinScripts(jar: File): Boolean = runCatching {
             JarFile(jar, false).use { archive ->

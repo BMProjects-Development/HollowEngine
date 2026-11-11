@@ -13,6 +13,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ModList.ModInfo
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonPlatform
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.addons.project.*
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
@@ -249,6 +250,7 @@ internal class ProjectSettingsForm(
     var name by mutableStateOf(properties.name)
     var version by mutableStateOf(properties.version)
     var environment by mutableStateOf(properties.environment)
+    var platform by mutableStateOf(properties.platform)
     var description by mutableStateOf(properties.description)
     var authors by mutableStateOf(properties.authors.joinToString(", "))
     var license by mutableStateOf(properties.license)
@@ -294,13 +296,12 @@ internal class ProjectSettingsForm(
         if (!enabled) modDependencies -= id
     }
 
-    fun toProperties(base: ProjectProperties) = base.copy(
+    fun toProperties(base: ProjectProperties) = base.withDependencies(dependencies.toList(), modDependencies.toList()).copy(
         id = id.trim(),
         name = name.trim(),
         version = version.trim(),
         environment = environment,
-        dependsOn = dependencies.toList(),
-        modDependencies = modDependencies.toList(),
+        platform = platform,
         description = description.trim(),
         authors = authors.split(',').map(String::trim).filter(String::isNotEmpty),
         license = license.trim(),
@@ -309,6 +310,7 @@ internal class ProjectSettingsForm(
 
     companion object {
         val environments = HollowAddonEnvironment.entries
+        val platforms = HollowAddonPlatform.entries
 
         /** Always on the classpath, so offering them as dependencies would only add noise. */
         private val PlatformModIds = setOf("minecraft", "java", "fabricloader", "neoforge", "hollowengine")

@@ -35,7 +35,12 @@ internal data class HollowAddonCandidate(
     val hasAssets: Boolean,
     val hasData: Boolean,
     val embeddedModId: String? = null,
-)
+) {
+    /** Identifies the installed file whatever it holds at the moment; [sourceFile] is canonical. */
+    val key: String get() = sourceFile.path
+
+    fun isSameArtifact(other: HollowAddonCandidate): Boolean = key == other.key && fingerprint == other.fingerprint
+}
 
 internal class HollowAddonArtifactStore(
     private val cacheRoot: File,
@@ -82,7 +87,7 @@ internal class HollowAddonArtifactStore(
             Files.deleteIfExists(stagedFile.toPath())
             throw IllegalStateException("Addon jar changed while it was being staged: ${sourceFile.name}")
         }
-        val descriptor = HollowAddonDescriptorReader.read(stagedFile)
+        val descriptor = HollowAddonDescriptorReader.read(stagedFile, platform = platform)
         require(descriptor.hostModId == null) {
             "A mod-bound addon must use ${HollowAddonLayout.EMBEDDED_MOD_DESCRIPTOR}: ${sourceFile.name}"
         }
@@ -121,7 +126,7 @@ internal class HollowAddonArtifactStore(
         require(sourceFile.isFile && sourceFile.extension.equals("jar", ignoreCase = true)) {
             "Installed mod is not a jar: ${sourceFile.absolutePath}"
         }
-        val descriptor = HollowAddonDescriptorReader.read(sourceFile, HollowAddonLayout.EMBEDDED_MOD_DESCRIPTOR)
+        val descriptor = HollowAddonDescriptorReader.read(sourceFile, HollowAddonLayout.EMBEDDED_MOD_DESCRIPTOR, platform)
         require(descriptor.hostModId == modId) {
             "Embedded addon '${descriptor.id}' belongs to '${descriptor.hostModId}', not '$modId'"
         }
@@ -139,7 +144,9 @@ internal class HollowAddonArtifactStore(
             artifactFile = file,
             classesFile = file,
             fingerprint = file.sha256(),
-            descriptor = descriptor.copy(modDependencies = (descriptor.modDependencies + modId).distinct()),
+            descriptor = descriptor.copy(
+                modRequirements = descriptor.modRequirements.filterNot { it.id == modId } + HollowAddonDependency(modId),
+            ),
             requiresBootstrapLibraries = false,
             hasStartupScripts = false,
             hasMixinScripts = false,
@@ -166,12 +173,16 @@ internal class HollowAddonArtifactStore(
         outputDirectory.mkdirs()
         val unpacked = outputDirectory.resolve("named.jar.tmp")
         val table = JarFile(artifact).use { jar ->
-            val classes = jar.getJarEntry(HollowAddonLayout.CLASSES_JAR)
+            // The loader's own part comes first, so that a class it redefines replaces the common one.
+            val classes = listOfNotNull(
+                jar.getJarEntry(HollowAddonLayout.platformClassesJar(platform)),
+                jar.getJarEntry(HollowAddonLayout.CLASSES_JAR),
+            )
             val scripts = jar.entries().asSequence().filterNot { it.isDirectory }.filter { entry ->
                 entry.name.startsWith(HollowAddonLayout.SOURCE_PREFIX) || entry.name.startsWith(HollowAddonLayout.COMPILED_PREFIX)
             }.toList()
-            if (classes != null && scripts.isEmpty()) {
-                jar.getInputStream(classes)
+            if (classes.size == 1 && scripts.isEmpty()) {
+                jar.getInputStream(classes.single())
                     .use { Files.copy(it, unpacked.toPath(), StandardCopyOption.REPLACE_EXISTING) }
             } else {
                 writeUnpacked(jar, classes, scripts, unpacked)
@@ -201,7 +212,7 @@ internal class HollowAddonArtifactStore(
         return outputFile
     }
 
-    private fun writeUnpacked(jar: JarFile, classes: JarEntry?, scripts: List<JarEntry>, target: File) {
+    private fun writeUnpacked(jar: JarFile, classes: List<JarEntry>, scripts: List<JarEntry>, target: File) {
         JarOutputStream(target.outputStream().buffered()).use { output ->
             output.setLevel(Deflater.BEST_SPEED)
             val written = HashSet<String>()
@@ -212,7 +223,7 @@ internal class HollowAddonArtifactStore(
                 output.closeEntry()
             }
 
-            classes?.let { entry ->
+            classes.forEach { entry ->
                 JarInputStream(jar.getInputStream(entry)).use { nested ->
                     generateSequence { nested.nextJarEntry }.filterNot { it.isDirectory }
                         .forEach { put(it.name, nested) }

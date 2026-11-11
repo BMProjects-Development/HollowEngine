@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.addons
 
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.common.scripting.source.AddonScriptSource
 import java.util.jar.JarFile
 
@@ -14,6 +15,9 @@ internal object HollowAddonLayout {
     const val COMPILED_PREFIX = AddonScriptSource.COMPILED_PREFIX
     const val ASSETS_PREFIX = "assets/"
     const val DATA_PREFIX = "data/"
+
+    /** Classes written against the API of [platform], which only exist for the game on that loader. */
+    fun platformClassesJar(platform: RuntimePlatform): String = "META-INF/hollowengine/classes-${platform.id()}.jar"
 
     fun requireCurrentFormat(jar: JarFile) {
         val format = jar.manifest?.mainAttributes?.getValue(FORMAT_ATTRIBUTE)

@@ -278,3 +278,5 @@ tasks.named<JavaCompile>("compileJava") {
 tasks.matching { it.name.startsWith("run") }.configureEach {
     dependsOn("classes")
 }
+
+apply(from = rootProject.file("gradle/addon-platform-api.gradle.kts"))

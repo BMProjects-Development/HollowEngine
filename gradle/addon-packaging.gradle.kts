@@ -75,7 +75,8 @@ fun Project.hollowScriptCompilerClasspath(): FileCollection {
                 "androidx.compose.runtime:runtime:$composeRuntimeVersion",
                 "org.apache.logging.log4j:log4j-api:2.23.1",
                 "org.apache.logging.log4j:log4j-core:2.23.1",
-                "org.ow2.asm:asm-commons:9.7.1",
+                // The remapper is the engine's own, which is written for the ASM of the game.
+                "org.ow2.asm:asm-commons:9.9.1",
             ).forEach { notation -> dependencies.add(created.name, notation) }
             (dependencies.add(created.name, dependencies.project(mapOf("path" to ":bridge", "configuration" to "namedElements"))) as ModuleDependency)
                 .isTransitive = false
@@ -134,7 +135,7 @@ fun Project.registerHollowScriptCompilation(
  * Records which Mojang names in [content] have to change on Fabric, and to what. The game applies the
  * table when it loads the addon there, so one jar serves both loaders.
  */
-fun Project.registerHollowRemapTable(content: TaskProvider<Jar>): TaskProvider<JavaExec> {
+fun Project.registerHollowRemapTable(content: TaskProvider<Jar>, fabricClasspath: FileCollection): TaskProvider<JavaExec> {
     val gameVersion = rootProject.property("minecraftVersion") as String
     val relocation = rootProject.property("fabricRelocation") as String
     val mappings = rootProject.file("addons/compiler/src/main/resources/mappings-$gameVersion.tiny")
@@ -159,13 +160,14 @@ fun Project.registerHollowRemapTable(content: TaskProvider<Jar>): TaskProvider<J
         inputs.file(content.flatMap { it.archiveFile }).withPathSensitivity(PathSensitivity.NONE)
         inputs.file(mappings).withPathSensitivity(PathSensitivity.NONE)
         inputs.files(engineClasses).withPathSensitivity(PathSensitivity.NONE)
+        inputs.files(fabricClasspath).withPathSensitivity(PathSensitivity.NONE)
         inputs.property("relocation", relocation)
         outputs.file(table)
         argumentProviders.add(CommandLineArgumentProvider {
             listOf(
                 "--payload", content.get().archiveFile.get().asFile.absolutePath,
                 "--mappings", mappings.absolutePath,
-                "--classpath", ownSources.get().compileClasspath.asPath,
+                "--classpath", (fabricClasspath + ownSources.get().compileClasspath).asPath,
                 "--from", "named",
                 "--to", "intermediary",
                 "--output", table.get().asFile.absolutePath,
@@ -230,24 +232,64 @@ val processAddonResources = tasks.named<ProcessResources>("processResources") {
     }
 }
 val namedClassesJar = tasks.named<Jar>("jar")
+val addonNamespace = readHollowAddonId()
+
+// Loaders the addon runs on and those whose API it uses, from `platform` of its descriptor; see
+// addon-mod-metadata.gradle.kts.
+@Suppress("UNCHECKED_CAST")
+val addonPlatforms = extra["hollowAddonPlatforms"] as List<String>
+@Suppress("UNCHECKED_CAST")
+val addonLoaderApis = extra["hollowAddonLoaderApis"] as List<String>
+
+// The parts written against one loader's API. They are compiled apart from src/main and travel in
+// jars of their own, so the game only ever opens the one made for the loader it runs on.
+val platformSourceSets = listOf("fabric", "neoforge").mapNotNull(extensions.getByType<SourceSetContainer>()::findByName)
+platformSourceSets.forEach { sourceSet ->
+    require(addonLoaderApis.isNotEmpty()) {
+        "Addon '$addonNamespace' is common: it knows no mod loader and can have no src/${sourceSet.name}. " +
+            "Name the loaders it is written against, as in platform=fabric,neoforge"
+    }
+    require(sourceSet.name in addonLoaderApis) {
+        "Addon '$addonNamespace' is declared for ${addonLoaderApis.joinToString()} and can have no src/${sourceSet.name}"
+    }
+    val resources = projectDir.resolve("src/${sourceSet.name}/resources")
+    require(!resources.walkTopDown().any(File::isFile)) {
+        "Addon '$addonNamespace': $resources would not reach the jar, keep resources in src/main/resources"
+    }
+}
+val platformClassesJars = platformSourceSets.associate { sourceSet ->
+    sourceSet.name to tasks.register<Jar>("${sourceSet.name}ClassesJar") {
+        group = "build"
+        description = "Packs the classes this addon has for ${sourceSet.name} only."
+        archiveClassifier.set("classes-${sourceSet.name}-named")
+        from(sourceSet.output.classesDirs)
+        include("**/*.class", "META-INF/*.kotlin_module")
+    }
+}
 
 val scriptsDirectory = projectDir.resolve("src/main/resources/$hollowScriptsDirectory")
-val addonNamespace = readHollowAddonId()
 val compileNamedScripts = registerHollowScriptCompilation(
     scriptsDirectory = scriptsDirectory,
     namespace = addonNamespace,
     fingerprint = version.toString(),
 )
 
-// The classes and compiled scripts laid out as the game sees them once it has unpacked the addon,
-// which is what the remap table is recorded from.
+// The classes and compiled scripts laid out as the game sees them on Fabric once it has unpacked the
+// addon, which is what the remap table is recorded from.
 val addonContentJar = tasks.register<Jar>("addonContentJar") {
     archiveClassifier.set("content-named")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    platformClassesJars["fabric"]?.let { fabricClasses -> from(zipTree(fabricClasses.flatMap { it.archiveFile })) }
     from(zipTree(namedClassesJar.flatMap { it.archiveFile }))
     from(compileNamedScripts) { into(hollowCompiledScriptsPath) }
 }
-val generateAddonRemapTable = registerHollowRemapTable(addonContentJar)
+// Only Fabric runs on other names than the ones an addon is compiled with.
+val generateAddonRemapTable = if ("fabric" in addonPlatforms) {
+    registerHollowRemapTable(
+        addonContentJar,
+        platformSourceSets.firstOrNull { it.name == "fabric" }?.compileClasspath ?: files(),
+    )
+} else null
 
 val addonJar = tasks.register<Jar>("addonJar") {
     dependsOn(processAddonResources, addonModMetadata)
@@ -267,9 +309,17 @@ val addonJar = tasks.register<Jar>("addonJar") {
         into(hollowAddonClassesJar.substringBeforeLast('/'))
         rename { hollowAddonClassesJar.substringAfterLast('/') }
     }
+    platformClassesJars.forEach { (platform, classesJar) ->
+        from(classesJar) {
+            into(hollowAddonClassesJar.substringBeforeLast('/'))
+            rename { "classes-$platform.jar" }
+        }
+    }
     from(compileNamedScripts) { into(hollowCompiledScriptsPath) }
-    from(generateAddonRemapTable) {
-        into(hollowAddonRemapTablePath.substringBeforeLast('/'))
+    generateAddonRemapTable?.let { remapTable ->
+        from(remapTable) {
+            into(hollowAddonRemapTablePath.substringBeforeLast('/'))
+        }
     }
     from(addonLibraries) {
         into("hollowengine-addon-libs")
@@ -290,6 +340,24 @@ val addonJar = tasks.register<Jar>("addonJar") {
         check(forbiddenLibraries.isEmpty()) {
             "Addons must use Minecraft's native libraries instead of bundling: " +
                 forbiddenLibraries.joinToString { file -> file.name }
+        }
+
+        // The game lays a loader's classes over the common ones, where a second class of the same
+        // name would silently replace the first.
+        fun classesOf(jar: TaskProvider<Jar>): Set<String> {
+            val names = HashSet<String>()
+            zipTree(jar.get().archiveFile).matching { include("**/*.class") }.visit {
+                if (!isDirectory) names += relativePath.pathString
+            }
+            return names
+        }
+        val commonClasses = classesOf(namedClassesJar)
+        platformClassesJars.forEach { (platform, classesJar) ->
+            val repeated = classesOf(classesJar).intersect(commonClasses)
+            check(repeated.isEmpty()) {
+                "Addon '$addonNamespace' defines the same classes in src/main and src/$platform: " +
+                    repeated.sorted().take(5).joinToString()
+            }
         }
     }
 }

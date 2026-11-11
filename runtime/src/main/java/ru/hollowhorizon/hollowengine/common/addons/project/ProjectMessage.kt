@@ -17,6 +17,7 @@ internal object ProjectLang {
     const val EXPORT_NO_COMPILER = "$ROOT.export.no_compiler"
     const val EXPORT_COMPILE_FAILED = "$ROOT.export.compile_failed"
     const val EXPORT_ICON_MISSING = "$ROOT.export.icon_missing"
+    const val EXPORT_LOADER_API = "$ROOT.export.loader_api"
     const val EXPORT_COMPILING = "$ROOT.export.compiling"
     const val EXPORT_REMAPPING = "$ROOT.export.remapping"
     const val EXPORT_PACKING = "$ROOT.export.packing"

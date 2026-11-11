@@ -2,7 +2,9 @@ package ru.hollowhorizon.hollowengine.bootstrap.impl;
 
 import org.apache.logging.log4j.Logger;
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonBootstrapContract;
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonTargets;
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.AddonVersions;
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,10 +38,11 @@ final class AddonBootstrapLibraries {
 
     /**
      * [directories] are searched in order, and that order decides ties: the engine's own addon folder
-     * comes before the loader's mods folder.
+     * comes before the loader's mods folder. Only addons the runtime is going to run take part: one that is
+     * switched off or made for the other loader or side must not put its libraries in the way of the rest.
      */
-    static Result discover(List<File> directories, File cacheDirectory, Logger logger) throws IOException {
-        List<File> sortedAddons = selectAddons(directories, logger);
+    static Result discover(List<File> directories, File cacheDirectory, Target target, Logger logger) throws IOException {
+        List<File> sortedAddons = selectAddons(directories, target, logger);
         if (sortedAddons.isEmpty()) {
             removeStaleExtractions(cacheDirectory, Set.of(), logger);
             System.clearProperty(AddonBootstrapContract.LOADED_ADDON_FINGERPRINTS_PROPERTY);
@@ -101,7 +104,7 @@ final class AddonBootstrapLibraries {
                 }).toList());
     }
 
-    private static List<File> selectAddons(List<File> directories, Logger logger) {
+    private static List<File> selectAddons(List<File> directories, Target target, Logger logger) {
         Map<String, AddonFile> selected = new LinkedHashMap<>();
 
         for (int priority = 0; priority < directories.size(); priority++) {
@@ -113,7 +116,7 @@ final class AddonBootstrapLibraries {
             List<File> sorted = new ArrayList<>(List.of(files));
             sorted.sort(Comparator.comparing(File::getName));
             for (File file : sorted) {
-                AddonFile addon = readAddon(file, priority);
+                AddonFile addon = readAddon(file, priority, target);
                 if (addon == null) continue;
 
                 AddonFile previous = selected.get(addon.id());
@@ -144,12 +147,11 @@ final class AddonBootstrapLibraries {
     }
 
     private static AddonFile preferred(AddonFile left, AddonFile right) {
-        int byVersion = AddonVersions.compare(left.version(), right.version());
-        if (byVersion != 0) return byVersion > 0 ? left : right;
-        return left.priority() <= right.priority() ? left : right;
+        int order = AddonVersions.compareCopies(left.version(), left.priority(), right.version(), right.priority());
+        return order <= 0 ? left : right;
     }
 
-    private static AddonFile readAddon(File file, int priority) {
+    private static AddonFile readAddon(File file, int priority, Target target) {
         try (JarFile jar = new JarFile(file, false)) {
             JarEntry descriptor = jar.getJarEntry(AddonBootstrapContract.DESCRIPTOR_PATH);
             if (descriptor == null) return null;
@@ -159,7 +161,9 @@ final class AddonBootstrapLibraries {
                 properties.load(input);
             }
             String id = properties.getProperty("id", "").trim();
-            if (id.isEmpty()) return null;
+            if (id.isEmpty() || target.disabledIds().contains(id)) return null;
+            if (!AddonTargets.runsOn(properties.getProperty(AddonTargets.PLATFORM_KEY), target.platform())) return null;
+            if (!AddonTargets.runsIn(properties.getProperty(AddonTargets.ENVIRONMENT_KEY), target.physicalClient())) return null;
             return new AddonFile(file, id, properties.getProperty("version", "1.0.0").trim(), priority);
         } catch (IOException exception) {
             return null;
@@ -167,6 +171,10 @@ final class AddonBootstrapLibraries {
     }
 
     private record AddonFile(File file, String id, String version, int priority) {
+    }
+
+    /** The game the libraries are prepared for, and the addons an operator switched off in it. */
+    record Target(RuntimePlatform platform, boolean physicalClient, Set<String> disabledIds) {
     }
 
     /**

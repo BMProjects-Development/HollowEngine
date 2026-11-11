@@ -49,7 +49,12 @@ public final class BootstrapRuntimeManager {
         try {
             File runtimeJar = resolveRuntimeJar();
             File hollowEngineDirectory = new File("hollowengine");
-            AddonBootstrapLibraries.Result addonLibraries = AddonBootstrapLibraries.discover(addonSources(hollowEngineDirectory), new File(hollowEngineDirectory, ".cache"), LOGGER);
+            AddonBootstrapLibraries.Target target = new AddonBootstrapLibraries.Target(
+                    BootstrapEnvironment.platform(),
+                    BootstrapEnvironment.isPhysicalClient(),
+                    AddonBootstrapContract.disabledAddonIds(new File(hollowEngineDirectory, "addons"))
+            );
+            AddonBootstrapLibraries.Result addonLibraries = AddonBootstrapLibraries.discover(addonSources(hollowEngineDirectory), new File(hollowEngineDirectory, ".cache"), target, LOGGER);
             List<URL> runtimeClasspath = new ArrayList<>();
             runtimeClasspath.add(runtimeJar.toURI().toURL());
             runtimeClasspath.addAll(addonLibraries.urls());

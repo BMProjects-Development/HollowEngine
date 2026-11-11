@@ -12,7 +12,7 @@ apply(from = rootProject.file("hollow-addon/addon.gradle.kts"))
 
 Код аддона должен лежать в собственном пакете, в том, где находится entrypoint, и во вложенных в него. HE загружает этот пакет рядом с движком, потому что загрузчик модов классы движка не видит; остальные классы мода аддон получает как обычно, так что может свободно обращаться к ним. Обратное не работает: код мода не должен ссылаться на классы аддона.
 
-Переименуйте пакет и `ExampleAddon`, затем обновите `entry` в `src/main/resources/META-INF/hollowengine/mod-addon.properties`. `id` - идентификатор аддона в HE, `hostModId` подставляется Gradle автоматически. Версия аддона совпадает с версией мода. В JAR мода должен сохраниться его обычный `fabric.mod.json` или `neoforge.mods.toml`.
+Переименуйте пакет и `ExampleAddon`, затем обновите `entry` в `src/main/resources/META-INF/hollowengine/mod-addon.properties`. `id` - идентификатор аддона в HE, `hostModId` подставляется Gradle автоматически. Если мод собран под один загрузчик, добавьте `platform=fabric` или `platform=neoforge`: на другом загрузчике HE покажет аддон как несовместимый, а не попытается его запустить. Версия аддона совпадает с версией мода. В JAR мода должен сохраниться его обычный `fabric.mod.json` или `neoforge.mods.toml`.
 
 Положите в `libs/` dev JAR HE (`HollowEngine-<minecraft>-<version>-dev.jar`): его собирает задача `developmentJar` движка, а `buildAndCollect` кладёт его в `merged/`. При смене версии HE замените этот файл. Для Fabric нужны official Mojang mappings либо Parchment поверх них; NeoForge использует official mappings. HE должен быть установлен в игре как зависимость мода.
 
