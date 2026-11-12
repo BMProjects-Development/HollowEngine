@@ -59,6 +59,25 @@ class HollowAddonArtifactStoreTests {
     }
 
     @Test
+    fun `classes of the running loader join the common ones and those of the other loader stay out`(@TempDir directory: File) {
+        fun hooks(name: String) = jarOf("$name.class" to classBytes(name, "Ljava/lang/String;"))
+        val addon = writeAddon(
+            directory.resolve("addon.jar"),
+            HollowAddonLayout.CLASSES_JAR to hooks("com/example/Addon"),
+            HollowAddonLayout.platformClassesJar(RuntimePlatform.NEOFORGE) to hooks("com/example/neoforge/Hooks"),
+            HollowAddonLayout.platformClassesJar(RuntimePlatform.FABRIC) to hooks("com/example/fabric/Hooks"),
+        )
+
+        val candidate = store(directory, HollowAddonMappingNamespace.OFFICIAL).stage(addon)
+
+        JarFile(candidate.classesFile).use { classes ->
+            assertNotNull(classes.getJarEntry("com/example/Addon.class"))
+            assertNotNull(classes.getJarEntry("com/example/neoforge/Hooks.class"))
+            assertNull(classes.getJarEntry("com/example/fabric/Hooks.class"))
+        }
+    }
+
+    @Test
     fun `on Fabric the table remaps classes and compiled scripts and restamps the scripts`(@TempDir directory: File) {
         val table = PayloadRemapTable(
             from = "named",
@@ -82,7 +101,7 @@ class HollowAddonArtifactStoreTests {
             JarInputStream(ByteArrayInputStream(classes.read("META-INF/hollowengine/scripts/quest.node.kts.jar"))).use { script ->
                 assertEquals(FABRIC_RUNTIME, script.manifest.mainAttributes.getValue(ScriptCache.RUNTIME_ATTRIBUTE))
                 assertEquals("hash", script.manifest.mainAttributes.getValue(ScriptCache.HASH_ATTRIBUTE))
-                val entry = generateSequence { script.nextJarEntry }.first { it.name == "Quest.class" }
+                val entry = generateSequence { script.nextJarEntry }.firstOrNull { it.name == "Quest.class" }
                 assertNotNull(entry)
                 assertEquals("L$INTERMEDIARY_LEVEL;", fieldDescriptor(script.readBytes()))
             }

@@ -9,4 +9,13 @@ Since 2.3.0.3:
 - `@EditorRange` takes numbers instead of strings;
 - Added a confirmation before hiding the IDE toolbar;
 - Fixed timing of server reload scripts on world load;
-- Fixed client-only reload listeners on dedicated servers.
+- Fixed client-only reload listeners on dedicated servers;
+- Addons declare their mod loaders with `platform`: a `common` addon sees only Minecraft and the engine, one for `fabric`, `neoforge` or `fabric,neoforge` keeps the code for a loader in `src/fabric` or `src/neoforge` and can give `entry`, `dependsOn`, `dependsOnMods` and `requiredClasses` per loader;
+- `dependsOnMods` is now required for an addon to load, unless the mod is optional: `dependsOnMods=jei?`;
+- `dependsOn` and `dependsOnMods` take versions: `dependsOn=library>=1.2`;
+- The client shows a notification when an addon is loaded, reloaded or unloaded during the game, and when one cannot start;
+- Exporting a project for any loader reports the scripts that use Fabric or NeoForge classes;
+- `/he addons list` gives the reason for every addon that is not loaded, `/he addons info` its details;
+- One rule picks the copy of an addon at startup and while the game runs, and addons with duplicates can be managed;
+- An addon update that cannot start no longer stops the version that was running;
+- Bootstrap libraries of disabled addons and of addons for the other loader or side are not loaded.

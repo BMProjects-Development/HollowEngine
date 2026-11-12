@@ -1,5 +1,15 @@
 {
   "addon_restart": "Аддон «%s» включится после перезапуска",
+  "addon_loaded": "Аддон «%s» %s загружен",
+  "addons_loaded": "Загружены аддоны: %s",
+  "addon_reloaded": "Аддон «%s» %s перезагружен",
+  "addons_reloaded": "Перезагружены аддоны: %s",
+  "addon_unloaded": "Аддон «%s» выгружен",
+  "addons_unloaded": "Выгружены аддоны: %s",
+  "addon_failed": "Аддон «%s» %s не загрузился",
+  "addon_missing_mods": "Аддону «%s» %s не хватает модов",
+  "addon_waiting_for_dependencies": "Аддон «%s» %s ждёт другие аддоны",
+  "addon_rejected": "Аддон «%s» %s отклонён",
   "startup_failed": "Стартовые скрипты не запустились, смотрите лог: %s",
   "title": "Уведомление",
   "undo": "Отмена"

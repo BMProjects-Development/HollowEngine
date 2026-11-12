@@ -39,7 +39,6 @@ fun Project.configureHollowAddon() {
     val modGroup = rootProject.property("modGroup") as String
     val minecraftVersion = rootProject.property("minecraftVersion") as String
     val parchmentVersion = rootProject.property("parchmentVersion") as String
-    val fabricLoaderVersion = rootProject.property("fabricLoaderVersion") as String
     val kotlinVersion = rootProject.property("kotlinVersion") as String
     val serializationVersion = rootProject.property("serializationVersion") as String
     val coroutinesVersion = rootProject.property("coroutinesVersion") as String
@@ -60,8 +59,10 @@ fun Project.configureHollowAddon() {
         flatDir { dirs(rootProject.file("libs")) }
     }
 
+    // Every loader the engine is built for; an addon names those it uses in `platform`.
+    val loaders = (rootProject.property("enabledPlatforms") as String).split(',').map(String::trim).filter(String::isNotEmpty)
     extensions.configure<ArchitectPluginExtension>("architectury") {
-        common("fabric", "neoforge")
+        common(*loaders.toTypedArray())
     }
     val loom = extensions.getByType<LoomGradleExtensionAPI>()
     loom.silentMojangMappingsLicense()
@@ -99,7 +100,6 @@ fun Project.configureHollowAddon() {
             officialMojangMappings()
             parchment("org.parchmentmc.data:parchment-$minecraftVersion:$parchmentVersion")
         })
-        add("modCompileOnly", "net.fabricmc:fabric-loader:$fabricLoaderVersion")
         add("compileOnly", project(path = ":runtime", configuration = "namedElements"))
         add("testImplementation", project(path = ":runtime", configuration = "namedElements"))
         add("testImplementation", project(path = ":bridge", configuration = "namedElements"))
@@ -120,6 +120,30 @@ fun Project.configureHollowAddon() {
     }
     tasks.named<RemapJarTask>("remapJar") {
         enabled = false
+    }
+
+    // src/main sees Minecraft and the engine and nothing of a mod loader, which is all a common addon has.
+    // Code written against the API of one loader lives in src/fabric or src/neoforge of an addon that
+    // names the loader in `platform`; only there is that API on the classpath.
+    val sourceSets = extensions.getByType<SourceSetContainer>()
+    val mainSourceSet = sourceSets.getByName("main")
+    loaders.filter { platform -> projectDir.resolve("src/$platform").isDirectory }.forEach { platform ->
+        val platformSourceSet = sourceSets.create(platform)
+        // The loader's bootstrap lists its classpath, see gradle/addon-platform-api.gradle.kts.
+        val platformApiList = configurations.create("${platform}PlatformApi") {
+            isCanBeResolved = true
+            isCanBeConsumed = false
+        }
+        val platformApi = files(provider {
+            platformApiList.singleFile.takeIf(File::isFile)?.readLines().orEmpty()
+        }).builtBy(platformApiList)
+        dependencies {
+            add(platformApiList.name, project(path = ":bootstrap:$platform", configuration = "addonPlatformApiElements"))
+            // Ahead of the common classpath: on NeoForge the game's own classes are the patched ones.
+            add(platformSourceSet.compileOnlyConfigurationName, platformApi)
+            add(platformSourceSet.compileOnlyConfigurationName, mainSourceSet.output)
+            add(platformSourceSet.compileOnlyConfigurationName, files(provider { mainSourceSet.compileClasspath }))
+        }
     }
 
     apply(from = rootProject.file("gradle/addon-packaging.gradle.kts"))

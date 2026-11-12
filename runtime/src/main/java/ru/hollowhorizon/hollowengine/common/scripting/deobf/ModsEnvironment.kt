@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.deobf
 
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
+import ru.hollowhorizon.hollowengine.common.addons.present
 import ru.hollowhorizon.hollowengine.common.addons.project.HollowProject
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
@@ -13,13 +14,13 @@ import java.io.File
 /**
  * Mods whose classes scripts compile against: `dependsOnMods` of the project and of every enabled addon,
  * plus the `scripting_mods` config. All of them share one classpath, so a mod requested anywhere is
- * visible to every script.
+ * visible to every script. An optional mod is requested only while it is installed.
  */
 object ScriptingMods {
     fun requested(): List<String> = buildList {
         if (RuntimeFlags.production) addAll(HollowEngineConfig.scriptingMods)
-        addAll(HollowProject.properties().modDependencies)
-        HollowAddonManager.enabled.forEach { addon -> addAll(addon.descriptor.modDependencies) }
+        addAll(HollowProject.properties().modRequirements.present(ModList::isLoaded))
+        HollowAddonManager.enabled.forEach { addon -> addAll(addon.descriptor.modRequirements.present(ModList::isLoaded)) }
     }.distinct()
 }
 

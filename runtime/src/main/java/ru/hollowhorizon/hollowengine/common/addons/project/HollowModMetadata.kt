@@ -6,11 +6,12 @@ import com.google.gson.JsonObject
 import net.minecraft.SharedConstants
 import net.minecraft.server.packs.PackType
 import ru.hollowhorizon.hollowengine.HollowEngine
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 
 /**
- * Files that let an addon jar sit in `mods`: a descriptor for each loader, which both read only
- * their own of, and a `pack.mcmeta` for its assets and data.
+ * Files that let an addon jar sit in `mods`: a descriptor for each loader the addon is made for, which
+ * both read only their own of, and a `pack.mcmeta` for its assets and data.
  */
 internal object HollowModMetadata {
     const val FABRIC_DESCRIPTOR = "fabric.mod.json"
@@ -20,11 +21,11 @@ internal object HollowModMetadata {
     private const val DEFAULT_LICENSE = "All Rights Reserved"
     private val gson = GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
 
-    fun files(properties: ProjectProperties): Map<String, String> = mapOf(
-        FABRIC_DESCRIPTOR to fabric(properties),
-        NEOFORGE_DESCRIPTOR to neoforge(properties),
-        PACK_METADATA to pack(properties),
-    )
+    fun files(properties: ProjectProperties): Map<String, String> = buildMap {
+        if (properties.platform.supports(RuntimePlatform.FABRIC)) put(FABRIC_DESCRIPTOR, fabric(properties))
+        if (properties.platform.supports(RuntimePlatform.NEOFORGE)) put(NEOFORGE_DESCRIPTOR, neoforge(properties))
+        put(PACK_METADATA, pack(properties))
+    }
 
     /** A loader mod id for [addonId], which may contain characters loaders do not allow. */
     fun modId(addonId: String): String {

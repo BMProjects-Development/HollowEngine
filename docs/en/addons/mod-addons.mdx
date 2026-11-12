@@ -38,7 +38,7 @@ The repository contains a ready-made template in `addons/template/`.
 
 The script adds the template's sources and resources to `main`, adds the dev jar as `compileOnly`, and checks the production jar. The mod id comes from `modId` or `mod_id` in Gradle, or from `fabric.mod.json` / `neoforge.mods.toml`.
 
-In `mod-addon.properties`, `id` is the addon's identifier in HollowEngine, and `hostModId` is filled in by Gradle. The addon's version matches the mod's version. The mod's regular `fabric.mod.json` or `neoforge.mods.toml` must stay in the jar.
+In `mod-addon.properties`, `id` is the addon's identifier in HollowEngine, and `hostModId` is filled in by Gradle. A mod built for one loader should say so with `platform=fabric` or `platform=neoforge`. The addon's version matches the mod's version. The mod's regular `fabric.mod.json` or `neoforge.mods.toml` must stay in the jar.
 
 ## Rules
 
