@@ -107,10 +107,11 @@ class HollowAddonRuntimeTests {
     @Test
     fun `an addon for the other side is inactive and is not offered to scripts`() {
         addon(addons, "hud.jar", "id=hud\nenvironment=client")
+        addon(addons, "quests.jar", "id=quests")
         start()
 
         assertEquals(HollowAddonState.INACTIVE, state("addons/hud.jar"))
-        assertTrue(runtime.enabledSnapshot.isEmpty())
+        assertEquals(listOf("quests"), runtime.enabledSnapshot.map { it.descriptor.id })
     }
 
     @Test
@@ -163,8 +164,11 @@ class HollowAddonRuntimeTests {
     fun `the player is told what starts and stops after the game is up, and what cannot run`() = runBlocking {
         addon(addons, "library.jar", "id=library\nversion=1.0.0")
         addon(addons, "broken.jar", "id=broken\nrequiredClasses=does.not.Exist")
+        addon(addons, "compat.jar", "id=compat\ndependsOnMods=create")
+        addon(addons, "hud.jar", "id=hud\nenvironment=client")
         start()
-        assertEquals(listOf("not running: broken failed"), notifications)
+        // A missing mod is the player's to fix; an addon for the other side is nothing to report.
+        assertEquals(listOf("not running: broken failed", "not running: compat missing mods"), notifications)
         notifications.clear()
 
         runtime.install(stage(addon(addons, "quests.jar", "id=quests\ndependsOn=library")))
@@ -181,6 +185,33 @@ class HollowAddonRuntimeTests {
             ),
             notifications,
         )
+    }
+
+    @Test
+    fun `a dependency reloaded in a version that no longer fits stops its dependant`() = runBlocking {
+        addon(addons, "library.jar", "id=library\nversion=1.2.0")
+        addon(addons, "quests.jar", "id=quests\ndependsOn=library>=1.2")
+        start()
+        assertEquals(listOf("library", "quests"), runtime.loadedSnapshot.map { it.id })
+
+        addon(addons, "library.jar", "id=library\nversion=1.0.0")
+        assertTrue(runtime.reload("library").successful)
+
+        assertEquals(listOf("library"), runtime.loadedSnapshot.map { it.id })
+        assertEquals("Needs: library>=1.2 (1.0.0 is running).", status("addons/quests.jar").details)
+    }
+
+    @Test
+    fun `an addon switched off stays off after the game restarts`() = runBlocking {
+        addon(addons, "library.jar", "id=library")
+        start()
+        assertTrue(runtime.setEnabled("library", false).successful)
+        runtime.close()
+
+        start()
+
+        assertEquals(HollowAddonState.DISABLED, state("addons/library.jar"))
+        assertTrue(runtime.loadedSnapshot.isEmpty())
     }
 
     @Test

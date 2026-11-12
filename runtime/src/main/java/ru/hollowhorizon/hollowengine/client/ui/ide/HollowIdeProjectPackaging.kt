@@ -13,7 +13,6 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ModList.ModInfo
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
-import ru.hollowhorizon.hollowengine.common.addons.HollowAddonPlatform
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
 import ru.hollowhorizon.hollowengine.common.addons.project.*
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
@@ -310,7 +309,6 @@ internal class ProjectSettingsForm(
 
     companion object {
         val environments = HollowAddonEnvironment.entries
-        val platforms = HollowAddonPlatform.entries
 
         /** Always on the classpath, so offering them as dependencies would only add noise. */
         private val PlatformModIds = setOf("minecraft", "java", "fabricloader", "neoforge", "hollowengine")

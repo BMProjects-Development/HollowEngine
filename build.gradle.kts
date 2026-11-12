@@ -59,8 +59,10 @@ fun Project.configureHollowAddon() {
         flatDir { dirs(rootProject.file("libs")) }
     }
 
+    // Every loader the engine is built for; an addon names those it uses in `platform`.
+    val loaders = (rootProject.property("enabledPlatforms") as String).split(',').map(String::trim).filter(String::isNotEmpty)
     extensions.configure<ArchitectPluginExtension>("architectury") {
-        common("fabric", "neoforge")
+        common(*loaders.toTypedArray())
     }
     val loom = extensions.getByType<LoomGradleExtensionAPI>()
     loom.silentMojangMappingsLicense()
@@ -125,7 +127,7 @@ fun Project.configureHollowAddon() {
     // names the loader in `platform`; only there is that API on the classpath.
     val sourceSets = extensions.getByType<SourceSetContainer>()
     val mainSourceSet = sourceSets.getByName("main")
-    listOf("fabric", "neoforge").filter { platform -> projectDir.resolve("src/$platform").isDirectory }.forEach { platform ->
+    loaders.filter { platform -> projectDir.resolve("src/$platform").isDirectory }.forEach { platform ->
         val platformSourceSet = sourceSets.create(platform)
         // The loader's bootstrap lists its classpath, see gradle/addon-platform-api.gradle.kts.
         val platformApiList = configurations.create("${platform}PlatformApi") {

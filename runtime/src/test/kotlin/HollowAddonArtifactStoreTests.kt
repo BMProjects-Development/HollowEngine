@@ -101,7 +101,7 @@ class HollowAddonArtifactStoreTests {
             JarInputStream(ByteArrayInputStream(classes.read("META-INF/hollowengine/scripts/quest.node.kts.jar"))).use { script ->
                 assertEquals(FABRIC_RUNTIME, script.manifest.mainAttributes.getValue(ScriptCache.RUNTIME_ATTRIBUTE))
                 assertEquals("hash", script.manifest.mainAttributes.getValue(ScriptCache.HASH_ATTRIBUTE))
-                val entry = generateSequence { script.nextJarEntry }.first { it.name == "Quest.class" }
+                val entry = generateSequence { script.nextJarEntry }.firstOrNull { it.name == "Quest.class" }
                 assertNotNull(entry)
                 assertEquals("L$INTERMEDIARY_LEVEL;", fieldDescriptor(script.readBytes()))
             }

@@ -240,14 +240,16 @@ val addonNamespace = readHollowAddonId()
 val addonPlatforms = extra["hollowAddonPlatforms"] as List<String>
 @Suppress("UNCHECKED_CAST")
 val addonLoaderApis = extra["hollowAddonLoaderApis"] as List<String>
+@Suppress("UNCHECKED_CAST")
+val hollowLoaders = extra["hollowLoaders"] as List<String>
 
 // The parts written against one loader's API. They are compiled apart from src/main and travel in
 // jars of their own, so the game only ever opens the one made for the loader it runs on.
-val platformSourceSets = listOf("fabric", "neoforge").mapNotNull(extensions.getByType<SourceSetContainer>()::findByName)
+val platformSourceSets = hollowLoaders.mapNotNull(extensions.getByType<SourceSetContainer>()::findByName)
 platformSourceSets.forEach { sourceSet ->
     require(addonLoaderApis.isNotEmpty()) {
         "Addon '$addonNamespace' is common: it knows no mod loader and can have no src/${sourceSet.name}. " +
-            "Name the loaders it is written against, as in platform=fabric,neoforge"
+            "Name the loaders it is written against, as in platform=${hollowLoaders.joinToString(",")}"
     }
     require(sourceSet.name in addonLoaderApis) {
         "Addon '$addonNamespace' is declared for ${addonLoaderApis.joinToString()} and can have no src/${sourceSet.name}"

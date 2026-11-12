@@ -34,7 +34,7 @@ class HollowAddonDescriptorTests {
         """.trimIndent()
 
         val onNeoForge = read(text, RuntimePlatform.NEOFORGE)
-        assertEquals(HollowAddonPlatform.FABRIC_AND_NEOFORGE, onNeoForge.platform)
+        assertEquals(HollowAddonPlatform.of(RuntimePlatform.FABRIC, RuntimePlatform.NEOFORGE), onNeoForge.platform)
         assertTrue(RuntimePlatform.entries.all(onNeoForge.platform::supports))
         assertEquals("com.example.NeoForge", onNeoForge.entrypoint)
         assertEquals(listOf("library"), onNeoForge.dependencies)
@@ -49,10 +49,37 @@ class HollowAddonDescriptorTests {
     }
 
     @Test
+    fun `what a loader says about a dependency replaces what is said for every loader`() {
+        val text = "id=bridge\nplatform=fabric,neoforge\ndependsOnMods=jei>=18, create\ndependsOnMods.neoforge=jei>=19?"
+
+        assertEquals(
+            listOf("jei>=19?", "create"),
+            read(text, RuntimePlatform.NEOFORGE).modRequirements.map { it.toString() },
+        )
+        assertEquals(
+            listOf("jei>=18", "create"),
+            read(text, RuntimePlatform.FABRIC).modRequirements.map { it.toString() },
+        )
+    }
+
+    @Test
+    fun `a platform is a set of loaders however it is written`() {
+        val both = HollowAddonPlatform.of(RuntimePlatform.NEOFORGE, RuntimePlatform.FABRIC)
+        assertEquals("fabric,neoforge", both.id)
+        assertEquals(both, HollowAddonPlatform.of(" NeoForge , fabric,neoforge "))
+        assertEquals(HollowAddonPlatform.COMMON, HollowAddonPlatform.of(""))
+        assertEquals(HollowAddonPlatform.COMMON, both.with(RuntimePlatform.FABRIC, false).with(RuntimePlatform.NEOFORGE, false))
+        assertEquals(HollowAddonPlatform.of(RuntimePlatform.FABRIC), HollowAddonPlatform.COMMON.with(RuntimePlatform.FABRIC, true))
+        assertEquals(null, HollowAddonPlatform.of("fabric,forge"))
+        assertEquals(null, HollowAddonPlatform.of("common,fabric"))
+        assertEquals(RuntimePlatform.entries, HollowAddonPlatform.COMMON.targets)
+    }
+
+    @Test
     fun `a single-loader addon supports only its loader`() {
         val descriptor = read("id=tweaks\nplatform=NeoForge\nenvironment=Client", RuntimePlatform.FABRIC)
 
-        assertEquals(HollowAddonPlatform.NEOFORGE, descriptor.platform)
+        assertEquals(HollowAddonPlatform.of(RuntimePlatform.NEOFORGE), descriptor.platform)
         assertEquals(HollowAddonEnvironment.CLIENT, descriptor.environment)
         assertTrue(descriptor.platform.supports(RuntimePlatform.NEOFORGE))
         assertTrue(!descriptor.platform.supports(RuntimePlatform.FABRIC))
@@ -91,8 +118,21 @@ class HollowAddonDescriptorTests {
         val range = HollowAddonDependency.parse("core>=1.2<2.0!=1.5.0")
         assertTrue(listOf("1.2", "1.2.0", "1.9.9", "1.5.1").all(range::accepts))
         assertTrue(listOf("1.1.9", "1.2.0-beta1", "2.0", "2.0.0", "1.5").none(range::accepts))
-        assertTrue(HollowAddonDependency.parse("core=1.0").accepts("1.0.0"))
         assertTrue(HollowAddonDependency.parse("core").accepts("anything"))
+    }
+
+    @Test
+    fun `every comparison holds exactly where its sign says, the bound itself included or not`() {
+        fun accepted(spec: String) = listOf("1.0", "1.1", "1.2").filter(HollowAddonDependency.parse("core$spec")::accepts)
+
+        assertEquals(listOf("1.1", "1.2"), accepted(">=1.1"))
+        assertEquals(listOf("1.2"), accepted(">1.1"))
+        assertEquals(listOf("1.0", "1.1"), accepted("<=1.1"))
+        assertEquals(listOf("1.0"), accepted("<1.1"))
+        assertEquals(listOf("1.1"), accepted("=1.1"))
+        assertEquals(listOf("1.1"), accepted("==1.1"))
+        assertEquals(listOf("1.0", "1.2"), accepted("!=1.1"))
+        assertEquals("core=1.1", HollowAddonDependency.parse("core==1.1").toString())
     }
 
     @Test

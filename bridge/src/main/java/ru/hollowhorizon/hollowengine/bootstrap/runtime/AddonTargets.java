@@ -1,13 +1,16 @@
 package ru.hollowhorizon.hollowengine.bootstrap.runtime;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
- * Where a descriptor says its addon runs. The bootstrap and the runtime read the two keys through this
- * class, so that they never disagree about whether an addon belongs to the running game.
+ * Where a descriptor says its addon runs. The bootstrap and the runtime read the two keys through this class
+ *
+ * <p>{@code platform} is either {@link #COMMON}, an addon that knows no loader, or a comma-separated list
+ * of the loaders whose API the addon uses, each named by {@link RuntimePlatform#id()}.
  */
 public final class AddonTargets {
     public static final String PLATFORM_KEY = "platform";
@@ -26,31 +29,47 @@ public final class AddonTargets {
     }
 
     /**
-     * The declared platform in its canonical form. {@link #COMMON} is an addon that knows no loader; any
-     * other value lists the loaders the addon is written against, in the order of {@link RuntimePlatform}
-     * and joined by commas, however the descriptor spelled them. A value that names anything else comes
-     * back as it was written, and is none of {@link #platforms()}.
+     * The loaders a declared platform names, in the order of {@link RuntimePlatform}: none for
+     * {@link #COMMON}, and null when a part of it names no loader at all.
      */
-    public static String normalizePlatform(String declared) {
+    public static List<RuntimePlatform> loadersOf(String declared) {
         String platform = normalize(declared);
-        if (platform.equals(COMMON)) return COMMON;
+        if (platform.equals(COMMON)) return List.of();
 
-        List<String> named = new ArrayList<>();
+        Set<String> named = new LinkedHashSet<>();
         for (String part : platform.split(",")) {
             if (!part.isBlank()) named.add(part.trim());
         }
-        List<String> loaders = new ArrayList<>();
+        List<RuntimePlatform> loaders = new ArrayList<>();
         for (RuntimePlatform loader : RuntimePlatform.values()) {
-            if (named.removeIf(loader.id()::equals)) loaders.add(loader.id());
+            if (named.remove(loader.id())) loaders.add(loader);
         }
-        return named.isEmpty() && !loaders.isEmpty() ? String.join(",", loaders) : platform;
+        return named.isEmpty() && !loaders.isEmpty() ? List.copyOf(loaders) : null;
     }
 
-    /** Every value {@code platform} can have, in canonical form. */
-    public static List<String> platforms() {
-        String fabric = RuntimePlatform.FABRIC.id();
-        String neoforge = RuntimePlatform.NEOFORGE.id();
-        return List.of(COMMON, fabric, neoforge, fabric + "," + neoforge);
+    /**
+     * The declared platform in its canonical form: {@link #COMMON}, or its loaders in the order of
+     * {@link RuntimePlatform} joined by commas. A value that names something else comes back as written.
+     */
+    public static String normalizePlatform(String declared) {
+        List<RuntimePlatform> loaders = loadersOf(declared);
+        return loaders == null ? normalize(declared) : platformId(loaders);
+    }
+
+    /** The canonical value of {@code platform} for these loaders, {@link #COMMON} for none. */
+    public static String platformId(List<RuntimePlatform> loaders) {
+        List<String> ids = new ArrayList<>();
+        for (RuntimePlatform loader : RuntimePlatform.values()) {
+            if (loaders.contains(loader)) ids.add(loader.id());
+        }
+        return ids.isEmpty() ? COMMON : String.join(",", ids);
+    }
+
+    /** What {@code platform} may hold, for a message about a value it may not. */
+    public static String platformHint() {
+        List<String> ids = new ArrayList<>();
+        for (RuntimePlatform loader : RuntimePlatform.values()) ids.add(loader.id());
+        return COMMON + ", or loaders separated by commas out of " + String.join(", ", ids);
     }
 
     public static List<String> environments() {
@@ -59,7 +78,8 @@ public final class AddonTargets {
 
     /** False for a loader other than the running one, and for a value that names no loader at all. */
     public static boolean runsOn(String declaredPlatform, RuntimePlatform running) {
-        return normalizePlatform(declaredPlatform).equals(COMMON) || namesLoader(declaredPlatform, running);
+        List<RuntimePlatform> loaders = loadersOf(declaredPlatform);
+        return loaders != null && (loaders.isEmpty() || loaders.contains(running));
     }
 
     /**
@@ -67,8 +87,8 @@ public final class AddonTargets {
      * every loader and is written against none of them.
      */
     public static boolean namesLoader(String declaredPlatform, RuntimePlatform loader) {
-        String platform = normalizePlatform(declaredPlatform);
-        return platforms().contains(platform) && Arrays.asList(platform.split(",")).contains(loader.id());
+        List<RuntimePlatform> loaders = loadersOf(declaredPlatform);
+        return loaders != null && loaders.contains(loader);
     }
 
     /** False for the other physical side, and for a value that names no side at all. */

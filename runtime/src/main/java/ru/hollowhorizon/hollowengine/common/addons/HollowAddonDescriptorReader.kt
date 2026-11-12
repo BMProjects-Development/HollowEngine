@@ -36,7 +36,7 @@ internal object HollowAddonDescriptorReader {
             ?: throw IllegalArgumentException("Missing 'id' in $descriptorPath")
         val declaredPlatform = AddonTargets.normalizePlatform(properties.getProperty(AddonTargets.PLATFORM_KEY))
         val addonPlatform = HollowAddonPlatform.of(declaredPlatform) ?: throw IllegalArgumentException(
-            "Addon '$id' has unknown platform '$declaredPlatform', use ${AddonTargets.platforms().joinToString(" or ")}"
+            "Addon '$id' has unknown platform '$declaredPlatform', use ${AddonTargets.platformHint()}"
         )
         properties.requireKnownPlatformKeys(id, addonPlatform)
         return HollowAddonDescriptor(
@@ -86,7 +86,7 @@ internal object HollowAddonDescriptorReader {
             }
             require(addonPlatform.usesLoaderApi) {
                 "Addon '$id' has '$key', but a common addon knows no loader; " +
-                    "name the loaders, as in platform=${HollowAddonPlatform.FABRIC_AND_NEOFORGE.id}"
+                    "name the loaders, as in platform=${AddonTargets.platformId(RuntimePlatform.entries)}"
             }
             require(addonPlatform.names(target)) {
                 "Addon '$id' has '$key', but its platform is ${addonPlatform.id}"
