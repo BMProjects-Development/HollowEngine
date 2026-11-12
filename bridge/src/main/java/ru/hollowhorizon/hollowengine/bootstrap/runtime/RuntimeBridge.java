@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -400,6 +401,20 @@ public interface RuntimeBridge extends AutoCloseable {
     RegistryHelper getRegistryHelper();
 
     void initRegistryProvider(RegistryProvider<?> provider);
+
+    default void onBeforeLevelFrame(Minecraft minecraft, DeltaTracker deltaTracker) {}
+
+    default boolean isRenderingWorldPreview() { return false; }
+
+    default void markWorldPreviewSectionDirty(int x, int y, int z, boolean immediate) {}
+
+    default @Nullable Camera getWorldPreviewCamera() { return null; }
+
+    default void drawWorldPreviewGuides() {}
+
+    default MultiBufferSource worldPreviewEntityBuffers(Entity entity, float partialTick, MultiBufferSource buffers) {
+        return buffers;
+    }
 
     void onLevelFrameRendered(Minecraft minecraft);
 

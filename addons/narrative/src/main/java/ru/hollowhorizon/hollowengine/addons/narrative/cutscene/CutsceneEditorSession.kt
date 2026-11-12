@@ -1,11 +1,12 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import net.minecraft.client.Minecraft
+import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.AnimProperty
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineEdits
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineKeys
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 class CutsceneEditorSession {
@@ -13,6 +14,34 @@ class CutsceneEditorSession {
     val timeline = playback.timeline
 
     val uiRevision = mutableStateOf(0)
+    val cameraDraft = mutableStateOf<CameraPose?>(null)
+    private val animatedFrame = mutableStateOf(sampleFrame())
+    internal val previewFrame: CutscenePreviewFrame
+        get() {
+            val frame = animatedFrame.value
+            return cameraDraft.value?.let { frame.copy(pose = it) } ?: frame
+        }
+    val previewPose: CameraPose get() = previewFrame.pose
+    internal val cameraPath = derivedStateOf {
+        timeline.keysRevision
+        val translation = playback.translation
+        val times = translation.curves.filter { it.isVisible }
+            .flatMap { curve -> curve.keyframes.map { it.time } }
+            .distinct().sorted()
+
+        val frame = authoringFrame
+        if (times.isEmpty()) emptyList() else buildList {
+            add(frame.toWorld(translation.valueAt(times.first())))
+            for (index in 1 until times.size) {
+                val start = times[index - 1]
+                val end = times[index]
+                for (sample in 1..PATH_SAMPLES_PER_SEGMENT) {
+                    val time = start + (end - start) * sample / PATH_SAMPLES_PER_SEGMENT
+                    add(frame.toWorld(translation.valueAt(time)))
+                }
+            }
+        }
+    }
 
     fun invalidateUi() {
         uiRevision.value++
@@ -20,15 +49,11 @@ class CutsceneEditorSession {
 
     init {
         timeline.onChanged = {
-            syncPlaybackFromTimeline()
+            refreshCamera()
             invalidateUi()
         }
         timeline.onTimeChanged = {
-            syncPlaybackFromTimeline()
-            invalidateUi()
-        }
-        timeline.onPreviewChanged = {
-            updatePreviewState()
+            refreshCamera()
             invalidateUi()
         }
         timeline.captureExtraState = { playback.origin }
@@ -39,25 +64,48 @@ class CutsceneEditorSession {
 
     fun update(deltaSeconds: Float) {
         timeline.onUpdate(deltaSeconds)
-        syncPlaybackFromTimeline()
     }
 
-    fun captureFrame(time: Float) {
-        val minecraft = Minecraft.getInstance()
-        val pose = CutsceneCameraSystem.capturePlayerPose(minecraft) ?: return
-        val environment = minecraft.level?.captureCutsceneEnvironment() ?: return
+    fun captureFrame() {
+        val world = Minecraft.getInstance().level?.captureCutsceneEnvironment() ?: return
+        val frame = previewFrame
+        val animated = frame.environment
+        captureCamera(
+            timeline.currentTime,
+            frame.pose,
+            CutsceneEnvironment(animated.timeOfDay ?: world.timeOfDay, animated.weather ?: world.weather),
+        )
+    }
+
+    fun captureCamera(
+        time: Float,
+        pose: CameraPose,
+        environment: CutsceneEnvironment = CutsceneEnvironment(),
+        channels: CameraKeyChannels = CameraKeyChannels.ALL,
+    ) {
         val frame = authoringFrame
+        val keepDraft = channels != CameraKeyChannels.ALL && cameraDraft.value != null && time == timeline.currentTime
         timeline.edit(TimelineEdits.CAPTURE_KEY) {
             timeline.clearSelection()
-            val position = frame.toLocal(pose.position)
-            writeChannels(playback.translation, time, listOf(position.x, position.y, position.z))
-            writeChannels(playback.rotation, time, frame.toLocalRotation(pose.rotation).decomposedBy(playback.rotation))
-            writeChannels(playback.fov, time, listOf(pose.fov))
+            if (channels == CameraKeyChannels.ALL || channels == CameraKeyChannels.POSITION) {
+                val position = frame.toLocal(pose.position)
+                writeChannels(playback.translation, time, listOf(position.x, position.y, position.z))
+            }
+            if (channels == CameraKeyChannels.ALL || channels == CameraKeyChannels.ROTATION) {
+                writeChannels(
+                    playback.rotation,
+                    time,
+                    frame.toLocalRotation(pose.rotation).decomposedBy(playback.rotation)
+                )
+            }
+            if (channels == CameraKeyChannels.ALL || channels == CameraKeyChannels.FOV) {
+                writeChannels(playback.fov, time, listOf(pose.fov))
+            }
             writeChannels(playback.timeOfDay, time, listOfNotNull(environment.timeOfDay))
             writeChannels(playback.weather, time, listOfNotNull(environment.weather?.value))
         }
-        playback.seek(time)
-        updatePreviewState()
+        timeline.applyCurrentTime(time)
+        if (keepDraft) cameraDraft.value = pose
     }
 
     private fun <T> T.decomposedBy(property: AnimProperty<T>): List<Float> {
@@ -81,8 +129,6 @@ class CutsceneEditorSession {
             if (keepWorld) playback.reanchor(position, yaw)
             else playback.origin = playback.origin.moved(position, yaw)
         }
-        syncPlaybackFromTimeline()
-        invalidateUi()
     }
 
     /** Puts the origin on the player standing in the world, the usual way to place a scene. */
@@ -91,43 +137,31 @@ class CutsceneEditorSession {
         moveOrigin(Vec3f(player.x.toFloat(), player.y.toFloat(), player.z.toFloat()), player.yRot, keepWorld)
     }
 
-    fun onHollowUiKey(key: Int, modifiers: Int): Boolean {
-        val handled = TimelineKeys.handle(timeline, key, modifiers)
-        if (handled) invalidateUi()
-        return handled
-    }
-
-    fun syncPlaybackFromTimeline() {
+    private fun refreshCamera() {
         playback.updateProperties()
-        updatePreviewState()
+        animatedFrame.value = sampleFrame()
+        cameraDraft.value = null
     }
 
-    fun updatePreviewState() {
-        if (timeline.isCameraPreviewEnabled) {
-            CutsceneCameraSystem.preview(playback)
-        } else if (CutsceneCameraSystem.activeController === playback) {
-            CutsceneCameraSystem.stop()
-        }
-    }
+    private fun sampleFrame() = CutscenePreviewFrame(playback.currentPose, playback.currentEnvironment)
 
-    fun exportCutscene(path: String, name: String) {
-        CutsceneStorage.save(path, name, playback.toData(name))
-    }
-
-    fun importCutscene(readablePath: String) {
-        val data = CutsceneStorage.load(readablePath)
+    fun load(data: CutsceneData) {
+        cameraDraft.value = null
         playback.setupTracks(data)
+        timeline.notifyKeysChanged()
         timeline.isPlaying = false
         timeline.applyCurrentTime(0f)
         timeline.clearSelection()
         timeline.clearHistory()
-        updatePreviewState()
+        invalidateUi()
     }
 }
 
-object CutsceneEditorSessions {
-    val default = CutsceneEditorSession()
-}
+internal data class CutscenePreviewFrame(val pose: CameraPose, val environment: CutsceneEnvironment)
+
+enum class CameraKeyChannels { POSITION, ROTATION, FOV, ALL }
+
+private const val PATH_SAMPLES_PER_SEGMENT = 16
 
 private val MOVE = UndoLabel("${UndoLabel.LANG}.timeline.move_cutscene")
 private val REANCHOR = UndoLabel("${UndoLabel.LANG}.timeline.reanchor_cutscene")

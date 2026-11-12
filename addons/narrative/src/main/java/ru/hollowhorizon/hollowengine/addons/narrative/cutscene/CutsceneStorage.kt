@@ -1,24 +1,21 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.NbtIo
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
-import ru.hollowhorizon.hollowengine.common.utils.nbt.loadAsNBT
 import ru.hollowhorizon.hollowengine.common.utils.nbt.save
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize
-import java.io.DataOutputStream
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 
 object CutsceneStorage {
     const val ROOT_READABLE_PATH = "cutscenes"
     const val EXTENSION = "dat"
 
     private const val VERSION = CutsceneMigrations.CURRENT_VERSION
-    private const val VERSION_KEY = "version"
-    private const val NAME_KEY = "name"
-    private const val DATA_KEY = "data"
 
     private val root: File
         get() = DirectoryManager.HOLLOW_ENGINE.resolve(ROOT_READABLE_PATH).toFile().apply {
@@ -30,35 +27,31 @@ object CutsceneStorage {
         file.parentFile?.mkdirs()
 
         val cutscene = data.copy(name = normalizeName(name).ifBlank { data.name })
+        file.writeBytes(encode(cutscene))
+        return file
+    }
+
+    fun encode(cutscene: CutsceneData): ByteArray {
         val tag = CompoundTag().apply {
-            putInt(VERSION_KEY, VERSION)
-            putString(NAME_KEY, cutscene.name)
-            put(DATA_KEY, NBTFormat.serialize(cutscene))
+            putInt("version", VERSION)
+            putString("name", cutscene.name)
+            put("data", NBTFormat.serialize(cutscene))
         }
 
-        FileOutputStream(file).use { stream ->
-            tag.save(DataOutputStream(stream))
-        }
-        return file
+        return ByteArrayOutputStream().also { tag.save(it) }.toByteArray()
     }
 
     fun load(readablePath: String): CutsceneData {
         val file = resolveReadablePath(withExtension(readablePath))
-        val tag = FileInputStream(file).use { it.loadAsNBT() } as? CompoundTag
-            ?: error("Cutscene file is not a compound NBT tag: $readablePath")
-        val payload = tag.get(DATA_KEY)
-            ?: error("Cutscene file has no `$DATA_KEY` payload: $readablePath")
-        return CutsceneMigrations.read(payload, tag.getInt(VERSION_KEY))
+        return file.inputStream().buffered().let(::DataInputStream).use { decode(NbtIo.read(it), readablePath) }
     }
 
-    fun listFiles(): List<String> {
-        val rootFile = root
-        return rootFile.walk()
-            .filter(File::isFile)
-            .filter { it.extension.equals(EXTENSION, ignoreCase = true) }
-            .map { it.relativeTo(rootFile).invariantSeparatorsPath }
-            .sorted()
-            .toList()
+    fun decode(bytes: ByteArray, readablePath: String): CutsceneData =
+        DataInputStream(ByteArrayInputStream(bytes)).use { decode(NbtIo.read(it), readablePath) }
+
+    private fun decode(tag: CompoundTag, readablePath: String): CutsceneData {
+        val payload = tag.get("data") ?: error("Cutscene file has no `data` payload: $readablePath")
+        return CutsceneMigrations.read(payload, tag.getInt("version"))
     }
 
     fun normalizeFileName(name: String): String {
@@ -70,7 +63,8 @@ object CutsceneStorage {
     }
 
     private fun normalizeName(name: String): String {
-        return name.trim().replace('\\', '/').substringAfterLast('/').removeSuffix(".$EXTENSION")
+        val base = name.trim().replace('\\', '/').substringAfterLast('/')
+        return if (base.endsWith(".$EXTENSION", ignoreCase = true)) base.dropLast(EXTENSION.length + 1) else base
     }
 
     private fun resolve(path: String, name: String): File {
@@ -92,10 +86,7 @@ object CutsceneStorage {
     }
 
     private fun normalizeFolder(path: String): String {
-        val normalized = path.trim()
-            .replace('\\', '/')
-            .removePrefix("$ROOT_READABLE_PATH/")
-            .trim('/')
+        val normalized = path.trim().replace('\\', '/').removePrefix("$ROOT_READABLE_PATH/").trim('/')
         if (normalized.isBlank()) return ""
         require(!File(normalized).isAbsolute) { "Cutscene folder must be relative" }
         normalized.split('/').forEach { segment ->
@@ -108,6 +99,6 @@ object CutsceneStorage {
 
     private fun withExtension(path: String): String {
         val normalized = path.trim().replace('\\', '/')
-        return if (normalized.endsWith(".$EXTENSION")) normalized else "$normalized.$EXTENSION"
+        return if (normalized.endsWith(".$EXTENSION", ignoreCase = true)) normalized else "$normalized.$EXTENSION"
     }
 }

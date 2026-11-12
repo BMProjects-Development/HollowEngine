@@ -39,6 +39,10 @@ class HollowIdeFileType(
     private val pathMatcher: ((path: String) -> Boolean)? = null,
     internal val requiresContent: Boolean = true,
     val actions: List<HollowIdeFileAction> = emptyList(),
+    val icon: String? = null,
+    val openBesideGame: Boolean = false,
+    val onOpened: ((HollowIdeContext) -> Unit)? = null,
+    val tracksDocumentChanges: Boolean = false,
 ) {
     init {
         require(id.isNotBlank()) { "File type ID cannot be blank" }
@@ -129,6 +133,10 @@ class HollowIdeFileTypeRegistry {
     @Synchronized
     fun find(path: String, bytes: ByteArray): HollowIdeFileType? =
         entries.firstOrNull { it.type.matches(path, bytes) }?.type
+
+    @Synchronized
+    internal fun iconForPath(path: String): String? =
+        entries.firstNotNullOfOrNull { entry -> entry.type.icon?.takeIf { entry.type.matchesPath(path) == true } }
 
     @Synchronized
     fun find(id: String): HollowIdeFileType? {

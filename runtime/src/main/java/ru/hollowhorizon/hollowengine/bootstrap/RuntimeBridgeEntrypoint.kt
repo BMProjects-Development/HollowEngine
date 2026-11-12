@@ -3,11 +3,13 @@ package ru.hollowhorizon.hollowengine.bootstrap
 import com.google.common.collect.ImmutableMap
 import com.mojang.blaze3d.audio.SoundBuffer
 import com.mojang.blaze3d.platform.Window
+import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.datafixers.util.Either
 import net.minecraft.Util
 import net.minecraft.client.Camera
+import net.minecraft.client.DeltaTracker
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
@@ -87,6 +89,9 @@ import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments
 import ru.hollowhorizon.hollowengine.client.sounds.SoundResourceConverter
 import ru.hollowhorizon.hollowengine.client.sounds.SoundStreams
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeGameViewport
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+import ru.hollowhorizon.hollowengine.bridge.world.CameraChunkTracker
+import ru.hollowhorizon.hollowengine.common.network.mayStreamCameraChunks
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlayPoint
 import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationOverlay
@@ -170,6 +175,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun shouldApplyMixin(targetClassName: String, mixinClassName: String): Boolean {
         return if (mixinClassName.contains(".client.iris.")) {
             isClassPresent("net.irisshaders.iris.Iris")
+        } else if (mixinClassName.contains(".client.sodium.")) {
+            isClassPresent("net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager")
         } else if (mixinClassName.endsWith(".client.LevelRendererStagesMixin")) {
             !isClassPresent("net.minecraftforge.client.event.RenderLevelStageEvent")
         } else {
@@ -258,6 +265,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onPlayerPermissionsChanged(player: ServerPlayer) {
+        if (!player.mayStreamCameraChunks()) {
+            (player.serverLevel().chunkSource.chunkMap as CameraChunkTracker).`hollowengine$trackCameraChunks`(
+                    player,
+                    emptyList()
+                )
+        }
         PlayerEvent.PermissionsChanged.post(PlayerEvent.PermissionsChanged(player))
     }
 
@@ -493,9 +506,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         cache: Map<ResourceLocation, CompletableFuture<SoundBuffer>>,
     ): CompletableFuture<SoundBuffer>? {
         if (!SoundStreams.handles(soundId)) return null
-        @Suppress("UNCHECKED_CAST")
-        return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>)
-            .computeIfAbsent(soundId) { SoundStreams.complete(it, resourceManager)!! }
+        @Suppress("UNCHECKED_CAST") return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>).computeIfAbsent(
+                soundId
+            ) { SoundStreams.complete(it, resourceManager)!! }
     }
 
     override fun onLoadStreamSound(
@@ -515,12 +528,31 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>, executor: Executor) =
         ClientSounds.frame(channels, executor)
 
-    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) =
-        ClientSounds.stopMatching(id, category)
+    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) = ClientSounds.stopMatching(id, category)
 
     override fun getOpenGlVersionOverride(): String = HollowCoreLoader.openGlVersion
 
     override fun shouldForceAutoGuiScale(screen: Screen?): Boolean = screen is AutoScaled
+
+    override fun onBeforeLevelFrame(minecraft: Minecraft, deltaTracker: DeltaTracker) {
+        WorldCameraPreviewRenderer.render(minecraft, deltaTracker)
+    }
+
+    override fun isRenderingWorldPreview(): Boolean = WorldCameraPreviewRenderer.isRendering
+
+    override fun markWorldPreviewSectionDirty(x: Int, y: Int, z: Int, immediate: Boolean) =
+        WorldCameraPreviewRenderer.markSectionDirty(x, y, z, immediate)
+
+    override fun getWorldPreviewCamera(): Camera? =
+        if (RenderSystem.isOnRenderThread()) WorldCameraPreviewRenderer.activeCamera else null
+
+    override fun drawWorldPreviewGuides() = WorldCameraPreviewRenderer.drawGuides()
+
+    override fun worldPreviewEntityBuffers(
+        entity: Entity,
+        partialTick: Float,
+        buffers: MultiBufferSource,
+    ): MultiBufferSource = WorldCameraPreviewRenderer.entityBuffers(entity, partialTick, buffers)
 
     override fun onLevelFrameRendered(minecraft: Minecraft) {
         RenderTickEvent.LevelRendered.post(RenderTickEvent.LevelRendered(minecraft))
@@ -582,6 +614,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onClientTick(client: Minecraft) {
         HollowIdeGameViewport.beginFrame(client)
+        WorldCameraPreviewRenderer.beginFrame(client)
         RuntimeDispatcherState.runClientTasks(client)
         DiscordRichPresence.tick(client)
     }
@@ -595,6 +628,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientStopping(client: Minecraft) {
+        WorldCameraPreviewRenderer.release(client)
         HollowIdeOverlay.closeDetachedWindows()
         DiscordRichPresence.stop()
         RuntimeDispatcherState.stopClient(client)
@@ -607,9 +641,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onLevelUpdateNeighbors(level: Level, pos: BlockPos) {
         BlockEvent.NeighborNotify.post(
             BlockEvent.NeighborNotify(
-                level.getBlockState(pos),
-                pos,
-                EnumSet.allOf(Direction::class.java)
+                level.getBlockState(pos), pos, EnumSet.allOf(Direction::class.java)
             )
         )
     }
@@ -623,6 +655,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onLevelClosed(level: Level) {
         if (level.isClientSide) {
+            WorldCameraPreviewRenderer.release(Minecraft.getInstance())
             ClientSounds.clear()
             SoundAttachments.clear()
         }
@@ -668,8 +701,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         return kept
     }
 
-    override fun collideShapesWithColliders(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 =
-        SolidColliders.collide(movement, box, shapes, vanilla)
+    override fun collideShapesWithColliders(
+        movement: Vec3,
+        box: AABB,
+        shapes: List<VoxelShape>,
+        vanilla: Supplier<Vec3>,
+    ): Vec3 = SolidColliders.collide(movement, box, shapes, vanilla)
 
     override fun stepHeightsWithColliders(box: AABB, limit: Float, vanilla: FloatArray): FloatArray =
         SolidColliders.stepHeights(box, limit, vanilla)
@@ -678,7 +715,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun isSupportedByColliders(entity: Entity): Boolean = SolidColliders.supports(entity)
 
-    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
+    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean =
+        SolidColliders.obstructs(level, shape)
 
     override fun overlapsSolidColliders(entity: Entity, box: AABB): Boolean = SolidColliders.overlaps(entity, box)
 
@@ -693,8 +731,17 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun pickColliders(
         level: Level, source: Entity?, start: Vec3, end: Vec3, search: AABB,
         predicate: Predicate<Entity>, maxDistanceSquared: Double, vanilla: EntityHitResult?, projectile: Boolean,
-    ): EntityHitResult? =
-        EntityColliders.pick(level, source, start, end, search, predicate, maxDistanceSquared, vanilla, colliderModes(projectile))
+    ): EntityHitResult? = EntityColliders.pick(
+        level,
+        source,
+        start,
+        end,
+        search,
+        predicate,
+        maxDistanceSquared,
+        vanilla,
+        colliderModes(projectile)
+    )
 
     override fun onPlayerAttack(player: Player, target: Entity, attack: Runnable) =
         ColliderCombat.attack(player, target, attack)
@@ -707,8 +754,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onClientTargetEntity(target: Entity, result: HitResult?) = ClientColliderHooks.claim(result, target)
 
-    override fun renderColliderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean =
-        ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
+    override fun renderColliderHitbox(
+        entity: Entity,
+        partialTick: Float,
+        poseStack: PoseStack,
+        lines: VertexConsumer,
+    ): Boolean = ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
 
     /** Projectiles land only on colliders that take hits; the crosshair also stops at the clickable ones. */
     private fun colliderModes(projectile: Boolean): (ColliderModes) -> Boolean =
@@ -768,12 +819,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     ) {
         RenderEntityEvent.Post.post(
             RenderEntityEvent.Post(
-                entity,
-                entityYaw,
-                partialTick,
-                poseStack,
-                buffer,
-                packedLight
+                entity, entityYaw, partialTick, poseStack, buffer, packedLight
             )
         )
     }
@@ -801,6 +847,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         roll: Float,
         partialTick: Float,
     ): RuntimeBridge.CameraSetup {
+        if (WorldCameraPreviewRenderer.isRendering) return RuntimeBridge.CameraSetup(yaw, pitch, roll)
         val pose = CameraDirector.currentPose.takeIf { shouldApplyCameraPose() }
         val event = CameraSetupEvent(
             gameRenderer = gameRenderer,
@@ -848,7 +895,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     private fun shouldApplyCameraPose(): Boolean {
-        return !IrisHelper.isShadowRendering()
+        return !WorldCameraPreviewRenderer.isRendering && !IrisHelper.isShadowRendering()
     }
 
     override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, Supplier<LayerDefinition>>) {
@@ -908,6 +955,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onIrisPipelineDestroyed() {
+        WorldCameraPreviewRenderer.invalidateShaderPipelines()
         IrisHelper.invalidateInstancingPrograms()
     }
 
@@ -1007,8 +1055,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         }
 
         val isScreenOpen = minecraft.screen != null
-        val shouldCancel = isNotificationCaptured || isOverlayInputCaptured ||
-                isGizmoInputCaptured || isScriptOverlayCaptured || isGizmoBlocking && isScreenOpen
+        val shouldCancel =
+            isNotificationCaptured || isOverlayInputCaptured || isGizmoInputCaptured || isScriptOverlayCaptured || isGizmoBlocking && isScreenOpen
         val shouldResetMousePosition = isGizmoBlocking && isScreenOpen
         val redirect = if (shouldCancel) null else HollowIdeOverlay.gameWindowPointer(convertedX, convertedY)
         return RuntimeBridge.MouseMoveResult(
@@ -1042,12 +1090,25 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseButton(x, y, button, action)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return WorldObjectContextMenu.handleMouseButton(world.x, world.y, button, action) ||
-                TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
-                WorldInspector.pickAt(world.x, world.y, button, action) ||
-                UiScriptHudHost.handleMouseButton(guiX, guiY, button, action) ||
-                minecraft.screen == null && UiPanels.handleMouseButton(button, action) ||
-                TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
+        return WorldObjectContextMenu.handleMouseButton(
+            world.x,
+            world.y,
+            button,
+            action
+        ) || TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) || WorldInspector.pickAt(
+            world.x,
+            world.y,
+            button,
+            action
+        ) || UiScriptHudHost.handleMouseButton(
+            guiX,
+            guiY,
+            button,
+            action
+        ) || minecraft.screen == null && UiPanels.handleMouseButton(
+            button,
+            action
+        ) || TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
     override fun onMouseScroll(
@@ -1063,10 +1124,20 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseScroll(x, y, xOffset, yOffset)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return TransformGizmoEditor.handleMouseScroll(world.x, world.y, xOffset, yOffset) ||
-                UiScriptHudHost.handleMouseScroll(guiX, guiY, xOffset, yOffset) ||
-                minecraft.screen == null && UiPanels.handleMouseScroll(xOffset, yOffset) ||
-                TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
+        return TransformGizmoEditor.handleMouseScroll(
+            world.x,
+            world.y,
+            xOffset,
+            yOffset
+        ) || UiScriptHudHost.handleMouseScroll(
+            guiX,
+            guiY,
+            xOffset,
+            yOffset
+        ) || minecraft.screen == null && UiPanels.handleMouseScroll(
+            xOffset,
+            yOffset
+        ) || TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
     override fun allowMouseGrab(): Boolean = HollowIdeOverlay.allowMouseGrab()
@@ -1102,6 +1173,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
                 renderer, poseStack, projectionMatrix, ticks, partialTick, camera, frustum, stage.toRenderStage()
             )
         )
+        if (stage == RuntimeBridge.RenderLevelStage.AFTER_LEVEL) {
+            WorldCameraPreviewRenderer.captureGuideView(camera, projectionMatrix)
+        }
     }
 
     override fun onCommonInitialize() {

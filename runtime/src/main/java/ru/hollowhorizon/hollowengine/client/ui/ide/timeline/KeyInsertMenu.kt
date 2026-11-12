@@ -18,12 +18,17 @@ enum class KeyParts(private val key: String) {
  */
 @Composable
 fun KeyInsertMenu(anchor: UiRect?, onPick: (KeyParts) -> Unit, onClose: () -> Unit) {
+    KeyInsertMenu(anchor, KeyParts.entries, KeyParts::label, onPick, onClose)
+}
+
+@Composable
+fun <T> KeyInsertMenu(anchor: UiRect?, choices: List<T>, label: (T) -> String, onPick: (T) -> Unit, onClose: () -> Unit) {
     if (anchor == null) return
     ContextMenu(
         id = "key-insert-menu",
         anchorBounds = anchor,
-        items = KeyParts.entries.map { parts ->
-            UiDropdownItem(parts.label, separatorBefore = parts == KeyParts.ALL) {
+        items = choices.mapIndexed { index, parts ->
+            UiDropdownItem(label(parts), separatorBefore = index == choices.lastIndex && index > 0) {
                 onPick(parts)
                 onClose()
             }

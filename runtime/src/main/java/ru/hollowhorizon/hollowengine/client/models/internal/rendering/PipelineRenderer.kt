@@ -121,7 +121,7 @@ class PipelineRenderer(private val primitive: Primitive) {
         val shader = RenderSystem.getShader() ?: return
         val nodeMatrix = instance.matrix.asMatrix4f()
 
-        instance.material.bind(MaterialBindContext(shader, COLOR_LOCATION))
+        instance.material.withOpacity(opacity).bind(MaterialBindContext(shader, COLOR_LOCATION))
 
         val packedLight = instance.material.packedLight(light)
         GL33.glVertexAttribI2i(4, packedLight and FFFF, packedLight shr 16 and FFFF)

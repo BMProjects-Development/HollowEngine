@@ -4,10 +4,13 @@ import com.mojang.blaze3d.platform.GlStateManager
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.MultiBufferSource
 import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.client.models.internal.drawWithShader
+import ru.hollowhorizon.hollowengine.client.models.internal.SHADER
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
+import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
 
 typealias Renderable = RenderContext.() -> Unit
 
@@ -30,6 +33,7 @@ data class RenderContext(
     val light: Int,
     val overlay: Int,
     val allowInstancing: Boolean = false,
+    val opacity: Float = 1f,
 )
 
 
@@ -92,7 +96,10 @@ class ListRenderPipeline : RenderPipeline {
 
         val texture = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding
 
-        drawWithShader {
+        val shader = if (context.opacity < 1f && shouldOverrideShaders()) {
+            GameRenderer.getRendertypeEntityTranslucentShader() ?: SHADER
+        } else SHADER
+        drawWithShader(shader) {
             for (draw in vaoCommands) context.draw()
         }
 

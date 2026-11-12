@@ -10,6 +10,7 @@ import net.irisshaders.iris.shaderpack.programs.ProgramSource
 import net.irisshaders.iris.vertices.IrisVertexFormats
 import net.minecraft.client.renderer.ShaderInstance
 import ru.hollowhorizon.hollowengine.LOGGER
+import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticGeometry
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
 import ru.hollowhorizon.hollowengine.fabric.internal.accessors.IrisRenderingPipelineAccessor
 import ru.hollowhorizon.hollowengine.fabric.internal.accessors.ProgramSourceAccessor
@@ -26,14 +27,17 @@ private enum class IrisProgramVariant(
 }
 
 object IrisInstancingPrograms {
-    private var pipeline: IrisRenderingPipeline? = null
-    private val programs = EnumMap<IrisProgramVariant, ShaderInstance>(IrisProgramVariant::class.java)
-    private val failures = EnumSet.noneOf(IrisProgramVariant::class.java)
+    private class PipelinePrograms {
+        val shaders = EnumMap<IrisProgramVariant, ShaderInstance>(IrisProgramVariant::class.java)
+        val failures = EnumSet.noneOf(IrisProgramVariant::class.java)
+    }
+
+    private val byPipeline = IdentityHashMap<IrisRenderingPipeline, PipelinePrograms>()
     private var shaderCounter = 0
 
     fun shaderFor(translucent: Boolean, shadow: Boolean): ShaderInstance? {
         val currentPipeline = IrisHelper.currentPipeline() as? IrisRenderingPipeline ?: return null
-        ensurePipeline(currentPipeline)
+        val programs = byPipeline.getOrPut(currentPipeline) { PipelinePrograms() }
 
         val variant = when {
             shadow -> IrisProgramVariant.SHADOW
@@ -41,28 +45,24 @@ object IrisInstancingPrograms {
             else -> IrisProgramVariant.OPAQUE
         }
 
-        programs[variant]?.let { return it }
-        if (variant in failures) return null
+        programs.shaders[variant]?.let { return it }
+        if (variant in programs.failures) return null
 
         val created = createProgram(currentPipeline, variant)
         if (created == null) {
-            failures += variant
+            programs.failures += variant
         } else {
-            programs[variant] = created
+            programs.shaders[variant] = created
         }
         return created
     }
 
     fun invalidate() {
-        programs.clear()
-        failures.clear()
-        pipeline = null
+        byPipeline.clear()
     }
 
-    private fun ensurePipeline(currentPipeline: IrisRenderingPipeline) {
-        if (pipeline === currentPipeline) return
-        invalidate()
-        pipeline = currentPipeline
+    fun forget(pipeline: IrisRenderingPipeline) {
+        byPipeline.remove(pipeline)?.shaders?.values?.let(StaticGeometry::invalidateBindings)
     }
 
     private fun createProgram(pipeline: IrisRenderingPipeline, variant: IrisProgramVariant): ShaderInstance? {

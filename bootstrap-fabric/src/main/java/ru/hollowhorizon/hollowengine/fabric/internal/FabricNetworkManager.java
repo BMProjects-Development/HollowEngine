@@ -16,6 +16,11 @@ import java.util.function.BiConsumer;
 
 public class FabricNetworkManager implements NetworkManager {
     @Override
+    public boolean canSendToServer(CustomPacketPayload.Type<?> type) {
+        return ClientPlayNetworking.canSend(type);
+    }
+
+    @Override
     public <T extends CustomPacketPayload> void registerClient(CustomPacketPayload.@NotNull Type<T> type, @NotNull StreamCodec<RegistryFriendlyByteBuf, T> codec, @NotNull BiConsumer<T, Player> consumer) {
         PayloadTypeRegistry.playS2C().register(type, codec);
         if (FabricLoader.getInstance().getEnvironmentType().equals(EnvType.CLIENT)) {

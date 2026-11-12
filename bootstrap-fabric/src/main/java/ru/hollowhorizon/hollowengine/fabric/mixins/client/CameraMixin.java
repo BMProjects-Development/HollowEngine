@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.hollowhorizon.hollowengine.bootstrap.impl.BootstrapRuntimeManager;
+import ru.hollowhorizon.hollowengine.bridge.client.CameraTransforms;
 import ru.hollowhorizon.hollowengine.bridge.mixins.client.CameraInvoker;
 
 @Mixin(Camera.class)
@@ -25,14 +26,6 @@ public class CameraMixin {
 
         var renderer = Minecraft.getInstance().gameRenderer;
         var setup = bridge.onCameraSetup(renderer, camera, override.active() ? override.yaw() : camera.getYRot(), override.active() ? override.pitch() : camera.getXRot(), override.active() ? override.roll() : 0.0F, partialTick);
-        var accessor = (CameraInvoker) camera;
-        accessor.hollowcore$rotate(setup.yaw(), setup.pitch());
-        if (setup.roll() != 0.0F) {
-            var rotation = accessor.hollowcore$getRotation();
-            rotation.rotateZ((float) Math.toRadians(setup.roll()));
-            accessor.hollowcore$getForwards().set(0.0F, 0.0F, -1.0F).rotate(rotation);
-            accessor.hollowcore$getUp().set(0.0F, 1.0F, 0.0F).rotate(rotation);
-            accessor.hollowcore$getLeft().set(-1.0F, 0.0F, 0.0F).rotate(rotation);
-        }
+        CameraTransforms.setRotation(camera, setup.yaw(), setup.pitch(), setup.roll());
     }
 }

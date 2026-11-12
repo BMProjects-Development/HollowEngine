@@ -21,6 +21,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBa
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
 import ru.hollowhorizon.hollowengine.common.colliders.hostScale
@@ -247,6 +248,7 @@ object RenderManager {
                     (entity as? LivingEntity)?.let { LivingEntityRenderer.getOverlayCoords(it, 0f) }
                         ?: OverlayTexture.NO_OVERLAY,
                     allowInstancing = allowInstancing,
+                    opacity = WorldCameraPreviewRenderer.entityOpacity(entity, partialTick),
                 )
             )
             if (DebugSkeletonRenderer.isEnabled) {

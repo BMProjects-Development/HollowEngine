@@ -1,0 +1,21 @@
+@import "hollowengine:ui/styles/theme.hss";
+
+.cutscene-viewport-toolbar {
+    size: fill fit;
+    padding: 3px 6px;
+    gap: 4px;
+    align-items: start center;
+    background: $bg-panel;
+}
+
+.cutscene-camera-viewport {
+    background: $bg-window;
+}
+
+.cutscene-preview-message {
+    padding: 4px 6px;
+    foreground: $text-muted;
+    size: fill fit;
+    text-wrap: true;
+    text-align: center;
+}

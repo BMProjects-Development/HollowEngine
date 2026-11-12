@@ -137,7 +137,7 @@ internal object WorldObjectScene {
     val toolbar: @Composable () -> Unit = { ScopeToolbar() }
 
     /** The hierarchy for the scene window, or null for a player who may not edit the world. */
-    fun target(): SceneTarget? {
+    fun target(context: HollowIdeContext? = null): SceneTarget? {
         if (!isAvailable()) return null
         val all = rows
         val favorites = WorldObjectEditing.favorites
@@ -150,7 +150,7 @@ internal object WorldObjectScene {
             onSelect = ::select,
             onToggle = ::toggle,
             hint = "$LANG.empty".lang.takeIf { all.isEmpty() },
-            menu = { id -> menu(id, byId) },
+            menu = { id -> menu(id, byId, context) },
             onKey = ::handleKey,
             onMove = ::move,
             canMove = { dragged, target -> canMove(dragged, target, byId) },
@@ -302,7 +302,7 @@ internal object WorldObjectScene {
         return PartRef(row.entityId, uuid, path) to (row.parts ?: return null)
     }
 
-    private fun menu(id: String?, byId: Map<UUID, WorldObjectRow>): List<UiDropdownItem> {
+    private fun menu(id: String?, byId: Map<UUID, WorldObjectRow>, context: HollowIdeContext?): List<UiDropdownItem> {
         partOf(id)?.let { (ref, parts) -> return WorldObjectParts.menu(ref, parts) }
         if (id == null || id == ROOT) {
             return listOf(
@@ -310,7 +310,7 @@ internal object WorldObjectScene {
                     "$LANG.create_empty".lang,
                     mark = UiMenuParts.icon(WorldObjectEditing.EMPTY_ICON)
                 ) { WorldObjectEditing.spawnEmpty(null) },
-            )
+            ) + context?.let { ide -> HollowIdeExtensionPoints.WORLD_SCENE_ACTIONS.extensions.map { it.item(ide) } }.orEmpty()
         }
         objectOf(id)?.let { return WorldObjectEditing.menu(it, inScene = true) }
         val bookmarked = favoriteUuid(id)?.takeIf { it !in byId } ?: return emptyList()

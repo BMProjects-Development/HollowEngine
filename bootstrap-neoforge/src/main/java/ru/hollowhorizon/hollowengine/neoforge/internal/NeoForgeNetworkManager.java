@@ -1,11 +1,14 @@
 package ru.hollowhorizon.hollowengine.neoforge.internal;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
 import org.jetbrains.annotations.NotNull;
 import ru.hollowhorizon.hollowengine.api.NetworkManager;
 
@@ -15,6 +18,12 @@ import java.util.function.BiConsumer;
 
 public class NeoForgeNetworkManager implements NetworkManager {
     private static final Map<CustomPacketPayload.Type<?>, PacketRegistration<?>> PACKETS = new LinkedHashMap<>();
+
+    @Override
+    public boolean canSendToServer(CustomPacketPayload.Type<?> type) {
+        var listener = Minecraft.getInstance().getConnection();
+        return listener != null && NetworkRegistry.hasChannel(listener.getConnection(), ConnectionProtocol.PLAY, type.id());
+    }
 
     @SuppressWarnings("unchecked")
     public static void onRegisterPackets(RegisterPayloadHandlersEvent event) {

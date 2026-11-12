@@ -14,6 +14,22 @@ import ru.hollowhorizon.hollowengine.bootstrap.impl.BootstrapRuntimeManager;
 
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
+    @Inject(method = "getMainCamera", at = @At("HEAD"), cancellable = true)
+    private void hollowengine$worldPreviewCamera(CallbackInfoReturnable<Camera> cir) {
+        var preview = BootstrapRuntimeManager.bridge().getWorldPreviewCamera();
+        if (preview != null) cir.setReturnValue(preview);
+    }
+
+    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;renderLevel(Lnet/minecraft/client/DeltaTracker;)V"))
+    private void onBeforeLevelFrame(DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().onBeforeLevelFrame(Minecraft.getInstance(), deltaTracker);
+    }
+
+    @Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/LevelRenderer;renderLevel(Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/Camera;Lnet/minecraft/client/renderer/GameRenderer;Lnet/minecraft/client/renderer/LightTexture;Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V", shift = At.Shift.AFTER))
+    private void hollowengine$drawCameraGuides(DeltaTracker deltaTracker, CallbackInfo ci) {
+        BootstrapRuntimeManager.bridge().drawWorldPreviewGuides();
+    }
+
     @Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
     private void onRenderItemInHand(Camera camera, float partialTick, Matrix4f projectionMatrix, CallbackInfo ci) {
         if (BootstrapRuntimeManager.bridge().onRenderItemInHand(camera, partialTick, projectionMatrix)) {

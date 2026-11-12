@@ -19,6 +19,8 @@
     "client.CameraInvoker",
     "client.ClientAttributeSyncMixin",
     "client.LevelRendererInvoker",
+    "client.LevelWeatherAccessor",
+    "client.LightTextureAccessor",
     "client.ShaderInstanceAccessor"
   ],
   "injectors": {

@@ -6,6 +6,9 @@ accessible class net/minecraft/client/renderer/RenderType$CompositeRenderType
 accessible class net/minecraft/client/renderer/RenderType$OutlineProperty
 accessible class net/minecraft/client/renderer/RenderStateShard$TextureStateShard
 accessible class net/minecraft/client/renderer/RenderStateShard$EmptyTextureStateShard
+accessible method net/minecraft/client/renderer/RenderType$CompositeRenderType state ()Lnet/minecraft/client/renderer/RenderType$CompositeState;
+accessible field net/minecraft/client/renderer/RenderType$CompositeState textureState Lnet/minecraft/client/renderer/RenderStateShard$EmptyTextureStateShard;
+accessible method net/minecraft/client/renderer/RenderStateShard$EmptyTextureStateShard cutoutTexture ()Ljava/util/Optional;
 accessible class net/minecraft/client/renderer/RenderStateShard$LightmapStateShard
 accessible class net/minecraft/client/renderer/RenderStateShard$OverlayStateShard
 accessible class net/minecraft/client/renderer/RenderStateShard$LayeringStateShard
@@ -78,3 +81,13 @@ accessible field net/minecraft/server/level/ServerChunkCache chunkMap Lnet/minec
 accessible method net/minecraft/server/level/ChunkMap getChunks ()Ljava/lang/Iterable;
 
 accessible field net/minecraft/server/level/ServerLevel navigatingMobs Ljava/util/Set;
+
+accessible class net/minecraft/client/multiplayer/ClientChunkCache$Storage
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage <init> (Lnet/minecraft/client/multiplayer/ClientChunkCache;I)V
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage inRange (II)Z
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getIndex (II)I
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage replace (ILnet/minecraft/world/level/chunk/LevelChunk;)V
+accessible field net/minecraft/client/multiplayer/ClientChunkCache$Storage chunks Ljava/util/concurrent/atomic/AtomicReferenceArray;
+accessible field net/minecraft/client/multiplayer/ClientChunkCache$Storage viewCenterX I
+accessible field net/minecraft/client/multiplayer/ClientChunkCache$Storage viewCenterZ I
+accessible field net/minecraft/client/multiplayer/ClientChunkCache$Storage chunkCount I

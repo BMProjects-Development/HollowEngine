@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+
 import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.Entity
@@ -56,7 +58,7 @@ object WorldInspector {
 
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
-        if (event.stage != RenderStage.AFTER_LEVEL) return
+        if (WorldCameraPreviewRenderer.isRendering || event.stage != RenderStage.AFTER_LEVEL) return
         if (!EditorMode.isActive()) {
             hovered = null
             boxed = emptyList()

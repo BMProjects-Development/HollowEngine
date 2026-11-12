@@ -32,6 +32,8 @@ class TimelineTarget(
     val advance: ((Float) -> Unit)? = null,
     /** Dialogs and chrome the owner wants drawn over the timeline. */
     val overlay: HollowUiContent? = null,
+    /** Supplies an inspector for the timeline's own properties. */
+    val inspector: (@Composable (() -> Unit) -> Unit)? = null,
 )
 
 /**
@@ -108,7 +110,7 @@ fun TimelineDock(keyboardActive: Boolean = true) {
     }
     revision.value
 
-    LaunchedEffect(target.id) {
+    LaunchedEffect(target) {
         var lastNanos = -1L
         while (isActive) {
             withFrameNanos { now ->
@@ -122,15 +124,16 @@ fun TimelineDock(keyboardActive: Boolean = true) {
         }
     }
 
-    PublishInspector(source = "timeline-${target.id}", key = controller.selectionKey()) {
-        if (!controller.hasInspectableSelection()) return@PublishInspector null
+    PublishInspector(source = "timeline-${target.id}", key = target to controller.selectionKey()) {
+        if (target.inspector == null && !controller.hasInspectableSelection()) return@PublishInspector null
         InspectorTarget(
             id = "timeline-${target.id}-${controller.selectionKey()}",
             title = TimelineLang.PROPERTIES.lang,
             icon = CutsceneIcon,
         ) {
             revision.value
-            TimelineSelectionFields(controller, refresh)
+            val inspector = target.inspector
+            if (inspector != null) inspector(refresh) else TimelineSelectionFields(controller, refresh)
         }
     }
 

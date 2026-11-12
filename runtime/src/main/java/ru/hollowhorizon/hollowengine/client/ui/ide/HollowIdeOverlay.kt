@@ -70,7 +70,7 @@ internal const val AssetManagerId = "ide-asset-manager"
 
 internal const val ProjectFilterInputId = "ide-project-filter"
 internal const val ConsoleId = "ide-console"
-internal const val TimelineId = "ide-cutscene-timeline"
+const val TimelineId = "ide-cutscene-timeline"
 internal const val SceneId = "ide-scene"
 internal const val InspectorId = "ide-inspector"
 internal const val GameViewportId = "ide-game-viewport"
@@ -123,6 +123,7 @@ object HollowIdeOverlay {
     private val assetManagerState = AssetManagerState()
     private val dock = DockingState()
     private val surface = HollowUiSurface()
+    private var mainSurfaceWindow: Long? = null
     private val renderer = MinecraftUiRenderer()
     private val pipeline = PipelinedUiFrameBuilder()
     private val detachedWindows = HollowIdeDetachedWindows(
@@ -219,8 +220,21 @@ object HollowIdeOverlay {
     private var colorPicker by mutableStateOf<EditorColorPicker?>(null)
     private val ideContext = object : HollowIdeContext {
         override val focusedFile: HollowIdeOpenFile? get() = this@HollowIdeOverlay.focusedFile()
+        override val activeFile: HollowIdeOpenFile?
+            get() = focusedFile ?: lastFocusedFilePath?.let { model.files[it] }?.takeIf { dock.contains(it.id) }
 
         override fun openFile(path: String): Boolean = openPath(path)
+
+        override fun createFile(
+            directory: String,
+            title: String,
+            suggestedName: String,
+            extension: String,
+            content: (String) -> ByteArray,
+        ) {
+            require(extension.startsWith('.'))
+            project.openCreateFileDialog(directory, IdeFileCreation(title, suggestedName, extension, content))
+        }
 
         override fun openPanel(id: String): Boolean {
             val window = toolWindow(id) ?: return false
@@ -241,6 +255,8 @@ object HollowIdeOverlay {
             statusText = message
         }
     }
+
+    private var lastFocusedFilePath by mutableStateOf<String?>(null)
     private val contributions = HollowIdeContributions(
         fileTypes,
         model,
@@ -301,6 +317,9 @@ object HollowIdeOverlay {
     fun isVisible(): Boolean = useHollowUiOverlay && isAvailable()
 
     fun isExpanded(): Boolean = isVisible() && !collapsed
+
+    internal fun showsEditorSurfaces(): Boolean =
+        expanded || (detachedWindows.active && useHollowUiOverlay && HollowEngineConfig.editMode != EditMode.DISABLED)
 
     fun hasFocusedInput(): Boolean = isVisible() && surface.runtime.isAnyFocused
 
@@ -621,12 +640,13 @@ object HollowIdeOverlay {
 
     @SubscribeEvent
     fun render(event: RenderTickEvent.Blit) {
+        val windowHandle = event.minecraft.window.window
         syncMouseGrab(event.minecraft)
         if (WindowsFileDragSource.active) {
             pipeline.await()
-            WindowsFileDragSource.runPending(event.minecraft.window.window)
+            WindowsFileDragSource.runPending(windowHandle)
         }
-        externalFiles.update(event.minecraft.window.window, isVisible() && !collapsed)
+        externalFiles.update(windowHandle, isVisible() && !collapsed)
         if (detachedWindows.active) {
             pipeline.await()
             if (!useHollowUiOverlay || HollowEngineConfig.editMode == EditMode.DISABLED) {
@@ -636,15 +656,16 @@ object HollowIdeOverlay {
                 pipeline.reset()
             }
         }
-        if (!isVisible() && !detachedWindows.active) return
+        val renderMain = isVisible()
+        if (!renderMain && !detachedWindows.active) return
         if (!externalFiles.active && refreshFilesRequested.getAndSet(false)) {
             pipeline.await()
             model.refreshExternalFiles()
         }
         AssetManagerLifecycle.observe(event.minecraft)
-        if (isVisible()) renderOverlay(currentBlitTarget())
+        if (renderMain) renderOverlay(currentBlitTarget(), windowHandle)
         detachedWindows.render()
-        if (isVisible() && PIPELINE_FRAMES) scheduleOverlayFrame()
+        if (renderMain && PIPELINE_FRAMES) scheduleOverlayFrame()
     }
 
     internal fun closeDetachedWindows() {
@@ -664,7 +685,6 @@ object HollowIdeOverlay {
         contributions.start()
         restoreLayout()
         surface.pointerWrap = HollowIdePointerWrap
-        surface.setContent { Content() }
         TagModuleRevision.observe(::rereadFilesSoon)
     }
 
@@ -852,7 +872,7 @@ object HollowIdeOverlay {
         }
 
     @Composable
-    private fun Content() {
+    private fun Content(windowHandle: Long) {
         RememberLayout()
         TrackActiveEditor()
         WatchTextFiles()
@@ -860,7 +880,11 @@ object HollowIdeOverlay {
             id = "ide-root",
             modifier = workspaceModifier(),
         ) {
-            CompositionLocalProvider(LocalDragAndDrop provides dragAndDrop) {
+            CompositionLocalProvider(
+                LocalDragAndDrop provides dragAndDrop,
+                LocalHollowIdeContext provides ideContext,
+                LocalHollowIdeWindow provides windowHandle,
+            ) {
                 if (collapsed) {
                     GearButton()
                 } else {
@@ -893,7 +917,11 @@ object HollowIdeOverlay {
     private fun DetachedContent(id: String, window: HollowIdeNativeWindow) {
         val panel = dock.floatingWindows.firstOrNull { it.id == id && it.detached } ?: return
         Box(id = "ide-root", modifier = workspaceModifier()) {
-            CompositionLocalProvider(LocalDragAndDrop provides window.dragAndDrop) {
+            CompositionLocalProvider(
+                LocalDragAndDrop provides window.dragAndDrop,
+                LocalHollowIdeContext provides ideContext,
+                LocalHollowIdeWindow provides window.handle,
+            ) {
                 DetachedDockSpace(
                     panel,
                     dock,
@@ -948,6 +976,12 @@ object HollowIdeOverlay {
         HollowIdeFileContextMenu(fileContextMenu, ::runFileAction, onDismiss = { fileContextMenu = null })
         HollowIdeSearchDialog(search, ::openSearchResult)
         HollowIdeProjectDialogs(packaging)
+        HollowIdeProjectNameDialog(
+            dialog = project.nameDialog,
+            onNameChange = project::updateNameDialog,
+            onConfirm = project::applyNameDialog,
+            onCancel = project::cancelNameDialog,
+        )
         EditorColorPickerPopup()
         if (gutterNavigation.isNotEmpty()) ContextMenu(
             id = "ide-gutter-navigation",
@@ -979,9 +1013,13 @@ object HollowIdeOverlay {
 
     @Composable
     private fun TrackActiveEditor() {
-        val focused = focusedFile()?.takeIf { it.textOrNull != null }?.path
+        val focusedFile = focusedFile()
+        val focused = focusedFile?.takeIf { it.textOrNull != null }?.path
         LaunchedEffect(focused) {
             if (focused != null) activeEditorPath = focused
+        }
+        LaunchedEffect(focusedFile) {
+            if (focusedFile != null) lastFocusedFilePath = focusedFile.path
         }
         val focusedItem = dock.focusedItemId
         LaunchedEffect(focusedItem) { histories.follow(focusedItem) }
@@ -1305,13 +1343,6 @@ object HollowIdeOverlay {
                     )
                 },
             )
-            val dialog = project.nameDialog
-            HollowIdeProjectNameDialog(
-                dialog = dialog,
-                onNameChange = project::updateNameDialog,
-                onConfirm = project::applyNameDialog,
-                onCancel = project::cancelNameDialog,
-            )
         }
     }
 
@@ -1452,16 +1483,22 @@ object HollowIdeOverlay {
     }
 
     private fun openFileDockItem(file: HollowIdeOpenFile) {
+        collapsed = false
         statusText = ""
         if (dock.contains(file.id)) {
             dock.updateItem(file.dockItem())
             dock.focus(file.id)
             return
         }
-        val target = editorTarget()
+        val target = editorTarget(file)
+        if (file.type.openBesideGame) dock.focus(GameViewportId)
         dock.open(file.dockItem(), target)
-        if (target.placement == DockPlacement.RIGHT) {
+        if (target.placement == DockPlacement.RIGHT && !file.type.openBesideGame) {
             dock.setSplitFractionForItem(ProjectTreeId, file.id, 0.28f)
+        }
+        file.type.onOpened?.let { onOpened ->
+            onOpened(ideContext)
+            dock.focus(file.id)
         }
     }
 
@@ -1746,10 +1783,17 @@ object HollowIdeOverlay {
      * Where a newly opened file goes: in with the files that are already open, else into the main
      * panel the game view sits in, and only failing both of those into a split off the project tree.
      */
-    private fun editorTarget(): DockTarget {
-        model.files.values.firstOrNull { dock.contains(it.id) }?.let { dock.stackIdOf(it.id) }
+    private fun editorTarget(file: HollowIdeOpenFile): DockTarget {
+        val game = dock.stackIdOf(GameViewportId)
+        if (file.type.openBesideGame && game != null) {
+            val sibling = model.files.values.firstNotNullOfOrNull {
+                dock.stackIdOf(it.id)?.takeIf { stack -> it.type == file.type && stack != game && !dock.isFloating(it.id) }
+            }
+            return if (sibling != null) DockTarget(sibling) else DockTarget(game, DockPlacement.RIGHT)
+        }
+        model.files.values.firstOrNull { dock.contains(it.id) && !it.type.openBesideGame }?.let { dock.stackIdOf(it.id) }
             ?.let { return DockTarget(it) }
-        dock.stackIdOf(GameViewportId)?.let { return DockTarget(it) }
+        game?.let { return DockTarget(it) }
         dock.stackIdOf(ProjectTreeId)?.let { return DockTarget(it, DockPlacement.RIGHT) }
         return DockTarget.Root
     }
@@ -1892,8 +1936,12 @@ object HollowIdeOverlay {
         }
     }
 
-    private fun renderOverlay(target: UiRenderTarget) {
-        val window = Minecraft.getInstance().window
+    private fun renderOverlay(target: UiRenderTarget, windowHandle: Long) {
+        if (mainSurfaceWindow != windowHandle) {
+            pipeline.reset()
+            surface.setContent { Content(windowHandle) }
+            mainSurfaceWindow = windowHandle
+        }
         val frameWidth = HollowIdeScale.scaledWidth()
         val frameHeight = HollowIdeScale.scaledHeight()
         val frame = (if (PIPELINE_FRAMES) pipeline.take(frameWidth, frameHeight) else null) ?: surface.frame(
@@ -1906,7 +1954,7 @@ object HollowIdeOverlay {
             lastMouseX, lastMouseY
         ) == true
         UiCursorManager.claim(
-            window = window.window,
+            window = windowHandle,
             owner = this,
             shape = surface.runtime.cursor.takeIf { overIde },
         )

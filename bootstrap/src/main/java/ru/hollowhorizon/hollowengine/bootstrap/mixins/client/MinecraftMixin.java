@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.bootstrap.mixins.client;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -11,11 +12,19 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.hollowhorizon.hollowengine.bootstrap.impl.BootstrapRuntimeManager;
+import ru.hollowhorizon.hollowengine.bridge.client.WorldPreviewTargets;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
     @Shadow @Nullable public ClientLevel level;
+
+    @Inject(method = "getMainRenderTarget", at = @At("HEAD"), cancellable = true)
+    private void hollowengine$previewTarget(CallbackInfoReturnable<RenderTarget> cir) {
+        var preview = WorldPreviewTargets.active();
+        if (preview != null) cir.setReturnValue(preview.target());
+    }
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void onInit(GameConfig gameConfig, CallbackInfo ci) {

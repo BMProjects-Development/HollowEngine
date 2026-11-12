@@ -7,6 +7,7 @@ import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.decals.Decals
 import ru.hollowhorizon.hollowengine.client.render.CameraSetupEvent
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings
 import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
@@ -75,11 +76,11 @@ object VfxWorldRenderer {
         deferred = null
         frameView = null
         if (scene == null && bones.isEmpty() && decals.isEmpty()) {
-            shake.fill(0f)
+            if (!WorldCameraPreviewRenderer.isRendering) shake.fill(0f)
             return
         }
 
-        scene?.update(camera)
+        if (!WorldCameraPreviewRenderer.isRendering) scene?.update(camera)
 
         val levelPose = event.poseStack.last().pose()
         scene?.forEachInstance { instance, _ ->
@@ -87,7 +88,7 @@ object VfxWorldRenderer {
         }
         bones.forEach { binding -> binding.instance.collect(frame, binding.placement) }
         frame.decals += decals
-        frame.shake.copyInto(shake)
+        if (!WorldCameraPreviewRenderer.isRendering) frame.shake.copyInto(shake)
         if (frame.isEmpty) return
 
         val time = RenderSystem.getShaderGameTime() * SECONDS_PER_DAY

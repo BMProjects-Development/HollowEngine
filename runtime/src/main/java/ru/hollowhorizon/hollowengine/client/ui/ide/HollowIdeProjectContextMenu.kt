@@ -234,10 +234,11 @@ internal data class ProjectNameDialog(
     val y: Float,
     val template: HollowIdeScriptTemplate? = null,
     val isDirectory: Boolean = false,
+    val fileCreation: IdeFileCreation? = null,
 ) {
     val title: String
         get() = when (action) {
-            ProjectNameAction.CreateFile -> template?.let { "New ${it.label}" } ?: "New File"
+            ProjectNameAction.CreateFile -> fileCreation?.title ?: template?.let { "New ${it.label}" } ?: "New File"
             ProjectNameAction.CreateFolder -> "New Folder"
             ProjectNameAction.Rename -> "Rename"
         }

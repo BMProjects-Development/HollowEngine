@@ -1,20 +1,18 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.client
 
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
-import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneTimeline
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CreateCutscene
+import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneFileType
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGraphFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
-import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeScriptTemplate
-import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdePreview
-import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeScriptTemplate
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
+import ru.hollowhorizon.hollowengine.client.ui.ide.*
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 
 /**
  * What the addon adds to the client: the cutscene and dialogue cameras, the cutscene
- * timeline and the editors of `.story` files in the IDE.
+ * and story editors in the IDE.
  */
 @ClientOnly
 internal object NarrativeClient {
@@ -24,7 +22,8 @@ internal object NarrativeClient {
     fun register(extensions: HollowAddonExtensions) {
         extensions.register(CameraDirector.sources, "cutscene", CutsceneCameraSystem, CUTSCENE_CAMERA_PRIORITY)
         extensions.register(CameraDirector.sources, "story", StoryCameraSystem)
-        extensions.register(IdeTimelines.defaults, "cutscene", CutsceneTimeline)
+        extensions.registerIdeFileType(CutsceneFileType)
+        extensions.register(HollowIdeExtensionPoints.WORLD_SCENE_ACTIONS, "cutscene", CreateCutscene)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "speech", DialogueOverlays.speech)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "choice", DialogueOverlays.choice)
         extensions.registerIdePreview(StoryGraphFilePreview)

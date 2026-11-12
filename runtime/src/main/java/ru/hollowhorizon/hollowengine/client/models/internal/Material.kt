@@ -34,6 +34,12 @@ data class Material(
 
     override val isTranslucent: Boolean get() = blend != Blend.OPAQUE
 
+    internal fun withOpacity(opacity: Float): Material = if (opacity >= 1f) this else copy(
+        color = Color(color.rgb, color.a * opacity),
+        blend = if (blend == Blend.OPAQUE) Blend.BLEND else blend,
+        doubleSided = true,
+    )
+
     override fun bind(context: MaterialBindContext) {
         val shader = context.shader
         if (context.colorLocation != -1) {

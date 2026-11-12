@@ -1,10 +1,12 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockPlacement
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
+import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonRegistration
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -22,13 +24,32 @@ object HollowIdeExtensionPoints {
     val LANGUAGES = ExtensionPoints.create("hollowengine:ide/languages".rl, HollowIdeLanguageService::class)
     val SCRIPT_TEMPLATES = ExtensionPoints.create("hollowengine:ide/script-templates".rl, HollowIdeScriptTemplate::class)
     val PREVIEWS = ExtensionPoints.create("hollowengine:ide/previews".rl, HollowIdeFilePreview::class)
+    val WORLD_SCENE_ACTIONS = ExtensionPoints.create("hollowengine:ide/world-scene-actions".rl, WorldSceneAction::class)
 }
+
+/** Adds a command to the World row and empty space of the world hierarchy. */
+fun interface WorldSceneAction {
+    fun item(context: HollowIdeContext): UiDropdownItem
+}
+
+val LocalHollowIdeContext = staticCompositionLocalOf<HollowIdeContext?> { null }
+val LocalHollowIdeWindow = staticCompositionLocalOf<Long> { 0L }
 
 /** Operations a contributed panel or menu action may request from the IDE. */
 interface HollowIdeContext {
     val focusedFile: HollowIdeOpenFile?
+    val activeFile: HollowIdeOpenFile? get() = focusedFile
 
     fun openFile(path: String): Boolean
+
+    /** Prompts for a file name, then creates and opens the document in [directory]. */
+    fun createFile(
+        directory: String,
+        title: String,
+        suggestedName: String,
+        extension: String,
+        content: (String) -> ByteArray,
+    )
 
     /** Opens a window by its id: a built-in one or a contributed panel's qualified id (`addon:panel`). */
     fun openPanel(id: String): Boolean

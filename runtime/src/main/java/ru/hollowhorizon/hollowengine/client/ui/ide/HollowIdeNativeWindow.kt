@@ -14,7 +14,7 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 internal class HollowIdeNativeWindow(
-    private val handle: Long,
+    val handle: Long,
     customChrome: Boolean,
     val surface: HollowUiSurface = HollowUiSurface(),
 ) : AutoCloseable {
