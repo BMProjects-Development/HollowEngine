@@ -129,7 +129,8 @@ private data class SceneDrag(val scene: String, val item: String)
  */
 @Composable
 internal fun SceneDock(onFilterOpened: (String) -> Unit) {
-    val target = IdeScenes.current ?: WorldObjectScene.target()
+    val context = LocalHollowIdeContext.current
+    val target = IdeScenes.current ?: WorldObjectScene.target(context)
     var menu by remember { mutableStateOf<SceneMenu?>(null) }
 
     Column(tags = listOf("ide-panel", "scene-panel"), modifier = Modifier.size(100.percent, 100.percent)) {

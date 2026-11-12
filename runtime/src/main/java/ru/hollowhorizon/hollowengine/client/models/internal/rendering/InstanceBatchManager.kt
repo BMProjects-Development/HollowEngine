@@ -140,7 +140,7 @@ fun RenderContext.submitStatic(
     val batching = allowInstancing && InstanceBatchManager.canBatch()
     val immediate = if (batching) null else LinkedHashMap<StaticBatchKey, MutableList<StaticInstance>>()
     fun hand(part: StaticPart, slots: KeptSlots) {
-        val material = slots.material
+        val material = slots.material.withOpacity(opacity)
         val instance = StaticInstance(
             part, material, modelView, modelNormal, viewNormal, slots.matrices, slots.drawn,
             overlay, material.packedLight(light), entityInfo,

@@ -8,25 +8,20 @@ order: 4
 Record camera movement in the editor and play the scene for a chosen player. You can also set the field of view, time of day, and weather on the timeline.
 
 :::advice
-Cutscenes come with the [narrative addon](/docs/hollowengine/addons/narrative). Without it the timeline window shows only the timelines of open files, such as montages and effects.
+The cutscene editor comes with the [Narrative addon](/docs/hollowengine/addons/narrative).
 :::
-
-![Cutscene editor timeline and viewport](/hollowengine/pictures/cutscenes/overview.webp)
-
----
 
 ## Create a cutscene
 
-1. Open **Windows > Cutscene** and create a new cutscene.
-2. Place the scene's origin (the **Origin** section) - **Move here** is the quick way.
-3. Add keyframes with the capture button: the current camera pose, time of day, and weather are written onto the active layer of every property.
-4. Set the duration and preview the result from the timeline.
-5. Save the cutscene. A name such as `intro` is stored as `hollowengine/cutscenes/intro.dat`.
-6. Start it for a player from a server script.
+1. Open **Windows > Scene**, right-click **World**, and choose **New cutscene**. For a name such as `intro`, the IDE creates `hollowengine/cutscenes/intro.dat` with its first camera key taken from the player's current viewpoint.
+2. The file tab shows the cutscene camera alongside **Game View**. Use **Game View** to control the player while keeping the cutscene shot in view. Open existing `.dat` files from the project tree.
+3. Move the playhead to the desired time. In **Orbit** mode, middle-drag to orbit around the block under the pointer. Hold `Shift` to pan or scroll to move smoothly along the pointer ray. In **Fly** mode, click the preview. Use `WASD` to move, `Space` or `E` to rise, and `Shift` or `Q` to descend. Right-drag to look around.
 
-The tracks are evaluated on the receiving client. Camera, HUD, hand rendering, time of day, and weather
-can be controlled locally while the cutscene is active. The server world is not changed, and the client's
-previous time and weather are restored when the cutscene or preview stops.
+In single-player and for operators on a HollowEngine server, the preview loads chunks around the camera. Loading uses the server's view distance, capped at an eight-chunk radius.
+4. Press `I` in the preview and choose position, rotation, field of view, or all camera channels. The timeline's capture button also records time of day and weather. Moving the playhead returns the camera to the animation.
+5. Check the motion on the timeline. The camera frame and path are visible in **Game View**. Save with `Ctrl + S`.
+
+When played from a script, tracks are evaluated on the receiving player's client. The cutscene can control that client's camera, HUD, hand rendering, time of day, and weather. The gameplay camera and environment return when playback stops.
 
 ## What the file holds?
 
@@ -39,7 +34,7 @@ and only the numbers it is measured against change.
 Older cutscenes are migrated on load: the origin is placed on the first position key, the keys are
 re-expressed relative to it, and the old easings become curves. Nothing moves on screen.
 
-## Objects, properties and layers
+## Properties and channels
 
 The timeline animates **properties**. On the camera these are `Transform` (Translation, Rotation) and
 `Lens` (FOV); `World / Environment` contains Time of Day and Weather. A property breaks down into
@@ -49,23 +44,7 @@ Time of Day is continuous and uses Minecraft's 24,000-tick day. When it is the o
 the value axis is shown as a 24-hour clock. Weather is discrete (`Clear`, `Rain`, `Thunder`): it changes on
 a key and is intentionally absent from the curve editor.
 
-A property can carry several **layers**. A layer is a full set of curves plus how it folds into the
-layers below it:
-
-| Blending | What it does |
-| --- | --- |
-| **Override** | Replaces the value below. The first layer is always this - there is nothing under it. |
-| **Add** | Adds on top: shakes, offsets, corrections. |
-| **Subtract** | The inverse of Add. |
-| **Multiply** | Scales; only offered where scaling means something. |
-
-The `+` on a property row adds a layer and opens its settings: name, blend mode, weight, visibility and
-lock. The gear on the property row opens the property's own settings - its **limits** (a minimum and
-maximum per channel, applied after every layer has had its say) and the rotation basis. Clicking a layer
-row makes it the active one, which is where captured poses are written.
-
-Hiding a layer, a channel or a whole group takes its contribution out of the result, and the preview
-shows that immediately.
+Hiding a property or channel immediately updates the preview. Lock a property to protect its keys from capture and editing.
 
 ### Rotation: Euler or quaternion
 
@@ -98,7 +77,7 @@ what turns that segment into a spline.
 
 ### The curve editor
 
-Use **Dope sheet / Curves** in the toolbar to switch modes. Keys live on channel rows; properties and layers group them. Each channel has its own color and visibility.
+Use **Dope sheet / Curves** in the toolbar to switch modes. Properties group the channel rows. Each channel has its own keys, color, and visibility.
 
 See the [shared timeline guide](/docs/hollowengine/ide/timeline) for navigation, selection, copying and key transforms. Rebind actions through **Help > Keyboard shortcuts**. In the current default layout, the wheel zooms time and Ctrl + wheel scrolls it; S scales selected keys. Smoothing is available through key menus and settings; assign a shortcut if needed.
 

@@ -47,8 +47,10 @@ public class EntityRenderDispatcherMixin {
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;render(Lnet/minecraft/world/entity/Entity;FFLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V")
     )
     private <T extends Entity> void onRenderEntity(EntityRenderer<T> instance, T entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, Operation<Void> original) {
-        if (BootstrapRuntimeManager.bridge().onRenderEntityPre(entity, entityYaw, partialTick, poseStack, buffer, packedLight)) return;
-        original.call(instance, entity, entityYaw, partialTick, poseStack, buffer, packedLight);
-        BootstrapRuntimeManager.bridge().onRenderEntityPost(entity, entityYaw, partialTick, poseStack, buffer, packedLight);
+        var bridge = BootstrapRuntimeManager.bridge();
+        var buffers = bridge.worldPreviewEntityBuffers(entity, partialTick, buffer);
+        if (bridge.onRenderEntityPre(entity, entityYaw, partialTick, poseStack, buffers, packedLight)) return;
+        original.call(instance, entity, entityYaw, partialTick, poseStack, buffers, packedLight);
+        bridge.onRenderEntityPost(entity, entityYaw, partialTick, poseStack, buffers, packedLight);
     }
 }

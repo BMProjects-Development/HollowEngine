@@ -3,11 +3,13 @@ package ru.hollowhorizon.hollowengine.bootstrap
 import com.google.common.collect.ImmutableMap
 import com.mojang.blaze3d.audio.SoundBuffer
 import com.mojang.blaze3d.platform.Window
+import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.datafixers.util.Either
 import net.minecraft.Util
 import net.minecraft.client.Camera
+import net.minecraft.client.DeltaTracker
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
@@ -87,6 +89,9 @@ import ru.hollowhorizon.hollowengine.client.sounds.SoundAttachments
 import ru.hollowhorizon.hollowengine.client.sounds.SoundResourceConverter
 import ru.hollowhorizon.hollowengine.client.sounds.SoundStreams
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeGameViewport
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+import ru.hollowhorizon.hollowengine.bridge.world.CameraChunkTracker
+import ru.hollowhorizon.hollowengine.common.network.mayStreamCameraChunks
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlayPoint
 import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationOverlay
@@ -171,6 +176,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun shouldApplyMixin(targetClassName: String, mixinClassName: String): Boolean {
         return if (mixinClassName.contains(".client.iris.")) {
             isClassPresent("net.irisshaders.iris.Iris")
+        } else if (mixinClassName.contains(".client.sodium.")) {
+            isClassPresent("net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager")
         } else if (mixinClassName.endsWith(".client.LevelRendererStagesMixin")) {
             !isClassPresent("net.minecraftforge.client.event.RenderLevelStageEvent")
         } else {
@@ -259,6 +266,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onPlayerPermissionsChanged(player: ServerPlayer) {
+        if (!player.mayStreamCameraChunks()) {
+            (player.serverLevel().chunkSource.chunkMap as CameraChunkTracker).`hollowengine$trackCameraChunks`(
+                    player,
+                    emptyList()
+                )
+        }
         PlayerEvent.PermissionsChanged.post(PlayerEvent.PermissionsChanged(player))
     }
 
@@ -530,6 +543,26 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun shouldForceAutoGuiScale(screen: Screen?): Boolean = screen is AutoScaled
 
+    override fun onBeforeLevelFrame(minecraft: Minecraft, deltaTracker: DeltaTracker) {
+        WorldCameraPreviewRenderer.render(minecraft, deltaTracker)
+    }
+
+    override fun isRenderingWorldPreview(): Boolean = WorldCameraPreviewRenderer.isRendering
+
+    override fun markWorldPreviewSectionDirty(x: Int, y: Int, z: Int, immediate: Boolean) =
+        WorldCameraPreviewRenderer.markSectionDirty(x, y, z, immediate)
+
+    override fun getWorldPreviewCamera(): Camera? =
+        if (RenderSystem.isOnRenderThread()) WorldCameraPreviewRenderer.activeCamera else null
+
+    override fun drawWorldPreviewGuides() = WorldCameraPreviewRenderer.drawGuides()
+
+    override fun worldPreviewEntityBuffers(
+        entity: Entity,
+        partialTick: Float,
+        buffers: MultiBufferSource,
+    ): MultiBufferSource = WorldCameraPreviewRenderer.entityBuffers(entity, partialTick, buffers)
+
     override fun onLevelFrameRendered(minecraft: Minecraft) {
         RenderTickEvent.LevelRendered.post { RenderTickEvent.LevelRendered(minecraft) }
     }
@@ -590,6 +623,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onClientTick(client: Minecraft) {
         HollowIdeGameViewport.beginFrame(client)
+        WorldCameraPreviewRenderer.beginFrame(client)
         RuntimeDispatcherState.runClientTasks(client)
         DiscordRichPresence.tick(client)
     }
@@ -603,6 +637,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientStopping(client: Minecraft) {
+        WorldCameraPreviewRenderer.release(client)
         HollowIdeOverlay.closeDetachedWindows()
         DiscordRichPresence.stop()
         RuntimeDispatcherState.stopClient(client)
@@ -629,6 +664,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onLevelClosed(level: Level) {
         if (level.isClientSide) {
+            WorldCameraPreviewRenderer.release(Minecraft.getInstance())
             ClientSounds.clear()
             SoundAttachments.clear()
         }
@@ -825,6 +861,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         roll: Float,
         partialTick: Float,
     ): RuntimeBridge.CameraSetup {
+        if (WorldCameraPreviewRenderer.isRendering) return RuntimeBridge.CameraSetup(yaw, pitch, roll)
         val pose = CameraDirector.currentPose.takeIf { shouldApplyCameraPose() }
         val event = CameraSetupEvent(
             gameRenderer = gameRenderer,
@@ -873,7 +910,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     private fun shouldApplyCameraPose(): Boolean {
-        return !IrisHelper.isShadowRendering()
+        return !WorldCameraPreviewRenderer.isRendering && !IrisHelper.isShadowRendering()
     }
 
     override fun onRegisterLayerDefinitions(definitions: MutableMap<ModelLayerLocation, Supplier<LayerDefinition>>) {
@@ -940,6 +977,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onIrisPipelineDestroyed() {
+        WorldCameraPreviewRenderer.invalidateShaderPipelines()
         IrisHelper.invalidateInstancingPrograms()
     }
 
@@ -1156,6 +1194,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
             RenderLevelStageEvent(
                 renderer, poseStack, projectionMatrix, ticks, partialTick, camera, frustum, stage.toRenderStage()
             )
+        }
+        if (stage == RuntimeBridge.RenderLevelStage.AFTER_LEVEL) {
+            WorldCameraPreviewRenderer.captureGuideView(camera, projectionMatrix)
         }
     }
 

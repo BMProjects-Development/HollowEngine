@@ -1,0 +1,12 @@
+{
+  "camera": "Camera",
+  "create": "New cutscene",
+  "load_failed": "Could not open the cutscene. %s",
+  "preview.insert_camera_key": "Insert camera key at the playhead",
+  "preview.fov": "Field of view",
+  "preview.mode.fly": "Fly",
+  "preview.mode.orbit": "Orbit",
+  "preview.no_world": "Open a world to preview this camera.",
+  "preview.player_view": "Use the player's viewpoint",
+  "preview.reset_view": "Reset to the animated camera"
+}

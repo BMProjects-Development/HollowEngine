@@ -12,7 +12,7 @@ import kotlin.math.abs
  * [rest] is how close counts as arrived; it has to be small next to the steps the value takes, or
  * the last stretch of the motion is a visible jump.
  */
-internal class SpringFloat(initial: Float, private val rest: Float = 0.05f) {
+class SpringFloat(initial: Float, private val rest: Float = 0.05f) {
     var value by mutableStateOf(initial)
         private set
 

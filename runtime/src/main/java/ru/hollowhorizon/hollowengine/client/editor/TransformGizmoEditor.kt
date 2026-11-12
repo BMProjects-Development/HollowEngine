@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -155,6 +157,7 @@ object TransformGizmoEditor {
 
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
+        if (WorldCameraPreviewRenderer.isRendering) return
         when (event.stage) {
             RenderStage.AFTER_ENTITIES -> captureCamera(event)
             RenderStage.AFTER_LEVEL -> renderGizmo()

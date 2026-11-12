@@ -1,0 +1,12 @@
+{
+  "camera": "Камера",
+  "create": "Создать катсцену",
+  "load_failed": "Не удалось открыть катсцену. %s",
+  "preview.insert_camera_key": "Вставить ключ камеры в текущей позиции",
+  "preview.fov": "Поле зрения",
+  "preview.mode.fly": "Полёт",
+  "preview.mode.orbit": "Орбита",
+  "preview.no_world": "Откройте мир, чтобы посмотреть через эту камеру.",
+  "preview.player_view": "Взять ракурс игрока",
+  "preview.reset_view": "Вернуться к анимированной камере"
+}

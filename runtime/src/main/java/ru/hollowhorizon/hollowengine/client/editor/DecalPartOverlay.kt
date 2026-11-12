@@ -1,5 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.editor
 
+import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+
 import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
@@ -23,7 +25,7 @@ internal object DecalPartOverlay {
     /** Hands the decal over as where it lands, before the decals of the frame are drawn. */
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
-        if (event.stage != RenderStage.AFTER_ENTITIES) return
+        if (WorldCameraPreviewRenderer.isRendering || event.stage != RenderStage.AFTER_ENTITIES) return
         val part = WorldObjectParts.selectedPart() as? AttachmentGizmo ?: return
         val decal = part.decal ?: return
         val camera = event.camera.position

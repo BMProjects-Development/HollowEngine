@@ -50,7 +50,8 @@ internal class HollowIdeModel(
                 label = if (node.path.isEmpty()) rootLabel else node.name,
                 depth = node.depth,
                 payload = node,
-                icon = IconHelper.forPath(node.path, node.isDirectory, node.expanded).toString(),
+                icon = (if (node.isDirectory) null else fileTypes.iconForPath(node.path))
+                    ?: IconHelper.forPath(node.path, node.isDirectory, node.expanded).toString(),
                 hasChildren = node.isDirectory,
                 expanded = node.expanded,
                 selected = node.path in selectedTreePaths,
@@ -251,14 +252,30 @@ internal class HollowIdeModel(
     }
 
     fun createFile(parentPath: String, name: String, content: String = ""): HollowIdeFileOperationResult {
+        return createFile(targetDirectory(parentPath), name) { content.toByteArray(Charsets.UTF_8) }
+    }
+
+    fun createFileInDirectory(directory: String, name: String, content: (String) -> ByteArray): HollowIdeFileOperationResult =
+        createFile(directory.fromReadablePath(), name, content)
+
+    private fun createFile(parent: File, name: String, content: (String) -> ByteArray): HollowIdeFileOperationResult {
         val cleanName = name.trim().replace('\\', '/').trim('/')
         if (cleanName.isBlank()) return HollowIdeFileOperationResult.InvalidName
-        val parent = targetDirectory(parentPath)
-        val target =
-            parent.resolve(cleanName).toPath().normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
+        val target = try {
+            parent.resolve(cleanName).toPath().normalizeInsideRoot()
+        } catch (_: InvalidPathException) {
+            null
+        } ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
-        Files.createDirectories(target.parent)
-        writeIdeFile(target, content.toByteArray(Charsets.UTF_8))
+        try {
+            Files.createDirectories(target.parent)
+            writeIdeFile(target, content(target.fileName.toString()))
+        } catch (_: FileAlreadyExistsException) {
+            return HollowIdeFileOperationResult.AlreadyExists
+        } catch (e: Exception) {
+            HollowEngine.LOGGER.error("Could not create {}", target, e)
+            return HollowIdeFileOperationResult.NotFound
+        }
         tree.refresh()
         selectPath(target.toReadablePathInsideRoot())
         return HollowIdeFileOperationResult.Success
@@ -575,8 +592,8 @@ class HollowIdeOpenFile internal constructor(
     private val remoteSourcePath: String? = null,
     internal val analysisProject: RemoteProjectAnalysis? = null,
 ) {
-    var dirty by mutableStateOf(false)
-        private set
+    private var dirtyState by mutableStateOf(false)
+    val dirty: Boolean get() = dirtyState || (type.tracksDocumentChanges && document.isModified)
     internal var externalTextRevision by mutableStateOf(0L)
         private set
     private var saveHandler: (() -> Boolean)? = null
@@ -617,15 +634,15 @@ class HollowIdeOpenFile internal constructor(
 
     fun update(next: String) {
         val textDocument = document as? HollowIdeTextDocument ?: return
-        if (textDocument.update(next)) dirty = true
+        if (textDocument.update(next)) dirtyState = true
     }
 
     fun markDirty() {
-        if (!readOnly) dirty = true
+        if (!readOnly) dirtyState = true
     }
 
     fun updateDirty(modified: Boolean) {
-        if (!readOnly) dirty = modified
+        if (!readOnly) dirtyState = modified
     }
 
     fun save(): Boolean = saveHandler?.invoke() == true
@@ -637,12 +654,12 @@ class HollowIdeOpenFile internal constructor(
     fun markSaved() {
         if (readOnly) return
         document.markSaved()
-        dirty = false
+        dirtyState = false
     }
 
     fun markSavedIfText(savedText: String) {
         if (readOnly) return
-        if (text == savedText) dirty = false
+        if (text == savedText) dirtyState = false
     }
 
     fun refresh(bytes: ByteArray) {
@@ -654,7 +671,7 @@ class HollowIdeOpenFile internal constructor(
         document.reload(bytes)
         if (remoteSourceBytes != null) remoteSourceBytes = bytes
         markSaved()
-        dirty = false
+        dirtyState = false
         externalTextRevision++
     }
 
@@ -664,7 +681,7 @@ class HollowIdeOpenFile internal constructor(
 
     internal fun reloadExternalText(): Boolean = textFileSync?.reloadIfChanged { bytes ->
         document.reload(bytes)
-        dirty = false
+        dirtyState = false
         externalTextRevision++
     } == true
 
@@ -673,8 +690,7 @@ class HollowIdeOpenFile internal constructor(
         if (!readOnly) return
         if (textDocument.text == next) return
         textDocument.refresh(next)
-        dirty = false
-        externalTextRevision++
+        dirtyState = false
     }
 
     fun encode(): ByteArray = document.encode()

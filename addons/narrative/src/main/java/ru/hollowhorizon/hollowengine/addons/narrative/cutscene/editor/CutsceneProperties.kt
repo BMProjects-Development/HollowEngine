@@ -1,48 +1,22 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneEditorSession
 import ru.hollowhorizon.hollowengine.client.ui.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.TimelineController
-import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineColors
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineSelectionFields
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.ToolbarButton
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.inspector.NumberRow
+import ru.hollowhorizon.hollowengine.client.ui.inspector.Readonly
+import ru.hollowhorizon.hollowengine.client.ui.inspector.Section
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /** The cutscene's own fields, composed inside whichever panel the shared inspector is drawn in. */
 @Composable
 internal fun CutsceneProperties(session: CutsceneEditorSession, refresh: () -> Unit) {
-    PreviewSection(session.timeline, refresh)
+    session.uiRevision.value
     OriginSection(session, refresh)
     TimelineSelectionFields(session.timeline, refresh) { WorldReadout(session) }
-}
-
-@Composable
-private fun PreviewSection(controller: TimelineController, refresh: () -> Unit) {
-    Section(CutsceneLang.PREVIEW.lang) {
-        Row(
-            modifier = Modifier.size(100.percent, 24.px)
-                .alignItems(vertical = UiAlign.CENTER)
-                .gap(8.px)
-        ) {
-            Pill(
-                if (controller.isCameraPreviewEnabled) CutsceneLang.CAMERA_ON.lang
-                else CutsceneLang.CAMERA_OFF.lang,
-                controller.isCameraPreviewEnabled
-            ) {
-                controller.applyCameraPreviewEnabled(!controller.isCameraPreviewEnabled)
-                refresh()
-            }
-            Text(
-                if (controller.isPlaying) CutsceneLang.PLAYING.lang else CutsceneLang.PAUSED.lang,
-                modifier = Modifier.fontSize(10f).foreground(TimelineColors.Muted),
-            )
-        }
-        Readonly(CutsceneLang.CURRENT_TIME.lang, "%.3f s".format(controller.currentTime).replace(',', '.'))
-        Readonly(CutsceneLang.DURATION.lang, "%.3f s".format(controller.workAreaEnd).replace(',', '.'))
-    }
 }
 
 @Composable
@@ -81,7 +55,7 @@ private fun OriginSection(session: CutsceneEditorSession, refresh: () -> Unit) {
 
 @Composable
 private fun WorldReadout(session: CutsceneEditorSession) {
-    val pose = session.playback.currentPose
+    val pose = session.previewPose
     Readonly(CutsceneLang.WORLD.lang, formatVec3(pose.position))
     Readonly(CutsceneLang.WORLD_ROTATION.lang, formatVec3(pose.rotation))
 }

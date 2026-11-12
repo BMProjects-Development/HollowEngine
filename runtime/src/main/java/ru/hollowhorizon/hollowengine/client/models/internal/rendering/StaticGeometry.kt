@@ -241,6 +241,15 @@ class StaticGeometry private constructor(model: Model) {
         fun invalidateBindings() {
             GEOMETRIES.toList().forEach(StaticGeometry::clearBindings)
         }
+
+        fun invalidateBindings(shaders: Collection<ShaderInstance>) {
+            if (shaders.isEmpty()) return
+            GEOMETRIES.toList().forEach { geometry ->
+                shaders.forEach { shader ->
+                    geometry.bindings.remove(shader)?.let { GL33.glDeleteVertexArrays(it.vao) }
+                }
+            }
+        }
     }
 }
 

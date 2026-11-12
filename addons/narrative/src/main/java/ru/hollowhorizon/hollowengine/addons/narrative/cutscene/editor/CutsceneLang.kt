@@ -4,20 +4,16 @@ package ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor
 internal object CutsceneLang {
     private const val ROOT = "hollowengine.gui.ide.cutscene."
 
-    const val SAVE_TITLE = ROOT + "dialog.save_title"
-    const val LOAD_TITLE = ROOT + "dialog.load_title"
-    const val NAME = ROOT + "dialog.name"
-    const val NO_CUTSCENES = ROOT + "dialog.no_cutscenes"
-
-    const val PREVIEW = ROOT + "section.preview"
+    const val CREATE = ROOT + "create"
+    const val CAMERA = ROOT + "camera"
+    const val LOAD_FAILED = ROOT + "load_failed"
+    const val INSERT_CAMERA_KEY = ROOT + "preview.insert_camera_key"
+    const val PLAYER_VIEW = ROOT + "preview.player_view"
+    const val RESET_VIEW = ROOT + "preview.reset_view"
+    const val MODE = ROOT + "preview.mode"
+    const val FOV = ROOT + "preview.fov"
+    const val NO_WORLD = ROOT + "preview.no_world"
     const val ORIGIN = ROOT + "section.origin"
-
-    const val CAMERA_ON = ROOT + "preview.camera_on"
-    const val CAMERA_OFF = ROOT + "preview.camera_off"
-    const val PLAYING = ROOT + "preview.playing"
-    const val PAUSED = ROOT + "preview.paused"
-    const val CURRENT_TIME = ROOT + "preview.current_time"
-    const val DURATION = ROOT + "preview.duration"
 
     const val ORIGIN_X = ROOT + "origin.x"
     const val ORIGIN_Y = ROOT + "origin.y"

@@ -29,6 +29,8 @@ import java.util.function.BiConsumer
 object CommonNetworkManager : NetworkManager {
     lateinit var manager: NetworkManager
 
+    override fun canSendToServer(type: CustomPacketPayload.Type<*>): Boolean = manager.canSendToServer(type)
+
     override fun <T : CustomPacketPayload> registerClient(
         type: CustomPacketPayload.Type<T>,
         codec: StreamCodec<RegistryFriendlyByteBuf, T>,
