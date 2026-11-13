@@ -45,19 +45,30 @@ class DecalDraw(
  * A preview that draws models into a panel takes them for itself.
  */
 object Decals {
-    private val submitted = ArrayList<DecalDraw>()
-    private var captured: MutableList<DecalDraw>? = null
+    private class Draws(val items: MutableList<DecalDraw> = ArrayList()) {
+        val attachments = HashSet<DecalAttachment>()
+    }
+
+    private val submitted = Draws()
+    private var captured: Draws? = null
 
     /** Takes [draw] for the frame; a model drawn into an interface outside a preview that takes it hands in nothing. */
     fun submit(draw: DecalDraw) {
-        val into = captured ?: submitted.takeIf { RenderManager.isWorldPass && !RenderManager.isShadowPass } ?: return
-        into += draw
+        queue()?.items?.add(draw)
     }
+
+    internal fun submitAttachment(attachment: DecalAttachment, draw: () -> DecalDraw) {
+        val into = queue() ?: return
+        if (into.attachments.add(attachment)) into.items += draw()
+    }
+
+    private fun queue(): Draws? =
+        captured ?: submitted.takeIf { RenderManager.isWorldPass && !RenderManager.isShadowPass }
 
     /** Runs [draw], keeping the decals submitted meanwhile in [into]. */
     fun <T> capturing(into: MutableList<DecalDraw>, draw: () -> T): T {
         val previous = captured
-        captured = into
+        captured = Draws(into)
         try {
             return draw()
         } finally {
@@ -67,8 +78,13 @@ object Decals {
 
     /** The decals of this frame, taken away so the next starts empty. */
     fun drain(): List<DecalDraw> {
-        if (submitted.isEmpty()) return emptyList()
-        return ArrayList(submitted).also { submitted.clear() }
+        if (submitted.items.isEmpty()) return emptyList()
+        return ArrayList(submitted.items).also { clear() }
+    }
+
+    internal fun clear() {
+        submitted.items.clear()
+        submitted.attachments.clear()
     }
 }
 

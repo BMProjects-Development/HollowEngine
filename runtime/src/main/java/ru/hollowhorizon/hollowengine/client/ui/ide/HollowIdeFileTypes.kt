@@ -23,7 +23,17 @@ interface HollowIdeFileDocument : AutoCloseable {
 
     fun markSaved() = Unit
 
+    /** An immutable copy of persisted data. Equality identifies edits for background saving. */
+    fun autosaveSnapshot(): HollowIdeFileSnapshot? = null
+
+    /** Marks the snapshot written to disk as saved, even if editing has continued since it was captured. */
+    fun markSaved(snapshot: HollowIdeFileSnapshot, bytes: ByteArray) = markSaved()
+
     override fun close() = Unit
+}
+
+interface HollowIdeFileSnapshot {
+    fun encode(): ByteArray
 }
 
 /**

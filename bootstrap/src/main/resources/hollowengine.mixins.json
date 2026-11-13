@@ -63,6 +63,7 @@
     "client.iris.ProgramSourceMixin",
     "client.iris.ShadowRendererMixin",
     "client.sodium.RenderSectionManagerMixin",
+    "client.sodium.SodiumEntityCullingMixin",
     "kool.KeyboardHandlerMixin",
     "kool.MouseHandlerMixin"
   ],

@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.decals
 
 import org.joml.Matrix4f
-import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
@@ -19,9 +18,6 @@ class DecalAttachment(
     override var spec: DecalAttachmentSpec = spec
         private set
 
-    /** The frame it last handed itself over in: a model is drawn by several passes, a decal only once. */
-    private var submittedIn = Long.MIN_VALUE
-
     /** How an editor finds this decal: `bone/id`, the bone blank when it hangs on the model itself. */
     private val key = "${node.name.takeUnless { it == ModelAttachment.MODEL_ROOT }.orEmpty()}/${spec.id}"
 
@@ -32,13 +28,12 @@ class DecalAttachment(
     override fun collectCommands(pipeline: RenderPipeline) {
         pipeline.addBatchedRenderable {
             if (!node.isVisible) return@addBatchedRenderable
-            val frame = TickHandler.renderFrame
-            if (frame == submittedIn) return@addBatchedRenderable
-            submittedIn = frame
-            val placement = Matrix4f(stack.last().pose())
-                .mul(globalMatrix.asMatrix4f())
-                .mul(spec.localTransform().matrixF.asMatrix4f())
-            Decals.submit(DecalDraw(spec.decal, placement, light, key = key))
+            Decals.submitAttachment(this@DecalAttachment) {
+                val placement = Matrix4f(stack.last().pose())
+                    .mul(globalMatrix.asMatrix4f())
+                    .mul(spec.localTransform().matrixF.asMatrix4f())
+                DecalDraw(spec.decal, placement, light, key = key)
+            }
         }
     }
 

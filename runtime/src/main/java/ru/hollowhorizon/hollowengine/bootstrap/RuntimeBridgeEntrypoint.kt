@@ -628,6 +628,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientStopping(client: Minecraft) {
+        HollowIdeOverlay.flushDocumentAutosaves()
         WorldCameraPreviewRenderer.release(client)
         HollowIdeOverlay.closeDetachedWindows()
         DiscordRichPresence.stop()

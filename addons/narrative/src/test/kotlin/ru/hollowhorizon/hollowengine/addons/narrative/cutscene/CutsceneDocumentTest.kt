@@ -6,6 +6,8 @@ import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CutsceneDocumentTest {
@@ -59,6 +61,40 @@ class CutsceneDocumentTest {
 
         assertTrue(document.readOnly)
         assertTrue(bytes.contentEquals(document.encode()))
+    }
+
+    @Test
+    fun `acknowledging an autosave leaves a newer camera edit dirty`() {
+        val document = CutsceneDocument(path, CutsceneStorage.encode(CutsceneData(origin = origin)))
+        document.session.captureCamera(2f, pose)
+        val snapshot = assertNotNull(document.autosaveSnapshot())
+
+        document.session.captureCamera(3f, pose)
+        val saved = snapshot.encode()
+        document.markSaved(snapshot, saved)
+
+        assertTrue(document.isModified)
+        assertNotEquals(CutsceneStorage.decode(document.encode(), path), CutsceneStorage.decode(saved, path))
+        assertTrue(document.history.undo())
+        assertFalse(document.isModified)
+        assertEquals(snapshot, document.autosaveSnapshot())
+    }
+
+    @Test
+    fun `the autosave snapshot observes origin and duration changes`() {
+        val document = CutsceneDocument(path, CutsceneStorage.encode(CutsceneData(origin = origin)))
+        val before = document.autosaveSnapshot()
+        val newOrigin = origin.copy(x = 32f)
+
+        document.session.playback.origin = newOrigin
+        val afterOrigin = assertNotNull(document.autosaveSnapshot())
+        assertNotEquals(before, afterOrigin)
+        assertEquals(newOrigin, CutsceneStorage.decode(afterOrigin.encode(), path).origin)
+
+        document.session.timeline.workAreaEnd = 18f
+        val afterDuration = assertNotNull(document.autosaveSnapshot())
+        assertNotEquals(afterOrigin, afterDuration)
+        assertEquals(18f, CutsceneStorage.decode(afterDuration.encode(), path).duration)
     }
 
     @Test
