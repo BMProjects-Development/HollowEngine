@@ -8,9 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Row
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMontageDocument
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.AnimationExpressionEditing
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.AttachmentAnimation
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.HolderFields
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.LocalAttachmentAnimation
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PlaybackPreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.PreviewDataSection
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.playback.playbackInspectorTarget
@@ -62,15 +60,12 @@ internal fun montageInspectorTarget(
         CompositionLocalProvider(
             LocalEditorBones provides bones,
             LocalAttachmentAnimation provides MontageAttachmentAnimation(state),
+            LocalRigModelInfo provides rigState.viewer.attachment.rigModelInfo(),
         ) {
             if (bone == null) MontageFields(document, state.preview) else BoneFields(state, bone)
             key(bone) {
                 HolderFields(
-                    state.rigs,
-                    bone,
-                    rigState.selectedPart,
-                    onSelectBone = rigState::select,
-                    boneFields = false
+                    state.rigs, bone, rigState.selectedPart, onSelectBone = rigState::select, boneFields = false
                 )
             }
         }
@@ -111,9 +106,7 @@ private fun BoneFields(state: MontageEditorState, bone: String) {
                 key(property) {
                     val animated = session.isBoneAnimated(bone, property)
                     KeyedField(
-                        "bone-${property.name}",
-                        animated,
-                        onToggle = { session.toggleBone(bone, property) }) {
+                        "bone-${property.name}", animated, onToggle = { session.toggleBone(bone, property) }) {
                         Vec3Row(
                             montageText("bone_${property.name.lowercase()}"),
                             session.boneValue(bone, property),
@@ -126,9 +119,7 @@ private fun BoneFields(state: MontageEditorState, bone: String) {
                 }
             }
             KeyedField(
-                "bone-visible",
-                session.isBoneAnimated(bone, MontageBoneProperty.VISIBLE),
-                onToggle = {
+                "bone-visible", session.isBoneAnimated(bone, MontageBoneProperty.VISIBLE), onToggle = {
                     session.toggleBone(bone, MontageBoneProperty.VISIBLE)
                 }) {
                 ToggleRow(montageText("bone_visible"), session.isBoneShown(bone)) { shown ->
@@ -156,21 +147,14 @@ private fun ClipFields(document: HollowIdeMontageDocument, state: MontageEditorS
             NumberRow(montageText("from"), clip.from, min = 0f) { value -> edit { it.copy(from = value) } }
             NumberRow(montageText("speed"), clip.speed) { value -> edit { it.copy(speed = value) } }
             ToggleRow(
-                montageText("loop"),
-                clip.loop,
-                hint = montageText("loop_hint")
+                montageText("loop"), clip.loop, hint = montageText("loop_hint")
             ) { value -> edit { it.copy(loop = value) } }
             NumberRow(
-                montageText("fade_in"),
-                clip.fadeIn,
-                min = 0f,
-                help = montageText("fade_hint")
+                montageText("fade_in"), clip.fadeIn, min = 0f, help = montageText("fade_hint")
             ) { value -> edit { it.copy(fadeIn = value) } }
             NumberRow(montageText("fade_out"), clip.fadeOut, min = 0f) { value -> edit { it.copy(fadeOut = value) } }
             KeyedField(
-                "clip-weight",
-                session.isWeightAnimated(id),
-                onToggle = { session.toggleWeight(id) }) {
+                "clip-weight", session.isWeightAnimated(id), onToggle = { session.toggleWeight(id) }) {
                 FieldLabel(
                     montageText("weight") + ": " + montageText(if (session.isWeightAnimated(id)) "weight_keyed" else "weight_full"),
                     montageText("weight_hint"),
@@ -214,8 +198,7 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
     override fun Header(bone: String?, attachment: RigAttachmentSpec) {
         val document = state.rigs
         if (!document.owns(bone, attachment.id)) return FieldLabel(
-            montageText("model_attachment"),
-            montageText("model_attachment_hint")
+            montageText("model_attachment"), montageText("model_attachment_hint")
         )
         val owned =
             state.document.montage.attachments.firstOrNull { it.bone == bone && it.spec.id == attachment.id } ?: return
@@ -225,19 +208,19 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
         owned.windows.forEachIndexed { index, window ->
             key(index) {
                 Row(tags = listOf("insp-input-row")) {
-                    NumberRow(montageText("window_start"), window.start, id = "window-$index-start", min = 0f) { value ->
+                    NumberRow(
+                        montageText("window_start"),
+                        window.start,
+                        id = "window-$index-start",
+                        min = 0f
+                    ) { value ->
                         session.editWindow(bone, attachment.id, index) { it.copy(start = value) }
                     }
                     NumberRow(
-                        montageText("window_end"),
-                        window.end ?: duration,
-                        id = "window-$index-end",
-                        min = 0f
+                        montageText("window_end"), window.end ?: duration, id = "window-$index-end", min = 0f
                     ) { value ->
                         session.editWindow(
-                            bone,
-                            attachment.id,
-                            index
+                            bone, attachment.id, index
                         ) { it.copy(end = value.takeIf { end -> end < duration }) }
                     }
                 }
@@ -245,9 +228,7 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
         }
         InspectorButton(montageText("add_window")) {
             session.addWindow(
-                bone,
-                attachment.id,
-                session.timeline.currentTime
+                bone, attachment.id, session.timeline.currentTime
             )
         }
     }

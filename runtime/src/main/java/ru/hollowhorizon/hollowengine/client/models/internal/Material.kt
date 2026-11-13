@@ -34,7 +34,12 @@ data class Material(
 
     override val isTranslucent: Boolean get() = blend != Blend.OPAQUE
 
-    internal fun withOpacity(opacity: Float): Material = if (opacity >= 1f) this else copy(
+    internal fun forDraw(opacity: Float, wireframe: Boolean): Material {
+        val material = withOpacity(opacity)
+        return if (wireframe) material.copy(texture = MISSING_TEXTURE, textureContent = null) else material
+    }
+
+    private fun withOpacity(opacity: Float): Material = if (opacity >= 1f) this else copy(
         color = Color(color.rgb, color.a * opacity),
         blend = if (blend == Blend.OPAQUE) Blend.BLEND else blend,
         doubleSided = true,

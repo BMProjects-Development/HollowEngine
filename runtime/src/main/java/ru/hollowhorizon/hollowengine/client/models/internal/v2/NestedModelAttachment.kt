@@ -25,7 +25,6 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
 
     init {
         respec(spec)
-        model.onModelChange { context.owner?.invalidatePipeline() }
     }
 
     /** Takes the attachment as it now is, after a change that only moved, posed or redressed the nested model. */

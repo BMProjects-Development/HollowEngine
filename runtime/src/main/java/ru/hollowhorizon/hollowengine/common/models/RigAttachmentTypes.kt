@@ -28,6 +28,8 @@ class RigAttachmentType<S : RigAttachmentSpec>(
     val allowedOnModel: Boolean = false,
     val namedAcrossRig: Boolean = false,
     val editorColor: Int? = null,
+    val requiresMesh: Boolean = false,
+    val uniqueOnHolder: Boolean = false,
 ) {
     val key: ResourceLocation = id.rl
 }
@@ -76,6 +78,7 @@ object RigAttachmentTypes {
         register(UiPanelAttachmentSpec.TYPE)
         register(IkTargetSpec.TYPE)
         register(IkChainSpec.TYPE)
+        register(MeshExtrusionSpec.TYPE)
     }
 
     fun register(type: RigAttachmentType<*>): ExtensionHandle = point.register(type.key, type)

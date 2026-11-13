@@ -15,10 +15,10 @@ import ru.hollowhorizon.hollowengine.client.utils.areShadersEnabled
 import ru.hollowhorizon.hollowengine.client.utils.instancingEntityInfo
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.fabric.internal.IrisHelper
+import java.nio.FloatBuffer
 
 /**
- * Draws one skinned or morphed primitive: [GpuDeformer] writes its vertices for the frame, and the primitive is drawn
- * on its own with the shader of the pass. Unmoving primitives are merged into [StaticGeometry] instead.
+ * Draws a standalone primitive. [GpuDeformer] supplies the animated vertex attributes when needed.
  */
 class PipelineRenderer(private val primitive: Primitive) {
     private var vao = -1
@@ -39,11 +39,13 @@ class PipelineRenderer(private val primitive: Primitive) {
             vao = GL33.glGenVertexArrays()
             GL33.glBindVertexArray(vao)
 
-            initDeformedBuffers()
-            deformer = GpuDeformer(primitive).also {
-                it.init(dstPos = posBuffer!!.id, dstNor = norBuffer!!.id, dstTan = tanBuffer!!.id)
+            initVertexBuffers()
+            if (primitive.isDynamic) {
+                deformer = GpuDeformer(primitive).also {
+                    it.init(dstPos = posBuffer!!.id, dstNor = norBuffer!!.id, dstTan = tanBuffer!!.id)
+                }
+                GL33.glBindVertexArray(vao)
             }
-            GL33.glBindVertexArray(vao)
 
             initCommonBuffers()
         } finally {
@@ -52,26 +54,26 @@ class PipelineRenderer(private val primitive: Primitive) {
         }
     }
 
-    private fun initDeformedBuffers() {
-        val vertexCount = primitive.positionsCount / 3
-
-        posBuffer = VboWrapper.createArrayBuffer().apply {
-            allocate(vertexCount * 3 * 4L, GL33.GL_DYNAMIC_COPY)
-            GL33.glVertexAttribPointer(0, 3, GL33.GL_FLOAT, false, 0, 0)
-            GL33.glEnableVertexAttribArray(0)
-        }
-
-        norBuffer = VboWrapper.createArrayBuffer().apply {
-            allocate(vertexCount * 3 * 4L, GL33.GL_DYNAMIC_COPY)
-            GL33.glVertexAttribPointer(5, 3, GL33.GL_FLOAT, false, 0, 0)
-            GL33.glEnableVertexAttribArray(5)
-        }
-
-        tanBuffer = VboWrapper.createArrayBuffer().apply {
-            allocate(vertexCount * 4 * 4L, GL33.GL_DYNAMIC_COPY)
-            bindFloatAttribute(TANGENT_LOCATION, 4)
+    private fun initVertexBuffers() {
+        posBuffer = vertexBuffer(0, 3) { primitive.positions?.toFloatBuffer(3) { v, b -> b.put(v.x).put(v.y).put(v.z) } }
+        norBuffer = vertexBuffer(5, 3) { primitive.normals?.toFloatBuffer(3) { v, b -> b.put(v.x).put(v.y).put(v.z) } }
+        tanBuffer = vertexBuffer(TANGENT_LOCATION, 4) {
+            primitive.tangents?.toFloatBuffer(4) { v, b -> b.put(v.x).put(v.y).put(v.z).put(v.w) }
         }
     }
+
+    private inline fun vertexBuffer(location: Int, size: Int, data: () -> FloatBuffer?): VboWrapper =
+        VboWrapper.createArrayBuffer().apply {
+            if (primitive.isDynamic) {
+                allocate(primitive.positionsCount / 3 * size * Float.SIZE_BYTES.toLong(), GL33.GL_DYNAMIC_COPY)
+                bindFloatAttribute(location, size)
+            } else {
+                data()?.let {
+                    uploadData(it)
+                    bindFloatAttribute(location, size)
+                }
+            }
+        }
 
     private fun initCommonBuffers() {
         primitive.texCoords?.let { uvs ->
@@ -107,21 +109,19 @@ class PipelineRenderer(private val primitive: Primitive) {
         GL33.glEnableVertexAttribArray(location)
     }
 
-    fun setupPipeline(pipeline: RenderPipeline, instance: MeshAttachment) {
-        val deformer = deformer ?: return
-        pipeline.addSkinnable {
-            if (instance.isVisible) deformer.compute(instance)
-        }
-        pipeline.addVAORenderable {
-            if (instance.isVisible) renderVAO(instance)
-        }
+    internal fun deform(instance: MeshAttachment) {
+        if (instance.isVisible) deformer?.compute(instance)
+    }
+
+    internal fun draw(context: RenderContext, instance: MeshAttachment) {
+        if (instance.isVisible) context.renderVAO(instance)
     }
 
     private fun RenderContext.renderVAO(instance: MeshAttachment) {
         val shader = RenderSystem.getShader() ?: return
         val nodeMatrix = instance.matrix.asMatrix4f()
 
-        instance.material.withOpacity(opacity).bind(MaterialBindContext(shader, COLOR_LOCATION))
+        instance.material.forDraw(opacity, wireframe).bind(MaterialBindContext(shader, COLOR_LOCATION))
 
         val packedLight = instance.material.packedLight(light)
         GL33.glVertexAttribI2i(4, packedLight and FFFF, packedLight shr 16 and FFFF)

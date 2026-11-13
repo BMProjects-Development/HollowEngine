@@ -70,7 +70,11 @@ object MaterialSources {
         val uuid = player.asUuid()
         val connection = Minecraft.getInstance().connection
         val online = uuid?.let { connection?.getPlayerInfo(it) } ?: connection?.getPlayerInfo(player)
-        if (online != null) return online.skin
+        if (online != null) {
+            val loading = Minecraft.getInstance().skinManager.getOrLoad(online.profile)
+            if (!loading.isDone) loading.thenRun { RenderSystem.recordRenderCall(onLoaded) }
+            return online.skin
+        }
 
         val lookup = lookups.computeIfAbsent(player) { lookUp(it, uuid) }
         if (!lookup.isDone) lookup.thenRun { RenderSystem.recordRenderCall(onLoaded) }

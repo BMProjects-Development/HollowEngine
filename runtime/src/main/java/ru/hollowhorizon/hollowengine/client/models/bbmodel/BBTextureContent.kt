@@ -56,6 +56,7 @@ internal class BBTextureContent(
     private val uvWidth = texture.uvWidth.takeIf { it > 0 } ?: file.resolution.width
     private val uvHeight = texture.uvHeight.takeIf { it > 0 } ?: file.resolution.height
     internal val frameCount = ceil(source.height.toDouble() * uvWidth / (width.toDouble() * uvHeight) - 0.05).toInt().coerceAtLeast(1)
+    override val animated: Boolean get() = frameCount > 1
     private val frameHeight = source.height / frameCount
     private val pixels = source.getRGB(0, 0, width, source.height, null, 0, width)
     val hasTranslucency: Boolean = pixels.any { (it ushr 24) in 1..254 }

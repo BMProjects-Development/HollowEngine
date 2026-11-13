@@ -151,8 +151,11 @@ internal class PartsReader {
         val materials =
             (model.materials.map { it.name } + model.rig.materials.keys).filter { it.isNotEmpty() }.distinct().sorted()
         bones[steps] = nodes.map { it.name }
-        models[steps] =
-            RigModelInfo(materials, nodes.filter { it.definition.mesh != null }.mapTo(HashSet()) { it.name })
+        models[steps] = RigModelInfo(
+            materials,
+            nodes.filter { it.definition.mesh != null }.mapTo(HashSet()) { it.name },
+            nodes.filter { it.supportsMeshExtrusion }.mapTo(HashSet()) { it.name },
+        )
 
         val materialRows = materials.map { name ->
             PartNode(

@@ -201,7 +201,9 @@ internal object WorldObjectParts {
     }
 
     private fun attachMenu(ref: PartRef, parts: ObjectParts, editing: RigEditing, bone: String?): UiDropdownItem? {
-        val kinds = instanceKinds(bone)
+        val model = parts.models[ref.path.steps]
+        val kinds = attachableKinds(bone, model?.texturedMeshBones?.contains(bone) == true)
+            .availableOn(editing.occupied.holder(bone))
         if (kinds.isEmpty()) return null
         return UiDropdownItem(
             rigText("attach"),
@@ -222,7 +224,7 @@ internal object WorldObjectParts {
      * of its own that needs no file. The new part comes up selected.
      */
     private fun effectPartMenu(ref: PartRef, editing: RigEditing, bone: String?): UiDropdownItem? {
-        val type = instanceKinds(bone).firstOrNull { it.specClass == VfxBoneAttachmentSpec::class } ?: return null
+        val type = attachableKinds(bone, hasMesh = false).firstOrNull { it.specClass == VfxBoneAttachmentSpec::class } ?: return null
         return UiDropdownItem(
             rigText("attach_effect_part"),
             mark = UiMenuParts.icon(PartIcons.EFFECT),
@@ -335,9 +337,6 @@ internal object WorldObjectParts {
         return created
     }
 
-    /** What an object can hang on its models: whatever a rig file can. */
-    private fun instanceKinds(bone: String?): List<RigAttachmentType<*>> = attachableKinds(bone)
-
     private fun target(editing: RigEditing, ref: PartRef, node: PartNode, parts: ObjectParts) = InspectorTarget(
         id = "object-part-${ref.entityId}-${ref.path.encode()}",
         title = node.label,
@@ -358,7 +357,7 @@ internal object WorldObjectParts {
                 when (node.kind) {
                     PartKind.MATERIAL -> MaterialFields(editing, ref.path.material.orEmpty())
                     PartKind.MATERIALS -> Hint(rigText("material_hint"))
-                    else -> HolderFields(editing, ref.path.bone, ref.path.attachment, instanceKinds(ref.path.bone))
+                    else -> HolderFields(editing, ref.path.bone, ref.path.attachment)
                 }
             }
         }

@@ -7,14 +7,17 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.MultiBufferSource
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.client.models.internal.drawWithShader
 import ru.hollowhorizon.hollowengine.client.models.internal.SHADER
+import ru.hollowhorizon.hollowengine.client.models.internal.drawWithShader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
 
 typealias Renderable = RenderContext.() -> Unit
 
 interface RenderPipeline {
+    /** Resolves runtime geometry before any command reads visibility or submits a batch. */
+    fun addPreparation(action: () -> Unit)
+    fun requireImmediateMeshes()
     fun addBatchedRenderable(action: Renderable)
     fun addInstancedRenderable(action: Renderable)
     fun addVAORenderable(action: Renderable)
@@ -34,14 +37,25 @@ data class RenderContext(
     val overlay: Int,
     val allowInstancing: Boolean = false,
     val opacity: Float = 1f,
+    val wireframe: Boolean = false,
 )
 
 
 class ListRenderPipeline : RenderPipeline {
+    private val preparations = ArrayList<() -> Unit>()
     private val batchedCommands = ArrayList<Renderable>()
     private val instancedCommands = ArrayList<Renderable>()
     private val vaoCommands = ArrayList<Renderable>()
     private val skinCommands = ArrayList<() -> Unit>()
+    private var immediateMeshes = false
+
+    override fun addPreparation(action: () -> Unit) {
+        preparations.add(action)
+    }
+
+    override fun requireImmediateMeshes() {
+        immediateMeshes = true
+    }
 
     override fun addBatchedRenderable(action: Renderable) {
         batchedCommands.add(action)
@@ -60,12 +74,17 @@ class ListRenderPipeline : RenderPipeline {
     }
 
     override fun render(context: RenderContext) {
+        for (action in preparations) action()
         for (action in batchedCommands) action(context)
-        if (instancedCommands.isNotEmpty()) renderInstanced(context)
+        if (instancedCommands.isNotEmpty()) {
+            renderInstanced(if (immediateMeshes && context.allowInstancing) context.copy(allowInstancing = false) else context)
+        }
         if (vaoCommands.isNotEmpty()) renderVAO(context)
     }
 
     override fun clear() {
+        immediateMeshes = false
+        preparations.clear()
         batchedCommands.clear()
         instancedCommands.clear()
         vaoCommands.clear()

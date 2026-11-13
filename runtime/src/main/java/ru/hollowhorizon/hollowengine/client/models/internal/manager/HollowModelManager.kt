@@ -24,6 +24,7 @@ import ru.hollowhorizon.hollowengine.client.models.bbmodel.BlockBenchModelLoader
 import ru.hollowhorizon.hollowengine.client.models.fbx.FbxModelLoader
 import ru.hollowhorizon.hollowengine.client.models.gltf.GltfModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.extrusion.MaterialTexelMasks
 import ru.hollowhorizon.hollowengine.client.models.internal.renameMaterials
 import ru.hollowhorizon.hollowengine.client.models.obj.ObjModelLoader
 import ru.hollowhorizon.hollowengine.client.textures.GlTexture
@@ -103,6 +104,7 @@ object HollowModelManager : SimplePreparableReloadListener<Map<ResourceLocation,
         manager: ResourceManager,
         profiler: ProfilerFiller,
     ) {
+        MaterialTexelMasks.invalidate()
         prepared.forEach { (location, update) ->
             publish(location, models.computeIfAbsent(location) { MutableStateFlow(Model.EMPTY) }, update)
         }

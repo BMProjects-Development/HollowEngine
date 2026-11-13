@@ -42,7 +42,8 @@ internal fun rigInspectorTarget(
         icon = if (bone == null) ModelIcon else BoneIcon,
         subtitle = rigText(if (bone == null) "section_model" else "section_bone"),
     ) {
-        CompositionLocalProvider(LocalEditorBones provides bones) {
+        val info = state.viewer.attachment.rigModelInfo()
+        CompositionLocalProvider(LocalEditorBones provides bones, LocalRigModelInfo provides info) {
             key(bone) { HolderFields(document, bone, collider, onSelectBone = state::select) }
         }
     }
@@ -53,7 +54,7 @@ internal fun HolderFields(
     document: RigEditing,
     bone: String?,
     selectedPart: String?,
-    kinds: List<RigAttachmentType<*>> = attachableKinds(bone),
+    kinds: List<RigAttachmentType<*>> = attachableKinds(bone, bone in LocalRigModelInfo.current.texturedMeshBones),
     onSelectBone: (String?) -> Unit = {},
     /** Whether the bone's own fields show: its alias, pose and material, which a montage does not author. */
     boneFields: Boolean = true,
@@ -84,7 +85,7 @@ internal fun HolderFields(
             }
         }
 
-        AddAttachment(document, bone, current, kinds)
+        AddAttachment(document, bone, current, kinds.availableOn(document.occupied.holder(bone)))
     }
 }
 
@@ -253,8 +254,13 @@ internal interface AttachmentAnimation {
 internal val LocalAttachmentAnimation = compositionLocalOf<AttachmentAnimation?> { null }
 
 /** What can be hung on [bone]; on the model itself, only what works in model space. */
-internal fun attachableKinds(bone: String?): List<RigAttachmentType<*>> =
-    RigAttachmentTypes.all.filter { it.createDefault != null && (bone != null || it.allowedOnModel) }
+internal fun attachableKinds(bone: String?, hasMesh: Boolean): List<RigAttachmentType<*>> =
+    RigAttachmentTypes.all.filter {
+        it.createDefault != null && (bone != null || it.allowedOnModel) && (!it.requiresMesh || hasMesh)
+    }
+
+internal fun List<RigAttachmentType<*>>.availableOn(holder: RigBone): List<RigAttachmentType<*>> =
+    filter { type -> !type.uniqueOnHolder || holder.attachments.none(type.specClass::isInstance) }
 
 /**
  * A name for a new attachment of [type] on [bone]. Kinds others refer to by name, as scripts do colliders

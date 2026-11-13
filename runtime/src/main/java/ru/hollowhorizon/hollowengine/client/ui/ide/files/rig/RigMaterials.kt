@@ -5,12 +5,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 
 /** What the inspector knows of the model a rig dresses: the names of its materials and which bones carry meshes. */
-data class RigModelInfo(val materials: List<String> = emptyList(), val meshBones: Set<String> = emptySet())
+data class RigModelInfo(
+    val materials: List<String> = emptyList(),
+    val meshBones: Set<String> = emptySet(),
+    val texturedMeshBones: Set<String> = emptySet(),
+)
+
+internal fun ModelAttachment.rigModelInfo(): RigModelInfo {
+    val nodes = nodes.flatMap { it.walk() }
+    return RigModelInfo(
+        materials = materials.map { it.name }.filter(String::isNotEmpty).distinct(),
+        meshBones = nodes.filter { it.definition.mesh != null }.mapTo(HashSet()) { it.name },
+        texturedMeshBones = nodes.filter { it.supportsMeshExtrusion }.mapTo(HashSet()) { it.name },
+    )
+}
 
 val LocalRigModelInfo = staticCompositionLocalOf { RigModelInfo() }
 
@@ -34,11 +49,26 @@ internal fun MeshMaterialFields(document: RigEditing, bone: String, current: Rig
 @Composable
 internal fun MaterialFields(document: RigEditing, name: String) {
     val source = document.rig.materials[name]
-    val encoded = remember(source) { ComponentJson.format.encodeToJsonElement(MaterialSlot.serializer(), MaterialSlot(source)) as JsonObject }
+    val encoded = remember(source) {
+        ComponentJson.format.encodeToJsonElement(
+            MaterialSlot.serializer(),
+            MaterialSlot(source)
+        ) as JsonObject
+    }
 
     Section(name) {
-        AutoFields(owner = null, descriptor = MaterialSlot.serializer().descriptor, value = encoded, path = "/materials/$name") { updated ->
-            val slot = runCatching { ComponentJson.format.decodeFromJsonElement(MaterialSlot.serializer(), updated) }.getOrNull() ?: return@AutoFields
+        AutoFields(
+            owner = null,
+            descriptor = MaterialSlot.serializer().descriptor,
+            value = encoded,
+            path = "/materials/$name"
+        ) { updated ->
+            val slot = runCatching {
+                ComponentJson.format.decodeFromJsonElement(
+                    MaterialSlot.serializer(),
+                    updated
+                )
+            }.getOrNull() ?: return@AutoFields
             document.edit(mergeKey = "/materials/$name") { rig ->
                 val next = slot.source
                 rig.copy(materials = if (next == null) rig.materials - name else rig.materials + (name to next))

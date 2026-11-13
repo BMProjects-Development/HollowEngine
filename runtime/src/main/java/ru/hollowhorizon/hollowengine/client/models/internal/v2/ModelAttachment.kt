@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
+import ru.hollowhorizon.hollowengine.client.models.internal.extrusion.MeshExtrusionAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
@@ -122,11 +123,14 @@ class ModelAttachment(
             if (currentRig == value) return
 
             val sameStructure = currentRig.structure() == value.structure()
+            val materialsChanged = currentRig.materials != value.materials
             currentRig = value
             if (sameStructure) {
                 respecAttachments()
                 placeAddedBones()
-                dress()
+                if (materialsChanged) dress()
+                cachedBounds = null
+                keptCullingBounds = null
                 target = null
             } else {
                 builtFor?.let(::rebuild)
@@ -226,6 +230,7 @@ class ModelAttachment(
     /** Drops the draw commands, which something hung on this model changed under; they are collected again on the next draw. */
     fun invalidatePipeline() {
         renderPipeline = null
+        generateSequence(parent) { it.parent }.filterIsInstance<ModelAttachment>().firstOrNull()?.invalidatePipeline()
     }
 
     /**
@@ -287,7 +292,7 @@ class ModelAttachment(
         carriesEffects = currentRig.carriesEffects()
         worldPoseAttachments = (allNodes.flatMap { it.attachments } + modelRoot?.attachments.orEmpty()).filter { it.followsWorldPose }
         dress()
-        renderPipeline = null
+        invalidatePipeline()
         target = null
         cachedBounds = null
         keptCullingBounds = null
@@ -322,15 +327,15 @@ class ModelAttachment(
             return
         }
 
-        val context = RigAttachmentContext(node, { entity }, this) { carrier }
-        bone.attachments.forEach { spec ->
-            RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
-        }
         if (bone.hidden) node.isVisible = false
         bone.material?.let { name ->
             node.attachments.replaceAll { mesh ->
                 if (mesh is MeshAttachment) MeshAttachment(mesh.primitive, node, runtimeMaterials.named(name, mesh.material)) else mesh
             }
+        }
+        val context = RigAttachmentContext(node, { entity }, this) { carrier }
+        bone.attachments.forEach { spec ->
+            RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
         }
     }
 
@@ -401,10 +406,11 @@ class ModelAttachment(
 
         nodesByIndex.values.forEach { runtimeNode ->
             val matrix = runtimeNode.globalMatrix
+            val margin = runtimeNode.attachments.firstNotNullOfOrNull { (it as? MeshExtrusionAttachment)?.boundsMargin } ?: 0f
             runtimeNode.definition.mesh?.primitives?.forEach { primitive ->
                 val localBounds = primitive.localBounds ?: return@forEach
-                val min = localBounds.first
-                val max = localBounds.second
+                val min = localBounds.first - margin
+                val max = localBounds.second + margin
 
                 fun update(x: Float, y: Float, z: Float) {
                     source.set(x, y, z)

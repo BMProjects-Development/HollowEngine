@@ -15,7 +15,8 @@ class MeshAttachment(
 ) : Attachment(node) {
     val matrix: Mat4f get() = globalMatrix
     val morphWeights: FloatArray get() = node.morphWeights
-    val isVisible: Boolean get() = node.isVisible
+    internal var replaced = false
+    val isVisible: Boolean get() = node.isVisible && !replaced
 
     fun skinMatrices(): Array<Mat4f> =
         node.definition.skin!!.compute(globalMatrix, node.jointGetter)

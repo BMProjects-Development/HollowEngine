@@ -6,8 +6,10 @@ import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.extrusion.MeshExtrusionAttachment
 import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.common.models.ItemSlotAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.MeshExtrusionSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.RigItemSlot
@@ -56,10 +58,12 @@ object RigAttachmentFactories {
         register("hollowengine:rig/item") { spec, context ->
             ItemNode(context.entity, (spec as ItemSlotAttachmentSpec).slot.vanilla(), context.node)
         }
+        register(MeshExtrusionSpec.TYPE.id) { spec, context ->
+            MeshExtrusionAttachment.create(spec as MeshExtrusionSpec, context)
+        }
     }
 
-    fun register(typeId: String, factory: RigAttachmentFactory): ExtensionHandle =
-        point.register(typeId.rl, factory)
+    fun register(typeId: String, factory: RigAttachmentFactory): ExtensionHandle = point.register(typeId.rl, factory)
 
     fun create(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment? {
         val type = RigAttachmentTypes.of(spec) ?: return null

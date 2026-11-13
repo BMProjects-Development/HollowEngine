@@ -48,6 +48,8 @@ open class RuntimeNode(
 ) : Attachment(parent) {
     /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
     val name: String = definition.name ?: "Node_${definition.index}"
+    internal val supportsMeshExtrusion: Boolean
+        get() = definition.mesh?.primitives?.any { it.supportsExtrusion } == true
     /** Set by a sampled channel and reset at the start of each pose. */
     var isAnimated: Boolean = false
     var isVisible: Boolean = definition.visible && ((parent as? RuntimeNode)?.isVisible ?: true)

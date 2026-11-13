@@ -22,10 +22,15 @@ class Primitive(
     val morphTargets: List<Map<String, FloatArray>> = listOf(),
     var weights: FloatArray = FloatArray(morphTargets.size) { 0f },
     var additionalSkinWeights: Array<List<SkinInfluence>>? = null,
+    retainSurface: Boolean = true,
 ) {
     val hasSkinning = joints != null && jointWeights != null
-    val positionsCount: Int get() = (positions?.size ?: 0) * 3
+    val positionsCount: Int = (positions?.size ?: 0) * 3
     var jointCount = 0
+    internal val texturedSurface = if (retainSurface && positions != null && texCoords != null) {
+        TexturedMeshSurface(positions!!, texCoords!!, joints, jointWeights, additionalSkinWeights)
+    } else null
+    internal val supportsExtrusion: Boolean get() = texturedSurface != null && positionsCount > 0
 
     /**
      * Whether the vertices move on their own, by skinning or morph targets. Such a primitive is drawn by itself;
@@ -36,18 +41,6 @@ class Primitive(
     val localBounds: Pair<Vec3f, Vec3f>? = computeBounds()
 
     private var renderer: PipelineRenderer? = null
-
-    private var isLoaded = false
-
-    /** Uploads a dynamic primitive; a static one is uploaded as part of its model's [StaticGeometry]. */
-    fun init() {
-        if (isLoaded || !isDynamic) return
-        isLoaded = true
-
-        prepareGeometry()
-        renderer = PipelineRenderer(this).also(PipelineRenderer::init)
-        releaseCpu()
-    }
 
     /** Fills in what the loader left out and drawing needs: normals, centers of the UV rectangles and tangents. */
     fun prepareGeometry() {
@@ -66,8 +59,24 @@ class Primitive(
         pipeline: RenderPipeline,
         instance: MeshAttachment,
     ) {
-        init()
-        renderer?.setupPipeline(pipeline, instance)
+        val renderer = standaloneRenderer()
+        if (isDynamic) pipeline.addSkinnable { renderer.deform(instance) }
+        pipeline.addVAORenderable { renderer.draw(this, instance) }
+    }
+
+    internal fun standaloneRenderer(): PipelineRenderer {
+        renderer?.let { return it }
+        prepareGeometry()
+        val next = PipelineRenderer(this)
+        try {
+            next.init()
+        } catch (error: Exception) {
+            next.destroy()
+            throw error
+        }
+        renderer = next
+        releaseCpu()
+        return next
     }
 
     fun destroy() {

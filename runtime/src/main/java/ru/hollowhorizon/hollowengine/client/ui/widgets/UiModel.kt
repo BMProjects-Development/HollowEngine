@@ -13,7 +13,6 @@ import org.joml.Matrix4f
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.decals.DecalDraw
 import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.decals.DecalRenderer
@@ -50,7 +49,6 @@ import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.utils.Color
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
 import ru.hollowhorizon.hollowengine.common.utils.math.*
-import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -334,28 +332,17 @@ class ModelViewerState(model: String) : OrbitCamera {
         val bounds = if (showBoundingBox) attachment.calculateBounds() else null
 
         if (showWireframe) GL33.glPolygonMode(GL33.GL_FRONT_AND_BACK, GL33.GL_LINE)
-        val savedTextures = if (showWireframe) {
-            attachment.materials.map { material ->
-                val old = material.texture
-                material.texture = "${HollowEngine.MODID}:default_color_map".rl
-                material to old
-            }
-        } else emptyList()
-
         RenderSystem.setShaderLights(CUSTOM_IMGUI_LIGHT_0, CUSTOM_IMGUI_LIGHT_1)
 
         val bufferSource = Minecraft.getInstance().renderBuffers().bufferSource()
-        attachment.pipeline.render(
-            RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
-        )
+        val context = RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, wireframe = showWireframe)
+        attachment.pipeline.render(context)
         bufferSource.endBatch()
         val effects = ArrayList<VfxBindingSource>()
         val decals = ArrayList<DecalDraw>()
         Decals.capturing(decals) {
             VfxBoneBindings.capturing(effects) {
-                attachment.pipeline.render(
-                    RenderContext(stack, bufferSource, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY)
-                )
+                attachment.pipeline.render(context)
             }
         }
         bufferSource.endBatch()
@@ -366,7 +353,6 @@ class ModelViewerState(model: String) : OrbitCamera {
 
         if (showWireframe) {
             GL33.glPolygonMode(GL33.GL_FRONT_AND_BACK, GL33.GL_FILL)
-            savedTextures.forEach { (material, texture) -> material.texture = texture }
         }
 
         bounds?.let { (minCorner, maxCorner) ->

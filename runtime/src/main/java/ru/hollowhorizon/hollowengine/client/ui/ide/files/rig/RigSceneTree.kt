@@ -103,7 +103,7 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
  */
 private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?, addsBones: Boolean): List<UiDropdownItem> {
     val node = bone?.let { state.viewer.nodes.findBone(it) }
-    val kinds = attachableKinds(bone)
+    val kinds = attachableKinds(bone, node?.supportsMeshExtrusion == true).availableOn(document.occupied.holder(bone))
     return listOfNotNull(
         UiDropdownItem(rigText("add_bone"), mark = UiMenuParts.icon(AddIcon)) {
             val existing = state.viewer.nodes.flatMap { it.walk() }.map(RuntimeNode::name)
