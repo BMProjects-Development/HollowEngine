@@ -107,10 +107,12 @@ dependencies {
     neoForge("net.neoforged:neoforge:$neoForgeVersion")
 
     modImplementation("lib:iris-neoforge:1.8.14-beta.1+mc1.21.1")
-    "forgeRuntimeLibrary"("lib:sodium-neoforge:0.8.13+mc1.21.1")
+    forgeRuntimeLibrary("lib:sodium-neoforge:0.8.13+mc1.21.1")
 
     implementation("org.anarres:jcpp:1.4.14")
     implementation("io.github.douira:glsl-transformer:3.0.0-pre3")
+    forgeRuntimeLibrary("org.anarres:jcpp:1.4.14")
+    forgeRuntimeLibrary("io.github.douira:glsl-transformer:3.0.0-pre3")
 
     val mixinExtras = "io.github.llamalad7:mixinextras-neoforge:0.4.1"
     implementation(mixinExtras)

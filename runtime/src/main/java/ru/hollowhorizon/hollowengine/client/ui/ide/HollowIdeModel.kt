@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.Minecraft
@@ -14,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeReveal
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
+import ru.hollowhorizon.hollowengine.common.coroutines.coroutineScope
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.toReadablePath
@@ -121,7 +123,7 @@ internal class HollowIdeModel(
             return HollowIdeOpenResult.File(openReadOnly(path, file.readText()), created)
         }
         files[path]?.let { opened ->
-            if (opened.textFileSync != null) refreshExternalTextFile(opened)
+            if (opened.fileSync != null) refreshExternalFile(opened)
             else if (!opened.dirty && opened.type.requiresContent) opened.refresh(file.readBytes())
             return HollowIdeOpenResult.File(opened, created = false)
         }
@@ -131,6 +133,7 @@ internal class HollowIdeModel(
             }
         }.getOrNull() ?: return HollowIdeOpenResult.Unsupported
         files[path] = opened
+        observeAutosave(opened)
         return HollowIdeOpenResult.File(opened, created = true)
     }
 
@@ -214,21 +217,27 @@ internal class HollowIdeModel(
         if (file.remote != null) return file.save()
         pendingSaves.remove(path)?.cancel()
         try {
-            val sync = file.textFileSync
+            val sync = file.fileSync
+            val snapshot = file.document.autosaveSnapshot()
             if (sync != null) {
-                if (refreshExternalTextFile(file)) return false
-                if (!file.dirty) return true
-                if (!sync.save(file.encode(), sync.revision())) {
-                    refreshExternalTextFile(file)
+                if (snapshot != null) sync.invalidatePendingSaves()
+                if (refreshExternalFile(file)) return false
+                if (!file.dirty && !file.autosaveInFlight) return true
+                val bytes = snapshot?.encode() ?: file.encode()
+                if (!sync.save(bytes, sync.revision())) {
+                    refreshExternalFile(file)
                     return false
                 }
-            } else writeIdeFile(path.fromReadablePath().toPath(), file.encode())
+                if (snapshot == null) file.markSaved() else file.markSaved(snapshot, bytes)
+            } else {
+                writeIdeFile(path.fromReadablePath().toPath(), file.encode())
+                file.markSaved()
+            }
         } catch (e: Exception) {
             HollowEngine.LOGGER.error("Could not save {}", path, e)
             HollowNotifications.error("hollowengine.gui.ide.file.save_failed".lang.format(path.substringAfterLast('/')))
             return false
         }
-        file.markSaved()
         tree.refresh()
         return true
     }
@@ -335,8 +344,13 @@ internal class HollowIdeModel(
             source.parent.resolve(cleanName).normalizeInsideRoot() ?: return HollowIdeFileOperationResult.InvalidName
         if (Files.exists(target)) return HollowIdeFileOperationResult.AlreadyExists
         val opened = files[path]
-        if (opened?.dirty == true && !save(path)) return HollowIdeFileOperationResult.NotFound
+        if (opened?.needsSave == true && !save(path)) return HollowIdeFileOperationResult.NotFound
+        val children = openFilesUnder(listOf(path)).filter { it !== opened }
+        if (!saveModifiedFiles(children.filter { it.documentAutosave != null }.map { it.path })) {
+            return HollowIdeFileOperationResult.NotFound
+        }
         Files.move(source, target)
+        children.forEach { closeFile(it.path) }
         val targetPath = target.toReadablePathInsideRoot()
         files.remove(path)
         onFileRemoved?.invoke(path)
@@ -346,7 +360,10 @@ internal class HollowIdeModel(
                 fileTypes.open(targetPath) { Files.readAllBytes(target) }?.also { reopened ->
                     reopened.attachSaveHandler { save(targetPath) }
                 }
-            }.getOrNull()?.let { files[targetPath] = it }
+            }.getOrNull()?.let {
+                files[targetPath] = it
+                observeAutosave(it)
+            }
         }
         tree.refresh()
         selectPath(targetPath)
@@ -357,13 +374,14 @@ internal class HollowIdeModel(
         val targets = paths.mapNotNull { it.toPathInsideRoot() }.filter { Files.exists(it) }
             .filterNot { it == DirectoryManager.HOLLOW_ENGINE }.withoutNestedChildren()
         if (targets.isEmpty()) return HollowIdeFileOperationResult.NotFound
-        targets.forEach { path -> path.deleteTree() }
         val removedReadable = targets.map { it.toReadablePathInsideRoot() }
-        files.keys.filter { openPath -> removedReadable.any { openPath == it || openPath.startsWith("$it/") } }.toList()
-            .forEach { path ->
-                files.remove(path)?.close()
-                onFileRemoved?.invoke(path)
-            }
+        val removed = openFilesUnder(removedReadable)
+        removed.forEach { file ->
+            pendingSaves.remove(file.path)?.cancel()
+            file.fileSync?.invalidatePendingSaves()
+        }
+        targets.forEach { path -> path.deleteTree() }
+        removed.forEach { closeFile(it.path) }
         tree.refresh()
         selectedTreePaths.clear()
         selectedTreePath = ""
@@ -379,8 +397,7 @@ internal class HollowIdeModel(
 
     /** Flush edited documents before another application can move their files away. */
     fun exportFiles(paths: List<String>): List<File> {
-        files.values.filter { file -> file.dirty && paths.any { file.path == it || file.path.startsWith("$it/") } }
-            .forEach { save(it.path) }
+        saveModifiedFiles(openFilesUnder(paths).map { it.path })
         return paths.mapNotNull { it.toPathInsideRoot() }.withoutNestedChildren().map { it.toFile() }
             .filter { it.exists() }
     }
@@ -390,11 +407,16 @@ internal class HollowIdeModel(
      * outside; a pending autosave would otherwise write the old text back afterwards.
      */
     fun discardFilesUnder(directories: List<String>) {
-        files.keys.filter { path -> directories.any { path == it || path.startsWith("$it/") } }.forEach { path ->
-            pendingSaves.remove(path)?.cancel()
-            files.remove(path)?.close()
-            onFileRemoved?.invoke(path)
-        }
+        openFilesUnder(directories).forEach { closeFile(it.path) }
+    }
+
+    private fun openFilesUnder(paths: List<String>): List<HollowIdeOpenFile> =
+        files.values.filter { file -> paths.any { file.path == it || file.path.startsWith("$it/") } }
+
+    private fun closeFile(path: String) {
+        pendingSaves.remove(path)?.cancel()
+        files.remove(path)?.close()
+        onFileRemoved?.invoke(path)
     }
 
     /** Reads every open file without unsaved edits again from disk. */
@@ -404,7 +426,7 @@ internal class HollowIdeModel(
                 val source = file.path.fromReadablePath()
                 if (!source.isFile) return@forEach
                 runCatching {
-                    if (file.textFileSync != null) refreshExternalTextFile(file)
+                    if (file.fileSync != null) refreshExternalFile(file)
                     else file.refresh(source.readBytes())
                 }.onFailure {
                     HollowEngine.LOGGER.warn(
@@ -417,9 +439,9 @@ internal class HollowIdeModel(
     /** Reconcile on a file notification or on return from another application. */
     fun refreshExternalFiles() {
         tree.refresh()
-        files.values.toList().filter { it.textFileSync != null }.forEach { file ->
+        files.values.toList().filter { it.fileSync != null }.forEach { file ->
             if (!file.path.fromReadablePath().isFile) return@forEach
-            runCatching { refreshExternalTextFile(file) }.onFailure { error ->
+            runCatching { refreshExternalFile(file) }.onFailure { error ->
                 HollowEngine.LOGGER.warn("Could not reload IDE file '{}'", file.path, error)
             }
         }
@@ -448,10 +470,11 @@ internal class HollowIdeModel(
             if (source.parent == targetDir || targetDir.swallowedBy(source)) return@forEach
             val destination = uniqueDestination(targetDir, source.fileName.toString())
             val openPath = source.toReadablePathInsideRoot()
+            val affected = openFilesUnder(listOf(openPath))
+            if (!saveModifiedFiles(affected.filter { it.documentAutosave != null }.map { it.path })) return@forEach
             runCatching { Files.move(source, destination) }.onSuccess {
                 moved++
-                files.remove(openPath)?.close()
-                onFileRemoved?.invoke(openPath)
+                affected.forEach { closeFile(it.path) }
             }
         }
         if (moved == 0) return HollowIdeFileOperationResult.InvalidName
@@ -504,7 +527,7 @@ internal class HollowIdeModel(
     fun saveAll(): Int {
         var count = 0
         files.values.forEach { file ->
-            if (file.hasUnsavedChanges && save(file.path)) count++
+            if (file.needsSave && save(file.path)) count++
         }
         return count
     }
@@ -513,19 +536,58 @@ internal class HollowIdeModel(
         var allSaved = true
         for (path in paths) {
             val file = files[path] ?: continue
-            if (!file.hasUnsavedChanges) continue
+            if (!file.needsSave) continue
             if (!save(path)) allSaved = false
         }
         return allSaved
     }
 
+    fun flushDocumentAutosaves() =
+        saveModifiedFiles(files.values.filter { it.documentAutosave != null }.map { it.path })
+
+    private fun observeAutosave(file: HollowIdeOpenFile) {
+        val sync = file.fileSync ?: return
+        if (file.textOrNull != null) return
+        val client = Minecraft.getInstance()
+        file.documentAutosave = client.coroutineScope.launch {
+            snapshotFlow { if (file.dirty) file.document.autosaveSnapshot() else null }.collectLatest { snapshot ->
+                if (snapshot == null) return@collectLatest
+                val revision = sync.revision()
+                withContext(Dispatchers.IO) { delay(AutoSaveDelayMillis) }
+                val context = currentCoroutineContext()
+                file.autosaveInFlight = true
+                try {
+                    withContext(NonCancellable) {
+                        val (bytes, saved) = withContext(Dispatchers.IO) {
+                            context.ensureActive()
+                            val bytes = snapshot.encode()
+                            bytes to sync.save(bytes, revision, context::ensureActive)
+                        }
+                        if (files[file.path] !== file) return@withContext
+                        if (saved) {
+                            if (sync.isCurrent(bytes)) file.markSaved(snapshot, bytes)
+                        } else if (file.path.fromReadablePath().isFile) {
+                            refreshExternalFile(file)
+                        }
+                        tree.refresh()
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    HollowEngine.LOGGER.error("Could not autosave IDE file '{}'", file.path, error)
+                    HollowNotifications.error("hollowengine.gui.ide.file.save_failed".lang.format(file.title))
+                } finally {
+                    file.autosaveInFlight = false
+                }
+            }
+        }
+    }
+
     /** Saves and closes every file opened with [type], whose addon is unloading. */
     fun closeFilesUsing(type: HollowIdeFileType) {
         files.values.filter { file -> file.type === type }.map(HollowIdeOpenFile::path).forEach { path ->
-            if (files[path]?.dirty == true) save(path)
-            pendingSaves.remove(path)?.cancel()
-            files.remove(path)?.close()
-            onFileRemoved?.invoke(path)
+            if (files[path]?.needsSave == true) save(path)
+            closeFile(path)
         }
     }
 
@@ -546,7 +608,7 @@ internal class HollowIdeModel(
                     if (files[path] !== file || pendingSaves[path] !== context[Job]) return@execute
                     pendingSaves.remove(path)
                     if (saved) file.markSavedIfText(text)
-                    else runCatching { refreshExternalTextFile(file) }.onFailure { error ->
+                    else runCatching { refreshExternalFile(file) }.onFailure { error ->
                         HollowEngine.LOGGER.warn("Could not reload IDE file '{}' after autosave", path, error)
                     }
                     tree.refresh()
@@ -562,9 +624,9 @@ internal class HollowIdeModel(
     }
 
     /** Reloads [file] when it changed on disk; the change wins over unsaved edits, and the user is told they went. */
-    private fun refreshExternalTextFile(file: HollowIdeOpenFile): Boolean {
+    private fun refreshExternalFile(file: HollowIdeOpenFile): Boolean {
         val unsaved = file.dirty
-        val changed = file.reloadExternalText()
+        val changed = file.reloadExternal()
         if (!changed) return false
         pendingSaves.remove(file.path)?.cancel()
         if (unsaved) HollowNotifications.warning("hollowengine.gui.ide.file.external_change_discarded".lang.format(file.title))
@@ -594,6 +656,7 @@ class HollowIdeOpenFile internal constructor(
 ) {
     private var dirtyState by mutableStateOf(false)
     val dirty: Boolean get() = dirtyState || (type.tracksDocumentChanges && document.isModified)
+    internal val needsSave: Boolean get() = !readOnly && (dirty || document.isModified || autosaveInFlight)
     internal var externalTextRevision by mutableStateOf(0L)
         private set
     private var saveHandler: (() -> Boolean)? = null
@@ -622,10 +685,14 @@ class HollowIdeOpenFile internal constructor(
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
     val id: String = fileDockItemId(path)
-    val title: String get() = projectPath.substringAfterLast('/').ifEmpty { path }
-    internal val textFileSync = if (document is HollowIdeTextDocument && !readOnly && !virtual) {
-        HollowIdeTextFileSync(path.fromReadablePath().toPath(), initialContent)
+    val title: String get() = path.substringAfterLast('/').ifEmpty { path }
+    internal val fileSync = if (!readOnly && !virtual &&
+        (document is HollowIdeTextDocument || document.autosaveSnapshot() != null)) {
+        HollowIdeFileSync(path.fromReadablePath().toPath(), initialContent)
     } else null
+    internal val textFileSync get() = fileSync.takeIf { document is HollowIdeTextDocument }
+    internal var documentAutosave: Job? = null
+    internal var autosaveInFlight = false
 
     fun dockItem(): DockItem {
         val label = if (remote == null) title else "hollowengine.gui.ide.remote.tab".lang(title)
@@ -657,6 +724,12 @@ class HollowIdeOpenFile internal constructor(
         dirtyState = false
     }
 
+    internal fun markSaved(snapshot: HollowIdeFileSnapshot, bytes: ByteArray) {
+        if (readOnly) return
+        document.markSaved(snapshot, bytes)
+        dirtyState = false
+    }
+
     fun markSavedIfText(savedText: String) {
         if (readOnly) return
         if (text == savedText) dirtyState = false
@@ -679,10 +752,10 @@ class HollowIdeOpenFile internal constructor(
         if (encode().contentEquals(saved)) markSaved() else updateDirty(true)
     }
 
-    internal fun reloadExternalText(): Boolean = textFileSync?.reloadIfChanged { bytes ->
+    internal fun reloadExternal(): Boolean = fileSync?.reloadIfChanged { bytes ->
         document.reload(bytes)
         dirtyState = false
-        externalTextRevision++
+        if (textOrNull != null) externalTextRevision++
     } == true
 
     fun refreshReadOnly(next: String) {
@@ -695,7 +768,11 @@ class HollowIdeOpenFile internal constructor(
 
     fun encode(): ByteArray = document.encode()
 
-    fun close() = document.close()
+    fun close() {
+        documentAutosave?.cancel()
+        if (documentAutosave != null) fileSync?.invalidatePendingSaves()
+        document.close()
+    }
 }
 
 internal class HollowIdeFileTree {

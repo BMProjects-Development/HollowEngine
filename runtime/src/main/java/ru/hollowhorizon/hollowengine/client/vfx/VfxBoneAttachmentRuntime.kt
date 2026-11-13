@@ -27,7 +27,7 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
 
     private var instance: VfxInstance? = null
     private var lastGameTime = Float.NaN
-    private var lastFrame = Long.MIN_VALUE
+    private var simulationFrame = Long.MIN_VALUE
 
     /** The effect's space to camera-relative space, as of the last time the carrier was drawn. */
     val placement = Matrix4f()
@@ -35,12 +35,15 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
     /** Whether the effect makes particles; otherwise it is held, and what it made lives out its lifetime. */
     var emitting: Boolean = true
 
-    /** True on the first call of a frame: a carrier is drawn by several passes, the effect only once. */
-    fun claimFrame(): Boolean {
+    /** Simulates in world space once, then returns the placement for this camera. */
+    fun forWorldView(cameraPosition: Vec3, local: Matrix4f): VfxBoneBinding? {
         val frame = TickHandler.renderFrame
-        if (frame == lastFrame) return false
-        lastFrame = frame
-        return true
+        if (simulationFrame != frame) {
+            val binding = advance(cameraPosition, local) ?: return null
+            simulationFrame = frame
+            return binding
+        }
+        return instance?.let { VfxBoneBinding(it, local) }
     }
 
     /** Advances the effect and places it at [local], camera-relative; null while its file is missing. */
@@ -120,7 +123,7 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
 
 /** Something that hands the world renderer one placed effect a frame. */
 fun interface VfxBindingSource {
-    /** Advances the effect and says where it is; called once a frame by the world renderer. */
+    /** Supplies the placement for the current world view. */
     fun update(cameraPosition: Vec3): VfxBoneBinding?
 }
 
@@ -156,17 +159,16 @@ class VfxBoneAttachment(
 
         pipeline.addBatchedRenderable {
             if (!node.isVisible || RenderManager.isShadowPass) return@addBatchedRenderable
-            if (!effect.claimFrame()) return@addBatchedRenderable
-
-            effect.placement.set(stack.last().pose()).mul(globalMatrix.asMatrix4f())
-            VfxBoneBindings.submit(this@VfxBoneAttachment)
+            VfxBoneBindings.submit(this@VfxBoneAttachment) {
+                effect.placement.set(stack.last().pose()).mul(globalMatrix.asMatrix4f())
+            }
         }
     }
 
     override fun update(cameraPosition: Vec3): VfxBoneBinding? {
         val local = Matrix4f(effect.placement)
         applyOffset(local)
-        return effect.advance(cameraPosition, local)
+        return effect.forWorldView(cameraPosition, local)
     }
 
     /**
@@ -202,14 +204,18 @@ class VfxBoneBinding(val instance: VfxInstance, val placement: Matrix4f)
  * The effects carried by bones and entities, drawn this frame.
  */
 object VfxBoneBindings {
-    private val submitted = ArrayList<VfxBindingSource>()
+    private val submitted = LinkedHashSet<VfxBindingSource>()
     private val bindings = ArrayList<VfxBoneBinding>()
 
     /** Where effects go while a preview draws a model, instead of to the world. */
     private var captured: MutableList<VfxBindingSource>? = null
 
-    fun submit(source: VfxBindingSource) {
-        (captured ?: submitted) += source
+    fun submit(source: VfxBindingSource, capturePlacement: () -> Unit) {
+        val into = captured
+        val added = if (into != null) {
+            if (source in into) false else into.add(source)
+        } else RenderManager.isWorldPass && !RenderManager.isShadowPass && submitted.add(source)
+        if (added) capturePlacement()
     }
 
     /** Runs [draw], keeping the effects submitted meanwhile in [into], for a preview that draws them itself. */
@@ -229,6 +235,8 @@ object VfxBoneBindings {
         submitted.clear()
         return bindings
     }
+
+    internal fun clear() = submitted.clear()
 
     fun register() {
         RigAttachmentFactories.register("hollowengine:rig/vfx") { spec, context ->

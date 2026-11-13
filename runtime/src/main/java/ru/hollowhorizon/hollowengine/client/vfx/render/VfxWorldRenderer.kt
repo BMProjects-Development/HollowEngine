@@ -36,7 +36,14 @@ object VfxWorldRenderer {
 
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
-        if (event.stage == RenderStage.AFTER_WEATHER) drawEffects(event)
+        when (event.stage) {
+            RenderStage.AFTER_SKY -> {
+                VfxBoneBindings.clear()
+                Decals.clear()
+            }
+            RenderStage.AFTER_WEATHER -> drawEffects(event)
+            else -> Unit
+        }
     }
 
     /** Before the overlays of the level, so that a gizmo or a selection outline stays readable. */
@@ -84,9 +91,9 @@ object VfxWorldRenderer {
 
         val levelPose = event.poseStack.last().pose()
         scene?.forEachInstance { instance, _ ->
-            instance.collect(frame, placeInWorld(instance, levelPose, camera.x, camera.y, camera.z))
+            instance.collectInWorld(frame, placeInWorld(instance, levelPose, camera.x, camera.y, camera.z), camera)
         }
-        bones.forEach { binding -> binding.instance.collect(frame, binding.placement) }
+        bones.forEach { binding -> binding.instance.collectInWorld(frame, binding.placement, camera) }
         frame.decals += decals
         if (!WorldCameraPreviewRenderer.isRendering) frame.shake.copyInto(shake)
         if (frame.isEmpty) return

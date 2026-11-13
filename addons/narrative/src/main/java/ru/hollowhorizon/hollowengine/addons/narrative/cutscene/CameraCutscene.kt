@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.cutscene
 
+import androidx.compose.runtime.mutableStateOf
 import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -41,9 +42,11 @@ class CutscenePlaybackController {
         private set
 
     /** Where the coordinates in this scene are measured from */
-    var origin: CutsceneOrigin = CutsceneOrigin()
+    private val recordedOrigin = mutableStateOf(CutsceneOrigin())
+    var origin: CutsceneOrigin
+        get() = recordedOrigin.value
         set(value) {
-            field = value
+            recordedOrigin.value = value
             refreshFrame()
         }
 

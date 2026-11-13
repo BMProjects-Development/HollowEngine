@@ -4,7 +4,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Coordinates disk access by autosave and the client thread against the last accepted contents. */
-internal class HollowIdeTextFileSync(
+internal class HollowIdeFileSync(
     private val path: Path,
     initialContent: ByteArray,
 ) {
@@ -13,6 +13,15 @@ internal class HollowIdeTextFileSync(
 
     @Synchronized
     fun revision(): Long = externalRevision
+
+    /** Waits for an active write and makes previously scheduled writes ineligible. */
+    @Synchronized
+    fun invalidatePendingSaves() {
+        externalRevision++
+    }
+
+    @Synchronized
+    fun isCurrent(bytes: ByteArray): Boolean = content === bytes
 
     /** External changes win even when the editor still has a pending local edit. */
     @Synchronized

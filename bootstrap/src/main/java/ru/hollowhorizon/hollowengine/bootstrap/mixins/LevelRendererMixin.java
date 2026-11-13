@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.bootstrap.mixins;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Camera;
@@ -14,6 +15,8 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -123,6 +126,16 @@ public class LevelRendererMixin {
     @ModifyExpressionValue(method = "renderLevel", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/LevelRenderer;captureFrustum:Z", opcode = Opcodes.GETFIELD))
     private boolean hollowengine$capturePlayerFrustumOnly(boolean capture) {
         return capture && !BootstrapRuntimeManager.bridge().isRenderingWorldPreview();
+    }
+
+    @WrapOperation(method = "renderLevel", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;isSectionCompiled(Lnet/minecraft/core/BlockPos;)Z"))
+    private boolean hollowengine$entityInLoadedPreviewChunk(LevelRenderer renderer, BlockPos pos, Operation<Boolean> original) {
+        // An empty section can contain entities even when the preview has no terrain mesh for it.
+        if (WorldPreviewTargets.active() != null && level != null) {
+            return level.hasChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()));
+        }
+        return original.call(renderer, pos);
     }
 
     @Inject(method = "setupRender", at = @At("HEAD"), cancellable = true)

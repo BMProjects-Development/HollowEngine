@@ -2,8 +2,6 @@ package ru.hollowhorizon.hollowengine.client.decals
 
 import com.mojang.blaze3d.platform.GlStateManager
 import org.lwjgl.opengl.GL33
-import ru.hollowhorizon.hollowengine.client.decals.DecalDepth.blocks
-import ru.hollowhorizon.hollowengine.client.decals.DecalDepth.scene
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
@@ -122,9 +120,7 @@ internal object DecalDepth {
     val scene = DepthCopy()
     val blocks = DepthCopy()
 
-    /** The frame [blocks] was copied in, so a copy left from another frame is not read. */
-    var blocksFrame = Long.MIN_VALUE
-        private set
+    private var blocksCaptured = false
 
     /** The last frame the world drew decals in: the blocks are copied only while there are decals to read them. */
     var drawnFrame = Long.MIN_VALUE
@@ -133,13 +129,14 @@ internal object DecalDepth {
 
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
-        if (event.stage != RenderStage.AFTER_CUTOUT_BLOCKS || TickHandler.renderFrame - drawnFrame > 1) return
+        if (event.stage == RenderStage.AFTER_SKY) blocksCaptured = false
+        if (event.stage != RenderStage.AFTER_CUTOUT_BLOCKS || drawnFrame < TickHandler.renderFrame - 1) return
         GL33.glGetIntegerv(GL33.GL_VIEWPORT, viewport)
-        if (blocks.capture(viewport)) blocksFrame = TickHandler.renderFrame
+        blocksCaptured = blocks.capture(viewport)
     }
 
     /** Whether [blocks] holds this frame and matches [scene] in size, so the two can be read side by side. */
     val blocksReady: Boolean
-        get() = blocksFrame == TickHandler.renderFrame &&
+        get() = blocksCaptured &&
                 blocks.copyWidth == scene.copyWidth && blocks.copyHeight == scene.copyHeight
 }

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.delay
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.ChatScreen
@@ -678,7 +679,10 @@ object HollowIdeOverlay {
             }
         }
         val renderMain = isVisible()
-        if (!renderMain && !detachedWindows.active) return
+        if (!renderMain && !detachedWindows.active) {
+            Snapshot.sendApplyNotifications()
+            return
+        }
         if (!externalFiles.active && refreshFilesRequested.getAndSet(false)) {
             pipeline.await()
             model.refreshExternalFiles()
@@ -693,6 +697,11 @@ object HollowIdeOverlay {
         if (!detachedWindows.active) return
         pipeline.await()
         detachedWindows.close()
+    }
+
+    internal fun flushDocumentAutosaves() {
+        pipeline.await()
+        model.flushDocumentAutosaves()
     }
 
     private fun initialize() {
@@ -901,8 +910,8 @@ object HollowIdeOverlay {
     private fun Content(windowHandle: Long) {
         RememberLayout()
         TrackActiveEditor()
-        WatchTextFiles()
         SynchronizeFileTabs()
+        WatchSyncedFiles()
         Box(
             id = "ide-root",
             modifier = workspaceModifier(),
@@ -1052,9 +1061,9 @@ object HollowIdeOverlay {
     }
 
     @Composable
-    private fun WatchTextFiles() {
+    private fun WatchSyncedFiles() {
         val paths =
-            model.files.values.filter { it.textFileSync != null }.map { it.path.fromReadablePath().toPath() }.sorted()
+            model.files.values.filter { it.fileSync != null }.map { it.path.fromReadablePath().toPath() }.sorted()
         LaunchedEffect(paths) {
             if (paths.isNotEmpty()) watchIdeFiles(paths) { refreshFilesRequested.set(true) }
         }

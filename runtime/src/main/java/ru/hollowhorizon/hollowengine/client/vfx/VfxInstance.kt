@@ -273,6 +273,21 @@ class VfxInstance(
         }
     }
 
+    /** Evaluates render expressions for this view without moving the simulation origin or clock. */
+    internal fun collectInWorld(into: VfxDrawList, placement: Matrix4f, viewCamera: Vec3) {
+        val x = camera.x
+        val y = camera.y
+        val z = camera.z
+        setCamera(viewCamera)
+        allNodes.forEach { it.fillContext() }
+        try {
+            collect(into, placement)
+        } finally {
+            camera.set(x, y, z)
+            allNodes.forEach { it.fillContext() }
+        }
+    }
+
     fun node(id: String): VfxNodeRuntime? = allNodes.firstOrNull { it.spec.id == id }
 
     /**
