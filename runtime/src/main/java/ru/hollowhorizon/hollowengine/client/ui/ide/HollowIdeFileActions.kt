@@ -60,7 +60,7 @@ object HollowIdeStandardFileActions {
             keyAction = HollowKeys.SAVE,
             icon = SaveIcon,
             isVisible = { !it.file.readOnly },
-            isEnabled = { it.file.dirty },
+            isEnabled = { it.file.hasUnsavedChanges },
             run = { it.save() },
         ),
         HollowIdeFileAction(

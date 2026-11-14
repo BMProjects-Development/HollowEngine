@@ -5,6 +5,7 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -233,13 +234,17 @@ internal enum class ProjectNameAction {
     CreateFile, CreateFolder, Rename,
 }
 
-internal fun HollowIdeFileOperationResult.statusText(): String {
+internal fun HollowIdeFileOperationResult.failureMessage(): String? {
     return when (this) {
-        HollowIdeFileOperationResult.Success -> ""
+        HollowIdeFileOperationResult.Success -> null
         HollowIdeFileOperationResult.InvalidName -> "hollowengine.gui.ide.file.invalid_name".lang
         HollowIdeFileOperationResult.AlreadyExists -> "hollowengine.gui.ide.file.already_exists".lang
         HollowIdeFileOperationResult.NotFound -> "hollowengine.gui.ide.file.not_found".lang
     }
+}
+
+internal fun HollowIdeFileOperationResult.notifyFailure() {
+    failureMessage()?.let { HollowNotifications.error(it) }
 }
 
 /** The icons of the project menu, drawn in the family of the rest of the IDE. */

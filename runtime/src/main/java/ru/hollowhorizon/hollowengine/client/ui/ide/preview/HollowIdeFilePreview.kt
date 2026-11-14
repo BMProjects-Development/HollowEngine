@@ -59,7 +59,7 @@ class HollowIdePreviewRegistry {
 /** Something wrong with a file that a preview has found, and how to show it there. */
 class HollowIdePreviewProblem(val diagnostic: UiTextDiagnostic, val reveal: () -> Unit = {})
 
-/** A step of where a preview is inside its file, shown after the file in the status bar; [onClick] goes back to it. */
+/** A step in the preview's own navigation. [onClick] goes back to it. */
 class HollowIdePreviewCrumb(val label: String, val icon: String? = null, val onClick: (() -> Unit)? = null)
 
 /** What one open file remembers about its previews while it stays open. */
@@ -120,7 +120,7 @@ class HollowIdePreviewContext internal constructor(
         view.problems = problems
     }
 
-    /** Tells the status bar where in the file the preview is, after the path of the file. */
+    /** Tells the preview navigation where in the file the preview is. */
     fun publishCrumbs(crumbs: List<HollowIdePreviewCrumb>) {
         view.crumbs = crumbs
     }

@@ -49,6 +49,15 @@
     margin-left: 6px;
 }
 
+.ide-remote-loading {
+    foreground: $text-muted;
+    wrap: false;
+}
+
+.remote-project-tree .tree-item {
+    animations: none;
+}
+
 #ide-toolbar {
     size: 100% fit;
     padding: 1px 0px;
@@ -130,20 +139,12 @@
     height: 18px;
 }
 
-/* The first breadcrumb's icon sits on the rail, under the stripe buttons. */
-#ide-status-bar {
-    padding: 0px 8px 0px 1px;
-    gap: 12px;
-    align-items: start center;
-    background: $bg-window;
-}
-
-.ide-breadcrumbs {
+.ide-preview-navigation {
     gap: 2px;
     align-items: start center;
 }
 
-.ide-breadcrumb {
+.ide-preview-crumb {
     size: fit 16px;
     padding: 0px 4px;
     gap: 4px;
@@ -156,39 +157,25 @@
             foreground 100ms ease-out;
 }
 
-.ide-breadcrumb.last {
+.ide-preview-crumb.last {
     foreground: $text-strong;
 }
 
-.ide-breadcrumb.link:hover {
+.ide-preview-crumb.link:hover {
     background: $bg-hover;
     foreground: $caret;
 }
 
-.ide-breadcrumb-icon {
+.ide-preview-crumb-icon {
     size: 11px 11px;
 }
 
-.ide-breadcrumb-separator {
+.ide-preview-crumb-separator {
     size: 8px 8px;
     shape: path("M 3 1 L 6 4 L 3 7", 8 8);
     fill: none;
     stroke: $text-faint;
     stroke-width: 1px;
-}
-
-.ide-status-message {
-    max-width: 360px;
-    foreground: $text-soft;
-}
-
-.ide-status-detail {
-    wrap: false;
-    foreground: $text-muted;
-}
-
-.ide-status-detail.version {
-    foreground: $text-faint;
 }
 
 .ide-keymap-dialog {

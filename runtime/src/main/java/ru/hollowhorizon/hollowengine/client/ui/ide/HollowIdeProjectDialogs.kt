@@ -295,7 +295,7 @@ private fun ImportDialog(packaging: HollowIdeProjectPackaging, form: ProjectImpo
 }
 
 @Composable
-private fun ProjectDialog(id: String, title: String, onDismiss: () -> Unit, content: HollowUiContent) {
+internal fun ProjectDialog(id: String, title: String, onDismiss: () -> Unit, content: HollowUiContent) {
     Popup(
         anchorBounds = LocalUiViewport.current,
         alignment = UiPopupAlignment.Centered,
@@ -338,7 +338,7 @@ private fun Field(
 }
 
 @Composable
-private fun Paragraph(text: String, tag: String = "project-dialog-text") {
+internal fun Paragraph(text: String, tag: String = "project-dialog-text") {
     Text(text, tags = listOf(tag), modifier = Modifier.size(100.percent, UiLength.Fit).textWrap())
 }
 
@@ -348,7 +348,7 @@ private fun Errors(errors: List<String>) {
 }
 
 @Composable
-private fun Actions(content: HollowUiContent) {
+internal fun Actions(content: HollowUiContent) {
     Row(
         tags = listOf("project-dialog-actions"),
         modifier = Modifier.size(100.percent, UiLength.Fit).alignItems(horizontal = UiAlign.END),
@@ -357,7 +357,7 @@ private fun Actions(content: HollowUiContent) {
 }
 
 @Composable
-private fun DialogButton(
+internal fun DialogButton(
     id: String,
     label: String,
     primary: Boolean = false,

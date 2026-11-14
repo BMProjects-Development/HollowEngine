@@ -25,7 +25,6 @@ internal class RemoteProjectWorkspace(
     var selected by mutableStateOf(false)
         private set
     var selectedPath by mutableStateOf("")
-    val loading: Boolean get() = directories.values.any { it.loading }
 
     init {
         RemoteProjectConnection.onReset = ::reset
@@ -61,17 +60,13 @@ internal class RemoteProjectWorkspace(
         model.files.values.toList().filter { it.remote?.online == true }.forEach(::refreshFile)
     }
 
-    fun discard(file: HollowIdeOpenFile) {
-        if (file.remote?.saving == false) model.removeRemote(file)
-    }
-
     fun tree(filter: String): List<Node> = buildList {
         val name = projectName ?: return@buildList
         val query = filter.trim()
         fun collect(path: String, label: String, depth: Int, isDirectory: Boolean) {
             val directory = directories[path]
             val index = size
-            add(Node(path, label, depth, isDirectory, directory?.expanded == true || query.isNotEmpty()))
+            add(Node(path, label, depth, isDirectory, directory?.expanded == true || query.isNotEmpty(), directory?.loading == true))
             if (isDirectory && (directory?.expanded == true || query.isNotEmpty())) {
                 directory?.entries?.forEach { child ->
                     collect(joinProjectPath(path, child.name), child.name, depth + 1, child.directory)
@@ -299,6 +294,7 @@ internal class RemoteProjectWorkspace(
         val depth: Int,
         val directory: Boolean,
         val expanded: Boolean,
+        val loading: Boolean,
     ) {
         val parent: String get() = if (directory) path else projectPathParent(path)
     }

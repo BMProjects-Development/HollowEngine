@@ -205,7 +205,6 @@ internal object FindLang {
     const val MATCH_CASE = ROOT + "match_case"
     const val NEXT = ROOT + "next"
     const val NO_RESULTS = ROOT + "no_results"
-    const val NO_RESULTS_FOR = ROOT + "no_results_for"
     const val POSITION = ROOT + "position"
     const val PREVIOUS = ROOT + "previous"
     const val QUERY_HINT = ROOT + "query_hint"

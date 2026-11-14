@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.api.ModList.ModInfo
+import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
+import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationKind
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
@@ -27,7 +29,6 @@ import java.io.File
  */
 internal class HollowIdeProjectPackaging(
     private val model: HollowIdeModel,
-    private val setStatus: (String) -> Unit,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -70,7 +71,7 @@ internal class HollowIdeProjectPackaging(
         runCatching { HollowProject.saveProperties(edited) }.onSuccess {
             properties = edited
             settings = null
-            setStatus(PROJECT_SAVED.lang)
+            HollowNotifications.success(PROJECT_SAVED.lang)
             if (previous.modDependencies != edited.modDependencies || previous.dependsOn != edited.dependsOn) {
                 rebuildScriptingEnvironment()
             }
@@ -86,13 +87,13 @@ internal class HollowIdeProjectPackaging(
 
     private fun rebuildScriptingEnvironment() {
         val initializer = HollowAddonManager.find<ScriptingEnvironmentInitializer>() ?: return
-        setStatus(MODS_REBUILDING.lang)
+        val notice = HollowNotifications.progress(MODS_REBUILDING.lang)
         scope.launch {
             val result = runCatching { initializer.rebuild() }
             onMain {
-                result.onSuccess { setStatus(MODS_REBUILT.lang) }.onFailure { error ->
+                result.onSuccess { HollowNotifications.finish(notice, MODS_REBUILT.lang) }.onFailure { error ->
                     HollowEngine.LOGGER.error("Could not rebuild the scripting environment", error)
-                    setStatus(MODS_REBUILD_FAILED.lang(error.message ?: error.javaClass.simpleName))
+                    HollowNotifications.finish(notice, MODS_REBUILD_FAILED.lang(error.message ?: error.javaClass.simpleName), NotificationKind.ERROR)
                 }
             }
         }
@@ -143,7 +144,7 @@ internal class HollowIdeProjectPackaging(
                 properties = HollowProject.properties()
                 result.onSuccess { file ->
                     form.result = file
-                    setStatus(EXPORT_DONE.lang(file.name))
+                    HollowNotifications.success(EXPORT_DONE.lang(file.name))
                 }.onFailure { error -> form.errors += error.userMessages("Project export failed") }
             }
         }
@@ -193,7 +194,7 @@ internal class HollowIdeProjectPackaging(
                 properties = HollowProject.properties()
                 result.onSuccess { backup ->
                     import = null
-                    setStatus(
+                    HollowNotifications.success(
                         if (backup == null) IMPORT_DONE.lang(plan.properties.displayName)
                         else IMPORT_DONE_BACKUP.lang(plan.properties.displayName, backup.name)
                     )

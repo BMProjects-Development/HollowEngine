@@ -20,7 +20,6 @@ internal class RemoteProjectPanelController(
     private var context by mutableStateOf<Pair<RemoteProjectWorkspace.Node, UiRect>?>(null)
     private var dialog by mutableStateOf<ProjectNameDialog?>(null)
     private var deletePath by mutableStateOf<String?>(null)
-    private var discardFile by mutableStateOf<HollowIdeOpenFile?>(null)
     private var cutPath by mutableStateOf<String?>(null)
     private var lastPath: String? = null
     private var lastClick = 0L
@@ -32,25 +31,6 @@ internal class RemoteProjectPanelController(
         dialog = null
         deletePath = null
         return open
-    }
-
-    fun confirmDiscard(file: HollowIdeOpenFile) {
-        discardFile = file
-    }
-
-    @Composable
-    fun DiscardDialog() {
-        val file = discardFile ?: return
-        val anchor = remember(file) { pointer().let { (x, y) -> UiRect(x, y, 0f, 0f) } }
-        ContextMenu(
-            id = "remote-project-discard",
-            anchorBounds = anchor,
-            items = listOf(
-                UiDropdownItem("$RemoteLang.confirm_discard".lang(file.title)) { workspace.discard(file) },
-                UiDropdownItem("$RemoteLang.cancel".lang),
-            ),
-            onExpandedChange = { if (!it) discardFile = null },
-        )
     }
 
     fun click(node: RemoteProjectWorkspace.Node, event: UiEvent) {
@@ -103,8 +83,8 @@ internal class RemoteProjectPanelController(
     @Composable
     fun Tree(filter: UiTreeFilterState, focusFilter: (String) -> Unit, sourceTail: @Composable () -> Unit) {
         Column(tags = listOf("ide-panel", "project-tree-panel"), modifier = Modifier.size(100.percent, 100.percent)) {
-            if (workspace.loading) Text("$RemoteLang.loading".lang, tags = listOf("ide-remote-message"))
             UiTreeView(
+                tags = listOf("remote-project-tree"),
                 items = workspace.tree(filter.query).map { node ->
                     UiTreeItem(
                         id = "remote-project-${node.path}",
@@ -123,7 +103,12 @@ internal class RemoteProjectPanelController(
                 filterState = filter,
                 filterPlaceholder = "$RemoteLang.filter".lang,
                 onFilterOpened = focusFilter,
-                rowTail = { if (it.depth == 0) sourceTail() },
+                rowTail = {
+                    if (it.depth == 0) sourceTail()
+                    if (it.expanded && it.payload.loading) {
+                        Text("$RemoteLang.loading".lang, tags = listOf("ide-remote-message", "ide-remote-loading"))
+                    }
+                },
                 dragItem = { item ->
                     item.takeIf { it.depth > 1 }?.let { UiDragItem(DraggedPath(it.payload.path), it.icon, it.label) }
                 },

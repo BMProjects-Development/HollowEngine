@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.TextFieldState
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTextCaret
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -31,7 +32,6 @@ internal class HollowIdeCodeRename(
     private val sessionOf: (String) -> HollowIdeEditorSession,
     private val editorOf: (String) -> TextFieldState?,
     private val changed: (HollowIdeOpenFile) -> Unit,
-    private val setStatus: (String) -> Unit,
 ) {
     var dialog by mutableStateOf<CodeRenameDialog?>(null)
         private set
@@ -41,7 +41,7 @@ internal class HollowIdeCodeRename(
         if (file.readOnly) return false
         val text = file.text
         sessionOf(file.path).resolveRenameTarget(text, caret) { target ->
-            if (target == null) setStatus(LANG_UNAVAILABLE.lang)
+            if (target == null) HollowNotifications.warning(LANG_UNAVAILABLE.lang)
             else dialog = CodeRenameDialog(file.path, text, caret, target.name, x, y)
         }
         return true
@@ -55,7 +55,7 @@ internal class HollowIdeCodeRename(
         val open = dialog ?: return
         val name = open.name.trim()
         if (!NAME.matches(name)) {
-            setStatus(LANG_INVALID.lang(name))
+            HollowNotifications.warning(LANG_INVALID.lang(name))
             return
         }
         dialog = null
@@ -69,17 +69,15 @@ internal class HollowIdeCodeRename(
 
     private fun apply(open: CodeRenameDialog, name: String, renames: List<FileRename>) {
         if (renames.isEmpty()) {
-            setStatus(LANG_NOTHING.lang(open.original))
+            HollowNotifications.info(LANG_NOTHING.lang(open.original))
             return
         }
         val label = UndoLabel(LANG_UNDO, open.original, name)
         val done = renames.filter { rename -> write(rename, label) }
         val skipped = renames.size - done.size
         val count = done.sumOf { it.edits.size }
-        setStatus(
-            if (skipped == 0) LANG_DONE.lang(count, done.size)
-            else LANG_PARTLY.lang(count, done.size, skipped)
-        )
+        if (skipped == 0) HollowNotifications.success(LANG_DONE.lang(count, done.size))
+        else HollowNotifications.warning(LANG_PARTLY.lang(count, done.size, skipped))
     }
 
     /** Writes [rename] into the open editor of its file, or onto the disk; false when the text changed meanwhile. */

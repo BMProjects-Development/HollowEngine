@@ -8,6 +8,7 @@ import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.ui.UiEvent
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
+import ru.hollowhorizon.hollowengine.client.ui.notification.NotificationKind
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
@@ -20,7 +21,6 @@ internal class HollowIdeProjectController(
     private val shortcutsActive: () -> Boolean,
     private val closeDockItem: (String) -> Unit,
     private val openFile: (HollowIdeOpenFile) -> Unit,
-    private val setStatus: (String) -> Unit,
     private val pointerX: () -> Float,
     private val pointerY: () -> Float,
 ) {
@@ -64,7 +64,7 @@ internal class HollowIdeProjectController(
         rememberClick("")
         when (val result = model.open(item.payload)) {
             HollowIdeOpenResult.Directory -> Unit
-            HollowIdeOpenResult.Unsupported -> setStatus("Unsupported or binary file: ${item.payload.path}")
+            HollowIdeOpenResult.Unsupported -> HollowNotifications.warning("hollowengine.gui.ide.file.unsupported".lang(item.payload.path))
             is HollowIdeOpenResult.File -> openFile(result.file)
         }
     }
@@ -73,7 +73,7 @@ internal class HollowIdeProjectController(
         contextMenu = null
         when (val result = model.createSoundsFile(path)) {
             is HollowIdeOpenResult.File -> openFile(result.file)
-            else -> setStatus("Не удалось создать sounds.json")
+            else -> HollowNotifications.error("hollowengine.gui.ide.file.create_sounds_failed".lang)
         }
     }
 
@@ -99,8 +99,7 @@ internal class HollowIdeProjectController(
             dialog.action == ProjectNameAction.CreateFolder -> model.createFolder(dialog.path, dialog.name)
             else -> rename(dialog)
         }
-        setStatus(result.statusText())
-        if (result == HollowIdeFileOperationResult.Success) nameDialog = null
+        if (result == HollowIdeFileOperationResult.Success) nameDialog = null else result.notifyFailure()
     }
 
     private fun createScript(
@@ -124,7 +123,7 @@ internal class HollowIdeProjectController(
 
     fun copy(path: String = model.selectedTreePath, cut: Boolean = false) {
         val paths = model.selectedOr(path)
-        setStatus(model.copyToClipboard(paths, cut).statusText())
+        model.copyToClipboard(paths, cut).notifyFailure()
         contextMenu = null
     }
 
@@ -135,9 +134,11 @@ internal class HollowIdeProjectController(
 
     fun pasteInto(path: String = model.selectedTreePath) {
         contextMenu = null
-        setStatus("Pasting...")
+        val notice = HollowNotifications.progress("hollowengine.gui.ide.file.pasting".lang)
         model.pasteIntoAsync(path) { result ->
-            setStatus(result.statusText())
+            val failure = result.failureMessage()
+            if (failure == null) HollowNotifications.dismiss(notice)
+            else HollowNotifications.finish(notice, failure, NotificationKind.ERROR)
         }
     }
 
@@ -146,7 +147,7 @@ internal class HollowIdeProjectController(
         if (files.isEmpty()) return false
         contextMenu = null
         focusProjectTree()
-        model.importFilesAsync(files, targetPath) { result -> setStatus(result.statusText()) }
+        model.importFilesAsync(files, targetPath) { it.notifyFailure() }
         return true
     }
 
@@ -154,7 +155,7 @@ internal class HollowIdeProjectController(
     fun moveInto(path: String, targetPath: String): Boolean {
         if (path == targetPath) return false
         val result = model.moveInto(listOf(path), targetPath)
-        setStatus(result.statusText())
+        result.notifyFailure()
         return result == HollowIdeFileOperationResult.Success
     }
 
@@ -166,12 +167,11 @@ internal class HollowIdeProjectController(
     fun delete(path: String = model.selectedTreePath) {
         val targets = model.selectedOr(path)
         val result = model.delete(targets)
-        setStatus(result.statusText())
         if (result == HollowIdeFileOperationResult.Success) {
             val what = targets.singleOrNull()?.substringAfterLast('/') ?: targets.size.toString()
             HollowNotifications.warning("hollowengine.gui.ide.file.deleted".lang.format(what))
         } else {
-            HollowNotifications.error(result.statusText())
+            result.notifyFailure()
         }
         contextMenu = null
     }
@@ -265,8 +265,7 @@ internal class HollowIdeProjectController(
 
     private fun rename(path: String, name: String) {
         val result = model.rename(path, name)
-        setStatus(result.statusText())
-        if (result != HollowIdeFileOperationResult.Success) HollowNotifications.error(result.statusText())
+        result.notifyFailure()
     }
 
     private fun openNameDialog(action: ProjectNameAction, path: String, template: HollowIdeScriptTemplate? = null) {

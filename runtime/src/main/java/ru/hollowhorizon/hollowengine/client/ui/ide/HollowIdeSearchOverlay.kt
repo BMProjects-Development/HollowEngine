@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
+import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.utils.lang
@@ -59,7 +60,7 @@ internal data class HollowIdeSearchResult(
  * the scan running off the render thread and debounced, so typing in a project of any size stays
  * responsive.
  */
-internal class HollowIdeSearchController(private val setStatus: (String) -> Unit) {
+internal class HollowIdeSearchController {
     var visible by mutableStateOf(false)
         private set
     var query by mutableStateOf("")
@@ -133,7 +134,7 @@ internal class HollowIdeSearchController(private val setStatus: (String) -> Unit
                     HollowIdeSearchScope.TEXT -> searchFileContents(current)
                 }
             }.getOrElse { failure ->
-                setStatus(SearchLang.FAILED.lang(failure.message ?: failure::class.simpleName.orEmpty()))
+                HollowNotifications.error(SearchLang.FAILED.lang(failure.message ?: failure::class.simpleName.orEmpty()))
                 emptyList()
             }
             ensureActive()

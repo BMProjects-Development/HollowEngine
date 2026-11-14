@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import ru.hollowhorizon.hollowengine.client.ui.*
+import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
@@ -27,6 +28,26 @@ internal fun HollowIdeFileViewBody(
                 Box(modifier = Modifier.size(0.px, 100.percent).grow(view.split)) { text() }
                 SplitDivider(view, id)
                 Box(modifier = Modifier.size(0.px, 100.percent).grow(1f - view.split)) { preview() }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun HollowIdePreviewNavigation(view: HollowIdeFileView, id: String) {
+    if (view.mode == HollowIdeViewMode.TEXT || view.crumbs.isEmpty()) return
+    Row(tags = listOf("ide-preview-navigation"), modifier = Modifier.size(100.percent, UiLength.Fit).clip()) {
+        view.crumbs.forEachIndexed { index, crumb ->
+            if (index > 0) Box(tags = listOf("ide-preview-crumb-separator"))
+            val reveal = crumb.onClick
+            Row(
+                id = "$id-preview-crumb-$index",
+                tags = listOfNotNull("ide-preview-crumb", "link".takeIf { reveal != null }, "last".takeIf { index == view.crumbs.lastIndex }),
+                modifier = if (reveal == null) Modifier else Modifier.input(hoverable = true, clickable = true)
+                    .cursor(UiCursorShape.HAND).onClick { event -> reveal(); event.consume() },
+            ) {
+                crumb.icon?.let { Image(it, tags = listOf("ide-preview-crumb-icon")) }
+                Text(crumb.label, modifier = Modifier.textWrap(false).textOverflow(UiTextOverflow.DOTS))
             }
         }
     }

@@ -185,7 +185,13 @@ internal class HollowIdeModel(
     }
 
     fun removeRemote(file: HollowIdeOpenFile) {
-        if (file.remote == null || files.remove(file.path) !== file) return
+        if (file.remote != null) removeFile(file)
+    }
+
+    internal fun removeFile(file: HollowIdeOpenFile) {
+        if (files[file.path] !== file) return
+        pendingSaves.remove(file.path)?.cancel()
+        files.remove(file.path)
         file.close()
         onFileRemoved?.invoke(file.path)
     }
@@ -469,7 +475,7 @@ internal class HollowIdeModel(
     fun saveAll(): Int {
         var count = 0
         files.values.forEach { file ->
-            if (file.dirty && save(file.path)) count++
+            if (file.hasUnsavedChanges && save(file.path)) count++
         }
         return count
     }
@@ -478,7 +484,7 @@ internal class HollowIdeModel(
         var allSaved = true
         for (path in paths) {
             val file = files[path] ?: continue
-            if (file.readOnly || (!file.dirty && !file.document.isModified)) continue
+            if (!file.hasUnsavedChanges) continue
             if (!save(path)) allSaved = false
         }
         return allSaved
@@ -561,6 +567,7 @@ class HollowIdeOpenFile internal constructor(
     private var saveHandler: (() -> Boolean)? = null
 
     val readOnly: Boolean get() = document.readOnly
+    internal val hasUnsavedChanges: Boolean get() = !readOnly && (dirty || document.isModified)
     val virtual: Boolean get() = remote != null || path.isVirtualIdePath()
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
@@ -572,7 +579,7 @@ class HollowIdeOpenFile internal constructor(
 
     fun dockItem(): DockItem {
         val label = if (remote == null) title else "hollowengine.gui.ide.remote.tab".lang(title)
-        return DockItem(id, label, IconHelper.forPath(path).toString(), dirty = dirty && !readOnly)
+        return DockItem(id, label, IconHelper.forPath(path).toString(), dirty = hasUnsavedChanges)
     }
 
     fun update(next: String) {

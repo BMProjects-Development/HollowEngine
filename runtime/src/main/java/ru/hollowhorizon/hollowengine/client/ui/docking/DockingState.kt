@@ -140,6 +140,10 @@ class DockingState {
 
     fun close(itemId: String): Boolean {
         if (!canCloseItem(itemId)) return false
+        return closeConfirmed(itemId)
+    }
+
+    internal fun closeConfirmed(itemId: String): Boolean {
         val pinnedIndex = pinnedItems.indexOfFirst { it.item.id == itemId }
         if (pinnedIndex >= 0) {
             val pinned = pinnedItems.removeAt(pinnedIndex)

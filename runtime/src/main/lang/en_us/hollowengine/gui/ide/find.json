@@ -4,7 +4,6 @@
   "match_case": "Match case",
   "next": "Next match (Enter)",
   "no_results": "No results",
-  "no_results_for": "No results for '%s'",
   "position": "%s of %s",
   "previous": "Previous match (Shift+Enter)",
   "query_hint": "Find",

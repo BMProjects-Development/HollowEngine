@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.style.UiTextOverflow
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
 import ru.hollowhorizon.hollowengine.client.ui.widgets.IconButton
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
+import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
 import ru.hollowhorizon.hollowengine.client.utils.lang
 
 private const val DockTabMinWidth = 72f
@@ -21,6 +22,7 @@ private const val DockTabOverhang = 6f
 private const val DockTabIndicatorHeight = 2f
 private const val DockTabMargin = 2f
 private const val DockTabCloseWidth = 22f
+private const val DockTabUnsavedWidth = 8f
 private const val DockTabCloseSize = 16f
 private const val DockCloseIcon = "hollowengine:textures/gui/icons/cross.svg"
 
@@ -456,6 +458,13 @@ private fun DockTab(
                 .alignItems(vertical = UiAlign.CENTER),
         ) {
             TabContentWrapper(item, tabContent)
+            if (item.dirty) {
+                Box(
+                    id = "dock-unsaved-${item.id}",
+                    tags = listOf("dock-unsaved"),
+                    modifier = Modifier.tooltipOnHover("hollowengine.gui.ide.file.unsaved_indicator".lang),
+                )
+            }
             CloseButton(item, state)
         }
         Box(tags = listOf(DockTags.TabIndicator), modifier = Modifier.size(UiLength.Auto, DockTabIndicatorHeight.px))
@@ -646,7 +655,8 @@ private fun dockTabBarMeasurePolicy(
 private fun TabContentWrapper(item: DockItem, tabContent: DockHeaderContent) {
     Box(
         modifier = Modifier.size(UiLength.Auto, 100.percent)
-            .maxSize((DockTabMaxWidth - DockTabCloseWidth).px, 100.percent).padding(8.px, 0.px).clip()
+            .maxSize((DockTabMaxWidth - DockTabCloseWidth - if (item.dirty) DockTabUnsavedWidth else 0f).px, 100.percent)
+            .padding(8.px, 0.px).clip()
     ) {
         tabContent(item)
     }

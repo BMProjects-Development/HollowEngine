@@ -4,7 +4,6 @@
   "match_case": "Учитывать регистр",
   "next": "Следующее совпадение (Enter)",
   "no_results": "Ничего не найдено",
-  "no_results_for": "Нет совпадений с «%s»",
   "position": "%s из %s",
   "previous": "Предыдущее совпадение (Shift+Enter)",
   "query_hint": "Найти",

@@ -9,5 +9,14 @@
   "open_mod_folder": "Open mod folder",
   "reload_client_resources": "Reload client resources",
   "reload_server_resources": "Reload server resources",
-  "renamed": "Renamed to %s"
+  "renamed": "Renamed to %s",
+  "unsaved_indicator": "Unsaved changes",
+  "close_unsaved_file": "%s has unsaved changes. Save before closing?",
+  "close_unsaved_files": "%s files have unsaved changes. Save before closing?",
+  "close_saving": "Waiting for the server to finish saving…",
+  "close_discard": "Close Without Saving",
+  "close_save": "Save and Close",
+  "unsupported": "Unsupported or binary file: %s",
+  "create_sounds_failed": "Could not create sounds.json",
+  "pasting": "Pasting files…"
 }
