@@ -54,23 +54,14 @@ internal fun HollowIdeProjectContextMenu(
         }
         if (menu.canCreateSoundEvents) {
             ProjectMenuItem(
-                "New Sound Events",
-                "",
-                IconHelper.forFile("sounds.ogg").toString(),
-                closeScripts
+                "New Sound Events", "", IconHelper.forFile("sounds.ogg").toString(), closeScripts
             ) { onCreateSoundEvents(menu.path) }
         }
         ProjectMenuItem(
-            "Rename",
-            HollowKeys.RENAME.shortcut.orEmpty(),
-            ProjectMenuIcons.RENAME,
-            closeScripts
+            "Rename", HollowKeys.RENAME.shortcut.orEmpty(), ProjectMenuIcons.RENAME, closeScripts
         ) { onRename(menu.path) }
         ProjectMenuItem(
-            "Copy",
-            HollowKeys.COPY.shortcut.orEmpty(),
-            ProjectMenuIcons.COPY,
-            closeScripts
+            "Copy", HollowKeys.COPY.shortcut.orEmpty(), ProjectMenuIcons.COPY, closeScripts
         ) { onCopy(menu.path) }
         ProjectMenuItem(
             "hollowengine.gui.ide.project.copy_path".lang,
@@ -80,10 +71,7 @@ internal fun HollowIdeProjectContextMenu(
             id = "project-copy-path"
         ) { onCopyPath(menu.path) }
         ProjectMenuItem(
-            "Cut",
-            HollowKeys.CUT.shortcut.orEmpty(),
-            ProjectMenuIcons.CUT,
-            closeScripts
+            "Cut", HollowKeys.CUT.shortcut.orEmpty(), ProjectMenuIcons.CUT, closeScripts
         ) { onCut(menu.path) }
         ProjectMenuItem("Paste", HollowKeys.PASTE.shortcut.orEmpty(), ProjectMenuIcons.PASTE, closeScripts) {
             onPaste(
@@ -92,10 +80,7 @@ internal fun HollowIdeProjectContextMenu(
         }
         ProjectMenuItem("Show in Explorer", "", ProjectMenuIcons.REVEAL, closeScripts) { onShowInExplorer(menu.path) }
         ProjectMenuItem(
-            "Delete",
-            HollowKeys.DELETE.shortcut.orEmpty(),
-            ProjectMenuIcons.DELETE,
-            closeScripts
+            "Delete", HollowKeys.DELETE.shortcut.orEmpty(), ProjectMenuIcons.DELETE, closeScripts
         ) { onDelete(menu.path) }
         contributedActions(menu).forEach { action ->
             ProjectMenuItem(action.label, "", action.icon, closeScripts) {
@@ -118,8 +103,7 @@ internal fun HollowIdeProjectContextMenu(
             scriptTemplates().forEach { template ->
                 ProjectMenuItem(template.label, template.extension, template.icon) {
                     onCreateScript(
-                        menu.path,
-                        template
+                        menu.path, template
                     )
                 }
             }
@@ -143,6 +127,9 @@ internal fun HollowIdeProjectNameDialog(
     onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
+    title: String? = null,
+    confirmLabel: String = "OK",
+    cancelLabel: String = "Cancel",
 ) {
     if (dialog == null) return
     val fieldState = remember(dialog.action, dialog.path) {
@@ -162,7 +149,7 @@ internal fun HollowIdeProjectNameDialog(
     ) {
         val focus = LocalUiFocusRequester.current
         LaunchedEffect(Unit) { focus.request(ProjectNameDialogInputId) }
-        Text(dialog.title, tags = listOf("project-name-dialog-title"))
+        Text(title ?: dialog.title, tags = listOf("project-name-dialog-title"))
         TextField(
             value = dialog.name,
             onChange = onNameChange,
@@ -184,8 +171,8 @@ internal fun HollowIdeProjectNameDialog(
             },
         )
         Row(tags = listOf("project-name-dialog-actions")) {
-            ProjectMenuItem("OK", "", icon = null, action = onConfirm)
-            ProjectMenuItem("Cancel", "", icon = null, action = onCancel)
+            ProjectMenuItem(confirmLabel, "", icon = null, action = onConfirm)
+            ProjectMenuItem(cancelLabel, "", icon = null, action = onCancel)
         }
     }
 }
@@ -212,8 +199,7 @@ private fun ProjectMenuItem(
         if (icon != null) Image(icon, tags = listOf("dropdown-item-icon", "project-context-menu-icon"))
         Text(label, tags = listOf("dropdown-item-label", "project-context-menu-label"))
         if (shortcut.isNotBlank()) Text(
-            shortcut,
-            tags = listOf("dropdown-item-shortcut", "project-context-menu-shortcut")
+            shortcut, tags = listOf("dropdown-item-shortcut", "project-context-menu-shortcut")
         )
     }
 }

@@ -10,6 +10,8 @@ class DockingState {
     private val ids = DockIdGenerator()
 
     var onTabContextMenu: ((DockItem, UiEvent) -> Unit)? = null
+    internal var canCloseItem: (String) -> Boolean = { true }
+    internal var onItemClosed: (String) -> Unit = {}
     internal var canDetachItem: (DockItem) -> Boolean = { true }
     internal var onDetachItem: ((DockItem) -> Unit)? = null
     internal var onDetachedFocus: ((String) -> Unit)? = null
@@ -137,11 +139,13 @@ class DockingState {
     }
 
     fun close(itemId: String): Boolean {
+        if (!canCloseItem(itemId)) return false
         val pinnedIndex = pinnedItems.indexOfFirst { it.item.id == itemId }
         if (pinnedIndex >= 0) {
             val pinned = pinnedItems.removeAt(pinnedIndex)
             if (expandedByAnchor[pinned.anchor] == itemId) expandedByAnchor.remove(pinned.anchor)
             if (focusedItemId == itemId) focusedItemId = firstItemId()
+            onItemClosed(itemId)
             return true
         }
 
@@ -149,6 +153,7 @@ class DockingState {
         if (dockedRemoval?.item != null) {
             root = dockedRemoval.root
             if (focusedItemId == itemId) focusedItemId = firstItemId()
+            onItemClosed(itemId)
             return true
         }
 
@@ -165,6 +170,7 @@ class DockingState {
                 window.copy(stack = window.stack.copy(items = remaining, selectedItemId = selected))
         }
         if (focusedItemId == itemId) focusedItemId = firstItemId()
+        onItemClosed(itemId)
         return true
     }
 
@@ -181,6 +187,7 @@ class DockingState {
         if (!beforeClose(items)) return
         floatingWindows.removeAt(index)
         if (items.any { it.id == focusedItemId }) focusedItemId = firstItemId()
+        items.forEach { onItemClosed(it.id) }
     }
 
     fun focus(itemId: String): Boolean {

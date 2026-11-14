@@ -1,0 +1,44 @@
+---
+title: Remote editing
+order: 3
+---
+
+# Remote editing
+
+Connect to a dedicated server to open its project in the HollowEngine IDE. From inside the game, you can edit scripts and other text files, create folders, and rename, move, or delete project files.
+
+## Who gets access
+
+Remote editing is disabled by default on dedicated servers. On a server with `online-mode=true`, open `config/hollowengine/remote-project.toml` in the server's working directory to configure it.
+
+:::warning
+Only grant access to those you're willing to trust to run code on the server. Any Johnny-come-lately can easily write a Kotlin script that will crash your Windows, Server or install **Bitcoin Miner 2004 (not a virus)**, especially when `online-mode=false` (no license-which means anyone can log in with that username/UUID, and no plugins at `/login <Password> <Password>` will likely save you)
+:::
+
+Set `enabled = true` and add the players' UUIDs to `editors`. Include each operator's UUID if they need access. Leaving the list empty keeps the project closed to everyone.
+
+On a dedicated server, the same list lets players start and stop server scripts from the IDE or with `/he scripting`. Managing scripts in the entity inspector also requires entity editing permissions.
+
+```toml
+enabled = true
+editors = ["01234567-89ab-cdef-0123-456789abcdef"]
+```
+
+Replace the example UUID with the player's UUID. To turn remote editing off for everyone, set `enabled = false`.
+
+To test on one computer, run a dedicated server from your development environment with `online-mode=false` and `server-ip=127.0.0.1`. Connect to `127.0.0.1` and add the UUID the server sees in this mode to `editors`.
+
+## Opening the server project
+
+1. Connect to a server running the same HollowEngine version as your client and open **Windows > Project**.
+2. Choose **Server** from the dropdown next to the project name. The dropdown appears when the server grants you access.
+3. Expand a folder and double-click a file. The IDE loads each folder's contents as you expand it.
+4. Press `Ctrl + S` to save your edits. The tab is marked **Server** and continues to save to the server if you switch the tree to **Local**.
+
+The tree gives you access to `scripts`, `assets`, `data`, and `META-INF`. The editor opens text files up to 2 MiB. The dropdown is hidden in singleplayer.
+
+## When another editor changes the file
+
+The server notifies connected editors when someone saves through the IDE. A tab with no unsaved edits updates right away. If you have unsaved edits, they stay in the tab and the IDE shows a conflict. Choose **Resolve > Open Server Version** and bring over the changes you need. When you're ready, choose **Keep My Edits for the Next Save** and press `Ctrl + S`.
+
+If a file changes directly on the server's disk, use **Refresh Expanded Folders** from the project context menu to refresh the tree and open tabs. If the server version changes again after refreshing, the IDE reports a conflict on your next save.

@@ -20,12 +20,15 @@ import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.scripting.NODE_SCRIPT_EXTENSION
+import ru.hollowhorizon.hollowengine.common.scripting.execution.ServerScriptAccessDenied
+import ru.hollowhorizon.hollowengine.common.scripting.execution.canControlServerScripts
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeRuntime
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.NodeAttachTargets
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import ru.hollowhorizon.hollowengine.common.slots.*
 import ru.hollowhorizon.hollowengine.common.ui.net.UiSessionManager
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
+import ru.hollowhorizon.hollowengine.common.utils.mcTranslate
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForResourceLocation
 
 /**
@@ -59,9 +62,12 @@ object EntityEditorService {
             stored = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.components.orEmpty(),
             virtual = VirtualComponentRegistry.read(entity),
             attachedScripts = EntityNodeRuntime.editors(entity),
-            availableScripts = files
-                .filter { it.path.endsWith(".$NODE_SCRIPT_EXTENSION") && NodeAttachTargets.accepts(it, entity.javaClass) }
-                .map(ScriptRegistry::display).sorted(),
+            availableScripts = files.filter {
+                    it.path.endsWith(".$NODE_SCRIPT_EXTENSION") && NodeAttachTargets.accepts(
+                        it,
+                        entity.javaClass
+                    )
+                }.map(ScriptRegistry::display).sorted(),
             scriptFiles = files.map(ScriptRegistry::display).sorted(),
             hasSlots = entity is LivingEntity,
         )
@@ -131,9 +137,15 @@ class RemoveEntityComponentPacket(val entityId: Int, val component: ResourceLoca
 class EntityNodeScriptPacket(val entityId: Int, val path: String, val attach: Boolean) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return
+        val requester = player as? ServerPlayer ?: return
         val target = player.level().getEntity(entityId) ?: return
+        if (!requester.canControlServerScripts()) {
+            requester.sendSystemMessage(ServerScriptAccessDenied.mcTranslate())
+            EntityEditorService.sendState(requester, target)
+            return
+        }
         if (attach) EntityNodeRuntime.attach(target, path) else EntityNodeRuntime.detach(target, path)
-        EntityEditorService.sendState(player as? ServerPlayer ?: return, target)
+        EntityEditorService.sendState(requester, target)
     }
 }
 
@@ -143,7 +155,13 @@ class EntityNodeScriptPacket(val entityId: Int, val path: String, val attach: Bo
 class SetEntityScriptValuesPacket(val entityId: Int, val path: String, val values: String) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return
+        val requester = player as? ServerPlayer ?: return
         val target = player.level().getEntity(entityId) ?: return
+        if (!requester.canControlServerScripts()) {
+            requester.sendSystemMessage(ServerScriptAccessDenied.mcTranslate())
+            EntityEditorService.sendState(requester, target)
+            return
+        }
         val parsed = runCatching { ScriptEditorJson.parseToJsonElement(values) as? JsonObject }.getOrNull() ?: return
         EntityNodeRuntime.applyEditorValues(target, path, parsed)
     }

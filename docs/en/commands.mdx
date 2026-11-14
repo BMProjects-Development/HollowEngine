@@ -15,7 +15,9 @@ The mod adds quite a few useful commands, which can be accessed via two main com
 | `/hollowengine` | Full command name  |
 | `/he`           | Short alias        |
 
-Commands under `scripting` and `addons` that change something need operator permission (level 2).
+Addon management commands, `/he scripting list`, and `/he scripting compile` require operator permission (level 2). On a dedicated server, players need [remote project access](/docs/hollowengine/ide/remote-editing) to use `run`, `stop`, `attach`, or `detach`. In a singleplayer or LAN world, the host can use these commands with cheats enabled.
+
+The server console, RCON, and datapack functions can run these commands at permission level 2 or higher. Command blocks cannot run them.
 
 ---
 

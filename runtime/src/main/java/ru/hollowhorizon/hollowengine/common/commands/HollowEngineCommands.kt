@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.FloatArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
+import com.mojang.brigadier.context.CommandContext
 import kotlinx.serialization.Serializable
 import net.minecraft.client.Minecraft
 import net.minecraft.commands.CommandSourceStack
@@ -43,6 +44,8 @@ import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.npcs.NpcAnimationRuntime
 import ru.hollowhorizon.hollowengine.common.scripting.*
+import ru.hollowhorizon.hollowengine.common.scripting.execution.ServerScriptAccessDenied
+import ru.hollowhorizon.hollowengine.common.scripting.execution.canControlServerScripts
 import ru.hollowhorizon.hollowengine.common.scripting.mixins.MixinScripts
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeRuntime
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.addNode
@@ -287,16 +290,16 @@ private fun CommandExtension.registerUtilityCommands() {
 
 private fun CommandExtension.registerScriptingCommands() {
     "scripting" {
-        requires { hasPermission(2) }
+        requires { hasPermission(PlayerPermissions.GAMEMASTER) || canControlServerScripts() }
 
         "run"(runnableScriptArgument()) {
-            executes {
+            executesWithScriptAccess {
                 val id = ScriptPathArgument.getScript(this, "path")
                 if (isNodeScriptPath(id.path)) {
                     source.server.addNode(ScriptRegistry.display(id))
-                    return@executes SUCCESS
+                    return@executesWithScriptAccess SUCCESS
                 }
-                if (isMixinScriptPath(id.path)) return@executes reloadMixinScript(source, id)
+                if (isMixinScriptPath(id.path)) return@executesWithScriptAccess reloadMixinScript(source, id)
                 runPlainScript(source, id)
             }
         }
@@ -305,10 +308,10 @@ private fun CommandExtension.registerScriptingCommands() {
             nodeScriptArgument(),
             arg("state", StringArgumentType.string())
         ) {
-            executes {
+            executesWithScriptAccess {
                 val id = ScriptPathArgument.getScript(this, "path")
                 if (!isNodeScriptPath(id.path)) {
-                    return@executes sendFailure(
+                    return@executesWithScriptAccess sendFailure(
                         "hollowengine.commands.scripting_state_requires_node_script"
                             .mcTranslate(ScriptRegistry.display(id))
                     )
@@ -322,7 +325,7 @@ private fun CommandExtension.registerScriptingCommands() {
         }
 
         "stop"(runningNodeArgument()) {
-            executes {
+            executesWithScriptAccess {
                 source.server.removeNode(ScriptRegistry.display(ScriptPathArgument.getScript(this, "path")))
                 SUCCESS
             }
@@ -333,7 +336,7 @@ private fun CommandExtension.registerScriptingCommands() {
             nodeScriptArgument(),
             arg("state", StringArgumentType.string())
         ) {
-            executes {
+            executesWithScriptAccess {
                 attachEntityNode(
                     EntityArgument.getEntity(this, "entity"),
                     ScriptPathArgument.getScript(this, "path"),
@@ -346,7 +349,7 @@ private fun CommandExtension.registerScriptingCommands() {
             arg("entity", EntityArgument.entity()),
             nodeScriptArgument()
         ) {
-            executes {
+            executesWithScriptAccess {
                 attachEntityNode(
                     EntityArgument.getEntity(this, "entity"),
                     ScriptPathArgument.getScript(this, "path"),
@@ -359,7 +362,7 @@ private fun CommandExtension.registerScriptingCommands() {
             arg("entity", EntityArgument.entity()),
             attachedNodeArgument()
         ) {
-            executes {
+            executesWithScriptAccess {
                 val entity = EntityArgument.getEntity(this, "entity")
                 val path = ScriptRegistry.display(ScriptPathArgument.getScript(this, "path"))
                 if (EntityNodeRuntime.detach(entity, path)) SUCCESS
@@ -368,6 +371,7 @@ private fun CommandExtension.registerScriptingCommands() {
         }
 
         "list" {
+            requires { hasPermission(PlayerPermissions.GAMEMASTER) }
             executes { listServerNodes(source) }
 
             "entity"(arg("entity", EntityArgument.entity())) {
@@ -376,8 +380,15 @@ private fun CommandExtension.registerScriptingCommands() {
         }
 
         "compile" {
+            requires { hasPermission(PlayerPermissions.GAMEMASTER) }
             executes { compileAllScripts(source) }
         }
+    }
+}
+
+private fun CommandExtension.executesWithScriptAccess(run: CommandContext<CommandSourceStack>.() -> Int) {
+    executes {
+        if (source.canControlServerScripts()) run(this) else sendFailure(ServerScriptAccessDenied.mcTranslate())
     }
 }
 

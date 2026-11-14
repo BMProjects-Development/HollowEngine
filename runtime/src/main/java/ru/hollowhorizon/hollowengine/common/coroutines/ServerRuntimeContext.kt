@@ -6,6 +6,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.MinecraftServer
+import ru.hollowhorizon.hollowengine.common.addons.project.remote.RemoteProjectService
 import ru.hollowhorizon.hollowengine.common.npcs.registry.ServerNpcs
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.SharedScriptClasses
 import ru.hollowhorizon.hollowengine.common.scripting.execution.ScriptRunService
@@ -19,6 +20,7 @@ class ServerRuntimeContext(
     val scope: CoroutineScope =
         CoroutineScope(server.dispatcher + SupervisorJob(server.coroutineScope.coroutineContext[Job]))
     val nodes = NodeManager(server)
+    internal val remoteProject by lazy { RemoteProjectService() }
     val scriptRuns = ScriptRunService(server, scope, nodes)
     val npcs = ServerNpcs(server, levelRoot.resolve("hollowengine").resolve("npcs.dat"))
 

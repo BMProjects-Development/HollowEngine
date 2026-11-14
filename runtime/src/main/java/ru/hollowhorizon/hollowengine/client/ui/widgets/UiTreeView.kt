@@ -77,6 +77,7 @@ fun <T> UiTreeView(
     onBackgroundContextMenu: ((UiEvent) -> Unit)? = null,
     reveal: UiTreeReveal? = null,
     onRevealed: (() -> Unit)? = null,
+    rowTail: (@Composable (UiTreeItem<T>) -> Unit)? = null,
 ) {
     val latestItems by rememberUpdatedState(items)
     if (reveal != null) {
@@ -141,6 +142,7 @@ fun <T> UiTreeView(
                         canDrop,
                         draggable = dragItem != null,
                         virtual = virtual,
+                        tail = rowTail,
                     ) {
                         dragItem?.invoke(item)
                     }
@@ -215,6 +217,7 @@ private fun <T> UiTreeRow(
     canDrop: (UiTreeItem<T>, UiDragItem) -> Boolean,
     draggable: Boolean,
     virtual: Boolean,
+    tail: (@Composable (UiTreeItem<T>) -> Unit)?,
     drag: () -> UiDragItem?,
 ) {
     val id = "tree-item-${item.id}"
@@ -254,6 +257,7 @@ private fun <T> UiTreeRow(
             onIconClick,
             dragAndDrop,
             virtual,
+            tail,
             Modifier.then(if (dragSource != null) Modifier.onPress { onSelect(item, it) } else Modifier.onClick(select))
                 .dragSource(dragSource, drag).then(dropModifier))
     }
@@ -269,6 +273,7 @@ private fun <T> UiTreeRowContent(
     onIconClick: ((UiTreeItem<T>) -> Unit)?,
     dragAndDrop: UiDragAndDropState?,
     virtual: Boolean,
+    tail: (@Composable (UiTreeItem<T>) -> Unit)?,
     interaction: Modifier,
 ) {
     Row(
@@ -309,6 +314,7 @@ private fun <T> UiTreeRowContent(
             )
         }
         Text(item.label, tags = listOf("tree-label"))
+        tail?.invoke(item)
     }
 }
 

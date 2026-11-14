@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockItem
+import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectDocument
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeReveal
@@ -101,6 +102,7 @@ internal class HollowIdeModel(
     }
 
     fun openFile(path: String): HollowIdeOpenResult {
+        files[path]?.takeIf { it.remote != null }?.let { return HollowIdeOpenResult.File(it, created = false) }
         selectedTreePath = path
         files[path]?.takeIf { it.readOnly }?.let { return HollowIdeOpenResult.File(it, created = false) }
         SourceDocumentPath.parse(path)?.let(::readSourceDocument)
@@ -169,8 +171,28 @@ internal class HollowIdeModel(
         scheduleSave(path)
     }
 
+    fun openRemote(
+        path: String,
+        text: String,
+        remote: RemoteProjectDocument,
+        save: (HollowIdeOpenFile) -> Boolean,
+    ): HollowIdeOpenFile {
+        val textType = requireNotNull(fileTypes.find(BuiltinTextFileTypeId))
+        return HollowIdeOpenFile(path, textType, HollowIdeTextDocument(text), remote = remote).also { file ->
+            file.attachSaveHandler { save(file) }
+            files[path] = file
+        }
+    }
+
+    fun removeRemote(file: HollowIdeOpenFile) {
+        if (file.remote == null || files.remove(file.path) !== file) return
+        file.close()
+        onFileRemoved?.invoke(file.path)
+    }
+
     fun save(path: String): Boolean {
         val file = files[path]?.takeUnless { it.readOnly } ?: return false
+        if (file.remote != null) return file.save()
         pendingSaves.remove(path)?.cancel()
         try {
             val sync = file.textFileSync
@@ -366,13 +388,14 @@ internal class HollowIdeModel(
                 HollowEngine.LOGGER.warn("Could not reload IDE file '{}'", file.path, error)
             }
         }
-        files.values.toList().filter { !it.readOnly && !it.path.fromReadablePath().exists() }.forEach { file ->
-            pendingSaves.remove(file.path)?.cancel()
-            if (!file.dirty) {
-                files.remove(file.path)?.close()
-                onFileRemoved?.invoke(file.path)
+        files.values.toList().filter { !it.readOnly && !it.virtual && !it.path.fromReadablePath().exists() }
+            .forEach { file ->
+                pendingSaves.remove(file.path)?.cancel()
+                if (!file.dirty) {
+                    files.remove(file.path)?.close()
+                    onFileRemoved?.invoke(file.path)
+                }
             }
-        }
         selectedTreePaths.removeAll { !it.fromReadablePath().exists() }
         if (selectedTreePath !in selectedTreePaths) selectedTreePath = selectedTreePaths.lastOrNull().orEmpty()
     }
@@ -494,9 +517,7 @@ internal class HollowIdeModel(
                 }
             }.onFailure { error ->
                 if (error !is CancellationException) HollowEngine.LOGGER.warn(
-                    "Could not autosave IDE file '{}'",
-                    path,
-                    error
+                    "Could not autosave IDE file '{}'", path, error
                 )
             }
         }
@@ -531,6 +552,7 @@ class HollowIdeOpenFile internal constructor(
     val type: HollowIdeFileType,
     val document: HollowIdeFileDocument,
     initialContent: ByteArray = document.encode(),
+    internal val remote: RemoteProjectDocument? = null,
 ) {
     var dirty by mutableStateOf(false)
         private set
@@ -539,17 +561,18 @@ class HollowIdeOpenFile internal constructor(
     private var saveHandler: (() -> Boolean)? = null
 
     val readOnly: Boolean get() = document.readOnly
-    val virtual: Boolean get() = path.isVirtualIdePath()
+    val virtual: Boolean get() = remote != null || path.isVirtualIdePath()
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
     val id: String = fileDockItemId(path)
-    val title: String get() = path.substringAfterLast('/').ifEmpty { path }
+    val title: String get() = (remote?.path ?: path).substringAfterLast('/').ifEmpty { path }
     internal val textFileSync = if (document is HollowIdeTextDocument && !readOnly && !virtual) {
         HollowIdeTextFileSync(path.fromReadablePath().toPath(), initialContent)
     } else null
 
     fun dockItem(): DockItem {
-        return DockItem(id, title, IconHelper.forPath(path).toString(), dirty = dirty && !readOnly)
+        val label = if (remote == null) title else "hollowengine.gui.ide.remote.tab".lang(title)
+        return DockItem(id, label, IconHelper.forPath(path).toString(), dirty = dirty && !readOnly)
     }
 
     fun update(next: String) {
@@ -585,6 +608,12 @@ class HollowIdeOpenFile internal constructor(
     fun refresh(bytes: ByteArray) {
         if (dirty) return
         document.reload(bytes)
+    }
+
+    internal fun replaceRemoteText(text: String) {
+        (document as? HollowIdeTextDocument)?.refresh(text)
+        markSaved()
+        externalTextRevision++
     }
 
     internal fun reloadExternalText(): Boolean = textFileSync?.reloadIfChanged { bytes ->

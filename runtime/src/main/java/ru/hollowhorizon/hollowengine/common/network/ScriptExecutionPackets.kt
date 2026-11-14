@@ -6,7 +6,7 @@ import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.client.ui.ide.ScriptExecutionClient
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import ru.hollowhorizon.hollowengine.common.scripting.execution.ScriptExecutionStatus
-import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
+import ru.hollowhorizon.hollowengine.common.scripting.execution.canControlServerScripts
 
 @Serializable
 enum class ScriptExecutionOperation { RUN, STOP }
@@ -20,14 +20,14 @@ class RequestScriptExecutionPacket(
 ) : HollowPacket {
     override fun handle(player: Player) {
         val serverPlayer = player as? ServerPlayer ?: return
-        if (!player.hasPermissions(PlayerPermissions.GAMEMASTER)) {
+        if (!serverPlayer.canControlServerScripts()) {
             ScriptExecutionStatePacket(allowed = false, reset = true).send(serverPlayer)
             return
         }
         val runs = serverPlayer.server.runtimeContext.scriptRuns
         runCatching {
             when (operation) {
-                ScriptExecutionOperation.RUN -> runs.start(path, state)
+                ScriptExecutionOperation.RUN -> runs.start(path, state, serverPlayer)
                 ScriptExecutionOperation.STOP -> runs.stop(path)
             }
         }.onFailure { failure ->

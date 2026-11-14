@@ -9,7 +9,8 @@ import java.util.zip.ZipFile
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
-internal fun String.isVirtualIdePath(): Boolean = startsWith("resource://") || SourceDocumentPath.parse(this) != null
+internal fun String.isVirtualIdePath(): Boolean =
+    startsWith("resource://") || startsWith("remote-project://") || SourceDocumentPath.parse(this) != null
 
 /**
  * Reads a library source tab back from disk. A decompiled class has no file to read: its text comes from

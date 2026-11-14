@@ -19,7 +19,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.nodes.nodeSave
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.startNode
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
 
@@ -64,7 +63,7 @@ class ScriptRunService(
         if (disposed) return
         val paths = tracker.paths() + nodes.executionPaths() + failures.keys
         val current = paths.associateWith { ScriptExecutionState(status(it), failure(it)) }
-        val players = server.playerList.players.filter { it.hasPermissions(PlayerPermissions.GAMEMASTER) }.toSet()
+        val players = server.playerList.players.filterTo(HashSet(), ServerPlayer::canControlServerScripts)
         updates.synchronize(current, players) { player, allowed, reset, states ->
             if (player in server.playerList.players) ScriptExecutionStatePacket(states, allowed, reset).send(player)
         }
@@ -99,6 +98,10 @@ class ScriptRunService(
     }
 
     fun start(raw: String, state: String? = null) {
+        start(raw, state, requester = null)
+    }
+
+    internal fun start(raw: String, state: String?, requester: ServerPlayer?) {
         val id = ScriptRegistry.parse(raw)
         val path = ScriptRegistry.display(id)
         if (status(path) != ScriptExecutionStatus.IDLE) return
@@ -107,14 +110,15 @@ class ScriptRunService(
         require(node || provider.baseClass == "kotlin.Any") { "This script type cannot be started from the editor" }
         require(state == null || node) { "Only node scripts have states" }
         failures.remove(path)
-        tracker.start(path) {
+        tracker.start(path) execute@{
             try {
                 val compiled = withContext(Dispatchers.IO) { ScriptLoader.compile(id).getOrThrow() }
                 coroutineContext.ensureActive()
+                if (requester?.canControlServerScripts() == false) return@execute
                 tracker.markRunning(path)
                 if (node) {
                     require(compiled.implicitReceiverCount == 1) { "An attached node must be started on its entity" }
-                    if (nodes.contains(path) || nodes.isStopping(path)) return@start
+                    if (nodes.contains(path) || nodes.isStopping(path)) return@execute
                     server.startNode(path, nodeSave(null), entry = state, compiled = compiled)
                     check(nodes.contains(path)) { "Node initialization failed; see the server log" }
                 } else ScriptLoader.executeCompiled<Any?>(id, precompiled = compiled).getOrThrow()

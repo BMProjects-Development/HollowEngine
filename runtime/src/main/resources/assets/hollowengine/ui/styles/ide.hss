@@ -35,6 +35,20 @@
     background: alpha($accent, 0.2);
 }
 
+.ide-project-source {
+    margin-left: 6px;
+    height: 18px;
+}
+
+.ide-remote-status {
+    gap: 6px;
+    padding: 2px 6px;
+}
+
+.ide-remote-message {
+    margin-left: 6px;
+}
+
 #ide-toolbar {
     size: 100% fit;
     padding: 1px 0px;

@@ -61,7 +61,8 @@ internal class HollowIdeCodeRename(
         dialog = null
         if (name == open.original) return
         val documents =
-            model.files.values.filterNot { it.readOnly }.mapNotNull { file -> file.textOrNull?.let { file.path to it } }
+            model.files.values.filter { !it.readOnly && it.remote == null }
+                .mapNotNull { file -> file.textOrNull?.let { file.path to it } }
                 .toMap()
         sessionOf(open.path).rename(open.text, open.caret, name, documents) { renames -> apply(open, name, renames) }
     }
