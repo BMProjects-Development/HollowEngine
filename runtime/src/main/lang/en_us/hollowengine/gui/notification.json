@@ -1,5 +1,15 @@
 {
   "addon_restart": "Addon '%s' will be enabled after a restart",
+  "addon_loaded": "Addon '%s' %s loaded",
+  "addons_loaded": "Addons loaded: %s",
+  "addon_reloaded": "Addon '%s' %s reloaded",
+  "addons_reloaded": "Addons reloaded: %s",
+  "addon_unloaded": "Addon '%s' unloaded",
+  "addons_unloaded": "Addons unloaded: %s",
+  "addon_failed": "Addon '%s' %s failed to load",
+  "addon_missing_mods": "Addon '%s' %s is missing mods",
+  "addon_waiting_for_dependencies": "Addon '%s' %s is waiting for other addons",
+  "addon_rejected": "Addon '%s' %s was rejected",
   "startup_failed": "Startup scripts failed, see the log: %s",
   "title": "Notification",
   "undo": "Undo"

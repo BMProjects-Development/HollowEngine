@@ -54,6 +54,7 @@ object ProjectExporter {
                 progress(ProjectMessage(ProjectLang.EXPORT_COMPILING, scripts.size))
                 val directory = work.resolve("compiled")
                 compileNamed(scripts, environment, directory)
+                if (!properties.platform.usesLoaderApi) requireNoLoaderApi(scripts, directory)
 
                 progress(ProjectMessage(ProjectLang.EXPORT_REMAPPING))
                 val content = namedContent(directory, work)
@@ -109,6 +110,17 @@ object ProjectExporter {
                 ProjectMessage(ProjectLang.EXPORT_COMPILE_FAILED, ScriptRegistry.display(id), reason)
             })
         }
+    }
+
+    /** A common project runs on every loader, so its scripts cannot be written against one of them. */
+    private fun requireNoLoaderApi(scripts: List<ScriptId>, compiled: File) {
+        val uses = scripts.mapNotNull { id ->
+            val artifact = ScriptCache.artifactIn(compiled, id).takeIf(File::isFile) ?: return@mapNotNull null
+            runCatching { LoaderApiScan.firstIn(artifact) }.getOrNull()?.let { loaderClass ->
+                ProjectMessage(ProjectLang.EXPORT_LOADER_API, ScriptRegistry.display(id), loaderClass)
+            }
+        }
+        if (uses.isNotEmpty()) throw ProjectException(uses)
     }
 
     private fun describe(error: Throwable): String {

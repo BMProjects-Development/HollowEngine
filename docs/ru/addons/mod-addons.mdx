@@ -38,7 +38,7 @@ order: 4
 
 Скрипт добавляет исходники и ресурсы шаблона в `main`, подключает dev jar как `compileOnly` и проверяет производственный jar. Id мода берётся из `modId` или `mod_id` в Gradle либо из `fabric.mod.json` / `neoforge.mods.toml`.
 
-В `mod-addon.properties` `id` - идентификатор аддона в HollowEngine, а `hostModId` подставляет Gradle. Версия аддона совпадает с версией мода. В jar должен остаться обычный `fabric.mod.json` или `neoforge.mods.toml` мода.
+В `mod-addon.properties` `id` - идентификатор аддона в HollowEngine, а `hostModId` подставляет Gradle. Если мод собран под один загрузчик, укажите это: `platform=fabric` или `platform=neoforge`. Версия аддона совпадает с версией мода. В jar должен остаться обычный `fabric.mod.json` или `neoforge.mods.toml` мода.
 
 ## Правила
 

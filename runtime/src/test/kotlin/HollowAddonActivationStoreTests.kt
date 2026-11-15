@@ -11,8 +11,7 @@ class HollowAddonActivationStoreTests {
 
     @Test
     fun `disabled addon ids survive restart`() {
-        val file = temporaryDirectory.resolve(".disabled-addons").toFile()
-        val store = HollowAddonActivationStore(file)
+        val store = HollowAddonActivationStore(temporaryDirectory.toFile())
 
         store.save(linkedSetOf("video", "debug-command"))
 

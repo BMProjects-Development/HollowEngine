@@ -8,7 +8,7 @@ Build every addon with:
 ./gradlew buildAddons
 ```
 
-The resulting jars are collected in `build/addon-jars/`. One jar works with both mod loaders.
+The resulting jars are collected in `build/addon-jars/`. An addon that uses only Minecraft and the engine works with both mod loaders from one jar; see "Mod loaders" below for the rest.
 
 Copy the jar to either of these directories:
 
@@ -17,24 +17,27 @@ Copy the jar to either of these directories:
 
 In a development run of this repository nothing has to be copied: `runClient` and `runServer` build every addon first and pass `build/addon-jars` to the game with `-Dhollowengine.devAddons`. That directory is looked at before the two others, so a copy of the same addon left in `mods/` never wins, and it is watched like them: run `./gradlew buildAddons` while the game is open and the rebuilt addons are reloaded in place. Addons with bootstrap libraries still need a restart.
 
-The runtime scans and watches both directories. If the same addon id is present in both at startup, the newest version wins; when the versions are equal, the copy in `hollowengine/addons/` has priority. Do not keep duplicate copies unless you are deliberately testing version selection.
+The runtime scans and watches both directories. When several copies of one addon are installed, those made for the running loader and side compete: the newest version wins, and between equal versions the copy from the directory looked at first. The rule is the same at startup and while the game runs: a newer copy dropped in takes over, removing the running copy starts the one that is left, and the copies that lost are listed as `duplicate`.
 
 Runtime diagnostics and lifecycle controls are available to operators:
 
 ```text
 /he addons list
+/he addons info <addon-id>
 /he addons enable <addon-id>
 /he addons disable <addon-id>
 /he addons reload <addon-id>
 ```
 
-Disabled ids are persisted in `hollowengine/addons/.disabled-addons`. An addon without bootstrap libraries can be copied and loaded while Minecraft is running.
+`list` gives every installed addon jar with its state and, unless it simply runs, the reason: `disabled`, `inactive` (made for the other side), `incompatible` (made for the other loader), `missing mods`, `waiting for dependencies`, `restart required`, `rejected`, `failed` or `duplicate`. The same is available to code as `HollowAddonManager.statuses`.
+
+Disabled ids are persisted in `hollowengine/addons/.disabled-addons`. An addon without bootstrap libraries can be copied and loaded while Minecraft is running; a jar is read once it has stopped changing. If an updated addon cannot start, the version that was running stays.
 
 Command addons use Brigadier directly from `@SubscribeEvent`. `RegisterCommandsEvent` fires on every datapack load, and enabling, disabling or reloading an addon reloads the datapacks of every running server, so the command tree is rebuilt with the addon's commands added or gone. The video addon demonstrates the same mechanism with `/he video <local-path-or-url>`.
 
 An addon's `build.gradle.kts` only needs its own settings and libraries. Dependencies added to `addonLibraries` are available during compilation, embedded as nested jars, and loaded in the addon's isolated classloader. Pure Java runtime-only libraries belong in `addonRuntimeLibraries`.
 
-Libraries that load native code or keep process-global state belong in `addonBootstrapLibraries`. They are loaded into HollowEngine's stable runtime classloader before addon initialization. A newly copied or updated addon that contains bootstrap libraries is deliberately not hot-loaded: `HollowAddonManager.restartRequired` reports it, the log asks for a restart, and it becomes available on the next game launch.
+Libraries that load native code or keep process-global state belong in `addonBootstrapLibraries`. They are loaded into HollowEngine's stable runtime classloader before addon initialization. A newly copied or updated addon that contains bootstrap libraries is deliberately not hot-loaded: `HollowAddonManager.restartRequired` reports it, the log asks for a restart, and it becomes available on the next game launch. The libraries of an addon that is switched off, or made for the other loader or side, are not loaded at all.
 
 ```kotlin
 base.archivesName.set("MyAddon")
@@ -55,15 +58,32 @@ id=my-addon
 name=My Addon
 version=${version}
 entry=com.example.myaddon.MyAddon
-dependsOn=another-addon
+dependsOn=another-addon>=1.2
+dependsOnMods=some-mod, optional-mod?
 environment=common
+platform=common
 description=What the addon does
 authors=Me, Someone Else
 license=MIT
 icon=assets/my-addon/icon.png
 ```
 
-`entry` may be left out by an addon made only of scripts and resources. `description`, `authors`, `license` and `icon` go into the `fabric.mod.json` and `neoforge.mods.toml` the build generates, which is what mod lists show.
+`entry` may be left out by an addon made only of scripts and resources. The mods in `dependsOnMods` must be installed for the addon to load, and its scripts compile against them; one written with a `?` is optional. An id in `dependsOn` and `dependsOnMods` may be followed by the versions it has to have, as in `library>=1.2` or `core>=2.0<3.0` (`>=`, `>`, `<=`, `<`, `=`, `!=`): an addon whose dependency is of another version waits for it, and `/he addons list` names the installed one. `description`, `authors`, `license` and `icon` go into the `fabric.mod.json` and `neoforge.mods.toml` the build generates, which is what mod lists show.
+
+## Mod loaders
+
+`platform` says which loaders the addon is written for: `common` (the default) knows no loader, uses only Minecraft and the engine and runs on Fabric and NeoForge from one jar; `fabric` and `neoforge` use that loader's API and run only there; `fabric,neoforge` uses both, each in its own part, and runs on both from one jar.
+
+The sources follow the same split. `src/main` is common code and never sees a loader's API, in any addon. Code that needs one goes to `src/fabric` or `src/neoforge`, which see `src/main` and the API of that loader. A `common` addon has neither directory, and the build refuses one; a `fabric,neoforge` addon may have either or both: the jar carries each part apart from the rest and the game opens only the one made for its loader. A `fabric` or `neoforge` addon has only its own directory and gets only that loader's mod descriptor. Resources always stay in `src/main/resources`.
+
+In an addon that names loaders, `entry`, `dependsOn`, `dependsOnMods` and `requiredClasses` can be given for one of them by adding its name: `entry.neoforge` replaces `entry` on NeoForge, and for the lists the loader's values are added to the common ones.
+
+```properties
+platform=fabric,neoforge
+entry=com.example.myaddon.MyAddon
+entry.neoforge=com.example.myaddon.neoforge.MyNeoForgeAddon
+dependsOnMods.fabric=fabric-api
+```
 
 ## Addons inside a mod
 

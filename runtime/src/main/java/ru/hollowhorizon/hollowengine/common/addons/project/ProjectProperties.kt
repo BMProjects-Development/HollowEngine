@@ -1,6 +1,10 @@
 package ru.hollowhorizon.hollowengine.common.addons.project
 
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonDependency
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
+import ru.hollowhorizon.hollowengine.common.addons.HollowAddonPlatform
+import ru.hollowhorizon.hollowengine.common.addons.ids
+import ru.hollowhorizon.hollowengine.common.addons.withIds
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 import ru.hollowhorizon.hollowengine.common.scripting.source.NAMESPACE_PATTERN
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
@@ -16,8 +20,12 @@ data class ProjectProperties(
     val name: String = "",
     val version: String = DEFAULT_VERSION,
     val environment: HollowAddonEnvironment = HollowAddonEnvironment.COMMON,
-    val dependsOn: List<String> = emptyList(),
-    val modDependencies: List<String> = emptyList(),
+    /** The loaders an export of the project is made for; the folder itself runs wherever the game does. */
+    val platform: HollowAddonPlatform = HollowAddonPlatform.COMMON,
+    /** `dependsOn`, with the versions each entry asks for. */
+    val addonRequirements: List<HollowAddonDependency> = emptyList(),
+    /** `dependsOnMods`, with the versions each entry asks for and whether it is optional. */
+    val modRequirements: List<HollowAddonDependency> = emptyList(),
     val description: String = "",
     val authors: List<String> = emptyList(),
     val license: String = "",
@@ -25,6 +33,16 @@ data class ProjectProperties(
     val extra: Map<String, String> = emptyMap(),
 ) {
     val displayName: String get() = name.ifBlank { id }
+
+    /** Ids of the addons in `dependsOn`. */
+    val dependsOn: List<String> get() = addonRequirements.ids
+
+    /** Ids of the mods in `dependsOnMods`, the optional ones included. */
+    val modDependencies: List<String> get() = modRequirements.ids
+
+    /** With exactly [addons] and [mods] as dependencies; those already listed keep their versions. */
+    fun withDependencies(addons: List<String>, mods: List<String>): ProjectProperties =
+        copy(addonRequirements = addonRequirements.withIds(addons), modRequirements = modRequirements.withIds(mods))
 
     fun problems(): List<String> = buildList {
         if (!id.matches(NAMESPACE_PATTERN)) add(PROBLEM_ID)
@@ -45,8 +63,9 @@ data class ProjectProperties(
             "name" to name,
             "version" to version,
             "environment" to environment.name.lowercase(),
-            "dependsOn" to dependsOn.joinToString(","),
-            "dependsOnMods" to modDependencies.joinToString(","),
+            "platform" to if (platform == HollowAddonPlatform.COMMON) "" else platform.id,
+            "dependsOn" to addonRequirements.joinToString(","),
+            "dependsOnMods" to modRequirements.joinToString(","),
             "description" to description,
             "authors" to authors.joinToString(", "),
             "license" to license,
@@ -73,7 +92,7 @@ data class ProjectProperties(
         const val PROBLEM_ICON = "hollowengine.gui.ide.project.problem.icon"
 
         private val KNOWN_KEYS = setOf(
-            "id", "name", "version", "environment", "dependsOn", "dependsOnMods", "description", "authors", "license", "icon",
+            "id", "name", "version", "environment", "platform", "dependsOn", "dependsOnMods", "description", "authors", "license", "icon",
         )
 
         /** The properties in [file], or defaults when there is none. */
@@ -84,14 +103,18 @@ data class ProjectProperties(
             val properties = Properties().apply { load(input) }
             fun value(key: String) = properties.getProperty(key)?.trim().orEmpty()
             fun list(key: String) = value(key).split(',').map(String::trim).filter(String::isNotEmpty)
+            // An entry nobody can read is dropped rather than keeping the whole project from opening.
+            fun dependencies(key: String) =
+                list(key).mapNotNull(HollowAddonDependency::parseOrNull).distinctBy(HollowAddonDependency::id)
             return ProjectProperties(
                 id = value("id").ifEmpty { DEFAULT_SANDBOX_NAMESPACE },
                 name = value("name"),
                 version = value("version").ifEmpty { DEFAULT_VERSION },
                 environment = HollowAddonEnvironment.entries.firstOrNull { it.name.equals(value("environment"), true) }
                     ?: HollowAddonEnvironment.COMMON,
-                dependsOn = list("dependsOn"),
-                modDependencies = list("dependsOnMods"),
+                platform = HollowAddonPlatform.of(value("platform")) ?: HollowAddonPlatform.COMMON,
+                addonRequirements = dependencies("dependsOn"),
+                modRequirements = dependencies("dependsOnMods"),
                 description = value("description"),
                 authors = list("authors"),
                 license = value("license"),

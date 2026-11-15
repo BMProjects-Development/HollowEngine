@@ -42,7 +42,8 @@ id=my-addon
 name=My Addon
 version=${version}
 entry=com.example.myaddon.MyAddon
-dependsOn=another-addon
+dependsOn=another-addon>=1.2
+dependsOnMods=jei?
 environment=common
 description=What the addon does
 authors=Me, Someone Else
@@ -55,10 +56,69 @@ icon=assets/my-addon/icon.png
 | `id` | The addon's identifier. It is used in commands and as the namespace of its scripts. |
 | `name`, `version` | Shown in lists and messages. |
 | `entry` | The entrypoint class. May be left out by an addon made only of scripts and resources. |
-| `dependsOn` | Ids of other addons that must be loaded first. Also required to import their scripts. |
+| `dependsOn` | Ids of other addons that must be loaded first, optionally with a version, see [Dependencies](#dependencies). Also required to import their scripts. |
+| `dependsOnMods` | Ids of mods that must be installed. Without them the addon is not loaded; its scripts compile against them. A mod with `?` is optional. |
 | `environment` | `common` (default), `client`, or `server`: the side the addon loads on. |
+| `platform` | `common` (default), `fabric`, `neoforge`, or `fabric,neoforge`: the mod loaders the addon is written for, see below. |
 | `requiredClasses` | Classes that must be loadable before the addon starts. |
 | `description`, `authors`, `license`, `icon` | Copied into the generated `fabric.mod.json` and `neoforge.mods.toml`, which is what mod lists show. |
+
+## Dependencies
+
+An id in `dependsOn` and `dependsOnMods` may be followed by the version it has to have:
+
+```properties
+dependsOn=library>=1.2, core>=2.0<3.0
+dependsOnMods=create>=0.5, jei?, curios>=5?
+```
+
+| Entry | Meaning |
+| --- | --- |
+| `library` | Any version. |
+| `library>=1.2` | Not older than 1.2. There are also `>`, `<=`, `<`, `=` and `!=`. |
+| `core>=2.0<3.0` | Several conditions in a row must all hold. |
+| `jei?` | An optional mod: the addon loads without it, and when the mod is installed the addon's scripts compile against it. Only for `dependsOnMods`. |
+| `curios>=5?` | An optional mod, which has to be of a fitting version when it is installed. |
+
+Versions compare by their numbers: `1.10` is newer than `1.9`, and `1.2.0-beta1` is older than `1.2.0`. An addon whose dependency runs in a version that does not fit waits for it as `waiting for dependencies`; one whose mod is of the wrong version is `missing mods`. Either way `/he addons list` names the installed version.
+
+Addon code that touches the classes of an optional mod has to check that the mod is installed itself, or it fails with `NoClassDefFoundError`.
+
+## Mod loaders
+
+`platform` says which mod loaders the addon is written for:
+
+| `platform` | The addon may use | Runs on |
+| --- | --- | --- |
+| `common` (default) | Minecraft and HollowEngine only | Fabric and NeoForge, from one jar |
+| `fabric` | Fabric API as well | Fabric only |
+| `neoforge` | NeoForge API as well | NeoForge only |
+| `fabric,neoforge` | The API of both loaders as well, each in its own part | Fabric and NeoForge, from one jar |
+
+A `common` addon knows nothing of mod loaders: its code and scripts see the classes of Minecraft (`BlockPos`, `ItemStack`, `Level` and the rest) and of the engine, and not a single class of Fabric or NeoForge, so there is nothing in it to break on the other loader. It has no `src/fabric` or `src/neoforge` and no keys such as `entry.neoforge`: the build and the game report them as errors. An addon that needs a loader names the loaders in `platform`.
+
+The sources follow the same split. `src/main` is common code and never sees a loader's API in any addon. Code that needs one goes to `src/fabric` or `src/neoforge`, which see `src/main` and the API of that loader:
+
+```text
+src/main/java          common code
+src/main/resources     plugin.properties, assets, data, scripts
+src/fabric/kotlin      only on Fabric (src/fabric/java works too)
+src/neoforge/kotlin    only on NeoForge
+```
+
+A `fabric,neoforge` addon may have either directory or both: the jar carries each part apart from the rest, and the game opens only the one made for its loader. A `fabric` or `neoforge` addon has only its own directory, and the build generates only that loader's mod descriptor. Resources always stay in `src/main/resources`.
+
+In an addon that names loaders, `entry`, `dependsOn`, `dependsOnMods` and `requiredClasses` can be given for one of them by adding its name. `entry.neoforge` replaces `entry` on NeoForge; for the lists the loader's values are added to the common ones, and an entry about the same id replaces the common one:
+
+```properties
+platform=fabric,neoforge
+entry=com.example.myaddon.MyAddon
+entry.neoforge=com.example.myaddon.neoforge.MyNeoForgeAddon
+dependsOnMods=jei
+dependsOnMods.fabric=fabric-api
+```
+
+The entrypoint of a loader usually extends the common one and calls `super.load`. On the other loader an addon is not loaded, and `/he addons list` shows it as `incompatible`.
 
 ## The entrypoint
 
@@ -114,7 +174,7 @@ There are three library scopes:
 | `addonRuntimeLibraries` | Pure Java libraries that are needed only at runtime. | The addon's isolated class loader. |
 | `addonBootstrapLibraries` | Libraries that load native code or keep process-global state. | HollowEngine's stable runtime class loader, before the addon initializes. |
 
-An addon that contains bootstrap libraries is deliberately not hot-loaded, because such a library cannot be unloaded from a running process. `HollowAddonManager.restartRequired` reports it, the log asks for a restart, and the addon becomes available on the next launch.
+An addon that contains bootstrap libraries is deliberately not hot-loaded, because such a library cannot be unloaded from a running process. `HollowAddonManager.restartRequired` reports it, the log asks for a restart, and the addon becomes available on the next launch. The libraries of an addon that is switched off, or made for the other loader or side, are not loaded at all, so enabling such an addon takes a restart too.
 
 Do not bundle Minecraft-owned native stacks such as LWJGL, jemalloc, GLFW, OpenAL, OpenGL, STB, Vulkan, JNA, JInput, Netty, or OSHI. Addon builds reject them, and the bootstrap validates external addon jars before loading. The game-provided versions must be used.
 
@@ -124,4 +184,8 @@ An addon carries `assets/` and `data/` in `src/main/resources` exactly like a mo
 
 ## Testing and reloading
 
-During development, drop the jar into `hollowengine/addons/` and use `/he addons reload <id>` after rebuilding. Check `/he addons list` if the addon does not show up: a state other than loaded is explained in the details column.
+During development, drop the jar into `hollowengine/addons/`: a rebuilt jar is picked up by itself once it has stopped changing, and `/he addons reload <id>` restarts the addon on demand. If the new version cannot start, the previous one keeps running. Check `/he addons list` if the addon does not show up: every state other than loaded comes with its reason.
+
+A client says the same in the notifications in the corner of the screen: an addon loaded, reloaded or unloaded while the game runs, and an addon that could not start, with the reason. Addons loaded while the game starts are not listed, but one that failed then is still reported. A dedicated server writes all of it to its log.
+
+`HollowAddonManager.statuses` gives the same list to code. Reading it is safe anywhere; `enable`, `disable` and `reload` are refused from inside `load` and `unload`, where they would wait for themselves - launch them in the addon's scope instead.

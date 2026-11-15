@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.common.addons.project
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.addons.ClientResources
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonManager
-import ru.hollowhorizon.hollowengine.common.addons.HollowAddonState
 import ru.hollowhorizon.hollowengine.common.addons.project.HollowProject.root
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
@@ -27,11 +26,11 @@ object HollowProject {
     fun properties(): ProjectProperties = ProjectProperties.read(propertiesFile)
 
     /**
-     * An installed addon, not switched off, whose id is [id]. Its scripts would claim the namespace the
-     * project wants, so the two cannot be active together.
+     * An installed addon that runs here and is not switched off, whose id is [id]. Its scripts would claim
+     * the namespace the project wants, so the two cannot be active together.
      */
-    fun enabledAddonClaiming(id: String): String? = HollowAddonManager.statuses
-        .firstOrNull { it.descriptor.id == id && it.state != HollowAddonState.DISABLED }
+    fun enabledAddonClaiming(id: String): String? = HollowAddonManager.enabled
+        .firstOrNull { it.descriptor.id == id }
         ?.descriptor?.id
 
     /** Saves [properties] and lets the scripts pick up a new namespace, dependencies or version. */
