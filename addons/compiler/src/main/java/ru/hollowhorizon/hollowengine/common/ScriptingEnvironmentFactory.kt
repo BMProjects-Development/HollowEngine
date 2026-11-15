@@ -19,6 +19,8 @@ import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironment
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitializer
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.isSharedScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.CommonEnvironment
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.ScriptingAddons
+import ru.hollowhorizon.hollowengine.common.scripting.deobf.ScriptingMods
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.logI
 import ru.hollowhorizon.hollowengine.logW
@@ -38,6 +40,7 @@ import kotlin.script.experimental.jvm.defaultJvmScriptingHostConfiguration
 class ScriptingEnvironmentInitializerImpl(
     private val prepareClasspath: (File) -> Pair<Mappings, List<File>> = CommonEnvironment::setup,
     private val definitions: () -> List<ScriptClassProvider> = DefaultScriptDefinitions::providers,
+    private val classpathInputs: () -> Pair<List<String>, List<File>> = { ScriptingMods.requested() to ScriptingAddons.classpath() },
 ) : ScriptingEnvironmentInitializer, HollowAddonEntrypoint {
     @Volatile
     private var loaded: LoadedAddon? = null
@@ -67,23 +70,29 @@ class ScriptingEnvironmentInitializerImpl(
 
     /**
      * Addons loaded after this one may add script types and imports. Once they are all in, the
-     * environment is recreated with them on the same classpath, so nothing is remapped again.
+     * environment is recreated with them. Changes to addon or mod dependencies also rebuild its classpath.
      */
     @SubscribeEvent
     @Synchronized
     fun onAddonsChanged(event: HollowAddonsChangedEvent) {
         val addon = loaded ?: return
         val current = built ?: return
+        if (classpathInputs() != current.inputs) {
+            logI("Rebuilding the scripting classpath after addon dependencies changed")
+            rebuild()
+            return
+        }
         val scriptTypes = definitions()
         if (scriptTypes == current.scriptTypes) return
         logI("Reloading script definitions after addon imports or script types changed")
         ScriptingEnvironment.clear()
-        start(addon, current.mappings, current.classpath, scriptTypes)
+        start(addon, current.mappings, current.classpath, scriptTypes, current.inputs)
     }
 
     private fun setUp(addonFile: File, scope: CoroutineScope) {
+        val inputs = classpathInputs()
         val (mappings, classpath) = prepareClasspath(addonFile)
-        start(LoadedAddon(addonFile, scope), mappings, classpath, definitions())
+        start(LoadedAddon(addonFile, scope), mappings, classpath, definitions(), inputs)
     }
 
     private fun start(
@@ -91,6 +100,7 @@ class ScriptingEnvironmentInitializerImpl(
         mappings: Mappings,
         classpath: List<File>,
         scriptTypes: List<ScriptClassProvider>,
+        inputs: Pair<List<String>, List<File>>,
     ) {
         val environment = initialize(
             javaHome = File(System.getProperty("java.home")),
@@ -99,7 +109,7 @@ class ScriptingEnvironmentInitializerImpl(
             scriptTypes = scriptTypes,
             mappings = mappings,
         )
-        built = BuiltEnvironment(mappings, classpath, scriptTypes)
+        built = BuiltEnvironment(mappings, classpath, scriptTypes, inputs)
         environment.warmUpAnalysis(addon.scope)
     }
 
@@ -109,6 +119,7 @@ class ScriptingEnvironmentInitializerImpl(
         val mappings: Mappings,
         val classpath: List<File>,
         val scriptTypes: List<ScriptClassProvider>,
+        val inputs: Pair<List<String>, List<File>>,
     )
 
     override fun initialize(

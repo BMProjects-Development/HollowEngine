@@ -17,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.ScriptingEnvironmentInitia
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import java.io.File
 import java.util.jar.JarOutputStream
+import javax.tools.ToolProvider
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,6 +45,7 @@ class ScriptDefinitionsLifecycleTest {
                     provider.copy(defaultImports = imports.distinct())
                 }
             },
+            classpathInputs = { emptyList<String>() to emptyList() },
         )
         val compilerJar = directory.resolve("compiler.jar").also { JarOutputStream(it.outputStream()).close() }
         val services = TestHostServices()
@@ -84,6 +86,48 @@ class ScriptDefinitionsLifecycleTest {
             addonScope.cancel()
             initializer.unload(context)
             File("hollowengine").deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `addon classpath changes rebuild compiler and analyzer even when script definitions do not change`(@TempDir directory: File) = runBlocking {
+        val scope = CoroutineScope(Job())
+        val baseClasspath = System.getProperty("java.class.path").split(File.pathSeparator).map(::File).filter(File::exists)
+        val classes = directory.resolve("classes").apply { mkdirs() }
+        val source = directory.resolve("AddonValue.java").apply {
+            writeText("package sample; public class AddonValue { public static final int VALUE = 42; }")
+        }
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, "-d", classes.path, source.path))
+        var addonClasspath = emptyList<File>()
+        var preparations = 0
+        val initializer = ScriptingEnvironmentInitializerImpl(
+            prepareClasspath = { preparations++; Mappings.EMPTY to (baseClasspath + addonClasspath) },
+            definitions = { listOf(ScriptClassProvider("kts", LifecycleScript::class.qualifiedName!!)) },
+            classpathInputs = { emptyList<String>() to addonClasspath },
+        )
+        val compilerJar = directory.resolve("compiler.jar").also { JarOutputStream(it.outputStream()).close() }
+        val context = HollowAddonContext(
+            TestHostServices(), HollowAddonDescriptor("compiler", "test", null), compilerJar, javaClass.classLoader, Koin(),
+        )
+        val code = "import sample.AddonValue\nval value = AddonValue.VALUE"
+        try {
+            ScriptingEnvironment.clear()
+            initializer.load(context, scope)
+            assertTrue(ScriptingEnvironment.INSTANCE.compiler.compile("before.kts", code).isFailure)
+
+            addonClasspath = listOf(classes)
+            initializer.onAddonsChanged(HollowAddonsChangedEvent())
+            assertEquals(2, preparations)
+            assertTrue(ScriptingEnvironment.INSTANCE.compiler.compile("after.kts", code).isSuccess)
+            assertTrue(ScriptingEnvironment.INSTANCE.analyzer.diagnostic("after.kts", code).isEmpty())
+
+            addonClasspath = emptyList()
+            initializer.onAddonsChanged(HollowAddonsChangedEvent())
+            assertEquals(3, preparations)
+            assertTrue(ScriptingEnvironment.INSTANCE.compiler.compile("removed.kts", code).isFailure)
+        } finally {
+            scope.cancel()
+            initializer.unload(context)
         }
     }
 

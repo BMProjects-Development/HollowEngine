@@ -498,6 +498,7 @@ internal class HollowAddonRuntime(
     private fun notInstalled(id: String) = HollowAddonOperationResult(false, "Addon '$id' is not installed.")
 
     private suspend fun drainPending() {
+        refreshEnabledSnapshot()
         while (true) {
             val ready = pendingAddons.values.firstOrNull { candidate ->
                 candidate.descriptor.addonRequirements.all(::isSatisfied)
@@ -705,11 +706,16 @@ internal class HollowAddonRuntime(
             }
     }
 
-    private fun refreshStatuses() {
+    private fun refreshEnabledSnapshot() {
         val ids = knownCandidates.values.map { it.descriptor.id }.distinct()
         enabledSnapshot = ids.mapNotNull(::select).map { candidate ->
             HollowAddonInstallation(candidate.descriptor, candidate.classesFile)
         }
+    }
+
+    private fun refreshStatuses() {
+        refreshEnabledSnapshot()
+        val ids = knownCandidates.values.map { it.descriptor.id }.distinct()
         val statuses = knownCandidates.values
             .sortedWith(compareBy({ it.descriptor.id }, { it.sourceFile.name }))
             .map(::statusOf)
@@ -773,6 +779,7 @@ internal class HollowAddonRuntime(
     private suspend fun <T> locked(block: suspend () -> T): T {
         mutex.lock()
         val loadedBefore = loadedSnapshot
+        val enabledBefore = enabledSnapshot
         val runningBefore = loadedAddons.toMap()
         val packsBefore = resourcePackSnapshot
         return try {
@@ -782,7 +789,7 @@ internal class HollowAddonRuntime(
             runCatching { notifyLifecycle(runningBefore) }
                 .onFailure { HollowEngine.LOGGER.error("Failed to notify about the changed addons", it) }
             mutex.unlock()
-            if (loadedSnapshot !== loadedBefore) {
+            if (loadedSnapshot !== loadedBefore || enabledSnapshot != enabledBefore) {
                 runCatching { HollowAddonsChangedEvent.post(HollowAddonsChangedEvent()) }
                     .onFailure { HollowEngine.LOGGER.error("Failed to apply the changed set of addons", it) }
                 reloadRunningServers()

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.addons
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
 import org.junit.jupiter.api.io.TempDir
 import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import java.io.File
@@ -32,6 +33,23 @@ class HollowAddonRuntimeTests {
     @AfterTest
     fun close() {
         if (::runtime.isInitialized) runBlocking { runtime.close() }
+        SnapshotProbeAddon.onLoad = {}
+    }
+
+    @Test
+    fun `entrypoints see selected addons during startup and later activation`() = runBlocking {
+        val snapshots = mutableListOf<Set<String>>()
+        SnapshotProbeAddon.onLoad = { snapshots += runtime.enabledSnapshot.map { it.descriptor.id }.toSet() }
+        val entry = SnapshotProbeAddon::class.java.name
+        addon(addons, "probe.jar", "id=probe\nentry=$entry")
+        addon(addons, "library.jar", "id=library")
+        start()
+        assertEquals(setOf("probe", "library"), snapshots.single())
+
+        assertTrue(runtime.setEnabled("probe", false).successful)
+        runtime.install(stage(addon(addons, "extra.jar", "id=extra")))
+        assertTrue(runtime.setEnabled("probe", true).successful)
+        assertEquals(setOf("probe", "library", "extra"), snapshots.last())
     }
 
     @Test
@@ -399,5 +417,13 @@ class HollowAddonRuntimeTests {
 
     private companion object {
         const val NATIVE_LIBRARY = "hollowengine-addon-bootstrap/native.jar"
+    }
+}
+
+class SnapshotProbeAddon : HollowAddonEntrypoint {
+    override suspend fun load(context: HollowAddonContext, scope: CoroutineScope) = onLoad()
+
+    companion object {
+        var onLoad: () -> Unit = {}
     }
 }
