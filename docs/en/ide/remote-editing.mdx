@@ -35,10 +35,10 @@ To test on one computer, run a dedicated server from your development environmen
 3. Expand a folder and double-click a file. The IDE loads each folder's contents as you expand it.
 4. Press `Ctrl + S` to save your edits. The tab is marked **Server** and continues to save to the server if you switch the tree to **Local**.
 
-The tree gives you access to `scripts`, `assets`, `data`, and `META-INF`. The editor opens text files up to 2 MiB. The dropdown is hidden in singleplayer.
+The tree gives you access to `scripts`, `assets`, `data`, and `META-INF`. The limit is 2 MiB per file. The IDE selects an editor based on the file type, including formats supplied by addons installed on the client. For example, Narrative opens a `.story` file as a graph and provides JSON highlighting in text mode. 3D model previews are currently unavailable for server files. The dropdown is hidden in singleplayer.
 
 ## When another editor changes the file
 
-The server notifies connected editors when someone saves through the IDE. A tab with no unsaved edits updates right away. If you have unsaved edits, they stay in the tab and the IDE shows a conflict. Choose **Resolve > Open Server Version** and bring over the changes you need. When you're ready, choose **Keep My Edits for the Next Save** and press `Ctrl + S`.
+The server notifies connected editors when someone saves through the IDE. A tab with no unsaved edits updates right away. If you have unsaved edits, they stay in the tab and the IDE shows a conflict. For text files, choose **Resolve > Open Server Version** to bring over the changes you need by hand. To send your edits, choose **Keep My Edits for the Next Save** and press `Ctrl + S`. To accept the other editor's changes, choose **Replace My Edits with Server Version**.
 
 If a file changes directly on the server's disk, use **Refresh Expanded Folders** from the project context menu to refresh the tree and open tabs. If the server version changes again after refreshing, the IDE reports a conflict on your next save.

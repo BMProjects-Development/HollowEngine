@@ -8,7 +8,11 @@ import ru.hollowhorizon.hollowengine.common.ScriptingEnvironmentImpl
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptClassProvider
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.ide.CompletionItem
+import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptAnalysisProject
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.common.scripting.source.ProjectScriptTranslator
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
+import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -137,8 +141,99 @@ class ScriptingAnalysisEnvironmentTest {
 
             val spans = lines.flatMap { line -> line.spans }
 
-            assertTrue(spans.any { (text, style) -> text == "val" && style.color == TokenType.KEYWORD }, spans.toString())
-            assertTrue(spans.any { (text, style) -> text == "42" && style.color == TokenType.NUMERIC_LITERAL }, spans.toString())
+            assertTrue(
+                spans.any { (text, style) -> text == "val" && style.color == TokenType.KEYWORD },
+                spans.toString()
+            )
+            assertTrue(
+                spans.any { (text, style) -> text == "42" && style.color == TokenType.NUMERIC_LITERAL },
+                spans.toString()
+            )
+        }
+    }
+
+    @Test
+    fun `projects share classpath and resolve the same script path independently`() {
+        withEnvironment { environment ->
+            writeSandboxScript("analysis-isolation/imported.analysis.kts", "val importedValue = 21")
+            val path = "scripts/analysis-isolation/main.analysis.kts"
+            val importedPath = "scripts/analysis-isolation/imported.analysis.kts"
+            val text = """
+                @file:Import("imported.analysis.kts")
+
+                val answer: Int = importedValue
+                val file = File(".")
+            """.trimIndent()
+            val sources = mutableMapOf(
+                "META-INF/plugin.properties" to "id=server-project",
+                importedPath to """@file:Import("server-project:analysis-isolation/value.analysis.kts")
+                    |val importedValue = remoteValue
+                """.trimMargin(),
+                "scripts/analysis-isolation/value.analysis.kts" to """val remoteValue = "server"""",
+            )
+            val project = object : ScriptAnalysisProject {
+                override var revision = 0L
+                override fun read(path: String) = sources[path]
+            }
+            val local = environment.analyzer
+            val remote = local.forProject(project)
+            fun typeErrors() =
+                remote.diagnostic(path, text).filter { it.severity.isError() && !it.message.contains("Import") }
+
+            assertFalse(local.diagnostic(path, text).any { it.severity.isError() && !it.message.contains("Import") })
+            assertTrue(typeErrors().any { it.message.contains("String") }, typeErrors().toString())
+            assertEquals(importedPath, remote.definition(path, text, text.indexOf("importedValue"))?.path)
+            assertTrue(remote.highlight(path, text, -1).flatMap { it.spans }.any { (span, style) ->
+                span == "File" && style.color == TokenType.CLASS
+            })
+
+            sources["scripts/analysis-isolation/value.analysis.kts"] = "val remoteValue = 42"
+            project.revision++
+            assertTrue(typeErrors().isEmpty(), typeErrors().toString())
+
+            sources.remove(importedPath)
+            project.revision++
+            val diagnostics = remote.diagnostic(path, text)
+            assertTrue(diagnostics.any { it.message == "Cannot resolve the imported script 'imported.analysis.kts'" })
+            assertFalse(
+                local.diagnostic(path, text).any { it.message.startsWith("Cannot resolve the imported script") })
+            remote.forget(path)
+        }
+    }
+
+    @Test
+    fun `an imported translator reads project sources and yields a navigable declaration`() {
+        withEnvironment { environment ->
+            val extension = ".analysis-source"
+            val root = "scripts/translated/main.analysis.kts"
+            val text = "@file:Import(\"imported$extension\")\nval result = fromProject()"
+            val requested = mutableListOf<String>()
+            val project = object : ScriptAnalysisProject {
+                override val revision = 0L
+                override fun read(path: String): String? {
+                    requested += path
+                    return when (path) {
+                        "scripts/translated/imported$extension" -> "nested.analysis.kts"
+                        "scripts/translated/nested.analysis.kts" -> "fun fromProject() = 42"
+                        else -> null
+                    }
+                }
+            }
+            val analyzer = environment.analyzer.forProject(project)
+            ScriptTranslators.register(extension, object : ProjectScriptTranslator {
+                override fun translate(id: ScriptId, text: String, read: (ScriptId) -> String?): String =
+                    requireNotNull(read(id.copy(path = "translated/$text")))
+            })
+            try {
+                val definition = analyzer.definition(root, text, text.indexOf("fromProject"))
+                assertNotNull(definition)
+                assertTrue(definition.readOnly)
+                assertEquals("fun fromProject() = 42", definition.text)
+                assertTrue("scripts/translated/nested.analysis.kts" in requested)
+            } finally {
+                analyzer.forget(root)
+                ScriptTranslators.unregister(extension)
+            }
         }
     }
 
@@ -251,10 +346,12 @@ class ScriptingAnalysisEnvironmentTest {
             assertTrue(signature.label.startsWith("Sample("), signature.label)
             assertTrue(signature.label.contains("name: String = ..."), signature.label)
             assertTrue(signature.label.contains("count: Int"), signature.label)
-            assertEquals("(name: String = ..., count: Int)", signature.label.substring(
-                signature.presentation.start,
-                signature.presentation.end,
-            ))
+            assertEquals(
+                "(name: String = ..., count: Int)", signature.label.substring(
+                    signature.presentation.start,
+                    signature.presentation.end,
+                )
+            )
             assertEquals(
                 TokenType.VALUE_ARGUMENT_NAME,
                 signature.highlights.single { highlight ->
@@ -371,7 +468,12 @@ class ScriptingAnalysisEnvironmentTest {
             val secondLineHints = lines.getOrNull(1)?.hints.orEmpty()
 
             assertTrue(
-                spans.any { (segment, style) -> segment == "answer" && style.color in setOf(TokenType.VARIABLE, TokenType.PROPERTY_IDENTIFIER) && style.highlight },
+                spans.any { (segment, style) ->
+                    segment == "answer" && style.color in setOf(
+                        TokenType.VARIABLE,
+                        TokenType.PROPERTY_IDENTIFIER
+                    ) && style.highlight
+                },
                 spans.toString(),
             )
             assertTrue(
@@ -811,13 +913,7 @@ class ScriptingAnalysisEnvironmentTest {
     }
 
     private fun testClasspath(): List<File> {
-        return System.getProperty("java.class.path")
-            .split(File.pathSeparator)
-            .asSequence()
-            .filter(String::isNotBlank)
-            .map(::File)
-            .filter(File::exists)
-            .distinctBy { it.absoluteFile.normalize() }
-            .toList()
+        return System.getProperty("java.class.path").split(File.pathSeparator).asSequence().filter(String::isNotBlank)
+            .map(::File).filter(File::exists).distinctBy { it.absoluteFile.normalize() }.toList()
     }
 }

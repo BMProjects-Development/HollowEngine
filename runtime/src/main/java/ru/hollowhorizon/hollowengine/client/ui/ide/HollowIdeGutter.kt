@@ -16,7 +16,7 @@ internal fun ideGutterMarkers(
     navigate: (offset: Int) -> Unit,
 ): List<UiGutterMarker> {
     val runnable = !file.readOnly && structure.runTargets.isNotEmpty()
-    val canRun = runnable && ScriptExecutionClient.allowed
+    val canRun = runnable && file.remoteLanguagePath == null && ScriptExecutionClient.allowed
     val execution = ScriptExecutionClient.states[file.path]
     val analyzedText = file.text
     return remember(file, analyzedText, structure, execution, canRun) {

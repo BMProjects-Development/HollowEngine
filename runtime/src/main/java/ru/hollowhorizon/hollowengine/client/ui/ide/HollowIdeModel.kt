@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import net.minecraft.client.Minecraft
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.docking.DockItem
+import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectAnalysis
 import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectDocument
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
@@ -132,7 +133,12 @@ internal class HollowIdeModel(
         return HollowIdeOpenResult.File(opened, created = true)
     }
 
-    fun openReadOnly(path: String, text: String): HollowIdeOpenFile {
+    fun openReadOnly(
+        path: String,
+        text: String,
+        remoteSourcePath: String? = null,
+        analysisProject: RemoteProjectAnalysis? = null,
+    ): HollowIdeOpenFile {
         files[path]?.let { opened ->
             if (opened.textOrNull != null) {
                 opened.refreshReadOnly(text)
@@ -144,7 +150,10 @@ internal class HollowIdeModel(
         val textType = requireNotNull(fileTypes.find(BuiltinTextFileTypeId)) {
             "The built-in text file type is not registered"
         }
-        return HollowIdeOpenFile(path, textType, HollowIdeTextDocument(text, readOnly = true)).also { opened ->
+        return HollowIdeOpenFile(
+            path, textType, HollowIdeTextDocument(text, readOnly = true),
+            remoteSourcePath = remoteSourcePath, analysisProject = analysisProject,
+        ).also { opened ->
             opened.attachSaveHandler { save(path) }
             files[path] = opened
         }
@@ -173,19 +182,22 @@ internal class HollowIdeModel(
 
     fun openRemote(
         path: String,
-        text: String,
+        bytes: ByteArray,
         remote: RemoteProjectDocument,
+        analysisProject: RemoteProjectAnalysis,
         save: (HollowIdeOpenFile) -> Boolean,
-    ): HollowIdeOpenFile {
-        val textType = requireNotNull(fileTypes.find(BuiltinTextFileTypeId))
-        return HollowIdeOpenFile(path, textType, HollowIdeTextDocument(text), remote = remote).also { file ->
-            file.attachSaveHandler { save(file) }
-            files[path] = file
-        }
-    }
-
-    fun removeRemote(file: HollowIdeOpenFile) {
-        if (file.remote != null) removeFile(file)
+    ): HollowIdeOpenFile? {
+        val opened = runCatching {
+            fileTypes.open(remote.path, { bytes }) { type, content ->
+                HollowIdeOpenFile(
+                    path, type, type.load(remote.path, content), bytes, remote, analysisProject = analysisProject,
+                )
+            }
+        }.onFailure { HollowEngine.LOGGER.error("Could not open server file {}", remote.path, it) }
+            .getOrNull() ?: return null
+        opened.attachSaveHandler { !opened.readOnly && save(opened) }
+        files[path] = opened
+        return opened
     }
 
     internal fun removeFile(file: HollowIdeOpenFile) {
@@ -504,13 +516,14 @@ internal class HollowIdeModel(
         val file = files[path]?.takeIf { it.dirty } ?: return
         val text = file.textOrNull ?: return
         val sync = file.textFileSync ?: return
+        val bytes = file.encode()
         val revision = sync.revision()
         pendingSaves.remove(path)?.cancel()
         val job = ioScope.launch(start = CoroutineStart.LAZY) {
             delay(AutoSaveDelayMillis)
             val context = currentCoroutineContext()
             runCatching {
-                sync.save(text.toByteArray(Charsets.UTF_8), revision, context::ensureActive)
+                sync.save(bytes, revision, context::ensureActive)
             }.onSuccess { saved ->
                 Minecraft.getInstance().execute {
                     if (files[path] !== file || pendingSaves[path] !== context[Job]) return@execute
@@ -559,27 +572,47 @@ class HollowIdeOpenFile internal constructor(
     val document: HollowIdeFileDocument,
     initialContent: ByteArray = document.encode(),
     internal val remote: RemoteProjectDocument? = null,
+    private val remoteSourcePath: String? = null,
+    internal val analysisProject: RemoteProjectAnalysis? = null,
 ) {
     var dirty by mutableStateOf(false)
         private set
     internal var externalTextRevision by mutableStateOf(0L)
         private set
     private var saveHandler: (() -> Boolean)? = null
+    internal var remoteSourceBytes by mutableStateOf(initialContent.takeIf { remote != null && !type.requiresContent })
+        private set
 
     val readOnly: Boolean get() = document.readOnly
+    /** Path relative to the project root, suitable for file matching and resolving siblings. */
+    val projectPath: String get() = remoteLanguagePath ?: path
+    val isRemote: Boolean get() = analysisProject != null
+    val projectRevision: Long get() = analysisProject?.observableRevision ?: 0L
+
+    /** Reads a project-relative dependency from the same project as this tab. */
+    suspend fun readProjectFile(path: String): ByteArray? {
+        analysisProject?.let { return it.readBytes(path) }
+        return withContext(Dispatchers.IO) {
+            val source = runCatching { path.toPathInsideRoot() }.getOrNull() ?: return@withContext null
+            if (!Files.isRegularFile(source)) return@withContext null
+            val resolved = source.toRealPath()
+            if (resolved.startsWith(DirectoryManager.HOLLOW_ENGINE.toRealPath())) Files.readAllBytes(resolved) else null
+        }
+    }
+    internal val remoteLanguagePath: String? get() = remote?.path ?: remoteSourcePath
     internal val hasUnsavedChanges: Boolean get() = !readOnly && (dirty || document.isModified)
     val virtual: Boolean get() = remote != null || path.isVirtualIdePath()
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
     val id: String = fileDockItemId(path)
-    val title: String get() = (remote?.path ?: path).substringAfterLast('/').ifEmpty { path }
+    val title: String get() = projectPath.substringAfterLast('/').ifEmpty { path }
     internal val textFileSync = if (document is HollowIdeTextDocument && !readOnly && !virtual) {
         HollowIdeTextFileSync(path.fromReadablePath().toPath(), initialContent)
     } else null
 
     fun dockItem(): DockItem {
         val label = if (remote == null) title else "hollowengine.gui.ide.remote.tab".lang(title)
-        return DockItem(id, label, IconHelper.forPath(path).toString(), dirty = hasUnsavedChanges)
+        return DockItem(id, label, IconHelper.forPath(remoteLanguagePath ?: path).toString(), dirty = hasUnsavedChanges)
     }
 
     fun update(next: String) {
@@ -613,14 +646,20 @@ class HollowIdeOpenFile internal constructor(
     }
 
     fun refresh(bytes: ByteArray) {
-        if (dirty) return
+        if (hasUnsavedChanges) return
         document.reload(bytes)
     }
 
-    internal fun replaceRemoteText(text: String) {
-        (document as? HollowIdeTextDocument)?.refresh(text)
+    internal fun replaceRemoteContent(bytes: ByteArray) {
+        document.reload(bytes)
+        if (remoteSourceBytes != null) remoteSourceBytes = bytes
         markSaved()
+        dirty = false
         externalTextRevision++
+    }
+
+    internal fun markSavedIfContent(saved: ByteArray) {
+        if (encode().contentEquals(saved)) markSaved() else updateDirty(true)
     }
 
     internal fun reloadExternalText(): Boolean = textFileSync?.reloadIfChanged { bytes ->
@@ -632,8 +671,10 @@ class HollowIdeOpenFile internal constructor(
     fun refreshReadOnly(next: String) {
         val textDocument = document as? HollowIdeTextDocument ?: return
         if (!readOnly) return
+        if (textDocument.text == next) return
         textDocument.refresh(next)
         dirty = false
+        externalTextRevision++
     }
 
     fun encode(): ByteArray = document.encode()

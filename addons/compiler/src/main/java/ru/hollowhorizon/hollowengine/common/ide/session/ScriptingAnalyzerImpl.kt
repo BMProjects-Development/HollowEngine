@@ -12,16 +12,15 @@ import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.kotlin.psi.KtUserType
-import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.animationNameCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.checkpointNameCompletions
-import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.editorClips
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.createCompletions
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.findAcceptedExpressionTypes
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.findDefinition
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.diagnosticCode
+import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.editorClips
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.intentionActions
 import ru.hollowhorizon.hollowengine.common.ide.session.diagnostic.syntaxDiagnostics
 import ru.hollowhorizon.hollowengine.common.ide.session.format.formatKotlinCode
@@ -40,9 +39,7 @@ import ru.hollowhorizon.hollowengine.common.ide.session.symbols.symbolSource
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.sharedScriptImportError
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptImports
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslators
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -55,6 +52,7 @@ class ScriptingAnalyzerImpl internal constructor(
     val projectStructureProvider: ProjectStructureProviderImpl,
     internal val navigation: LibraryNavigation,
     private val lock: Any,
+    private val sourceProject: ScriptAnalysisProject? = null,
 ) : ScriptingAnalyzer {
     val project: Project
         get() = kotlinCoreProjectEnvironment.project
@@ -62,6 +60,13 @@ class ScriptingAnalyzerImpl internal constructor(
 
     /** Parses for fields as they are typed: on files of its own, so it never waits for analysis to finish. */
     private val snippetFactory = KtPsiFactory(project, eventSystemEnabled = false)
+
+    override fun forProject(project: ScriptAnalysisProject): ScriptingAnalyzer = ScriptingAnalyzerImpl(
+        kotlinCoreProjectEnvironment, libraries, builtins, projectStructureProvider, navigation, lock, project
+    )
+
+    private val scriptSources = AnalysisScriptSources(sourceProject)
+    private val clips get() = if (sourceProject == null) editorClips else AnimationClips.None
 
     internal val fileCache = object : LinkedHashMap<String, CachedFile>(5, 0.75f, true) {
         override fun removeEldestEntry(entry: MutableMap.MutableEntry<String, CachedFile>?): Boolean {
@@ -74,8 +79,7 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     internal data class CachedFile(
-        val textHash: Int,
-        val textLength: Int,
+        val revision: Long,
         val file: KtFile,
         val relatedFiles: List<KtFile>,
     )
@@ -84,18 +88,18 @@ class ScriptingAnalyzerImpl internal constructor(
     private data class ImportResolution(val files: List<KtFile>, val diagnostics: List<Diagnostic>)
 
     private val importDiagnostics = IdentityHashMap<KtFile, List<Diagnostic>>()
+    private val translatedSources = IdentityHashMap<KtFile, String>()
     private val librarySources = LinkedHashSet<KtFile>()
     private val sourceDependencies by lazy { libraries + builtins.kaModule }
     private val classpath by lazy { libraries.filterNot { it.isSdk } }
 
     private fun getOrCreateFile(name: String, original: String): KtFile {
         val text = original.withUnixLineSeparators()
-        val textHash = text.hashCode()
-        val textLength = text.length
+        val revision = sourceProject?.revision ?: 0L
         val cached = fileCache[name]
 
         if (cached != null) {
-            if (cached.textLength == textLength && cached.textHash == textHash) {
+            if (cached.revision == revision && cached.file.text == text) {
                 return cached.file
             }
             fileCache.remove(name)
@@ -103,7 +107,7 @@ class ScriptingAnalyzerImpl internal constructor(
         }
 
         val graph = createPsiGraph(name, text)
-        fileCache[name] = CachedFile(textHash, textLength, graph.root, graph.files)
+        fileCache[name] = CachedFile(revision, graph.root, graph.files)
         return graph.root
     }
 
@@ -124,10 +128,12 @@ class ScriptingAnalyzerImpl internal constructor(
         text: String,
         files: MutableMap<String, KtFile>,
         activeFiles: MutableSet<String>,
+        sourcePath: String = name,
     ): KtFile {
         files[name]?.let { return it }
 
         val file = factory.createFile(name, text)
+        if (sourcePath != name) translatedSources[file] = sourcePath
         files[name] = file
         if (!file.isScript()) {
             if (SourceDocumentPath.parse(name) != null) {
@@ -187,7 +193,6 @@ class ScriptingAnalyzerImpl internal constructor(
         files: MutableMap<String, KtFile>,
         activeFiles: MutableSet<String>,
     ): ImportResolution {
-        val owner = ScriptRegistry.parse(file.name)
         val importedFiles = ArrayList<KtFile>()
         val diagnostics = ArrayList<Diagnostic>()
         val importedNames = HashSet<String>()
@@ -200,12 +205,21 @@ class ScriptingAnalyzerImpl internal constructor(
                 if (reference.isEmpty() || !seenReferences.add(reference)) return@argumentLoop
 
                 val imported = try {
-                    ScriptImports.resolve(owner, reference)
+                    scriptSources.resolve(translatedSources[file] ?: file.name, reference)
+                } catch (pending: AnalysisSourcePending) {
+                    throw pending
                 } catch (exception: IllegalArgumentException) {
                     diagnostics += importDiagnostic(
                         file,
                         expression,
                         exception.message ?: "Invalid script import '$reference'",
+                    )
+                    return@argumentLoop
+                } catch (exception: IOException) {
+                    diagnostics += importDiagnostic(
+                        file,
+                        expression,
+                        exception.message ?: "Cannot load the imported script '$reference'",
                     )
                     return@argumentLoop
                 }
@@ -214,13 +228,7 @@ class ScriptingAnalyzerImpl internal constructor(
                     return@argumentLoop
                 }
 
-                val source = ScriptRegistry.artifacts(imported)?.sourceFile
-                if (source == null) {
-                    diagnostics += importDiagnostic(file, expression, "Cannot load the imported script '$reference'")
-                    return@argumentLoop
-                }
-
-                val importedName = editorPathOf(source) + if (ScriptTranslators.translates(imported)) TRANSLATED else ""
+                val importedName = imported.name
                 if (importedName in activeFiles) {
                     diagnostics += importDiagnostic(
                         file,
@@ -232,7 +240,9 @@ class ScriptingAnalyzerImpl internal constructor(
                 if (!importedNames.add(importedName)) return@argumentLoop
 
                 val importedText = try {
-                    ScriptTranslators.kotlinText(imported, source).withUnixLineSeparators()
+                    imported.readText().withUnixLineSeparators()
+                } catch (pending: AnalysisSourcePending) {
+                    throw pending
                 } catch (exception: Exception) {
                     diagnostics += importDiagnostic(
                         file,
@@ -241,7 +251,7 @@ class ScriptingAnalyzerImpl internal constructor(
                     )
                     return@argumentLoop
                 }
-                val importedFile = createPsiFile(importedName, importedText, files, activeFiles)
+                val importedFile = createPsiFile(importedName, importedText, files, activeFiles, imported.path)
                 if (file.isSharedScript() && !importedFile.isSharedScript()) {
                     diagnostics += importDiagnostic(file, expression, sharedScriptImportError(file.name, importedName))
                 }
@@ -266,18 +276,9 @@ class ScriptingAnalyzerImpl internal constructor(
         )
     }
 
-    /** The path [HollowIdeModel][ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel] opens files by. */
-    private fun editorPathOf(file: File): String {
-        ScriptRegistry.idOf(file)?.takeIf { it.namespace != ScriptRegistry.sandboxNamespace }
-            ?.let { return it.qualified }
-        val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
-        val path = file.toPath().toAbsolutePath().normalize()
-        if (!path.startsWith(root)) return file.name
-        return root.relativize(path).toString().replace(File.separatorChar, '/')
-    }
-
     internal fun cleanupFile(file: KtFile) {
         importDiagnostics.remove(file)
+        translatedSources.remove(file)
         projectStructureProvider.removeModule(file)
         if (librarySources.remove(file)) updateLibrarySourcesModule()
         (file as? PsiFileEx)?.markInvalidated()
@@ -303,7 +304,7 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     override fun highlight(name: String, text: String, offset: Int): List<TextLine> = synchronized(lock) {
-        highlightCode(getOrCreateFile(name, text), offset)
+        highlightCode(getOrCreateFile(name, text), offset, sourceProject)
     }
 
     override fun occurrences(name: String, text: String, offset: Int): List<OccurrenceRange> = synchronized(lock) {
@@ -313,19 +314,31 @@ class ScriptingAnalyzerImpl internal constructor(
     override val canFormat: Boolean get() = true
 
     override fun format(name: String, text: String): String? = synchronized(lock) {
-        val file = getOrCreateFile(name, text)
+        val file = snippetFactory.createFile(name, text.withUnixLineSeparators())
         formatKotlinCode(file).takeIf { it != file.text }
     }
 
     override fun completions(name: String, text: String, offset: Int, sink: CompletionSink) = synchronized(lock) {
         val file = getOrCreateFile(name, text)
-        val names = checkpointNameCompletions(file, offset) ?: animationNameCompletions(file, offset, editorClips)
+        val names = checkpointNameCompletions(file, offset) ?: animationNameCompletions(file, offset, clips)
         if (names != null) sink.emit(names) else createCompletions(file, offset, sink)
         Unit
     }
 
     override fun definition(name: String, text: String, offset: Int): DefinitionLocation? = synchronized(lock) {
-        findDefinition(getOrCreateFile(name, text), offset)
+        findDefinition(getOrCreateFile(name, text), offset, sourceProject)
+    }
+
+    internal fun definitionFor(element: PsiElement): DefinitionLocation? {
+        val location = navigation.definitionFor(element) ?: return null
+        val file = element.containingFile as? KtFile
+        if (file != null && location.path == file.name && (file in translatedSources || ':' in file.name.substringBefore(
+                '/'
+            ))
+        ) {
+            return location.copy(text = file.text, readOnly = true)
+        }
+        return location
     }
 
     override fun structure(name: String, text: String): EditorStructure = synchronized(lock) {
@@ -351,6 +364,7 @@ class ScriptingAnalyzerImpl internal constructor(
     }
 
     override fun renameTarget(name: String, text: String, offset: Int): RenameTarget? = synchronized(lock) {
+        if (sourceProject != null) return null
         SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }?.target
     }
 
@@ -361,6 +375,7 @@ class ScriptingAnalyzerImpl internal constructor(
         newName: String,
         documents: Map<String, String>,
     ): List<FileRename> = synchronized(lock) {
+        if (sourceProject != null) return emptyList()
         if (!SymbolRename.accepts(newName)) return emptyList()
         val renamed = SymbolRename.target(getOrCreateFile(name, text), offset) { it == name || isProjectScript(it) }
             ?: return emptyList()
@@ -397,7 +412,8 @@ class ScriptingAnalyzerImpl internal constructor(
     /** The scripts of the project, by the path the editor opens them with. */
     private fun projectScripts(): List<Pair<String, File>> =
         ScriptRegistry.listIn(ScriptRegistry.sandboxNamespace, ".kts").mapNotNull { id ->
-            ScriptRegistry.artifacts(id)?.sourceFile?.absoluteFile?.normalize()?.let { editorPathOf(it) to it }
+            ScriptRegistry.artifacts(id)?.sourceFile?.absoluteFile?.normalize()
+                ?.let { AnalysisScriptSources.editorPathOf(it) to it }
         }
 
     override fun signatureHelp(name: String, text: String, offset: Int): SignatureHelp? = synchronized(lock) {
@@ -411,7 +427,7 @@ class ScriptingAnalyzerImpl internal constructor(
     override fun diagnostic(name: String, text: String): List<Diagnostic> = synchronized(lock) {
         val file = getOrCreateFile(name, text)
         if (SourceDocumentPath.parse(name) != null) syntaxDiagnostics(file)
-        else collectImportDiagnostics(name, file) + diagnosticCode(file)
+        else collectImportDiagnostics(name, file) + diagnosticCode(file, clips)
     }
 
     override fun intentionActions(name: String, text: String, offset: Int): List<DiagnosticFix> = synchronized(lock) {
@@ -429,9 +445,6 @@ class ScriptingAnalyzerImpl internal constructor(
     private companion object {
         /** An empty sandbox script, so name lookups see the classpath the project's own scripts compile against. */
         val SymbolLookupScript = "${SandboxScriptSource.SCRIPTS_DIRECTORY}/.symbol-lookup.kts"
-
-        /** What the name of a translated script gets to be read as the Kotlin it is translated into. */
-        const val TRANSLATED = ".generated.kts"
     }
 }
 

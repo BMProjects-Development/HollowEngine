@@ -76,7 +76,7 @@ internal class HollowIdeCloseFiles(private val model: HollowIdeModel, private va
             }
         }.distinct()
         ProjectDialog("ide-close-unsaved", "$Lang.unsaved_indicator".lang, onDismiss = { cancel() }) {
-            Paragraph(if (saving) "$Lang.close_saving".lang else message)
+            Paragraph(message)
             if (!saving) remoteErrors.forEach { Paragraph(it.message(), "project-dialog-error") }
             Actions {
                 DialogButton("ide-close-cancel", "hollowengine.gui.ide.project.cancel".lang) { cancel() }

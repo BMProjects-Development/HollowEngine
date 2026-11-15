@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.HoverInfo
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
 import ru.hollowhorizon.hollowengine.common.scripting.ide.SignatureHelp
+import ru.hollowhorizon.hollowengine.common.scripting.ide.withAnalysisSources
 
 /** Asynchronous, latest-request-wins cache for caret and pointer code insight. */
 internal class HollowIdeCodeInsightSession(
@@ -50,7 +51,7 @@ internal class HollowIdeCodeInsightSession(
         signatureJob?.cancel()
         signatureJob = scope.launch {
             val help = runCatching {
-                analyzer.signatureHelp(path, context.text, key.offset)?.toUi()
+                withAnalysisSources { analyzer.signatureHelp(path, context.text, key.offset) }?.toUi()
             }.getOrElse { failure ->
                 reportFailure("signature-help", failure)
                 null
@@ -68,7 +69,7 @@ internal class HollowIdeCodeInsightSession(
         hoverJob?.cancel()
         hoverJob = scope.launch {
             val info = runCatching {
-                analyzer.hover(path, context.text, key.offset)?.toUi()
+                withAnalysisSources { analyzer.hover(path, context.text, key.offset) }?.toUi()
             }.getOrElse { failure ->
                 reportFailure("hover", failure)
                 null

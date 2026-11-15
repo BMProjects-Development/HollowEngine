@@ -62,8 +62,8 @@ internal object StoryChecks {
         storyLang("problem.graph.${problem.key}", *problem.arguments.toTypedArray())
 
     /** Everything wrong with [graph]: what the compiler says, and what the editors can see. */
-    fun all(graph: StoryGraph): List<StoryCheck> {
-        val compiled = StoryGraphCompiler.compile(graph, StoryActionFunctions).problems.map {
+    fun all(graph: StoryGraph, functions: StoryFunctions = StoryActionFunctions): List<StoryCheck> {
+        val compiled = StoryGraphCompiler.compile(graph, functions).problems.map {
             StoryCheck(it.node, text(it), it.warning)
         }
         val variables = graph.variables.mapNotNull { variable ->

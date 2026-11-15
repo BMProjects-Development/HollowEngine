@@ -7,11 +7,15 @@ import ru.hollowhorizon.hollowengine.common.scripting.ide.*
  * two sources of truth: the scanner in [HssLexer] and the property schema behind
  * [UiLanguageCatalog], so the editor never disagrees with the compiler.
  */
-object HssScriptingAnalyzer : ScriptingAnalyzer {
+object HssScriptingAnalyzer : ScriptingAnalyzer by HssAnalysis(null)
+
+private class HssAnalysis(private val project: ScriptAnalysisProject?) : ScriptingAnalyzer {
+    override fun forProject(project: ScriptAnalysisProject): ScriptingAnalyzer = HssAnalysis(project)
+
     override fun highlight(name: String, text: String, offset: Int): List<TextLine> {
         val model = HssDocumentModel(text)
         val spans = HssLexer(text, model.keyframeNames).tokenize()
-        return buildTextLines(text, spans, hssInlayHints(model))
+        return buildTextLines(text, spans, hssInlayHints(model, project))
     }
 
     override fun lightweightHighlightLine(name: String, line: String): TextLine {
@@ -32,7 +36,7 @@ object HssScriptingAnalyzer : ScriptingAnalyzer {
     override fun definition(name: String, text: String, offset: Int): DefinitionLocation? {
         val caret = offset.coerceIn(0, text.length)
         hssLocationAt(text, caret)?.let { location ->
-            ResourceLocationTargets.definition(location)?.let { return it }
+            ResourceLocationTargets.definition(location, project)?.let { return it }
         }
         val word = wordAt(text, caret) ?: return null
         val keyframes = HssDocumentModel(text).keyframesNamed(word) ?: return null

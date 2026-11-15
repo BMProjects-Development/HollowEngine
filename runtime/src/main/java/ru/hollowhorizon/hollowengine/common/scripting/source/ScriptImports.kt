@@ -22,26 +22,37 @@ object ScriptImports {
      * next to the importing script and then from the root of its namespace; qualified ones must point
      * at a declared dependency.
      */
-    fun resolve(owner: ScriptId, reference: String): ScriptId? {
+    fun resolve(owner: ScriptId, reference: String): ScriptId? =
+        resolve(owner, reference, ScriptRegistry::canImport) { ScriptRegistry.artifacts(it) != null }
+
+    fun resolve(
+        owner: ScriptId,
+        reference: String,
+        canImport: (from: String, to: String) -> Boolean,
+        exists: (ScriptId) -> Boolean,
+    ): ScriptId? {
         val normalized = reference.replace('\\', '/').trim().removePrefix("/")
         if (normalized.isEmpty() || normalized.any(Char::isISOControl)) return null
 
         if (normalized.indexOf(ScriptId.SEPARATOR) >= 0) {
             val id = ScriptId.parse(normalized, owner.namespace)
-            if (!ScriptRegistry.canImport(owner.namespace, id.namespace)) {
+            if (!canImport(owner.namespace, id.namespace)) {
                 throw IllegalArgumentException(
                     "Script ${ScriptRegistry.display(owner)} imports '$normalized', but '${owner.namespace}' " +
                         "does not declare '${id.namespace}' in dependsOn",
                 )
             }
-            return id.takeIf { ScriptRegistry.artifacts(it) != null }
+            return id.takeIf(exists)
         }
 
         val directory = owner.path.substringBeforeLast('/', "")
         val neighbour = if (directory.isEmpty()) normalized else "$directory/$normalized"
         return sequenceOf(neighbour, normalized)
-            .map { path -> ScriptId(owner.namespace, normalize(path)) }
-            .firstOrNull { candidate -> ScriptRegistry.artifacts(candidate) != null }
+            .map(::normalize)
+            .filter(String::isNotEmpty)
+            .distinct()
+            .map { path -> ScriptId(owner.namespace, path) }
+            .firstOrNull(exists)
     }
 
     /**

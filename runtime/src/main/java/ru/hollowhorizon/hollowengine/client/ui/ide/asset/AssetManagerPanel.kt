@@ -231,7 +231,7 @@ internal fun AssetManagerPanel(
             )
             when {
                 error != null -> AssetMessage(error.lang)
-                loading && index.directoryKeys.isEmpty() -> AssetMessage(AssetManagerLang.LOADING.lang)
+                loading && index.directoryKeys.isEmpty() -> Unit
                 selectedDirectory == null -> AssetMessage(AssetManagerLang.NO_RESOURCES.lang)
                 else -> AssetGrid(
                     scope = scope,

@@ -13,7 +13,6 @@
   "unsaved_indicator": "Unsaved changes",
   "close_unsaved_file": "%s has unsaved changes. Save before closing?",
   "close_unsaved_files": "%s files have unsaved changes. Save before closing?",
-  "close_saving": "Waiting for the server to finish saving…",
   "close_discard": "Close Without Saving",
   "close_save": "Save and Close",
   "unsupported": "Unsupported or binary file: %s",

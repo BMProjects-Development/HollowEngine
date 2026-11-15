@@ -12,7 +12,7 @@ private val LocationPattern = Regex("[a-z0-9_.-]+:[a-z0-9_./-]+")
  *
  * Resource locations get a button instead of a label, opening the file they point at.
  */
-internal fun hssInlayHints(model: HssDocumentModel): List<InlayHint> {
+internal fun hssInlayHints(model: HssDocumentModel, project: ScriptAnalysisProject? = null): List<InlayHint> {
     val hints = ArrayList<InlayHint>()
     for (declaration in model.declarations) {
         val valueStart = declaration.valueStart
@@ -21,7 +21,7 @@ internal fun hssInlayHints(model: HssDocumentModel): List<InlayHint> {
         for (hint in property.hints(declaration.value)) {
             hints += InlayHint(valueStart + hint.offset, "${hint.label}=", tags = listOf(InlayTags.PARAMETER))
         }
-        hints += locationHints(declaration.value, valueStart)
+        hints += locationHints(declaration.value, valueStart, project)
         hints += colorHints(declaration.value, valueStart)
         hints += variableColorHints(declaration.value, valueStart, model)
     }
@@ -88,10 +88,10 @@ internal fun hssColorLiteralText(argb: Int): String {
 }
 
 /** Open buttons for every resource location inside a declaration value. */
-private fun locationHints(value: String, valueStart: Int): List<InlayHint> =
+private fun locationHints(value: String, valueStart: Int, project: ScriptAnalysisProject?): List<InlayHint> =
     LocationPattern.findAll(value).mapNotNull { match ->
         val location = match.value
-        val target = ResourceLocationTargets.targetOf(location) ?: return@mapNotNull null
+        val target = ResourceLocationTargets.targetOf(location, project) ?: return@mapNotNull null
         InlayHint(
             index = valueStart + match.range.first,
             content = listOf(InlayContent.Icon(InlayIcons.OPEN_RESOURCE)),

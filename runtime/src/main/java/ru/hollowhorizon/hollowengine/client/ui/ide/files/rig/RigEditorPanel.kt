@@ -46,7 +46,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         file.updateDirty(document.isModified)
         if (!document.isModified) return@LaunchedEffect
         delay(AutoSaveDelayMillis.milliseconds)
-        if (document.isModified && file.save()) publishRig(state.viewer.model, document.rig)
+        if (document.isModified && file.save() && !file.isRemote) publishRig(state.viewer.model, document.rig)
     }
 
     LaunchedEffect(preview, state.partSelection) {

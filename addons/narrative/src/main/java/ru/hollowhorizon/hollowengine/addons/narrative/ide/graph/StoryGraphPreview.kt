@@ -10,6 +10,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNodeGroup
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPoint
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.TypeOperators
+import ru.hollowhorizon.hollowengine.addons.narrative.story.importedStories
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.graph.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeFilePreview
@@ -35,7 +36,7 @@ internal val StoryGraphFilePreview = HollowIdeFilePreview(
     defaultMode = HollowIdeViewMode.PREVIEW,
     icon = "hollowengine:textures/gui/icons/files/story.svg",
     title = "hollowengine.gui.ide.story.graph",
-    matcher = { it.endsWith(".story") },
+    matcher = { it.endsWith(".story", ignoreCase = true) },
 ) { StoryGraphPreview(it) }
 
 internal class StoryGraphState : StoryEditorState() {
@@ -65,7 +66,15 @@ internal fun StoryGraphPreview(context: HollowIdePreviewContext) {
     val graph = root.scope(scope) ?: root
     val controller = remember(state, scope) { GraphEditorController(CanvasId, state.editor) }
     val arranged = remember(graph) { arrange(graph) }
-    val ownChecks = remember(root) { StoryChecks.all(root) }
+    if (context.file.isRemote) {
+        val imports = remember(root) { root.importedStories() }
+        LaunchedEffect(context.file, imports, context.file.projectRevision) {
+            state.projectFunctions = if (imports.isEmpty()) StoryProjectFunctions.Empty
+            else StoryProjectFunctions.read(context.file, imports)
+        }
+    }
+    val functions = state.functions
+    val ownChecks = remember(root, functions) { StoryChecks.all(root, functions) }
     val analysis = StoryInsight.analysis(state, root)
     SideEffect { state.settle(analysis.revision) }
     val checks = ownChecks + analysis.checks

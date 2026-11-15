@@ -33,8 +33,7 @@ internal object StoryLibrary {
             read[file]?.takeIf { it.changed == changed }?.let { return it }
         }
         val graph = runCatching { StoryGraph.decode(source.readText()) }.getOrNull()
-        val imports = graph?.flattened()?.nodes.orEmpty().filterIsInstance<StoryNode.Invoke>().mapNotNull { it.file }.toSet()
-        val result = Read(changed, graph?.functions.orEmpty(), imports)
+        val result = Read(changed, graph?.functions.orEmpty(), graph?.importedStories().orEmpty())
         synchronized(read) { read[file] = result }
         return result
     }
@@ -42,3 +41,6 @@ internal object StoryLibrary {
     /** Every story of the game by its qualified script id. */
     fun stories(): List<String> = ScriptRegistry.list(StoryScripts.EXTENSION).map { it.qualified }.sorted()
 }
+
+internal fun StoryGraph.importedStories(): Set<String> =
+    flattened().nodes.filterIsInstance<StoryNode.Invoke>().mapNotNull { it.file }.toSet()

@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.psi.*
 import ru.hollowhorizon.hollowengine.common.ide.session.completion.util.renderVerbose
 import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
 import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayTags
+import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptAnalysisProject
 
 val KtNamedDeclaration.isSingleUnderscore: Boolean
     get() {
@@ -157,9 +158,9 @@ private fun functionHint(
 
 @OptIn(KaContextParameterApi::class)
 context(session: KaSession)
-fun provideHints(file: KtFile): List<InlayHint> {
+fun provideHints(file: KtFile, project: ScriptAnalysisProject? = null): List<InlayHint> {
     val res = mutableListOf<InlayHint>()
-    res += resourceLocationHints(file)
+    res += resourceLocationHints(file, project)
     for (node in file.preOrderTraversal().asIterable()) {
         try {
             when (node) {

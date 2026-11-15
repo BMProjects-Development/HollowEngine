@@ -8,6 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.EditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.PlainEditorLanguageService
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.pathExtension
+import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectAnalysis
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtension
@@ -19,8 +20,9 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class HollowIdeEditorSession(
-    private val path: String,
+    internal val path: String,
     private val typedProperties: String? = null,
+    private val project: RemoteProjectAnalysis? = null,
     private val onUpdated: () -> Unit,
 ) {
     private val languageService = languageServiceForPath(path)
@@ -221,7 +223,7 @@ internal class HollowIdeEditorSession(
         val publicationDispatcher = Minecraft.getInstance().dispatcher
         formatJob?.cancel()
         formatJob = scope.launch {
-            val formatted = runCatching { analyzer.format(path, text) }.getOrElse { failure ->
+            val formatted = runCatching { withAnalysisSources { analyzer.format(path, text) } }.getOrElse { failure ->
                 reportAnalysisFailure("format", failure)
                 null
             }
@@ -238,7 +240,7 @@ internal class HollowIdeEditorSession(
         definitionJob?.cancel()
         definitionJob = scope.launch {
             val definition = runCatching {
-                analyzer.definition(path, text, safeCaret)
+                withAnalysisSources { analyzer.definition(path, text, safeCaret) }
             }.getOrElse { failure ->
                 reportAnalysisFailure("definition", failure)
                 null
@@ -291,7 +293,7 @@ internal class HollowIdeEditorSession(
         val publicationDispatcher = Minecraft.getInstance().dispatcher
         gutterJob?.cancel()
         gutterJob = scope.launch {
-            val targets = runCatching { analyzer.gutterTargets(path, text, offset) }.getOrElse { failure ->
+            val targets = runCatching { withAnalysisSources { analyzer.gutterTargets(path, text, offset) } }.getOrElse { failure ->
                 reportAnalysisFailure("gutter targets", failure)
                 emptyList()
             }
@@ -324,7 +326,10 @@ internal class HollowIdeEditorSession(
         if (!scope.isActive) return
         scope.cancel()
         analysisDispatcher.executor.execute {
-            runCatching { currentAnalyzer().forget(path) }.onFailure { reportAnalysisFailure("forget", it) }
+            runCatching {
+                val analyzer = if (project == null) languageService.analyzer else projectAnalyzer?.scoped
+                analyzer?.forget(path)
+            }.onFailure { reportAnalysisFailure("forget", it) }
         }
         analysisDispatcher.close()
     }
@@ -339,12 +344,14 @@ internal class HollowIdeEditorSession(
             delay(EditorAnalysisDebounceMillis.milliseconds)
             ensureActive()
             val lineStarts = lineStarts(text)
-            val lines = runCatching { analyzer.highlight(path, text, UiNoCaretOffset) }.getOrElse { failure ->
+            val lines = runCatching {
+                withAnalysisSources { analyzer.highlight(path, text, UiNoCaretOffset) }
+            }.getOrElse { failure ->
                 reportAnalysisFailure("highlight", failure)
                 UnavailableKotlinScriptingAnalyzer.highlight(path, text, UiNoCaretOffset)
             }
             val diagnostics = runCatching {
-                analyzer.diagnostic(path, text).map { diagnostic -> diagnostic.toUi(text, lineStarts) }
+                withAnalysisSources { analyzer.diagnostic(path, text) }.map { diagnostic -> diagnostic.toUi(text, lineStarts) }
             }.getOrElse { failure ->
                 reportAnalysisFailure("diagnostic", failure)
                 emptyList()
@@ -357,7 +364,7 @@ internal class HollowIdeEditorSession(
                 highlights = lines.toHighlights(text, lineStarts),
                 inlayHints = lines.toInlayHints(lineStarts, text.length),
                 diagnostics = diagnostics,
-                structure = runCatching { analyzer.structure(path, text) }.getOrElse { failure ->
+                structure = runCatching { withAnalysisSources { analyzer.structure(path, text) } }.getOrElse { failure ->
                     reportAnalysisFailure("structure", failure)
                     EditorStructure()
                 },
@@ -380,7 +387,7 @@ internal class HollowIdeEditorSession(
         requestedOccurrence = key
         occurrenceJob?.cancel()
         occurrenceJob = scope.launch {
-            val ranges = runCatching { analyzer.occurrences(path, text, key.caret) }.getOrElse { failure ->
+            val ranges = runCatching { withAnalysisSources { analyzer.occurrences(path, text, key.caret) } }.getOrElse { failure ->
                 reportAnalysisFailure("occurrences", failure)
                 emptyList()
             }
@@ -399,13 +406,15 @@ internal class HollowIdeEditorSession(
         val requestRevision = completionRevision.incrementAndGet()
         completionJob?.cancel()
         completionJob = scope.launch {
-            val acceptedTypes = runCatching {
-                analyzer.acceptedExpressionTypes(path, text, key.caret, ContextSnippetTypes)
-            }.getOrElse { failure ->
-                reportAnalysisFailure("expected types", failure)
-                null
+            if (project == null) {
+                val acceptedTypes = runCatching {
+                    analyzer.acceptedExpressionTypes(path, text, key.caret, ContextSnippetTypes)
+                }.getOrElse { failure ->
+                    reportAnalysisFailure("expected types", failure)
+                    null
+                }
+                requestContextCompletions(text, key, analyzer, requestRevision, acceptedTypes)
             }
-            requestContextCompletions(text, key, analyzer, requestRevision, acceptedTypes)
 
             val collected = ArrayList<UiTextCompletion>()
             var publishedAt = 0L
@@ -421,12 +430,14 @@ internal class HollowIdeEditorSession(
             }
 
             runCatching {
-                analyzer.completions(path, text, key.caret, CompletionSink { items ->
-                    if (requestRevision < completionRevision.get() || !isActive) return@CompletionSink false
-                    items.mapTo(collected, CompletionItem::toUi)
-                    if (System.nanoTime() - publishedAt >= CompletionPublishIntervalNanos) publish()
-                    true
-                })
+                withAnalysisSources {
+                    analyzer.completions(path, text, key.caret, CompletionSink { items ->
+                        if (requestRevision < completionRevision.get() || !isActive) return@CompletionSink false
+                        items.mapTo(collected, CompletionItem::toUi)
+                        if (System.nanoTime() - publishedAt >= CompletionPublishIntervalNanos) publish()
+                        true
+                    })
+                }
             }.onFailure { failure ->
                 reportAnalysisFailure("completions", failure)
             }
@@ -470,7 +481,7 @@ internal class HollowIdeEditorSession(
         requestedIntentions = key
         intentionJob?.cancel()
         intentionJob = scope.launch {
-            val items = runCatching { analyzer.intentionActions(path, text, key.caret) }.getOrElse { failure ->
+            val items = runCatching { withAnalysisSources { analyzer.intentionActions(path, text, key.caret) } }.getOrElse { failure ->
                 reportAnalysisFailure("intentions", failure)
                 emptyList()
             }.map { it.toUi().toCompletion() }
@@ -503,9 +514,30 @@ internal class HollowIdeEditorSession(
 
     private val reportedFailures = HashSet<String>()
 
+    @Volatile
+    private var projectAnalyzer: ProjectAnalyzer? = null
+
     private fun currentAnalyzer(): ScriptingAnalyzer {
-        return languageService.analyzer
+        val base = languageService.analyzer
+        val project = project ?: return base
+        val revision = project.revision
+        projectAnalyzer?.takeIf { it.base === base && it.revision == revision }?.let { return it.version }
+        return synchronized(this) {
+            val current = projectAnalyzer
+            val latestRevision = project.revision
+            if (current?.base === base && current.revision == latestRevision) return@synchronized current.version
+            val scoped = project.bind(base)
+            ProjectAnalyzer(base, scoped, latestRevision, object : ScriptingAnalyzer by scoped {})
+                .also { projectAnalyzer = it }.version
+        }
     }
+
+    private data class ProjectAnalyzer(
+        val base: ScriptingAnalyzer,
+        val scoped: ScriptingAnalyzer,
+        val revision: Long,
+        val version: ScriptingAnalyzer,
+    )
 }
 
 private const val EditorAnalysisDebounceMillis = 180L

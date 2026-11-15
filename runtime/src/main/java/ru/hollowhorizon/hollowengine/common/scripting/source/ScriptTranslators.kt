@@ -9,6 +9,14 @@ fun interface ScriptTranslator {
     fun translate(id: ScriptId, source: File): String
 }
 
+/** A translator whose sources, including dependencies, can come from an IDE project. */
+interface ProjectScriptTranslator : ScriptTranslator {
+    fun translate(id: ScriptId, text: String, read: (ScriptId) -> String?): String
+
+    override fun translate(id: ScriptId, source: File): String =
+        translate(id, source.readText()) { ScriptRegistry.artifacts(it)?.sourceFile?.readText() }
+}
+
 /**
  * The sources an addon teaches the engine to compile, by the extension of their files. What a translator gives is
  * compiled as an ordinary script but stays the script [id]: what it reports and saves names the source.
@@ -39,6 +47,12 @@ object ScriptTranslators {
 
     /** The Kotlin of the script [id] as text, which is [source] itself unless a translator takes it. */
     fun kotlinText(id: ScriptId, source: File): String = translatorOf(id)?.translate(id, source) ?: source.readText()
+
+    fun kotlinText(id: ScriptId, text: String, read: (ScriptId) -> String?): String = when (val translator = translatorOf(id)) {
+        null -> text
+        is ProjectScriptTranslator -> translator.translate(id, text, read)
+        else -> throw IllegalArgumentException("The translator for '${id.qualified}' requires a local source file")
+    }
 
     /** Whether the script [id] is written in a language a translator turns into Kotlin. */
     fun translates(id: ScriptId): Boolean = translatorOf(id) != null

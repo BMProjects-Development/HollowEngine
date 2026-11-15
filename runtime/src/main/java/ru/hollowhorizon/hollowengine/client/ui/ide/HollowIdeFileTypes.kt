@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.common.addons.project.ProjectProperties
 
 internal const val BuiltinTextFileTypeId = "text"
 private const val TextDetectionSampleSize = 8192
@@ -19,6 +20,7 @@ interface HollowIdeFileDocument : AutoCloseable {
 
     fun encode(): ByteArray
 
+    /** Replace data from the file's project after an external update or a conflict resolution. */
     fun reload(bytes: ByteArray) = Unit
 
     fun markSaved() = Unit
@@ -49,7 +51,9 @@ class HollowIdeFileType(
     internal fun matchesPath(path: String): Boolean? = pathMatcher?.invoke(path)
 
     fun open(path: String, bytes: ByteArray): HollowIdeOpenFile =
-        HollowIdeOpenFile(path, this, loader(path, bytes), bytes)
+        HollowIdeOpenFile(path, this, load(path, bytes), bytes)
+
+    internal fun load(path: String, bytes: ByteArray): HollowIdeFileDocument = loader(path, bytes)
 
     companion object {
         fun extensions(
@@ -136,7 +140,14 @@ class HollowIdeFileTypeRegistry {
         return entries.filter { it.type.id == id }.singleOrNull()?.type
     }
 
-    fun open(path: String, readContent: () -> ByteArray): HollowIdeOpenFile? {
+    fun open(path: String, readContent: () -> ByteArray): HollowIdeOpenFile? =
+        open(path, readContent) { type, bytes -> type.open(path, bytes) }
+
+    internal fun open(
+        path: String,
+        readContent: () -> ByteArray,
+        openDocument: (HollowIdeFileType, ByteArray) -> HollowIdeOpenFile,
+    ): HollowIdeOpenFile? {
         val types = synchronized(this) { entries.map(Entry::type) }
         var content: ByteArray? = null
         fun content(): ByteArray = content ?: readContent().also { content = it }
@@ -144,7 +155,7 @@ class HollowIdeFileTypeRegistry {
         for (type in types) {
             val matches = type.matchesPath(path) ?: type.matches(path, content())
             if (!matches) continue
-            return type.open(path, if (type.requiresContent) content() else EmptyFileContent)
+            return openDocument(type, if (type.requiresContent) content() else EmptyFileContent)
         }
         return null
     }
@@ -155,6 +166,7 @@ private val EmptyFileContent = ByteArray(0)
 internal class HollowIdeTextDocument(
     initialText: String,
     override val readOnly: Boolean = false,
+    private val properties: Boolean = false,
 ) : HollowIdeFileDocument {
     /** Snapshot state, so a preview beside the editor follows every edit. */
     var text: String by mutableStateOf(initialText.normalizeEditorText())
@@ -172,15 +184,30 @@ internal class HollowIdeTextDocument(
         text = value.normalizeEditorText()
     }
 
-    override fun encode(): ByteArray = text.toByteArray()
+    override fun encode(): ByteArray = if (properties) buildString {
+        text.forEach { character ->
+            if (character.code <= 0xff) append(character) else append("\\u%04x".format(character.code))
+        }
+    }.toByteArray(Charsets.ISO_8859_1) else text.encodeToByteArray()
 
-    override fun reload(bytes: ByteArray) = refresh(bytes.toString(Charsets.UTF_8))
+    override fun reload(bytes: ByteArray) = refresh(bytes.toString(if (properties) Charsets.ISO_8859_1 else Charsets.UTF_8))
+
+    companion object {
+        fun open(path: String, bytes: ByteArray): HollowIdeTextDocument {
+            val properties = path == ProjectProperties.PATH
+            return HollowIdeTextDocument(
+                bytes.toString(if (properties) Charsets.ISO_8859_1 else Charsets.UTF_8),
+                properties = properties,
+            )
+        }
+    }
 }
 
 internal object HollowIdeReadOnlyDocument : HollowIdeFileDocument {
     override val readOnly: Boolean = true
 
     override fun encode(): ByteArray = ByteArray(0)
+
 }
 
 private fun normalizeExtension(extension: String): String =

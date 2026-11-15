@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctions
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryOperators
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryTypeShape
@@ -21,6 +22,7 @@ internal class StoryGenericChecks(
     private val unknown: Set<StoryGenericKey>,
     private val parameters: (String) -> List<Pair<String, String>>,
     private val reads: (String) -> Boolean,
+    private val functions: StoryFunctions,
 ) {
     private class Slot(val index: Int, val pin: String, val shape: StoryTypeShape) {
         val parameters = shape.parameters
@@ -79,7 +81,7 @@ internal class StoryGenericChecks(
         val block = blocks[node]
         val slot = block?.inputs?.firstOrNull { it.pin == pin }
         if (block == null || slot == null) {
-            return StoryFieldChecks.place(graph, target, pin)?.takeIf { reads("null as $it") }?.let { "storySink<$it>()" }
+            return StoryFieldChecks.place(graph, target, pin, functions)?.takeIf { reads("null as $it") }?.let { "storySink<$it>()" }
         }
         val fix = fix(block) ?: return null
         if (fix.bindings.values.any { it.slot == slot && it.into == null }) return null

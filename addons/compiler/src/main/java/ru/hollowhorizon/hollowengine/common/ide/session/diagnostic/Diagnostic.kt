@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtProperty
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
-fun diagnosticCode(file: KtFile): List<Diagnostic> {
+fun diagnosticCode(file: KtFile, clips: AnimationClips = editorClips): List<Diagnostic> {
     val document = file.fileDocument
     val analysisDiagnostics = analyze(file) {
         file.collectDiagnostics(KaDiagnosticCheckerFilter.EXTENDED_AND_COMMON_CHECKERS).map { diagnostic ->
@@ -28,7 +28,6 @@ fun diagnosticCode(file: KtFile): List<Diagnostic> {
             Diagnostic(document.rangeOf(range), severity, diagnostic.defaultMessage, fixes)
         }
     }
-    val clips = editorClips
     val inspections = listOf(
         ::unusedImportDiagnostics,
         ::subscribeEventDiagnostics,

@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.definition
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySignatureEditor
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySignaturePart
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.storyLang
-import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 
@@ -98,7 +97,7 @@ private fun StoryNodeLayout.Rows.typedField(value: StoryTypedName, written: Stri
 
 /** A call of a function: a value for each parameter, a pin for each result, and the story it is from. */
 internal fun StoryNodeLayout.Rows.invoke(node: StoryNode.Invoke) {
-    val function = StoryActionFunctions.definition(layout.state.root() ?: layout.graph, node)
+    val function = layout.state.functions.definition(layout.state.root() ?: layout.graph, node)
     flow()
     node.file?.let { file ->
         row(storyLang("invoke.from", ScriptRegistry.display(ScriptId.parse(file, ScriptRegistry.sandboxNamespace))))

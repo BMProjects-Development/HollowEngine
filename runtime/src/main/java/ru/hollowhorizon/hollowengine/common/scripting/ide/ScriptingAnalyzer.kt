@@ -3,6 +3,9 @@ package ru.hollowhorizon.hollowengine.common.scripting.ide
 interface ScriptingAnalyzer {
     fun highlight(name: String, text: String, offset: Int): List<TextLine>
 
+    /** Uses the same language and classpath with a different project's source files. */
+    fun forProject(project: ScriptAnalysisProject): ScriptingAnalyzer = this
+
     /** Ranges to highlight for the symbol/bracket at [offset]; cheap compared to [highlight]. */
     fun occurrences(name: String, text: String, offset: Int): List<OccurrenceRange> = emptyList()
 

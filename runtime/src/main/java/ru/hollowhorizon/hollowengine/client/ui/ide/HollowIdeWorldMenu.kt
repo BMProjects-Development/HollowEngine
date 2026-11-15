@@ -39,7 +39,6 @@ internal object WorldLang {
     private const val ROOT = "hollowengine.gui.ide.world."
 
     const val TITLE = ROOT + "title"
-    const val LOADING = ROOT + "loading"
     const val TIME = ROOT + "time"
     const val DAYLIGHT_CYCLE = ROOT + "daylight_cycle"
     const val WEATHER_CYCLE = ROOT + "weather_cycle"
@@ -80,7 +79,7 @@ private val TimePresets = listOf(
  */
 internal fun hollowIdeWorldMenuItems(): List<UiDropdownItem> {
     WorldControlClient.error?.let { return listOf(UiDropdownItem(it.lang, enabled = false)) }
-    val state = WorldControlClient.state ?: return listOf(UiDropdownItem(WorldLang.LOADING.lang, enabled = false))
+    val state = WorldControlClient.state ?: return emptyList()
 
     fun rule(rule: WorldRule, label: String = rule.key.descriptionId.lang, separatorBefore: Boolean = false) =
         UiDropdownItem(

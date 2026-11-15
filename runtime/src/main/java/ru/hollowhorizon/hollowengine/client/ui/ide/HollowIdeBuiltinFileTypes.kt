@@ -103,7 +103,7 @@ internal fun HollowIdeFileTypeRegistry.registerBuiltinFileTypes(
         HollowIdeFileType.fallback(
             id = BuiltinTextFileTypeId,
             matcher = { _, bytes -> bytes.isProbablyText() },
-            loader = { _, bytes -> HollowIdeTextDocument(bytes.toString(Charsets.UTF_8)) },
+            loader = HollowIdeTextDocument::open,
             editor = textEditor,
         ),
     )

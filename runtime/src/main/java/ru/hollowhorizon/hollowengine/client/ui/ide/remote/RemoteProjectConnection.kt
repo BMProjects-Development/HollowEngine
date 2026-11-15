@@ -114,6 +114,7 @@ internal object RemoteProjectConnection {
     private fun revoke() {
         if (projectName == null) return
         projectName = null
+        session++
         onReset?.invoke()
     }
 

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeModel
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOpenFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.isProbablyText
@@ -11,14 +12,17 @@ import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.project.ProjectProperties
 import ru.hollowhorizon.hollowengine.common.addons.project.remote.*
+import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 
 internal class RemoteProjectWorkspace(
     private val model: HollowIdeModel,
     private val openTab: (HollowIdeOpenFile) -> Unit,
     private val tabChanged: (HollowIdeOpenFile) -> Unit,
+    private val analysisChanged: () -> Unit,
 ) {
     private val directories = mutableStateMapOf<String, Directory>()
-    private val pendingReads = HashSet<String>()
+    private val pendingReads = HashMap<String, MutableList<(HollowIdeOpenFile) -> Unit>>()
+    private var analysis: RemoteProjectAnalysis? = null
     private var nextTabId = 0L
 
     val projectName: String? get() = RemoteProjectConnection.projectName
@@ -54,6 +58,7 @@ internal class RemoteProjectWorkspace(
     }
 
     fun refresh() {
+        invalidateAnalysis()
         directories.toMap().forEach { (path, directory) ->
             if (directory.expanded) refreshDirectory(path)
         }
@@ -66,7 +71,7 @@ internal class RemoteProjectWorkspace(
         fun collect(path: String, label: String, depth: Int, isDirectory: Boolean) {
             val directory = directories[path]
             val index = size
-            add(Node(path, label, depth, isDirectory, directory?.expanded == true || query.isNotEmpty(), directory?.loading == true))
+            add(Node(path, label, depth, isDirectory, directory?.expanded == true || query.isNotEmpty()))
             if (isDirectory && (directory?.expanded == true || query.isNotEmpty())) {
                 directory?.entries?.forEach { child ->
                     collect(joinProjectPath(path, child.name), child.name, depth + 1, child.directory)
@@ -79,25 +84,35 @@ internal class RemoteProjectWorkspace(
         collect("", name, 0, true)
     }
 
-    fun open(path: String) {
-        val session = RemoteProjectConnection.session
+    fun open(path: String, onOpened: (HollowIdeOpenFile) -> Unit = {}) {
+        if (projectName == null) return
+        val project = analysis ?: RemoteProjectAnalysis(RemoteProjectConnection.session, analysisChanged).also { analysis = it }
+        val session = project.session
         model.files.values.firstOrNull { it.remote?.session == session && it.remote.path == path }?.let {
             openTab(it)
             refreshFile(it)
+            onOpened(it)
             return
         }
-        if (!pendingReads.add(path)) return
+        pendingReads[path]?.let { callbacks ->
+            callbacks += onOpened
+            return
+        }
+        val callbacks = mutableListOf(onOpened)
+        pendingReads[path] = callbacks
         RemoteProjectConnection.read(path) { snapshot, error ->
+            if (pendingReads[path] !== callbacks) return@read
             pendingReads.remove(path)
             if (snapshot == null) {
                 notifyRemoteProjectError(error ?: RemoteProjectError.IO)
             } else {
-                val text = snapshot.text(path)
-                if (text == null) notifyRemoteProjectError(RemoteProjectError.UNSUPPORTED)
+                val identity = "remote-project://$session/${++nextTabId}/$path"
+                val remote = RemoteProjectDocument(session, path, snapshot.revision)
+                val file = model.openRemote(identity, snapshot.bytes, remote, project, ::save)
+                if (file == null) notifyRemoteProjectError(RemoteProjectError.UNSUPPORTED)
                 else {
-                    val identity = "remote-project://$session/${++nextTabId}/$path"
-                    val remote = RemoteProjectDocument(session, path, snapshot.revision)
-                    openTab(model.openRemote(identity, text, remote, ::save))
+                    openTab(file)
+                    callbacks.forEach { it(file) }
                 }
             }
         }
@@ -106,7 +121,17 @@ internal class RemoteProjectWorkspace(
     fun showServerVersion(file: HollowIdeOpenFile) {
         val remote = file.remote ?: return
         val text = remote.conflict?.text(remote.path) ?: return
-        openTab(model.openReadOnly("remote-project://${remote.session}/server-version/${remote.path}", text))
+        openTab(model.openReadOnly(
+            "remote-project://${remote.session}/server-version/${remote.path}", text, remote.path, file.analysisProject,
+        ))
+    }
+
+    fun openDefinition(project: RemoteProjectAnalysis, path: String, onOpened: (HollowIdeOpenFile) -> Unit) {
+        if (analysis !== project || projectName == null) {
+            notifyRemoteProjectError(RemoteProjectError.DISCONNECTED)
+            return
+        }
+        open(path, onOpened)
     }
 
     fun mutate(command: RemoteProjectCommand, completed: () -> Unit = {}) {
@@ -133,10 +158,7 @@ internal class RemoteProjectWorkspace(
             remote.refreshing = false
             if (remote.path == requestedPath && model.files[file.path] === file) {
                 when {
-                    snapshot != null -> if (snapshot.text(requestedPath) != null) remote.receive(file, snapshot) else {
-                        remote.conflict = null
-                        remote.error = RemoteProjectError.UNSUPPORTED
-                    }
+                    snapshot != null -> remote.receive(file, snapshot)
 
                     error != null -> {
                         if (error == RemoteProjectError.MISSING) {
@@ -150,15 +172,30 @@ internal class RemoteProjectWorkspace(
                 }
             }
             if (remote.refreshAgain) refreshFile(file)
+            else if (remote.saveAgain && remote.writable) save(file)
         }
     }
 
     private fun save(file: HollowIdeOpenFile): Boolean {
         val remote = file.remote ?: return false
-        if (!file.dirty) return true
+        if (file.readOnly || model.files[file.path] !== file) return false
+        if (!file.hasUnsavedChanges) {
+            remote.saveAgain = false
+            return true
+        }
+        if (remote.saving || remote.refreshing) {
+            remote.saveAgain = true
+            return false
+        }
+        remote.saveAgain = false
         if (!remote.writable) return false
-        val text = file.text
-        val bytes = encodeProjectText(remote.path, text)
+        val bytes = try {
+            file.encode().copyOf()
+        } catch (failure: Exception) {
+            HollowEngine.LOGGER.error("Could not encode server file {}", remote.path, failure)
+            remote.error = RemoteProjectError.IO
+            return false
+        }
         if (bytes.size > RemoteProjectFileLimit) {
             remote.error = RemoteProjectError.TOO_LARGE
             return false
@@ -181,7 +218,11 @@ internal class RemoteProjectWorkspace(
 
                     is RemoteProjectReply.Saved -> {
                         remote.revision = reply.revision
-                        file.markSavedIfText(text)
+                        runCatching { file.markSavedIfContent(bytes) }.onFailure { failure ->
+                            file.markDirty()
+                            HollowEngine.LOGGER.error("Could not compare contents of server file {}", path, failure)
+                        }
+                        invalidateSources(path)
                         tabChanged(file)
                         if (path == ProjectProperties.PATH) RemoteProjectConnection.refreshProjectName()
                     }
@@ -197,6 +238,7 @@ internal class RemoteProjectWorkspace(
                 }
                 remote.saving = false
                 if (remote.refreshAgain) refreshFile(file)
+                else if (reply is RemoteProjectReply.Saved && remote.saveAgain) save(file)
             }
         }
         chunk(0)
@@ -206,6 +248,7 @@ internal class RemoteProjectWorkspace(
     private fun changed(change: RemoteProjectChange) {
         val path = change.path
         val destination = change.destination
+        invalidateSources(*listOfNotNull(path, destination).toTypedArray())
         if (projectPathContains(path, ProjectProperties.PATH) || destination?.let {
                 projectPathContains(
                     it,
@@ -241,6 +284,21 @@ internal class RemoteProjectWorkspace(
                 ) && change.kind == RemoteProjectChange.Kind.CREATED -> refreshFile(file)
             }
         }
+    }
+
+    private fun invalidateSources(vararg paths: String) {
+        if (paths.any { path ->
+                projectPathContains(path, ProjectProperties.PATH) || projectPathContains(path, "assets") ||
+                    projectPathContains("assets", path) || projectPathContains(path, SandboxScriptSource.SCRIPTS_DIRECTORY) ||
+                    projectPathContains(SandboxScriptSource.SCRIPTS_DIRECTORY, path)
+            }) {
+            invalidateAnalysis(*paths)
+        }
+    }
+
+    private fun invalidateAnalysis(vararg paths: String) {
+        analysis?.invalidate(*paths)
+        analysisChanged()
     }
 
     private fun refreshDirectory(path: String) {
@@ -285,7 +343,14 @@ internal class RemoteProjectWorkspace(
         selectedPath = ""
         directories.clear()
         pendingReads.clear()
-        model.files.values.toList().filter { it.remote != null && !it.dirty }.forEach(model::removeRemote)
+        val previous = analysis
+        previous?.close()
+        analysis = null
+        analysisChanged()
+        if (previous != null) {
+            model.files.values.toList().filter { it.analysisProject === previous && !it.hasUnsavedChanges }
+                .forEach(model::removeFile)
+        }
     }
 
     data class Node(
@@ -294,7 +359,6 @@ internal class RemoteProjectWorkspace(
         val depth: Int,
         val directory: Boolean,
         val expanded: Boolean,
-        val loading: Boolean,
     ) {
         val parent: String get() = if (directory) path else projectPathParent(path)
     }
@@ -302,7 +366,7 @@ internal class RemoteProjectWorkspace(
     private class Directory {
         var entries by mutableStateOf<List<RemoteProjectEntry>>(emptyList())
         var expanded by mutableStateOf(false)
-        var loading by mutableStateOf(false)
+        var loading = false
         var loaded = false
         var refreshAgain = false
     }
@@ -324,11 +388,3 @@ internal fun RemoteProjectFile.text(path: String): String? {
         null
     }
 }
-
-internal fun encodeProjectText(path: String, text: String): ByteArray = if (path == ProjectProperties.PATH) {
-    buildString {
-        text.forEach { character ->
-            if (character.code <= 0xff) append(character) else append("\\u%04x".format(character.code))
-        }
-    }.toByteArray(Charsets.ISO_8859_1)
-} else text.encodeToByteArray()

@@ -1,8 +1,8 @@
 package ru.hollowhorizon.hollowengine.common.ide.session.highlight
 
 import com.intellij.openapi.util.TextRange
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiComment
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.tree.IElementType
@@ -22,11 +22,7 @@ import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import ru.hollowhorizon.hollowengine.client.HighlightTheme
 import ru.hollowhorizon.hollowengine.common.ide.session.TEMPLATE_BRACES
 import ru.hollowhorizon.hollowengine.common.ide.session.inlays.provideHints
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
-import ru.hollowhorizon.hollowengine.common.scripting.ide.OccurrenceRange
-import ru.hollowhorizon.hollowengine.common.scripting.ide.SpanStyle
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TextLine
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
 class LineBuilder(val lines: MutableList<TextLine>) {
 
@@ -60,7 +56,7 @@ class LineBuilder(val lines: MutableList<TextLine>) {
     }
 }
 
-fun highlightCode(file: KtFile, offset: Int): List<TextLine> {
+fun highlightCode(file: KtFile, offset: Int, project: ScriptAnalysisProject? = null): List<TextLine> {
     val code = file.text
     val lineCount = code.lines().size
     val builder = LineBuilder(arrayListOf())
@@ -68,7 +64,7 @@ fun highlightCode(file: KtFile, offset: Int): List<TextLine> {
     val elementAtCaret = file.findElementAtCaret(offset)
 
     analyze(file) {
-        val hints = runCatching { provideHints(file) }.getOrDefault(emptyList())
+        val hints = runCatching { provideHints(file, project) }.getOrDefault(emptyList())
 
         // Предварительно вычисляем ключи символов под курсором
         val caretKeys = elementAtCaret?.let { element ->
@@ -93,13 +89,15 @@ fun highlightCode(file: KtFile, offset: Int): List<TextLine> {
                 val document = file.fileDocument
                 val lineStartOffset = document.getLineStartOffset(i)
                 val lineEndOffset = document.getLineEndOffset(i)
-                hints.filter { it.index in lineStartOffset .. lineEndOffset }.forEach { appendHint(it.copy(index = it.index - lineStartOffset)) }
+                hints.filter { it.index in lineStartOffset..lineEndOffset }
+                    .forEach { appendHint(it.copy(index = it.index - lineStartOffset)) }
             }
         }
     }
 
     return builder.lines
 }
+
 // Comments and strings are excluded so a caret inside them does not highlight the whole element.
 private val nonSelectableCaretTokens: List<IElementType> = buildList {
     add(KtTokens.DOT)
@@ -130,8 +128,8 @@ fun occurrencesCode(file: KtFile, offset: Int): List<OccurrenceRange> {
     val ranges = ArrayList<OccurrenceRange>()
     analyze(file) {
         val expression = target.parentsWithSelf.firstIsInstanceOrNull<KtExpression>()
-        val caretKeys = expression?.let { resolveSymbolsForHighlight(it) }
-            ?.map { normalizeToKey(it) }?.toSet().orEmpty()
+        val caretKeys =
+            expression?.let { resolveSymbolsForHighlight(it) }?.map { normalizeToKey(it) }?.toSet().orEmpty()
 
         var leaf: PsiElement? = file.findElementAt(0)
         while (leaf != null) {
@@ -206,7 +204,9 @@ private fun LineBuilder.SpanBuilder.renderPsiElement(
             psi is KtAnnotationEntry || parent is KtAnnotationEntry -> tokenType = TokenType.ANNOTATION
             elementType in KtTokens.KEYWORDS || elementType in KtTokens.SOFT_KEYWORDS -> tokenType = TokenType.KEYWORD
             elementType in TEMPLATE_BRACES -> tokenType = TokenType.KEYWORD
-            elementType in KtTokens.STRINGS || elementType == KtTokens.OPEN_QUOTE || elementType == KtTokens.CLOSING_QUOTE -> tokenType = TokenType.STRING
+            elementType in KtTokens.STRINGS || elementType == KtTokens.OPEN_QUOTE || elementType == KtTokens.CLOSING_QUOTE -> tokenType =
+                TokenType.STRING
+
             parent is KtConstantExpression && !isEnumConstant(parent) -> tokenType = TokenType.NUMERIC_LITERAL
             elementType == KtTokens.MINUS && psi.isUnaryNumericMinus() -> tokenType = TokenType.NUMERIC_LITERAL
 
@@ -405,11 +405,9 @@ private fun pickBestSymbol(symbols: Collection<KaSymbol>): KaSymbol? {
     if (symbols.isEmpty()) return null
     if (symbols.size == 1) return symbols.first()
 
-    return symbols.firstOrNull { it is KaClassSymbol }
-        ?: symbols.firstOrNull { it is KaConstructorSymbol }
-        ?: symbols.firstOrNull { it is KaVariableSymbol }
-        ?: symbols.firstOrNull { it is KaFunctionSymbol }
-        ?: symbols.first()
+    return symbols.firstOrNull { it is KaClassSymbol } ?: symbols.firstOrNull { it is KaConstructorSymbol }
+    ?: symbols.firstOrNull { it is KaVariableSymbol } ?: symbols.firstOrNull { it is KaFunctionSymbol }
+    ?: symbols.first()
 }
 
 context(session: KaSession)
@@ -452,6 +450,7 @@ private fun LineBuilder.SpanBuilder.computeSymbolStyle(symbol: KaSymbol) {
                         }
                     } ?: TokenType.CLASS
                 }
+
                 is KaNamedFunctionSymbol -> {
                     if (symbol.isExtension) TokenType.EXTENSION_RECEIVER
                     else if (symbol.location == KaSymbolLocation.TOP_LEVEL) TokenType.TOP_LEVEL
@@ -520,17 +519,14 @@ private fun isEnumConstant(element: KtElement): Boolean {
 
 private fun PsiElement.isOtherParenthesis(other: PsiElement): Boolean {
     val matchingPairs = mapOf(
-        KtTokens.LPAR to KtTokens.RPAR,
-        KtTokens.LBRACE to KtTokens.RBRACE,
-        KtTokens.LBRACKET to KtTokens.RBRACKET
+        KtTokens.LPAR to KtTokens.RPAR, KtTokens.LBRACE to KtTokens.RBRACE, KtTokens.LBRACKET to KtTokens.RBRACKET
     )
     val thisType = this.node.elementType
     val otherType = other.node.elementType
 
     if (matchingPairs[thisType] != otherType && matchingPairs[otherType] != thisType) return false
     val commonParent = PsiTreeUtil.findCommonParent(this, other) ?: return false
-    return commonParent.firstChild == this && commonParent.lastChild == other ||
-            commonParent.firstChild == other && commonParent.lastChild == this
+    return commonParent.firstChild == this && commonParent.lastChild == other || commonParent.firstChild == other && commonParent.lastChild == this
 }
 
 class Element(val psiElement: PsiElement, val text: String)

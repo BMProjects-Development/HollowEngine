@@ -3,25 +3,20 @@ package ru.hollowhorizon.hollowengine.common.ide.session.inlays
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtStringTemplateExpression
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayAction
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayContent
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayHint
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayIcons
-import ru.hollowhorizon.hollowengine.common.scripting.ide.InlayTags
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ResourceLocationTargets
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 
 /**
  * Turns `"project:ui/style.hss"` in a script into a button that opens the file it names.
  * Resources the project owns open for editing; those served by the game open read-only,
  * which the hint says through its tags rather than through a different button.
  */
-fun resourceLocationHints(file: KtFile): List<InlayHint> {
+fun resourceLocationHints(file: KtFile, project: ScriptAnalysisProject?): List<InlayHint> {
     val hints = mutableListOf<InlayHint>()
     for (node in file.preOrderTraversal()) {
         val literal = node as? KtStringTemplateExpression ?: continue
         val location = literal.plainText() ?: continue
         if (!ResourceLocationTargets.looksLikeLocation(location)) continue
-        val target = ResourceLocationTargets.targetOf(location) ?: continue
+        val target = ResourceLocationTargets.targetOf(location, project) ?: continue
         hints += InlayHint(
             index = literal.startOffset,
             content = listOf(InlayContent.Icon(InlayIcons.OPEN_RESOURCE)),
@@ -41,8 +36,8 @@ private fun KtStringTemplateExpression.plainText(): String? {
 }
 
 /** Definition target of the location literal at [offset], if the caret sits on one. */
-fun resourceLocationDefinition(file: KtFile, offset: Int) =
-    file.locationLiteralAt(offset)?.let { ResourceLocationTargets.definition(it) }
+fun resourceLocationDefinition(file: KtFile, offset: Int, project: ScriptAnalysisProject?) =
+    file.locationLiteralAt(offset)?.let { ResourceLocationTargets.definition(it, project) }
 
 private fun KtFile.locationLiteralAt(offset: Int): String? {
     if (textLength == 0) return null

@@ -4,8 +4,8 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.utils.HollowJavaUtils
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -29,17 +29,31 @@ object ResourceLocationTargets {
     fun looksLikeLocation(value: String): Boolean = LocationPattern.matches(value.trim())
 
     /** Where [location] resolves to, or `null` when nothing provides it. */
-    fun targetOf(location: String): ResourceTarget? = when (target(location)) {
-        Target.PROJECT -> ResourceTarget.PROJECT
-        Target.RESOURCE -> ResourceTarget.RESOURCE
-        Target.MISSING -> null
+    fun targetOf(location: String, project: ScriptAnalysisProject? = null): ResourceTarget? {
+        if (project != null) {
+            val path = projectTextPath(location) ?: return null
+            return try {
+                ResourceTarget.PROJECT.takeIf { project.readForHint(path) != null }
+            } catch (_: IOException) {
+                null
+            }
+        }
+        return when (target(location)) {
+            Target.PROJECT -> ResourceTarget.PROJECT
+            Target.RESOURCE -> ResourceTarget.RESOURCE
+            Target.MISSING -> null
+        }
     }
 
     /** Where the IDE should open [location], or `null` when nothing provides it. */
-    fun definition(location: String): DefinitionLocation? {
+    fun definition(location: String, project: ScriptAnalysisProject? = null): DefinitionLocation? {
         val cleaned = location.trim()
-        return when (target(cleaned)) {
-            Target.PROJECT -> localPath(cleaned)?.let { DefinitionLocation(editorPathOf(it.toFile()), offset = 0) }
+        val target = if (project == null) target(cleaned) else {
+            val path = projectTextPath(cleaned) ?: return null
+            if (project.read(path) != null) Target.PROJECT else Target.MISSING
+        }
+        return when (target) {
+            Target.PROJECT -> projectPath(cleaned)?.let { DefinitionLocation(it, offset = 0) }
             Target.RESOURCE -> readGameResource(cleaned)?.let { text ->
                 DefinitionLocation(
                     path = "resources/${cleaned.replace(':', '/')}",
@@ -58,12 +72,13 @@ object ResourceLocationTargets {
         if (!looksLikeLocation(cleaned)) return Target.MISSING
         val now = System.nanoTime()
         targets[cleaned]?.takeIf { now - it.checkedAtNanos <= CacheNanos }?.let { return it.target }
-        return resolve(cleaned).also { targets[cleaned] = CachedTarget(it, now) }
+        val path = projectPath(cleaned)?.let(DirectoryManager.HOLLOW_ENGINE::resolve)
+        val target = if (path != null && Files.isRegularFile(path)) Target.PROJECT else gameTarget(cleaned)
+        targets[cleaned] = CachedTarget(target, now)
+        return target
     }
 
-    private fun resolve(location: String): Target {
-        val path = localPath(location)
-        if (path != null && Files.isRegularFile(path)) return Target.PROJECT
+    private fun gameTarget(location: String): Target {
         val parsed = parse(location) ?: return Target.MISSING
         if (!isTextResource(parsed.path)) return Target.MISSING
         val readable = runCatching { HollowJavaUtils.getResource(parsed).close() }.isSuccess
@@ -73,13 +88,13 @@ object ResourceLocationTargets {
     private fun parse(location: String): ResourceLocation? =
         runCatching { ResourceLocation.parse(location.trim()) }.getOrNull()
 
-    private fun localPath(location: String): Path? {
+    internal fun projectTextPath(location: String): String? = projectPath(location)?.takeIf(::isTextResource)
+
+    private fun projectPath(location: String): String? {
         val parsed = parse(location) ?: return null
-        return DirectoryManager.HOLLOW_ENGINE
-            .resolve("assets")
-            .resolve(parsed.namespace)
-            .resolve(parsed.path)
-            .normalize()
+        val path = DirectoryManager.HOLLOW_ENGINE.resolve("assets").resolve(parsed.namespace).resolve(parsed.path).normalize()
+        return path.takeIf { it.startsWith(DirectoryManager.HOLLOW_ENGINE.resolve("assets")) }
+            ?.let { DirectoryManager.HOLLOW_ENGINE.relativize(it).toString().replace(File.separatorChar, '/') }
     }
 
     private fun readGameResource(location: String): String? {
@@ -91,13 +106,6 @@ object ResourceLocationTargets {
 
     /** Binary assets have no source to show, so only text ones become read-only tabs. */
     private fun isTextResource(path: String): Boolean = TextExtensions.any { path.endsWith(it, ignoreCase = true) }
-
-    private fun editorPathOf(file: File): String {
-        val root = DirectoryManager.HOLLOW_ENGINE.toAbsolutePath().normalize()
-        val path = file.toPath().toAbsolutePath().normalize()
-        if (!path.startsWith(root)) return file.name
-        return root.relativize(path).toString().replace(File.separatorChar, '/')
-    }
 
     /** What provides a resource location, and therefore how the IDE may open it. */
     enum class ResourceTarget(val tag: String) {

@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.docking.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.asset.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeImageEditor
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeMediaFile
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.animator.HollowIdeAnimatorEditor
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.montage.MontageEditorPanel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditorPanel
@@ -48,6 +49,7 @@ import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
 import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.ui.hssColorLiteralText
+import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 import ru.hollowhorizon.hollowengine.common.utils.DesktopUtil
 import ru.hollowhorizon.hollowengine.common.utils.isProduction
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -98,16 +100,17 @@ object HollowIdeOverlay {
 
     private val fileTypes = HollowIdeFileTypeRegistry().apply {
         registerBuiltinFileTypes(
-            modelEditor = { file -> ModelEditorPanel(file.path) },
+            modelEditor = { file ->
+                if (file.isRemote) Text("hollowengine.gui.ide.remote.model_preview_unavailable".lang)
+                else ModelEditorPanel(file.projectPath)
+            },
             imageEditor = { file -> HollowIdeImageEditor(file, file::save) },
             videoEditor = { file ->
-                Video(
-                    source = file.path,
-                    fit = UiImageFit.CONTAIN,
-                    modifier = Modifier.size(100.percent, 100.percent),
-                )
+                HollowIdeMediaFile(file) { path ->
+                    Video(source = path, fit = UiImageFit.CONTAIN, modifier = Modifier.size(100.percent, 100.percent))
+                }
             },
-            audioEditor = { file -> AudioFilePanel(file.path) },
+            audioEditor = { file -> HollowIdeMediaFile(file) { AudioFilePanel(it) } },
             animatorEditor = { file -> HollowIdeAnimatorEditor(file) },
             rigEditor = { file -> RigEditorPanel(file) },
             vfxEditor = { file -> VfxEditorPanel(file) },
@@ -171,7 +174,11 @@ object HollowIdeOverlay {
         pointerX = { activeRuntime().mouseX },
         pointerY = { activeRuntime().mouseY },
     )
-    private val remoteProject = RemoteProjectWorkspace(model, ::openFileDockItem) { dock.updateItem(it.dockItem()) }
+    private val remoteProject = RemoteProjectWorkspace(
+        model, ::openFileDockItem,
+        tabChanged = { dock.updateItem(it.dockItem()) },
+        analysisChanged = { editorAnalysisRevision++ },
+    )
     private val remotePanel = RemoteProjectPanelController(remoteProject, ::focusProjectTree) {
         activeRuntime().let { it.mouseX to it.mouseY }
     }
@@ -185,7 +192,9 @@ object HollowIdeOverlay {
     private val histories = IdeHistories(model) { file -> editorStates[file.path]?.history }
     private val fileViews = mutableMapOf<String, HollowIdeFileView>()
     private var fileContextMenu by mutableStateOf<FileContextMenu?>(null)
-    private var gutterNavigation by mutableStateOf<List<GutterNavigationTarget>>(emptyList())
+    private var gutterNavigation by mutableStateOf<GutterNavigationMenu?>(null)
+
+    private data class GutterNavigationMenu(val file: HollowIdeOpenFile, val targets: List<GutterNavigationTarget>)
     private val dragAndDrop = UiDragAndDropState()
     private val refreshFilesRequested = AtomicBoolean()
     private val externalFiles = HollowIdeExternalFiles(
@@ -262,7 +271,7 @@ object HollowIdeOverlay {
         TextFieldState(
             initialText = file.text,
             multiline = true,
-            pasteTransformer = KotlinStringPasteTransformer.takeIf { file.path.isKotlinSource() },
+            pasteTransformer = KotlinStringPasteTransformer.takeIf { (file.remoteLanguagePath ?: file.path).isKotlinSource() },
         ).also { state ->
             // An undo made away from the text editor, from a preview or the history window, still reaches the file.
             state.onHistoryRestored = { text ->
@@ -272,10 +281,16 @@ object HollowIdeOverlay {
         }
     }
 
-    private fun editorSession(path: String): HollowIdeEditorSession = editorSessions.getOrPut(path) {
-        HollowIdeEditorSession(path) {
-            editorAnalysisRevision++
+    private fun editorSession(path: String): HollowIdeEditorSession {
+        val file = model.files[path]
+        val languagePath = file?.remoteLanguagePath ?: path
+        editorSessions[path]?.let { previous ->
+            if (previous.path == languagePath) return previous
+            previous.close()
         }
+        return HollowIdeEditorSession(languagePath, project = file?.analysisProject) {
+            editorAnalysisRevision++
+        }.also { editorSessions[path] = it }
     }
 
     private var lastMouseX = 0f
@@ -665,7 +680,7 @@ object HollowIdeOverlay {
         dock.onTabContextMenu = ::openFileContextMenu
         dock.canCloseItem = { id -> !dock.contains(id) || closeFiles.confirm(listOf(id)) }
         dock.onItemClosed = { id ->
-            fileDockItemPath(id)?.let(model.files::get)?.let(model::removeRemote)
+            fileDockItemPath(id)?.let(model.files::get)?.takeIf { it.analysisProject != null }?.let(model::removeFile)
         }
         dock.canDetachItem = { item -> toolWindow(item.id)?.detachable != false }
         dock.onDetachItem = detachedWindows::detach
@@ -818,7 +833,7 @@ object HollowIdeOverlay {
             override val file: HollowIdeOpenFile = target
 
             override val canFormat: Boolean
-                get() = target.remote == null && !target.readOnly && target.textOrNull != null && editorSession(target.path).canFormat
+                get() = !target.readOnly && target.textOrNull != null && editorSession(target.path).canFormat
 
             override fun save(): Boolean {
                 val saved = model.save(target.path)
@@ -982,14 +997,16 @@ object HollowIdeOverlay {
         HollowIdeSearchDialog(search, ::openSearchResult)
         HollowIdeProjectDialogs(packaging)
         EditorColorPickerPopup()
-        if (gutterNavigation.isNotEmpty()) ContextMenu(
-            id = "ide-gutter-navigation",
-            anchorBounds = UiRect(runtime.mouseX, runtime.mouseY, 0f, 0f),
-            items = gutterNavigation.map { (label, location) ->
-                UiDropdownItem(label = label, onClick = { openDefinition(location) })
-            },
-            onExpandedChange = { if (!it) gutterNavigation = emptyList() },
-        )
+        gutterNavigation?.let { menu ->
+            ContextMenu(
+                id = "ide-gutter-navigation",
+                anchorBounds = UiRect(runtime.mouseX, runtime.mouseY, 0f, 0f),
+                items = menu.targets.map { (label, location) ->
+                    UiDropdownItem(label = label, onClick = { openDefinition(location, menu.file) })
+                },
+                onExpandedChange = { if (!it) gutterNavigation = null },
+            )
+        }
     }
 
     @Composable
@@ -1043,8 +1060,9 @@ object HollowIdeOverlay {
     private fun currentProblems(): HollowIdeProblems {
         val file = activeEditorFile()
         val found = file?.let(::fileView)?.problems.orEmpty()
-        val diagnostics =
-            file?.let { editorSessions[it.path]?.diagnostics(it.text) }.orEmpty() + found.map { it.diagnostic }
+        editorAnalysisRevision
+        val diagnostics = file?.textOrNull?.let { editorSession(file.path).diagnostics(it) }.orEmpty() +
+            found.map { it.diagnostic }
         return HollowIdeProblems(file, diagnostics) { diagnostic ->
             if (file != null) {
                 openFileDockItem(file)
@@ -1339,29 +1357,24 @@ object HollowIdeOverlay {
 
     @Composable
     private fun FileEditor(file: HollowIdeOpenFile) {
-        val remote = file.remote
-        val editorSession = if (remote == null) remember(file.path) { editorSession(file.path) } else null
+        val remotePath = file.remoteLanguagePath
+        val local = remotePath == null
+        val editorSession = remember(file.path, remotePath, contributions.revision) { editorSession(file.path) }
         val editorState = editorState(file)
-        LaunchedEffect(file, file.externalTextRevision) {
-            if (!file.dirty) editorState.setText(file.text, moveCaretToEnd = false)
-        }
-        val analysisRevision = editorAnalysisRevision.toLong() + (editorSession?.revision ?: 0L)
-        val diagnostics = editorSession?.diagnostics(file.text).orEmpty()
-        val structure = editorSession?.structure(file.text)
-        val gutterMarkers = if (editorSession != null && structure != null) {
-            ideGutterMarkers(file, structure, { model.save(file.path) }) { offset ->
-                editorSession.resolveGutterTargets(file.text, offset) { targets ->
-                    if (targets.size == 1) openDefinition(targets.single().location)
-                    else gutterNavigation = targets
-                }
+        val analysisRevision = editorAnalysisRevision.toLong() + editorSession.revision
+        val diagnostics = editorSession.diagnostics(file.text)
+        val structure = editorSession.structure(file.text)
+        val gutterMarkers = ideGutterMarkers(file, structure, { model.save(file.path) }) { offset ->
+            editorSession.resolveGutterTargets(file.text, offset) { targets ->
+                if (targets.size == 1) openDefinition(targets.single().location, file)
+                else if (targets.isNotEmpty()) gutterNavigation = GutterNavigationMenu(file, targets)
             }
-        } else emptyList()
+        }
         val fontSize = HollowIdeFontSize.size
         val editorId = "editor-${file.id}"
         val find = findStates[file.path]
         val matches = find?.matches(file.text).orEmpty()
         Column(tags = listOf("ide-editor-shell"), modifier = Modifier.size(100.percent, 100.percent)) {
-            RemoteProjectEditorStatus(file, remoteProject)
             if (find != null) {
                 HollowIdeFindBar(
                     state = find,
@@ -1379,7 +1392,7 @@ object HollowIdeOverlay {
                 mode = UiBoxMode.STACK,
                 tags = listOf("ide-editor-stack"),
                 modifier = Modifier.grow(1f).dropTarget(
-                    accepts = { remote == null && !file.readOnly && it.payload is HollowIdeFileDrag },
+                    accepts = { local && !file.readOnly && it.payload is HollowIdeFileDrag },
                     onDragOver = { _, x, y ->
                         editorState.previewDropAt(x, y)
                     },
@@ -1394,23 +1407,24 @@ object HollowIdeOverlay {
                     value = file.text,
                     onChange = { text ->
                         model.updateText(file.path, text)
-                        editorSession?.requestAnalysis(text, text.length)
+                        editorSession.requestAnalysis(text, text.length)
                         dock.updateItem(file.dockItem())
                     },
                     insight = UiCodeInsight(
-                        highlighter = editorSession?.highlighter,
-                        completions = if (file.readOnly) null else editorSession?.completions,
-                        signatureHelp = editorSession?.signatures,
-                        hover = editorSession?.hover,
+                        highlighter = editorSession.highlighter,
+                        highlightRevision = analysisRevision,
+                        completions = editorSession.completions.takeUnless { file.readOnly },
+                        signatureHelp = editorSession.signatures,
+                        hover = editorSession.hover,
                         diagnostics = diagnostics,
-                        inlayHints = editorSession?.inlayHints(file.text).orEmpty(),
+                        inlayHints = editorSession.inlayHints(file.text),
                         onInlayAction = { action -> runInlayAction(file, action) },
                         completionRevision = analysisRevision,
                         inlayRevision = analysisRevision,
                     ),
-                    view = UiCodeView(folds = structure?.folds.orEmpty(), markers = gutterMarkers),
+                    view = UiCodeView(folds = structure.folds, markers = gutterMarkers),
                     search = UiTextSearch(matches, find?.let { matches.getOrNull(it.currentIndex) }),
-                    syntax = KotlinCodeSyntax.takeIf { file.path.isKotlinSource() },
+                    syntax = KotlinCodeSyntax.takeIf { (remotePath ?: file.path).isKotlinSource() },
                     readOnly = file.readOnly,
                     fontSize = fontSize,
                     state = editorState,
@@ -1423,7 +1437,7 @@ object HollowIdeOverlay {
                         HollowIdeFontSize.zoom(event.rawScrollY)
                         event.consume()
                     })
-                if (remote == null) HollowIdeDiagnosticsBadge(file.id, diagnostics) { showProblems(file) }
+                HollowIdeDiagnosticsBadge(file.id, diagnostics) { showProblems(file) }
             }
         }
     }
@@ -1431,15 +1445,32 @@ object HollowIdeOverlay {
     /** The file's editor, or its text and preview in the mode the tab bar's switch picked. */
     @Composable
     private fun FileTabBody(file: HollowIdeOpenFile) {
+        LaunchedEffect(file, file.externalTextRevision) {
+            if (!file.hasUnsavedChanges) {
+                val text = file.textOrNull
+                if (text != null) editorStates[file.path]?.setText(text, moveCaretToEnd = false)
+            }
+        }
+        Column(modifier = Modifier.size(100.percent, 100.percent)) {
+            RemoteProjectEditorStatus(file, remoteProject)
+            Box(modifier = Modifier.size(100.percent, 0.px).grow(1f)) {
+                FileTabContent(file)
+            }
+        }
+    }
+
+    @Composable
+    private fun FileTabContent(file: HollowIdeOpenFile) {
         val view = fileView(file)
         if (view == null) {
             file.type.editor(file)
             return
         }
         val preview = view.preview
+        val editor = editorState(file)
         val context = remember(file, view, preview) {
-            HollowIdePreviewContext(file, view, preview, editorState(file).history) { next, label, mergeKey ->
-                applyEditorText(file, next, editorState(file).caret.coerceAtMost(next.length), label, mergeKey)
+            HollowIdePreviewContext(file, view, preview, editor.history) { next, label, mergeKey ->
+                applyEditorText(file, next, editor.caret.coerceAtMost(next.length), label, mergeKey)
             }
         }
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 100.percent)) {
@@ -1468,9 +1499,13 @@ object HollowIdeOverlay {
     /** Only text files get a preview: it reads and writes the text, whatever type the file has. */
     private fun fileView(file: HollowIdeOpenFile): HollowIdeFileView? {
         contributions.revision
-        if (file.remote != null || file.textOrNull == null) return null
-        fileViews[file.path]?.let { return it }
-        val found = previews.find(file.path).takeIf { it.isNotEmpty() } ?: return null
+        if (file.textOrNull == null) return null
+        val found = previews.find(file.projectPath)
+        fileViews[file.path]?.let { previous ->
+            if (previous.previews == found) return previous
+            fileViews.remove(file.path)?.close()
+        }
+        if (found.isEmpty()) return null
         return HollowIdeFileView(found).also { fileViews[file.path] = it }
     }
 
@@ -1734,6 +1769,7 @@ object HollowIdeOverlay {
         mergeKey: String? = null,
     ) {
         val editor = editorState(file)
+        if (editor.text != file.text) editor.setText(file.text, moveCaretToEnd = false)
         if (!editor.applyEdit(next, listOf(UiTextCaret(caret.coerceIn(0, next.length))), label, mergeKey)) return
         model.updateText(file.path, editor.text)
         dock.updateItem(file.dockItem())
@@ -1749,7 +1785,7 @@ object HollowIdeOverlay {
      * the caret kept on the line it was on.
      */
     private fun formatFile(file: HollowIdeOpenFile): Boolean {
-        if (file.remote != null || file.readOnly || file.textOrNull == null) return false
+        if (file.readOnly || file.textOrNull == null) return false
         val session = editorSession(file.path)
         if (!session.canFormat) {
             HollowNotifications.warning(EditorLang.NO_FORMATTER.lang(file.title))
@@ -1793,7 +1829,6 @@ object HollowIdeOverlay {
 
     private fun goToDefinition(): Boolean {
         val file = focusedEditorFile() ?: return false
-        if (file.remote != null) return false
         val editorKey = "editor-${file.id}"
         val editor = editorStates[file.path] ?: return false
         if (surface.runtime.focusedKey != editorKey) surface.runtime.focus(editorKey)
@@ -1803,7 +1838,7 @@ object HollowIdeOverlay {
                 HollowNotifications.warning(EditorLang.DEFINITION_NOT_FOUND.lang)
                 return@resolveDefinition
             }
-            openDefinition(definition)
+            openDefinition(definition, file)
         }
         return true
     }
@@ -1820,12 +1855,15 @@ object HollowIdeOverlay {
     private fun runInlayAction(file: HollowIdeOpenFile, action: UiInlayAction) {
         when (val decoded = InlayAction.decode(action.id)) {
             is InlayAction.OpenResource -> {
-                val definition = ResourceLocationTargets.definition(decoded.location)
-                if (definition == null) {
-                    HollowNotifications.error(EditorLang.RESOURCE_NOT_FOUND.lang(decoded.location))
-                } else {
-                    openDefinition(definition)
+                val project = file.analysisProject
+                if (project != null) {
+                    val path = ResourceLocationTargets.projectTextPath(decoded.location) ?: return
+                    remoteProject.openDefinition(project, path) { focusEditorAt(it, 0) }
+                    return
                 }
+                val definition = ResourceLocationTargets.definition(decoded.location)
+                if (definition == null) HollowNotifications.error(EditorLang.RESOURCE_NOT_FOUND.lang(decoded.location))
+                else openDefinition(definition)
             }
 
             is InlayAction.PickColor -> openColorPicker(file, action.range?.let {
@@ -1893,10 +1931,27 @@ object HollowIdeOverlay {
         colorPicker = picker.copy(text = next, end = picker.start + literal.length, color = color)
     }
 
-    private fun openDefinition(location: DefinitionLocation) {
+    private fun openDefinition(location: DefinitionLocation, from: HollowIdeOpenFile? = null) {
         val definition = location.withNormalizedLineSeparators()
+        val remote = from?.analysisProject
+        if (remote != null && !definition.readOnly && definition.text == null) {
+            if (definition.path == from.remoteLanguagePath) {
+                openFileDockItem(from)
+                focusEditorAt(from, definition.offset)
+                return
+            }
+            remoteProject.openDefinition(remote, definition.path) { focusEditorAt(it, definition.offset) }
+            return
+        }
         val file = if (definition.text != null || definition.readOnly) {
-            model.openReadOnly(definition.path, definition.text.orEmpty())
+            if (remote != null && definition.path.startsWith("${SandboxScriptSource.SCRIPTS_DIRECTORY}/")) {
+                model.openReadOnly(
+                    "remote-project://${remote.session}/generated/${definition.path}",
+                    definition.text.orEmpty(),
+                    definition.path,
+                    remote,
+                )
+            } else model.openReadOnly(definition.path, definition.text.orEmpty())
         } else {
             when (val result = model.openFile(definition.path)) {
                 HollowIdeOpenResult.Unsupported -> {

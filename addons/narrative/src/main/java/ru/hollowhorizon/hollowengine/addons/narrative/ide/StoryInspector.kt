@@ -4,7 +4,6 @@ import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.renameVariable
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.*
-import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeEditor
@@ -118,7 +117,7 @@ private fun StoryProperties(state: StoryEditorState) {
         }
     }
     StoryImports(state, graph)
-    val kotlin = StoryGraphCompiler.compile(state.root() ?: graph, StoryActionFunctions)
+    val kotlin = StoryGraphCompiler.compile(state.root() ?: graph, state.functions)
     kotlin.problems.forEach { Text(StoryChecks.text(it), tags = listOf("story-inspector-problem")) }
     CollapsibleSection(
         storyLang("kotlin"),

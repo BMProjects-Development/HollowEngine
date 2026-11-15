@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.*
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctions
 import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentAnalysis
 import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.KotlinFragmentInsight
@@ -103,9 +104,11 @@ object StoryInsight {
 
     /** What analysis has of the story in [state], which goes when the file closes. */
     class Session(val state: StoryEditorState, path: String) : AutoCloseable {
-        val script = KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN)
+        val script = state.context?.file?.let { KotlinFragmentInsight(it, SCRIPT, StoryFieldChecks.PIN) }
+            ?: KotlinFragmentInsight(path + SCRIPT, StoryFieldChecks.PIN)
         val fields = HashMap<StoryFieldKey, FieldInsight>()
         var graph: StoryGraph? = null
+        private var functions: StoryFunctions = StoryActionFunctions
         lateinit var story: GeneratedStory
         lateinit var checked: StoryCheckScript
         var found: KotlinFragmentAnalysis? = null
@@ -125,17 +128,19 @@ object StoryInsight {
         private var unknown: Set<StoryGenericKey> = emptySet()
 
         fun of(graph: StoryGraph) = apply {
-            if (graph == this.graph) return@apply
+            val functions = state.functions
+            if (graph == this.graph && functions === this.functions) return@apply
             this.graph = graph
-            story = StoryGraphCompiler.compile(graph, StoryActionFunctions)
-            checked = StoryFieldChecks.script(graph, story.code, unknown)
+            this.functions = functions
+            story = StoryGraphCompiler.compile(graph, functions)
+            checked = StoryFieldChecks.script(graph, story.code, unknown, functions)
         }
 
         fun inferred(unknown: Set<StoryGenericKey>): Boolean {
             val graph = graph ?: return false
             if (unknown == this.unknown) return false
             this.unknown = unknown
-            checked = StoryFieldChecks.script(graph, story.code, unknown)
+            checked = StoryFieldChecks.script(graph, story.code, unknown, functions)
             return true
         }
 

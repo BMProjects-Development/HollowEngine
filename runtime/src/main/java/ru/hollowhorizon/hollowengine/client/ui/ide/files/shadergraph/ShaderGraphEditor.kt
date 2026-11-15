@@ -37,7 +37,7 @@ internal fun ShaderGraphEditor(file: HollowIdeOpenFile) {
         if (document.isModified) file.save()
     }
     LaunchedEffect(document, document.isModified) {
-        if (document.isModified) return@LaunchedEffect
+        if (document.isModified || file.isRemote) return@LaunchedEffect
         val location = VfxGraphMaterials.locationOf(file.path)
         RenderSystem.recordRenderCall { VfxGraphMaterials.changed(location) }
     }

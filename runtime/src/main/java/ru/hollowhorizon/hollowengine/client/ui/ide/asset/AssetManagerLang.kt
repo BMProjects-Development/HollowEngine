@@ -9,7 +9,6 @@ internal object AssetManagerLang {
     const val FILTER_CURRENT_FOLDER = ROOT + "filter_current_folder"
     const val CLOSE_FILTER = ROOT + "close_filter"
     const val REFRESH = ROOT + "refresh"
-    const val LOADING = ROOT + "loading"
     const val NO_RESOURCES = ROOT + "no_resources"
     const val EMPTY_FOLDER = ROOT + "empty_folder"
     const val OPEN = ROOT + "open"

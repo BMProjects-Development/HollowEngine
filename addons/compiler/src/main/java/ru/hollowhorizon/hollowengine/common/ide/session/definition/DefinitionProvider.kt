@@ -13,9 +13,10 @@ import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import ru.hollowhorizon.hollowengine.common.ide.session.ScriptingAnalyzerImpl
 import ru.hollowhorizon.hollowengine.common.ide.session.inlays.resourceLocationDefinition
 import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
+import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptAnalysisProject
 
-fun ScriptingAnalyzerImpl.findDefinition(file: KtFile, offset: Int): DefinitionLocation? {
-    resourceLocationDefinition(file, offset)?.let { return it }
+fun ScriptingAnalyzerImpl.findDefinition(file: KtFile, offset: Int, project: ScriptAnalysisProject? = null): DefinitionLocation? {
+    resourceLocationDefinition(file, offset, project)?.let { return it }
     val expression = file.referenceExpressionAt(offset) ?: return null
     return analyze(file) {
         val call = expression.parent as? KtCallExpression
@@ -37,4 +38,4 @@ private fun KtFile.referenceExpressionAt(offset: Int): KtSimpleNameExpression? {
 }
 
 internal fun ScriptingAnalyzerImpl.definitionForSymbol(symbol: KaDeclarationSymbol): DefinitionLocation? =
-    symbol.psi?.let(navigation::definitionFor)
+    symbol.psi?.let(::definitionFor)

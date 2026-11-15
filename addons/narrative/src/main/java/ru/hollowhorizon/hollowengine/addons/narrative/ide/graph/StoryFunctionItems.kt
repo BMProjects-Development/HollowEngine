@@ -22,9 +22,12 @@ internal object StoryFunctionItems {
         val own = state.root()?.functions.orEmpty().sortedBy { it.name }.map { function ->
             item(function.name) { add(StoryNode.Invoke(StoryGraph.newId(), function.name)) }
         }
-        val here = state.context?.file?.path?.let { ScriptRegistry.parse(it).qualified }
-        val others = StoryLibrary.stories().filter { it != here }.mapNotNull { file ->
-            val functions = StoryLibrary.functions(file).sortedBy { it.name }.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+        val project = state.context?.file
+        val remote = state.projectFunctions.takeIf { project?.isRemote == true }
+        val here = project?.projectPath?.let { remote?.sourceId(it) ?: ScriptRegistry.parse(it).qualified }
+        val others = (remote?.sources() ?: StoryLibrary.stories()).filter { it != here }.mapNotNull { file ->
+            val functions = (remote?.functions(file) ?: StoryLibrary.functions(file))
+                .sortedBy { it.name }.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
             UiDropdownItem(
                 ScriptRegistry.display(ScriptId.parse(file, ScriptRegistry.sandboxNamespace)),
                 mark = UiMenuParts.icon(StoryNodeKind.FUNCTION.icon),

@@ -49,11 +49,6 @@
     margin-left: 6px;
 }
 
-.ide-remote-loading {
-    foreground: $text-muted;
-    wrap: false;
-}
-
 .remote-project-tree .tree-item {
     animations: none;
 }

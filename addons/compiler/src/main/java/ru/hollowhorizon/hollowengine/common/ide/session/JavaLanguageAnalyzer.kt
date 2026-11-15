@@ -2,38 +2,12 @@ package ru.hollowhorizon.hollowengine.common.ide.session
 
 import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiErrorElement
-import com.intellij.psi.PsiField
-import com.intellij.psi.PsiFileFactory
-import com.intellij.psi.PsiIdentifier
-import com.intellij.psi.PsiJavaCodeReferenceElement
-import com.intellij.psi.PsiJavaFile
-import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiNameIdentifierOwner
-import com.intellij.psi.PsiNamedElement
-import com.intellij.psi.PsiNewExpression
-import com.intellij.psi.PsiParameter
-import com.intellij.psi.PsiPackage
-import com.intellij.psi.PsiVariable
+import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import ru.hollowhorizon.hollowengine.common.ide.session.definition.LibraryNavigation
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.javaEditorStructure
 import ru.hollowhorizon.hollowengine.common.ide.session.structure.javaGutterTargets
-import ru.hollowhorizon.hollowengine.common.scripting.ide.EditorStructure
-import ru.hollowhorizon.hollowengine.common.scripting.ide.DefinitionLocation
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Diagnostic
-import ru.hollowhorizon.hollowengine.common.scripting.ide.GutterNavigationTarget
-import ru.hollowhorizon.hollowengine.common.scripting.ide.HoverInfo
-import ru.hollowhorizon.hollowengine.common.scripting.ide.JavaScriptingAnalyzer
-import ru.hollowhorizon.hollowengine.common.scripting.ide.OccurrenceRange
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Position
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Range
-import ru.hollowhorizon.hollowengine.common.scripting.ide.ScriptingAnalyzer
-import ru.hollowhorizon.hollowengine.common.scripting.ide.Severity
-import ru.hollowhorizon.hollowengine.common.scripting.ide.SourceDocumentPath
-import ru.hollowhorizon.hollowengine.common.scripting.ide.TextLine
+import ru.hollowhorizon.hollowengine.common.scripting.ide.*
 import ru.hollowhorizon.hollowengine.common.scripting.ide.TokenType
 
 /**
@@ -46,14 +20,17 @@ internal class JavaLanguageAnalyzer(
     private val navigation: LibraryNavigation,
     private val lock: Any,
 ) : ScriptingAnalyzer {
+    override fun forProject(project: ScriptAnalysisProject): ScriptingAnalyzer =
+        JavaLanguageAnalyzer(this.project, projectStructure, navigation, lock)
+
     private var cachedName: String? = null
     private var cachedText: String? = null
     private var cachedFile: PsiJavaFile? = null
 
     private fun file(name: String, text: String): PsiJavaFile {
         if (cachedName == name && cachedText == text) return requireNotNull(cachedFile)
-        val file = PsiFileFactory.getInstance(project)
-            .createFileFromText(name, JavaFileType.INSTANCE, text) as PsiJavaFile
+        val file =
+            PsiFileFactory.getInstance(project).createFileFromText(name, JavaFileType.INSTANCE, text) as PsiJavaFile
         cachedFile?.let(projectStructure::removeModule)
         projectStructure.setLibraryContext(file)
         cachedName = name
@@ -74,9 +51,10 @@ internal class JavaLanguageAnalyzer(
         javaEditorStructure(file(name, text))
     }
 
-    override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> = synchronized(lock) {
-        javaGutterTargets(file(name, text), offset, navigation)
-    }
+    override fun gutterTargets(name: String, text: String, offset: Int): List<GutterNavigationTarget> =
+        synchronized(lock) {
+            javaGutterTargets(file(name, text), offset, navigation)
+        }
 
     override fun documentText(path: String): String? = synchronized(lock) {
         (SourceDocumentPath.parse(path) as? SourceDocumentPath.Decompiled)?.let(navigation::decompiledText)
@@ -94,10 +72,17 @@ internal class JavaLanguageAnalyzer(
         val file = file(name, text)
         val leaf = file.findElementAt(offset.coerceIn(0, (text.length - 1).coerceAtLeast(0)))
         val target = file.referenceAt(offset)?.resolvedTarget() ?: (leaf?.parent as? PsiNameIdentifierOwner)
-            ?: return@synchronized emptyList()
+        ?: return@synchronized emptyList()
         buildList {
             if (target.containingFile == file) {
-                (target as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.let { add(OccurrenceRange(it.startOffset, it.endOffset)) }
+                (target as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.let {
+                    add(
+                        OccurrenceRange(
+                            it.startOffset,
+                            it.endOffset
+                        )
+                    )
+                }
             }
             PsiTreeUtil.collectElementsOfType(file, PsiJavaCodeReferenceElement::class.java).forEach { reference ->
                 if (reference.resolvedTarget() == target) reference.referenceNameElement?.textRange?.let {
@@ -126,14 +111,16 @@ internal class JavaLanguageAnalyzer(
 
     override fun diagnostic(name: String, text: String): List<Diagnostic> = synchronized(lock) {
         PsiTreeUtil.collectElementsOfType(file(name, text), PsiErrorElement::class.java).map { error ->
-            Diagnostic(Range(Position.at(text, error.textRange.startOffset), Position.at(text, error.textRange.endOffset)),
-                Severity.ERROR, error.errorDescription)
+            Diagnostic(
+                Range(Position.at(text, error.textRange.startOffset), Position.at(text, error.textRange.endOffset)),
+                Severity.ERROR,
+                error.errorDescription
+            )
         }
     }
 
     private fun PsiJavaFile.referenceAt(offset: Int): PsiJavaCodeReferenceElement? {
-        return sequenceOf(offset, offset - 1).filter { it in 0 until textLength }
-            .mapNotNull(::findElementAt)
+        return sequenceOf(offset, offset - 1).filter { it in 0 until textLength }.mapNotNull(::findElementAt)
             .flatMap { generateSequence(it) { element -> element.parent } }
             .filterIsInstance<PsiJavaCodeReferenceElement>().firstOrNull { reference ->
                 reference.referenceNameElement?.textRange?.let { offset in it.startOffset..it.endOffset } == true
@@ -147,11 +134,14 @@ private fun PsiJavaCodeReferenceElement.resolvedTarget(): PsiElement? {
     return resolve()
 }
 
-private fun PsiElement.nameOffset(): Int = (this as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.startOffset
-    ?: textRange.startOffset
+private fun PsiElement.nameOffset(): Int =
+    (this as? PsiNameIdentifierOwner)?.nameIdentifier?.textRange?.startOffset ?: textRange.startOffset
 
 private fun PsiElement.tokenType(): TokenType? = when (this) {
-    is PsiClass -> when { isAnnotationType -> TokenType.ANNOTATION; isEnum -> TokenType.ENUM; isInterface -> TokenType.INTERFACE; else -> TokenType.CLASS }
+    is PsiClass -> when {
+        isAnnotationType -> TokenType.ANNOTATION; isEnum -> TokenType.ENUM; isInterface -> TokenType.INTERFACE; else -> TokenType.CLASS
+    }
+
     is PsiMethod -> if (isConstructor) TokenType.CLASS else TokenType.METHOD
     is PsiField -> TokenType.FIELD
     is PsiParameter -> TokenType.PARAMETER
@@ -165,6 +155,7 @@ private fun PsiElement.presentation(): String? = when (this) {
         append(containingClass?.qualifiedName?.let { "$it." }.orEmpty()).append(name)
         append(parameterList.parameters.joinToString(", ", "(", ")") { "${it.type.presentableText} ${it.name}" })
     }
+
     is PsiClass -> qualifiedName ?: name.orEmpty()
     is PsiVariable -> "${type.presentableText} $name"
     is PsiPackage -> qualifiedName

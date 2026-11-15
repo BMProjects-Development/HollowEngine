@@ -103,12 +103,7 @@ internal class RemoteProjectPanelController(
                 filterState = filter,
                 filterPlaceholder = "$RemoteLang.filter".lang,
                 onFilterOpened = focusFilter,
-                rowTail = {
-                    if (it.depth == 0) sourceTail()
-                    if (it.expanded && it.payload.loading) {
-                        Text("$RemoteLang.loading".lang, tags = listOf("ide-remote-message", "ide-remote-loading"))
-                    }
-                },
+                rowTail = { if (it.depth == 0) sourceTail() },
                 dragItem = { item ->
                     item.takeIf { it.depth > 1 }?.let { UiDragItem(DraggedPath(it.payload.path), it.icon, it.label) }
                 },
@@ -277,7 +272,6 @@ internal fun RemoteProjectEditorStatus(file: HollowIdeOpenFile, workspace: Remot
     val remote = file.remote ?: return
     val message = when {
         !remote.online -> RemoteProjectError.DISCONNECTED.message()
-        remote.saving -> "$RemoteLang.saving".lang
         remote.missing -> RemoteProjectError.MISSING.message()
         remote.conflict != null -> RemoteProjectError.CONFLICT.message()
         else -> remote.error?.message()
@@ -294,11 +288,11 @@ internal fun RemoteProjectEditorStatus(file: HollowIdeOpenFile, workspace: Remot
                 label = "$RemoteLang.resolve".lang,
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
-                items = listOf(
-                    UiDropdownItem("$RemoteLang.view_server".lang) { workspace.showServerVersion(file) },
-                    UiDropdownItem("$RemoteLang.use_server".lang) { remote.useServerVersion(file) },
-                    UiDropdownItem("$RemoteLang.keep_local".lang) { remote.useLatestRevision() },
-                ),
+                items = buildList {
+                    if (file.textOrNull != null) add(UiDropdownItem("$RemoteLang.view_server".lang) { workspace.showServerVersion(file) })
+                    add(UiDropdownItem("$RemoteLang.use_server".lang) { remote.useServerVersion(file) })
+                    add(UiDropdownItem("$RemoteLang.keep_local".lang) { remote.useLatestRevision() })
+                },
             )
         }
     }

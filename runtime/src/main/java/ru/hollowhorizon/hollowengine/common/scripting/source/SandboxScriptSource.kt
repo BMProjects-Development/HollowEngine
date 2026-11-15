@@ -25,8 +25,6 @@ class SandboxScriptSource(
         directory.mkdirs()
     }
 
-    val scriptsDirectory: File get() = directory
-
     data class SandboxDescriptor(val id: String, val dependencies: List<String>, val version: String)
 
     companion object {
@@ -46,10 +44,14 @@ class SandboxScriptSource(
                     file,
                     DEFAULT_SANDBOX_NAMESPACE,
                 )
-                return fallback.copy(version = properties.version)
             }
-            return SandboxDescriptor(properties.id, properties.dependsOn, properties.version)
+            return descriptor(properties)
         }
+
+        fun descriptor(properties: ProjectProperties): SandboxDescriptor =
+            if (properties.id.matches(NAMESPACE_PATTERN)) {
+                SandboxDescriptor(properties.id, properties.dependsOn, properties.version)
+            } else SandboxDescriptor(DEFAULT_SANDBOX_NAMESPACE, emptyList(), properties.version)
     }
 }
 

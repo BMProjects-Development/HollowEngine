@@ -1,6 +1,5 @@
 {
   "title": "Мир",
-  "loading": "Запрос к серверу…",
   "error.operator_required": "Для изменения мира нужны права оператора",
   "time": "Время",
   "time.morning": "Утро",

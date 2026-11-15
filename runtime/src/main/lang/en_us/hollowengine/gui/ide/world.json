@@ -1,6 +1,5 @@
 {
   "title": "World",
-  "loading": "Asking the server…",
   "error.operator_required": "Changing the world needs operator permissions",
   "time": "Time",
   "time.morning": "Morning",

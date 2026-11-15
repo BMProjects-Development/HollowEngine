@@ -12,16 +12,15 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphCompiler
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.components.ComponentCommands
 import ru.hollowhorizon.hollowengine.common.scripting.ScriptLoader
+import ru.hollowhorizon.hollowengine.common.scripting.source.ProjectScriptTranslator
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptId
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
-import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptTranslator
-import java.io.File
 
 /**
  * The `.story` files as running scripts: each is compiled and kept running while its text stays the same, so that
  * [saved] variables and the stories in it live on through a reload that did not touch it.
  */
-internal object StoryScripts : ScriptTranslator {
+internal object StoryScripts : ProjectScriptTranslator {
     const val EXTENSION = ".story"
     private const val MAIN = "main"
     private const val NARRATIVE = "hollowengine-narrative"
@@ -31,14 +30,28 @@ internal object StoryScripts : ScriptTranslator {
 
     private val loaded = HashMap<ScriptId, Loaded>()
 
-    override fun translate(id: ScriptId, source: File): String {
-        val story = StoryGraphCompiler.compile(StoryGraph.decode(source.readText()), StoryActionFunctions, id.qualified)
+    override fun translate(id: ScriptId, text: String, read: (ScriptId) -> String?): String {
+        val functions = object : StoryFunctions by StoryActionFunctions {
+            private val stories = HashMap<String, StoryGraph?>()
+
+            private fun graph(file: String): StoryGraph? = if (file in stories) stories[file] else {
+                read(ScriptId.parse(file, id.namespace))
+                    ?.let { runCatching { StoryGraph.decode(it) }.getOrNull() }
+                    .also { stories[file] = it }
+            }
+
+            override fun storyFunction(file: String, name: String): StoryNode.Function? =
+                graph(file)?.functions?.firstOrNull { it.name == name }
+
+            override fun storyImports(file: String): Set<String> = graph(file)?.importedStories().orEmpty()
+        }
+        val story = StoryGraphCompiler.compile(StoryGraph.decode(text), functions, id.qualified)
         val errors = story.problems.filter { !it.warning }
         if (errors.isEmpty()) return story.code
         val problems = errors.joinToString("; ") { problem ->
             problem.node?.let { "$it: ${problem.message}" } ?: problem.message
         }
-        throw StoryException("Story '${ScriptRegistry.display(id)}' cannot be built: $problems")
+        throw StoryException("Story '${id.qualified}' cannot be built: $problems")
     }
 
     /** Brings the running stories in line with the files. */

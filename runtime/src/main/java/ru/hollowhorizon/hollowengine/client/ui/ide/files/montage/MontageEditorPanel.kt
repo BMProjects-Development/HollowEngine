@@ -63,7 +63,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
         session.sync()
         if (!document.isModified) return@LaunchedEffect
         delay(AutoSaveDelayMillis.milliseconds)
-        if (document.isModified && file.save()) state.publish()
+        if (document.isModified && file.save() && !file.isRemote) state.publish()
     }
 
     LaunchedEffect(document) {

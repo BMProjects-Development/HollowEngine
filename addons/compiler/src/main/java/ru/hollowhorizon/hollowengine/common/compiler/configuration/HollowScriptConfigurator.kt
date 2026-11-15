@@ -12,14 +12,16 @@ import kotlin.script.experimental.host.FileBasedScriptSource
 import kotlin.script.experimental.host.FileScriptSource
 
 /**
- * Handles `@file:Import("...")` through the script registry. Physical scripts use their registered identity,
- * IDE scripts use the logical editor path as that identity, and unregistered physical scripts fall back to
- * paths relative to their source file.
+ * Handles `@file:Import("...")` for compilation. IDE analysis supplies its own script modules
+ * from the active project. Unregistered physical scripts resolve relative to their source file.
  */
 class HollowScriptConfigurator : RefineScriptCompilationConfigurationHandler {
     override operator fun invoke(context: ScriptConfigurationRefinementContext) = processAnnotations(context)
 
     private fun processAnnotations(context: ScriptConfigurationRefinementContext): ResultWithDiagnostics<ScriptCompilationConfiguration> {
+        val script = context.script
+        if (script is KtFileScriptSource) return context.compilationConfiguration.asSuccess()
+
         val references = context.collectedData?.get(ScriptCollectedData.collectedAnnotations)
             .orEmpty()
             .asSequence()
@@ -38,19 +40,13 @@ class HollowScriptConfigurator : RefineScriptCompilationConfigurationHandler {
             .toList()
         if (references.isEmpty()) return context.compilationConfiguration.asSuccess()
 
-        val script = context.script
         val scriptFile = (script as? FileBasedScriptSource)?.file
-        val owner = when (script) {
-            is KtFileScriptSource -> ScriptRegistry.parse(script.ktFile.name)
-            else -> scriptFile?.let(ScriptRegistry::idOf)
-        }
-        val isIdeSource = script is KtFileScriptSource
+        val owner = scriptFile?.let(ScriptRegistry::idOf)
         val importedSources = ArrayList<SourceCode>(references.size)
         references.forEach { reference ->
             val resolution = runCatching { resolve(owner, scriptFile, reference) }
             val resolved = resolution.getOrNull()
             if (resolved == null) {
-                if (isIdeSource) return@forEach
                 val message = resolution.exceptionOrNull()?.message
                     ?: "Cannot resolve the imported script '$reference'"
                 return makeFailureResult(message)

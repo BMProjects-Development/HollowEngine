@@ -5,11 +5,14 @@ import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneTi
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGraphFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeScriptTemplate
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
+import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeLanguage
 import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdePreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.registerIdeScriptTemplate
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.IdeTimelines
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
+import ru.hollowhorizon.hollowengine.common.scripting.ide.JsonScriptingAnalyzer
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 
 /**
@@ -28,6 +31,11 @@ internal object NarrativeClient {
         extensions.register(UiDefinitionRegistry.builtInOverlays, "speech", DialogueOverlays.speech)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "choice", DialogueOverlays.choice)
         extensions.registerIdePreview(StoryGraphFilePreview)
+        extensions.registerIdeLanguage(
+            HollowIdeLanguageService.extensions(
+                "story",
+                listOf("story")
+            ) { JsonScriptingAnalyzer })
         extensions.registerIdeScriptTemplate(
             HollowIdeScriptTemplate.fromResource(
                 id = "dialogue",

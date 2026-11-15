@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectAnalysis
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContext
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCompletionContributor
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiInlineStyle
@@ -39,9 +40,18 @@ fun kotlinTokenHighlighter(tokens: (String) -> List<KotlinToken>) = UiSyntaxHigh
  * @param path the name analysis knows the text by; its extension picks the language.
  * @param typedProperties the start of the names of the properties to tell the types of.
  */
-class KotlinFragmentInsight(path: String, typedProperties: String? = null) : AutoCloseable {
+class KotlinFragmentInsight private constructor(
+    path: String,
+    typedProperties: String?,
+    project: RemoteProjectAnalysis?,
+) : AutoCloseable {
+    constructor(path: String, typedProperties: String? = null) : this(path, typedProperties, null)
+
+    constructor(file: HollowIdeOpenFile, suffix: String, typedProperties: String? = null) :
+        this(file.projectPath + suffix, typedProperties, file.analysisProject)
+
     private var revision by mutableLongStateOf(0L)
-    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties) { revision = session.revision }
+    private val session: HollowIdeEditorSession = HollowIdeEditorSession(path, typedProperties, project) { revision = session.revision }
 
     /** Moves on with analysis, for telling a field to read it again. */
     val version: Long get() = revision

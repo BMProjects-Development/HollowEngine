@@ -3,11 +3,13 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFunctions
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryGraphEdits.edit
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGenericBlocks
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
+import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryActionFunctions
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdePreviewContext
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.HollowIdeTextModel
@@ -40,6 +42,9 @@ data class StorySelection(val node: String, val pin: String? = null)
 open class StoryEditorState : AutoCloseable {
     /** The file drawn now; the inspector, drawn elsewhere, reads and writes through it. */
     var context: HollowIdePreviewContext? = null
+    internal var projectFunctions by mutableStateOf(StoryProjectFunctions.Empty)
+    internal val functions: StoryFunctions
+        get() = if (context?.file?.isRemote == true) projectFunctions else StoryActionFunctions
 
     var insight: StoryInsight.Session? = null
 
