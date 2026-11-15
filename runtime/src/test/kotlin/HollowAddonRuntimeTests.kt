@@ -167,7 +167,6 @@ class HollowAddonRuntimeTests {
         addon(addons, "compat.jar", "id=compat\ndependsOnMods=create")
         addon(addons, "hud.jar", "id=hud\nenvironment=client")
         start()
-        // A missing mod is the player's to fix; an addon for the other side is nothing to report.
         assertEquals(listOf("not running: broken failed", "not running: compat missing mods"), notifications)
         notifications.clear()
 

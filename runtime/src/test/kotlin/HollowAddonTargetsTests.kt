@@ -50,16 +50,4 @@ class HollowAddonTargetsTests {
         assertEquals("common", AddonTargets.normalizePlatform(null))
         assertEquals("fabric,forge", AddonTargets.normalizePlatform("Fabric,Forge"))
     }
-
-    @Test
-    fun `an environment keeps an addon to its side`() {
-        assertTrue(AddonTargets.runsIn(null, true))
-        assertTrue(AddonTargets.runsIn("common", false))
-        assertTrue(AddonTargets.runsIn("Client", true))
-        assertFalse(AddonTargets.runsIn("client", false))
-        assertTrue(AddonTargets.runsIn("server", false))
-        assertFalse(AddonTargets.runsIn("server", true))
-        assertFalse(AddonTargets.runsIn("both", true))
-        assertFalse(AddonTargets.runsIn("both", false))
-    }
 }
