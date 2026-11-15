@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonEnvironment
+import ru.hollowhorizon.hollowengine.bootstrap.runtime.RuntimePlatform
 import ru.hollowhorizon.hollowengine.common.scripting.source.DEFAULT_SANDBOX_NAMESPACE
 
 private const val LANG = "hollowengine.gui.ide.project"
@@ -55,6 +56,7 @@ private fun SettingsDialog(packaging: HollowIdeProjectPackaging, form: ProjectSe
             Field("$LANG.field.name".lang, form.name, "project-settings-name", form.id) { form.name = it }
             Field("$LANG.field.version".lang, form.version, "project-settings-version") { form.version = it }
             EnvironmentField(form)
+            PlatformField(form)
             Field("$LANG.field.description".lang, form.description, "project-settings-description") {
                 form.description = it
             }
@@ -116,6 +118,19 @@ private fun EnvironmentField(form: ProjectSettingsForm) {
 }
 
 private fun HollowAddonEnvironment.label(): String = "$LANG.environment.${name.lowercase()}".lang
+
+@Composable
+private fun PlatformField(form: ProjectSettingsForm) {
+    Column(tags = listOf("project-dialog-field"), modifier = Modifier.size(100.percent, UiLength.Fit)) {
+        Text("$LANG.field.platform".lang, tags = listOf("project-dialog-label"))
+        Paragraph("$LANG.field.platform.hint".lang, "project-dialog-hint")
+        RuntimePlatform.entries.forEach { loader ->
+            CheckboxRow("project-platform-${loader.id()}", loader.displayName(), form.platform.names(loader)) { checked ->
+                form.platform = form.platform.with(loader, checked)
+            }
+        }
+    }
+}
 
 @Composable
 private fun ModDependenciesField(form: ProjectSettingsForm) {
