@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache.SharedSc
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint.Fingerprint
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.isSharedScript
+import ru.hollowhorizon.hollowengine.common.scripting.compiling.ScriptClassFiles
 import ru.hollowhorizon.hollowengine.common.scripting.source.ScriptRegistry
 import java.io.File
 import java.io.FileOutputStream
@@ -32,9 +33,7 @@ private class SharedScript(
     val fingerprint: Fingerprint,
     val classes: Map<String, ByteArray>,
 ) {
-    private val classPrefix = reference.scriptClass.replace('.', '/')
-
-    fun owns(path: String): Boolean = path == "$classPrefix.class" || path.startsWith("$classPrefix$")
+    fun owns(path: String): Boolean = path in classes
 }
 
 /**
@@ -102,8 +101,7 @@ private fun KJvmCompiledScript.collectSharedScripts(output: Map<String, ByteArra
         val id = ScriptRegistry.idOf(source) ?: return
         val fingerprint = runCatching { ScriptFingerprint.compute(id) }.getOrNull()?.copy(runtime = runtime) ?: return
 
-        val prefix = name.replace('.', '/')
-        val classes = output.filterKeys { it == "$prefix.class" || it.startsWith("$prefix$") }
+        val classes = ScriptClassFiles.of(name, output)
         if (classes.isEmpty()) return
 
         found[name] = SharedScript(SharedScriptRef(name, id, fingerprint.code), fingerprint, classes)

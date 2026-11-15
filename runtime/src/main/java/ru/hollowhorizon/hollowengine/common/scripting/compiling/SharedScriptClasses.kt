@@ -24,7 +24,12 @@ import kotlin.script.experimental.jvm.impl.KJvmCompiledScript
  * file, and `@file:SharedScript` could only share an instance inside a single import graph.
  */
 object SharedScriptClasses {
-    private class Entry(val reference: SharedScriptRef, val loader: ClassLoader, val dependencies: List<Entry>) {
+    private class Entry(
+        val reference: SharedScriptRef,
+        val loader: ClassLoader,
+        val dependencies: List<Entry>,
+        val classNames: Set<String>,
+    ) {
         val identity: String get() = reference.fingerprint
     }
 
@@ -47,7 +52,18 @@ object SharedScriptClasses {
     ): Map<String, ClassLoader> {
         val result = LinkedHashMap<String, Entry>()
         imports.forEach { collect(it, entries, parent, declared, result) }
-        return result.mapValues { it.value.loader }
+        return classLoaders(result.values)
+    }
+
+    private fun classLoaders(entries: Collection<Entry>): Map<String, ClassLoader> = buildMap {
+        entries.forEach { entry ->
+            (entry.classNames + entry.reference.scriptClass).forEach { name ->
+                val previous = put(name, entry.loader)
+                check(previous == null || previous === entry.loader) {
+                    "Class '$name' belongs to more than one shared script in the same import graph"
+                }
+            }
+        }
     }
 
     private fun collect(
@@ -102,10 +118,13 @@ object SharedScriptClasses {
             }
         }
         val classes = classesOf(reference, entries)
-        val loader = MemoryClassLoader(classes, parent).apply { shareClassesOf(result.mapValues { it.value.loader }) }
+        val loader = MemoryClassLoader(classes, parent).apply { shareClassesOf(classLoaders(result.values)) }
         val dependencies = script.otherScripts.filterIsInstance<KJvmCompiledScript>()
             .mapNotNull { result[it.scriptClassFQName] }
-        val entry = Entry(reference, loader, dependencies)
+        val names = classes.keys.filter { it.endsWith(".class") }.mapTo(HashSet()) {
+            it.removeSuffix(".class").replace('/', '.')
+        }
+        val entry = Entry(reference, loader, dependencies, names)
         loaders[reference.id] = entry
         if (existing != null) {
             HollowEngine.LOGGER.warn("Shared script '{}' changed identity: class={}, old fingerprint={}, new fingerprint={}, old loader={}, new loader={}",
@@ -144,8 +163,7 @@ object SharedScriptClasses {
         }
 
         if (fallback.containsKey(classFileOf(reference.scriptClass))) {
-            val prefix = reference.scriptClass.replace('.', '/')
-            return fallback.filterKeys { it == "$prefix.class" || it.startsWith("$prefix$") }
+            return ScriptClassFiles.of(reference.scriptClass, fallback)
         }
 
         if (artifact != null) {
