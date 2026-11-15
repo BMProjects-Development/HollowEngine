@@ -132,6 +132,7 @@ internal class StoryNodeLayout(
             addLabel: String? = null,
             nameField: StoryRowField? = null,
             section: StoryRowSection? = null,
+            reorder: StoryRowReorder? = null,
         ) {
             foldedAt?.let { heading ->
                 result += StoryNodeRow(heading, 0f, label, input, output, field, section = section, hidden = true)
@@ -140,7 +141,7 @@ internal class StoryNodeLayout(
             val height = if (field != null && field.lines > 1) field.lines * LINE + 12f else StoryNodeBox.FLOW_ROW
             result += StoryNodeRow(
                 y, height, label, input, output, field, onRemove, onAdd, hint, optional, addLabel, nameField, section,
-                depth = depth,
+                depth = depth, reorder = reorder,
             )
             y += height
         }

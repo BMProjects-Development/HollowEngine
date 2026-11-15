@@ -150,6 +150,15 @@
     align-items: center center;
 }
 
+.st-reorder-handle {
+    size: 16px 20px;
+    border-radius: $radius-small;
+}
+
+.st-reorder-handle:hover { background: $bg-hover; }
+.st-reorder-icon { size: 10px 14px; tint: $text-muted; }
+.st-reorder-handle:hover .st-reorder-icon { tint: $text; }
+
 .story-slot-grid {
     padding: 8px;
     gap: 2px;

@@ -19,6 +19,30 @@ import kotlin.test.assertTrue
 
 /** The controller over a material graph, the way the editor drives it. */
 class GraphEditorControllerTest {
+    @Test
+    fun `grab can be confirmed as a single undoable move`() {
+        val fixture = Fixture(ShaderGraph(nodes = nodes))
+        fixture.controller.select(GraphSelection.of("a"))
+        fixture.controller.updatePointer(GraphPointer(100f, 100f, 100f, 100f, 40f, 40f))
+        fixture.controller.handleKey(key(GLFW.GLFW_KEY_G))
+        fixture.controller.updatePointer(GraphPointer(150f, 120f, 150f, 120f, 90f, 60f))
+        fixture.controller.endMove(true)
+        assertEquals(50f, fixture.document.graph.node("a")?.x)
+        assertTrue(fixture.document.history.undo())
+        assertEquals(0f, fixture.document.graph.node("a")?.x)
+    }
+    @Test
+    fun `grab follows the pointer and escape restores the node`() {
+        val fixture = Fixture(ShaderGraph(nodes = nodes))
+        fixture.controller.select(GraphSelection.of("a"))
+        fixture.controller.updatePointer(GraphPointer(100f, 100f, 100f, 100f, 40f, 40f))
+        assertTrue(fixture.controller.handleKey(key(GLFW.GLFW_KEY_G)))
+        fixture.controller.updatePointer(GraphPointer(150f, 120f, 150f, 120f, 90f, 60f))
+        assertEquals(50f, fixture.document.graph.node("a")?.x)
+        assertTrue(fixture.controller.handleKey(key(GLFW.GLFW_KEY_ESCAPE)))
+        assertEquals(0f, fixture.document.graph.node("a")?.x)
+        assertFalse(fixture.controller.moving)
+    }
     private val nodes = listOf(
         ShaderGraphNode("a", "hollowengine:math/add"),
         ShaderGraphNode("b", "hollowengine:math/add", x = 300f),

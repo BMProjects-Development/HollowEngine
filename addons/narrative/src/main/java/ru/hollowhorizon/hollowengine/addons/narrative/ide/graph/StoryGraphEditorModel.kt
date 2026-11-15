@@ -163,6 +163,7 @@ internal class StoryGraphEditorModel(
 
     override val scene: GraphEditorScene = scene()
     override val history: UndoHistory? get() = state.context?.history
+    override val editable: Boolean get() = state.context?.readOnly != true
 
     private fun scene(): GraphEditorScene {
         val frames = ArrayList<GraphFrameView>()
@@ -433,6 +434,28 @@ internal class StoryGraphEditorModel(
             next
         }
         return fresh.values.toSet()
+    }
+
+    override fun copy(nodes: Set<String>): Boolean {
+        val selected = graph.nodes.filter { it.id in nodes }
+        if (selected.isEmpty()) return false
+        StoryGraphClipboard.content = StoryGraphClipboard.snapshot(graph, nodes, places)
+        return true
+    }
+
+    override fun paste(x: Float?, y: Float?): Set<String> {
+        val source = StoryGraphClipboard.content ?: return emptySet()
+        if (state.scope != null && source.nodes.any { it is StoryNode.Function }) return emptySet()
+        val left = source.layout.values.minOfOrNull { it.x } ?: 0f
+        val top = source.layout.values.minOfOrNull { it.y } ?: 0f
+        val offset = StoryPoint(x?.minus(left) ?: COPY_OFFSET, y?.minus(top) ?: COPY_OFFSET)
+        var newIds = emptySet<String>()
+        state.change(StoryUndo.DUPLICATE) {
+            val (next, ids) = StoryGraphClipboard.paste(source, this, offset)
+            newIds = ids
+            next
+        }
+        return newIds
     }
 
     override fun groupMembers(group: String): Set<String> =

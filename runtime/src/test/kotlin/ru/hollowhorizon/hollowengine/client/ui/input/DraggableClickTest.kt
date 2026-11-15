@@ -71,4 +71,24 @@ class DraggableClickTest {
         assertEquals(emptyList(), row.clicks)
         assertEquals(listOf(0), row.drags)
     }
+
+    @Test
+    fun `an ancestor can capture the middle button over an interactive child`() {
+        val buttons = mutableListOf<Int>()
+        val child = BoxNode(modifiers = listOf(Modifier.size(100.px, 40.px).input(clickable = true, draggable = true)))
+        val parent = BoxNode(modifiers = listOf(
+            Modifier.size(200.px, 100.px).input(clickable = true, draggable = true)
+                .capturePointerButtons(2).onDrag { buttons += it.button },
+        )).also { it.children.add(child) }
+        val root = BoxNode().also { it.children.add(parent) }
+        parent.layoutState.attachTo(root)
+        child.layoutState.attachTo(parent)
+        UiModifierResolver().resolve(root)
+        val layout = UiLayoutPipeline().compute(root, 400f, 400f, UiScrollState())
+        val frame = HollowUiFrame(root, layout.nodes.keys.toList(), layout)
+        val input = HollowUiInputController()
+        input.mouseClicked(frame, 10f, 10f, 2, ::dispatch)
+        input.mouseDragged(frame, 20f, 10f, 2, 10f, 0f, 0, ::dispatch)
+        assertEquals(listOf(2), buttons)
+    }
 }

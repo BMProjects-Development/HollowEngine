@@ -211,9 +211,14 @@ object StoryGraphEdits {
     fun StoryGraph.copyNodes(ids: Set<String>, offset: StoryPoint): Pair<StoryGraph, Map<String, String>> {
         val fresh = ids.associateWith { StoryGraph.newId() }
         val taken = functions.mapTo(HashSet()) { it.name }
+        val renamed = HashMap<String, String>()
         val copies = fresh.mapNotNull { (old, new) -> node(old)?.withId(new) }.map { copy ->
-            if (copy is StoryNode.Function) copy.copy(name = freeFunctionName(taken).also(taken::add)) else copy
-        }
+            if (copy is StoryNode.Function) {
+                val name = freeFunctionName(taken).also(taken::add)
+                renamed[copy.name] = name
+                copy.copy(name = name)
+            } else copy
+        }.map { it.retargetFunctions(renamed) }
         val kept = links.filter { it.to in ids && (it.from in ids || !it.isFlow) }
             .map { it.copy(from = fresh[it.from] ?: it.from, to = fresh.getValue(it.to)) }
         val places = fresh.mapNotNull { (old, new) ->
@@ -226,6 +231,13 @@ object StoryGraphEdits {
             layout = layout + places,
             collapsed = collapsed + folded,
         ) to fresh
+    }
+
+    /** Retargets calls among copied local functions, including calls inside their bodies. */
+    fun StoryNode.retargetFunctions(renamed: Map<String, String>): StoryNode = when (this) {
+        is StoryNode.Invoke -> if (file == null && function in renamed) copy(function = renamed.getValue(function)) else this
+        is StoryNode.Function -> copy(body = body.copy(nodes = body.nodes.map { it.retargetFunctions(renamed) }))
+        else -> this
     }
 
     /** A new group of [ids], taken out of the groups they were in. */

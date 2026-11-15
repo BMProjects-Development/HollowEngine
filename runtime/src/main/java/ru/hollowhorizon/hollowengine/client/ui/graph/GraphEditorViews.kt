@@ -111,7 +111,9 @@ fun GraphEditorCanvas(
             },
             onSelectArea = controller::selectArea,
             onKey = controller::handleKey,
-            onPointer = { controller.pointer = it },
+            onPointer = controller::updatePointer,
+            moving = controller.moving,
+            onMoveClick = controller::endMove,
             nodes = content,
         )
 

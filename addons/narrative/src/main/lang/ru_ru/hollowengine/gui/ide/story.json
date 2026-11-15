@@ -138,6 +138,7 @@
   "param.linked": "из связи",
   "param.optional": "Необязательно: можно оставить пустым.",
   "phrase.format": "Разметка текста: <b>жирный</b>, <i>курсив</i>, <u>подчёркнутый</u>, <s>зачёркнутый</s>, <scale=1.5>крупный</scale>, <color=#FF8800>цвет</color>, <gradient from=#F00 to=#00F>градиент</gradient>, <rainbow>, <pulse>, <wave>, <shake>, <wiggle>, <swing>, <glitch>, <br> для новой строки.",
+  "function.reorder": "Перетащите, чтобы изменить порядок",
   "phrase.placeholder": "Что говорится",
   "phrase.speaker": "Говорящий",
   "phrase.speaker.help": "Кто говорит: имя или {выражение} для сущности. Пусто - рассказчик.",

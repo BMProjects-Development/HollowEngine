@@ -148,6 +148,7 @@ class GraphEditorScene(
 interface GraphEditorModel {
     val scene: GraphEditorScene
     val history: UndoHistory?
+    val editable: Boolean get() = true
 
     fun beginGesture()
     fun endGesture()
@@ -197,6 +198,10 @@ interface GraphEditorModel {
 
     /** Copies [nodes] next to them and gives the copies. */
     fun duplicate(nodes: Set<String>): Set<String>
+
+    /** Copies and pastes nodes in this editor's graph format. */
+    fun copy(nodes: Set<String>): Boolean = false
+    fun paste(x: Float?, y: Float?): Set<String> = emptySet()
 
     fun groupMembers(group: String): Set<String>
     fun isGrouped(node: String): Boolean

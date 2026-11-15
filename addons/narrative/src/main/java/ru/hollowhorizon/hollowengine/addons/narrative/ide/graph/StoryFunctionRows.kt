@@ -42,6 +42,7 @@ private fun StoryNodeLayout.Rows.part(signature: StorySignatureEditor, part: Sto
             nameField = StoryRowField("${part.key}-name-${entry.index}", entry.name, write = entry.rename),
             field = entry.type?.let { StoryRowField("${part.key}-type-${entry.index}", it, "Int", typeName = true, write = entry.retype) },
             onRemove = entry.remove,
+            reorder = StoryRowReorder(part, entry.index, entries.size) { from, to -> signature.reorder(part, from, to) },
         )
     }
     row(onAdd = { signature.add(part) }, addLabel = part.addLabel)

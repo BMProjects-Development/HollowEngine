@@ -12,7 +12,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryTypedName
 
 /** A part of the signature of a function: its parameters, its results or its flows, which have no type. */
-internal enum class StorySignaturePart(val key: String) {
+enum class StorySignaturePart(val key: String) {
     PARAM("param"),
     RESULT("result"),
     FLOW("flow");
@@ -46,6 +46,17 @@ internal class StorySignatureEditor(private val state: StoryEditorState, private
         when (part) {
             StorySignaturePart.FLOW -> addFlow(function.id)
             else -> addValue(function.id, part == StorySignaturePart.RESULT)
+        }
+    }
+
+    fun reorder(part: StorySignaturePart, from: Int, to: Int) = state.changeRoot {
+        edit(function.id) { node ->
+            node as StoryNode.Function
+            when (part) {
+                StorySignaturePart.PARAM -> node.copy(params = node.params.reordered(from, to))
+                StorySignaturePart.RESULT -> node.copy(results = node.results.reordered(from, to))
+                StorySignaturePart.FLOW -> node.copy(flows = node.flows.reordered(from, to))
+            }
         }
     }
 
@@ -89,4 +100,9 @@ internal class StorySignatureEditor(private val state: StoryEditorState, private
     private fun named(typed: String, write: (String) -> Unit) {
         typed.trim().takeIf { it.isNotEmpty() }?.let(write)
     }
+}
+
+internal fun <T> List<T>.reordered(from: Int, to: Int): List<T> {
+    if (from !in indices || to !in indices || from == to) return this
+    return toMutableList().apply { add(to, removeAt(from)) }
 }

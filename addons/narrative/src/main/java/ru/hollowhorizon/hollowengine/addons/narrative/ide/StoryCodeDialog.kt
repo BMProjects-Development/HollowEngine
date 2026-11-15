@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryRowField
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorIconButton
+import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeFontSize
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ColorPicker
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiCodeEditor
 import kotlin.math.roundToInt
@@ -49,8 +50,13 @@ internal fun StoryCodeDialog(state: StoryEditorState, field: StoryCodeField) {
                     },
                     insight = StoryInsight.field(state, field.key, text),
                     readOnly = state.context?.readOnly == true,
-                    fontSize = 9f,
+                    fontSize = HollowIdeFontSize.size,
                     id = "story-code-editor",
+                    modifier = Modifier.size(100.percent, 100.percent).onScroll { event ->
+                        if (!event.isCtrlDown()) return@onScroll
+                        HollowIdeFontSize.zoom(event.rawScrollY)
+                        event.consume()
+                    },
                 )
             }
         }

@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.narrative.ide.graph
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryFieldForm
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryNode
 import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryPinType
+import ru.hollowhorizon.hollowengine.addons.narrative.ide.StorySignaturePart
 import ru.hollowhorizon.hollowengine.client.ui.UiColor
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphNodeMetrics
 import ru.hollowhorizon.hollowengine.client.ui.graph.GraphPin
@@ -76,6 +77,14 @@ class StoryNodeRow(
     val section: StoryRowSection? = null,
     val hidden: Boolean = false,
     val depth: Int = 0,
+    internal val reorder: StoryRowReorder? = null,
+)
+
+class StoryRowReorder(
+    val part: StorySignaturePart,
+    val index: Int,
+    val count: Int,
+    val move: (Int, Int) -> Unit,
 )
 
 class StoryRowSection(val open: Boolean, val toggle: () -> Unit)

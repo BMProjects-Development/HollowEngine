@@ -439,6 +439,9 @@ fun Modifier.input(
     if (draggable) it.draggable = true
 }
 
+/** Routes the specified mouse buttons to this node before descendants. */
+fun Modifier.capturePointerButtons(vararg buttons: Int) = prop(UiProps.CapturePointerButtons, buttons.toSet())
+
 /**
  * Makes a node focusable within its enclosing [focusScope] (by click or Tab). While focused it
  * receives key/char events. Each scope holds its own focus independently, so several `focus` nodes

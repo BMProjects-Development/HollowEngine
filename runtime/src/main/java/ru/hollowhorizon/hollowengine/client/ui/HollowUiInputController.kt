@@ -196,9 +196,16 @@ class HollowUiInputController {
         dispatch: (UiEvent) -> Boolean,
         modifiers: Int = 0,
     ): UiInputResult {
-        val hit = frame.hitTest(mouseX, mouseY) ?: run {
+        val initialHit = frame.hitTest(mouseX, mouseY) ?: run {
             clearAllFocus(frame, dispatch)
             return UiInputResult(false)
+        }
+        val capture = frame.ancestorsOf(initialHit.node).asReversed().firstOrNull {
+            button in it.resolvedSnapshot.capturePointerButtons
+        }
+        val hit = if (capture == null) initialHit else {
+            val local = frame.layout[capture].inputTransform.inverse()?.transform(mouseX, mouseY, 0f)
+            UiHit(capture, local?.x ?: 0f, local?.y ?: 0f)
         }
 
         val layoutNode = frame.layout[hit.node]

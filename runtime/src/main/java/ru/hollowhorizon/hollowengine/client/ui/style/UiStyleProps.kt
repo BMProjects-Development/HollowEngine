@@ -197,6 +197,7 @@ object UiProps {
 
     val Modal = prop("modal", false)
     val Draggable = prop("draggable", false)
+    val CapturePointerButtons = prop("capture-pointer-buttons", emptySet<Int>())
     val Scroll = prop<UiScrollSpec?>("scroll", null, fingerprint = true)
     val ScrollPinned = prop<UiScrollPin?>("scroll-pinned", null, fingerprint = true)
     val InputTransparent = prop("input-transparent", false)
@@ -439,6 +440,7 @@ val UiComputedStyle.focusable by UiProps.Focusable
 val UiComputedStyle.focusScope by UiProps.FocusScope
 val UiComputedStyle.modal by UiProps.Modal
 val UiComputedStyle.draggable by UiProps.Draggable
+val UiComputedStyle.capturePointerButtons by UiProps.CapturePointerButtons
 
 val UiComputedStyle.scroll: UiScrollSpec? get() = this[UiProps.Scroll]
 

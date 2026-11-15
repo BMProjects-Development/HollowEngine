@@ -193,6 +193,7 @@ private fun StoryNodeView(
     problems: List<StoryCheck>?,
 ) {
     val node = box.node
+    val reorders = remember(node.id) { StorySignaturePart.entries.associateWith { StoryReorder() } }
     if (node is StoryNode.Reroute) {
         val output = box.pins.first { it.output }
         return GraphRerouteView(controller, node.id, box.rect, output, listOf(boxes.typeOf(output).tag()))
@@ -215,7 +216,11 @@ private fun StoryNodeView(
         }
         if (!box.collapsed) {
             box.bands.forEach { band -> SectionBand(box, band) }
-            box.rows.filterNot { it.hidden }.forEach { row -> StoryRowView(controller, state, box, row) }
+            box.rows.filterNot { it.hidden }.forEach { row ->
+                key(row.reorder?.let { "${it.part.key}-${it.index}" } ?: "row-${row.top}") {
+                    StoryRowView(controller, state, box, row, row.reorder?.let { reorders[it.part] })
+                }
+            }
         }
         box.shownPins.forEach { pin ->
             GraphPinView(
@@ -232,13 +237,23 @@ private fun StoryRowView(
     state: StoryGraphState,
     box: StoryNodeBox,
     row: StoryNodeRow,
+    reorder: StoryReorder?,
 ) {
     row.section?.let { return SectionRowView(box, row, it) }
     val readOnly = state.context?.readOnly == true
+    val rowModifier = row.reorder?.let { Modifier.rowPlace(box, row).reorderOffset(reorder!!, it.index, row.height) }
+        ?: Modifier.rowPlace(box, row)
     Row(
+        id = row.reorder?.let { "st-reorder-row-${box.node.id}-${it.part.key}-${it.index}" },
         tags = listOf("gn-node-row"),
-        modifier = Modifier.rowPlace(box, row).alignItems(vertical = UiAlign.CENTER),
+        modifier = rowModifier.alignItems(vertical = UiAlign.CENTER),
     ) {
+        row.reorder?.let { item ->
+            StoryReorderHandle(
+                "st-reorder-${box.node.id}-${item.part.key}-${item.index}", item.index, item.count,
+                row.height, controller.view.zoom, reorder!!, !readOnly, "gn-node-${box.node.id}", item.move,
+            )
+        }
         val field = row.field
         val insight = field?.let { fieldInsight(state, box.node.id, it) }
         val problems =

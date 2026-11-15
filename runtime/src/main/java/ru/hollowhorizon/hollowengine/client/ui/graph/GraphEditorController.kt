@@ -47,6 +47,10 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     }
 
     var pointer: GraphPointer? = null
+        private set
+    var moving by mutableStateOf(false)
+        private set
+    private val keyboardDrag = GraphDrag()
 
     var search by mutableStateOf<GraphSearch?>(null)
         private set
@@ -102,6 +106,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     /** Takes back the gesture under way, the link it drew and the nodes it dragged; false when there is none. */
     fun cancelGesture(): Boolean {
         if (!gesture) return false
+        moving = false
         view.drag = null
         gesture = false
         link = null
@@ -148,6 +153,39 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         joinFrame()
         dragOrigins.clear()
         endGesture()
+    }
+
+    fun updatePointer(point: GraphPointer?) {
+        pointer = point
+        if (!moving || point == null) return
+        keyboardDrag.update(point.canvasX, point.canvasY) {
+            dragNode(GraphNodeGesture(
+                view.toGraphX(point.canvasX) - keyboardDrag.startX,
+                view.toGraphY(point.canvasY) - keyboardDrag.startY,
+                point.canvasX, point.canvasY, point.modifiers, point.screenX, point.screenY,
+            ))
+        }
+        view.drag = keyboardDrag
+        keyboardDrag.apply()
+    }
+
+    private fun startMove() {
+        if (!model.editable) return
+        val point = pointer ?: return
+        if (selection.nodes.isEmpty()) return
+        beginDrag(selection.single)
+        if (dragOrigins.isEmpty()) return
+        keyboardDrag.startX = view.toGraphX(point.canvasX)
+        keyboardDrag.startY = view.toGraphY(point.canvasY)
+        moving = true
+        updatePointer(point)
+    }
+
+    fun endMove(confirm: Boolean) {
+        if (!moving) return
+        moving = false
+        if (view.drag === keyboardDrag) view.drag = null
+        if (confirm) finishDrag() else cancelGesture()
     }
 
     /**
@@ -256,6 +294,26 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
         if (copied.isNotEmpty()) select(GraphSelection(model.duplicate(copied)))
     }
 
+    private fun copySelection(): Boolean {
+        val nodes = selection.nodes.filter(model::isRemovable).toSet()
+        return nodes.isNotEmpty() && model.copy(nodes)
+    }
+
+    private fun pasteSelection() {
+        if (!model.editable) return
+        val point = pointer
+        val pasted = model.paste(point?.let { view.toGraphX(it.canvasX) }, point?.let { view.toGraphY(it.canvasY) })
+        if (pasted.isNotEmpty()) select(GraphSelection(pasted))
+    }
+
+    private fun cutSelection() {
+        if (!model.editable) return
+        val nodes = selection.nodes.filter(model::isRemovable).toSet()
+        if (nodes.isEmpty() || !model.copy(nodes)) return
+        model.removeNodes(nodes)
+        select(GraphSelection.None)
+    }
+
     private fun deleteGroupWithNodes(group: String) {
         val removable = model.groupMembers(group).filter(model::isRemovable).toSet()
         model.beginGesture()
@@ -281,7 +339,11 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
             HollowKeys.NEXT_FOUND.matches(input) && search != null -> stepSearch(1)
             HollowKeys.PREVIOUS_FOUND.matches(input) && search != null -> stepSearch(-1)
             HollowKeys.DELETE.matches(input) -> deleteSelection()
+            HollowKeys.COPY.matches(input) -> copySelection()
+            HollowKeys.CUT.matches(input) -> cutSelection()
+            HollowKeys.PASTE.matches(input) -> pasteSelection()
             HollowKeys.DUPLICATE.matches(input) -> duplicateSelection()
+            HollowKeys.GRAB.matches(input) && !moving -> startMove()
             HollowKeys.SELECT_ALL.matches(input) ->
                 select(GraphSelection(scene.boxes.keys + scene.cards.flatMap { model.groupMembers(it.id) }))
 

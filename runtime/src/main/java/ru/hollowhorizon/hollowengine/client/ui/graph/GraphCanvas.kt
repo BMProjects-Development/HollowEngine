@@ -94,6 +94,8 @@ fun GraphCanvas(
     onSelectArea: ((area: GraphRect, modifiers: Int) -> Unit)? = null,
     onKey: (UiKeyInput) -> Boolean = { false },
     onPointer: (GraphPointer?) -> Unit = {},
+    moving: Boolean = false,
+    onMoveClick: (Boolean) -> Unit = {},
     overlay: @Composable () -> Unit = {},
     nodes: @Composable () -> Unit,
 ) {
@@ -102,11 +104,21 @@ fun GraphCanvas(
     var marquee by remember { mutableStateOf<GraphRect?>(null) }
     val grabbedAt = remember { floatArrayOf(0f, 0f) }
     val selecting = remember { booleanArrayOf(false) }
+    val moveClick = remember { booleanArrayOf(false) }
     val lastEdgeClick = remember { EdgeClick() }
     val zoom = view.zoom
     val panX = view.panX
     val panY = view.panY
     val canvasFrames = frames.map { GraphFrame(it.rect.toCanvas(view), it.color) }
+    val cursor = LocalPointer.current
+    LaunchedEffect(cursor, canvas, moving) {
+        val x = cursor.x - canvas.x
+        val y = cursor.y - canvas.y
+        val inside = cursor.isKnown && x >= 0f && y >= 0f && x < canvas.width && y < canvas.height
+        onPointer(if (inside || moving && cursor.isKnown) GraphPointer(
+            cursor.x, cursor.y, x, y, view.toGraphX(x), view.toGraphY(y),
+        ) else null)
+    }
 
     LaunchedEffect(view) {
         var frameTime = 0L
@@ -143,14 +155,16 @@ fun GraphCanvas(
             .clip(true)
             .onPlaced { canvas = it }
             .input(hoverable = true, clickable = true, draggable = true)
+            .let {
+                if (moving) it.capturePointerButtons(GLFW.GLFW_MOUSE_BUTTON_MIDDLE, GLFW.GLFW_MOUSE_BUTTON_LEFT, GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+                else it.capturePointerButtons(GLFW.GLFW_MOUSE_BUTTON_MIDDLE)
+            }
             .onHover { event ->
                 val edge = edgeAt(event.localX, event.localY)
                 if (edge != hovered) hovered = edge
-                onPointer(pointer(event))
             }
             .onExit {
                 hovered = null
-                onPointer(null)
             }
             .focus()
             .onKeyInput { input ->
@@ -167,6 +181,14 @@ fun GraphCanvas(
                 event.consume()
             }
             .onPress { event ->
+                if (!moving) moveClick[0] = false
+                if (moving && event.button != GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
+                    moveClick[0] = true
+                    onPointer(pointer(event))
+                    onMoveClick(event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT)
+                    event.consume()
+                    return@onPress
+                }
                 grabbedAt[0] = event.localX
                 grabbedAt[1] = event.localY
                 selecting[0] = onSelectArea != null && event.button == GLFW.GLFW_MOUSE_BUTTON_LEFT
@@ -184,6 +206,10 @@ fun GraphCanvas(
                 event.consume()
             }
             .onRelease { event ->
+                if (moveClick[0]) {
+                    event.consume()
+                    return@onRelease
+                }
                 marquee?.let { area ->
                     marquee = null
                     val covered = GraphRect.between(
@@ -193,10 +219,15 @@ fun GraphCanvas(
                     onSelectArea?.invoke(covered, event.modifiers)
                 }
                 selecting[0] = false
-                onRelease()
+                if (!moving) onRelease()
                 event.consume()
             }
             .onClick { event ->
+                if (moveClick[0]) {
+                    moveClick[0] = false
+                    event.consume()
+                    return@onClick
+                }
                 val edge = edgeAt(event.localX, event.localY)
                 when {
                     event.button == GLFW.GLFW_MOUSE_BUTTON_RIGHT -> onContextMenu(pointer(event), edge)
