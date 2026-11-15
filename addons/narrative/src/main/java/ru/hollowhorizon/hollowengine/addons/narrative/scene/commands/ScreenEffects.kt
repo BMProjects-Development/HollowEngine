@@ -4,6 +4,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.graph.StoryParamTrait
 import ru.hollowhorizon.hollowengine.addons.narrative.story.StoryCategory
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.phys.Vec3
@@ -25,29 +26,40 @@ import kotlin.time.Duration
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorCategory
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorWidget
 
-/** `@fade-in player 600ms #000000`: covers the screen of [this] with [color]. Undone, the screen is clear again. */
+/** Covers the screen with [color] and optional formatted [text]. Undo restores the previous fade. */
 @EditorCategory(StoryCategory.SCREEN)
 @Action("fade-in")
-suspend fun ServerPlayer.fadeIn(time: Duration = DEFAULT_FADE, @EditorWidget(StoryParamTrait.Widget.COLOR) color: String = BLACK) =
-    action(this, time, color) {
-        undo { StoryClearFadePacket.send(this@fadeIn) }
-        fastForward { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeIn) }
-        perform {
-            ScreenEffects.borrow(this@fadeIn)?.fade = true
-            StoryFadePacket(1f, time.inWholeMilliseconds, parseColor(color)).send(this@fadeIn)
-            delay(time)
-        }
+suspend fun ServerPlayer.fadeIn(
+    time: Duration = DEFAULT_FADE,
+    @EditorWidget(StoryParamTrait.Widget.COLOR) color: String = BLACK,
+    text: String = "",
+) = action(this, time, color, text) {
+    val before = captureOr(emptyList()) { listOfNotNull(ScreenEffects.fadeOf(this@fadeIn)) }.firstOrNull()
+    val next = FadeState(parseColor(color), text)
+    undo { ScreenEffects.setFade(this@fadeIn, before) }
+    fastForward {
+        ScreenEffects.borrow(this@fadeIn)?.fade = true
+        ScreenEffects.setFade(this@fadeIn, next)
     }
+    perform {
+        ScreenEffects.borrow(this@fadeIn)?.fade = true
+        ScreenEffects.setFade(this@fadeIn, next, time.inWholeMilliseconds)
+        delay(time)
+    }
+}
 
-/** Uncovers the screen [fadeIn] covered. Undone, it is covered with [color] again. */
+/** Uncovers the screen; undo restores its previous fade and text. */
 @EditorCategory(StoryCategory.SCREEN)
 @Action("fade-out")
 suspend fun ServerPlayer.fadeOut(time: Duration = DEFAULT_FADE, color: String = BLACK) =
     action(this, time, color) {
-        undo { StoryFadePacket(1f, 0L, parseColor(color)).send(this@fadeOut) }
-        fastForward { StoryClearFadePacket.send(this@fadeOut) }
+        val before = captureOr(listOf(FadeState(parseColor(color), ""))) {
+            listOfNotNull(ScreenEffects.fadeOf(this@fadeOut))
+        }.firstOrNull()
+        undo { ScreenEffects.setFade(this@fadeOut, before) }
+        fastForward { ScreenEffects.setFade(this@fadeOut, null) }
         perform {
-            StoryFadePacket(0f, time.inWholeMilliseconds, parseColor(color)).send(this@fadeOut)
+            ScreenEffects.setFade(this@fadeOut, null, time.inWholeMilliseconds, parseColor(color))
             delay(time)
         }
     }
@@ -130,6 +142,9 @@ suspend fun ServerPlayer.showCutscene(name: String, time: Duration? = null) {
  * ends for any reason, a crash and a server stop included, and when the player dies: nobody may be left staring at a
  * black screen with no HUD and a camera that is not theirs.
  */
+@Serializable
+internal data class FadeState(val color: Int, val text: String)
+
 internal object ScreenEffects {
     class Borrowed {
         var fade = false
@@ -142,6 +157,20 @@ internal object ScreenEffects {
     }
 
     private val borrowed = WeakHashMap<StoryAudience, Borrowed>()
+    private val fades = WeakHashMap<ServerPlayer, FadeState>()
+
+    fun fadeOf(player: ServerPlayer): FadeState? = fades[player]
+
+    fun setFade(player: ServerPlayer, state: FadeState?, duration: Long = 0L, clearColor: Int = 0) {
+        if (state == null) {
+            fades.remove(player)
+            if (duration <= 0L) StoryClearFadePacket.send(player)
+            else StoryFadePacket(0f, duration, clearColor).send(player)
+        } else {
+            fades[player] = state
+            StoryFadePacket(1f, duration, state.color, state.text).send(player)
+        }
+    }
 
     /** What the scene the current command runs in borrowed, with [player] noted; null outside a scene. */
     suspend fun borrow(player: ServerPlayer): Borrowed? {
@@ -165,7 +194,7 @@ internal object ScreenEffects {
     }
 
     private fun giveBack(player: ServerPlayer, state: Borrowed) {
-        if (state.fade) StoryClearFadePacket.send(player)
+        if (state.fade) setFade(player, null)
         if (state.camera || state.cutscene) {
             StoryReleaseCameraPacket(0L).send(player)
             player.stopCutscene()

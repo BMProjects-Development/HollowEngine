@@ -16,8 +16,9 @@ class StoryFadePacket(
     private val alpha: Float,
     private val durationMillis: Long,
     private val color: Int,
+    private val text: String? = null,
 ) : HollowAddonPacket {
-    override fun handle(player: Player) = StoryFadeOverlay.fadeTo(alpha, durationMillis, color)
+    override fun handle(player: Player) = StoryFadeOverlay.fadeTo(alpha, durationMillis, color, text)
 }
 
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)

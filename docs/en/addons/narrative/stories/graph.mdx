@@ -22,6 +22,8 @@ A **Phrase** has a speaker and a line of text. Leave the speaker blank for narra
 
 Use markup such as `<b>Bold</b>`, `<color=#ff8800>Orange</color>`, `<wave>Moving text</wave>`, or `<br>` for a line break. **Choice** options support the same markup.
 
+Use `<scale=1.5>larger text</scale>` to change the size relative to the surrounding text. Scales can be nested. The **Fade in** block also accepts formatted text, which appears with the fade and disappears when the screen is uncovered. Minecraft chat cannot change font size, so it shows scaled text at the normal size.
+
 ## Variables and expressions
 
 Use **Variables** in the inspector to declare a saved value for a run. Give it a name, a Kotlin type, and an initial expression. For example, declare `trust` as `Float` with an initial value of `0.0f`. **Set variable** updates it. Read it through a value link or in an expression such as `trust > 10`.

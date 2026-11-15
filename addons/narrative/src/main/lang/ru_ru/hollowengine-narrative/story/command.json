@@ -116,6 +116,8 @@
   "eye-position.description": "Откуда смотрит сущность.",
   "fade-in": "Затемнение",
   "fade-in.description": "Закрывает экран цветом.",
+  "fade-in.text": "Текст",
+  "fade-in.text.description": "Необязательный текст с разметкой поверх затемнения.",
   "fade-out": "Из затемнения",
   "fade-out.description": "Убирает цвет с экрана.",
   "fill": "Заполнить",

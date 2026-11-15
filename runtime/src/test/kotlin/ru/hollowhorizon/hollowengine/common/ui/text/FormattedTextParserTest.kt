@@ -10,6 +10,20 @@ import kotlin.test.assertTrue
 
 class FormattedTextParserTest {
     @Test
+    fun `font scale tags nest and invalid scales remain visible`() {
+        val parsed = FormattedTextParser.parse("a<scale=1.5>b<scale=2>c</scale>d</scale>e")
+        assertEquals("abcde", parsed.plainText)
+        assertEquals(listOf(FormattedTextStyle.Scale(1.5f), FormattedTextStyle.Scale(2f)), parsed.spans[2].styles)
+        assertTrue(parsed.diagnostics.isEmpty())
+
+        for (value in listOf("0", "-1", "NaN", "Infinity")) {
+            val source = "<scale=$value>x</scale>"
+            val invalid = FormattedTextParser.parse(source)
+            assertEquals(source, invalid.plainText)
+            assertTrue(invalid.diagnostics.isNotEmpty())
+        }
+    }
+    @Test
     fun `nested tags produce styled spans without entering visible text`() {
         val document = FormattedTextParser.parse("Я теперь <b>очень <i>жирный</i></b>!")
 

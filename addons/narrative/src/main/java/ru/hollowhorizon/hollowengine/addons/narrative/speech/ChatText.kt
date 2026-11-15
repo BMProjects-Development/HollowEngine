@@ -30,6 +30,7 @@ internal object ChatText {
             is FormattedTextStyle.Color -> style.withColor(it.rgb)
             is FormattedTextStyle.Gradient -> style.withColor(it.from.rgb)
             is FormattedTextStyle.Animation -> style
+            is FormattedTextStyle.Scale -> style
         }
     }
 

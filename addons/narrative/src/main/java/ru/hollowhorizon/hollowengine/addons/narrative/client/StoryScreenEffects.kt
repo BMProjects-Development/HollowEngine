@@ -1,9 +1,15 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.client
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderType
+import ru.hollowhorizon.hollowengine.addons.narrative.speech.StoryText
 import ru.hollowhorizon.hollowengine.client.camera.CameraPose
 import ru.hollowhorizon.hollowengine.client.camera.CameraPoseSource
+import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderHudEvent
@@ -20,16 +26,20 @@ object StoryFadeOverlay {
     private var color = 0x000000
     private var startedAt = 0L
     private var durationMillis = 0L
+    private var text by mutableStateOf("")
+    private var textAlpha by mutableFloatStateOf(0f)
+    private var textOverlay: HollowUiWorldOverlay? = null
 
     val isActive: Boolean get() = currentAlpha() > 0f
 
     /** Fades to [target] opacity over [duration], from wherever the fade currently stands. */
-    fun fadeTo(target: Float, duration: Long, rgb: Int) {
+    fun fadeTo(target: Float, duration: Long, rgb: Int, text: String? = null) {
         from = currentAlpha()
         to = target.coerceIn(0f, 1f)
         color = rgb
         durationMillis = duration.coerceAtLeast(0L)
         startedAt = System.currentTimeMillis()
+        if (text != null) this.text = StoryText.localized(text)
     }
 
     /** Drops the veil at once, what a dialogue does when it stops for any reason. */
@@ -38,6 +48,8 @@ object StoryFadeOverlay {
         to = 0f
         durationMillis = 0L
         startedAt = 0L
+        text = ""
+        textAlpha = 0f
     }
 
     private fun currentAlpha(): Float {
@@ -50,14 +62,39 @@ object StoryFadeOverlay {
     @SubscribeEvent
     fun onRenderHud(event: RenderHudEvent) {
         val alpha = currentAlpha()
-        if (alpha <= 0f) return
+        if (alpha <= 0f) {
+            if (to == 0f) text = ""
+            return
+        }
 
         val argb = ((alpha * 255f).toInt().coerceIn(0, 255) shl 24) or (color and 0xFFFFFF)
         val graphics = event.guiGraphics
         graphics.flush()
         graphics.fill(RenderType.guiOverlay(), 0, 0, event.window.guiScaledWidth, event.window.guiScaledHeight, argb)
         graphics.flush()
+        if (text.isNotEmpty()) {
+            textAlpha = alpha
+            textHost().render()
+        }
     }
+
+    private fun textHost(): HollowUiWorldOverlay =
+        textOverlay ?: HollowUiWorldOverlay(manageCursor = false).also { host ->
+            host.setContent {
+                Box(
+                    mode = UiBoxMode.STACK,
+                    modifier = Modifier.size(100.percent, 100.percent).inputTransparent()
+                        .style("hollowengine-narrative:ui/styles/story-fade.hss").opacity(textAlpha),
+                ) {
+                    FormattedText(
+                        text,
+                        tags = listOf("story-fade-text"),
+                        modifier = Modifier.align(UiAlign.CENTER, UiAlign.CENTER)
+                    )
+                }
+            }
+            textOverlay = host
+        }
 }
 
 /**

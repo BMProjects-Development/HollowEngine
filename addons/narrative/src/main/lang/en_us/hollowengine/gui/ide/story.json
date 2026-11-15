@@ -137,7 +137,7 @@
   "param.default": "Default: %s",
   "param.linked": "from a link",
   "param.optional": "Optional: can be left empty.",
-  "phrase.format": "Text markup: <b>bold</b>, <i>italic</i>, <u>underlined</u>, <s>struck</s>, <color=#FF8800>color</color>, <gradient from=#F00 to=#00F>gradient</gradient>, <rainbow>, <pulse>, <wave>, <shake>, <wiggle>, <swing>, <glitch>, <br> for a new line.",
+  "phrase.format": "Text markup: <b>bold</b>, <i>italic</i>, <u>underlined</u>, <s>struck</s>, <scale=1.5>large</scale>, <color=#FF8800>color</color>, <gradient from=#F00 to=#00F>gradient</gradient>, <rainbow>, <pulse>, <wave>, <shake>, <wiggle>, <swing>, <glitch>, <br> for a new line.",
   "phrase.placeholder": "What is said",
   "phrase.speaker": "Speaker",
   "phrase.speaker.help": "Who says the line: a name, or {expression} for an entity. Empty is the narrator.",

@@ -319,7 +319,9 @@ class StoryAction internal constructor(
     }
 
     private fun decode(tag: CompoundTag): Map<KParameter, Any?> =
-        parameters.filter { it.kind != Kind.UNSAVED }.associate { parameter ->
+        parameters.filter {
+            it.kind != Kind.UNSAVED && !(it.kind == Kind.VALUE && it.reflected.isOptional && !tag.contains(it.name))
+        }.associate { parameter ->
             parameter.reflected to when (parameter.kind) {
                 Kind.SCRIPT -> tag.getString(parameter.name)
                     .let { StoryInstances.find(it) ?: throw StoryException("Script '$it' is not running") }
@@ -378,9 +380,11 @@ internal class ActionReplay(val entry: JournalEntry, val action: StoryAction) {
     /** The receivers and parameters the call was made with again. */
     var call: Array<out Any?> = emptyArray()
 
-    fun snapshot(index: Int, serializer: KSerializer<Any?>): Any? {
-        val tag = entry.snapshots.get(index.toString())
-            ?: throw StoryException("The record of '${action.id}' has no snapshot #$index: the action captures more than it did then")
+    fun snapshot(index: Int, serializer: KSerializer<Any?>, legacy: (() -> Any?)? = null): Any? {
+        val tag = entry.snapshots.get(index.toString()) ?: run {
+            if (legacy != null) return legacy()
+            throw StoryException("The record of '${action.id}' has no snapshot #$index: the action captures more than it did then")
+        }
         return StoryValues.decode(serializer, tag)
     }
 

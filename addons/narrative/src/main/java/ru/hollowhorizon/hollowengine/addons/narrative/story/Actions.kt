@@ -166,12 +166,16 @@ open class CaptureScope internal constructor(internal val replay: ActionReplay?)
      */
     inline fun <reified S> capture(noinline block: () -> S): S = capture(storySerializer<S>(), block)
 
+    /** Captures a newly introduced snapshot, using [legacy] for records made before it existed. */
+    inline fun <reified S> captureOr(legacy: S, noinline block: () -> S): S =
+        capture(storySerializer<S>(), block, legacy = { legacy })
+
     @PublishedApi
     @Suppress("UNCHECKED_CAST")
-    internal fun <S> capture(serializer: KSerializer<Any?>, block: () -> S): S {
+    internal fun <S> capture(serializer: KSerializer<Any?>, block: () -> S, legacy: (() -> S)? = null): S {
         check(!closed) { "capture { } must come before perform { }" }
         val index = captured++
-        replay?.let { return it.snapshot(index, serializer) as S }
+        replay?.let { return it.snapshot(index, serializer, legacy) as S }
         val value = block()
         snapshots.put(index.toString(), StoryValues.encode(serializer, value))
         return value

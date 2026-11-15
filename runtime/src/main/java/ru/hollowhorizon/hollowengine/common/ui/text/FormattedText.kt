@@ -26,6 +26,7 @@ sealed interface FormattedTextStyle {
     data object Italic : FormattedTextStyle
     data object Underline : FormattedTextStyle
     data object Strikethrough : FormattedTextStyle
+    data class Scale(val value: Float) : FormattedTextStyle
 
     data class Color(
         val red: Int,
@@ -67,7 +68,7 @@ data class FormattedTextDiagnostic(
 /**
  * Parser for the deliberately small, HTML-like dialogue markup.
  *
- * Supported tags are `<b>`, `<i>`, `<u>`, `<s>`, `<color=#RRGGBB>`, `<gradient from=... to=...>`,
+ * Supported tags are `<b>`, `<i>`, `<u>`, `<s>`, `<scale=1.5>`, `<color=#RRGGBB>`, `<gradient from=... to=...>`,
  * and the animation tags `<rainbow>`, `<pulse>`, `<wave>`, `<shake>`, `<wiggle>`, `<swing>` and
  * `<glitch>`. Tags nest. Unknown or invalid tags stay visible instead of silently losing author
  * text. `&lt;`, `&gt;`, `&amp;`, `&quot;` and `&apos;` insert literal reserved characters.
@@ -254,6 +255,7 @@ object FormattedTextParser {
             "i", "em" -> noAttributes(token, FormattedTextStyle.Italic)
             "u" -> noAttributes(token, FormattedTextStyle.Underline)
             "s", "strike" -> noAttributes(token, FormattedTextStyle.Strikethrough)
+            "scale" -> scale(token)
             "color" -> color(token)
             "gradient" -> gradient(token)
             "rainbow" -> animation(token, FormattedTextAnimation.RAINBOW, RainbowParameters)
@@ -283,6 +285,15 @@ object FormattedTextParser {
             val value = token.attributes[ValueAttribute]
                 ?: return invalid(token, "Tag '<color>' expects a color, for example <color=#FF5555>")
             return parseColor(value) ?: invalid(token, "Unknown color '$value'")
+        }
+
+        private fun scale(token: TagToken): FormattedTextStyle? {
+            if (!hasOnly(token, setOf(ValueAttribute))) return null
+            val value = token.attributes[ValueAttribute]
+                ?: return invalid(token, "Tag '<scale>' expects a positive number, for example <scale=1.5>")
+            val number = readFloat(token, ValueAttribute, value) ?: return null
+            if (number <= 0f) return invalid(token, "Tag '<scale>' expects a positive number")
+            return FormattedTextStyle.Scale(number)
         }
 
         private fun gradient(token: TagToken): FormattedTextStyle? {

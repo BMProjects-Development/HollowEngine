@@ -82,8 +82,11 @@ fun FormattedTextSpans(
 
 private fun List<FormattedTextStyle>.toModifier(): Modifier? {
     if (isEmpty()) return null
-    val effects = map { it.toUiEffect() }
-    return Modifier.textEffects(*effects.toTypedArray())
+    val effects = filterNot { it is FormattedTextStyle.Scale }.map { it.toUiEffect() }
+    val scale = filterIsInstance<FormattedTextStyle.Scale>().fold(1f) { value, style -> value * style.value }
+    var modifier = Modifier.textEffects(*effects.toTypedArray())
+    if (scale != 1f) modifier = modifier.fontScale(scale)
+    return modifier
 }
 
 private fun FormattedTextStyle.toUiEffect(): UiTextEffect = when (this) {
@@ -91,6 +94,7 @@ private fun FormattedTextStyle.toUiEffect(): UiTextEffect = when (this) {
     FormattedTextStyle.Italic -> Italic()
     FormattedTextStyle.Underline -> Underline()
     FormattedTextStyle.Strikethrough -> Strikethrough()
+    is FormattedTextStyle.Scale -> error("Font scale is applied to the span")
     is FormattedTextStyle.Color -> TextColor(toUiColor())
     is FormattedTextStyle.Gradient -> UiGradient(
         colors = listOf(from.toUiColor(), to.toUiColor()),

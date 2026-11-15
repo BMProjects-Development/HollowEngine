@@ -116,6 +116,8 @@
   "eye-position.description": "Where an entity looks from.",
   "fade-in": "Fade in",
   "fade-in.description": "Covers the screen with a color.",
+  "fade-in.text": "Text",
+  "fade-in.text.description": "Optional formatted text shown over the fade.",
   "fade-out": "Fade out",
   "fade-out.description": "Takes the color off the screen.",
   "fill": "Fill",

@@ -1,0 +1,7 @@
+.story-fade-text {
+    width: 80%;
+    font-size: 16px;
+    foreground: #ffffff;
+    text-align: center;
+    text-wrap: true;
+}
