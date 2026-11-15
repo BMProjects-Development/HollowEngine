@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.graph
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import org.lwjgl.glfw.GLFW
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -45,11 +46,15 @@ fun GraphNode(
     onContextMenu: (screenX: Float, screenY: Float) -> Unit = { _, _ -> },
     content: HollowUiContent,
 ) {
+    val drag = remember(view, id) { GraphDrag() }
+    DisposableEffect(view, drag) {
+        onDispose { if (view.drag === drag) view.drag = null }
+    }
     fun gesture(event: UiEvent): GraphNodeGesture {
         val canvas = event.ancestorLocalPositions[canvasId]
         return GraphNodeGesture(
-            graphDeltaX = event.dragTotalX / view.zoom,
-            graphDeltaY = event.dragTotalY / view.zoom,
+            graphDeltaX = view.toGraphX(canvas?.x ?: 0f) - drag.startX,
+            graphDeltaY = view.toGraphY(canvas?.y ?: 0f) - drag.startY,
             canvasX = canvas?.x ?: 0f,
             canvasY = canvas?.y ?: 0f,
             modifiers = event.modifiers,
@@ -71,6 +76,9 @@ fun GraphNode(
                     GLFW.GLFW_MOUSE_BUTTON_RIGHT -> onContextMenu(event.x, event.y)
                     GLFW.GLFW_MOUSE_BUTTON_LEFT -> {
                         held[0] = true
+                        val canvas = event.ancestorLocalPositions[canvasId]
+                        drag.startX = view.toGraphX(canvas?.x ?: 0f)
+                        drag.startY = view.toGraphY(canvas?.y ?: 0f)
                         onPress(gesture(event))
                     }
 
@@ -80,12 +88,21 @@ fun GraphNode(
             }
             .onDrag { event ->
                 if (!held[0] || event.button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return@onDrag
-                onDrag(gesture(event))
+                val current = gesture(event)
+                drag.update(current.canvasX, current.canvasY) {
+                    onDrag(current.copy(
+                        graphDeltaX = view.toGraphX(current.canvasX) - drag.startX,
+                        graphDeltaY = view.toGraphY(current.canvasY) - drag.startY,
+                    ))
+                }
+                view.drag = drag
+                drag.apply()
                 event.consume()
             }
             .onRelease { event ->
                 if (!held[0]) return@onRelease
                 held[0] = false
+                if (view.drag === drag) view.drag = null
                 onRelease()
                 event.consume()
             },

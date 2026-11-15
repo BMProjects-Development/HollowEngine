@@ -33,6 +33,16 @@ class GraphViewState(
     private var anchorGraphY = 0f
     private var anchored = false
     private var lastFrame = 0L
+    internal var drag: GraphDrag? = null
+
+    internal fun panBy(x: Float, y: Float) {
+        panX += x
+        panY += y
+        if (anchored) {
+            anchorCanvasX += x
+            anchorCanvasY += y
+        }
+    }
 
     fun toCanvasX(x: Float) = x * zoom + panX
     fun toCanvasY(y: Float) = y * zoom + panY

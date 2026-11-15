@@ -102,6 +102,7 @@ class GraphEditorController(val canvasId: String, val state: GraphEditorState) {
     /** Takes back the gesture under way, the link it drew and the nodes it dragged; false when there is none. */
     fun cancelGesture(): Boolean {
         if (!gesture) return false
+        view.drag = null
         gesture = false
         link = null
         insertInto = null

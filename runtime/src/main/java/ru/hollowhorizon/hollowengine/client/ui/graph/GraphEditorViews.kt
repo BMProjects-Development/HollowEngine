@@ -257,6 +257,10 @@ fun GraphPinView(
 ) {
     val half = GraphNodeMetrics.PIN / 2f
     val held = remember { booleanArrayOf(false) }
+    val drag = remember(controller) { GraphDrag() }
+    DisposableEffect(controller, drag) {
+        onDispose { if (controller.view.drag === drag) controller.view.drag = null }
+    }
     Box(
         id = "gn-pin-${pin.node}-${if (pin.output) "out" else "in"}-${pin.name}",
         tags = listOf("gn-pin") + tags + listOfNotNull("connected".takeIf { connected }),
@@ -272,17 +276,15 @@ fun GraphPinView(
             }.onDrag { event ->
                 if (!held[0]) return@onDrag
                 event.ancestorLocalPositions[controller.canvasId]?.let {
-                    controller.dragPin(
-                        it.x,
-                        it.y,
-                        event.x,
-                        event.y
-                    )
+                    drag.update(it.x, it.y) { controller.dragPin(it.x, it.y, event.x, event.y) }
+                    controller.view.drag = drag
+                    drag.apply()
                 }
                 event.consume()
             }.onRelease { event ->
                 if (!held[0]) return@onRelease
                 held[0] = false
+                if (controller.view.drag === drag) controller.view.drag = null
                 controller.releasePin()
                 event.consume()
             },

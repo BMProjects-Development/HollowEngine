@@ -103,10 +103,21 @@ fun GraphCanvas(
     val grabbedAt = remember { floatArrayOf(0f, 0f) }
     val selecting = remember { booleanArrayOf(false) }
     val lastEdgeClick = remember { EdgeClick() }
+    val zoom = view.zoom
+    val panX = view.panX
+    val panY = view.panY
+    val canvasFrames = frames.map { GraphFrame(it.rect.toCanvas(view), it.color) }
 
     LaunchedEffect(view) {
+        var frameTime = 0L
         while (true) {
-            withFrameNanos(view::advance)
+            withFrameNanos { time ->
+                val previous = frameTime
+                frameTime = time
+                view.advance(time)
+                val dt = if (previous == 0L) 0f else ((time - previous) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                view.drag?.advance(view, canvas.width, canvas.height, dt)
+            }
         }
     }
 
@@ -204,22 +215,22 @@ fun GraphCanvas(
                 .position(0.px, 0.px)
                 .size(100.percent, 100.percent)
                 .inputTransparent()
-                .drawBehind(GraphDrawKey(view.zoom, view.panX, view.panY, edges, link, hovered, frames)) {
-                    drawGrid(view)
-                    frames.forEach { drawFrame(it, view) }
+                .drawBehind(GraphDrawKey(zoom, panX, panY, edges, link, hovered, frames)) {
+                    drawGrid(zoom, panX, panY)
+                    canvasFrames.forEach { drawFrame(it, zoom) }
                     edges.sortedBy { it.selected }.forEach { edge ->
                         val color = when {
                             edge.selected -> GraphColors.EdgeSelected
                             edge.key == hovered -> GraphColors.EdgeHover
                             else -> edge.color
                         }
-                        drawCurve(edge.curve, view.zoom, color, edge.arrow, edge.dashed)
+                        drawCurve(edge.curve, zoom, color, edge.arrow, edge.dashed)
                     }
                     link?.let { pending ->
                         val curve = pending.curve ?: GraphCurve(
                             floatArrayOf(pending.fromX, pending.fromY, pending.toX, pending.toY),
                         )
-                        drawCurve(curve, view.zoom, pending.color, arrow = false)
+                        drawCurve(curve, zoom, pending.color, arrow = false)
                     }
                 },
         )
@@ -230,8 +241,8 @@ fun GraphCanvas(
                 .position(0.px, 0.px)
                 .size(100.percent, 100.percent)
                 .pivot(0.px, 0.px)
-                .translate(view.panX, view.panY)
-                .scale(view.zoom)
+                .translate(panX, panY)
+                .scale(zoom)
                 .transition(),
         ) {
             nodes()
@@ -295,17 +306,17 @@ private fun GraphMiniMap(items: List<GraphMiniMapItem>, onJumpTo: (Float, Float)
 }
 
 /** A line of the grid every [GRID_STEP] graph units, while they are far enough apart to be worth it. */
-private fun UiCanvasDrawScope.drawGrid(view: GraphViewState) {
+private fun UiCanvasDrawScope.drawGrid(zoom: Float, panX: Float, panY: Float) {
     val paint = UiPaint.Color(GraphColors.Grid)
-    val step = GRID_STEP * view.zoom
+    val step = GRID_STEP * zoom
     if (step < 4f) return
 
-    var x = view.panX.mod(step)
+    var x = panX.mod(step)
     while (x < size.width) {
         drawRect(UiRect(x, 0f, 1f, size.height), paint)
         x += step
     }
-    var y = view.panY.mod(step)
+    var y = panY.mod(step)
     while (y < size.height) {
         drawRect(UiRect(0f, y, size.width, 1f), paint)
         y += step
@@ -339,9 +350,9 @@ private fun UiCanvasDrawScope.drawCurve(curve: GraphCurve, zoom: Float, color: U
 }
 
 /** A frame fills its part of the canvas and outlines it. */
-private fun UiCanvasDrawScope.drawFrame(frame: GraphFrame, view: GraphViewState) {
-    val onCanvas = frame.rect.toCanvas(view)
-    val radius = FRAME_RADIUS * view.zoom
+private fun UiCanvasDrawScope.drawFrame(frame: GraphFrame, zoom: Float) {
+    val onCanvas = frame.rect
+    val radius = FRAME_RADIUS * zoom
     drawRect(
         UiRect(onCanvas.x, onCanvas.y, onCanvas.width, onCanvas.height),
         UiPaint.Color(frame.color.copy(alpha = frame.color.alpha * FRAME_FILL)),

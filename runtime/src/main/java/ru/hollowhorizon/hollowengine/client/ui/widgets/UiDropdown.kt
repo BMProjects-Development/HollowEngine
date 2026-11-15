@@ -178,6 +178,7 @@ fun ContextMenu(
         anchorBounds = anchorBounds,
         alignment = alignment,
         layer = layer,
+        animated = layer == 0,
         id = "$id-popup",
         tags = listOf("dropdown-popup"),
         modifier = Modifier.maxSize(height = maxHeight.px).scrollable(horizontal = false).onPlaced(onBounds),
