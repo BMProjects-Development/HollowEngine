@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.common.scripting.deobf.CommonEnvironment.ea
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.MappingsLoader
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
+import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import ru.hollowhorizon.hollowengine.runtime.bootstrap.HollowEngineRuntimeBootstrap
 import java.io.File
 import java.net.URI
@@ -59,8 +60,14 @@ object CommonEnvironment {
 
         val modsEnvironment = ModsEnvironment(mods)
         classpath += modsEnvironment.setup(mappings, outputDir)
-        classpath += addons
+        classpath += addonClasspath(mappings, outputDir, addons, RuntimeFlags.production && !NeoForgeEnvironmentSetup.isAvailable())
         return Built(classpath.distinctBy { it.absoluteFile.normalize() }, modsEnvironment.sources)
+    }
+
+    internal fun addonClasspath(mappings: Mappings, outputDir: File, addons: List<File>, remap: Boolean): List<File> {
+        if (!remap) return addons
+        val (directories, jars) = addons.partition(File::isDirectory)
+        return directories + remapJars(mappings, jars, outputDir, from = "intermediary", to = "named")
     }
 
     private fun retainModCopies(used: List<File>) {

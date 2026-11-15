@@ -16,6 +16,8 @@ import org.objectweb.asm.commons.Remapper
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.metadata.KotlinMetadataRemappingClassVisitor
 import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import java.io.File
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -153,11 +155,11 @@ fun remapJars(
 ) = runBlocking {
     if (!outputDir.exists()) outputDir.mkdirs()
 
-    val cache = hashMapOf<String, ByteArray?>()
+    val cache = ConcurrentHashMap<String, ByteArray>()
     val jarsToUse = (classpath + inputs).map { JarFile(it) }
     val lookup = jarsToUse.flatMap { j ->
         j.entries().asSequence().filter { it.name.endsWith(".class") }
-            .map { it.name.dropLast(6) to { j.getInputStream(it).readBytes() } }
+            .map { it.name.dropLast(6) to { j.getInputStream(it).use { stream -> stream.readBytes() } } }
     }.toMap()
 
     val remapper = MappingsRemapper(
@@ -169,14 +171,22 @@ fun remapJars(
     val semaphore = Semaphore(8)
     val context = if (RuntimeFlags.preparingMixins) EmptyCoroutineContext else Dispatchers.IO
 
-    inputs.map { file ->
-        async(context) {
-            semaphore.withPermit {
-                val (name, extension) = file.nameWithoutExtension to file.extension
-                remapJar(remapper, file, outputDir, name, postfix, extension)
+    try {
+        inputs.distinctBy { it.absoluteFile.normalize() }.map { file ->
+            async(context) {
+                semaphore.withPermit {
+                    val (name, extension) = file.nameWithoutExtension to file.extension
+                    val key = MessageDigest.getInstance("SHA-256")
+                        .digest(file.absoluteFile.normalize().path.toByteArray(Charsets.UTF_8))
+                        .joinToString("") { "%02x".format(it) }
+                    val directory = outputDir.resolve(key).apply { mkdirs() }
+                    remapJar(remapper, file, directory, name, postfix, extension)
+                }
             }
-        }
-    }.awaitAll()
+        }.awaitAll()
+    } finally {
+        jarsToUse.forEach(JarFile::close)
+    }
 }
 
 private fun remapJar(

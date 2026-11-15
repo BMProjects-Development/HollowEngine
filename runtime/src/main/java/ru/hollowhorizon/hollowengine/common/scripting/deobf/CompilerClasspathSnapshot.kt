@@ -11,7 +11,7 @@ import java.io.File
  */
 object CompilerClasspathSnapshot {
     /** Bump when classpath construction changes, so early compilation rebuilds obsolete snapshots. */
-    private const val CLASSPATH_VERSION = 2
+    private const val CLASSPATH_VERSION = 3
 
     private val file: File
         get() = DirectoryManager.HOLLOW_ENGINE.resolve(
