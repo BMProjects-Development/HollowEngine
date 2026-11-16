@@ -141,13 +141,7 @@ internal object HollowIdeGameViewport {
     private fun restoreWindowTarget(minecraft: Minecraft) {
         if (windowMetrics == null) return
         windowMetrics = null
-        val window = minecraft.window
-        val target = minecraft.mainRenderTarget
-        if (target.width != window.width || target.height != window.height) {
-            target.resize(window.width, window.height, Minecraft.ON_OSX)
-            minecraft.gameRenderer.resize(window.width, window.height)
-        }
-        minecraft.screen?.resize(minecraft, window.guiScaledWidth, window.guiScaledHeight)
+        minecraft.resizeDisplay()
     }
 
     fun imageRect(bounds: UiRect): UiRect? {

@@ -18,12 +18,15 @@ object ScriptClassFiles {
     }
 
     private fun sourceFile(bytes: ByteArray): String? {
-        var source: String? = null
-        ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9) {
-            override fun visitSource(sourceFile: String?, debug: String?) {
-                source = sourceFile
-            }
-        }, ClassReader.SKIP_CODE or ClassReader.SKIP_FRAMES)
-        return source
+        if (bytes.size < 8) return null
+        return runCatching {
+            var source: String? = null
+            ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM9) {
+                override fun visitSource(sourceFile: String?, debug: String?) {
+                    source = sourceFile
+                }
+            }, ClassReader.SKIP_CODE or ClassReader.SKIP_FRAMES)
+            source
+        }.getOrNull()
     }
 }
