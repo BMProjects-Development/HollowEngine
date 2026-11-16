@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneFi
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGraphFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
 import ru.hollowhorizon.hollowengine.client.ui.ide.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.files.HollowIdeLanguageService
 import ru.hollowhorizon.hollowengine.common.addons.HollowAddonExtensions
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.scripting.ide.JsonScriptingAnalyzer
