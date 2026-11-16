@@ -117,6 +117,7 @@ import ru.hollowhorizon.hollowengine.common.events.entity.ItemEntityEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.LivingEntityDeathEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerInteractEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.post
 import ru.hollowhorizon.hollowengine.common.events.item.ArrowEvent
 import ru.hollowhorizon.hollowengine.common.events.level.LevelEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.RegisterParticlesEvent
@@ -236,7 +237,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onLivingEntityTick(entity: LivingEntity) {
-        TickEvent.Entity.post(TickEvent.Entity(entity))
+        TickEvent.Entity.post { TickEvent.Entity(entity) }
     }
 
     override fun onLivingEntityDeath(entity: LivingEntity, damageSource: DamageSource): Boolean {
@@ -272,9 +273,13 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onServerLevelNeighborNotify(level: ServerLevel, pos: BlockPos, sides: MutableSet<Direction>): Boolean {
-        val event = BlockEvent.NeighborNotify(level.getBlockState(pos), pos, EnumSet.copyOf(sides))
-        BlockEvent.NeighborNotify.post(event)
-        return event.isCanceled
+        return BlockEvent.NeighborNotify.post {
+            BlockEvent.NeighborNotify(
+                level.getBlockState(pos),
+                pos,
+                EnumSet.copyOf(sides)
+            )
+        }?.isCanceled ?: true
     }
 
     override fun onPlayerClone(self: ServerPlayer, oldPlayer: ServerPlayer, wasDeath: Boolean) {
@@ -308,9 +313,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onBlockPlaced(player: Player, blockState: BlockState, pos: BlockPos): Boolean {
-        val event = BlockEvent.Placed(player, blockState, pos)
-        BlockEvent.Placed.post(event)
-        return event.isCanceled
+        BlockEvent.Placed.post { BlockEvent.Placed(player, blockState, pos) }?.let { return it.isCanceled }
+        return false
     }
 
     override fun onArrowLoose(stack: ItemStack, level: Level, player: Player, charge: Int, hasAmmo: Boolean): Int {
@@ -340,15 +344,13 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun getSkySunSize(level: ClientLevel, originalSize: Float): Float {
-        val event = SkyRenderEvent.SunSize(level, originalSize)
-        SkyRenderEvent.SunSize.post(event)
-        return event.sunSize
+        SkyRenderEvent.SunSize.post { SkyRenderEvent.SunSize(level, originalSize) }?.let { return it.sunSize }
+        return originalSize
     }
 
     override fun getSkyMoonSize(level: ClientLevel, originalSize: Float): Float {
-        val event = SkyRenderEvent.MoonSize(level, originalSize)
-        SkyRenderEvent.MoonSize.post(event)
-        return event.moonSize
+        SkyRenderEvent.MoonSize.post { SkyRenderEvent.MoonSize(level, originalSize) }?.let { return it.moonSize }
+        return originalSize
     }
 
     override fun shouldHideGui(currentScreen: Screen?): Boolean {
@@ -372,9 +374,15 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         mouseY: Int,
         partialTick: Float,
     ): Boolean {
-        val event = ScreenEvent.Render.Pre(screen, guiGraphics, mouseX, mouseY, partialTick)
-        ScreenEvent.Render.Pre.post(event)
-        return event.isCanceled
+        return ScreenEvent.Render.Pre.post {
+            ScreenEvent.Render.Pre(
+                screen,
+                guiGraphics,
+                mouseX,
+                mouseY,
+                partialTick
+            )
+        }?.isCanceled ?: false
     }
 
     override fun onScreenRenderPost(
@@ -384,7 +392,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         mouseY: Int,
         partialTick: Float,
     ) {
-        ScreenEvent.Render.Post.post(ScreenEvent.Render.Post(screen, guiGraphics, mouseX, mouseY, partialTick))
+        ScreenEvent.Render.Post.post { ScreenEvent.Render.Post(screen, guiGraphics, mouseX, mouseY, partialTick) }
         UiScriptHudHost.renderOnScreen(screen, ScreenLevel.CONTENT, guiGraphics, System.nanoTime())
     }
 
@@ -410,13 +418,14 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         packedLight: Int,
         player: AbstractClientPlayer,
         arm: HumanoidArm,
-    ): Boolean = RenderArmEvent.post(RenderArmEvent(stack, multiBufferSource, packedLight, player, arm)).isCanceled
+    ): Boolean =
+        RenderArmEvent.post { RenderArmEvent(stack, multiBufferSource, packedLight, player, arm) }?.isCanceled ?: false
 
     override fun onRenderItemInHand(camera: Camera, partialTick: Float, projectionMatrix: Matrix4f): Boolean =
-        RenderItemInHandEvent.post(RenderItemInHandEvent(camera, partialTick, projectionMatrix)).isCanceled
+        RenderItemInHandEvent.post { RenderItemInHandEvent(camera, partialTick, projectionMatrix) }?.isCanceled ?: false
 
     override fun onRegisterParticles(particleEngine: ParticleEngine) {
-        RegisterParticlesEvent.post(RegisterParticlesEvent(particleEngine))
+        RegisterParticlesEvent.post { RegisterParticlesEvent(particleEngine) }
     }
 
     override fun onClientUseItemOn(player: Player, hand: InteractionHand, hitResult: BlockHitResult): Boolean {
@@ -493,9 +502,9 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         cache: Map<ResourceLocation, CompletableFuture<SoundBuffer>>,
     ): CompletableFuture<SoundBuffer>? {
         if (!SoundStreams.handles(soundId)) return null
-        @Suppress("UNCHECKED_CAST")
-        return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>)
-            .computeIfAbsent(soundId) { SoundStreams.complete(it, resourceManager)!! }
+        @Suppress("UNCHECKED_CAST") return (cache as MutableMap<ResourceLocation, CompletableFuture<SoundBuffer>>).computeIfAbsent(
+            soundId
+        ) { SoundStreams.complete(it, resourceManager)!! }
     }
 
     override fun onLoadStreamSound(
@@ -515,15 +524,14 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onSoundFrame(channels: Map<SoundInstance, ChannelAccess.ChannelHandle>, executor: Executor) =
         ClientSounds.frame(channels, executor)
 
-    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) =
-        ClientSounds.stopMatching(id, category)
+    override fun onSoundStop(id: ResourceLocation?, category: SoundCategory?) = ClientSounds.stopMatching(id, category)
 
     override fun getOpenGlVersionOverride(): String = HollowCoreLoader.openGlVersion
 
     override fun shouldForceAutoGuiScale(screen: Screen?): Boolean = screen is AutoScaled
 
     override fun onLevelFrameRendered(minecraft: Minecraft) {
-        RenderTickEvent.LevelRendered.post(RenderTickEvent.LevelRendered(minecraft))
+        RenderTickEvent.LevelRendered.post { RenderTickEvent.LevelRendered(minecraft) }
     }
 
     override fun onBeforeBlitScreen(minecraft: Minecraft) {
@@ -533,7 +541,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onBlitScreen(minecraft: Minecraft) {
         HollowIdeGameViewport.restoreWindowViewport()
         try {
-            RenderTickEvent.Blit.post(RenderTickEvent.Blit(minecraft))
+            RenderTickEvent.Blit.post { RenderTickEvent.Blit(minecraft) }
         } finally {
             HollowIdeGameViewport.endWindowPass()
         }
@@ -587,11 +595,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onClientRenderTickPre(client: Minecraft) {
-        RenderTickEvent.Pre.post(RenderTickEvent.Pre(client))
+        RenderTickEvent.Pre.post { RenderTickEvent.Pre(client) }
     }
 
     override fun onClientRenderTickPost(client: Minecraft) {
-        RenderTickEvent.Post.post(RenderTickEvent.Post(client))
+        RenderTickEvent.Post.post { RenderTickEvent.Post(client) }
     }
 
     override fun onClientStopping(client: Minecraft) {
@@ -607,9 +615,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onLevelUpdateNeighbors(level: Level, pos: BlockPos) {
         BlockEvent.NeighborNotify.post(
             BlockEvent.NeighborNotify(
-                level.getBlockState(pos),
-                pos,
-                EnumSet.allOf(Direction::class.java)
+                level.getBlockState(pos), pos, EnumSet.allOf(Direction::class.java)
             )
         )
     }
@@ -640,15 +646,14 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onEntityHurt(entity: Entity, damageSource: DamageSource, amount: Float): Boolean {
-        val event = EntityEvent.Hurt(entity, damageSource, amount)
-        EntityEvent.Hurt.post(event)
-        return event.isCanceled
+        EntityEvent.Hurt.post { EntityEvent.Hurt(entity, damageSource, amount) }?.let { return it.isCanceled }
+        return false
     }
 
     override fun onLivingEntityHurt(entity: LivingEntity, damageSource: DamageSource, amount: Float): Float {
-        val event = EntityEvent.Hurt(entity, damageSource, amount)
-        EntityEvent.Hurt.post(event)
-        return if (event.isCanceled) Float.NaN else event.amount
+        EntityEvent.Hurt.post { EntityEvent.Hurt(entity, damageSource, amount) }
+            ?.let { return if (it.isCanceled) Float.NaN else it.amount }
+        return amount
     }
 
     override fun bodyPushable(entity: Entity, vanilla: Boolean): Boolean = EntityBodies.isPushable(entity, vanilla)
@@ -668,8 +673,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         return kept
     }
 
-    override fun collideShapesWithColliders(movement: Vec3, box: AABB, shapes: List<VoxelShape>, vanilla: Supplier<Vec3>): Vec3 =
-        SolidColliders.collide(movement, box, shapes, vanilla)
+    override fun collideShapesWithColliders(
+        movement: Vec3,
+        box: AABB,
+        shapes: List<VoxelShape>,
+        vanilla: Supplier<Vec3>,
+    ): Vec3 = SolidColliders.collide(movement, box, shapes, vanilla)
 
     override fun stepHeightsWithColliders(box: AABB, limit: Float, vanilla: FloatArray): FloatArray =
         SolidColliders.stepHeights(box, limit, vanilla)
@@ -678,7 +687,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun isSupportedByColliders(entity: Entity): Boolean = SolidColliders.supports(entity)
 
-    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean = SolidColliders.obstructs(level, shape)
+    override fun isObstructedByColliders(level: Level, shape: VoxelShape): Boolean =
+        SolidColliders.obstructs(level, shape)
 
     override fun overlapsSolidColliders(entity: Entity, box: AABB): Boolean = SolidColliders.overlaps(entity, box)
 
@@ -693,8 +703,17 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun pickColliders(
         level: Level, source: Entity?, start: Vec3, end: Vec3, search: AABB,
         predicate: Predicate<Entity>, maxDistanceSquared: Double, vanilla: EntityHitResult?, projectile: Boolean,
-    ): EntityHitResult? =
-        EntityColliders.pick(level, source, start, end, search, predicate, maxDistanceSquared, vanilla, colliderModes(projectile))
+    ): EntityHitResult? = EntityColliders.pick(
+        level,
+        source,
+        start,
+        end,
+        search,
+        predicate,
+        maxDistanceSquared,
+        vanilla,
+        colliderModes(projectile)
+    )
 
     override fun onPlayerAttack(player: Player, target: Entity, attack: Runnable) =
         ColliderCombat.attack(player, target, attack)
@@ -707,8 +726,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
 
     override fun onClientTargetEntity(target: Entity, result: HitResult?) = ClientColliderHooks.claim(result, target)
 
-    override fun renderColliderHitbox(entity: Entity, partialTick: Float, poseStack: PoseStack, lines: VertexConsumer): Boolean =
-        ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
+    override fun renderColliderHitbox(
+        entity: Entity,
+        partialTick: Float,
+        poseStack: PoseStack,
+        lines: VertexConsumer,
+    ): Boolean = ColliderDebugRenderer.renderHitbox(entity, partialTick, poseStack, lines)
 
     /** Projectiles land only on colliders that take hits; the crosshair also stops at the clickable ones. */
     private fun colliderModes(projectile: Boolean): (ColliderModes) -> Boolean =
@@ -742,7 +765,7 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         playerRenderers: MutableMap<String, EntityRenderer<out Player>>,
         context: EntityRendererProvider.Context,
     ) {
-        AddEntityRendererLayers.post(AddEntityRendererLayers(renderers, playerRenderers, context))
+        AddEntityRendererLayers.post { AddEntityRendererLayers(renderers, playerRenderers, context) }
     }
 
     override fun onRenderEntityPre(
@@ -753,9 +776,16 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         buffer: MultiBufferSource,
         packedLight: Int,
     ): Boolean {
-        val event = RenderEntityEvent.Pre(entity, entityYaw, partialTick, poseStack, buffer, packedLight)
-        RenderEntityEvent.Pre.post(event)
-        return event.isCanceled
+        return RenderEntityEvent.Pre.post {
+            RenderEntityEvent.Pre(
+                entity,
+                entityYaw,
+                partialTick,
+                poseStack,
+                buffer,
+                packedLight
+            )
+        }?.isCanceled ?: false
     }
 
     override fun onRenderEntityPost(
@@ -766,16 +796,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         buffer: MultiBufferSource,
         packedLight: Int,
     ) {
-        RenderEntityEvent.Post.post(
+        RenderEntityEvent.Post.post {
             RenderEntityEvent.Post(
-                entity,
-                entityYaw,
-                partialTick,
-                poseStack,
-                buffer,
-                packedLight
+                entity, entityYaw, partialTick, poseStack, buffer, packedLight
             )
-        )
+        }
     }
 
     override fun extendEntityCullingBounds(entity: Entity, vanillaBounds: AABB): AABB =
@@ -785,9 +810,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         RenderManager.isFrustumCullingDisabled(entity)
 
     override fun onRenderEntityNameplate(entity: Entity, vanillaVisible: Boolean): Boolean {
-        val event = RenderEntityNameplateEvent(entity, vanillaVisible)
-        RenderEntityNameplateEvent.post(event)
-        return event.isVisible
+        return RenderEntityNameplateEvent.post { RenderEntityNameplateEvent(entity, vanillaVisible) }?.isVisible
+            ?: vanillaVisible
     }
 
     override fun entityNameplateAttachment(entity: Entity, vanilla: Vec3?): Vec3? =
@@ -836,15 +860,16 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         partialTick: Float,
         changingFov: Boolean,
     ): Double {
-        val event = CameraFovEvent(
-            gameRenderer = gameRenderer,
-            camera = camera,
-            partialTick = partialTick,
-            changingFov = changingFov,
-            fov = CameraDirector.currentPose?.takeIf { shouldApplyCameraPose() }?.fov?.toDouble() ?: fov,
-        )
-        CameraFovEvent.post(event)
-        return event.fov
+        CameraFovEvent.post {
+            CameraFovEvent(
+                gameRenderer = gameRenderer,
+                camera = camera,
+                partialTick = partialTick,
+                changingFov = changingFov,
+                fov = CameraDirector.currentPose?.takeIf { shouldApplyCameraPose() }?.fov?.toDouble() ?: fov,
+            )
+        }?.let { return it.fov }
+        return fov
     }
 
     private fun shouldApplyCameraPose(): Boolean {
@@ -875,9 +900,16 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         buffer: MultiBufferSource,
         packedLight: Int,
     ): Boolean {
-        val event = RenderPlayerEvent(player, entityYaw, partialTicks, poseStack, buffer, packedLight)
-        RenderPlayerEvent.post(event)
-        return event.isCanceled
+        return RenderPlayerEvent.post {
+            RenderPlayerEvent(
+                player,
+                entityYaw,
+                partialTicks,
+                poseStack,
+                buffer,
+                packedLight
+            )
+        }?.isCanceled ?: false
     }
 
     override fun customizePlayerSkin(player: AbstractClientPlayer, vanilla: PlayerSkin): PlayerSkin? {
@@ -952,12 +984,12 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         layerId: String,
     ) {
         val layer = ResourceLocation.parse(layerId)
-        RenderOverlayEvent.Post.post(RenderOverlayEvent.Post(window, guiGraphics, partialTick, layer))
+        RenderOverlayEvent.Post.post { RenderOverlayEvent.Post(window, guiGraphics, partialTick, layer) }
         UiScriptHudHost.render(layer, HudPlacement.AFTER, System.nanoTime())
     }
 
     override fun onRenderHudPost(window: Window, guiGraphics: GuiGraphics, partialTick: Float) {
-        RenderHudEvent.post(RenderHudEvent(window, guiGraphics, partialTick))
+        RenderHudEvent.post { RenderHudEvent(window, guiGraphics, partialTick) }
     }
 
     override fun onKeyboardKey(windowPointer: Long, key: Int, scanCode: Int, action: Int, modifiers: Int): Boolean {
@@ -1007,8 +1039,8 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         }
 
         val isScreenOpen = minecraft.screen != null
-        val shouldCancel = isNotificationCaptured || isOverlayInputCaptured ||
-                isGizmoInputCaptured || isScriptOverlayCaptured || isGizmoBlocking && isScreenOpen
+        val shouldCancel =
+            isNotificationCaptured || isOverlayInputCaptured || isGizmoInputCaptured || isScriptOverlayCaptured || isGizmoBlocking && isScreenOpen
         val shouldResetMousePosition = isGizmoBlocking && isScreenOpen
         val redirect = if (shouldCancel) null else HollowIdeOverlay.gameWindowPointer(convertedX, convertedY)
         return RuntimeBridge.MouseMoveResult(
@@ -1042,12 +1074,25 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseButton(x, y, button, action)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return WorldObjectContextMenu.handleMouseButton(world.x, world.y, button, action) ||
-                TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) ||
-                WorldInspector.pickAt(world.x, world.y, button, action) ||
-                UiScriptHudHost.handleMouseButton(guiX, guiY, button, action) ||
-                minecraft.screen == null && UiPanels.handleMouseButton(button, action) ||
-                TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
+        return WorldObjectContextMenu.handleMouseButton(
+            world.x,
+            world.y,
+            button,
+            action
+        ) || TransformGizmoEditor.handleMouseButton(world.x, world.y, button, action) || WorldInspector.pickAt(
+            world.x,
+            world.y,
+            button,
+            action
+        ) || UiScriptHudHost.handleMouseButton(
+            guiX,
+            guiY,
+            button,
+            action
+        ) || minecraft.screen == null && UiPanels.handleMouseButton(
+            button,
+            action
+        ) || TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
     override fun onMouseScroll(
@@ -1063,10 +1108,20 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         if (HollowIdeOverlay.handleMouseScroll(x, y, xOffset, yOffset)) return true
         val world = HollowIdeOverlay.worldPointer(x, y) ?: return true
         val (guiX, guiY) = hudPointer(minecraft, world.x, world.y)
-        return TransformGizmoEditor.handleMouseScroll(world.x, world.y, xOffset, yOffset) ||
-                UiScriptHudHost.handleMouseScroll(guiX, guiY, xOffset, yOffset) ||
-                minecraft.screen == null && UiPanels.handleMouseScroll(xOffset, yOffset) ||
-                TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
+        return TransformGizmoEditor.handleMouseScroll(
+            world.x,
+            world.y,
+            xOffset,
+            yOffset
+        ) || UiScriptHudHost.handleMouseScroll(
+            guiX,
+            guiY,
+            xOffset,
+            yOffset
+        ) || minecraft.screen == null && UiPanels.handleMouseScroll(
+            xOffset,
+            yOffset
+        ) || TransformGizmoEditor.shouldBlockScreenInput(world.x, world.y)
     }
 
     override fun allowMouseGrab(): Boolean = HollowIdeOverlay.allowMouseGrab()
@@ -1097,11 +1152,11 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         frustum: Frustum?,
         stage: RuntimeBridge.RenderLevelStage,
     ) {
-        RenderLevelStageEvent.post(
+        RenderLevelStageEvent.post {
             RenderLevelStageEvent(
                 renderer, poseStack, projectionMatrix, ticks, partialTick, camera, frustum, stage.toRenderStage()
             )
-        )
+        }
     }
 
     override fun onCommonInitialize() {

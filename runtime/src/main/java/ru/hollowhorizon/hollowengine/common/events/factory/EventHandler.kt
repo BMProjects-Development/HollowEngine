@@ -168,3 +168,9 @@ suspend inline fun <reified T : Event> EventHandler<T>.await(
 context(scope: CoroutineScope)
 fun <T : Event> EventHandler<T>.subscribe(priority: Int = 0, listener: (T) -> Unit): EventListener<T> =
     subscribe(scope, priority, listener)
+
+/** A minor optimization of memory allocation. Since this is an inline function, the lambda is not actually created. */
+inline fun <T : Event> EventHandler<T>.post(factory: () -> T): T? {
+    if (!hasListeners) return null
+    return post(factory())
+}

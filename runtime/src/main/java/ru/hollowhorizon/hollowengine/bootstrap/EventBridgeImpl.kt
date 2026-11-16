@@ -33,6 +33,7 @@ import ru.hollowhorizon.hollowengine.common.events.client.ItemTooltipEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityLoadedEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityTrackingEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.player.PlayerEvent
+import ru.hollowhorizon.hollowengine.common.events.factory.post
 import ru.hollowhorizon.hollowengine.common.events.item.BuildTabContentsEvent
 import ru.hollowhorizon.hollowengine.common.events.registry.*
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
@@ -83,15 +84,15 @@ object EventBridgeImpl : EventBridge {
         flags: TooltipFlag,
         lines: MutableList<Component>,
     ) {
-        ItemTooltipEvent.post(ItemTooltipEvent(flags, stack, lines, tooltip))
+        ItemTooltipEvent.post { ItemTooltipEvent(flags, stack, lines, tooltip) }
     }
 
     override fun onClientTick(minecraft: Minecraft) {
-        TickEvent.Client.post(TickEvent.Client(minecraft))
+        TickEvent.Client.post {TickEvent.Client(minecraft) }
     }
 
     override fun onServerTick(server: MinecraftServer) {
-        TickEvent.Server.post(TickEvent.Server(server))
+        TickEvent.Server.post { TickEvent.Server(server) }
     }
 
     override fun onRegisterCommands(
@@ -110,32 +111,31 @@ object EventBridgeImpl : EventBridge {
     }
 
     override fun onEntityTrackingStart(player: ServerPlayer, entity: Entity) {
-        EntityTrackingEvent.Start.post(EntityTrackingEvent.Start(player, entity))
+        EntityTrackingEvent.Start.post { EntityTrackingEvent.Start(player, entity) }
     }
 
     override fun onEntityTrackingStop(player: ServerPlayer, entity: Entity) {
-        EntityTrackingEvent.Stop.post(EntityTrackingEvent.Stop(player, entity))
+        EntityTrackingEvent.Stop.post { EntityTrackingEvent.Stop(player, entity) }
     }
 
     override fun onPlayerJoin(player: ServerPlayer) {
-        PlayerEvent.Join.post(PlayerEvent.Join(player))
+        PlayerEvent.Join.post { PlayerEvent.Join(player) }
     }
 
     override fun onPlayerLeave(player: ServerPlayer) {
-        PlayerEvent.Leave.post(PlayerEvent.Leave(player))
+        PlayerEvent.Leave.post { PlayerEvent.Leave(player) }
     }
 
     override fun onPlayerChangeDimension(player: ServerPlayer, from: ServerLevel, to: ServerLevel) {
-        PlayerEvent.ChangeDimension.post(PlayerEvent.ChangeDimension(player, from, to))
+        PlayerEvent.ChangeDimension.post { PlayerEvent.ChangeDimension(player, from, to) }
     }
 
     override fun onEntityLoad(entity: Entity) {
-        EntityLoadedEvent.post(EntityLoadedEvent(entity))
+        EntityLoadedEvent.post { EntityLoadedEvent(entity) }
     }
 
     override fun onBlockBreak(level: Level, pos: BlockPos, state: BlockState, player: ServerPlayer): Boolean {
-        val event = BlockEvent.Break(level, pos, state, player)
-        return BlockEvent.Break.post(event).isCanceled
+        return BlockEvent.Break.post { BlockEvent.Break(level, pos, state, player) }?.isCanceled == true
     }
 
     override fun onBuildTabContents(

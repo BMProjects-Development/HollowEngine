@@ -7,6 +7,7 @@ import net.minecraft.world.phys.AABB
 import ru.hollowhorizon.hollowengine.common.events.ServerEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityEvent
 import ru.hollowhorizon.hollowengine.common.events.factory.EventHandler
+import ru.hollowhorizon.hollowengine.common.events.factory.post
 
 /** Where a touch between a collider and an entity is at. */
 enum class ColliderTouchPhase {
@@ -101,6 +102,15 @@ internal object ColliderTouches {
     }
 
     private fun post(touch: Touch, phase: ColliderTouchPhase, standing: Boolean) {
-        ColliderTouchEvent.post(ColliderTouchEvent(touch.host, touch.other, touch.collider, touch.bone, phase, standing))
+        ColliderTouchEvent.post {
+            ColliderTouchEvent(
+                touch.host,
+                touch.other,
+                touch.collider,
+                touch.bone,
+                phase,
+                standing
+            )
+        }
     }
 }
