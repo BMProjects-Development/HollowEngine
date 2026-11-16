@@ -4,6 +4,8 @@ import kotlinx.coroutines.*
 import ru.hollowhorizon.hollowengine.HollowEngine
 import java.lang.Runnable
 import java.util.PriorityQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.LockSupport
 import kotlin.Any
 import kotlin.Boolean
 import kotlin.Comparable
@@ -124,6 +126,33 @@ class SingleThreadDispatcher(private val name: String, thread: Thread?) : Corout
         }
     }
 
+    /** Keeps the owner dispatcher alive while its cancelled scope finishes cooperative cleanup. */
+    internal fun awaitCompletion(jobs: Collection<Job>, timeoutMillis: Long): Boolean {
+        require(timeoutMillis >= 0) { "Timeout must not be negative" }
+        val waiter = Thread.currentThread()
+        val completions = jobs.map { job -> job.invokeOnCompletion { LockSupport.unpark(waiter) } }
+        val timeoutNanos = TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        val started = System.nanoTime()
+        var nextTick = started
+        try {
+            while (true) {
+                if (jobs.all { it.isCompleted }) return true
+                if (waiter.isInterrupted) return false
+                val now = System.nanoTime()
+                val remaining = timeoutNanos - (now - started)
+                if (remaining <= 0L) return false
+                if (now - nextTick >= 0L) {
+                    runTasks()
+                    nextTick = now + TICK_NANOS
+                } else {
+                    LockSupport.parkNanos(minOf(remaining, nextTick - now))
+                }
+            }
+        } finally {
+            completions.forEach(DisposableHandle::dispose)
+        }
+    }
+
     fun shutdown() {
         synchronized(lock) {
             if (isShutdown) return
@@ -151,6 +180,10 @@ class SingleThreadDispatcher(private val name: String, thread: Thread?) : Corout
         val onShutdown: (() -> Unit)? = null,
     ) : Comparable<ScheduledTask> {
         override fun compareTo(other: ScheduledTask): Int = targetTick.compareTo(other.targetTick)
+    }
+
+    private companion object {
+        const val TICK_NANOS = 50_000_000L
     }
 }
 

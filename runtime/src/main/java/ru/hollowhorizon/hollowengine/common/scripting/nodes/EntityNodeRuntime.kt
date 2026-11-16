@@ -133,7 +133,7 @@ class EntityNodeManager(private val entity: Entity) {
         dormant.remove(canonicalPath)
         lifecycle.cancelStart(canonicalPath)
         val removed = nodes.remove(canonicalPath) ?: return hadPendingStart
-        lifecycle.stop(canonicalPath, removed.script.coroutineContext.job)
+        lifecycle.stop(canonicalPath, removed.script.coroutineContext.job, removed.script.binding.stop.completion)
         return true
     }
 
@@ -147,7 +147,7 @@ class EntityNodeManager(private val entity: Entity) {
             .getOrNull() ?: return false
 
         dormant[canonicalPath] = saved
-        lifecycle.stop(canonicalPath, node.script.coroutineContext.job)
+        lifecycle.stop(canonicalPath, node.script.coroutineContext.job, node.script.binding.stop.completion)
         var accepted = true
         lifecycle.start(canonicalPath) {
             val latest = runCatching { node.persist(node.script.server) }
@@ -219,7 +219,7 @@ class EntityNodeManager(private val entity: Entity) {
                 runCatching { dormant[path] = node.persist(node.script.server) }
                     .onFailure { HollowEngine.LOGGER.error("Error while suspending entity node '$path'", it) }
                 nodes.remove(path)
-                lifecycle.stop(path, node.script.coroutineContext.job)
+                lifecycle.stop(path, node.script.coroutineContext.job, node.script.binding.stop.completion)
             }
     }
 

@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.server.MinecraftServer
+import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -20,7 +21,10 @@ abstract class NodeScript(
         get() = binding.scope.coroutineContext
 
     val host: NodeHost get() = binding.host
-    val server: MinecraftServer get() = binding.host.server
+    val server: MinecraftServer get() = binding.server
+
+    /** Shared server scene, held in memory until the server runtime is stopped. */
+    val serverScene get() = server.runtimeContext.scene
 
     internal val onSaveHandlers = mutableListOf<(SerializationContext) -> Unit>()
     internal val onLoadHandlers = mutableListOf<(SerializationContext) -> Unit>()

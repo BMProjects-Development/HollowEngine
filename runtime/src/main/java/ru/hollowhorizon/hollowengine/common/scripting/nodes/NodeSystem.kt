@@ -107,7 +107,7 @@ class NodeManager(val server: MinecraftServer) {
     }
 
     private fun stop(path: String, node: RunningNode) {
-        lifecycle.stop(path, node.script.coroutineContext.job)
+        lifecycle.stop(path, node.script.coroutineContext.job, node.script.binding.stop.completion)
     }
 
     fun dispose() {

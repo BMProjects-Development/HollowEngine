@@ -15,7 +15,7 @@ package ru.hollowhorizon.hollowengine.common.utils.math
  *         .scale(scale)
  * ```
  */
-class TrsTransformF : TransformF() {
+open class TrsTransformF : TransformF() {
 
     val translation = MutableVec3f()
     val rotation = MutableQuatF()

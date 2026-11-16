@@ -25,11 +25,11 @@ internal class NodeLifecycle(
         pending.remove(path)?.cancel()
     }
 
-    fun stop(path: String, job: Job) {
+    fun stop(path: String, job: Job, completion: Job = job) {
         cancelStart(path)
-        if (!job.isCompleted) {
-            stopping[path] = job
-            job.notifyOnCompletion()
+        if (!completion.isCompleted) {
+            stopping[path] = completion
+            completion.notifyOnCompletion()
         }
         job.cancel()
     }
@@ -59,7 +59,8 @@ internal class NodeLifecycle(
 
     /** A node's last child may finish on a worker thread; the notification still belongs to the game thread. */
     private fun Job.notifyOnCompletion() {
-        invokeOnCompletion { scope().launch { changed() } }
+        val owner = scope()
+        invokeOnCompletion { owner.launch { changed() } }
     }
 
     private fun MutableMap<String, Job>.activePaths(): Set<String> {

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.coroutines
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import net.minecraft.client.Minecraft
@@ -50,6 +51,13 @@ object RuntimeDispatcherState {
         state.scope.cancel()
         state.dispatcher.runTasks()
         state.dispatcher.shutdown()
+    }
+
+    fun awaitServerStop(server: MinecraftServer, timeoutMillis: Long, otherJobs: Collection<Job>): Boolean {
+        val state = serverStates[server] ?: return otherJobs.all { it.isCompleted }
+        val job = state.scope.coroutineContext[Job] ?: return otherJobs.all { it.isCompleted }
+        state.scope.cancel()
+        return state.dispatcher.awaitCompletion(otherJobs + job, timeoutMillis)
     }
 
     fun serverDispatcher(server: MinecraftServer) = server(server).dispatcher

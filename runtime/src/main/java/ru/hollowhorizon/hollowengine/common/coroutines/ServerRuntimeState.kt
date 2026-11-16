@@ -43,7 +43,11 @@ object ServerRuntimeState {
                 }
             }
         } catch (exception: Exception) {
-            HollowEngine.LOGGER.error("Failed to load HollowEngine server runtime from {}", state.runtimePath, exception)
+            HollowEngine.LOGGER.error(
+                "Failed to load HollowEngine server runtime from {}",
+                state.runtimePath,
+                exception
+            )
         }
     }
 
@@ -67,7 +71,12 @@ object ServerRuntimeState {
     }
 
     fun remove(server: MinecraftServer) {
-        states.remove(server)?.runtimeContext?.dispose()
+        val state = states[server] ?: return
+        try {
+            state.runtimeContext.dispose()
+        } finally {
+            states.remove(server, state)
+        }
     }
 
     fun context(server: MinecraftServer): ServerRuntimeContext = entry(server).runtimeContext

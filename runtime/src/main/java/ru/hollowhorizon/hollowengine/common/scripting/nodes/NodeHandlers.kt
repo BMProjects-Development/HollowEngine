@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scripting.nodes
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
@@ -15,10 +14,10 @@ fun onStart(block: suspend CoroutineScope.() -> Unit) {
     script.onStartHandlers += block
 }
 
-/** Runs [block] when the node is stopped (its scope is cancelled). */
+/** Runs [block] on the server thread after the node's coroutine scope has finished. */
 context(script: NodeScript)
 fun onStop(block: () -> Unit) {
-    script.coroutineContext.job.invokeOnCompletion { block() }
+    script.binding.stop.add(block)
 }
 
 /** Registers a handler that writes persistent data into the node's tag on world save. */

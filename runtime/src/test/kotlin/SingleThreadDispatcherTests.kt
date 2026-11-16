@@ -1,8 +1,7 @@
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import ru.hollowhorizon.hollowengine.common.coroutines.SingleThreadDispatcher
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,5 +66,95 @@ class SingleThreadDispatcherTests {
 
         assertTrue(shutdownResult.isSuccess)
         job.cancel()
+    }
+
+    @Test
+    fun `cancelled scope finishes suspended cleanup before dispatcher closes`() {
+        val dispatcher = SingleThreadDispatcher("test", Thread.currentThread())
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val events = mutableListOf<String>()
+        scope.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) {
+                    delay(50)
+                    events += "cleanup"
+                }
+            }
+        }
+        scope.cancel()
+        assertTrue(dispatcher.awaitCompletion(listOf(scope.coroutineContext[Job]!!), 2_000))
+        assertEquals(listOf("cleanup"), events)
+        dispatcher.shutdown()
+    }
+
+    @Test
+    fun `cleanup that never finishes reaches the timeout`() {
+        val dispatcher = SingleThreadDispatcher("test", Thread.currentThread())
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val release = CompletableDeferred<Unit>()
+        var cleaned = false
+        scope.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) {
+                    release.await()
+                    cleaned = true
+                }
+            }
+        }
+        scope.cancel()
+        assertFalse(dispatcher.awaitCompletion(listOf(scope.coroutineContext[Job]!!), 20))
+        assertFalse(cleaned)
+        release.complete(Unit)
+        assertTrue(dispatcher.awaitCompletion(listOf(scope.coroutineContext[Job]!!), 2_000))
+        assertTrue(cleaned)
+        dispatcher.shutdown()
+    }
+
+    @Test
+    fun `scope is not considered finished while a stop callback runs on a worker`() {
+        val dispatcher = SingleThreadDispatcher("test", Thread.currentThread())
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val callbackStarted = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val worker = scope.launch(Dispatchers.Default) { awaitCancellation() }
+        worker.invokeOnCompletion {
+            callbackStarted.countDown()
+            release.await()
+        }
+        try {
+            scope.cancel()
+            assertTrue(callbackStarted.await(2, TimeUnit.SECONDS))
+            assertFalse(dispatcher.awaitCompletion(listOf(scope.coroutineContext[Job]!!), 20))
+        } finally {
+            release.countDown()
+            assertTrue(dispatcher.awaitCompletion(listOf(scope.coroutineContext[Job]!!), 2_000))
+            dispatcher.shutdown()
+        }
+    }
+
+    @Test
+    fun `shutdown waits for independently owned jobs too`() {
+        val dispatcher = SingleThreadDispatcher("test", Thread.currentThread())
+        val server = CoroutineScope(SupervisorJob() + dispatcher)
+        val reload = CoroutineScope(SupervisorJob() + dispatcher)
+        val release = CompletableDeferred<Unit>()
+        reload.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) { release.await() }
+            }
+        }
+        server.cancel()
+        reload.cancel()
+        val jobs = listOf(server.coroutineContext[Job]!!, reload.coroutineContext[Job]!!)
+        assertFalse(dispatcher.awaitCompletion(jobs, 20))
+        release.complete(Unit)
+        assertTrue(dispatcher.awaitCompletion(jobs, 2_000))
+        dispatcher.shutdown()
     }
 }

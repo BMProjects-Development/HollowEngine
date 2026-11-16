@@ -610,11 +610,35 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     }
 
     override fun onServerStopped(server: MinecraftServer) {
-        ServerReloadScripts.stop()
-        RuntimeDispatcherState.stopServer(server)
-        ServerRuntimeState.remove(server)
-        clearCurrentServer(server)
+        val reloadJobs = runSafely("Failed to stop server reload scripts") {
+            ServerReloadScripts.stop()
+        }.orEmpty()
+
+        try {
+            val context = ServerRuntimeState.contextOrNull(server)
+            runSafely("Failed to stop server scripts") {
+                context?.stopScripts()
+            }
+
+            val nodeStops = context?.nodeStops?.pending().orEmpty()
+            if (!RuntimeDispatcherState.awaitServerStop(server, SCRIPT_SHUTDOWN_TIMEOUT_MS, reloadJobs + nodeStops)) {
+                LOGGER.warn("Server coroutine cleanup timed out or was interrupted after waiting up to {} ms", SCRIPT_SHUTDOWN_TIMEOUT_MS)
+            }
+        } finally {
+            runSafely("Failed to remove server runtime state") { ServerRuntimeState.remove(server) }
+            runSafely("Failed to stop runtime dispatcher") { RuntimeDispatcherState.stopServer(server) }
+            runSafely("Failed to clear current server") { clearCurrentServer(server) }
+        }
     }
+
+    private inline fun <T> runSafely(errorMessage: String, block: () -> T): T? =
+        try {
+            block()
+        } catch (e: Exception) {
+            LOGGER.error("$errorMessage; continuing server shutdown", e)
+            null
+        }
+
 
     override fun onClientCreated(client: Minecraft) {
         RuntimeDispatcherState.createClient(client)
@@ -1259,3 +1283,5 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
         RuntimeBridge.RenderLevelStage.AFTER_TRIPWIRE_BLOCKS -> RenderStage.AFTER_TRIPWIRE_BLOCKS
     }
 }
+
+private const val SCRIPT_SHUTDOWN_TIMEOUT_MS = 5_000L

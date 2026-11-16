@@ -42,5 +42,5 @@ object ServerReloadScripts : ResourceManagerReloadListener {
     }
 
     /** The scripts belong to the server that loaded them and end with it. */
-    fun stop() = runner.stop()
+    fun stop() = runner.stopAndTakeJobs()
 }

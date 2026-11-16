@@ -154,4 +154,28 @@ class NodeLifecycleTest {
         assertEquals(0, starts)
         assertTrue(lifecycle.pendingPaths().isEmpty())
     }
+
+    @Test
+    fun `completion notification retains owner scope after runtime removal`() = runTest {
+        val node = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
+        node.launch {
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) { delay(10) }
+            }
+        }
+        runCurrent()
+        var ownerAvailable = true
+        var notifications = 0
+        val lifecycle = NodeLifecycle({ notifications++ }) {
+            check(ownerAvailable) { "owner was removed" }
+            this
+        }
+        lifecycle.stop("node", node.coroutineContext.job)
+        ownerAvailable = false
+        testScheduler.advanceUntilIdle()
+        assertTrue(node.coroutineContext.job.isCompleted)
+        assertEquals(1, notifications)
+    }
 }

@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.coroutines
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.Entity
@@ -12,6 +13,7 @@ import kotlin.coroutines.CoroutineContext
  */
 class EntityScope(override val coroutineContext: CoroutineContext) : CoroutineScope {
     constructor(entity: Entity) : this(
-        SupervisorJob() + (entity.server?.dispatcher ?: Minecraft.getInstance().dispatcher)
+        SupervisorJob(entity.server?.coroutineScope?.coroutineContext?.get(Job)) +
+            (entity.server?.dispatcher ?: Minecraft.getInstance().dispatcher)
     )
 }

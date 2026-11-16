@@ -20,6 +20,7 @@ import kotlin.script.experimental.api.implicitReceivers
  */
 internal class ReloadScriptRunner(private val side: LogicalSide) {
     private var scope: CoroutineScope? = null
+    private val stopping = mutableSetOf<Job>()
 
     /** Runs every reload script of this side; [receiver] is the implicit receiver its scripts expect. */
     @Synchronized
@@ -35,8 +36,27 @@ internal class ReloadScriptRunner(private val side: LogicalSide) {
 
     @Synchronized
     fun stop() {
-        scope?.cancel()
+        val previous = scope
         scope = null
+        previous?.coroutineContext?.job?.let { job ->
+            if (!job.isCompleted) {
+                stopping += job
+                job.invokeOnCompletion { forget(job) }
+            }
+        }
+        previous?.cancel()
+    }
+
+    /** Transfers unfinished generations to their owner's shutdown, including earlier reloads. */
+    @Synchronized
+    fun stopAndTakeJobs(): List<Job> {
+        stop()
+        return stopping.toList().also { stopping.clear() }
+    }
+
+    @Synchronized
+    private fun forget(job: Job) {
+        stopping.remove(job)
     }
 
     private fun load(id: ScriptId, runScope: CoroutineScope, resources: ResourceManager, receiver: Any) {
