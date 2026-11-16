@@ -26,6 +26,20 @@ data class Model(
     /** Every node of every scene, flattened once. */
     val nodes: List<NodeDefinition> by lazy { walkNodes().toList() }
 
+    /** Authored paths in the active scene, computed once for the shared model asset. */
+    val nodePaths: ModelNodePaths by lazy { ModelNodePaths(scenes.getOrNull(scene)?.nodes.orEmpty()) }
+
+    /** Definitions in the selected scene, shared by every scene-backed instance. */
+    internal val activeNodesByIndex: Map<Int, NodeDefinition> by lazy {
+        buildMap {
+            fun visit(node: NodeDefinition) {
+                require(put(node.index, node) == null) { "Duplicate model node index: ${node.index}" }
+                node.children.forEach(::visit)
+            }
+            scenes.getOrNull(scene)?.nodes.orEmpty().forEach(::visit)
+        }
+    }
+
     /**
      * How much room each bone's geometry takes up, in the bone's own space; see [BoneGeometry].
      *

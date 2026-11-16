@@ -4,6 +4,7 @@ import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
@@ -45,13 +46,16 @@ open class RuntimeNode(
     val definition: NodeDefinition,
     parent: Attachment?,
     private val materialResolver: (Material) -> Material = { it },
-) : Attachment(parent) {
+) : Attachment(parent), ModelPoseNode {
+    override val poseParent: ModelPoseNode? get() = parent as? RuntimeNode
     /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
     val name: String = definition.name ?: "Node_${definition.index}"
     internal val supportsMeshExtrusion: Boolean
         get() = definition.mesh?.primitives?.any { it.supportsExtrusion } == true
     /** Set by a sampled channel and reset at the start of each pose. */
-    var isAnimated: Boolean = false
+    override var isAnimated: Boolean = false
+    override val poseTransform: TrsTransformF get() = transform
+    override val restTransform: TrsTransformF get() = definition.baseTransform
     var isVisible: Boolean = definition.visible && ((parent as? RuntimeNode)?.isVisible ?: true)
         set(value) {
             if (field != value) owningModel()?.appearanceChanged()
@@ -78,14 +82,14 @@ open class RuntimeNode(
         children.forEach { it.updateWorldPose(modelToWorld, entity) }
     }
 
-    val baseMorphWeights: FloatArray = definition.mesh
+    override val baseMorphWeights: FloatArray = definition.mesh
         ?.primitives
         ?.firstOrNull()
         ?.weights
         ?.copyOf()
         ?: floatArrayOf()
 
-    val morphWeights: FloatArray = baseMorphWeights.copyOf()
+    override val morphWeights: FloatArray = baseMorphWeights.copyOf()
 
     init {
         definition.mesh?.primitives?.forEach { primitive ->
@@ -124,16 +128,16 @@ open class RuntimeNode(
 
     fun child(name: String): RuntimeNode = children.single { it.name == name }
 
-    private var restTransform = -1
+    private var restTransformVersion = -1
     private var restBase = -1
 
     /** Puts the node back at rest; one nothing moved since the last time is left as it is. */
-    fun resetPose() {
+    override fun resetPose() {
         isAnimated = false
         val base = definition.baseTransform
-        if (transform.modCount != restTransform || base.modCount != restBase) {
+        if (transform.modCount != restTransformVersion || base.modCount != restBase) {
             transform.set(base)
-            restTransform = transform.modCount
+            restTransformVersion = transform.modCount
             restBase = base.modCount
         }
         if (morphWeights.isNotEmpty()) baseMorphWeights.copyInto(morphWeights)

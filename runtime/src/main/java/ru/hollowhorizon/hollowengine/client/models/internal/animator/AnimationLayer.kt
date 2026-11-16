@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
+import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
@@ -10,41 +11,68 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator as evaluator
 
-class PoseTarget(
+class PoseTarget private constructor(
+    /** Legacy renderer nodes; empty when this target belongs to a scene-backed instance. */
     val nodesByIndex: Map<Int, RuntimeNode>,
     val animations: Map<String, AnimationClip>,
-    val aliases: Map<String, String> = emptyMap(),
-    val rig: ModelRig = ModelRig.EMPTY,
-    val molangDefaults: MolangDefaults = MolangDefaults.EMPTY,
+    val aliases: Map<String, String>,
+    val rig: ModelRig,
+    val molangDefaults: MolangDefaults,
+    val poseNodesByIndex: Map<Int, ModelPoseNode>,
+    private val sceneDefinitions: Map<Int, NodeDefinition>?,
 ) {
+    constructor(
+        nodesByIndex: Map<Int, RuntimeNode>,
+        animations: Map<String, AnimationClip>,
+        aliases: Map<String, String> = emptyMap(),
+        rig: ModelRig = ModelRig.EMPTY,
+        molangDefaults: MolangDefaults = MolangDefaults.EMPTY,
+    ) : this(nodesByIndex, animations, aliases, rig, molangDefaults, nodesByIndex, null)
+
     private val masks = HashMap<BoneMask, Set<Int>>()
 
-    private val nodesByName: Map<String, RuntimeNode> by lazy {
+    private val nodesByName: Map<String, Int> by lazy {
         buildMap {
-            nodesByIndex.values.forEach { node ->
-                putIfAbsent(node.name, node)
-                putIfAbsent(node.definition.path, node)
+            poseNodesByIndex.keys.forEach { index ->
+                val definition = definition(index) ?: return@forEach
+                putIfAbsent(definition.name ?: "Node_${definition.index}", index)
+                putIfAbsent(definition.path, index)
             }
             aliases.forEach { (alias, name) -> this[name]?.let { putIfAbsent(alias, it) } }
         }
     }
 
-    fun node(name: String): RuntimeNode? = nodesByName[name]
+    fun nodeIndex(name: String): Int? = nodesByName[name]
+
+    /** Legacy runtime node, available only for targets backed by the existing renderer. */
+    fun node(name: String): RuntimeNode? = nodeIndex(name)?.let(nodesByIndex::get)
 
     fun mask(mask: BoneMask): Set<Int> = masks.getOrPut(mask) {
-        nodesByIndex.values.asSequence()
-            .filter { node ->
-                val name = node.name
-                val path = node.definition.path
+        poseNodesByIndex.keys.asSequence()
+            .filter { index ->
+                val definition = definition(index) ?: return@filter false
+                val name = definition.name ?: "Node_${definition.index}"
+                val path = definition.path
                 (mask.includes.isEmpty() || mask.includes.any { it == name || path.endsWith(it) }) &&
                         mask.excludes.none { it == name || path.endsWith(it) }
             }
-            .map { it.definition.index }
             .toSet()
     }
 
     fun apply(pose: AnimationPose, blendMode: LayerBlendMode, weight: Float, reference: AnimationPose? = null) {
-        applyAnimationPose(pose, nodesByIndex, blendMode, weight, reference)
+        applyAnimationPose(pose, poseNodesByIndex, blendMode, weight, reference)
+    }
+
+    private fun definition(index: Int): NodeDefinition? = sceneDefinitions?.get(index) ?: nodesByIndex[index]?.definition
+
+    companion object {
+        internal fun forScene(
+            poses: Map<Int, ModelPoseNode>,
+            definitions: Map<Int, NodeDefinition>,
+            animations: Map<String, AnimationClip>,
+            rig: ModelRig,
+            molangDefaults: MolangDefaults,
+        ): PoseTarget = PoseTarget(emptyMap(), animations, rig.boneByAlias, rig, molangDefaults, poses, definitions)
     }
 }
 
@@ -206,9 +234,9 @@ class ProceduralLayer(procedural: ProceduralLayerSpec) : SpecLayer(procedural) {
         val pose = AnimationPose()
 
         procedural.transforms.forEach { transform ->
-            val node = target.node(transform.bone) ?: return@forEach
-            if (node.definition.index !in allowed) return@forEach
-            val bone = pose.bone(node.definition.index)
+            val node = target.nodeIndex(transform.bone) ?: return@forEach
+            if (node !in allowed) return@forEach
+            val bone = pose.bone(node)
             transform.translation?.let { bone.translation = evaluator.vector(it, context) }
             transform.rotation?.let { rotation ->
                 val euler = evaluator.vector(rotation, context)

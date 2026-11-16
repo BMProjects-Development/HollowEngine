@@ -1,19 +1,96 @@
 package ru.hollowhorizon.hollowengine.client.models.fbx
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import net.minecraft.resources.ResourceLocation
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
+import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec2f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class FbxGeometryTest {
     @Test
+    fun `authored paths ignore axis and animated transform nodes`() {
+        val doc = fbxDocument(
+            """
+            Model: 1, "Model::Body", "Null" {
+                Properties70: { P: "Lcl Translation", "Lcl Translation", "", "A", 1,0,0 }
+            }
+            Model: 2, "Model::Hand", "Null" {
+                Properties70: { P: "RotationPivot", "Vector3D", "", "", 1,2,3 }
+            }
+            Model: 3, "Model::Hand", "Null" {}
+        """, """
+            C: "OO",1,0
+            C: "OO",2,1
+            C: "OO",3,1
+        """
+        )
+        val model = doc.convert(ResourceLocation.fromNamespaceAndPath("test", "model.fbx"), ModelSide.SERVER)
+        val first = listOf(ScenePathSegment("Body"), ScenePathSegment("Hand"))
+        val second = listOf(ScenePathSegment("Body"), ScenePathSegment("Hand", 2))
+        assertEquals(1, assertNotNull(model.nodePaths.node(first)).index)
+        assertEquals(2, assertNotNull(model.nodePaths.node(second)).index)
+        assertEquals(first, model.nodePaths.path(model.nodePaths.node(first)!!))
+        assertNull(model.nodePaths.node(listOf(ScenePathSegment("Node_3"))))
+        val instance = ModelAttachment(MutableStateFlow(model), null)
+        val scene = Scene(object : SceneContext {
+            override val side = LogicalSide.SERVER
+        })
+        val parent = scene.create("owner")
+        val sceneModel = ModelSceneInstance.create(parent, "model", model)
+        try {
+            instance.endPose()
+            assertEquals(-1f, assertNotNull(instance.findNode(first)).globalMatrix.getTranslation().x, 0.0001f)
+            assertEquals(-1f, assertNotNull(instance.findNode(second)).globalMatrix.getTranslation().x, 0.0001f)
+            val body = assertNotNull(sceneModel.node(listOf(ScenePathSegment("Body"))))
+            val sceneHand = assertNotNull(sceneModel.node(first))
+            assertSame(sceneModel.root, body.parent)
+            assertSame(body, sceneHand.parent)
+            assertEquals(listOf(body), sceneModel.root.children)
+            assertEquals(2, body.children.size)
+            assertEquals(-1f, sceneHand.worldTransform.getTranslation().x, 0.0001f)
+
+            val bodyDefinition = assertNotNull(model.nodePaths.node(listOf(ScenePathSegment("Body"))))
+            val translation =
+                generateSequence(bodyDefinition.parent) { it.parent }.first { it.isSynthetic && it.baseTransform.translation.x == 1f }
+            val pose = AnimationPose().apply { bone(translation.index).translation = Vec3f(2f, 0f, 0f) }
+            sceneModel.resetPose()
+            sceneModel.applyPose(pose, LayerBlendMode.Override, 1f)
+            instance.beginPose()
+            applyAnimationPose(
+                pose,
+                instance.nodes.flatMap { it.walk() }.associateBy { it.definition.index },
+                LayerBlendMode.Override,
+                1f
+            )
+            instance.endPose()
+            assertEquals(-3f, sceneHand.worldTransform.getTranslation().x, 0.0001f)
+            assertEquals(
+                assertNotNull(instance.findNode(first)).globalMatrix.getTranslation().x,
+                sceneHand.worldTransform.getTranslation().x,
+                0.0001f
+            )
+        } finally {
+            scene.close()
+            instance.close()
+        }
+    }
+
+    @Test
     fun `mixed polygons resolve indexed attributes and per-face materials`() {
-        val geometry = fbxMesh(vertices = "0,0,0,1,0,0,1,1,0,0,2,0,-1,1,0", indices = "0,1,-3,0,2,3,-5", extra = """
+        val geometry = fbxMesh(
+            vertices = "0,0,0,1,0,0,1,1,0,0,2,0,-1,1,0", indices = "0,1,-3,0,2,3,-5", extra = """
             LayerElementNormal: 0 {
                 MappingInformationType: "ByPolygon"
                 ReferenceInformationType: "IndexToDirect"
@@ -31,7 +108,8 @@ class FbxGeometryTest {
                 ReferenceInformationType: "IndexToDirect"
                 Materials: *2 { a: 1,0 }
             }
-        """)
+        """
+        )
         val doc = fbxDocument(geometry, "")
         val mesh = assertNotNull(doc[10]!!.get<MeshGeometry>())
         assertEquals(7, mesh.vertices.size)
@@ -39,17 +117,30 @@ class FbxGeometryTest {
         assertEquals(listOf(1, 0, 0), mesh.materials)
         assertEquals(List(3) { Vec3f.Y_AXIS } + List(4) { Vec3f.Z_AXIS }, mesh.normals)
         assertEquals(listOf(0, 1, 2, 0, 2, 3, 4), mesh.vertexControlPoints)
-        assertEquals(listOf(Vec2f(0.5f, 0.5f), Vec2f(0f, 1f), Vec2f(1f, 1f), Vec2f(0.5f, 0.5f), Vec2f(1f, 1f), Vec2f(1f, 0f), Vec2f.ZERO), mesh.uvs[0])
+        assertEquals(
+            listOf(
+                Vec2f(0.5f, 0.5f),
+                Vec2f(0f, 1f),
+                Vec2f(1f, 1f),
+                Vec2f(0.5f, 0.5f),
+                Vec2f(1f, 1f),
+                Vec2f(1f, 0f),
+                Vec2f.ZERO
+            ), mesh.uvs[0]
+        )
     }
 
     @Test
     fun `missing optional attributes and materials use runtime defaults`() {
-        val doc = fbxDocument(fbxMesh() + "\nModel: 1, \"Model::Root\", \"Mesh\" {}", """
+        val doc = fbxDocument(
+            fbxMesh() + "\nModel: 1, \"Model::Root\", \"Mesh\" {}", """
             C: "OO",10,1
             C: "OO",1,0
-        """)
+        """
+        )
         val model = doc.convert(ResourceLocation.fromNamespaceAndPath("test", "model.fbx"), ModelSide.SERVER)
         val primitive = model.nodes.flatMap { it.mesh?.primitives.orEmpty() }.single()
+        assertNull(model.nodePaths.node(listOf(ScenePathSegment("Root"), ScenePathSegment("Mesh"))))
         assertNull(primitive.normals)
         assertNull(primitive.texCoords)
         assertNull(primitive.joints)
@@ -60,25 +151,32 @@ class FbxGeometryTest {
     @Test
     fun `weights keep strongest influences and expand from control points`() {
         val bones = (1..6).joinToString("\n") { "Model: ${4294967296L + it}, \"Model::Joint$it\", \"LimbNode\" {}" }
-        val clusters = (1..6).joinToString("\n") { """
+        val clusters = (1..6).joinToString("\n") {
+            """
             Deformer: ${100 + it}, "SubDeformer::Cluster$it", "Cluster" {
                 Indexes: *1 { a: 0 }
                 Weights: *1 { a: ${it * 0.1} }
                 Transform: *16 { a: $IDENTITY_VALUES }
                 TransformLink: *16 { a: $IDENTITY_VALUES }
             }
-        """ }
-        val links = (1..6).joinToString("\n") { """
+        """
+        }
+        val links = (1..6).joinToString("\n") {
+            """
             C: "OO",${4294967296L + it},0
             C: "OO",${4294967296L + it},${100 + it}
             C: "OO",${100 + it},20
-        """ }
-        val doc = fbxDocument(fbxMesh() + "\n$clusters\n$bones\nDeformer: 20, \"Deformer::Skin\", \"Skin\" {}\nModel: 1, \"Model::Mesh\", \"Mesh\" {}", """
+        """
+        }
+        val doc = fbxDocument(
+            fbxMesh() + "\n$clusters\n$bones\nDeformer: 20, \"Deformer::Skin\", \"Skin\" {}\nModel: 1, \"Model::Mesh\", \"Mesh\" {}",
+            """
             $links
             C: "OO",20,10
             C: "OO",10,1
             C: "OO",1,0
-        """)
+        """
+        )
         val model = doc.convert(ResourceLocation.fromNamespaceAndPath("test", "model.fbx"), ModelSide.SERVER)
         val node = model.nodes.single { it.skin != null }
         val joints = node.mesh!!.primitives.single().joints!!
@@ -92,7 +190,8 @@ class FbxGeometryTest {
 
     @Test
     fun `sparse morph targets expand at every corner sharing a control point`() {
-        val doc = fbxDocument(fbxMesh(indices = "0,1,-3,2,1,-1") + """
+        val doc = fbxDocument(
+            fbxMesh(indices = "0,1,-3,2,1,-1") + """
             Deformer: 20, "Deformer::Blend", "BlendShape" {}
             Deformer: 21, "Deformer::Channel", "BlendShapeChannel" {
                 Properties70: { P: "DeformPercent", "double", "", "",50 }
@@ -105,7 +204,8 @@ class FbxGeometryTest {
             C: "OO",22,21
             C: "OO",21,20
             C: "OO",20,10
-        """)
+        """
+        )
         val mesh = doc[10]!!.get<MeshGeometry>()!!
         val deltas = morphTargets(mesh).single().getValue("POSITION")
         assertEquals(18, deltas.size)

@@ -2,6 +2,7 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bbmodel.*
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
@@ -9,8 +10,11 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelRotation
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -75,7 +79,7 @@ class BlockBenchRigTests {
         val mesh = model.findNodeByName("mesh01-uuid")!!
         val skin = assertNotNull(mesh.skin)
         assertEquals(8f, model.findNodeByName("tip")!!.transform.translation.y)
-        val matrices = skin.compute(runtime.getValue(mesh.index).modelMatrix(), runtime)
+        val matrices = skin.pose().compute(runtime.getValue(mesh.index).modelMatrix(), runtime)
         val primitive = mesh.mesh!!.primitives.single()
         assertTrue(primitive.hasSkinning && primitive.isDynamic)
         primitive.positions!!.forEach { point ->
@@ -120,9 +124,7 @@ class BlockBenchRigTests {
         val extra = assertNotNull(primitive.additionalSkinWeights)[0]
         assertEquals(listOf(4, 5), extra.map { it.joint })
         assertEquals(
-            1f,
-            primary.x + primary.y + primary.z + primary.w + extra.sumOf { it.weight.toDouble() }.toFloat(),
-            0.00001f
+            1f, primary.x + primary.y + primary.z + primary.w + extra.sumOf { it.weight.toDouble() }.toFloat(), 0.00001f
         )
         assertEquals(6f / 21f, extra[1].weight, 0.00001f)
     }
@@ -173,6 +175,29 @@ class BlockBenchRigTests {
         assertTrue(mid.modelMatrix().getTranslation().z > 0f)
         val rotation = end.modelRotation()
         assertEquals(1f, rotation.w, 0.0001f)
+
+        val scene = Scene(object : SceneContext {
+            override val side = LogicalSide.SERVER
+        })
+        val owner = scene.create("owner")
+        owner.localTransform.translate(10f, 0f, 0f)
+        val instance = ModelSceneInstance.create(owner, "model", model)
+        val sceneEnd = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(end.definition))))
+        val sceneControl = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(control.definition))))
+        instance.poseTarget().poseNodesByIndex.getValue(control.definition.index).isAnimated = true
+        instance.applyAuthoredConstraints()
+        assertTrue(
+            sceneEnd.worldTransform.getTranslation().distance(sceneControl.worldTransform.getTranslation()) < 0.001f
+        )
+
+        instance.resetPose()
+        val sceneRoot = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(root.definition))))
+        val restEnd = Vec3f(sceneEnd.worldTransform.getTranslation())
+        sceneRoot.setEnabled(false)
+        instance.poseTarget().poseNodesByIndex.getValue(control.definition.index).isAnimated = true
+        instance.applyAuthoredConstraints()
+        assertEquals(restEnd, sceneEnd.worldTransform.getTranslation())
+        scene.close()
     }
 
     @Test

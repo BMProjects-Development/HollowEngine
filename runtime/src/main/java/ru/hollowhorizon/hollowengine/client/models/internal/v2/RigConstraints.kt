@@ -34,16 +34,22 @@ fun applyRigConstraints(
 }
 
 /** [this] node's matrix in the space of its model, from the local transforms as they are now. */
-fun RuntimeNode.modelMatrix(): Mat4f {
-    val above = parent as? RuntimeNode ?: return transform.matrixF
-    return above.modelMatrix().mul(transform.matrixF, MutableMat4f())
+fun ModelPoseNode.modelMatrix(): Mat4f {
+    val above = poseParent ?: return poseTransform.matrixF
+    return above.modelMatrix().mul(poseTransform.matrixF, MutableMat4f())
 }
 
+/** Compatibility overload for extensions compiled against runtime nodes. */
+fun RuntimeNode.modelMatrix(): Mat4f = (this as ModelPoseNode).modelMatrix()
+
 /** [this] node's turn in the space of its model. */
-fun RuntimeNode.modelRotation(): QuatF {
-    val above = parent as? RuntimeNode ?: return MutableQuatF(transform.rotation)
-    return above.modelRotation() * transform.rotation
+fun ModelPoseNode.modelRotation(): QuatF {
+    val above = poseParent ?: return MutableQuatF(poseTransform.rotation)
+    return above.modelRotation() * poseTransform.rotation
 }
+
+/** Compatibility overload for extensions compiled against runtime nodes. */
+fun RuntimeNode.modelRotation(): QuatF = (this as ModelPoseNode).modelRotation()
 
 /** [this] node's matrix in the space of its model in the rest pose, before anything animates it. */
 fun RuntimeNode.restModelMatrix(): Mat4f {

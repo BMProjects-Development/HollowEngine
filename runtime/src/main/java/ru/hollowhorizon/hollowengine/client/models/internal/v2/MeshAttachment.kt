@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
+import ru.hollowhorizon.hollowengine.client.models.internal.SkinPose
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
@@ -18,8 +19,12 @@ class MeshAttachment(
     internal var replaced = false
     val isVisible: Boolean get() = node.isVisible && !replaced
 
-    fun skinMatrices(): Array<Mat4f> =
-        node.definition.skin!!.compute(globalMatrix, node.jointGetter)
+    private var skinPose: SkinPose? = null
+
+    fun skinMatrices(): Array<Mat4f> {
+        val pose = skinPose ?: checkNotNull(node.definition.skin).pose().also { skinPose = it }
+        return pose.compute(globalMatrix, node.jointGetter)
+    }
 
     /** Only a skinned or morphed primitive draws itself; the model draws its static ones together. */
     override fun collectCommands(pipeline: RenderPipeline) {

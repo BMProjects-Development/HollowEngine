@@ -1,6 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -13,12 +15,17 @@ fun applyRigPose(roots: List<RuntimeNode>, rig: ModelRig) {
     roots.forEach { root ->
         root.walk().forEach { node ->
             val pose = rig.bone(node.name)?.pose?.takeUnless { it.isIdentity } ?: return@forEach
-            val local = node.transform
-            local.setCompositionOf(
-                Vec3f(local.translation) + pose.position,
-                MutableQuatF(local.rotation).mul(pose.rotation).norm(),
-                Vec3f(local.scale) * pose.scale,
-            )
+            node.applyRigPose(pose)
         }
     }
+}
+
+internal fun ModelPoseNode.applyRigPose(pose: RigPose) {
+    if (!acceptsPose || pose.isIdentity) return
+    val local = poseTransform
+    local.setCompositionOf(
+        Vec3f(local.translation) + pose.position,
+        MutableQuatF(local.rotation).mul(pose.rotation).norm(),
+        Vec3f(local.scale) * pose.scale,
+    )
 }

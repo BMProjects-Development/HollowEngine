@@ -13,11 +13,15 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsCom
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 
 class ModelInstanceIsolationTests {
     @Test
@@ -57,6 +61,36 @@ class ModelInstanceIsolationTests {
     }
 
     @Test
+    fun `skin poses keep joint matrices per instance and reuse their storage`() {
+        val skin = Skin(listOf(0), arrayOf<Mat4f>(MutableMat4f().translate(Vec3f(-1f, 0f, 0f))))
+        val definition = NodeDefinition(0, "joint", mutableListOf(), TrsTransformF())
+        val firstJoint = RuntimeNode(definition, null)
+        val secondJoint = RuntimeNode(definition, null)
+        firstJoint.transform.translate(5f, 0f, 0f)
+        secondJoint.transform.translate(9f, 0f, 0f)
+        firstJoint.updateGlobalMatrix()
+        secondJoint.updateGlobalMatrix()
+        val root = MutableMat4f().translate(Vec3f(2f, 0f, 0f))
+        val first = skin.pose()
+        val second = skin.pose()
+
+        val firstMatrices = first.compute(root, mapOf(0 to firstJoint))
+        val firstMatrix = firstMatrices[0]
+        val secondMatrices = second.compute(root, mapOf(0 to secondJoint))
+        assertNotSame(firstMatrices, secondMatrices)
+        assertNotSame(firstMatrix, secondMatrices[0])
+        assertEquals(2f, firstMatrix.m30)
+        assertEquals(6f, secondMatrices[0].m30)
+
+        firstJoint.transform.translate(2f, 0f, 0f)
+        firstJoint.updateGlobalMatrix()
+        assertSame(firstMatrices, first.compute(root, mapOf(0 to firstJoint)))
+        assertSame(firstMatrix, firstMatrices[0])
+        assertEquals(4f, firstMatrix.m30)
+        assertEquals(6f, secondMatrices[0].m30)
+    }
+
+    @Test
     fun `model animation advances once per render frame`() {
         val animation = AnimationClip(name = "clock", nodes = emptyMap(), duration = 10f)
         val model = Model(
@@ -78,8 +112,7 @@ class ModelInstanceIsolationTests {
         )
         val instance = ModelInstance(ModelAttachment(MutableStateFlow(model), null))
         instance.animator.configure(
-            model = null,
-            animations = AnimationsComponent(
+            model = null, animations = AnimationsComponent(
                 clips = listOf(
                     ClipAnimationLayerSpec(
                         id = "clock",

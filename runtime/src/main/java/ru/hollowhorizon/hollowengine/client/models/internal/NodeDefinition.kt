@@ -12,6 +12,8 @@ open class NodeDefinition(
     val skin: Skin? = null,
     val visible: Boolean = true,
 ) {
+    /** Runtime transform introduced by a loader, rather than an authored node. */
+    var isSynthetic: Boolean = false
     var parent: NodeDefinition? = null
     val root: NodeDefinition by lazy { parent?.root ?: this }
     val path: String get() = parent?.let { it.name + "/" + name } ?: name ?: "Unnamed Bone"

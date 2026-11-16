@@ -38,7 +38,7 @@ object MontageSampler {
         }
         montage.bones.forEach { track ->
             if (track.property == MontageBoneProperty.VISIBLE) return@forEach
-            val node = target.node(track.bone)?.definition?.index?.takeIf { it in allowed } ?: return@forEach
+            val node = target.nodeIndex(track.bone)?.takeIf { it in allowed } ?: return@forEach
             val bone = pose[node] ?: pose.bone(node).also { it.cover = 1f }
             val value = track.valueAt(time)
             when (track.property) {

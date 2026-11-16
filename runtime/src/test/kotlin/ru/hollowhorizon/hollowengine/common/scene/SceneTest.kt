@@ -32,13 +32,15 @@ class SceneTest {
         val swordBone = sword.importChild("hand")
         val second = scene.create("second").importChild("right").importChild("hand")
 
-        assertEquals(listOf("left", "hand"), left.address.importedPath)
+        assertEquals(listOf(ScenePathSegment("left"), ScenePathSegment("hand")), left.address.importedPath)
         assertNotEquals(left.address, right.address)
         assertNotEquals(right.address, second.address)
         assertEquals(sword.createdId, swordBone.address.instanceId)
         listOf(character, left, right, sword, swordBone, second).forEach { assertSame(it, scene.resolve(it.address)) }
-        assertNull(scene.resolve(SceneAddress(character.createdId!!, listOf("right", "sword", "hand"))))
-        assertFailsWith<IllegalArgumentException> { character.importChild("right") }
+        assertNull(scene.resolve(SceneAddress(character.createdId!!, listOf("right", "sword", "hand").map { ScenePathSegment(it) })))
+        val duplicate = character.importChild("right")
+        assertEquals(ScenePathSegment("right", 2), duplicate.address.importedPath.single())
+        assertSame(duplicate, scene.resolve(duplicate.address))
         assertFailsWith<IllegalArgumentException> { left.rename("  ") }
         assertFailsWith<IllegalArgumentException> { scene.create("other", character.createdId) }
         val oldAddress = left.address
@@ -48,6 +50,106 @@ class SceneTest {
         val swordAddress = swordBone.address
         sword.remove()
         assertNull(scene.resolve(swordAddress))
+    }
+
+    @Test
+    fun `numbered imported siblings keep distinct addresses even when names contain numbers`() {
+        val scene = scene()
+        val root = scene.create("model")
+        val first = root.importChild("hand")
+        val second = root.importChild("hand")
+        val named = root.importChild("hand (2)")
+        val other = root.importChild("other").importChild("hand")
+        assertEquals(ScenePathSegment("hand", 1), first.address.importedPath.single())
+        assertEquals(ScenePathSegment("hand", 2), second.address.importedPath.single())
+        assertNotEquals(second.address, named.address)
+        assertNotEquals(second.address, other.address)
+        listOf(first, second, named, other).forEach { assertSame(it, scene.resolve(it.address)) }
+        assertFailsWith<IllegalArgumentException> { root.create("hand") }
+        assertFailsWith<IllegalArgumentException> { ScenePathSegment("hand", 0) }
+    }
+
+    @Test
+    fun `numbered paths resolve after rebuilding an instance with the same source order`() {
+        val firstScene = scene()
+        val original = firstScene.create("model")
+        original.importChild("hand")
+        val originalSecond = original.importChild("hand").importChild("finger")
+        val address = originalSecond.address
+        firstScene.close()
+
+        val secondScene = scene()
+        val reloaded = secondScene.create("model", address.instanceId)
+        reloaded.importChild("hand")
+        val reloadedSecond = reloaded.importChild("hand").importChild("finger")
+        assertSame(reloadedSecond, secondScene.resolve(address))
+    }
+
+    @Test
+    fun `children snapshots and lookup update through synthetic branches`() {
+        val scene = scene()
+        val root = scene.create("root")
+        val roots = scene.children
+        assertSame(roots, scene.children)
+        val initial = root.children
+        assertSame(initial, root.children)
+        val firstHidden = root.importSynthetic("correction")
+        val secondHidden = firstHidden.importSynthetic("pivot")
+        val first = secondHidden.importModelChild(ScenePathSegment("hand"))
+        val snapshot = root.children
+        assertSame(snapshot, root.children)
+        assertEquals(listOf(first), snapshot)
+        assertTrue(initial.isEmpty())
+        assertSame(root, first.parent)
+        assertSame(first, scene.resolve(first.address))
+
+        val second = secondHidden.importModelChild(ScenePathSegment("hand", 2))
+        assertNotEquals(snapshot.size, root.children.size)
+        assertSame(second, scene.resolve(second.address))
+        first.rename("renamed")
+        assertSame(first, scene.resolve(first.address))
+        assertNull(scene.resolve(SceneAddress(root.createdId!!, listOf(ScenePathSegment("hand")))))
+        second.remove()
+        assertEquals(listOf(first), root.children)
+        firstHidden.remove()
+        assertTrue(root.children.isEmpty())
+        root.remove()
+        assertTrue(scene.children.isEmpty())
+        assertEquals(listOf(root), roots)
+    }
+
+    @Test
+    fun `component snapshots are reused and invalidated on mutation and rollback`() {
+        val node = scene().create("owner")
+        val many = type(multiple = true)
+        val empty = node.components
+        val first = node.addComponent(many, "first")
+        val all = node.components
+        val typed = node.components(many)
+        assertSame(all, node.components)
+        assertSame(typed, node.components(many))
+        assertSame(first, node.component(many))
+        val second = node.addComponent(many, "second")
+        assertTrue(empty.isEmpty())
+        assertEquals(listOf(first), all)
+        assertEquals(listOf(first), typed)
+        assertEquals(listOf(first, second), node.components(many))
+        first.remove()
+        assertEquals(listOf(second), node.components)
+
+        val failing = SceneComponentType(
+            "test:failing".rl, String::class, String.serializer(), createRuntime = {
+                object : SceneComponentRuntime<String> {
+                    override fun onAttach(component: SceneComponent<String>) {
+                        assertEquals(2, component.owner.components.size)
+                        error("failed")
+                    }
+                }
+            },
+        )
+        assertFailsWith<IllegalStateException> { node.addComponent(failing, "bad") }
+        assertEquals(listOf(second), node.components)
+        assertTrue(node.components(failing).isEmpty())
     }
 
     @Test
@@ -172,6 +274,35 @@ class SceneTest {
         assertEquals(1, events.count { it == "remove root" })
         assertEquals(1, events.count { it == "remove child" })
         assertFailsWith<IllegalStateException> { childComponent.setData("late") }
+    }
+
+    @Test
+    fun `lifecycle callbacks see updated activity throughout the branch`() {
+        val root = scene().create("root")
+        val first = root.create("first")
+        val second = root.create("second")
+        val observations = mutableListOf<List<Boolean>>()
+        val type = type(multiple = true, runtime = {
+            object : SceneComponentRuntime<String> {
+                override fun onActivate(component: SceneComponent<String>) {
+                    observations += listOf(root.isActive, first.isActive, second.isActive)
+                }
+
+                override fun onSuspend(component: SceneComponent<String>) {
+                    observations += listOf(root.isActive, first.isActive, second.isActive)
+                }
+            }
+        })
+        root.addComponent(type, "root")
+        first.addComponent(type, "first")
+        second.addComponent(type, "second")
+        observations.clear()
+
+        root.setEnabled(false)
+        assertEquals(List(3) { listOf(false, false, false) }, observations)
+        observations.clear()
+        root.setEnabled(true)
+        assertEquals(List(3) { listOf(true, true, true) }, observations)
     }
 
     @Test

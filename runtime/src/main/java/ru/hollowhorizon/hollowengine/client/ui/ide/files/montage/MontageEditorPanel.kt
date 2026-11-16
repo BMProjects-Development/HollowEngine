@@ -282,7 +282,7 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
             val montage = session.withHeldBones(document.montage)
             val time = session.timeline.currentTime.coerceIn(0f, montage.duration)
             context.montages += MontageMoment(montage, time, 1f)
-            return LayerPose(MontageSampler.sample(montage, time, target, target.nodesByIndex.keys))
+            return LayerPose(MontageSampler.sample(montage, time, target, target.poseNodesByIndex.keys))
         }
     }
 }

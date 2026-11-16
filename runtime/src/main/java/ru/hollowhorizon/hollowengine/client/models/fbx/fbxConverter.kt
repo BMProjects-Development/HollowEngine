@@ -61,7 +61,7 @@ internal class FbxConverter(
             null,
             roots.toMutableList(),
             TrsTransformF().setMatrix(Mat4f.fromArray(basis))
-        )
+        ).also { it.isSynthetic = true }
         roots.forEach { it.parent = axisNode }
         val nodes = ModelSpace.place(
             listOf(axisNode),
@@ -105,7 +105,7 @@ internal class FbxConverter(
             children += NodeDefinition(
                 geometryIndex, mesh.name.substringAfter("::"), mutableListOf(), geometryTransform,
                 Mesh(primitives, weights), skin,
-            )
+            ).also { it.isSynthetic = true }
         }
         children += convertChildren(model.id)
         children.forEach { it.parent = chain.last }

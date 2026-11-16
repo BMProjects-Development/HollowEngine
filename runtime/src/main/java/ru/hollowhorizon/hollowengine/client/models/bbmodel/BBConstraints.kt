@@ -1,10 +1,11 @@
 package ru.hollowhorizon.hollowengine.client.models.bbmodel
 
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelPoseConstraint
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.SharedModelPoseConstraint
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelRotation
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
@@ -41,16 +42,17 @@ private class BBIKConstraint(
     private val chain: List<Int>,
     private val pole: Int?,
     private val lockEndRotation: Boolean,
-) : ModelPoseConstraint {
-    override fun apply(nodes: Map<Int, RuntimeNode>) {
+) : SharedModelPoseConstraint {
+    override fun applyPose(nodes: Map<Int, ModelPoseNode>) {
         val control = nodes[controller] ?: return
         // Blockbench enables an IK controller only while its animation has keys.
-        if (!control.isAnimated || chain.size < 2) return
+        if (!control.acceptsPose || !control.isAnimated || chain.size < 2) return
         val links = chain.map { nodes[it] ?: return }
+        if (links.any { !it.acceptsPose }) return
         val endRotation = links.last().modelRotation()
         links.forEach { link ->
-            link.transform.rotation.set(link.definition.baseTransform.rotation)
-            link.transform.markDirty()
+            link.poseTransform.rotation.set(link.restTransform.rotation)
+            link.poseTransform.markDirty()
         }
         val positions = links.map { it.modelMatrix().getTranslation() }
         val solution = IkSolver.solve(
@@ -61,8 +63,8 @@ private class BBIKConstraint(
             maxStretch = 1f,
         )
         val current = positions.map { MutableVec3f(it) }
-        val original = links.map { MutableQuatF(it.transform.rotation) }
-        var above: QuatF = (links.first().parent as? RuntimeNode)?.modelRotation() ?: QuatF.IDENTITY
+        val original = links.map { MutableQuatF(it.poseTransform.rotation) }
+        var above: QuatF = links.first().poseParent?.modelRotation() ?: QuatF.IDENTITY
         for (i in 0 until links.lastIndex) {
             val turn =
                 IkSolver.rotationBetween(current[i + 1] - current[i], solution.joints[i + 1] - solution.joints[i])
@@ -70,13 +72,13 @@ private class BBIKConstraint(
                 current[j].set(current[i] + IkSolver.rotate(current[j] - current[i], turn))
             }
             val global = turn * (above * original[i])
-            links[i].transform.rotation.set(above.inverted() * global)
-            links[i].transform.markDirty()
+            links[i].poseTransform.rotation.set(above.inverted() * global)
+            links[i].poseTransform.markDirty()
             above = global
         }
         if (lockEndRotation) {
-            links.last().transform.rotation.set(above.inverted() * endRotation)
-            links.last().transform.markDirty()
+            links.last().poseTransform.rotation.set(above.inverted() * endRotation)
+            links.last().poseTransform.markDirty()
         }
     }
 }

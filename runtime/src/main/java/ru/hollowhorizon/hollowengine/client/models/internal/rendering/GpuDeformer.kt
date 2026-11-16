@@ -9,6 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.utils.VboWrapper
 import ru.hollowhorizon.hollowengine.client.models.internal.utils.toFloatBuffer
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import java.nio.FloatBuffer
 import kotlin.math.min
 
 private const val MaxMorphTargets = 64
@@ -32,6 +33,7 @@ class GpuDeformer(private val primitive: Primitive) {
     private var morphTanTexture = -1
 
     private var jointMatrixBuffer: VboWrapper? = null
+    private var jointMatrixUpload: FloatBuffer? = null
     private var jointMatrixTexture = -1
 
     private var outPosBufferId = -1
@@ -223,7 +225,10 @@ class GpuDeformer(private val primitive: Primitive) {
     }
 
     private fun updateJointMatrices(matrices: Array<Mat4f>) {
-        val buffer = BufferUtils.createFloatBuffer(matrices.size * 16)
+        val size = matrices.size * 16
+        val buffer = jointMatrixUpload?.takeIf { it.capacity() >= size }
+            ?: BufferUtils.createFloatBuffer(size).also { jointMatrixUpload = it }
+        buffer.clear()
         for (m in matrices) {
             buffer.put(m.m00).put(m.m01).put(m.m02).put(m.m03)
             buffer.put(m.m10).put(m.m11).put(m.m12).put(m.m13)
@@ -281,6 +286,7 @@ class GpuDeformer(private val primitive: Primitive) {
         morphNorBuffer?.delete()
         morphTanBuffer?.delete()
         jointMatrixBuffer?.delete()
+        jointMatrixUpload = null
 
         if (morphPosTexture != -1) GL11.glDeleteTextures(morphPosTexture)
         if (morphNorTexture != -1) GL11.glDeleteTextures(morphNorTexture)

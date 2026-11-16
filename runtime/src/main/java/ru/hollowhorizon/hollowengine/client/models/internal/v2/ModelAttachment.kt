@@ -26,6 +26,7 @@ import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.addedBones
+import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -378,6 +379,13 @@ class ModelAttachment(
     fun findNode(name: String): RuntimeNode? {
         ensureReady()
         return allNodes.firstOrNull { it.name == name }
+    }
+
+    /** Resolves an authored path inside this model instance. */
+    fun findNode(path: List<ScenePathSegment>): RuntimeNode? {
+        ensureReady()
+        val definition = model.nodePaths.node(path) ?: return null
+        return nodesByIndex[definition.index]?.takeIf { it.definition === definition }
     }
 
     /** The instance's bounds in its own space, recomputed after every pose. */

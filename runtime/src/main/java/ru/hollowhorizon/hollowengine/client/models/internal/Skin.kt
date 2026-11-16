@@ -10,21 +10,29 @@ class Skin(
     val jointsIds: List<Int>,
     val inverseBindMatrices: Array<Mat4f>,
 ) {
-    private val cache: Array<Mat4f> = Array(jointsIds.size) { MutableMat4f() }
+    fun pose(): SkinPose = SkinPose(this)
+
+    /** Use a retained [SkinPose] when computing matrices repeatedly. */
+    @Deprecated("Retain a SkinPose per mesh instead")
+    fun compute(globalRoot: Mat4f, jointGetter: Map<Int, RuntimeNode>): Array<Mat4f> {
+        return pose().compute(globalRoot, jointGetter)
+    }
+}
+
+/** Reusable joint matrices for one mesh instance. The returned array is a live view of this pose. */
+class SkinPose internal constructor(private val skin: Skin) {
+    private val matrices: Array<Mat4f> = Array(skin.jointsIds.size) { MutableMat4f() }
+    private val inverseRoot = MutableMat4f()
 
     fun compute(globalRoot: Mat4f, jointGetter: Map<Int, RuntimeNode>): Array<Mat4f> {
-        // Получаем и инвертируем глобальную матрицу узла модели
-        val inverseRoot = MutableMat4f(globalRoot)
+        inverseRoot.set(globalRoot)
         inverseRoot.invert()
 
-        // Проходим по всем суставам
-        for ((i, id) in jointsIds.withIndex()) {
-            val jointGlobalMatrix = MutableMat4f(jointGetter[id]!!.globalMatrix)
-            val bindMatrix = MutableMat4f(inverseBindMatrices[i])
-            val skinMatrix = MutableMat4f(jointGlobalMatrix).mul(bindMatrix)
-            cache[i] = MutableMat4f(inverseRoot).mul(skinMatrix).transpose() // Транспозируем уже для передачи в Minecraft
+        for ((i, id) in skin.jointsIds.withIndex()) {
+            val result = matrices[i] as? MutableMat4f ?: MutableMat4f().also { matrices[i] = it }
+            result.set(inverseRoot).mul(jointGetter.getValue(id).globalMatrix).mul(skin.inverseBindMatrices[i]).transpose()
         }
-        return cache
+        return matrices
     }
 }
 

@@ -38,7 +38,7 @@ object ModelSpace {
             index = index,
             children = nodes.toMutableList(),
             transform = transform,
-        )
+        ).also { it.isSynthetic = true }
         nodes.forEach { it.parent = root }
         return listOf(root)
     }

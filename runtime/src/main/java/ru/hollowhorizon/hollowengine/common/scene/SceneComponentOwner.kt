@@ -17,7 +17,10 @@ interface SceneComponentOwner {
 
 internal class SceneComponentSet(private val owner: SceneComponentOwner) {
     private val values = linkedMapOf<UUID, SceneComponent<*>>()
-    val components: List<SceneComponent<*>> get() = values.values.toList()
+    private var snapshot: List<SceneComponent<*>>? = null
+    private var typedSnapshots: MutableMap<SceneComponentType<*>, List<SceneComponent<*>>>? = null
+    val components: List<SceneComponent<*>>
+        get() = snapshot ?: buildList { addAll(values.values) }.also { snapshot = it }
 
     fun <T : Any> add(type: SceneComponentType<T>, data: T, id: UUID): SceneComponent<T> = owner.scene.mutate {
         checkAttached()
@@ -35,6 +38,7 @@ internal class SceneComponentSet(private val owner: SceneComponentOwner) {
         val component = SceneComponent(owner, id, type, data)
         component.runtime = type.createRuntime(component)
         values[id] = component
+        invalidate()
         try {
             component.runtime?.onAttach(component)
             val failures = SceneFailures()
@@ -42,6 +46,7 @@ internal class SceneComponentSet(private val owner: SceneComponentOwner) {
             failures.throwIfAny()
         } catch (exception: Exception) {
             values.remove(id)
+            invalidate()
             val failures = SceneFailures()
             component.finish(failures)
             try {
@@ -56,12 +61,18 @@ internal class SceneComponentSet(private val owner: SceneComponentOwner) {
 
     fun component(id: UUID): SceneComponent<*>? = values[id]
 
-    fun <T : Any> components(type: SceneComponentType<T>): List<SceneComponent<T>> = values.values
-        .filter { it.type === type }
-        .map {
-            @Suppress("UNCHECKED_CAST")
-            it as SceneComponent<T>
-        }
+    fun <T : Any> components(type: SceneComponentType<T>): List<SceneComponent<T>> {
+        val cache = typedSnapshots ?: mutableMapOf<SceneComponentType<*>, List<SceneComponent<*>>>()
+            .also { typedSnapshots = it }
+        val matches = cache.getOrPut(type) { buildList { values.values.forEach { if (it.type === type) add(it) } } }
+        @Suppress("UNCHECKED_CAST")
+        return matches as List<SceneComponent<T>>
+    }
+
+    fun <T : Any> component(type: SceneComponentType<T>): SceneComponent<T>? {
+        @Suppress("UNCHECKED_CAST")
+        return values.values.firstOrNull { it.type === type } as SceneComponent<T>?
+    }
 
     fun remove(id: UUID): Boolean = owner.scene.mutate {
         checkAttached()
@@ -72,6 +83,7 @@ internal class SceneComponentSet(private val owner: SceneComponentOwner) {
             }
         }
         values.remove(id)
+        invalidate()
         val failures = SceneFailures()
         component.finish(failures)
         failures.throwIfAny()
@@ -86,6 +98,12 @@ internal class SceneComponentSet(private val owner: SceneComponentOwner) {
     fun finish(failures: SceneFailures) {
         values.values.toList().asReversed().forEach { it.finish(failures) }
         values.clear()
+        invalidate()
+    }
+
+    private fun invalidate() {
+        snapshot = null
+        typedSnapshots?.clear()
     }
 
     private fun checkAttached() = check(!owner.isRemoved && !owner.scene.isClosed) { "Component owner has been removed" }

@@ -4,8 +4,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.Animation
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose.Companion.mix
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 class AnimationPose {
@@ -143,7 +143,7 @@ class BonePose(val node: Int) {
 
 fun applyAnimationPose(
     pose: AnimationPose,
-    nodes: Map<Int, RuntimeNode>,
+    nodes: Map<Int, ModelPoseNode>,
     blendMode: LayerBlendMode,
     weight: Float,
     referencePose: AnimationPose? = null,
@@ -153,9 +153,10 @@ fun applyAnimationPose(
 
     pose.entries.forEach { (nodeIndex, bonePose) ->
         val runtimeNode = nodes[nodeIndex] ?: return@forEach
+        if (!runtimeNode.acceptsPose) return@forEach
         runtimeNode.isAnimated = true
-        val transform = runtimeNode.transform
-        val base = runtimeNode.definition.baseTransform
+        val transform = runtimeNode.poseTransform
+        val base = runtimeNode.restTransform
         val reference = referencePose?.get(nodeIndex)
         val boneWeight = clampedWeight * bonePose.cover.coerceIn(0f, 1f)
 

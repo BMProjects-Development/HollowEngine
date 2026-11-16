@@ -19,7 +19,7 @@ internal fun buildTransformChain(model: Model, index: Int, allocate: () -> Int):
     val nodes = mutableListOf<NodeDefinition>()
     fun addTransform(transform: TrsTransformF, property: String? = null) {
         val id = allocate()
-        nodes += NodeDefinition(id, null, mutableListOf(), transform)
+        nodes += NodeDefinition(id, null, mutableListOf(), transform).also { it.isSynthetic = true }
         if (property != null) targets[property] = id
     }
     fun add(matrix: Mat4f, property: String? = null) = addTransform(TrsTransformF().setMatrix(matrix), property)
