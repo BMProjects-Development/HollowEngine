@@ -685,7 +685,7 @@ class HollowIdeOpenFile internal constructor(
     val text: String get() = requireNotNull(textOrNull) { "File '$path' is not a text document" }
     internal val textOrNull: String? get() = (document as? HollowIdeTextDocument)?.text
     val id: String = fileDockItemId(path)
-    val title: String get() = path.substringAfterLast('/').ifEmpty { path }
+    val title: String get() = projectPath.substringAfterLast('/').ifEmpty { path }
     internal val fileSync = if (!readOnly && !virtual &&
         (document is HollowIdeTextDocument || document.autosaveSnapshot() != null)) {
         HollowIdeFileSync(path.fromReadablePath().toPath(), initialContent)
@@ -764,6 +764,7 @@ class HollowIdeOpenFile internal constructor(
         if (textDocument.text == next) return
         textDocument.refresh(next)
         dirtyState = false
+        externalTextRevision++
     }
 
     fun encode(): ByteArray = document.encode()
