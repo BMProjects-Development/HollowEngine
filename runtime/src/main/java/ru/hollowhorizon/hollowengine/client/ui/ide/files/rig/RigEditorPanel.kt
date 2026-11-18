@@ -62,7 +62,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
 
     viewer.debugFill = { shapes ->
         if (state.showSkeleton) {
-            val colors = boneColors(document.rig, viewer.nodes)
+            val colors = boneColors(document.rig, viewer.attachment.scenePoseNodes.values)
             DebugSkeletonRenderer.fill(viewer.attachment, shapes, state.selected, colors::get)
         }
     }
@@ -70,10 +70,10 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
     viewer.decalOverlay = { key -> state.partSelection.picksDecal(key) }
     viewer.debugDraw = { lines ->
         if (state.showSkeleton) {
-            lines.ikOverlay(document.rig, viewer.nodes, state.partSelection)
+            lines.ikOverlay(document.rig, viewer.attachment.scenePoseNodes.values, state.partSelection)
         }
         if (state.showColliders) {
-            lines.colliders(previewColliders(document.rig, viewer.nodes), state.partSelection)
+            lines.colliders(previewColliders(document.rig, viewer.attachment.scenePoseNodes.values), state.partSelection)
             lines.soundAreas(document.rig, viewer.nodes, state.partSelection)
             lines.decalShapes(document.rig, viewer.nodes, state.partSelection)
             RigOverlays.all.forEach { it.draw(viewer.attachment, lines, state.selected) }
@@ -153,7 +153,7 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
             UiDropdownItem(entry.titleKey.lang, mark = UiMenuParts.icon(entry.icon)) {
                 viewer.attachment.ensureReady()
                 val attachment = viewer.attachment
-                val source = RigGenerationSource(attachment.model, attachment.nodes.flatMap { it.walk() })
+                val source = RigGenerationSource(attachment.model, attachment.scenePoseNodes.values)
                 document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(source, it) }
             }
         },

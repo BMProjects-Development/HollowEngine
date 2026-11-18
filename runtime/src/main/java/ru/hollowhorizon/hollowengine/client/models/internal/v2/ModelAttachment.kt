@@ -211,12 +211,26 @@ class ModelAttachment(
 
     internal fun applyRigPose() = renderScene.instance.applyRigPose(rig)
 
+    private val scaleMeshes: (SceneObject, Vec3f) -> Unit = { pose, scale ->
+        val node = nodesByIndex[pose.poseIndex]
+        if (node != null && node.definition.skin == null) {
+            for (mesh in node.attachments) {
+                if (mesh !is MeshAttachment) continue
+                mesh.transform.scale.set(scale)
+                mesh.transform.markDirty()
+            }
+        }
+    }
+
+    internal fun applyRigConstraints(context: AnimatorEvaluationContext, grounding: RigGroundingState? = null) =
+        renderScene.instance.applyRigConstraints(rig, context, grounding, scaleMeshes)
+
     /** Turns the posed nodes into the matrices the renderer draws from. */
     fun endPose() {
         applyAuthoredConstraints()
         updateGlobalMatrix()
-        runtimeNodes.forEach(RenderModelNode::updateHierarchyMatrices)
-        modelRoot?.updateHierarchyMatrices()
+        allNodes.forEach(RenderModelNode::updateAttachmentMatrices)
+        modelRoot?.updateAttachmentMatrices()
         cachedBounds = null
         posesSinceCullingBounds++
         poseVersion++
@@ -290,7 +304,7 @@ class ModelAttachment(
         nodesByIndex = allNodes.associateBy { it.definition.index }
         nodesByIndex.values.forEach(::customizeNode)
         val rootDefinition = NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF())
-        modelRoot = RenderModelNode(renderScene.modelRoot(rootDefinition), this, this) { it }.also { root ->
+        modelRoot = RenderModelNode(sceneRoot, rootDefinition, this) { it }.also { root ->
             val context = RigAttachmentContext(root, { entity }, this) { carrier }
             currentRig.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(root.attachments::add) }
         }
@@ -369,7 +383,7 @@ class ModelAttachment(
     override fun collectCommands(pipeline: RenderPipeline) {
         super.collectCommands(pipeline)
         collectStaticMeshes(pipeline)
-        runtimeNodes.forEach { it.collectCommands(pipeline) }
+        allNodes.forEach { it.collectCommands(pipeline) }
         modelRoot?.collectCommands(pipeline)
     }
 

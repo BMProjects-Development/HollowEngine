@@ -1,4 +1,3 @@
-import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bbmodel.*
@@ -7,8 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
@@ -16,6 +14,7 @@ import ru.hollowhorizon.hollowengine.common.models.modelMatrix
 import ru.hollowhorizon.hollowengine.common.models.modelRotation
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -33,9 +32,10 @@ class BlockBenchRigTests {
     private fun convert(file: BlockBenchModel): Model =
         BlockBenchModelLoader.convert(file, "test:models/rig.bbmodel".rl, ModelSide.SERVER)
 
-    private fun skeleton(model: Model): Map<Int, RenderModelNode> =
-        model.scenes[0].nodes.map { renderModelNode(it, null) }.onEach(RenderModelNode::updateHierarchyMatrices)
-            .flatMap { it.walk() }.associateBy { it.definition.index }
+    private fun skeleton(model: Model): Map<Int, SceneObject> {
+        val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
+        return ModelSceneInstance.create(scene.create("owner"), "model", model).poseTarget().poseNodesByIndex
+    }
 
     private fun triangle(id: String) = BBElement(
         id, id, "mesh", origin = listOf(2f, 0f, 0f),
@@ -164,7 +164,7 @@ class BlockBenchRigTests {
             )
         )
         val runtime = skeleton(model)
-        val root = runtime.values.single { it.definition.index == 0 }
+        val root = runtime.getValue(0)
         val mid = root.children.single()
         val end = mid.children.single()
         val control = runtime.values.single { it.name == "control" }
@@ -183,19 +183,19 @@ class BlockBenchRigTests {
         val owner = scene.create("owner")
         owner.localTransform.translate(10f, 0f, 0f)
         val instance = ModelSceneInstance.create(owner, "model", model)
-        val sceneEnd = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(end.definition))))
-        val sceneControl = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(control.definition))))
-        instance.poseTarget().poseNodesByIndex.getValue(control.definition.index).isAnimated = true
+        val sceneEnd = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(end.source as NodeDefinition))))
+        val sceneControl = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(control.source as NodeDefinition))))
+        sceneControl.isAnimated = true
         instance.applyAuthoredConstraints()
         assertTrue(
             sceneEnd.worldTransform.getTranslation().distance(sceneControl.worldTransform.getTranslation()) < 0.001f
         )
 
         instance.resetPose()
-        val sceneRoot = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(root.definition))))
+        val sceneRoot = assertNotNull(instance.node(assertNotNull(model.nodePaths.path(root.source as NodeDefinition))))
         val restEnd = Vec3f(sceneEnd.worldTransform.getTranslation())
         sceneRoot.setEnabled(false)
-        instance.poseTarget().poseNodesByIndex.getValue(control.definition.index).isAnimated = true
+        sceneControl.isAnimated = true
         instance.applyAuthoredConstraints()
         assertEquals(restEnd, sceneEnd.worldTransform.getTranslation())
         scene.close()
@@ -227,8 +227,8 @@ class BlockBenchRigTests {
         applyAnimationPose(pose, runtime, LayerBlendMode.Override, 1f)
         val child = runtime.values.single { it.name == "child" }
         assertEquals(1f, child.modelRotation().w, 0.0001f)
-        val masked = AnimationPose.sample(model.animations.single(), 0f, setOf(child.definition.index))
+        val masked = AnimationPose.sample(model.animations.single(), 0f, setOf(child.poseIndex))
         assertEquals(1, masked.entries.size)
-        assertEquals(pose[child.definition.index]!!.rotation, masked[child.definition.index]!!.rotation)
+        assertEquals(pose[child.poseIndex]!!.rotation, masked[child.poseIndex]!!.rotation)
     }
 }

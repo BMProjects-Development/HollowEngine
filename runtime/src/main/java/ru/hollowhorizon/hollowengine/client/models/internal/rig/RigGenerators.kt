@@ -3,12 +3,12 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rig
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /** Shared asset and the instance's pose nodes, without a renderer-specific hierarchy. */
-class RigGenerationSource(val model: Model, val nodes: Collection<ModelPoseNode>)
+class RigGenerationSource(val model: Model, val nodes: Collection<SceneObject>)
 
 fun interface RigGenerator {
     /** [current] is what the editor has now, so a generator can leave what was authored by hand alone. */

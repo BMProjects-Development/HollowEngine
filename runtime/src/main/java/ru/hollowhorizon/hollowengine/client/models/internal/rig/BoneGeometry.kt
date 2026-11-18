@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.rig
 
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
@@ -28,12 +28,12 @@ class BoneBounds(val min: Vec3f, val max: Vec3f) {
  */
 object BoneGeometry {
     /** The corners of every piece of geometry each bone holds, in the bone's own space. */
-    fun cornersPerBone(nodes: Collection<ModelPoseNode>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<ModelPoseNode, List<Vec3f>> {
+    fun cornersPerBone(nodes: Collection<SceneObject>, geometry: Map<Int, Pair<Vec3f, Vec3f>>): Map<SceneObject, List<Vec3f>> {
         if (nodes.isEmpty() || geometry.isEmpty()) return emptyMap()
 
         val bindGlobals = bindGlobalsOf(nodes)
         val bones = boneNodes(nodes)
-        val corners = LinkedHashMap<ModelPoseNode, MutableList<Vec3f>>()
+        val corners = LinkedHashMap<SceneObject, MutableList<Vec3f>>()
         val corner = MutableVec3f()
 
         nodes.forEach { node ->
@@ -55,7 +55,7 @@ object BoneGeometry {
     }
 
     /** The nodes that are bones: the joints of a skin, or for a model without one, every node that only groups others. */
-    fun boneNodes(nodes: Collection<ModelPoseNode>): Set<ModelPoseNode> {
+    fun boneNodes(nodes: Collection<SceneObject>): Set<SceneObject> {
         val joints = nodes.flatMap { it.source.skinJoints }.toSet()
         if (joints.isNotEmpty()) return nodes.filterTo(LinkedHashSet()) { it.poseIndex in joints }
 
@@ -63,7 +63,7 @@ object BoneGeometry {
         return nodes.filterTo(LinkedHashSet()) { !it.source.hasMesh && it in parents }
     }
 
-    private fun intoBoneSpace(node: ModelPoseNode, bone: ModelPoseNode, bindGlobals: Map<Int, Mat4f>): Mat4f? {
+    private fun intoBoneSpace(node: SceneObject, bone: SceneObject, bindGlobals: Map<Int, Mat4f>): Mat4f? {
         if (node === bone) return IDENTITY
 
         val nodeGlobal = bindGlobals[node.poseIndex] ?: return null
@@ -74,12 +74,12 @@ object BoneGeometry {
     }
 
     /** Where every node stands in model space in the bind pose, by node index. */
-    fun bindGlobalsOf(nodes: Collection<ModelPoseNode>): Map<Int, Mat4f> {
+    fun bindGlobalsOf(nodes: Collection<SceneObject>): Map<Int, Mat4f> {
         val globals = HashMap<Int, Mat4f>(nodes.size)
         val byIndex = nodes.associateBy { it.poseIndex }
         require(byIndex.size == nodes.size) { "Duplicate model node indices" }
         val visiting = HashSet<Int>()
-        fun resolve(node: ModelPoseNode): Mat4f {
+        fun resolve(node: SceneObject): Mat4f {
             globals[node.poseIndex]?.let { return it }
             check(visiting.add(node.poseIndex)) { "Cycle in model pose hierarchy" }
             val local = node.restTransform.matrixF
@@ -98,7 +98,7 @@ object BoneGeometry {
 }
 
 /** The nearest bone above this node. */
-fun ModelPoseNode.boneAncestor(bones: Set<ModelPoseNode>): ModelPoseNode? {
+fun SceneObject.boneAncestor(bones: Set<SceneObject>): SceneObject? {
     var current = poseParent
     while (current != null) {
         if (current in bones) return current

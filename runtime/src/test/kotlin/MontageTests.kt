@@ -26,7 +26,7 @@ class MontageTests {
         NodeDefinition(index = 0, name = "leg", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )
     private val target = PoseTarget(
-        mapOf(0 to leg, 1 to arm),
+        mapOf(0 to leg.sceneObject, 1 to arm.sceneObject),
         mapOf("walk" to clip("walk", 1f, 1f), "wave" to clip("wave", 1f, 5f)),
     )
 
@@ -79,7 +79,7 @@ class MontageTests {
         leg.transform.translation.set(Vec3f(10f, 0f, 0f))
 
         applyAnimationPose(
-            MontageSampler.sample(montage, 0.1f, target, setOf(0)), mapOf(0 to leg), LayerBlendMode.Override, 1f
+            MontageSampler.sample(montage, 0.1f, target, setOf(0)), mapOf(0 to leg.sceneObject), LayerBlendMode.Override, 1f
         )
 
         assertEquals((10f + 0.1f) / 2f, leg.transform.translation.x, 1e-4f)

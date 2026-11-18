@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExp
 import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.modelMatrix
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
@@ -86,7 +86,7 @@ internal fun groundKey(bone: String, chain: IkChainSpec): String = "$bone/${chai
  */
 internal fun plantFeet(
     grounded: List<Pair<String, IkChainSpec>>,
-    nodes: Map<String, ModelPoseNode>,
+    nodes: Map<String, SceneObject>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
     state: RigGroundingState,
@@ -132,7 +132,7 @@ private class Leg(val shift: Float, val reach: Float, val firm: Boolean, val ble
 private const val PELVIS_KEY = "pelvis:"
 
 /** Moves [node] down by [drop] in model space, whatever its parent turns it by. */
-private fun lower(node: ModelPoseNode, drop: Float) {
+private fun lower(node: SceneObject, drop: Float) {
     if (drop == 0f) return
     val down = Vec3f(0f, drop, 0f)
     val local = node.poseParent?.let { parent ->
@@ -140,8 +140,8 @@ private fun lower(node: ModelPoseNode, drop: Float) {
         if (!inverse.invert()) return
         inverse.transform(down, 0f, MutableVec3f())
     } ?: down
-    node.poseTransform.translation.set(Vec3f(node.poseTransform.translation) + local)
-    node.poseTransform.markDirty()
+    node.localTransform.translation.set(Vec3f(node.localTransform.translation) + local)
+    node.localTransform.markDirty()
 }
 
 /** How far down a pelvis goes at most, as a share of the shortest leg standing on it. */

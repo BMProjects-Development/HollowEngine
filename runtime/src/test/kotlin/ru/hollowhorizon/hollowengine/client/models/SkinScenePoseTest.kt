@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Primitive
 import ru.hollowhorizon.hollowengine.client.models.internal.Scene as ModelScene
 import ru.hollowhorizon.hollowengine.client.models.internal.Skin
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
@@ -68,7 +67,7 @@ class SkinScenePoseTest {
         val firstNode = attachment.findNode("first")!!
         val secondNode = attachment.findNode("second")!!
 
-        assertSame(jointNode.transform, firstNode.modelPoseNodes.getValue(0).poseTransform)
+        assertSame(jointNode.transform, firstNode.modelPoseNodes.getValue(0).localTransform)
         assertSame(firstNode.modelPoseNodes, secondNode.modelPoseNodes)
         attachment.close()
     }
@@ -95,10 +94,9 @@ class SkinScenePoseTest {
         val firstSkin = skin.pose()
         val secondSkin = skin.pose()
 
-        val runtimeRoot = renderModelNode(root, null)
-        val runtimeNodes = listOf(runtimeRoot).byIndex()
-        runtimeRoot.updateHierarchyMatrices()
-        val legacyMatrices = skin.pose().compute(runtimeNodes.getValue(2).globalMatrix, runtimeNodes)
+        val rendered = renderModel(root)
+        val runtimeNodes = rendered.poseTarget().poseNodesByIndex
+        val legacyMatrices = skin.pose().compute(runtimeNodes.getValue(2).worldTransform, runtimeNodes)
         val firstMatrices = firstSkin.compute(firstMesh.worldTransform, first.poseTarget().poseNodesByIndex)
         val secondMatrices = secondSkin.compute(secondMesh.worldTransform, second.poseTarget().poseNodesByIndex)
         assertNotSame(firstMatrices, secondMatrices)
@@ -106,12 +104,12 @@ class SkinScenePoseTest {
         assertMatrixEquals(legacyMatrices[0], secondMatrices[0])
 
         first.node(jointPath)!!.localTransform.translate(1f, 0f, 0f)
-        runtimeNodes.getValue(1).transform.translate(1f, 0f, 0f)
-        runtimeRoot.updateHierarchyMatrices()
-        val updatedLegacy = skin.pose().compute(runtimeNodes.getValue(2).globalMatrix, runtimeNodes)
+        runtimeNodes.getValue(1).localTransform.translate(1f, 0f, 0f)
+        val updatedLegacy = skin.pose().compute(runtimeNodes.getValue(2).worldTransform, runtimeNodes)
         assertSame(firstMatrices, firstSkin.compute(firstMesh.worldTransform, first.poseTarget().poseNodesByIndex))
         assertMatrixEquals(updatedLegacy[0], firstMatrices[0])
         assertMatrixEquals(legacyMatrices[0], secondMatrices[0])
+        rendered.close()
         scene.close()
     }
 

@@ -15,7 +15,6 @@ import ru.hollowhorizon.hollowengine.addons.physics.world.PhysicsWorld
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -54,7 +53,7 @@ class JointLimitAxesTests {
                 "shin" to limb("shin", JointAttachmentSpec(parent = "thigh", limits = limits))
             )
         )
-        val target = PoseTarget(listOf(renderModelNode(thigh)).byIndex(), emptyMap(), rig = rig)
+        val target = PoseTarget(sceneModel(thigh).poseTarget().poseNodesByIndex, emptyMap(), rig = rig)
 
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
         val system = PhysicsWorld.createSystem()

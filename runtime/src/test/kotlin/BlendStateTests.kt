@@ -57,7 +57,7 @@ class BlendStateTests {
     fun `clips of different lengths play in step`() {
         val node = renderModelNode(NodeDefinition(index = 0, name = "Bone", children = mutableListOf(), transform = TrsTransformF()), parent = null)
         val target = PoseTarget(
-            mapOf(0 to node),
+            mapOf(0 to node.sceneObject),
             mapOf("walk" to timeClip("walk", 1f), "run" to timeClip("run", 0.5f)),
         )
         val state = BlendState(

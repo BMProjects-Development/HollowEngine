@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 
 /** Scene-owned spatial state for a rendered model and its rig-added bones. */
@@ -29,14 +28,13 @@ internal class ModelRenderScene private constructor(
         instance.setRigBones(rig).forEach { HollowEngine.LOGGER.warn("Rig rebuild removed scene subtree '{}'", it) }
     }
 
-    fun modelRoot(definition: NodeDefinition) = SceneModelPose(root, definition)
-
     fun bindNodes(owner: ModelAttachment, materials: (Material) -> Material): List<RenderModelNode> = buildList {
-        for (pose in instance.poseNodesByIndex.values) {
-            val parentPose = pose.poseParent as? SceneModelPose
-            val parent = parentPose?.let { checkNotNull(it.sceneObject.observer as? RenderModelNode) } ?: owner
-            val binding = RenderModelNode(pose, parent, owner, materials)
-            if (parentPose == null) add(binding)
+        for (node in instance.poseNodesByIndex.values) {
+            val definition = node.source as NodeDefinition
+            val parent = node.poseParent
+            node.setModelVisibility(definition.visible && parent?.modelVisible != false, includeChildren = false)
+            val binding = RenderModelNode(node, definition, owner, materials)
+            if (parent == null) add(binding)
         }
     }
 

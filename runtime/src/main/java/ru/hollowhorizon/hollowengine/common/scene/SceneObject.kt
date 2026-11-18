@@ -1,9 +1,12 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
+import ru.hollowhorizon.hollowengine.common.models.ModelNodeSource
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import java.util.UUID
+
+private val EMPTY_WEIGHTS = FloatArray(0)
 
 class SceneObject internal constructor(
     override val scene: Scene,
@@ -44,6 +47,75 @@ class SceneObject internal constructor(
     private var effectiveActive = physicalParent?.isActive ?: !scene.isClosed
     private var activeChanged = false
     override val isActive: Boolean get() = !isRemoved && !scene.isClosed && effectiveActive
+
+    private var modelState: ModelState? = null
+    val modelSource: ModelNodeSource? get() = modelState?.source
+    val source: ModelNodeSource get() = checkNotNull(modelSource) { "Scene object '$name' has no model source" }
+    val poseIndex: Int get() = source.index
+    val poseName: String get() = source.name ?: "Node_$poseIndex"
+    val poseParent: SceneObject? get() = physicalParent?.takeIf { it.modelState != null }
+    val restTransform: TrsTransformF get() = source.restTransform
+    val acceptsPose: Boolean
+        get() {
+            val state = modelState ?: return false
+            if (!isActive) return false
+            if (!isSynthetic || state.hasGeometry) return true
+            return children.isEmpty() || children.any { it.isActive }
+        }
+    var isAnimated: Boolean
+        get() = modelState?.isAnimated == true
+        set(value) { checkNotNull(modelState).isAnimated = value }
+    val baseMorphWeights: FloatArray get() = modelState?.baseWeights ?: EMPTY_WEIGHTS
+    val morphWeights: FloatArray get() = modelState?.weights ?: EMPTY_WEIGHTS
+    internal val modelVisible: Boolean get() = modelState?.visible ?: true
+
+    internal fun setModelSource(source: ModelNodeSource, weights: FloatArray? = null) {
+        checkAttached()
+        require(source.restTransform !== localTransform) { "The rest transform must not alias the scene object's pose" }
+        modelState = ModelState(source, weights)
+    }
+
+    internal fun includeSyntheticGeometry() {
+        checkNotNull(modelState).hasGeometry = true
+    }
+
+    internal fun setModelVisibility(visible: Boolean, includeChildren: Boolean = true) {
+        val state = modelState ?: return
+        if (state.visible != visible) {
+            state.visible = visible
+            scene.markChanged()
+            observer?.onActivityChanged(isActive)
+        }
+        if (includeChildren) ownChildren?.forEach { it.setModelVisibility(visible) }
+    }
+
+    fun resetPose() {
+        val state = modelState ?: return
+        if (acceptsPose) state.reset(localTransform)
+    }
+
+    private class ModelState(val source: ModelNodeSource, initialWeights: FloatArray?) {
+        val baseWeights = initialWeights?.takeIf { it.isNotEmpty() }?.copyOf() ?: EMPTY_WEIGHTS
+        val weights = if (baseWeights.isEmpty()) EMPTY_WEIGHTS else baseWeights.copyOf()
+        var hasGeometry = false
+        var visible = true
+        var isAnimated = false
+        private var resetVersion = -1
+        private var restVersion = -1
+
+        fun reset(current: TrsTransformF) {
+            isAnimated = false
+            val rest = source.restTransform
+            if (current.modCount != resetVersion || rest.modCount != restVersion) {
+                if (current.translation != rest.translation || current.rotation != rest.rotation || current.scale != rest.scale) {
+                    current.set(rest)
+                }
+                resetVersion = current.modCount
+                restVersion = rest.modCount
+            }
+            if (weights.isNotEmpty()) baseWeights.copyInto(weights)
+        }
+    }
 
     private var cachedWorldTransform: MutableMat4f? = null
     private var worldTransformDirty = true

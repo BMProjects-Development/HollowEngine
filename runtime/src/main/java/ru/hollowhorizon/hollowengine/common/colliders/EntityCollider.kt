@@ -7,13 +7,11 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
@@ -39,21 +37,11 @@ fun ModelRig.hasColliders(modes: (ColliderModes) -> Boolean = { true }): Boolean
     }
 
 /**
- * Places every collider of the rig on the current pose of [roots]. [toEntity] carries model space to the
+ * Places every collider of the rig on the current [pose]. [toEntity] carries model space to the
  * world around [origin], the entity's position, which is added last to stay precise far from spawn.
  */
-internal fun ModelRig.placeColliders(
-    roots: List<RenderModelNode>,
-    toEntity: Mat4f,
-    origin: Vec3,
-    modelMatrix: Mat4f? = null,
-): List<EntityCollider> {
-    if (!hasColliders()) return emptyList()
-    return placeCollidersOnPose(roots.flatMap { it.walk() }, toEntity, origin, modelMatrix)
-}
-
 internal fun ModelRig.placeCollidersOnPose(
-    pose: Collection<ModelPoseNode>,
+    pose: Collection<SceneObject>,
     toEntity: Mat4f,
     origin: Vec3,
     modelMatrix: Mat4f? = null,
@@ -67,7 +55,7 @@ internal fun ModelRig.placeCollidersOnPose(
         val holder = if (bone == null) onModel else {
             val node = nodes[bone] ?: return@mapNotNull null
             if (!node.acceptsPose) return@mapNotNull null
-            toEntity.mul(node.poseGlobalMatrix, MutableMat4f())
+            toEntity.mul(node.worldTransform, MutableMat4f())
         }
         EntityCollider(spec.id, bone, spec, spec.place(holder, toEntity, origin))
     }

@@ -5,6 +5,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.*
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.MontageLayer
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
@@ -17,6 +18,11 @@ import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.Montage
+import ru.hollowhorizon.hollowengine.common.models.MontageAssets
+import ru.hollowhorizon.hollowengine.common.models.MontageBoneProperty
+import ru.hollowhorizon.hollowengine.common.models.MontageBoneTrack
+import ru.hollowhorizon.hollowengine.common.models.MontageLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
@@ -25,6 +31,9 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import ru.hollowhorizon.hollowengine.common.vfx.VfxInterpolation
+import ru.hollowhorizon.hollowengine.common.vfx.VfxKey
+import ru.hollowhorizon.hollowengine.common.vfx.VfxTrackCurve
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -34,6 +43,31 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ModelInstanceIsolationTests {
+    @Test
+    fun `montage changes scene visibility and restores it after the layer ends`() {
+        val attachment = ModelAttachment(MutableStateFlow(modelWith(Material(), floatArrayOf())), null)
+        val instance = ModelInstance(attachment)
+        val node = attachment.sceneRoot.children.single()
+        val key = "test:montages/scene_visibility"
+        MontageAssets.put(key, Montage(duration = 1f, bones = listOf(
+            MontageBoneTrack("Root", MontageBoneProperty.VISIBLE, listOf(
+                VfxTrackCurve(0, keys = listOf(VfxKey(0f, 0f, VfxInterpolation.LINEAR)))
+            )),
+        )))
+        val layer = MontageLayer(MontageLayerSpec(montage = key, fadeIn = 0f, fadeOut = 0f))
+        instance.animator.add(layer)
+        instance.update(contextAt(0f), frame = 0L)
+        assertFalse(node.modelVisible)
+        assertFalse(attachment.findNode("Root")!!.isVisible)
+        assertTrue(node.isActive)
+
+        instance.animator.remove(layer.id)
+        instance.update(contextAt(1f), frame = 1L)
+        assertTrue(node.modelVisible)
+        assertTrue(attachment.findNode("Root")!!.isVisible)
+        instance.close()
+    }
+
     @Test
     fun `settled rendered model follows an external parent transform`() {
         val parent = object : BaseAttachment() {}
@@ -193,8 +227,8 @@ class ModelInstanceIsolationTests {
     fun `morph weights stay inside one runtime node`() {
         val sourceWeights = floatArrayOf(0.25f, 0.75f)
         val definition = modelWith(Material(), sourceWeights).scenes.single().nodes.single()
-        val first = renderModelNode(definition, null)
-        val second = renderModelNode(definition, null)
+        val first = renderModelNode(definition, null).sceneObject
+        val second = renderModelNode(definition, null).sceneObject
         val pose = AnimationPose().apply {
             bone(definition.index).weights = floatArrayOf(1f, 0f)
         }
@@ -225,9 +259,9 @@ class ModelInstanceIsolationTests {
         val first = skin.pose()
         val second = skin.pose()
 
-        val firstMatrices = first.compute(root, mapOf(0 to firstJoint))
+        val firstMatrices = first.compute(root, mapOf(0 to firstJoint.sceneObject))
         val firstMatrix = firstMatrices[0]
-        val secondMatrices = second.compute(root, mapOf(0 to secondJoint))
+        val secondMatrices = second.compute(root, mapOf(0 to secondJoint.sceneObject))
         assertNotSame(firstMatrices, secondMatrices)
         assertNotSame(firstMatrix, secondMatrices[0])
         assertEquals(2f, firstMatrix.m30)
@@ -235,7 +269,7 @@ class ModelInstanceIsolationTests {
 
         firstJoint.transform.translate(2f, 0f, 0f)
         firstJoint.updateGlobalMatrix()
-        assertSame(firstMatrices, first.compute(root, mapOf(0 to firstJoint)))
+        assertSame(firstMatrices, first.compute(root, mapOf(0 to firstJoint.sceneObject)))
         assertSame(firstMatrix, firstMatrices[0])
         assertEquals(4f, firstMatrix.m30)
         assertEquals(6f, secondMatrices[0].m30)

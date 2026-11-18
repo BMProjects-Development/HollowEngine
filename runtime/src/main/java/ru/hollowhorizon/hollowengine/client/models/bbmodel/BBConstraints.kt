@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.bbmodel
 
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelPoseConstraint
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.modelMatrix
 import ru.hollowhorizon.hollowengine.common.models.modelRotation
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
@@ -42,7 +42,7 @@ private class BBIKConstraint(
     private val pole: Int?,
     private val lockEndRotation: Boolean,
 ) : ModelPoseConstraint {
-    override fun apply(nodes: Map<Int, ModelPoseNode>) {
+    override fun apply(nodes: Map<Int, SceneObject>) {
         val control = nodes[controller] ?: return
         // Blockbench enables an IK controller only while its animation has keys.
         if (!control.acceptsPose || !control.isAnimated || chain.size < 2) return
@@ -50,8 +50,8 @@ private class BBIKConstraint(
         if (links.any { !it.acceptsPose }) return
         val endRotation = links.last().modelRotation()
         links.forEach { link ->
-            link.poseTransform.rotation.set(link.restTransform.rotation)
-            link.poseTransform.markDirty()
+            link.localTransform.rotation.set(link.restTransform.rotation)
+            link.localTransform.markDirty()
         }
         val positions = links.map { it.modelMatrix().getTranslation() }
         val solution = IkSolver.solve(
@@ -62,7 +62,7 @@ private class BBIKConstraint(
             maxStretch = 1f,
         )
         val current = positions.map { MutableVec3f(it) }
-        val original = links.map { MutableQuatF(it.poseTransform.rotation) }
+        val original = links.map { MutableQuatF(it.localTransform.rotation) }
         var above: QuatF = links.first().poseParent?.modelRotation() ?: QuatF.IDENTITY
         for (i in 0 until links.lastIndex) {
             val turn =
@@ -71,13 +71,13 @@ private class BBIKConstraint(
                 current[j].set(current[i] + IkSolver.rotate(current[j] - current[i], turn))
             }
             val global = turn * (above * original[i])
-            links[i].poseTransform.rotation.set(above.inverted() * global)
-            links[i].poseTransform.markDirty()
+            links[i].localTransform.rotation.set(above.inverted() * global)
+            links[i].localTransform.markDirty()
             above = global
         }
         if (lockEndRotation) {
-            links.last().poseTransform.rotation.set(above.inverted() * endRotation)
-            links.last().poseTransform.markDirty()
+            links.last().localTransform.rotation.set(above.inverted() * endRotation)
+            links.last().localTransform.markDirty()
         }
     }
 }

@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.animator
 
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.bedrock.MolangDefaults
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -9,7 +10,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.deg
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator as evaluator
 
 class PoseTarget(
-    val poseNodesByIndex: Map<Int, ModelPoseNode>,
+    val poseNodesByIndex: Map<Int, SceneObject>,
     val animations: Map<String, AnimationClip>,
     val aliases: Map<String, String> = emptyMap(),
     val rig: ModelRig = ModelRig.EMPTY,
@@ -35,7 +36,7 @@ class PoseTarget(
 
     fun nodeIndex(name: String): Int? = nodesByName[name]
 
-    fun node(name: String): ModelPoseNode? = nodeIndex(name)?.let(poseNodesByIndex::get)
+    fun node(name: String): SceneObject? = nodeIndex(name)?.let(poseNodesByIndex::get)
 
     fun mask(mask: BoneMask): Set<Int> = masks.getOrPut(mask) {
         poseNodesByIndex.values.asSequence()

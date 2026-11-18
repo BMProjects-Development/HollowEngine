@@ -17,7 +17,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Scene as ModelScene
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigGenerationSource
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
@@ -27,7 +26,6 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
@@ -52,14 +50,9 @@ class RagdollSceneTests {
         })
         val instance = ModelSceneInstance.create(scene.create("owner"), "model", model)
         val target = instance.poseTarget()
-        val legacy = PoseTarget(listOf(renderModelNode(root)).byIndex(), emptyMap())
         val spec = RagdollStateSpec()
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
-        val legacyPlan = requireNotNull(RagdollPlan.build(legacy, spec, legacy.mask(BoneMask.full())))
-
-        assertTrue(target.poseNodesByIndex.values.all { it is SceneModelPose })
-        assertEquals(legacyPlan.bones.map { it.nodeIndex to it.parent }, plan.bones.map { it.nodeIndex to it.parent })
-        assertEquals(legacyPlan.bones.map { it.bindPosition }, plan.bones.map { it.bindPosition })
+        assertSame(instance.root.children.single(), target.node("hips"))
 
         val animated = RagdollPose.globals(plan.order, AnimationPose(), HashMap())
         val originalMatrix = animated.getValue(0)
@@ -76,9 +69,9 @@ class RagdollSceneTests {
         target.apply(pose, LayerBlendMode.Override, 1f)
 
         plan.bones.forEach { bone ->
-            val node = target.poseNodesByIndex.getValue(bone.nodeIndex) as SceneModelPose
+            val node = target.poseNodesByIndex.getValue(bone.nodeIndex)
             assertTrue(
-                node.sceneObject.worldTransform.getTranslation()
+                node.worldTransform.getTranslation()
                     .distance(simulated.getValue(bone.nodeIndex).getTranslation()) < 0.001f
             )
         }

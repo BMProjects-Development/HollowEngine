@@ -1,28 +1,13 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
-/**
- * Moves every bone of [roots] that [rig] poses by its pose, over whatever the animator left in it. Run
- * after the animator and before the matrices are worked out, the same way wherever a model is posed.
- */
-fun applyRigPose(roots: List<RenderModelNode>, rig: ModelRig) {
-    if (rig.bones.values.none { it.pose != null }) return
-    roots.forEach { root ->
-        root.walk().forEach { node ->
-            val pose = rig.bone(node.name)?.pose?.takeUnless { it.isIdentity } ?: return@forEach
-            node.applyRigPose(pose)
-        }
-    }
-}
-
-internal fun ModelPoseNode.applyRigPose(pose: RigPose) {
+internal fun SceneObject.applyRigPose(pose: RigPose) {
     if (!acceptsPose || pose.isIdentity) return
-    val local = poseTransform
+    val local = localTransform
     local.setCompositionOf(
         Vec3f(local.translation) + pose.position,
         MutableQuatF(local.rotation).mul(pose.rotation).norm(),

@@ -6,7 +6,7 @@ import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -43,7 +43,7 @@ object ColliderRigGenerator : RigGenerator {
         generate(source.nodes, source.model.boneBounds, current)
 
     private fun generate(
-        nodes: Collection<ModelPoseNode>,
+        nodes: Collection<SceneObject>,
         geometry: Map<Int, Pair<Vec3f, Vec3f>>,
         current: ModelRig,
     ): ModelRig {

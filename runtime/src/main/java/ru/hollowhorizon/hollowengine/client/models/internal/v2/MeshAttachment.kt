@@ -15,7 +15,7 @@ class MeshAttachment(
     val material: Material,
 ) : BaseAttachment(node) {
     val matrix: Mat4f get() = globalMatrix
-    val morphWeights: FloatArray get() = node.morphWeights
+    val morphWeights: FloatArray get() = node.sceneObject.morphWeights
     internal var replaced = false
     val isVisible: Boolean get() = node.isVisible && !replaced
 

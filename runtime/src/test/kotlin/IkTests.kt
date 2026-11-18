@@ -84,17 +84,17 @@ class IkTests {
         val knee = definition(1, "knee", Vec3f(0f, -1f, 0.01f), foot)
         val hip = renderModelNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null)
         val nodes = hip.walk().associateBy { it.name }
-        val footTurn = nodes.getValue("foot").modelRotation()
+        val footTurn = nodes.getValue("foot").sceneObject.modelRotation()
 
         val goal = Vec3f(0.3f, -1.5f, 0.4f)
         val rig = ModelRig(
             bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step", weight = AnimationExpression.ONE)))),
             attachments = listOf(IkTargetSpec(id = "step", offset = goal)),
         )
-        applyRigConstraints(listOf(hip), rig, AnimatorEvaluationContext())
+        applyRigConstraintsToPose(hip.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext())
 
-        assertClose(goal, nodes.getValue("foot").modelMatrix().getTranslation(), tolerance = 1e-3f)
-        assertEquals(1f, abs(footTurn.dot(nodes.getValue("foot").modelRotation())), 1e-4f)
+        assertClose(goal, nodes.getValue("foot").sceneObject.modelMatrix().getTranslation(), tolerance = 1e-3f)
+        assertEquals(1f, abs(footTurn.dot(nodes.getValue("foot").sceneObject.modelRotation())), 1e-4f)
     }
 
     @Test
@@ -118,9 +118,9 @@ class IkTests {
         val names = roots.flatMap { it.walk() }.map { it.name }
         assertEquals(listOf("leg", "foot", "toe"), names)
 
-        applyRigConstraints(roots, rig, AnimatorEvaluationContext())
+        model.applyRigConstraints(AnimatorEvaluationContext())
         val toe = roots.flatMap { it.walk() }.single { it.name == "toe" }
-        assertClose(Vec3f(0.5f, -0.5f, 0f), toe.modelMatrix().getTranslation(), tolerance = 1e-2f)
+        assertClose(Vec3f(0.5f, -0.5f, 0f), toe.sceneObject.modelMatrix().getTranslation(), tolerance = 1e-2f)
         model.close()
     }
 
@@ -137,15 +137,15 @@ class IkTests {
         val rig = ModelRig(bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", ground = true)))))
 
         val drawn = leg()
-        applyRigConstraints(listOf(drawn), rig, AnimatorEvaluationContext(), RigGroundingState())
-        val foot = drawn.walk().single { it.name == "foot" }.modelMatrix().getTranslation()
-        val knee = drawn.walk().single { it.name == "knee" }.modelMatrix().getTranslation()
+        applyRigConstraintsToPose(drawn.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext(), RigGroundingState())
+        val foot = drawn.walk().single { it.name == "foot" }.sceneObject.modelMatrix().getTranslation()
+        val knee = drawn.walk().single { it.name == "knee" }.sceneObject.modelMatrix().getTranslation()
         assertEquals(-2f, foot.y, 1e-3f)
         assertClose(Vec3f(0f, 1f, 0f), (knee - foot).normed(), tolerance = 1e-2f)
 
         val forColliders = leg()
-        applyRigConstraints(listOf(forColliders), rig, AnimatorEvaluationContext())
-        assertEquals(-2.3f, forColliders.walk().single { it.name == "foot" }.modelMatrix().getTranslation().y, 1e-3f)
+        applyRigConstraintsToPose(forColliders.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext())
+        assertEquals(-2.3f, forColliders.walk().single { it.name == "foot" }.sceneObject.modelMatrix().getTranslation().y, 1e-3f)
     }
 
     @Test
@@ -160,12 +160,12 @@ class IkTests {
             bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", ground = true, pole = "front")))),
             attachments = listOf(IkTargetSpec(id = "front", offset = Vec3f(0f, -1f, 3f))),
         )
-        applyRigConstraints(listOf(hip), rig, AnimatorEvaluationContext(), RigGroundingState())
+        applyRigConstraintsToPose(hip.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext(), RigGroundingState())
 
         val nodes = hip.walk().associateBy { it.name }
-        val placedFoot = nodes.getValue("foot").modelMatrix().getTranslation()
-        val placedKnee = nodes.getValue("knee").modelMatrix().getTranslation()
-        val placedHip = nodes.getValue("hip").modelMatrix().getTranslation()
+        val placedFoot = nodes.getValue("foot").sceneObject.modelMatrix().getTranslation()
+        val placedKnee = nodes.getValue("knee").sceneObject.modelMatrix().getTranslation()
+        val placedHip = nodes.getValue("hip").sceneObject.modelMatrix().getTranslation()
         assertEquals(-2f, placedFoot.y, 1e-2f)
         assertTrue((placedKnee - placedHip).normed().z > 0.2f, "the thigh leans toward the pole: ${placedKnee - placedHip}")
     }

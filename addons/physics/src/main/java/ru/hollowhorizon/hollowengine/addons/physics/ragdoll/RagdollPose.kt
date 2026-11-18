@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.physics.ragdoll
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 /**
@@ -15,7 +15,7 @@ internal object RagdollPose {
      * @param order all model nodes, with parent nodes before child nodes.
      */
     fun globals(
-        order: List<ModelPoseNode>,
+        order: List<SceneObject>,
         pose: AnimationPose,
         into: MutableMap<Int, MutableMat4f>,
     ): MutableMap<Int, MutableMat4f> {
@@ -93,7 +93,7 @@ internal object RagdollPose {
         return drawn
     }
 
-    private fun localInPose(node: ModelPoseNode, parent: ModelPoseNode?, animated: Map<Int, Mat4f>): Mat4f {
+    private fun localInPose(node: SceneObject, parent: SceneObject?, animated: Map<Int, Mat4f>): Mat4f {
         val global = animated[node.poseIndex] ?: return node.restTransform.matrixF
         val parentGlobal = parent?.poseIndex?.let { animated[it] } ?: return global
 

@@ -7,5 +7,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Scene
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 
-internal fun renderModelNode(definition: NodeDefinition, parent: Attachment?) =
-    ModelAttachment(MutableStateFlow(Model(0, listOf(Scene(listOf(definition))), emptySet())), parent).nodes.single()
+internal fun renderModel(definition: NodeDefinition, parent: Attachment? = null) =
+    ModelAttachment(MutableStateFlow(Model(0, listOf(Scene(listOf(definition))), emptySet())), parent)
+
+internal fun renderModelNode(definition: NodeDefinition, parent: Attachment?) = renderModel(definition, parent).nodes.single()

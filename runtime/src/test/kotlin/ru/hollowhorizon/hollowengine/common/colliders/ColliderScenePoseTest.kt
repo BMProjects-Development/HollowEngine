@@ -1,13 +1,13 @@
 package ru.hollowhorizon.hollowengine.common.colliders
 
 import ru.hollowhorizon.hollowengine.client.models.renderModelNode
+import ru.hollowhorizon.hollowengine.client.models.renderModel
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.BaseAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraints
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.models.internal.Scene as ModelScene
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
@@ -19,7 +19,6 @@ import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -79,13 +78,13 @@ class ColliderScenePoseTest {
         )
         val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
         val posed = PosedModel(model, rig, scene.create("entity"), "model", { null })
-        val drawn = renderModelNode(hip, null)
+        val drawn = renderModel(hip).apply { this.rig = rig }
         posed.applyRigConstraints(AnimatorEvaluationContext())
-        applyRigConstraints(listOf(drawn), rig, AnimatorEvaluationContext())
+        drawn.applyRigConstraints(AnimatorEvaluationContext())
 
         val sceneNodes = posed.poseNodes.associateBy { it.poseName }
-        drawn.walk().forEach { node ->
-            val actual = sceneNodes.getValue(node.name).poseTransform
+        drawn.nodes.single().walk().forEach { node ->
+            val actual = sceneNodes.getValue(node.name).localTransform
             assertTrue(Vec3f(node.transform.translation).distance(Vec3f(actual.translation)) < 1e-4f, node.name)
             assertTrue(Vec3f(node.transform.scale).distance(Vec3f(actual.scale)) < 1e-4f, node.name)
             assertEquals(1f, abs(node.transform.rotation.dot(actual.rotation)), 1e-4f, node.name)
@@ -149,15 +148,15 @@ class ColliderScenePoseTest {
         val initial = posed.placeColliders(MutableMat4f(), Vec3.ZERO).associateBy { it.name }
         assertEquals(Vec3(2.0, 1.0, 0.0), initial.getValue("hand").volume.center)
         assertEquals(Vec3(2.0, 2.0, 1.0), initial.getValue("blade").volume.center)
-        val hand = assertIs<SceneModelPose>(posed.poseNodes.single { it.poseName == "hand" })
-        hand.poseTransform.translate(0f, 0f, 2f)
+        val hand = posed.poseNodes.single { it.poseName == "hand" }
+        hand.localTransform.translate(0f, 0f, 2f)
         val moved = posed.placeColliders(MutableMat4f(), Vec3.ZERO).associateBy { it.name }
         assertEquals(Vec3(2.0, 1.0, 2.0), moved.getValue("hand").volume.center)
         assertEquals(Vec3(2.0, 2.0, 3.0), moved.getValue("blade").volume.center)
 
-        hand.sceneObject.setEnabled(false)
+        hand.setEnabled(false)
         assertTrue(posed.placeColliders(MutableMat4f(), Vec3.ZERO).isEmpty())
-        hand.sceneObject.setEnabled(true)
+        hand.setEnabled(true)
         assertEquals(2, posed.placeColliders(MutableMat4f(), Vec3.ZERO).size)
 
         posed.close()

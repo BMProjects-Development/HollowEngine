@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class BlockBenchMolangTests {
     private data class Fixture(val clip: AnimationClip, val node: RenderModelNode) {
-        val target = PoseTarget(mapOf(node.definition.index to node), mapOf(clip.name to clip))
+        val target = PoseTarget(mapOf(node.definition.index to node.sceneObject), mapOf(clip.name to clip))
         val allowed = setOf(node.definition.index)
     }
 
@@ -121,7 +121,7 @@ class BlockBenchMolangTests {
         }
 
         fun sample(animator: ModelAnimator, ticks: Float): Vec3f {
-            fixture.node.resetPose()
+            fixture.node.sceneObject.resetPose()
             animator.applyTo(fixture.target, context(ticks))
             return Vec3f(fixture.node.transform.translation)
         }
@@ -131,10 +131,10 @@ class BlockBenchMolangTests {
         assertEquals(Vec3f(2f, 1f, 5.05f), sample(first, 101f))
         assertEquals(Vec3f(1f, 1f, 5f), sample(animator(), 100f))
         val shared = context()
-        fixture.node.resetPose()
+        fixture.node.sceneObject.resetPose()
         first.applyTo(fixture.target, shared)
         assertEquals(3f, fixture.node.transform.translation.x)
-        fixture.node.resetPose()
+        fixture.node.sceneObject.resetPose()
         animator().applyTo(fixture.target, shared)
         assertEquals(1f, fixture.node.transform.translation.x)
     }

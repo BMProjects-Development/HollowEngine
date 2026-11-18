@@ -14,6 +14,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 
@@ -31,8 +32,8 @@ internal fun publishRig(modelId: String, rig: ModelRig) {
 }
 
 /** The colliders of [rig] on the preview's current pose, in model space. */
-internal fun previewColliders(rig: ModelRig, roots: List<RenderModelNode>): List<EntityCollider> =
-    rig.placeColliders(roots, IDENTITY, Vec3.ZERO)
+internal fun previewColliders(rig: ModelRig, pose: Collection<SceneObject>): List<EntityCollider> =
+    rig.placeCollidersOnPose(pose, IDENTITY, Vec3.ZERO)
 
 /** The matrix of what a collider hangs on, in model space; the model itself is the identity. */
 internal fun holderMatrix(roots: List<RenderModelNode>, bone: String?): Mat4f? {

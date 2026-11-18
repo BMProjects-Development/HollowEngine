@@ -17,6 +17,7 @@ import ru.hollowhorizon.hollowengine.common.models.ikChains
 import ru.hollowhorizon.hollowengine.common.models.MontageBoneProperty
 import ru.hollowhorizon.hollowengine.common.models.MontageRig
 import ru.hollowhorizon.hollowengine.common.models.withMontages
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import java.util.*
 
 /**
@@ -40,7 +41,10 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
 
     init {
         // A reloaded model may bring new materials
-        attachment.onModelChange(::dress)
+        attachment.onModelChange {
+            shownBones.clear()
+            dress()
+        }
     }
 
     /**
@@ -85,23 +89,27 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
     }
 
     /** The bones montages hid or showed last frame, with whether each was drawn before they did. */
-    private val shownBones = HashMap<RenderModelNode, Boolean>()
+    private val shownBones = HashMap<SceneObject, Boolean>()
 
     /** Shows or hides the bones the montages playing key, and gives the ones they let go of back. */
     private fun showBones(context: AnimatorEvaluationContext) {
         if (context.montages.isEmpty() && shownBones.isEmpty()) return
-        val keyed = HashMap<RenderModelNode, Boolean>()
+        val keyed = HashMap<SceneObject, Boolean>()
+        val target = attachment.poseTarget()
         context.montages.forEach { moment ->
             moment.montage.bones.forEach { track ->
                 if (track.property != MontageBoneProperty.VISIBLE) return@forEach
-                val node = attachment.findNode(track.bone) ?: return@forEach
+                val node = target.node(track.bone) ?: return@forEach
                 keyed[node] = track.valueAt(moment.time).x >= 0.5f
             }
         }
-        shownBones.keys.filter { it !in keyed }.forEach { node -> node.isVisible = shownBones.remove(node) ?: true }
+        shownBones.keys.filter { it !in keyed }.forEach { node ->
+            val previous = shownBones.remove(node)
+            if (previous != null && !node.isRemoved) node.setModelVisibility(previous)
+        }
         keyed.forEach { (node, visible) ->
-            shownBones.getOrPut(node) { node.isVisible }
-            if (node.isVisible != visible) node.isVisible = visible
+            shownBones.getOrPut(node) { node.modelVisible }
+            if (node.modelVisible != visible) node.setModelVisibility(visible)
         }
     }
 
@@ -131,8 +139,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         layMontages(context)
         attachment.evaluateConditions(context)
         attachment.applyRigPose()
-        attachment.applyAuthoredConstraints()
-        applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
+        attachment.applyRigConstraints(context, grounding)
         attachment.endPose()
 
         val still = animator.isEmpty && !attachment.carriesEffects && attachment.rig.ikChains().isEmpty()

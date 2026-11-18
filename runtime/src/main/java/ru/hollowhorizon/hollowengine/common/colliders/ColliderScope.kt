@@ -7,11 +7,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraintsToPose
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.models.*
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
@@ -20,7 +18,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
  * hung on it, which carry colliders of their own.
  */
 internal interface ColliderScope {
-    val poseNodes: Collection<ModelPoseNode>
+    val poseNodes: Collection<SceneObject>
     val rig: ModelRig
     val isActive: Boolean get() = true
 
@@ -88,9 +86,7 @@ internal class PosedModel(
     depth: Int = 0,
 ) : ColliderScope, AutoCloseable {
     private val instance = ModelSceneInstance.create(parent, name, model).also { it.setRigBones(rig) }
-    override val poseNodes: Collection<ModelPoseNode> get() = instance.poseNodes
-    private val childrenByParent by lazy(LazyThreadSafetyMode.NONE) { poseNodes.groupBy { it.poseParent } }
-    private val poseChildren: (ModelPoseNode) -> List<ModelPoseNode> = { childrenByParent[it].orEmpty() }
+    override val poseNodes: Collection<SceneObject> get() = instance.poseNodes
     fun poseTarget() = instance.poseTarget(rig)
 
     override val modelMatrix: Mat4f get() = instance.root.worldTransform
@@ -99,8 +95,9 @@ internal class PosedModel(
     override val nested: List<PosedModel> = if (depth >= MAX_NESTING) emptyList() else rig.allAttachments().mapNotNull { (bone, spec) ->
         val attachment = spec as? ModelAttachmentSpec ?: return@mapNotNull null
         val assets = assetsOf(attachment.model) ?: return@mapNotNull null
-        val host = bone?.let { name -> poseNodes.firstOrNull { it.poseName == name } as? SceneModelPose ?: return@mapNotNull null }
-        val owner = host?.sceneObject ?: instance.root
+        val owner = if (bone == null) instance.root else {
+            instance.poseNodesByIndex.values.firstOrNull { it.poseName == bone } ?: return@mapNotNull null
+        }
         val holder = owner.mountModel(attachment)
         PosedModel(assets.model, assets.rig.overlay(attachment.rig), holder, holder.name, assetsOf, depth + 1)
     }
@@ -122,8 +119,7 @@ internal class PosedModel(
      * one, which the animator moves, has anything to bend.
      */
     fun applyRigConstraints(context: AnimatorEvaluationContext) {
-        instance.applyAuthoredConstraints()
-        applyRigConstraintsToPose(poseNodes, rig, context, childrenOf = poseChildren)
+        instance.applyRigConstraints(rig, context)
     }
 
     /** Turns the posed nodes into matrices, the nested models' with them. */

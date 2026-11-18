@@ -14,7 +14,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
@@ -58,7 +58,7 @@ object ClientColliderPoses {
 
     /** A drawn model as its colliders see it, the models drawn on it included. */
     private class DrawnScope(private val model: ModelAttachment, override val modelMatrix: Mat4f?, depth: Int) : ColliderScope {
-        override val poseNodes: Collection<ModelPoseNode> get() = model.scenePoseNodes.values
+        override val poseNodes: Collection<SceneObject> get() = model.scenePoseNodes.values
         override val rig: ModelRig get() = model.rig
 
         override val nested: List<ColliderScope> = if (depth >= MAX_NESTING) emptyList() else model.rig.allAttachments().mapNotNull { (bone, spec) ->

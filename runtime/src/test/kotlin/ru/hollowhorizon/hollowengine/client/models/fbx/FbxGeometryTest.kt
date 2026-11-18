@@ -70,7 +70,7 @@ class FbxGeometryTest {
             instance.beginPose()
             applyAnimationPose(
                 pose,
-                instance.nodes.flatMap { it.walk() }.associateBy { it.definition.index },
+                instance.poseTarget().poseNodesByIndex,
                 LayerBlendMode.Override,
                 1f
             )

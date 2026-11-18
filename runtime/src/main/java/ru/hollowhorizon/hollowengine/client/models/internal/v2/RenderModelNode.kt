@@ -4,8 +4,6 @@ import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.scene.SceneFailures
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.scene.SceneObjectObserver
@@ -68,30 +66,22 @@ abstract class BaseAttachment(parent: Attachment? = null, override val transform
 }
 
 class RenderModelNode internal constructor(
-    private val scenePose: SceneModelPose,
-    override val attachmentParent: Attachment,
+    val sceneObject: SceneObject,
+    val definition: NodeDefinition,
     private val owner: ModelAttachment,
     materialResolver: (Material) -> Material,
-) : Attachment, ModelPoseNode by scenePose, SceneObjectObserver {
-    val definition: NodeDefinition = scenePose.source as NodeDefinition
-    internal val sceneObject: SceneObject get() = scenePose.sceneObject
-    override val transform: TrsTransformF get() = poseTransform
+) : Attachment, SceneObjectObserver {
+    override val attachmentParent: Attachment get() = sceneObject.poseParent?.observer as? RenderModelNode ?: owner
+    override val transform: TrsTransformF get() = sceneObject.localTransform
     override val globalMatrix: Mat4f get() = sceneObject.worldTransform
     override val globalVersion: Int get() = sceneObject.worldVersion
-    override val poseParent: ModelPoseNode? get() = attachmentParent as? RenderModelNode
     /** Rigs and animations find the node by it, so it depends on the node alone, never on what holds it. */
     val name: String = definition.name ?: "Node_${definition.index}"
     internal val supportsMeshExtrusion: Boolean
         get() = definition.mesh?.primitives?.any { it.supportsExtrusion } == true
-    var isVisible: Boolean = definition.visible && ((attachmentParent as? RenderModelNode)?.isVisible ?: true)
-        get() = field && sceneObject.isActive
-        set(value) {
-            if (field != value) {
-                field = value
-                onActivityChanged(sceneObject.isActive)
-            }
-            children.forEach { it.isVisible = value }
-        }
+    var isVisible: Boolean
+        get() = sceneObject.modelVisible && sceneObject.isActive
+        set(value) { sceneObject.setModelVisibility(value) }
 
     val attachments = arrayListOf<Attachment>()
     private var closed = false
@@ -102,7 +92,6 @@ class RenderModelNode internal constructor(
         sceneObject.unobserve(this)
         val failures = SceneFailures()
         attachments.forEach { attachment -> failures.capture(attachment::close) }
-        children.forEach { child -> failures.capture(child::close) }
         attachments.clear()
         cachedChildren = null
         failures.throwIfAny()
@@ -147,22 +136,18 @@ class RenderModelNode internal constructor(
             }
         }
 
-    internal val modelPoseNodes: Map<Int, ModelPoseNode> get() = owner.scenePoseNodes
+    internal val modelPoseNodes: Map<Int, SceneObject> get() = owner.scenePoseNodes
 
     override fun collectCommands(pipeline: RenderPipeline) {
         attachments.forEach {
             it.collectCommands(pipeline)
         }
-        children.forEach {
-            it.collectCommands(pipeline)
-        }
     }
 
-    fun updateHierarchyMatrices() {
-        if (!acceptsPose) return
+    internal fun updateAttachmentMatrices() {
+        if (!sceneObject.isActive || (sceneObject.modelSource != null && !sceneObject.acceptsPose)) return
         updateGlobalMatrix()
         attachments.forEach(Attachment::updateGlobalMatrix)
-        children.forEach(RenderModelNode::updateHierarchyMatrices)
     }
 
     override fun updateGlobalMatrix() {
@@ -184,7 +169,3 @@ private fun RenderModelNode.collectInto(into: MutableList<RenderModelNode>) {
     into += this
     children.forEach { it.collectInto(into) }
 }
-
-/** Every node of the hierarchy, indexed the way poses address them. */
-fun List<RenderModelNode>.byIndex(): Map<Int, RenderModelNode> =
-    flatMap { it.walk() }.associateBy { it.definition.index }

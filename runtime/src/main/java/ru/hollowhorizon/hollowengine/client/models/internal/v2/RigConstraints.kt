@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -7,41 +8,20 @@ import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/**
- * Bends every IK chain of [rig] on the nodes under [roots].
- *
- * Chains are solved in the order the rig lists them, each on the pose the ones before it left.
- */
-fun applyRigConstraints(
-    roots: List<RenderModelNode>,
-    rig: ModelRig,
-    context: AnimatorEvaluationContext,
-    grounding: RigGroundingState? = null,
-) {
-    if (rig.ikChains().isEmpty()) return
-    applyRigConstraintsToPose(
-        roots.flatMap { it.walk() }, rig, context, grounding,
-        childrenOf = { (it as RenderModelNode).children }, scaleMeshes = ::scaleUnskinnedMeshes,
-    )
-}
-
 /** Solves IK on a model pose. A renderer can also scale the unskinned meshes on each stretched link. */
 fun applyRigConstraintsToPose(
-    pose: Collection<ModelPoseNode>,
+    pose: Collection<SceneObject>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
     grounding: RigGroundingState? = null,
-    childrenOf: ((ModelPoseNode) -> List<ModelPoseNode>)? = null,
-    scaleMeshes: ((ModelPoseNode, Vec3f) -> Unit)? = null,
+    scaleMeshes: ((SceneObject, Vec3f) -> Unit)? = null,
 ) {
     val chains = rig.ikChains()
     if (chains.isEmpty()) return
-    val nodes = HashMap<String, ModelPoseNode>()
+    val nodes = HashMap<String, SceneObject>()
     pose.forEach { nodes.putIfAbsent(it.poseName, it) }
-    val children by lazy(LazyThreadSafetyMode.NONE) { pose.groupBy { it.poseParent } }
-    val branchChildren = childrenOf ?: { node -> children[node].orEmpty() }
-    val stretch: (List<ModelPoseNode>, Float) -> Unit = { links, factor ->
-        if (factor != 1f || scaleMeshes != null) stretchBranches(links, factor, branchChildren, scaleMeshes)
+    val stretch: (List<SceneObject>, Float) -> Unit = { links, factor ->
+        if (factor != 1f || scaleMeshes != null) stretchBranches(links, factor, scaleMeshes)
     }
     val grounded = chains.filter { it.second.ground }
     val planted = if (grounding != null && grounded.isNotEmpty()) plantFeet(grounded, nodes, rig, context, grounding) else emptyMap()
@@ -54,20 +34,20 @@ fun applyRigConstraintsToPose(
 }
 
 /** [this] node's matrix in the space of its model in the rest pose, before anything animates it. */
-fun ModelPoseNode.restModelMatrix(): Mat4f {
+fun SceneObject.restModelMatrix(): Mat4f {
     val above = poseParent ?: return restTransform.matrixF
     return above.restModelMatrix().mul(restTransform.matrixF, MutableMat4f())
 }
 
 /** The bones a chain hung on [end] bends, from its root down to [end] itself. */
-fun IkChainSpec.links(end: ModelPoseNode): List<ModelPoseNode> {
+fun IkChainSpec.links(end: SceneObject): List<SceneObject> {
     val links = mutableListOf(end)
     while (links.size <= bones) links += links.last().poseParent ?: break
     return links.asReversed()
 }
 
 /** Where the target named [id] stands in model space, turned as it is turned; null when the rig has none. */
-fun ModelRig.ikTargetMatrix(id: String, nodes: (String) -> ModelPoseNode?): Mat4f? {
+fun ModelRig.ikTargetMatrix(id: String, nodes: (String) -> SceneObject?): Mat4f? {
     if (id.isBlank()) return null
     val (bone, spec) = ikTarget(id) ?: return null
     val holder = if (bone == null) Mat4f.IDENTITY else nodes(bone)?.modelMatrix() ?: return null
@@ -76,13 +56,13 @@ fun ModelRig.ikTargetMatrix(id: String, nodes: (String) -> ModelPoseNode?): Mat4
 
 private fun solveChain(
     chain: IkChainSpec,
-    end: ModelPoseNode,
-    nodes: Map<String, ModelPoseNode>,
+    end: SceneObject,
+    nodes: Map<String, SceneObject>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
     goal: Vec3f?,
     steps: Boolean,
-    stretchGeometry: (List<ModelPoseNode>, Float) -> Unit,
+    stretchGeometry: (List<SceneObject>, Float) -> Unit,
 ) {
     val links = chain.links(end)
     if (links.size < 2 || links.any { !it.acceptsPose }) return
@@ -114,14 +94,14 @@ private fun solveChain(
     val stretch = 1f + (solution.stretch - 1f) * weight
     if (stretch != 1f) {
         for (i in 1..links.lastIndex) {
-            val translation = links[i].poseTransform.translation
+            val translation = links[i].localTransform.translation
             translation.set(Vec3f(translation) * stretch)
-            links[i].poseTransform.markDirty()
+            links[i].localTransform.markDirty()
         }
     }
     if (chain.stretch > 1f) stretchGeometry(links, stretch)
 
-    val original = links.map { MutableQuatF(it.poseTransform.rotation) }
+    val original = links.map { MutableQuatF(it.localTransform.rotation) }
     val endRotation = links.last().modelRotation()
     val solved = arrayOfNulls<QuatF>(links.size)
     val current = joints.map { MutableVec3f(it) }
@@ -142,8 +122,8 @@ private fun solveChain(
 
     links.forEachIndexed { i, node ->
         val turn = solved[i] ?: return@forEachIndexed
-        node.poseTransform.rotation.set(original[i].mix(turn, weight).norm())
-        node.poseTransform.markDirty()
+        node.localTransform.rotation.set(original[i].mix(turn, weight).norm())
+        node.localTransform.markDirty()
     }
 }
 
@@ -179,7 +159,7 @@ private const val MIN_LENGTH = 1e-4f
 private const val AHEAD = 4f
 
 /** How far the end of the chain stands from its root in the rest pose, where the limb looks straight. */
-private fun restReach(links: List<ModelPoseNode>): Float {
+private fun restReach(links: List<SceneObject>): Float {
     val rest = MutableMat4f(links.first().restTransform.matrixF)
     val root = rest.getTranslation()
     for (i in 1..links.lastIndex) rest.mul(links[i].restTransform.matrixF)
@@ -190,15 +170,14 @@ private fun restReach(links: List<ModelPoseNode>): Float {
  * Stretches what each bone of the chain draws along the bone, by [factor].
  */
 private fun stretchBranches(
-    links: List<ModelPoseNode>,
+    links: List<SceneObject>,
     factor: Float,
-    children: (ModelPoseNode) -> List<ModelPoseNode>,
-    scaleMeshes: ((ModelPoseNode, Vec3f) -> Unit)?,
+    scaleMeshes: ((SceneObject, Vec3f) -> Unit)?,
 ) {
     for (i in 0 until links.lastIndex) {
         val bone = links[i]
         val next = links[i + 1]
-        val along = Vec3f(next.poseTransform.translation)
+        val along = Vec3f(next.localTransform.translation)
         if (along.length() < 1e-5f) continue
         val axis = along.normed()
         val scale =
@@ -206,21 +185,12 @@ private fun stretchBranches(
 
         scaleMeshes?.invoke(bone, scale)
         if (factor == 1f) continue
-        children(bone).forEach { child ->
-            if (child === next || !child.acceptsPose || children(child).isNotEmpty()) return@forEach
-            val transform = child.poseTransform
+        bone.physicalChildren.forEach { child ->
+            if (child === next || !child.acceptsPose || child.physicalChildren.any { it.modelSource != null }) return@forEach
+            val transform = child.localTransform
             transform.translation.set(Vec3f(transform.translation) * scale)
             transform.scale.set(Vec3f(transform.scale) * scale)
             transform.markDirty()
         }
-    }
-}
-
-private fun scaleUnskinnedMeshes(node: ModelPoseNode, scale: Vec3f) {
-    if (node !is RenderModelNode || node.definition.skin != null) return
-    for (attachment in node.attachments) {
-        if (attachment !is MeshAttachment) continue
-        attachment.transform.scale.set(scale)
-        attachment.transform.markDirty()
     }
 }

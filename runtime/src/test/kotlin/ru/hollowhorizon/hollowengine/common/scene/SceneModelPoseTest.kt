@@ -28,17 +28,17 @@ class SceneModelPoseTest {
         val node = scene.create("bone")
         val rest = TrsTransformF().translate(1f, 0f, 0f)
         val definition = NodeDefinition(0, "bone", mutableListOf(), rest)
-        val pose = SceneModelPose(node, definition)
-        pose.resetPose()
+        node.setModelSource(definition)
+        node.resetPose()
         val version = node.localTransform.modCount
-        pose.resetPose()
+        node.resetPose()
         assertEquals(version, node.localTransform.modCount)
 
         node.localTransform.translate(4f, 0f, 0f)
-        pose.resetPose()
+        node.resetPose()
         assertEquals(Vec3f(1f, 0f, 0f), node.localTransform.translation)
         definition.baseTransform.translate(0f, 2f, 0f)
-        pose.resetPose()
+        node.resetPose()
         assertEquals(Vec3f(1f, 2f, 0f), node.localTransform.translation)
         scene.close()
     }
@@ -60,7 +60,7 @@ class SceneModelPoseTest {
             )
             val existing = renderModelNode(definition, null)
             node.localTransform.set(definition.baseTransform)
-            val scenePose = SceneModelPose(node, definition, weights)
+            node.setModelSource(definition, weights)
             val pose = AnimationPose().apply {
                 bone(7).translation = Vec3f(2f, 3f, 0f)
                 bone(7).scale = Vec3f(2f, 1f, 1f)
@@ -71,12 +71,12 @@ class SceneModelPoseTest {
                 bone(7).weights = floatArrayOf(0.5f, 0.5f)
             }
 
-            applyAnimationPose(pose, mapOf(7 to existing), mode, 0.5f, reference)
-            applyAnimationPose(pose, mapOf(7 to scenePose), mode, 0.5f, reference)
+            applyAnimationPose(pose, mapOf(7 to existing.sceneObject), mode, 0.5f, reference)
+            applyAnimationPose(pose, mapOf(7 to node), mode, 0.5f, reference)
 
             assertEquals(existing.transform.translation, node.localTransform.translation)
             assertEquals(existing.transform.scale, node.localTransform.scale)
-            assertContentEquals(existing.morphWeights, scenePose.morphWeights)
+            assertContentEquals(existing.sceneObject.morphWeights, node.morphWeights)
             existing.close()
             scene.close()
         }
@@ -94,8 +94,8 @@ class SceneModelPoseTest {
         second.localTransform.set(rest)
         val sourceWeights = floatArrayOf(0.25f, 0.75f)
         val source = NodeDefinition(7, "bone", mutableListOf(), rest)
-        val firstPose = SceneModelPose(first, source, sourceWeights)
-        val secondPose = SceneModelPose(second, source, sourceWeights)
+        first.setModelSource(source, sourceWeights)
+        second.setModelSource(source, sourceWeights)
         val aliasedSource = object : ModelNodeSource {
             override val index = 0
             override val name = "bone"
@@ -104,34 +104,34 @@ class SceneModelPoseTest {
             override val skinJoints = emptyList<Int>()
             override val restTransform = first.localTransform
         }
-        assertFailsWith<IllegalArgumentException> { SceneModelPose(first, aliasedSource) }
+        assertFailsWith<IllegalArgumentException> { first.setModelSource(aliasedSource) }
         val animation = AnimationPose().apply {
             bone(7).translation = Vec3f(2f, 3f, 0f)
             bone(7).weights = floatArrayOf(1f, 0f)
         }
 
-        applyAnimationPose(animation, mapOf(7 to firstPose), LayerBlendMode.Override, 1f)
+        applyAnimationPose(animation, mapOf(7 to first), LayerBlendMode.Override, 1f)
 
         assertEquals(Vec3f(3f, 3f, 0f), first.localTransform.translation)
         assertEquals(Vec3f(1f, 0f, 0f), second.localTransform.translation)
-        assertContentEquals(floatArrayOf(1f, 0f), firstPose.morphWeights)
-        assertContentEquals(sourceWeights, secondPose.morphWeights)
-        assertTrue(firstPose.isAnimated)
+        assertContentEquals(floatArrayOf(1f, 0f), first.morphWeights)
+        assertContentEquals(sourceWeights, second.morphWeights)
+        assertTrue(first.isAnimated)
         val position = MutableVec3f()
         first.worldTransform.transform(position)
         assertEquals(Vec3f(3f, 3f, 0f), position)
 
         first.setEnabled(false)
-        firstPose.resetPose()
+        first.resetPose()
         assertEquals(Vec3f(3f, 3f, 0f), first.localTransform.translation)
         animation.bone(7).translation = Vec3f(9f, 0f, 0f)
-        applyAnimationPose(animation, mapOf(7 to firstPose), LayerBlendMode.Override, 1f)
+        applyAnimationPose(animation, mapOf(7 to first), LayerBlendMode.Override, 1f)
         assertEquals(Vec3f(3f, 3f, 0f), first.localTransform.translation)
         first.setEnabled(true)
-        firstPose.resetPose()
+        first.resetPose()
         assertEquals(Vec3f(1f, 0f, 0f), first.localTransform.translation)
-        assertContentEquals(sourceWeights, firstPose.morphWeights)
-        applyAnimationPose(animation, mapOf(7 to firstPose), LayerBlendMode.Override, 1f)
+        assertContentEquals(sourceWeights, first.morphWeights)
+        applyAnimationPose(animation, mapOf(7 to first), LayerBlendMode.Override, 1f)
         assertEquals(Vec3f(10f, 0f, 0f), first.localTransform.translation)
     }
 
@@ -146,28 +146,28 @@ class SceneModelPoseTest {
         root.localTransform.translate(1f, 0f, 0f).rotate(90f.deg, Vec3f.Z_AXIS)
         middle.localTransform.translate(0f, 2f, 0f).rotate(45f.deg, Vec3f.X_AXIS)
         leaf.localTransform.translate(0f, 0f, 3f)
-        val rootPose = SceneModelPose(root, NodeDefinition(0, "root", mutableListOf(), TrsTransformF()))
-        val middlePose = SceneModelPose(middle, NodeDefinition(1, "middle", mutableListOf(), TrsTransformF()), poseParent = rootPose)
-        val leafPose = SceneModelPose(leaf, NodeDefinition(2, "leaf", mutableListOf(), TrsTransformF()), poseParent = middlePose)
+        root.setModelSource(NodeDefinition(0, "root", mutableListOf(), TrsTransformF()))
+        middle.setModelSource(NodeDefinition(1, "middle", mutableListOf(), TrsTransformF()))
+        leaf.setModelSource(NodeDefinition(2, "leaf", mutableListOf(), TrsTransformF()))
         val expectedMatrix = MutableMat4f(root.localTransform.matrixF)
             .mul(middle.localTransform.matrixF).mul(leaf.localTransform.matrixF)
         val matrix = MutableMat4f()
         val rotation = MutableQuatF()
 
-        assertSame(rootPose.poseTransform.matrixF, rootPose.modelMatrix())
-        assertSame(matrix, leafPose.modelMatrix(matrix))
+        assertSame(root.localTransform.matrixF, root.modelMatrix())
+        assertSame(matrix, leaf.modelMatrix(matrix))
         for (row in 0..3) for (column in 0..3) {
             assertEquals(expectedMatrix[row, column], matrix[row, column], 0.0001f)
         }
         val expectedRotation = MutableQuatF(root.localTransform.rotation)
             .mul(middle.localTransform.rotation).mul(leaf.localTransform.rotation)
-        assertSame(rotation, leafPose.modelRotation(rotation))
+        assertSame(rotation, leaf.modelRotation(rotation))
         assertEquals(1f, abs(expectedRotation.dot(rotation)), 0.0001f)
-        assertFailsWith<IllegalArgumentException> { leafPose.modelRotation(root.localTransform.rotation) }
+        assertFailsWith<IllegalArgumentException> { leaf.modelRotation(root.localTransform.rotation) }
 
         root.localTransform.translate(2f, 0f, 0f)
         expectedMatrix.set(root.localTransform.matrixF).mul(middle.localTransform.matrixF).mul(leaf.localTransform.matrixF)
-        assertSame(matrix, leafPose.modelMatrix(matrix))
+        assertSame(matrix, leaf.modelMatrix(matrix))
         for (row in 0..3) for (column in 0..3) {
             assertEquals(expectedMatrix[row, column], matrix[row, column], 0.0001f)
         }

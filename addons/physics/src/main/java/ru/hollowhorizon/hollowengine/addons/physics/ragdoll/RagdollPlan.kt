@@ -4,7 +4,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.physics.rig.*
 import ru.hollowhorizon.hollowengine.addons.physics.rotatedInverse
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 /**
@@ -35,7 +35,7 @@ class RagdollBone(
 class RagdollPlan(
     val bones: List<RagdollBone>,
     /** Every node of the model, parents first. */
-    val order: List<ModelPoseNode>,
+    val order: List<SceneObject>,
 ) {
     companion object {
         /**
@@ -61,7 +61,7 @@ class RagdollPlan(
 
         private fun fromRig(
             target: PoseTarget,
-            order: List<ModelPoseNode>,
+            order: List<SceneObject>,
             bindGlobals: Map<Int, Mat4f>,
             allowed: Set<Int>,
         ): RagdollPlan? {
@@ -102,7 +102,7 @@ class RagdollPlan(
         private fun fromSkeleton(
             target: PoseTarget,
             spec: RagdollStateSpec,
-            order: List<ModelPoseNode>,
+            order: List<SceneObject>,
             bindGlobals: Map<Int, Mat4f>,
             allowed: Set<Int>,
         ): RagdollPlan? {
@@ -128,12 +128,12 @@ class RagdollPlan(
         }
 
         private fun buildBone(
-            node: ModelPoseNode,
+            node: SceneObject,
             position: Int,
             spec: RagdollStateSpec,
             bindGlobals: Map<Int, Mat4f>,
             boneByNode: Map<Int, Int>,
-            childrenByParent: Map<Int?, List<ModelPoseNode>>,
+            childrenByParent: Map<Int?, List<SceneObject>>,
         ): RagdollBone {
             val overrides = spec.boneSpec(node.poseName)
             val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
@@ -176,7 +176,7 @@ class RagdollPlan(
             ).also { check(it.parent < position) { "Bone ${it.name} is ordered before its parent" } }
         }
 
-        private fun boneNodes(target: PoseTarget, children: Map<Int?, List<ModelPoseNode>>): Set<Int> {
+        private fun boneNodes(target: PoseTarget, children: Map<Int?, List<SceneObject>>): Set<Int> {
             val joints = target.poseNodesByIndex.values.flatMap { it.source.skinJoints }.toSet()
             if (joints.isNotEmpty()) return joints
 
@@ -190,7 +190,7 @@ class RagdollPlan(
 
         private const val MODEL_ROOT = 0
 
-        private fun bindGlobalsOf(order: List<ModelPoseNode>): Map<Int, Mat4f> {
+        private fun bindGlobalsOf(order: List<SceneObject>): Map<Int, Mat4f> {
             val bindGlobals = HashMap<Int, Mat4f>(order.size)
             order.forEach { node ->
                 val local = node.restTransform.matrixF
@@ -200,18 +200,18 @@ class RagdollPlan(
             return bindGlobals
         }
 
-        private fun Map<Int, Mat4f>.decomposeOf(node: ModelPoseNode): Pair<Vec3f, QuatF> {
+        private fun Map<Int, Mat4f>.decomposeOf(node: SceneObject): Pair<Vec3f, QuatF> {
             val position = MutableVec3f()
             val rotation = MutableQuatF()
             getValue(node.poseIndex).decompose(position, rotation, null)
             return Vec3f(position) to QuatF(rotation)
         }
 
-        private fun walkParentsFirst(target: PoseTarget): List<ModelPoseNode> {
+        private fun walkParentsFirst(target: PoseTarget): List<SceneObject> {
             val nodes = target.poseNodesByIndex.values
             val depths = HashMap<Int, Int>(nodes.size)
 
-            fun depth(node: ModelPoseNode): Int = depths.getOrPut(node.poseIndex) {
+            fun depth(node: SceneObject): Int = depths.getOrPut(node.poseIndex) {
                 node.poseParent?.let { depth(it) + 1 } ?: 0
             }
 
@@ -219,14 +219,14 @@ class RagdollPlan(
         }
 
         private fun parentsFirst(
-            bodies: List<ModelPoseNode>,
-            parents: Map<ModelPoseNode, ModelPoseNode?>,
-        ): List<ModelPoseNode> {
-            val sorted = ArrayList<ModelPoseNode>(bodies.size)
-            val placed = HashSet<ModelPoseNode>(bodies.size)
-            val visiting = HashSet<ModelPoseNode>()
+            bodies: List<SceneObject>,
+            parents: Map<SceneObject, SceneObject?>,
+        ): List<SceneObject> {
+            val sorted = ArrayList<SceneObject>(bodies.size)
+            val placed = HashSet<SceneObject>(bodies.size)
+            val visiting = HashSet<SceneObject>()
 
-            fun place(node: ModelPoseNode) {
+            fun place(node: SceneObject) {
                 if (node in placed || node in visiting) return
                 visiting += node
                 parents[node]?.let(::place)
@@ -246,20 +246,20 @@ class RagdollPlan(
  * The body the rig puts on [node]. It is read from the rig itself, so the server, which builds no attachments
  * for the nodes it poses, plans the same skeleton the client does.
  */
-private fun PoseTarget.bodyOf(node: ModelPoseNode): RigidBodyAttachmentSpec? =
+private fun PoseTarget.bodyOf(node: SceneObject): RigidBodyAttachmentSpec? =
     rig.bone(node.poseName)?.attachments?.firstNotNullOfOrNull { it as? RigidBodyAttachmentSpec }
 
-private fun PoseTarget.jointOf(node: ModelPoseNode): JointAttachmentSpec? =
+private fun PoseTarget.jointOf(node: SceneObject): JointAttachmentSpec? =
     rig.bone(node.poseName)?.attachments?.firstNotNullOfOrNull { it as? JointAttachmentSpec }
 
 /** What the body on [node] is made of: the colliders it takes from its bone. Null with no body, or none to make it of. */
-private fun PoseTarget.bodyShapeOf(node: ModelPoseNode): RagdollShape? {
+private fun PoseTarget.bodyShapeOf(node: SceneObject): RagdollShape? {
     val body = bodyOf(node) ?: return null
     val parts = body.partsOn(rig.bone(node.poseName)?.attachments.orEmpty()).map(RagdollPart::of)
     return parts.takeIf { it.isNotEmpty() }?.let(::RagdollShape)
 }
 
-private fun ModelPoseNode.physicalParent(joint: JointAttachmentSpec?, byName: Map<String, ModelPoseNode>, bodies: Set<ModelPoseNode>): ModelPoseNode? {
+private fun SceneObject.physicalParent(joint: JointAttachmentSpec?, byName: Map<String, SceneObject>, bodies: Set<SceneObject>): SceneObject? {
     joint?.parent?.takeIf { it.isNotBlank() }?.let { named ->
         return byName[named]?.takeIf { it !== this }
     }
@@ -272,8 +272,8 @@ private fun ModelPoseNode.physicalParent(joint: JointAttachmentSpec?, byName: Ma
     return null
 }
 
-private fun ModelPoseNode.isUnder(ancestor: ModelPoseNode): Boolean {
-    var current: ModelPoseNode? = this
+private fun SceneObject.isUnder(ancestor: SceneObject): Boolean {
+    var current: SceneObject? = this
     while (current != null) {
         if (current === ancestor) return true
         current = current.poseParent
@@ -281,7 +281,7 @@ private fun ModelPoseNode.isUnder(ancestor: ModelPoseNode): Boolean {
     return false
 }
 
-private fun ModelPoseNode.simulatedAncestor(boneByNode: Map<Int, Int>): Int {
+private fun SceneObject.simulatedAncestor(boneByNode: Map<Int, Int>): Int {
     var current = poseParent
     while (current != null) {
         boneByNode[current.poseIndex]?.let { return it }

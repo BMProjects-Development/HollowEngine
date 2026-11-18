@@ -166,7 +166,7 @@ class AnimatorRuntimeTests {
     fun `stop fade is measured exactly on an old world clock`() {
         val start = 100_000_000L
         val node = testNode()
-        val target = PoseTarget(mapOf(node.definition.index to node), mapOf("wave" to waveAnimation()))
+        val target = PoseTarget(mapOf(node.definition.index to node.sceneObject), mapOf("wave" to waveAnimation()))
         val stopping = clip(id = "npc:wave", animation = "wave", playMode = AnimationPlayMode.Loop).copy(
             startGameTime = start,
             stopAtGameTime = start + 10,
@@ -175,7 +175,7 @@ class AnimatorRuntimeTests {
         )
         val animator = ModelAnimator().apply { configure(null, AnimationsComponent(clips = listOf(stopping))) }
 
-        node.resetPose()
+        node.sceneObject.resetPose()
         animator.applyTo(target, clockAt(start + 10, 5f))
 
         assertEquals(0.5f, node.transform.translation.x, 0.0001f)
@@ -530,7 +530,7 @@ class AnimatorRuntimeTests {
 
         applyAnimationPose(
             pose = pose,
-            nodes = mapOf(0 to node),
+            nodes = mapOf(0 to node.sceneObject),
             blendMode = LayerBlendMode.Override,
             weight = 1f,
         )
@@ -639,11 +639,11 @@ private fun animationContext(
  * the first one only sets the clock, the second one is the frame being tested.
  */
 private fun ModelAnimator.step(node: RenderModelNode, seconds: Float) {
-    val target = PoseTarget(mapOf(node.definition.index to node), mapOf("wave" to waveAnimation()))
-    node.resetPose()
+    val target = PoseTarget(mapOf(node.definition.index to node.sceneObject), mapOf("wave" to waveAnimation()))
+    node.sceneObject.resetPose()
     applyTo(target, animationContext(time = clockTicks))
     clockTicks += seconds * 20f
-    node.resetPose()
+    node.sceneObject.resetPose()
     applyTo(target, animationContext(time = clockTicks))
 }
 

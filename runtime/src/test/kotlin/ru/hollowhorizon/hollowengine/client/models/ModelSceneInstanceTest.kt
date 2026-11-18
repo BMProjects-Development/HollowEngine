@@ -6,7 +6,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.Animation
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraintsToPose
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -239,26 +238,28 @@ class ModelSceneInstanceTest {
     }
 
     @Test
-    fun `legacy animation target retains node aliases and masks`() {
+    fun `renderer animation target uses the addressed scene object`() {
         val definition = NodeDefinition(0, "hand", mutableListOf(), TrsTransformF())
-        val node = renderModelNode(definition, null)
-        val target = PoseTarget(mapOf(0 to node), emptyMap(), aliases = mapOf("rightHand" to "hand"))
+        val rendered = renderModel(definition)
+        rendered.rig = ModelRig(bones = mapOf("hand" to RigBone(alias = "rightHand")))
+        val target = rendered.poseTarget()
+        val node = rendered.sceneRoot.children.single()
 
         assertSame(node, target.node("rightHand"))
         assertEquals(0, target.nodeIndex("rightHand"))
         assertEquals(setOf(0), target.mask(BoneMask.of("hand")))
         assertSame(node, target.poseNodesByIndex[0])
         assertFailsWith<IllegalArgumentException> { PoseTarget(mapOf(1 to node), emptyMap()) }
+        rendered.close()
     }
 
     @Test
-    fun `rig pose is shared with legacy evaluation and respects disabled scene nodes`() {
+    fun `rig pose updates the scene node and respects disabled branches`() {
         val definition = NodeDefinition(0, "hand", mutableListOf(), TrsTransformF())
         val model = Model(0, listOf(ModelScene(listOf(definition))), emptySet())
         val scene = scene()
         val instance = ModelSceneInstance.create(scene.create("owner"), "model", model)
         val hand = instance.node(listOf(ScenePathSegment("hand")))!!
-        val legacy = renderModelNode(definition, null)
         val rig = ModelRig(
             bones = mapOf(
                 "hand" to RigBone(
@@ -272,9 +273,8 @@ class ModelSceneInstanceTest {
         assertSame(target, instance.poseTarget(rig))
         assertEquals(0, target.nodeIndex("rightHand"))
 
-        applyRigPose(listOf(legacy), rig)
         instance.applyRigPose(rig)
-        assertEquals(legacy.transform.translation, hand.localTransform.translation)
+        assertEquals(Vec3f(2f, 3f, 4f), hand.localTransform.translation)
         hand.setEnabled(false)
         instance.applyRigPose(rig)
         assertEquals(Vec3f(2f, 3f, 4f), hand.localTransform.translation)

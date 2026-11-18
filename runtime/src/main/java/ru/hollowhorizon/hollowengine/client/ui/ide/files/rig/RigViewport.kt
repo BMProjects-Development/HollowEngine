@@ -106,7 +106,7 @@ private fun handleKey(document: RigEditing, state: RigEditorState, input: UiKeyI
 private fun pick(document: RigEditing, state: RigEditorState, x: Float, y: Float) {
     val viewer = state.viewer
     if (state.showSkeleton && state.gizmo.capture(viewer)) {
-        state.gizmo.ikTargetAt(previewIkTargets(document.rig, viewer.nodes), x, y)?.let { target ->
+        state.gizmo.ikTargetAt(previewIkTargets(document.rig, viewer.attachment.scenePoseNodes.values), x, y)?.let { target ->
             state.select(target.bone, target.id)
             return
         }
@@ -121,7 +121,7 @@ private fun pick(document: RigEditing, state: RigEditorState, x: Float, y: Float
     // A click on nothing lets go of what was picked, back to the model itself.
     if (!state.showColliders || !state.gizmo.capture(viewer)) return state.select(null)
     val (start, end) = state.gizmo.ray(x, y) ?: return state.select(null)
-    val hits = previewColliders(document.rig, viewer.nodes).mapNotNull { collider ->
+    val hits = previewColliders(document.rig, viewer.attachment.scenePoseNodes.values).mapNotNull { collider ->
             collider.volume.clip(start, end)?.let { collider to it.distanceToSqr(start) }
         }.sortedBy { it.second }.map { it.first }
     if (hits.isEmpty()) return state.select(null)

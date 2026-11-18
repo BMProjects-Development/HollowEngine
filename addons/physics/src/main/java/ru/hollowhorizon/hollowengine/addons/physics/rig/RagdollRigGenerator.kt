@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigGenerationSou
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.boneAncestor
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -35,7 +35,7 @@ object RagdollRigGenerator : RigGenerator {
         generate(source.nodes, source.model.boneBounds, current)
 
     internal fun generate(
-        nodes: Collection<ModelPoseNode>,
+        nodes: Collection<SceneObject>,
         geometry: Map<Int, Pair<Vec3f, Vec3f>>,
         current: ModelRig,
     ): ModelRig {
@@ -62,9 +62,9 @@ object RagdollRigGenerator : RigGenerator {
     }
 
 
-    private fun jointParents(bodies: Map<ModelPoseNode, BoneBounds>, globals: Map<Int, Mat4f>): Map<ModelPoseNode, ModelPoseNode> {
-        val parents = HashMap<ModelPoseNode, ModelPoseNode>()
-        val tops = ArrayList<ModelPoseNode>()
+    private fun jointParents(bodies: Map<SceneObject, BoneBounds>, globals: Map<Int, Mat4f>): Map<SceneObject, SceneObject> {
+        val parents = HashMap<SceneObject, SceneObject>()
+        val tops = ArrayList<SceneObject>()
         bodies.keys.forEach { bone ->
             val above = bone.boneAncestor(bodies.keys)
             if (above == null) tops += bone else parents[bone] = above
@@ -86,7 +86,7 @@ object RagdollRigGenerator : RigGenerator {
     }
 
     /** How far [point], in model space, is from the geometry of [bone]. */
-    private fun distance(point: Vec3f, bone: ModelPoseNode, box: BoneBounds, globals: Map<Int, Mat4f>): Float {
+    private fun distance(point: Vec3f, bone: SceneObject, box: BoneBounds, globals: Map<Int, Mat4f>): Float {
         val inverse = MutableMat4f().set(globals[bone.poseIndex] ?: return Float.MAX_VALUE)
         if (!inverse.invert()) return Float.MAX_VALUE
         val local = inverse.transform(point, 1f, MutableVec3f())
@@ -100,8 +100,8 @@ object RagdollRigGenerator : RigGenerator {
 
     private fun Mat4f.origin(): Vec3f = Vec3f(transform(Vec3f.ZERO, 1f, MutableVec3f()))
 
-    private fun ModelPoseNode.isUnder(ancestor: ModelPoseNode): Boolean {
-        var current: ModelPoseNode? = this
+    private fun SceneObject.isUnder(ancestor: SceneObject): Boolean {
+        var current: SceneObject? = this
         while (current != null) {
             if (current === ancestor) return true
             current = current.poseParent

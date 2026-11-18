@@ -1,9 +1,8 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ikTargetMatrix
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.links
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -13,8 +12,10 @@ import kotlin.math.hypot
 internal class PlacedIkTarget(val bone: String?, val id: String, val position: Vec3f)
 
 /** Every IK target of [rig] on the preview's current pose, in model space. */
-internal fun previewIkTargets(rig: ModelRig, roots: List<RenderModelNode>): List<PlacedIkTarget> {
-    val nodes = roots.nodesByName()
+internal fun previewIkTargets(rig: ModelRig, pose: Collection<SceneObject>): List<PlacedIkTarget> =
+    previewIkTargets(rig, pose.nodesByName())
+
+private fun previewIkTargets(rig: ModelRig, nodes: Map<String, SceneObject>): List<PlacedIkTarget> {
     return rig.allAttachments().mapNotNull { (bone, spec) ->
         if (spec !is IkTargetSpec) return@mapNotNull null
         val place = rig.ikTargetMatrix(spec.id, nodes::get) ?: return@mapNotNull null
@@ -33,15 +34,15 @@ internal fun RigPartGizmo.ikTargetAt(targets: List<PlacedIkTarget>, x: Float, y:
  * The IK parts of the rig over the preview: each target as a small cross, each chain along the bones it
  * bends, with a line to the target it reaches for and to the pole it bends toward.
  */
-internal fun DebugLines.Batch.ikOverlay(rig: ModelRig, roots: List<RenderModelNode>, selected: RigPartSelection?) {
-    val nodes = roots.nodesByName()
+internal fun DebugLines.Batch.ikOverlay(rig: ModelRig, pose: Collection<SceneObject>, selected: RigPartSelection?) {
+    val nodes = pose.nodesByName()
     rig.ikChains().forEach { (bone, chain) ->
-        val joints = chain.links(nodes[bone] ?: return@forEach).map { it.poseGlobalMatrix.getTranslation() }
+        val joints = chain.links(nodes[bone] ?: return@forEach).map { it.worldTransform.getTranslation() }
         joints.zipWithNext { start, end -> line(start, end, CHAIN_COLOR) }
         rig.ikTargetMatrix(chain.target, nodes::get)?.let { line(joints.last(), it.getTranslation(), REACH_COLOR) }
         if (joints.size > 2) rig.ikTargetMatrix(chain.pole, nodes::get)?.let { line(joints[1], it.getTranslation(), POLE_COLOR) }
     }
-    previewIkTargets(rig, roots).forEach { target ->
+    previewIkTargets(rig, nodes).forEach { target ->
         val isSelected = selected != null && selected.bone == target.bone && selected.id == target.id
         cross(target.position, if (isSelected) SELECTED_COLOR else TARGET_COLOR)
     }
@@ -63,8 +64,8 @@ private fun DebugLines.Batch.cross(center: Vec3f, color: Int) {
     line(center - Vec3f(0f, 0f, CROSS), center + Vec3f(0f, 0f, CROSS), color)
 }
 
-private fun List<RenderModelNode>.nodesByName(): Map<String, RenderModelNode> = HashMap<String, RenderModelNode>().also { map ->
-    forEach { root -> root.walk().forEach { map.putIfAbsent(it.name, it) } }
+private fun Collection<SceneObject>.nodesByName(): Map<String, SceneObject> = HashMap<String, SceneObject>().also { map ->
+    forEach { map.putIfAbsent(it.poseName, it) }
 }
 
 /** How far from a target's cross, in panel pixels, a click still picks it. */
@@ -88,13 +89,13 @@ private val FLOOR_COLOR = 0x40FFFFFF
  * The color each bone of [rig] takes in the preview's skeleton: the bones an IK chain bends in the chain's
  * color, any other bone in the color of the first thing hung on it that has one.
  */
-internal fun boneColors(rig: ModelRig, roots: List<RenderModelNode>): Map<String, Int> {
+internal fun boneColors(rig: ModelRig, pose: Collection<SceneObject>): Map<String, Int> {
     val colors = HashMap<String, Int>()
     rig.bones.forEach { (name, bone) ->
         bone.attachments.firstNotNullOfOrNull { RigAttachmentTypes.of(it)?.editorColor }?.let { colors[name] = it }
     }
     val chainColor = IkChainSpec.TYPE.editorColor ?: return colors
-    val nodes = roots.nodesByName()
+    val nodes = pose.nodesByName()
     rig.ikChains().forEach { (bone, chain) ->
         nodes[bone]?.let(chain::links)?.forEach { colors[it.poseName] = chainColor }
     }

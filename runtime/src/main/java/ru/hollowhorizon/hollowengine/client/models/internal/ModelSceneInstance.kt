@@ -1,19 +1,21 @@
 package ru.hollowhorizon.hollowengine.client.models.internal
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
+import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraintsToPose
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigGroundingState
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.scene.SceneAddress
 import ru.hollowhorizon.hollowengine.common.scene.SceneFailures
-import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import java.util.*
 
 /** A model's mutable pose and hierarchy under one scene object; the model asset remains shared. */
@@ -22,20 +24,20 @@ class ModelSceneInstance private constructor(
 ) : AutoCloseable {
     var model: Model = Model.EMPTY
         private set
-    private var imported = LinkedHashMap<Int, SceneModelPose>()
+    private var imported = LinkedHashMap<Int, SceneObject>()
     private var poses = imported
-    private val rigBones = LinkedHashMap<String, SceneModelPose>()
+    private val rigBones = LinkedHashMap<String, SceneObject>()
     private var authoredConstraintsApplied = false
     private var target: PoseTarget? = null
 
     /** Imported pose nodes in hierarchy order, including loader-generated transforms. */
-    val poseNodes: Collection<ModelPoseNode> get() = poses.values
-    internal val poseNodesByIndex: Map<Int, SceneModelPose> get() = poses
+    val poseNodes: Collection<SceneObject> get() = poses.values
+    internal val poseNodesByIndex: Map<Int, SceneObject> get() = poses
 
     internal fun forgetPose(index: Int, node: SceneObject) {
-        if (poses[index]?.sceneObject !== node) return
+        if (poses[index] !== node) return
         poses.remove(index)
-        if (imported[index]?.sceneObject === node) imported.remove(index)
+        if (imported[index] === node) imported.remove(index)
         target = null
     }
 
@@ -61,15 +63,15 @@ class ModelSceneInstance private constructor(
         if (replacement === model) return emptyList()
         val paths = replacement.nodePaths
         val definitions = replacement.scenes.getOrNull(replacement.scene)?.nodes.orEmpty()
-        val existing = imported.values.filterNot { it.sceneObject.isSynthetic || it.sceneObject.isRemoved }
-            .associateBy { it.sceneObject.address.importedPath }
+        val existing = imported.values.filterNot { it.isSynthetic || it.isRemoved }
+            .associateBy { it.address.importedPath }
         val indices = HashSet<Int>()
 
         fun validate(definition: NodeDefinition, logicalPath: List<ScenePathSegment>) {
             require(indices.add(definition.index)) { "Duplicate model node index: ${definition.index}" }
             val path = if (definition.isSynthetic) logicalPath else {
                 val segment = checkNotNull(paths.segment(definition))
-                val holder = if (logicalPath.isEmpty()) root else existing[logicalPath]?.sceneObject
+                val holder = if (logicalPath.isEmpty()) root else existing[logicalPath]
                 require(holder?.children?.none { it.createdId != null && it.name == segment.name } != false) {
                     "Imported node conflicts with created child: ${segment.name}"
                 }
@@ -81,35 +83,35 @@ class ModelSceneInstance private constructor(
 
         val previous = imported.values.toList()
         val remaining = existing.toMutableMap()
-        val next = LinkedHashMap<Int, SceneModelPose>()
+        val next = LinkedHashMap<Int, SceneObject>()
         val failures = SceneFailures()
-        fun visit(definition: NodeDefinition, holder: SceneObject, parentPose: SceneModelPose?, logicalPath: List<ScenePathSegment>): Boolean {
+        fun visit(definition: NodeDefinition, holder: SceneObject, logicalPath: List<ScenePathSegment>): Boolean {
             val path = if (definition.isSynthetic) logicalPath else logicalPath + checkNotNull(paths.segment(definition))
             val node = if (definition.isSynthetic) {
                 holder.importSynthetic(definition.name?.takeUnless(String::isBlank) ?: "Node_${definition.index}")
             } else {
-                val retained = remaining.remove(path)?.sceneObject
+                val retained = remaining.remove(path)
                 if (retained == null) holder.importModelChild(checkNotNull(paths.segment(definition)))
                 else retained.also { failures.capture { it.moveWithinLogicalParent(holder) } }
             }
             node.localTransform.set(definition.baseTransform)
-            val pose = SceneModelPose(node, definition, definition.mesh?.primitives?.firstOrNull()?.weights, poseParent = parentPose)
-            next[definition.index] = pose
+            node.setModelSource(definition, definition.mesh?.primitives?.firstOrNull()?.weights)
+            next[definition.index] = node
             var geometry = definition.mesh != null
             definition.children.forEach { child ->
-                val childGeometry = visit(child, node, pose, path)
+                val childGeometry = visit(child, node, path)
                 if (child.isSynthetic && childGeometry) geometry = true
             }
-            pose.hasSyntheticGeometry = geometry
+            if (definition.isSynthetic && geometry) node.includeSyntheticGeometry()
             return geometry
         }
-        definitions.forEach { visit(it, root, null, emptyList()) }
+        definitions.forEach { visit(it, root, emptyList()) }
 
-        val removed = remaining.values.map { it.sceneObject.address }
-        val obsolete = remaining.values.mapTo(HashSet()) { it.sceneObject }
+        val removed = remaining.values.map { it.address }
+        val obsolete = remaining.values.toHashSet()
         previous.asReversed().forEach { old ->
-            if ((old.sceneObject.isSynthetic || old.sceneObject in obsolete) && !old.sceneObject.isRemoved) {
-                failures.capture { old.sceneObject.remove() }
+            if ((old.isSynthetic || old in obsolete) && !old.isRemoved) {
+                failures.capture(old::remove)
             }
         }
         this.model = replacement
@@ -126,19 +128,19 @@ class ModelSceneInstance private constructor(
         val added = rig.addedBones
         if (added.isEmpty() && rigBones.isEmpty()) return emptyList()
         val next = LinkedHashMap(imported)
-        val byName = HashMap<String, SceneModelPose>()
+        val byName = HashMap<String, SceneObject>()
         imported.values.forEach { byName.putIfAbsent(it.poseName, it) }
         var index = (next.keys.maxOrNull() ?: -1) + 1
         val pending = added.filterKeys { it !in byName }.toMutableMap()
-        val retained = LinkedHashMap<String, SceneModelPose>()
+        val retained = LinkedHashMap<String, SceneObject>()
         val removed = ArrayList<String>()
         while (pending.isNotEmpty()) {
             val ready = pending.filterValues { it.parent == null || it.parent in byName }
             if (ready.isEmpty()) break
             for ((name, origin) in ready) {
                 val parent = origin.parent?.let(byName::getValue)
-                val holder = parent?.sceneObject ?: root
-                val previous = rigBones.remove(name)?.sceneObject?.takeUnless { it.isRemoved }
+                val holder = parent ?: root
+                val previous = rigBones.remove(name)?.takeUnless { it.isRemoved }
                 val node = if (previous?.physicalParent === holder) {
                     previous
                 } else {
@@ -151,16 +153,16 @@ class ModelSceneInstance private constructor(
                 val definition = NodeDefinition(index++, name, mutableListOf(), origin.localTransform())
                 definition.parent = parent?.source as? NodeDefinition
                 node.localTransform.set(definition.baseTransform)
-                val pose = SceneModelPose(node, definition, poseParent = parent)
-                next[definition.index] = pose
-                retained[name] = pose
-                byName[name] = pose
+                node.setModelSource(definition)
+                next[definition.index] = node
+                retained[name] = node
+                byName[name] = node
                 pending.remove(name)
             }
         }
-        rigBones.forEach { (name, pose) ->
-            if (!pose.sceneObject.isRemoved) {
-                pose.sceneObject.remove()
+        rigBones.forEach { (name, node) ->
+            if (!node.isRemoved) {
+                node.remove()
                 removed += name
             }
         }
@@ -174,7 +176,7 @@ class ModelSceneInstance private constructor(
 
     fun resetPose() {
         invalidateConstraints()
-        poses.values.forEach(SceneModelPose::resetPose)
+        poses.values.forEach(SceneObject::resetPose)
     }
 
     internal fun invalidateConstraints() { authoredConstraintsApplied = false }
@@ -192,6 +194,16 @@ class ModelSceneInstance private constructor(
         poses.values.forEach { node ->
             rig.bone(node.poseName)?.pose?.let(node::applyRigPose)
         }
+    }
+
+    internal fun applyRigConstraints(
+        rig: ModelRig,
+        context: AnimatorEvaluationContext,
+        grounding: RigGroundingState? = null,
+        scaleMeshes: ((SceneObject, Vec3f) -> Unit)? = null,
+    ) {
+        applyAuthoredConstraints()
+        applyRigConstraintsToPose(poseNodes, rig, context, grounding, scaleMeshes)
     }
 
     fun applyPose(

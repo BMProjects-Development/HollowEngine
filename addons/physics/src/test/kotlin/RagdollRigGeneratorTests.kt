@@ -3,7 +3,6 @@ import ru.hollowhorizon.hollowengine.addons.physics.rig.JointLimits
 import ru.hollowhorizon.hollowengine.addons.physics.rig.RagdollRigGenerator
 import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -46,7 +45,7 @@ class RagdollRigGeneratorTests {
         val rightLeg = bone("RightLeg", 0.125f, 0.75f, 0f, leg.first, leg.second)
         val root = node("Model", 0f, 0f, 0f, body, leftLeg, rightLeg)
 
-        val nodes = renderModelNode(root).walk()
+        val nodes = sceneModel(root).poseNodes
         return RagdollRigGenerator.generate(nodes, geometry, current)
     }
 
