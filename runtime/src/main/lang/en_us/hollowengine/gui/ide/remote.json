@@ -1,6 +1,11 @@
 {
   "local": "Local",
   "server": "Server",
+  "unlock": "Unlock Server Project",
+  "token_prompt": "Copy the access token from your server administrator, then paste it to connect.",
+  "paste_token": "Paste Token and Connect",
+  "authenticating": "Connecting...",
+  "invalid_token": "The clipboard does not contain a valid access token.",
   "tab": "%s (Server)",
   "filter": "Filter loaded folders",
   "new_file": "New File",

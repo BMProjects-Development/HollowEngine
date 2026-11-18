@@ -251,8 +251,13 @@ internal class RemoteProjectPanelController(
 }
 
 @Composable
-internal fun RemoteProjectSourceDropdown(workspace: RemoteProjectWorkspace, switch: (Boolean) -> Unit) {
-    if (workspace.projectName == null) return
+internal fun RemoteProjectSourceDropdown(
+    workspace: RemoteProjectWorkspace,
+    unlock: () -> Unit,
+    switch: (Boolean) -> Unit,
+) {
+    val access = RemoteProjectConnection.access
+    if (access == RemoteProjectAccess.UNAVAILABLE) return
     var expanded by remember { mutableStateOf(false) }
     UiDropdown(
         id = "ide-project-source",
@@ -261,7 +266,12 @@ internal fun RemoteProjectSourceDropdown(workspace: RemoteProjectWorkspace, swit
         onExpandedChange = { expanded = it },
         items = listOf(
             UiDropdownItem("$RemoteLang.local".lang, mark = UiMenuParts.radio(!workspace.selected)) { switch(false) },
-            UiDropdownItem("$RemoteLang.server".lang, mark = UiMenuParts.radio(workspace.selected)) { switch(true) },
+            UiDropdownItem(
+                "$RemoteLang.${if (access == RemoteProjectAccess.LOCKED) "unlock" else "server"}".lang,
+                mark = UiMenuParts.radio(workspace.selected),
+            ) {
+                if (access == RemoteProjectAccess.LOCKED) unlock() else switch(true)
+            },
         ),
         tags = listOf("ide-project-source"),
     )
@@ -298,7 +308,7 @@ internal fun RemoteProjectEditorStatus(file: HollowIdeOpenFile, workspace: Remot
     }
 }
 
-private const val RemoteLang = "hollowengine.gui.ide.remote"
+internal const val RemoteLang = "hollowengine.gui.ide.remote"
 
 private val ProjectNameAction.labelKey: String
     get() = when (this) {

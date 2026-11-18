@@ -98,7 +98,7 @@ class HollowIdePreviewContext internal constructor(
     private val preview: HollowIdeFilePreview,
     /** The history of the file's text, which the preview's edits go into. */
     val history: UndoHistory,
-    private val write: (next: String, label: UndoLabel?, mergeKey: String?) -> Unit,
+    private val documents: HollowIdePreviewDocuments,
 ) {
     val text: String get() = file.text
     val readOnly: Boolean get() = file.readOnly
@@ -110,7 +110,20 @@ class HollowIdePreviewContext internal constructor(
      * @param mergeKey folds the step into the one just before with the same key, as for typing into one field.
      */
     fun edit(next: String, label: UndoLabel? = null, mergeKey: String? = null) {
-        if (!readOnly && next != text) write(next, label, mergeKey)
+        documents.edit(file, file, next, label, mergeKey)
+    }
+
+    /** Open document for a sibling in the same project, including its unsaved edits. */
+    fun sibling(name: String): HollowIdeOpenFile? = documents.sibling(file, name)
+
+    /** Loads a sibling into its own tab without switching away from the preview. */
+    fun openSibling(name: String, completed: (Boolean) -> Unit) = documents.openSibling(file, name, completed)
+
+    val canOpenSiblings: Boolean get() = documents.canOpenSiblings(file)
+
+    /** Applies an undoable edit to the sibling's own document. */
+    fun editSibling(name: String, next: String, label: UndoLabel? = null, mergeKey: String? = null) {
+        sibling(name)?.let { documents.edit(file, it, next, label, mergeKey) }
     }
 
     fun <T : Any> state(create: () -> T): T = view.state(preview, create)

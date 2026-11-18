@@ -39,7 +39,7 @@ object ScriptingAddons {
         }
 
         HollowProject.properties().dependsOn.forEach(::visit)
-        return wanted.mapNotNull { id -> installed[id]?.classes?.takeIf(File::isFile) }
+        return wanted.mapNotNull { id -> installed[id]?.compilationClasses?.takeIf(File::isFile) }
     }
 }
 

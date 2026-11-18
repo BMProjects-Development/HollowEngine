@@ -106,7 +106,7 @@ internal object MixinScriptStage {
             }
             project.dependsOn.forEach(::visit)
 
-            val addons = chosen(stage { jar -> descriptorOf(jar)?.id in wanted }).map { it.classesFile }
+            val addons = chosen(stage { jar -> descriptorOf(jar)?.id in wanted }).mapNotNull { it.compilationClassesFile }
             val mods = (project.modRequirements + enabled.flatMap { it.modRequirements })
                 .present(ru.hollowhorizon.hollowengine.common.utils.ModList::isLoaded).distinct()
             return EarlyMixinCompilation.Dependencies(mods, addons)

@@ -35,6 +35,7 @@ import kotlin.reflect.full.findAnnotation
 object HollowModProcessor {
     init {
         val handles = MethodHandles.lookup()
+        Config.startObserver()
 
         registerMethodHandler<SubscribeEvent> { method, _ ->
             val listener = if (method.isStatic()) {

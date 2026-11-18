@@ -27,6 +27,7 @@ internal data class HollowAddonCandidate(
     val sourceModifiedAt: Long,
     val artifactFile: File,
     val classesFile: File,
+    val compilationClassesFile: File?,
     val fingerprint: String,
     val descriptor: HollowAddonDescriptor,
     val requiresBootstrapLibraries: Boolean,
@@ -104,13 +105,14 @@ internal class HollowAddonArtifactStore(
                 hasData = names.any { it.startsWith(HollowAddonLayout.DATA_PREFIX) },
             )
         }
-        val classesFile = unpackClasses(stagedFile, fingerprint)
+        val classes = unpackClasses(stagedFile, fingerprint)
         return HollowAddonCandidate(
             sourceFile = sourceFile.canonicalFile,
             sourceLength = sourceLength,
             sourceModifiedAt = sourceModifiedAt,
             artifactFile = stagedFile,
-            classesFile = classesFile,
+            classesFile = classes.runtime,
+            compilationClassesFile = classes.named,
             fingerprint = fingerprint,
             descriptor = descriptor.copy(mappingNamespace = runtimeNamespace),
             requiresBootstrapLibraries = contents.requiresBootstrapLibraries,
@@ -143,6 +145,7 @@ internal class HollowAddonArtifactStore(
             sourceModifiedAt = file.lastModified(),
             artifactFile = file,
             classesFile = file,
+            compilationClassesFile = null,
             fingerprint = file.sha256(),
             descriptor = descriptor.copy(
                 modRequirements = descriptor.modRequirements.filterNot { it.id == modId } + HollowAddonDependency(modId),
@@ -164,52 +167,56 @@ internal class HollowAddonArtifactStore(
         val hasData: Boolean,
     )
 
-    private fun unpackClasses(artifact: File, fingerprint: String): File {
+    private class StagedClasses(val runtime: File, val named: File)
+
+    private fun unpackClasses(artifact: File, fingerprint: String): StagedClasses {
         val variantCacheKey = "${platform.id()}-${runtimeNamespace.id}"
         val outputDirectory = cacheRoot.resolve("variants").resolve(fingerprint).resolve(variantCacheKey)
-        val outputFile = outputDirectory.resolve("classes.jar")
-        if (outputFile.isFile) return outputFile
+        val runtime = outputDirectory.resolve("classes.jar")
+        return JarFile(artifact).use { jar ->
+            val remapEntry = if (runtimeNamespace == HollowAddonMappingNamespace.INTERMEDIARY)
+                jar.getJarEntry(HollowAddonLayout.REMAP_TABLE) else null
+            val named = if (remapEntry != null) outputDirectory.resolve("named.jar") else runtime
+            if (!named.isFile) {
+                materialize(named) { output -> unpackNamed(jar, output) }
+            }
+            if (remapEntry != null && !runtime.isFile) {
+                val table = jar.getInputStream(remapEntry).use(PayloadRemapTable::read)
+                materialize(runtime) { output -> table.applyTo(named, output, artifactRuntime = runtimeIdentity()) }
+            }
+            StagedClasses(runtime, named)
+        }
+    }
 
-        outputDirectory.mkdirs()
-        val unpacked = outputDirectory.resolve("named.jar.tmp")
-        val table = JarFile(artifact).use { jar ->
-            // The loader's own part comes first, so that a class it redefines replaces the common one.
-            val classes = listOfNotNull(
-                jar.getJarEntry(HollowAddonLayout.platformClassesJar(platform)),
-                jar.getJarEntry(HollowAddonLayout.CLASSES_JAR),
-            )
-            val scripts = jar.entries().asSequence().filterNot { it.isDirectory }.filter { entry ->
-                entry.name.startsWith(HollowAddonLayout.SOURCE_PREFIX) || entry.name.startsWith(HollowAddonLayout.COMPILED_PREFIX)
-            }.toList()
-            if (classes.size == 1 && scripts.isEmpty()) {
-                jar.getInputStream(classes.single())
-                    .use { Files.copy(it, unpacked.toPath(), StandardCopyOption.REPLACE_EXISTING) }
-            } else {
-                writeUnpacked(jar, classes, scripts, unpacked)
-            }
-            jar.getJarEntry(HollowAddonLayout.REMAP_TABLE)
-                ?.takeIf { runtimeNamespace == HollowAddonMappingNamespace.INTERMEDIARY }
-                ?.let { entry -> jar.getInputStream(entry).use(PayloadRemapTable::read) }
-        }
-        val finished = if (table == null) {
-            unpacked
-        } else {
-            outputDirectory.resolve("classes.jar.tmp").also { remapped ->
-                table.applyTo(unpacked, remapped, artifactRuntime = runtimeIdentity())
-                Files.deleteIfExists(unpacked.toPath())
-            }
-        }
+    private fun materialize(file: File, write: (File) -> Unit) {
+        val directory = Files.createDirectories(file.parentFile.toPath())
+        val temporary = Files.createTempFile(directory, file.name, ".tmp")
         try {
-            Files.move(
-                finished.toPath(),
-                outputFile.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(finished.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            write(temporary.toFile())
+            try {
+                Files.move(temporary, file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary, file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary)
         }
-        return outputFile
+    }
+
+    private fun unpackNamed(jar: JarFile, output: File) {
+        val classes = listOfNotNull(
+            jar.getJarEntry(HollowAddonLayout.platformClassesJar(platform)),
+            jar.getJarEntry(HollowAddonLayout.CLASSES_JAR),
+        )
+        val scripts = jar.entries().asSequence().filterNot { it.isDirectory }.filter { entry ->
+            entry.name.startsWith(HollowAddonLayout.SOURCE_PREFIX) || entry.name.startsWith(HollowAddonLayout.COMPILED_PREFIX)
+        }.toList()
+        if (classes.size == 1 && scripts.isEmpty()) {
+            jar.getInputStream(classes.single())
+                .use { Files.copy(it, output.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+        } else {
+            writeUnpacked(jar, classes, scripts, output)
+        }
     }
 
     private fun writeUnpacked(jar: JarFile, classes: List<JarEntry>, scripts: List<JarEntry>, target: File) {

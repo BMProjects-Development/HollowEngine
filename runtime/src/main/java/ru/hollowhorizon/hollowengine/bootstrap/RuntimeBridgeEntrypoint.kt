@@ -102,7 +102,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArms
 import ru.hollowhorizon.hollowengine.common.attachments.components.PlayerArmsComponent
 import ru.hollowhorizon.hollowengine.common.colliders.*
 import ru.hollowhorizon.hollowengine.common.compat.util.recipeManagerProtected
-import ru.hollowhorizon.hollowengine.common.config.Config
 import ru.hollowhorizon.hollowengine.common.coroutines.RuntimeDispatcherState
 import ru.hollowhorizon.hollowengine.common.coroutines.ServerRuntimeState
 import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
@@ -450,7 +449,6 @@ class RuntimeBridgeEntrypoint : RuntimeBridge {
     override fun onDebugClientMain() {
         ConsoleAppender.attach()
         HollowCoreLoader.initialize()
-        Config.startObserver()
 
         LOGGER.info(
             "Production: {}, Can attach renderdoc: {}, Platform: {}",

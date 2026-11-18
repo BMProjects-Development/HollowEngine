@@ -28,6 +28,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.preview.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectEditorStatus
 import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectPanelController
 import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectSourceDropdown
+import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectTokenDialog
 import ru.hollowhorizon.hollowengine.client.ui.ide.remote.RemoteProjectWorkspace
 import ru.hollowhorizon.hollowengine.client.ui.ide.timeline.ui.TimelineDock
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AssetPickerDialog
@@ -179,6 +180,9 @@ object HollowIdeOverlay {
         tabChanged = { dock.updateItem(it.dockItem()) },
         analysisChanged = { editorAnalysisRevision++ },
     )
+    private val previewDocuments = HollowIdePreviewDocuments(model, remoteProject, ::openFileDockItem) { file, next, label, mergeKey ->
+        applyEditorText(file, next, editorState(file).caret, label, mergeKey)
+    }
     private val remotePanel = RemoteProjectPanelController(remoteProject, ::focusProjectTree) {
         activeRuntime().let { it.mouseX to it.mouseY }
     }
@@ -993,6 +997,15 @@ object HollowIdeOverlay {
         IdeInspectorHost.pending?.let { request -> AssetPickerDialog(request) { IdeInspectorHost.pending = null } }
         codeRename.Dialog()
         if (!expanded) return
+        if (remoteTokenDialog) {
+            RemoteProjectTokenDialog(
+                onUnlocked = {
+                    remoteTokenDialog = false
+                    selectProjectSource(true)
+                },
+                onDismiss = { remoteTokenDialog = false },
+            )
+        }
         HollowIdeFileContextMenu(fileContextMenu, ::runFileAction, onDismiss = { fileContextMenu = null })
         HollowIdeSearchDialog(search, ::openSearchResult)
         HollowIdeProjectDialogs(packaging)
@@ -1347,12 +1360,16 @@ object HollowIdeOverlay {
 
     @Composable
     private fun ProjectSourceDropdown() {
-        RemoteProjectSourceDropdown(remoteProject) { remote ->
-            project.closePopups()
-            remotePanel.closePopups()
-            projectFilter.close()
-            remoteProject.select(remote)
-        }
+        RemoteProjectSourceDropdown(remoteProject, { remoteTokenDialog = true }, ::selectProjectSource)
+    }
+
+    private var remoteTokenDialog by mutableStateOf(false)
+
+    private fun selectProjectSource(remote: Boolean) {
+        project.closePopups()
+        remotePanel.closePopups()
+        projectFilter.close()
+        remoteProject.select(remote)
     }
 
     @Composable
@@ -1469,9 +1486,7 @@ object HollowIdeOverlay {
         val preview = view.preview
         val editor = editorState(file)
         val context = remember(file, view, preview) {
-            HollowIdePreviewContext(file, view, preview, editor.history) { next, label, mergeKey ->
-                applyEditorText(file, next, editor.caret.coerceAtMost(next.length), label, mergeKey)
-            }
+            HollowIdePreviewContext(file, view, preview, editor.history, previewDocuments)
         }
         Box(mode = UiBoxMode.STACK, modifier = Modifier.size(100.percent, 100.percent)) {
             Column(modifier = Modifier.size(100.percent, 100.percent)) {
@@ -1516,14 +1531,16 @@ object HollowIdeOverlay {
         }
     }
 
-    private fun openFileDockItem(file: HollowIdeOpenFile) {
+    private fun openFileDockItem(file: HollowIdeOpenFile, focus: Boolean = true) {
         if (dock.contains(file.id)) {
             dock.updateItem(file.dockItem())
-            dock.focus(file.id)
+            if (focus) dock.focus(file.id)
             return
         }
+        val previous = dock.focusedItemId
         val target = editorTarget()
         dock.open(file.dockItem(), target)
+        if (!focus && previous != null) dock.focus(previous)
         if (target.placement == DockPlacement.RIGHT) {
             dock.setSplitFractionForItem(ProjectTreeId, file.id, 0.28f)
         }

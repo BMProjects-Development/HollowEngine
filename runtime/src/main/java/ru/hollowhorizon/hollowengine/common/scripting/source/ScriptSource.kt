@@ -13,7 +13,7 @@ interface ScriptSource {
     /** Parent classloader for compiled scripts of this namespace. */
     val classLoader: ClassLoader
 
-    /** Classpath entries beyond the engine's own, e.g. the addon jar and its bundled libraries. */
+    /** Classpath entries in the compiler's namespace, e.g. named addon classes and bundled libraries. */
     val classpath: List<File>
 
     /** Namespaces this one may reference from `@file:Import`. */

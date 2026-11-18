@@ -20,6 +20,8 @@ internal object RemoteProjectConnection {
 
     var projectName by mutableStateOf<String?>(null)
         private set
+    var access by mutableStateOf(RemoteProjectAccess.UNAVAILABLE)
+        private set
     var session by mutableStateOf(0L)
         private set
 
@@ -35,14 +37,19 @@ internal object RemoteProjectConnection {
         if (pending?.let { now - it.deadline >= 0 } == true) finish(RemoteProjectReply.Failure(RemoteProjectError.TIMEOUT))
     }
 
-    fun receiveAccess(allowed: Boolean) {
+    fun receiveAccess(next: RemoteProjectAccess) {
         synchronize(Minecraft.getInstance())
         if (connection == null) return
-        if (!allowed) revoke()
-        else {
+        access = next
+        if (next != RemoteProjectAccess.GRANTED) revoke()
+        else if (projectName == null) {
             projectName = "HollowEngine"
             refreshProjectName()
         }
+    }
+
+    fun authenticate(token: String, completed: (RemoteProjectReply) -> Unit) {
+        enqueue(RemoteProjectCommand.Authenticate(token), false, completed)
     }
 
     fun refreshProjectName() {
@@ -68,7 +75,7 @@ internal object RemoteProjectConnection {
         fileCompleted: ((RemoteProjectFile) -> Unit)? = null,
     ) {
         synchronize(Minecraft.getInstance())
-        if (connection == null || projectName == null) {
+        if (connection == null || !canSend(command)) {
             completed(RemoteProjectReply.Failure(if (connection == null) RemoteProjectError.DISCONNECTED else RemoteProjectError.ACCESS))
             return
         }
@@ -84,7 +91,6 @@ internal object RemoteProjectConnection {
             receiveFileChunk(request, reply)
             return
         }
-        if (reply is RemoteProjectReply.Failure && reply.error == RemoteProjectError.ACCESS) revoke()
         finish(reply)
     }
 
@@ -115,7 +121,7 @@ internal object RemoteProjectConnection {
         if (projectName == null) return
         projectName = null
         session++
-        onReset?.invoke()
+        resetRequests(RemoteProjectError.ACCESS)
     }
 
     private fun synchronize(minecraft: Minecraft) {
@@ -123,13 +129,18 @@ internal object RemoteProjectConnection {
         if (connection === current) return
         connection = current
         session++
+        access = RemoteProjectAccess.UNAVAILABLE
+        projectName = null
+        resetRequests(RemoteProjectError.DISCONNECTED)
+    }
+
+    private fun resetRequests(error: RemoteProjectError) {
         val cancelled = listOfNotNull(pending) + queue
         pending = null
         queue.clear()
-        projectName = null
         onReset?.invoke()
-        val disconnected = RemoteProjectReply.Failure(RemoteProjectError.DISCONNECTED)
-        cancelled.forEach { it.completed(disconnected) }
+        val failure = RemoteProjectReply.Failure(error)
+        cancelled.forEach { it.completed(failure) }
     }
 
     private fun finish(reply: RemoteProjectReply) {
@@ -142,7 +153,7 @@ internal object RemoteProjectConnection {
     private fun dispatch() {
         while (pending == null && queue.isNotEmpty()) {
             val request = queue.removeFirst()
-            if (projectName == null) {
+            if (!canSend(request.command)) {
                 request.completed(RemoteProjectReply.Failure(RemoteProjectError.ACCESS))
                 continue
             }
@@ -152,6 +163,9 @@ internal object RemoteProjectConnection {
             return
         }
     }
+
+    private fun canSend(command: RemoteProjectCommand): Boolean =
+        if (command is RemoteProjectCommand.Authenticate) access == RemoteProjectAccess.LOCKED else projectName != null
 
     private class Pending(
         val id: Long,

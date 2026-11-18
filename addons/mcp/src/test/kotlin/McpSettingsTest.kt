@@ -1,4 +1,4 @@
-import ru.hollowhorizon.hollowengine.addons.mcp.IpAllowlist
+import ru.hollowhorizon.hollowengine.common.network.IpAllowlist
 import ru.hollowhorizon.hollowengine.addons.mcp.loadMcpSettings
 import java.nio.file.Files
 import java.nio.file.Path

@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
 
@@ -18,6 +20,9 @@ internal const val RemoteProjectRevisionLength = 64
 
 @Serializable
 internal sealed interface RemoteProjectCommand {
+    @Serializable
+    class Authenticate(@Serializable(with = RemoteProjectTokenSerializer::class) val token: String) : RemoteProjectCommand
+
     @Serializable
     data object ProjectName : RemoteProjectCommand
 
@@ -84,6 +89,9 @@ internal enum class RemoteProjectError {
 }
 
 @Serializable
+internal enum class RemoteProjectAccess { UNAVAILABLE, LOCKED, GRANTED }
+
+@Serializable
 internal data class RemoteProjectChange(val path: String, val kind: Kind, val destination: String? = null) {
     @Serializable
     enum class Kind { SAVED, CREATED, MOVED, DELETED }
@@ -114,4 +122,15 @@ private class ProjectBytesSerializer(private val maxSize: Int) : KSerializer<Byt
 
     override fun deserialize(decoder: Decoder): ByteArray =
         (decoder as FriendlyByteBufDecoder).input.readByteArray(maxSize)
+}
+
+internal object RemoteProjectTokenSerializer : KSerializer<String> {
+    override val descriptor = PrimitiveSerialDescriptor("RemoteProjectToken", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: String) {
+        (encoder as FriendlyByteBufEncoder).buf.writeUtf(value, RemoteProjectTokenLimit)
+    }
+
+    override fun deserialize(decoder: Decoder): String =
+        (decoder as FriendlyByteBufDecoder).input.readUtf(RemoteProjectTokenLimit)
 }

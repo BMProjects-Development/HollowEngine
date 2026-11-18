@@ -15,6 +15,8 @@ import ru.hollowhorizon.hollowengine.common.utils.ObservableMap
 import ru.hollowhorizon.hollowengine.common.utils.ObservableSet
 import ru.hollowhorizon.hollowengine.common.utils.toml.toml
 import java.nio.file.*
+import java.nio.file.StandardWatchEventKinds.ENTRY_CREATE
+import java.nio.file.StandardWatchEventKinds.ENTRY_DELETE
 import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -49,7 +51,7 @@ open class Config {
         try {
             if (Files.exists(configFile)) {
                 if (!load()) {
-                    LOGGER.warn("Config loaded with errors, regenerating: {}", configFile.fileName)
+                    LOGGER.warn("Config could not be loaded: {}", configFile.fileName)
                 } else {
                     LOGGER.info("Config loaded: {}", configFile.fileName)
                 }
@@ -86,7 +88,7 @@ open class Config {
     private fun registerFileWatcher() {
         val parentDir = configFile.parent
         try {
-            val key = parentDir.register(fileWatcher, ENTRY_MODIFY)
+            val key = parentDir.register(fileWatcher, ENTRY_MODIFY, ENTRY_CREATE, ENTRY_DELETE)
             val entry = FileWatcherEntry(this, configFile, configFile.fileName.toString())
             configRegistrations.compute(key) { _, entries -> entries.orEmpty() + (entry.fileName to entry) }
         } catch (e: Exception) {
@@ -142,15 +144,25 @@ open class Config {
         return try {
             val content = configFile.readText(Charsets.UTF_8)
             val table = toml.decodeFromString<TomlTable>(content)
-            properties.deserialize(table)
+            applyConfig(table)
             LOGGER.info("Config reloaded: {}", configFile.fileName)
             true
         } catch (e: Exception) {
-            LOGGER.error("Error loading config {}: {}", configFile.fileName, e.message)
-            createBackupAndRegenerate("errored")
+            handleLoadFailure(configFile.fileName, e)
             false
         }
     }
+
+    protected open fun applyConfig(table: TomlTable) {
+        properties.deserialize(table)
+    }
+
+    protected open fun handleLoadFailure(fileName: Path, error: Exception) {
+        LOGGER.error("Error loading config {}: {}", fileName, error.message)
+        createBackupAndRegenerate("errored")
+    }
+
+    protected open fun onConfigRemoved() = Unit
 
     fun <T> property(value: T) = properties.add(value)
 
@@ -208,10 +220,8 @@ open class Config {
                         val key = fileWatcher.take() ?: continue
                         val entries = configRegistrations[key] ?: continue
 
-                        key.pollEvents().forEach { event ->
-                            if (event.kind() != ENTRY_MODIFY) return@forEach
-                            entries[event.context()?.toString()]?.let { entry -> waitForFileStable(entry) }
-                        }
+                        key.pollEvents().mapNotNull { entries[it.context()?.toString()] }.distinct()
+                            .forEach { entry -> waitForFileStable(entry) }
 
                         if (!key.reset()) {
                             configRegistrations.remove(key)
@@ -235,6 +245,9 @@ open class Config {
 
             var lastModified = try {
                 Files.getLastModifiedTime(configPath).toMillis()
+            } catch (_: NoSuchFileException) {
+                entry.config.onConfigRemoved()
+                return
             } catch (_: Exception) {
                 return
             }
@@ -243,6 +256,9 @@ open class Config {
                 delay(FILE_STABLE_CHECK_INTERVAL_MS)
                 val currentModified = try {
                     Files.getLastModifiedTime(configPath).toMillis()
+                } catch (_: NoSuchFileException) {
+                    entry.config.onConfigRemoved()
+                    return
                 } catch (_: Exception) {
                     return
                 }

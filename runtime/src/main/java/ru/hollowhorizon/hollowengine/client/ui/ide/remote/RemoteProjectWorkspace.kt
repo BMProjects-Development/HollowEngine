@@ -16,12 +16,12 @@ import ru.hollowhorizon.hollowengine.common.scripting.source.SandboxScriptSource
 
 internal class RemoteProjectWorkspace(
     private val model: HollowIdeModel,
-    private val openTab: (HollowIdeOpenFile) -> Unit,
+    private val openTab: (HollowIdeOpenFile, Boolean) -> Unit,
     private val tabChanged: (HollowIdeOpenFile) -> Unit,
     private val analysisChanged: () -> Unit,
 ) {
     private val directories = mutableStateMapOf<String, Directory>()
-    private val pendingReads = HashMap<String, MutableList<(HollowIdeOpenFile) -> Unit>>()
+    private val pendingReads = HashMap<String, MutableList<(HollowIdeOpenFile?, RemoteProjectError?) -> Unit>>()
     private var analysis: RemoteProjectAnalysis? = null
     private var nextTabId = 0L
 
@@ -85,35 +85,49 @@ internal class RemoteProjectWorkspace(
     }
 
     fun open(path: String, onOpened: (HollowIdeOpenFile) -> Unit = {}) {
-        if (projectName == null) return
+        loadFile(path) { file, error ->
+            if (file != null) {
+                openTab(file, true)
+                onOpened(file)
+            } else if (error != null && error != RemoteProjectError.DISCONNECTED) notifyRemoteProjectError(error)
+        }
+    }
+
+    fun openInBackground(path: String, completed: (Boolean) -> Unit) {
+        loadFile(path) { file, _ ->
+            if (file != null) openTab(file, false)
+            completed(file != null)
+        }
+    }
+
+    private fun loadFile(path: String, completed: (HollowIdeOpenFile?, RemoteProjectError?) -> Unit) {
+        if (projectName == null) {
+            completed(null, RemoteProjectError.DISCONNECTED)
+            return
+        }
         val project = analysis ?: RemoteProjectAnalysis(RemoteProjectConnection.session, analysisChanged).also { analysis = it }
         val session = project.session
         model.files.values.firstOrNull { it.remote?.session == session && it.remote.path == path }?.let {
-            openTab(it)
             refreshFile(it)
-            onOpened(it)
+            completed(it, null)
             return
         }
         pendingReads[path]?.let { callbacks ->
-            callbacks += onOpened
+            callbacks += completed
             return
         }
-        val callbacks = mutableListOf(onOpened)
+        val callbacks = mutableListOf(completed)
         pendingReads[path] = callbacks
         RemoteProjectConnection.read(path) { snapshot, error ->
             if (pendingReads[path] !== callbacks) return@read
             pendingReads.remove(path)
             if (snapshot == null) {
-                notifyRemoteProjectError(error ?: RemoteProjectError.IO)
+                callbacks.forEach { it(null, error ?: RemoteProjectError.IO) }
             } else {
                 val identity = "remote-project://$session/${++nextTabId}/$path"
                 val remote = RemoteProjectDocument(session, path, snapshot.revision)
                 val file = model.openRemote(identity, snapshot.bytes, remote, project, ::save)
-                if (file == null) notifyRemoteProjectError(RemoteProjectError.UNSUPPORTED)
-                else {
-                    openTab(file)
-                    callbacks.forEach { it(file) }
-                }
+                callbacks.forEach { it(file, if (file == null) RemoteProjectError.UNSUPPORTED else null) }
             }
         }
     }
@@ -123,7 +137,7 @@ internal class RemoteProjectWorkspace(
         val text = remote.conflict?.text(remote.path) ?: return
         openTab(model.openReadOnly(
             "remote-project://${remote.session}/server-version/${remote.path}", text, remote.path, file.analysisProject,
-        ))
+        ), true)
     }
 
     fun openDefinition(project: RemoteProjectAnalysis, path: String, onOpened: (HollowIdeOpenFile) -> Unit) {
@@ -342,6 +356,7 @@ internal class RemoteProjectWorkspace(
         selected = false
         selectedPath = ""
         directories.clear()
+        val cancelledReads = pendingReads.values.flatten()
         pendingReads.clear()
         val previous = analysis
         previous?.close()
@@ -351,6 +366,7 @@ internal class RemoteProjectWorkspace(
             model.files.values.toList().filter { it.analysisProject === previous && !it.hasUnsavedChanges }
                 .forEach(model::removeFile)
         }
+        cancelledReads.forEach { it(null, RemoteProjectError.DISCONNECTED) }
     }
 
     data class Node(

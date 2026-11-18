@@ -129,8 +129,7 @@ class RemappingClasspath(classpath: List<File>) : AutoCloseable {
 /** Reuses one mappings index and one classpath index while remapping every class in a script module. */
 class ClassRemappingSession(
     mappings: Mappings,
-    classpath: RemappingClasspath,
-    loader: (String) -> ByteArray? = { null },
+    loader: (String) -> ByteArray?,
     from: String = "named",
     to: String = "intermediary",
 ) {
@@ -138,7 +137,7 @@ class ClassRemappingSession(
         mappings,
         from,
         to,
-        loader = { name -> loader(name) ?: classpath.findClass(name) },
+        loader = loader,
     )
 
     fun remap(input: ByteArray): ByteArray = input.remap(remapper)

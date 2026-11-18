@@ -77,6 +77,18 @@ fun UiDropdown(
     items: List<UiDropdownItem>,
     icon: String? = null,
     tags: Iterable<String> = emptyList(),
+) = UiDropdown(id, label, expanded, onExpandedChange, items, icon, tags, search = null)
+
+@Composable
+fun UiDropdown(
+    id: String,
+    label: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    items: List<UiDropdownItem>,
+    icon: String? = null,
+    tags: Iterable<String> = emptyList(),
+    search: String?,
 ) {
     var anchorBounds by remember { mutableStateOf(UiRect.Zero) }
     Row(
@@ -98,7 +110,7 @@ fun UiDropdown(
     }
 
     if (!expanded) return
-    ContextMenu(id, anchorBounds, items, onExpandedChange = onExpandedChange)
+    ContextMenu(id, anchorBounds, items, search = search, onExpandedChange = onExpandedChange)
 }
 
 private const val SearchIcon = "hollowengine:textures/gui/icons/search.svg"

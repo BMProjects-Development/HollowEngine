@@ -21,7 +21,7 @@ import java.security.MessageDigest
  */
 object ScriptFingerprint {
     /** Bumped whenever the layout of a cached artifact changes in a way older jars cannot satisfy. */
-    const val FORMAT_VERSION = 6
+    const val FORMAT_VERSION = 7
 
     /** What a build compiles addon scripts for: Mojang names, which is what NeoForge runs on. */
     const val NAMED_PRODUCTION_RUNTIME = "neoforge/official/production"

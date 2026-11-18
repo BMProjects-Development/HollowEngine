@@ -6,7 +6,6 @@ import ru.hollowhorizon.hollowengine.common.scripting.deobf.CommonEnvironment.ea
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.MappingsLoader
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.remapJars
-import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
 import ru.hollowhorizon.hollowengine.runtime.bootstrap.HollowEngineRuntimeBootstrap
 import java.io.File
 import java.net.URI
@@ -41,14 +40,14 @@ object CommonEnvironment {
      * The classpath scripts compile against, built while mixins are prepared, before the game or any addon
      * has started.
      */
-    fun earlyClasspath(compilerJar: File, mods: List<String>, addons: List<File>): List<File> {
+    fun earlyClasspath(compilerJar: File, mods: List<String>, namedAddons: List<File>): List<File> {
         if (earlyOutputDir.exists()) CacheCleanup.delete(earlyOutputDir)
-        return classpath(loadMappings(compilerJar), earlyOutputDir, mods, addons).classpath
+        return classpath(loadMappings(compilerJar), earlyOutputDir, mods, namedAddons).classpath
     }
 
     private class Built(val classpath: List<File>, val modSources: List<File>)
 
-    private fun classpath(mappings: Mappings, outputDir: File, mods: List<String>, addons: List<File>): Built {
+    private fun classpath(mappings: Mappings, outputDir: File, mods: List<String>, namedAddons: List<File>): Built {
         val classpath = setupPlatform(mappings, outputDir).toMutableList()
         resolveRuntimeJar()?.takeIf(File::isFile)?.let { runtimeJar ->
             if (!NeoForgeEnvironmentSetup.isAvailable()) {
@@ -60,14 +59,8 @@ object CommonEnvironment {
 
         val modsEnvironment = ModsEnvironment(mods)
         classpath += modsEnvironment.setup(mappings, outputDir)
-        classpath += addonClasspath(mappings, outputDir, addons, RuntimeFlags.production && !NeoForgeEnvironmentSetup.isAvailable())
+        classpath += namedAddons
         return Built(classpath.distinctBy { it.absoluteFile.normalize() }, modsEnvironment.sources)
-    }
-
-    internal fun addonClasspath(mappings: Mappings, outputDir: File, addons: List<File>, remap: Boolean): List<File> {
-        if (!remap) return addons
-        val (directories, jars) = addons.partition(File::isDirectory)
-        return directories + remapJars(mappings, jars, outputDir, from = "intermediary", to = "named")
     }
 
     private fun retainModCopies(used: List<File>) {

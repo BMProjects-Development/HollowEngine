@@ -1,6 +1,7 @@
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeNotNull
 import ru.hollowhorizon.hollowengine.addons.mcp.*
+import ru.hollowhorizon.hollowengine.common.network.IpAllowlist
 import java.io.IOException
 import java.net.*
 import java.net.http.HttpClient

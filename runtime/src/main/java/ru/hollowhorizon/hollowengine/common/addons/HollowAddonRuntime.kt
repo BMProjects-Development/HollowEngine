@@ -613,8 +613,8 @@ internal class HollowAddonRuntime(
     }
 
     /**
-     * Publishes the addon as a namespace of its own, with its `scripts/` directory if it has one. The addon jar
-     * and its bundled libraries go on the compilation classpath and its classloader becomes the parent of the
+     * Publishes the addon as a namespace of its own, with its `scripts/` directory if it has one. The named
+     * classes and bundled libraries go on the compilation classpath and its classloader becomes the parent of the
      * compiled scripts, so an addon can move part of its own logic into scripts. An addon without scripts is
      * published too: projects that list it in `dependsOn` reach its classes through it.
      */
@@ -628,7 +628,7 @@ internal class HollowAddonRuntime(
             namespace = descriptor.id,
             archive = candidate.classesFile,
             classLoader = classLoader,
-            classpath = listOf(candidate.classesFile) + libraries,
+            classpath = listOfNotNull(candidate.compilationClassesFile) + libraries,
             dependencies = descriptor.dependencies,
             fingerprint = descriptor.version,
             storageKey = candidate.fingerprint,
@@ -709,7 +709,7 @@ internal class HollowAddonRuntime(
     private fun refreshEnabledSnapshot() {
         val ids = knownCandidates.values.map { it.descriptor.id }.distinct()
         enabledSnapshot = ids.mapNotNull(::select).map { candidate ->
-            HollowAddonInstallation(candidate.descriptor, candidate.classesFile)
+            HollowAddonInstallation(candidate.descriptor, candidate.classesFile, candidate.compilationClassesFile)
         }
     }
 

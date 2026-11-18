@@ -181,6 +181,7 @@ dependencies {
     testRuntimeOnly(files(patchedLightTreeJar.flatMap { it.archiveFile }))
     testRuntimeOnly(files(compilerPluginRuntimeJar.flatMap { it.archiveFile }))
     testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+    testRuntimeOnly("org.jetbrains.kotlin:kotlin-metadata-jvm:$kotlinVersion")
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
     testRuntimeOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")

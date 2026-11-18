@@ -35,8 +35,8 @@ internal class RemoteProjectChangedPacket(val change: RemoteProjectChange) : Hol
 
 @Serializable
 @HollowPacketHandler(HollowPacketHandler.Direction.TO_CLIENT)
-internal class RemoteProjectAccessPacket(val allowed: Boolean) : HollowPacket {
-    override fun handle(player: Player) = RemoteProjectConnection.receiveAccess(allowed)
+internal class RemoteProjectAccessPacket(val access: RemoteProjectAccess) : HollowPacket {
+    override fun handle(player: Player) = RemoteProjectConnection.receiveAccess(access)
 }
 
 @SubscribeEvent

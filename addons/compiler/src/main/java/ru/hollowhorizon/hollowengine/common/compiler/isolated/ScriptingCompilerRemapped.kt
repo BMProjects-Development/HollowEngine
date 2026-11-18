@@ -35,6 +35,7 @@ import ru.hollowhorizon.hollowengine.common.plugin.mixins.MixinSpecWriter
 import ru.hollowhorizon.hollowengine.common.scripting.compiling.isClientSideScript
 import ru.hollowhorizon.hollowengine.common.scripting.deobf.mappings.Mappings
 import ru.hollowhorizon.hollowengine.common.utils.RuntimeFlags
+import java.io.File
 import java.io.Serializable
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.host.ScriptingHostConfiguration
@@ -49,6 +50,7 @@ class ScriptJvmCompilerRemapped(
     definitions: List<ScriptDefinition>,
     hostConfiguration: ScriptingHostConfiguration,
     private val remappingClasspath: Lazy<RemappingClasspath>,
+    private val extraClasspath: List<File>,
     private val mappings: () -> Mappings,
     private val remapToRuntime: Boolean = true,
     private val debugOutput: Boolean = true,
@@ -62,11 +64,19 @@ class ScriptJvmCompilerRemapped(
         val mixins = MixinDeclarationCollector()
         return when (val result = delegate.compile(script, scriptCompilationConfiguration, mixins)) {
             is ResultWithDiagnostics.Success -> {
-                val spec = when (val written = writeMixinSpec(script, result.value, mixins)) {
-                    is ResultWithDiagnostics.Success -> written.value
-                    is ResultWithDiagnostics.Failure -> return written
+                val extras = lazy { RemappingClasspath(extraClasspath) }
+                fun findClass(name: String): ByteArray? =
+                    remappingClasspath.value.findClass(name)
+                        ?: if (extraClasspath.isEmpty()) null else extras.value.findClass(name)
+                try {
+                    val spec = when (val written = writeMixinSpec(script, result.value, mixins, ::findClass)) {
+                        is ResultWithDiagnostics.Success -> written.value
+                        is ResultWithDiagnostics.Failure -> return written
+                    }
+                    ResultWithDiagnostics.Success(remapCompiledScript(result.value, ::findClass, spec), result.reports)
+                } finally {
+                    if (extras.isInitialized()) extras.value.close()
                 }
-                ResultWithDiagnostics.Success(remapCompiledScript(result.value, spec), result.reports)
             }
 
             is ResultWithDiagnostics.Failure -> result
@@ -80,6 +90,7 @@ class ScriptJvmCompilerRemapped(
         script: SourceCode,
         compiled: CompiledScript,
         mixins: MixinDeclarationCollector,
+        findClass: (String) -> ByteArray?,
     ): ResultWithDiagnostics<Map<String, ByteArray>> {
         val jvmScript = compiled as? KJvmCompiledScript ?: return emptyMap<String, ByteArray>().asSuccess()
         val errors = mixins.errors.toMutableList()
@@ -89,7 +100,7 @@ class ScriptJvmCompilerRemapped(
         }
         if (errors.isEmpty()) {
             val clientOnly = jvmScript.compilationConfiguration[ScriptCompilationConfiguration.isClientSideScript] == true
-            val output = MixinSpecWriter { name -> remappingClasspath.value.findClass(name) }
+            val output = MixinSpecWriter(findClass)
                 .write(jvmScript.scriptClassFQName, clientOnly, mixins.declarations)
             errors += output.errors
             val spec = output.spec
@@ -109,7 +120,11 @@ class ScriptJvmCompilerRemapped(
         location?.let { SourceCode.Location(SourceCode.Position(it.line, it.column), SourceCode.Position(it.endLine, it.endColumn)) },
     )
 
-    private fun remapCompiledScript(script: CompiledScript, extraFiles: Map<String, ByteArray> = emptyMap()): CompiledScript {
+    private fun remapCompiledScript(
+        script: CompiledScript,
+        findClass: (String) -> ByteArray?,
+        extraFiles: Map<String, ByteArray> = emptyMap(),
+    ): CompiledScript {
         val jvmScript = script as? KJvmCompiledScript ?: return script
         val module = jvmScript.getCompiledModule() as? KJvmCompiledModuleInMemory ?: return jvmScript
         val outputFiles = module.compilerOutputFiles + extraFiles
@@ -123,7 +138,7 @@ class ScriptJvmCompilerRemapped(
                 }
             }
         }
-        val imports = jvmScript.otherScripts.map { remapCompiledScript(it) }
+        val imports = jvmScript.otherScripts.map { remapCompiledScript(it, findClass) }
         val metadata = KJvmCompiledScript(
             jvmScript.sourceLocationId, configuration, jvmScript.scriptClassFQName,
             jvmScript.resultField, imports, null,
@@ -131,8 +146,7 @@ class ScriptJvmCompilerRemapped(
         val remappingSession = if (remapToRuntime && RuntimeFlags.production && !NeoForgeEnvironmentSetup.isAvailable()) {
             ClassRemappingSession(
                 mappings(),
-                remappingClasspath.value,
-                loader = { name -> outputFiles["$name.class"] },
+                loader = { name -> outputFiles["$name.class"] ?: findClass(name) },
             )
         } else {
             null

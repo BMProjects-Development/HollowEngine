@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.RecipePreview
 import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.isRecipeFile
 
 internal fun HollowIdePreviewRegistry.registerBuiltinPreviews() {
+    register(languageTablePreview)
     register(
         HollowIdeFilePreview(
             id = "sounds",

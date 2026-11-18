@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scripting.source
 
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager
 import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptCache
+import ru.hollowhorizon.hollowengine.common.scripting.cache.ScriptFingerprint
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -65,10 +66,14 @@ class AddonScriptSource(
         DirectoryManager.SCRIPT_SOURCE_CACHE.resolve(namespace).resolve(storageKey).resolve(id.path)
 
     private fun bundledCacheFile(id: ScriptId): File =
-        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(storageKey).resolve(id.path + COMPILED_SUFFIX)
+        bundleDirectory().resolve(id.path + COMPILED_SUFFIX)
 
     private fun bundledSharedCacheFile(id: ScriptId): File =
-        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(storageKey).resolve(id.path + SHARED_SUFFIX)
+        bundleDirectory().resolve(id.path + SHARED_SUFFIX)
+
+    private fun bundleDirectory(): File =
+        DirectoryManager.SCRIPT_BUNDLE_CACHE.resolve(namespace).resolve(storageKey)
+            .resolve(ScriptFingerprint.currentRuntimeIdentity)
 
     private fun extract(entryName: String, target: File): File? = JarFile(archive).use { jar ->
         val entry = jar.getJarEntry(entryName) ?: return null

@@ -102,9 +102,9 @@ internal class HollowIdeModel(
         return openFile(node.path)
     }
 
-    fun openFile(path: String): HollowIdeOpenResult {
+    fun openFile(path: String, selectInTree: Boolean = true): HollowIdeOpenResult {
         files[path]?.takeIf { it.remote != null }?.let { return HollowIdeOpenResult.File(it, created = false) }
-        selectedTreePath = path
+        if (selectInTree) selectedTreePath = path
         files[path]?.takeIf { it.readOnly }?.let { return HollowIdeOpenResult.File(it, created = false) }
         SourceDocumentPath.parse(path)?.let(::readSourceDocument)
             ?.let { return HollowIdeOpenResult.File(openReadOnly(path, it), created = true) }

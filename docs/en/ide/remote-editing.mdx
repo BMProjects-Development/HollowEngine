@@ -9,29 +9,28 @@ Connect to a dedicated server to open its project in the HollowEngine IDE. From 
 
 ## Who gets access
 
-Remote editing is disabled by default on dedicated servers. On a server with `online-mode=true`, open `config/hollowengine/remote-project.toml` in the server's working directory to configure it.
+Remote editing is disabled by default on dedicated servers. Open `config/hollowengine/remote-project.toml` in the server's working directory. These settings apply in both Minecraft authentication modes.
 
 :::warning
-Only grant access to those you're willing to trust to run code on the server. Any Johnny-come-lately can easily write a Kotlin script that will crash your Windows, Server or install **Bitcoin Miner 2004 (not a virus)**, especially when `online-mode=false` (no license-which means anyone can log in with that username/UUID, and no plugins at `/login <Password> <Password>` will likely save you)
+The token grants access to project files and lets editors start and stop server scripts. Share it only with trusted editors. With `online-mode=false`, a regular Minecraft connection can carry the token unencrypted. Use an encrypted tunnel or VPN for access over the Internet.
 :::
 
-Set `enabled = true` and add the players' UUIDs to `editors`. Include each operator's UUID if they need access. Leaving the list empty keeps the project closed to everyone.
-
-On a dedicated server, the same list lets players start and stop server scripts from the IDE or with `/he scripting`. Managing scripts in the entity inspector also requires entity editing permissions.
+Replace the previous `editors` setting with `token` and `allowlist`. Generate a random 32-byte secret, for example in hexadecimal, and paste it into `token`. An empty token or `enabled = false` closes access for everyone.
 
 ```toml
 enabled = true
-editors = ["01234567-89ab-cdef-0123-456789abcdef"]
+token = ""
+allowlist = ["127.0.0.1", "::1"]
 ```
 
-Replace the example UUID with the player's UUID. To turn remote editing off for everyone, set `enabled = false`.
+The example allows connections from the server machine. Add IPv4 addresses, IPv6 addresses, or CIDR ranges such as `192.168.1.0/24` as needed. An empty `allowlist` accepts a token from any IP. If a player connects through a proxy, the list is checked against the peer address the server sees.
 
-To test on one computer, run a dedicated server from your development environment with `online-mode=false` and `server-ip=127.0.0.1`. Connect to `127.0.0.1` and add the UUID the server sees in this mode to `editors`.
+Enter the token again when you reconnect. Applying a new token or allowlist revokes previous grants. The same grant controls access to `/he scripting`. Managing scripts in the entity inspector also requires entity editing permissions.
 
 ## Opening the server project
 
 1. Connect to a server running the same HollowEngine version as your client and open **Windows > Project**.
-2. Choose **Server** from the dropdown next to the project name. The dropdown appears when the server grants you access.
+2. Choose **Unlock Server Project** from the dropdown next to the project name. Copy the token from the server administrator and click **Paste Token and Connect**.
 3. Expand a folder and double-click a file. The IDE loads each folder's contents as you expand it.
 4. Press `Ctrl + S` to save your edits. The tab is marked **Server** and continues to save to the server if you switch the tree to **Local**.
 

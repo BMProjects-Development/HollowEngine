@@ -53,6 +53,233 @@
     animations: none;
 }
 
+.language-preview {
+    padding: 8px 10px;
+    background: $bg-panel;
+    font-family: $font;
+    font-size: $font-size;
+}
+
+.language-preview-toolbar {
+    margin-bottom: 8px;
+    gap: 8px;
+    align-items: start center;
+}
+
+.language-preview-tools {
+    gap: 10px;
+    align-items: start center;
+}
+
+.language-preview-selector-group {
+    gap: 4px;
+    align-items: start center;
+}
+
+.language-preview-label {
+    foreground: $text-soft;
+}
+
+.language-preview-dropdown {
+    height: 24px;
+    padding: 2px 8px;
+    background: $bg-pressed;
+    border-radius: $radius;
+}
+
+.language-preview-dropdown .dropdown-button-label {
+    max-width: 112px;
+    wrap: false;
+    text-overflow: dots;
+}
+
+.language-preview-search {
+    background: $bg-raised;
+    border: 1px transparent;
+    border-radius: 12px;
+    padding: 0px 10px;
+    gap: 6px;
+    align-items: start center;
+    height: 24px;
+}
+
+.language-preview-search:hover {
+    border: 1px $border-strong;
+}
+
+.language-preview-search-icon {
+    size: 12px 12px;
+    tint: $text-muted;
+}
+
+.language-preview-search-input {
+    background: transparent;
+    border: 0px transparent;
+    padding: 0px 2px;
+    height: 22px;
+    font-family: $font;
+    font-size: 9px;
+    foreground: $text-strong;
+    caret-color: $caret;
+    selection-color: $selection;
+    text-shadow: none;
+}
+
+.language-preview-save-btn {
+    size: 24px 24px;
+    padding: 4px;
+    border-radius: $radius;
+    background: $bg-pressed;
+    border: 1px transparent;
+}
+
+.language-preview-save-btn:hover {
+    background: $bg-hover;
+    border: 1px $border-strong;
+}
+
+.language-preview-save-btn:disabled {
+    opacity: 0.35;
+}
+
+.language-preview-columns {
+    padding: 0px 10px;
+    gap: 12px;
+    align-items: start center;
+}
+
+.language-preview-header {
+    background: $bg-window;
+    border-bottom: 1px $divider;
+}
+
+.language-preview-header-col {
+    foreground: $text-strong;
+}
+
+.language-preview-header-col,
+.language-preview-key,
+.language-preview-original {
+    wrap: false;
+    text-overflow: dots;
+}
+
+.language-preview-rows {
+    @apply $thin-scroll;
+}
+
+.language-preview-row {
+    background: $bg-panel;
+    transition: background 120ms ease;
+}
+
+.language-preview-row.alternate {
+    background: $bg-field;
+}
+
+.language-preview-row:hover {
+    background: $bg-hover;
+}
+
+.language-preview-row.selected,
+.language-preview-row.selected:hover {
+    background: $bg-selected;
+}
+
+.language-preview-key {
+    foreground: $text-muted;
+    font-family: $font-code;
+    font-size: 9px;
+    text-shadow: none;
+    transition: color 120ms ease;
+}
+
+.language-preview-row.selected .language-preview-key {
+    foreground: $accent;
+}
+
+.language-preview-original {
+    foreground: $text;
+    font-family: $font;
+    font-size: 9px;
+    text-shadow: none;
+}
+
+.language-preview-translation-cell {
+    gap: 6px;
+    align-items: start center;
+}
+
+.language-preview-translation-input {
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px $border;
+    border-radius: $radius;
+    font-family: $font;
+    font-size: 9px;
+    foreground: $text-strong;
+    caret-color: $caret;
+    selection-color: $selection;
+    text-shadow: none;
+}
+
+.language-preview-translation-input:hover {
+    border: 1px $border-strong;
+    background: $bg-field;
+}
+
+.language-preview-translation-input:focus {
+    border: 1px $accent;
+    background: $bg-field;
+}
+
+.language-preview-translation-input.missing {
+    foreground: $text-muted;
+}
+
+.language-preview-copy-btn {
+    size: 20px 20px;
+    padding: 2px;
+    border-radius: $radius-small;
+    background: transparent;
+    border: 0px transparent;
+    transition: background 120ms ease;
+}
+
+.language-preview-copy-btn:hover {
+    background: $accent-soft;
+}
+
+.language-preview-copy-btn .button-icon {
+    tint: $text-muted;
+}
+
+.language-preview-copy-btn:hover .button-icon,
+.language-preview-row.selected .language-preview-copy-btn .button-icon {
+    tint: $accent;
+}
+
+.language-preview-copy-btn:disabled,
+.language-preview-copy-btn:disabled:hover {
+    background: transparent;
+    opacity: 0.35;
+}
+
+.language-preview-status-bar {
+    padding: 4px 10px;
+    gap: 8px;
+}
+
+.language-preview-status {
+    foreground: $text-muted;
+    font-size: 9px;
+}
+
+.language-preview-error {
+    foreground: $danger;
+    margin-bottom: 6px;
+}
+
 #ide-toolbar {
     size: 100% fit;
     padding: 1px 0px;

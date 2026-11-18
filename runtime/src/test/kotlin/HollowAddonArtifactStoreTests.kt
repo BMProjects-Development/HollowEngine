@@ -30,6 +30,7 @@ class HollowAddonArtifactStoreTests {
         val candidate = store(directory, HollowAddonMappingNamespace.OFFICIAL).stageEmbedded(mod, "hostmod")
         assertEquals("hostmod", candidate.embeddedModId)
         assertEquals(mod.canonicalFile, candidate.classesFile)
+        assertNull(candidate.compilationClassesFile)
         assertEquals("hostmod", candidate.descriptor.hostModId)
         assertTrue("hostmod" in candidate.descriptor.modDependencies)
         assertFailsWith<IllegalArgumentException> {
@@ -50,6 +51,7 @@ class HollowAddonArtifactStoreTests {
 
         assertTrue(candidate.hasAssets)
         assertFalse(candidate.hasData)
+        assertEquals(candidate.classesFile, candidate.compilationClassesFile)
         JarFile(candidate.classesFile).use { classes ->
             assertNotNull(classes.getJarEntry("com/example/Addon.class"))
             assertNotNull(classes.getJarEntry("scripts/quest.node.kts"))
@@ -93,7 +95,13 @@ class HollowAddonArtifactStoreTests {
             HollowAddonLayout.REMAP_TABLE to ByteArrayOutputStream().also(table::write).toByteArray(),
         )
 
-        val candidate = store(directory, HollowAddonMappingNamespace.INTERMEDIARY).stage(addon)
+        val store = store(directory, HollowAddonMappingNamespace.INTERMEDIARY)
+        val candidate = store.stage(addon)
+        val named = assertNotNull(candidate.compilationClassesFile)
+        assertNotEquals(candidate.classesFile, named)
+        JarFile(named).use { classes ->
+            assertEquals("L$LEVEL;", fieldDescriptor(classes.read("com/example/Addon.class")))
+        }
 
         JarFile(candidate.classesFile).use { classes ->
             assertEquals("L$INTERMEDIARY_LEVEL;", fieldDescriptor(classes.read("com/example/Addon.class")))
@@ -104,6 +112,12 @@ class HollowAddonArtifactStoreTests {
                 val entry = generateSequence { script.nextJarEntry }.firstOrNull { it.name == "Quest.class" }
                 assertNotNull(entry)
                 assertEquals("L$INTERMEDIARY_LEVEL;", fieldDescriptor(script.readBytes()))
+            }
+            // An older installation has the runtime JAR, but has no named JAR yet.
+            assertTrue(named.delete())
+            assertEquals(candidate, store.stage(addon))
+            JarFile(named).use { rebuilt ->
+                assertEquals("L$LEVEL;", fieldDescriptor(rebuilt.read("com/example/Addon.class")))
             }
         }
     }

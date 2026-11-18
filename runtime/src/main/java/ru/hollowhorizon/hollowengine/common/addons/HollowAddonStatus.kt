@@ -9,11 +9,12 @@ data class HollowAddonStatus(
     val details: String? = null,
 )
 
-/**
- * An installed addon and the jar its classes live in, which scripts of a namespace depending on it are
- * compiled against.
- */
-data class HollowAddonInstallation(val descriptor: HollowAddonDescriptor, val classes: File)
+/** An installed addon with class jars for execution and for script compilation. */
+data class HollowAddonInstallation @JvmOverloads constructor(
+    val descriptor: HollowAddonDescriptor,
+    val classes: File,
+    val compilationClasses: File? = classes,
+)
 
 /** A jar that carries an addon descriptor but could not be read, so it has no status of its own. */
 data class HollowAddonProblem(val fileName: String, val message: String)

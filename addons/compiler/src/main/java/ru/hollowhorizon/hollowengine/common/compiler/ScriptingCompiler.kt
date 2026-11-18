@@ -29,13 +29,15 @@ import kotlin.script.experimental.api.CompiledScript as KotlinScript
 
 class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : ScriptingCompiler {
     private val remappingClasspath = lazy { RemappingClasspath(environment.classpath) }
+    private val baseClasspath = environment.classpath.mapTo(HashSet()) { it.absoluteFile.normalize() }
 
     override fun compile(file: File, context: ScriptCompilationContext): Result<CompiledScript.WithFile> {
         val definition = environment.scriptDefinitions.getDefinitionFor(file.name)
+        val extra = additionalClasspath(context.extraClasspath)
         val result = runScriptingBlocking {
-            newCompiler(definition, context.remapToRuntime)(
+            newCompiler(definition, context.remapToRuntime, extra)(
                 FileScriptSource(file),
-                definition.compilationConfiguration.withClasspath(context.extraClasspath),
+                definition.compilationConfiguration.withClasspath(extra),
             )
         }
 
@@ -80,10 +82,11 @@ class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : Scripti
      */
     fun compileMixinSpec(file: File, extraClasspath: List<File>): Result<ByteArray?> {
         val definition = environment.scriptDefinitions.getDefinitionFor(file.name)
+        val extra = additionalClasspath(extraClasspath)
         val result = runScriptingBlocking {
-            newCompiler(definition)(
+            newCompiler(definition, extraClasspath = extra)(
                 FileScriptSource(file),
-                definition.compilationConfiguration.withClasspath(extraClasspath)
+                definition.compilationConfiguration.withClasspath(extra)
             )
         }
         if (result !is ResultWithDiagnostics.Success) {
@@ -95,12 +98,20 @@ class ScriptingCompilerImpl(val environment: ScriptingEnvironmentImpl) : Scripti
         return Result.success(module.compilerOutputFiles[path])
     }
 
-    private fun newCompiler(definition: ScriptDefinition, remapToRuntime: Boolean = true) = JvmScriptCompiler(
+    private fun additionalClasspath(entries: List<File>): List<File> =
+        entries.filter { it.absoluteFile.normalize() !in baseClasspath }
+
+    private fun newCompiler(
+        definition: ScriptDefinition,
+        remapToRuntime: Boolean = true,
+        extraClasspath: List<File> = emptyList(),
+    ) = JvmScriptCompiler(
         definition.hostConfiguration,
         ScriptJvmCompilerRemapped(
             environment.scriptDefinitions,
             definition.hostConfiguration,
             remappingClasspath,
+            extraClasspath,
             mappings = { environment.mappings },
             remapToRuntime = remapToRuntime,
             debugOutput = environment.debugOutput,

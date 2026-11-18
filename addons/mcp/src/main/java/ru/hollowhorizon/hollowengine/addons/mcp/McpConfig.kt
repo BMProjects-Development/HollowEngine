@@ -4,6 +4,7 @@ import com.google.common.net.InetAddresses
 import kotlinx.serialization.*
 import net.peanuuutz.tomlkt.*
 import ru.hollowhorizon.hollowengine.common.config.Config
+import ru.hollowhorizon.hollowengine.common.network.IpAllowlist
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.NetworkInterface
