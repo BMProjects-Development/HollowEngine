@@ -1,7 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
 import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.models.ModelNodeSource
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
 /**
  * Per-instance model pose whose spatial state is owned by the scene object.
@@ -10,7 +12,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
  */
 class SceneModelPose(
     val sceneObject: SceneObject,
-    override val restTransform: TrsTransformF,
+    override val source: ModelNodeSource,
     initialMorphWeights: FloatArray? = null,
     internal var hasSyntheticGeometry: Boolean = false,
     override val poseParent: ModelPoseNode? = null,
@@ -20,6 +22,7 @@ class SceneModelPose(
     }
 
     override val poseTransform: TrsTransformF get() = sceneObject.localTransform
+    override val poseGlobalMatrix: Mat4f get() = sceneObject.worldTransform
     override val acceptsPose: Boolean
         get() {
             if (!sceneObject.isActive) return false
@@ -30,15 +33,20 @@ class SceneModelPose(
     override var isAnimated: Boolean = false
     override val baseMorphWeights: FloatArray = initialMorphWeights?.takeIf { it.isNotEmpty() }?.copyOf() ?: EMPTY_WEIGHTS
     override val morphWeights: FloatArray = if (baseMorphWeights.isEmpty()) EMPTY_WEIGHTS else baseMorphWeights.copyOf()
+    private var resetTransformVersion = -1
+    private var resetRestVersion = -1
 
     override fun resetPose() {
         if (!acceptsPose) return
         isAnimated = false
         val current = poseTransform
-        if (current.translation != restTransform.translation ||
-            current.rotation != restTransform.rotation || current.scale != restTransform.scale
-        ) {
-            current.set(restTransform)
+        val rest = restTransform
+        if (current.modCount != resetTransformVersion || rest.modCount != resetRestVersion) {
+            if (current.translation != rest.translation || current.rotation != rest.rotation || current.scale != rest.scale) {
+                current.set(rest)
+            }
+            resetTransformVersion = current.modCount
+            resetRestVersion = rest.modCount
         }
         baseMorphWeights.copyInto(morphWeights)
     }

@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.client.editor
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
@@ -64,7 +64,7 @@ internal sealed class PartGizmo(
 internal class BoneGizmo(
     entity: Entity,
     private val model: ModelAttachment,
-    private val node: RuntimeNode,
+    private val node: RenderModelNode,
     modelTransform: TransformComponent,
     editing: RigEditing,
     key: String,
@@ -75,7 +75,7 @@ internal class BoneGizmo(
 
     override fun local(): Mat4f = node.globalMatrix
 
-    override fun parent(): Mat4f = node.parent?.globalMatrix ?: Mat4f.IDENTITY
+    override fun parent(): Mat4f = node.attachmentParent?.globalMatrix ?: Mat4f.IDENTITY
 
     override fun place(relative: TrsTransformF) {
         val current = model.rig.bone(bone)?.pose ?: RigPose.IDENTITY
@@ -99,7 +99,7 @@ internal class BoneGizmo(
  */
 internal class AttachmentGizmo(
     entity: Entity,
-    private val holder: RuntimeNode,
+    private val holder: RenderModelNode,
     modelTransform: TransformComponent,
     editing: RigEditing,
     private val bone: String?,

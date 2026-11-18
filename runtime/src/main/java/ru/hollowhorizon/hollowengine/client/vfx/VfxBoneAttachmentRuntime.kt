@@ -35,6 +35,11 @@ class VfxBoundEffect(asset: String, own: VfxEffect? = null) {
     /** Whether the effect makes particles; otherwise it is held, and what it made lives out its lifetime. */
     var emitting: Boolean = true
 
+    fun pause() {
+        lastGameTime = Float.NaN
+        simulationFrame = Long.MIN_VALUE
+    }
+
     /** Simulates in world space once, then returns the placement for this camera. */
     fun forWorldView(cameraPosition: Vec3, local: Matrix4f): VfxBoneBinding? {
         val frame = TickHandler.renderFrame
@@ -132,8 +137,8 @@ fun interface VfxBindingSource {
  */
 class VfxBoneAttachment(
     spec: VfxBoneAttachmentSpec,
-    private val node: RuntimeNode,
-) : Attachment(node), VfxBindingSource, RespecAttachment, ConditionalAttachment {
+    private val node: RenderModelNode,
+) : BaseAttachment(node), VfxBindingSource, RespecAttachment, ConditionalAttachment {
     override var spec: VfxBoneAttachmentSpec = spec
         private set
 
@@ -141,6 +146,10 @@ class VfxBoneAttachment(
 
     /** Whether the condition of the attachment held at the last frame; see [VfxBoneAttachmentSpec.activeWhile]. */
     private var active = true
+
+    override fun onSceneActiveChanged(active: Boolean) {
+        if (!active) effect.pause()
+    }
 
     override fun respec(spec: RigAttachmentSpec) {
         if (spec !is VfxBoneAttachmentSpec) return

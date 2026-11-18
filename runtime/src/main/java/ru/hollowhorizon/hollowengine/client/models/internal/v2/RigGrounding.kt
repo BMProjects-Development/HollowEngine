@@ -9,6 +9,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExp
 import ru.hollowhorizon.hollowengine.common.models.IkChainSpec
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.models.modelMatrix
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.abs
 
@@ -84,7 +86,7 @@ internal fun groundKey(bone: String, chain: IkChainSpec): String = "$bone/${chai
  */
 internal fun plantFeet(
     grounded: List<Pair<String, IkChainSpec>>,
-    nodes: Map<String, RuntimeNode>,
+    nodes: Map<String, ModelPoseNode>,
     rig: ModelRig,
     context: AnimatorEvaluationContext,
     state: RigGroundingState,
@@ -96,7 +98,7 @@ internal fun plantFeet(
     grounded.forEach { (bone, chain) ->
         val end = nodes[bone] ?: return@forEach
         val links = chain.links(end)
-        if (links.size < 2) return@forEach
+        if (links.size < 2 || links.any { !it.acceptsPose }) return@forEach
 
         val goal = rig.ikTargetMatrix(chain.target, nodes::get)?.getTranslation() ?: end.modelMatrix().getTranslation()
         val reach = links.map { it.modelMatrix().getTranslation() }.zipWithNext { a, b -> a.distance(b) }.sum()
@@ -112,6 +114,7 @@ internal fun plantFeet(
 
     legs.forEach { (pelvis, standing) ->
         val node = nodes[pelvis] ?: return@forEach
+        if (!node.acceptsPose) return@forEach
         val wanted = if (ground.moving || standing.any(Leg::firm)) 1f else 0f
         val share = state.ease("$PELVIS_KEY$pelvis", wanted, context.deltaTime, standing.maxOf(Leg::blend)).coerceIn(0f, 1f)
         if (share <= 0f) return@forEach
@@ -129,16 +132,16 @@ private class Leg(val shift: Float, val reach: Float, val firm: Boolean, val ble
 private const val PELVIS_KEY = "pelvis:"
 
 /** Moves [node] down by [drop] in model space, whatever its parent turns it by. */
-private fun lower(node: RuntimeNode, drop: Float) {
+private fun lower(node: ModelPoseNode, drop: Float) {
     if (drop == 0f) return
     val down = Vec3f(0f, drop, 0f)
-    val local = (node.parent as? RuntimeNode)?.let { parent ->
+    val local = node.poseParent?.let { parent ->
         val inverse = MutableMat4f(parent.modelMatrix())
         if (!inverse.invert()) return
         inverse.transform(down, 0f, MutableVec3f())
     } ?: down
-    node.transform.translation.set(Vec3f(node.transform.translation) + local)
-    node.transform.markDirty()
+    node.poseTransform.translation.set(Vec3f(node.poseTransform.translation) + local)
+    node.poseTransform.markDirty()
 }
 
 /** How far down a pelvis goes at most, as a share of the shortest leg standing on it. */

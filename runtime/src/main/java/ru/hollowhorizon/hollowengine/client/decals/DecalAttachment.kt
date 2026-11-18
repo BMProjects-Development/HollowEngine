@@ -13,8 +13,8 @@ import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
  */
 class DecalAttachment(
     spec: DecalAttachmentSpec,
-    private val node: RuntimeNode,
-) : Attachment(node), RespecAttachment {
+    private val node: RenderModelNode,
+) : BaseAttachment(node), RespecAttachment {
     override var spec: DecalAttachmentSpec = spec
         private set
 

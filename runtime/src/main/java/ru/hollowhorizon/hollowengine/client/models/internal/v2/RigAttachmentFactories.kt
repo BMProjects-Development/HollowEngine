@@ -18,7 +18,7 @@ import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /** What one bone of the model this attachment is being built for is, and whose model it is. */
 class RigAttachmentContext(
-    val node: RuntimeNode,
+    val node: RenderModelNode,
     val entity: () -> LivingEntity?,
     val owner: ModelAttachment? = null,
     /** The entity that carries the model, living or not; see [ModelAttachment.carrier]. */

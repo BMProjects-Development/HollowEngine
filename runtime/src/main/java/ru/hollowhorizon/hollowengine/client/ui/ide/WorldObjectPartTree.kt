@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.NestedModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigModelInfo
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.rigText
@@ -184,7 +184,7 @@ internal class PartsReader {
         } + listOfNotNull(materialGroup.takeIf { materialRows.isNotEmpty() })
     }
 
-    private fun bone(node: RuntimeNode, rig: ModelRig, own: ModelRig, steps: List<NestStep>): PartNode {
+    private fun bone(node: RenderModelNode, rig: ModelRig, own: ModelRig, steps: List<NestStep>): PartNode {
         val hidden = rig.bone(node.name)?.hidden == true
         return PartNode(
             path = PartPath(steps, node.name),
@@ -200,7 +200,7 @@ internal class PartsReader {
     }
 
     private fun attachments(
-        holder: RuntimeNode?,
+        holder: RenderModelNode?,
         bone: String?,
         rig: ModelRig,
         own: ModelRig,

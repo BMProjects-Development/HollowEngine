@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
@@ -65,7 +65,7 @@ internal fun rigSceneTarget(
 }
 
 private fun MutableList<UiTreeItem<Any?>>.appendBones(
-    nodes: List<RuntimeNode>,
+    nodes: List<RenderModelNode>,
     rig: ModelRig,
     expanded: List<String>,
     selected: String?,
@@ -106,7 +106,7 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
     val kinds = attachableKinds(bone, node?.supportsMeshExtrusion == true).availableOn(document.occupied.holder(bone))
     return listOfNotNull(
         UiDropdownItem(rigText("add_bone"), mark = UiMenuParts.icon(AddIcon)) {
-            val existing = state.viewer.nodes.flatMap { it.walk() }.map(RuntimeNode::name)
+            val existing = state.viewer.nodes.flatMap { it.walk() }.map(RenderModelNode::name)
             var added: String? = null
             document.edit { rig -> rig.freeBoneName(existing).let { name -> added = name; rig.withAddedBone(name, bone) } }
             if (bone != null && bone !in state.expanded) state.expanded += bone
@@ -137,5 +137,5 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
     )
 }
 
-private fun List<RuntimeNode>.findBone(name: String): RuntimeNode? =
+private fun List<RenderModelNode>.findBone(name: String): RenderModelNode? =
     firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == name } }

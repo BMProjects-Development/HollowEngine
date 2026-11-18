@@ -25,8 +25,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.submitStat
 import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.addedBones
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -59,25 +60,31 @@ class ModelAttachment(
     parent: Attachment?,
     var entity: LivingEntity? = null,
     val location: ResourceLocation? = null,
-) : Attachment(parent) {
+) : BaseAttachment(parent) {
+    private val renderScene = ModelRenderScene.create(parent, flow.value)
+    private var rebuildingNested: ModelNestedAttachments? = null
+    val sceneRoot: SceneObject get() = renderScene.root
+    internal val sceneRevision: Int get() = sceneRoot.scene.revision
+    internal val parentRevision: Int get() = attachmentParent?.globalVersion ?: 0
+    override val transform: TrsTransformF get() = sceneRoot.localTransform
     var instanceId: String = UUID.randomUUID().toString()
 
     /** The entity that carries this model, living or not, for what hangs on it and talks to it, as a panel does. */
     var carrier: Entity? = null
     val soundScope: String
         get() {
-            val lineage = generateSequence<Attachment>(this) { it.parent }.toList()
+            val lineage = generateSequence<Attachment>(this) { it.attachmentParent }.toList()
             val root = lineage.filterIsInstance<ModelAttachment>().last()
             val nested = lineage.filterIsInstance<NestedModelAttachment>().asReversed().flatMap {
-                listOf((it.parent as RuntimeNode).name, it.spec.id)
+                listOf((it.attachmentParent as RenderModelNode).name, it.spec.id)
             }
             return (listOf(root.instanceId) + nested).joinToString("/")
         }
     private var builtFor: Model? = null
-    private var runtimeNodes: List<RuntimeNode> = emptyList()
+    private var runtimeNodes: List<RenderModelNode> = emptyList()
 
     /** Every node of [runtimeNodes], parents first; the hierarchy only changes when the model is built again. */
-    private var allNodes: List<RuntimeNode> = emptyList()
+    private var allNodes: List<RenderModelNode> = emptyList()
 
     /** What hangs on the model and follows it through the world, as sounds on bones; see [Attachment.followsWorldPose]. */
     private var worldPoseAttachments: List<Attachment> = emptyList()
@@ -86,16 +93,15 @@ class ModelAttachment(
      * Holds what hangs on the model itself rather than on a bone. It is not one of the model's nodes, so
      * no animation or name lookup ever reaches it.
      */
-    var modelRoot: RuntimeNode? = null
+    var modelRoot: RenderModelNode? = null
         private set
-    private var nodesByIndex: Map<Int, RuntimeNode> = emptyMap()
+    private var nodesByIndex: Map<Int, RenderModelNode> = emptyMap()
+    internal val scenePoseNodes get() = renderScene.instance.poseNodesByIndex
     private var runtimeMaterials = ModelInstanceMaterials(Model.EMPTY)
     private var renderPipeline: ListRenderPipeline? = null
-    private var target: PoseTarget? = null
     private var cachedBounds: Pair<Vec3f, Vec3f>? = null
     private var keptCullingBounds: Pair<Vec3f, Vec3f>? = null
     private var posesSinceCullingBounds = 0
-    private var authoredConstraintsApplied = false
 
     /** Changes with every pose, so what is worked out from one can be kept until the next. */
     var poseVersion = 0
@@ -103,7 +109,7 @@ class ModelAttachment(
     private val modelChangeListeners = ArrayList<() -> Unit>()
 
     val model: Model get() = builtFor ?: Model.EMPTY
-    val nodes: List<RuntimeNode> get() = runtimeNodes
+    val nodes: List<RenderModelNode> get() = runtimeNodes
     val animations: Collection<AnimationClip> get() = model.animations
     val materials: List<Material> get() = runtimeMaterials.values
     /** GPU buffers are created on the render thread, the first time something draws this instance. */
@@ -121,32 +127,22 @@ class ModelAttachment(
         get() = currentRig
         set(value) {
             authoredRig = value
+            if (sceneRoot.isRemoved) return
             if (currentRig == value) return
 
             val sameStructure = currentRig.structure() == value.structure()
             val materialsChanged = currentRig.materials != value.materials
-            currentRig = value
             if (sameStructure) {
+                currentRig = value
                 respecAttachments()
-                placeAddedBones()
+                renderScene.instance.updateRigBoneRestTransforms(value)
                 if (materialsChanged) dress()
                 cachedBounds = null
                 keptCullingBounds = null
-                target = null
             } else {
                 builtFor?.let(::rebuild)
             }
         }
-
-    /**
-     * Moves the bones the rig adds to where it now puts them. Their place is their own rest pose, so it is set
-     * there and the next pose starts from it, without building the model again.
-     */
-    private fun placeAddedBones() {
-        val added = currentRig.addedBones
-        if (added.isEmpty()) return
-        allNodes.forEach { node -> added[node.name]?.let { node.definition.baseTransform.set(it.localTransform()) } }
-    }
 
     /** Asks the conditions of the attachments that have one; see [ConditionalAttachment]. */
     fun evaluateConditions(context: AnimatorEvaluationContext) {
@@ -157,8 +153,8 @@ class ModelAttachment(
             }
         }
         if (!hasConditions) return
-        allNodes.forEach { node -> node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
-        modelRoot?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
+        allNodes.forEach { node -> if (node.isVisible) node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
+        modelRoot?.takeIf { it.isVisible }?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
     }
 
     /** Whether any attachment of [conditionsOf] works only while a condition holds, so a frame asks nothing otherwise. */
@@ -199,6 +195,7 @@ class ModelAttachment(
      * Called once a frame from the instance's own update.
      */
     fun ensureReady() {
+        if (sceneRoot.isRemoved) return
         val current = flow.value
         if (builtFor !== current) rebuild(current)
     }
@@ -206,32 +203,34 @@ class ModelAttachment(
     /** Puts every node back in "T-pose"; the animator then poses on top. */
     fun beginPose() {
         ensureReady()
-        authoredConstraintsApplied = false
-        allNodes.forEach(RuntimeNode::resetPose)
+        renderScene.instance.resetPose()
     }
 
     /** Resolves the imported rig before gameplay constraints can override it. */
-    fun applyAuthoredConstraints() {
-        if (authoredConstraintsApplied) return
-        model.constraints.forEach { it.apply(nodesByIndex) }
-        authoredConstraintsApplied = true
-    }
+    fun applyAuthoredConstraints() = renderScene.instance.applyAuthoredConstraints()
+
+    internal fun applyRigPose() = renderScene.instance.applyRigPose(rig)
 
     /** Turns the posed nodes into the matrices the renderer draws from. */
     fun endPose() {
         applyAuthoredConstraints()
         updateGlobalMatrix()
-        runtimeNodes.forEach(RuntimeNode::updateHierarchyMatrices)
+        runtimeNodes.forEach(RenderModelNode::updateHierarchyMatrices)
         modelRoot?.updateHierarchyMatrices()
         cachedBounds = null
         posesSinceCullingBounds++
         poseVersion++
     }
 
+    internal fun refreshScenePose() {
+        renderScene.instance.invalidateConstraints()
+        endPose()
+    }
+
     /** Drops the draw commands, which something hung on this model changed under; they are collected again on the next draw. */
     fun invalidatePipeline() {
         renderPipeline = null
-        generateSequence(parent) { it.parent }.filterIsInstance<ModelAttachment>().firstOrNull()?.invalidatePipeline()
+        generateSequence(attachmentParent) { it.attachmentParent }.filterIsInstance<ModelAttachment>().firstOrNull()?.invalidatePipeline()
     }
 
     /**
@@ -257,13 +256,7 @@ class ModelAttachment(
 
 
     /** What a pose is written into: this instance's nodes and the clips of its model. */
-    fun poseTarget(): PoseTarget = target ?: PoseTarget(
-        nodesByIndex = nodesByIndex,
-        animations = model.animationsByName,
-        aliases = rig.boneByAlias,
-        rig = rig,
-        molangDefaults = model.molangDefaults,
-    ).also { target = it }
+    fun poseTarget(): PoseTarget = renderScene.instance.poseTarget(rig)
 
     /**
      * Runs [listener] when newly loaded model replaces older one.
@@ -273,52 +266,83 @@ class ModelAttachment(
     }
 
     private fun rebuild(model: Model) {
-        runtimeNodes.forEach(RuntimeNode::close)
+        val nextRig = authoredRig ?: RigAssets.of(location)
+        renderScene.prepare(model, nextRig)
+        ModelNestedAttachments(allNodes, modelRoot).use { retained ->
+            rebuildingNested = retained
+            try {
+                rebuildContents(model, nextRig)
+            } finally {
+                rebuildingNested = null
+            }
+        }
+    }
+
+    private fun rebuildContents(model: Model, nextRig: ModelRig) {
+        // Scene reconciliation can move nodes away from their former render parents.
+        allNodes.asReversed().forEach(RenderModelNode::close)
         modelRoot?.close()
+        currentRig = nextRig
         builtFor = model
-        currentRig = authoredRig ?: RigAssets.of(location)
         runtimeMaterials = ModelInstanceMaterials(model)
-        runtimeNodes = addRigBones(
-            model.scenes.getOrNull(model.scene)?.nodes?.map { RuntimeNode(it, this, runtimeMaterials::resolve) } ?: emptyList(),
-            currentRig,
-            this,
-        )
+        runtimeNodes = renderScene.bindNodes(this, runtimeMaterials::resolve)
         allNodes = runtimeNodes.flatMap { it.walk() }
         nodesByIndex = allNodes.associateBy { it.definition.index }
         nodesByIndex.values.forEach(::customizeNode)
-        modelRoot = RuntimeNode(NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF()), this).also { root ->
+        val rootDefinition = NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF())
+        modelRoot = RenderModelNode(renderScene.modelRoot(rootDefinition), this, this) { it }.also { root ->
             val context = RigAttachmentContext(root, { entity }, this) { carrier }
-            currentRig.attachments.forEach { spec -> RigAttachmentFactories.create(spec, context)?.let(root.attachments::add) }
+            currentRig.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(root.attachments::add) }
         }
         carriesEffects = currentRig.carriesEffects()
         worldPoseAttachments = (allNodes.flatMap { it.attachments } + modelRoot?.attachments.orEmpty()).filter { it.followsWorldPose }
         dress()
         invalidatePipeline()
-        target = null
         cachedBounds = null
         keptCullingBounds = null
         modelChangeListeners.forEach { it() }
     }
 
     override fun close() {
-        runtimeNodes.forEach(RuntimeNode::close)
-        modelRoot?.close()
-        runtimeNodes = emptyList()
-        allNodes = emptyList()
-        worldPoseAttachments = emptyList()
-        modelRoot = null
-        renderPipeline = null
-        nodesByIndex = emptyMap()
+        try {
+            allNodes.asReversed().forEach(RenderModelNode::close)
+            modelRoot?.close()
+        } finally {
+            runtimeNodes = emptyList()
+            allNodes = emptyList()
+            worldPoseAttachments = emptyList()
+            modelRoot = null
+            renderPipeline = null
+            nodesByIndex = emptyMap()
+            renderScene.close()
+        }
+    }
+
+    internal fun sceneNodeRemoved(node: RenderModelNode) {
+        val wasModelRoot = modelRoot === node
+        if (wasModelRoot) modelRoot = null
+        if (runtimeNodes.any { it === node }) runtimeNodes = runtimeNodes.filterNot { it === node }
+        if (wasModelRoot || allNodes.any { it === node }) {
+            allNodes = allNodes.filterNot { it === node }
+            if (nodesByIndex[node.definition.index] === node) nodesByIndex = nodesByIndex - node.definition.index
+            worldPoseAttachments = worldPoseAttachments.filterNot { it.attachmentParent === node }
+            renderScene.instance.forgetPose(node.definition.index, node.sceneObject)
+            cachedBounds = null
+            keptCullingBounds = null
+            invalidatePipeline()
+        }
     }
 
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
-        worldPoseAttachments.forEach { it.updateWorldPose(modelToWorld, entity) }
+        worldPoseAttachments.forEach { attachment ->
+            if ((attachment.attachmentParent as? RenderModelNode)?.isVisible != false) attachment.updateWorldPose(modelToWorld, entity)
+        }
     }
 
     /**
      * Hangs on the node whatever the rig says belongs there.
      */
-    private fun customizeNode(node: RuntimeNode) {
+    private fun customizeNode(node: RenderModelNode) {
         val bone = rig.bone(node.name)
         if (bone == null) {
             when (node.name) {
@@ -335,10 +359,11 @@ class ModelAttachment(
             }
         }
         val context = RigAttachmentContext(node, { entity }, this) { carrier }
-        bone.attachments.forEach { spec ->
-            RigAttachmentFactories.create(spec, context)?.let(node.attachments::add)
-        }
+        bone.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(node.attachments::add) }
     }
+
+    private fun createRigAttachment(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment? =
+        rebuildingNested?.reuse(spec, context) ?: RigAttachmentFactories.create(spec, context)
 
 
     override fun collectCommands(pipeline: RenderPipeline) {
@@ -371,21 +396,20 @@ class ModelAttachment(
         private const val CULLING_BOUNDS_POSES = 4
     }
 
-    fun child(name: String): RuntimeNode {
+    fun child(name: String): RenderModelNode {
         ensureReady()
         return runtimeNodes.single { it.name == name }
     }
 
-    fun findNode(name: String): RuntimeNode? {
+    fun findNode(name: String): RenderModelNode? {
         ensureReady()
         return allNodes.firstOrNull { it.name == name }
     }
 
     /** Resolves an authored path inside this model instance. */
-    fun findNode(path: List<ScenePathSegment>): RuntimeNode? {
+    fun findNode(path: List<ScenePathSegment>): RenderModelNode? {
         ensureReady()
-        val definition = model.nodePaths.node(path) ?: return null
-        return nodesByIndex[definition.index]?.takeIf { it.definition === definition }
+        return renderScene.instance.node(path)?.observer as? RenderModelNode
     }
 
     /** The instance's bounds in its own space, recomputed after every pose. */

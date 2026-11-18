@@ -1,4 +1,8 @@
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.Scene
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
@@ -78,7 +82,7 @@ class IkTests {
     fun `a chain on model nodes puts its end on the target and keeps the end turned as animated`() {
         val foot = definition(2, "foot", Vec3f(0f, -1f, 0f))
         val knee = definition(1, "knee", Vec3f(0f, -1f, 0.01f), foot)
-        val hip = RuntimeNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null)
+        val hip = renderModelNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null)
         val nodes = hip.walk().associateBy { it.name }
         val footTurn = nodes.getValue("foot").modelRotation()
 
@@ -95,7 +99,7 @@ class IkTests {
 
     @Test
     fun `bones the rig adds are built under their parents, and a chain can end on one`() {
-        val leg = RuntimeNode(definition(0, "leg", Vec3f.ZERO), parent = null)
+        val leg = definition(0, "leg", Vec3f.ZERO)
         val rig = ModelRig(
             bones = mapOf(
                 "foot" to RigBone(origin = RigBoneOrigin("leg", offset = Vec3f(0f, -1f, 0f))),
@@ -108,21 +112,24 @@ class IkTests {
             attachments = listOf(IkTargetSpec(id = "spot", offset = Vec3f(0.5f, -0.5f, 0f))),
         )
 
-        val roots = addRigBones(listOf(leg), rig, holder = null)
+        val model = ModelAttachment(MutableStateFlow(Model(0, listOf(Scene(listOf(leg))), emptySet())), null)
+        model.rig = rig
+        val roots = model.nodes
         val names = roots.flatMap { it.walk() }.map { it.name }
         assertEquals(listOf("leg", "foot", "toe"), names)
 
         applyRigConstraints(roots, rig, AnimatorEvaluationContext())
         val toe = roots.flatMap { it.walk() }.single { it.name == "toe" }
         assertClose(Vec3f(0.5f, -0.5f, 0f), toe.modelMatrix().getTranslation(), tolerance = 1e-2f)
+        model.close()
     }
 
     @Test
     fun `a body lowered over a grounded leg bends it and keeps the foot where it stood, but only when drawn`() {
-        fun leg(): RuntimeNode {
+        fun leg(): RenderModelNode {
             val foot = definition(2, "foot", Vec3f(0f, -1f, 0f))
             val knee = definition(1, "knee", Vec3f(0f, -1f, 0.05f), foot)
-            return RuntimeNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null).also { hip ->
+            return renderModelNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null).also { hip ->
                 hip.transform.translation.set(Vec3f(0f, -0.3f, 0f))
                 hip.transform.markDirty()
             }
@@ -145,7 +152,7 @@ class IkTests {
     fun `a grounded leg whose knee pivot sits behind it steps up bending toward its pole`() {
         val foot = definition(2, "foot", Vec3f(0f, -1f, 0.1f))
         val knee = definition(1, "knee", Vec3f(0f, -1f, -0.1f), foot)
-        val hip = RuntimeNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null).apply {
+        val hip = renderModelNode(definition(0, "hip", Vec3f.ZERO, knee), parent = null).apply {
             transform.translation.set(Vec3f(0f, -0.5f, 0f))
             transform.markDirty()
         }

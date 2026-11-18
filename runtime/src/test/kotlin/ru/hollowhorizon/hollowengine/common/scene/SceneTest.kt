@@ -4,10 +4,29 @@ import kotlinx.serialization.builtins.serializer
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import kotlin.test.*
 
 class SceneTest {
+    @Test
+    fun `scene follows an external parent matrix without allocating a new world matrix`() {
+        val parent = object : SceneTransformParent {
+            override val matrix = MutableMat4f()
+            override var version = 0
+        }
+        val scene = Scene(object : SceneContext { override val side = LogicalSide.CLIENT }, parent)
+        val node = scene.create("node")
+        node.localTransform.translate(1f, 0f, 0f)
+        val matrix = node.worldTransform
+        assertEquals(1f, matrix.getTranslation().x)
+
+        parent.matrix.translate(3f, 0f, 0f)
+        parent.version++
+        assertSame(matrix, node.worldTransform)
+        assertEquals(4f, matrix.getTranslation().x)
+        scene.close()
+    }
     private fun scene(side: LogicalSide = LogicalSide.SERVER) = Scene(object : SceneContext {
         override val side = side
     })
@@ -21,6 +40,23 @@ class SceneTest {
         "test:sound".rl, String::class, String.serializer(), multiple = multiple,
         accepts = accepts, sides = sides, createRuntime = runtime,
     )
+
+    @Test
+    fun `world matrix version follows parent changes without reallocating`() {
+        val scene = scene()
+        val parent = scene.create("parent")
+        val child = parent.create("child")
+        val matrix = child.worldTransform
+        val initial = child.worldVersion
+        assertEquals(initial, child.worldVersion)
+        assertSame(matrix, child.worldTransform)
+
+        parent.localTransform.translate(2f, 0f, 0f)
+        assertNotEquals(initial, child.worldVersion)
+        assertSame(matrix, child.worldTransform)
+        assertEquals(2f, child.worldTransform.getTranslation().x)
+        scene.close()
+    }
 
     @Test
     fun `created IDs and imported paths address nested instances without ambiguity`() {
@@ -116,6 +152,57 @@ class SceneTest {
         root.remove()
         assertTrue(scene.children.isEmpty())
         assertEquals(listOf(root), roots)
+    }
+
+    @Test
+    fun `moving imported nodes across synthetic transforms preserves objects and components`() {
+        val scene = scene()
+        val root = scene.create("model")
+        val oldPivot = root.importSynthetic("old")
+        oldPivot.localTransform.translate(2f, 0f, 0f)
+        val hand = oldPivot.importModelChild(ScenePathSegment("hand"))
+        val sword = hand.create("sword")
+        val component = hand.addComponent(type(), "sound")
+        val address = hand.address
+        assertEquals(2f, hand.worldTransform.getTranslation().x)
+
+        val newPivot = root.importSynthetic("new")
+        newPivot.localTransform.translate(5f, 0f, 0f)
+        hand.moveWithinLogicalParent(newPivot)
+        oldPivot.remove()
+
+        assertSame(hand, scene.resolve(address))
+        assertSame(root, hand.parent)
+        assertSame(sword, hand.children.single())
+        assertSame(component, hand.components.single())
+        assertEquals(5f, hand.worldTransform.getTranslation().x)
+        assertFailsWith<IllegalArgumentException> { hand.moveWithinLogicalParent(sword) }
+        assertSame(hand, scene.resolve(address))
+        scene.close()
+    }
+
+    @Test
+    fun `moving into and out of disabled synthetic branches suspends and resumes components`() {
+        val scene = scene()
+        val root = scene.create("model")
+        val active = root.importSynthetic("active")
+        val disabled = root.importSynthetic("disabled")
+        disabled.setEnabled(false)
+        val node = active.importModelChild(ScenePathSegment("bone"))
+        val events = mutableListOf<String>()
+        val component = node.addComponent(type(runtime = {
+            object : SceneComponentRuntime<String> {
+                override fun onActivate(component: SceneComponent<String>) { events += "activate" }
+                override fun onSuspend(component: SceneComponent<String>) { events += "suspend" }
+            }
+        }), "value")
+
+        node.moveWithinLogicalParent(disabled)
+        assertFalse(component.isActive)
+        node.moveWithinLogicalParent(active)
+        assertTrue(component.isActive)
+        assertEquals(listOf("activate", "suspend", "activate"), events)
+        scene.close()
     }
 
     @Test

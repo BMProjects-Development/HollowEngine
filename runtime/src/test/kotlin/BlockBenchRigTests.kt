@@ -1,3 +1,4 @@
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bbmodel.*
@@ -6,13 +7,13 @@ import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.applyAnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelMatrix
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelRotation
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
+import ru.hollowhorizon.hollowengine.common.models.modelMatrix
+import ru.hollowhorizon.hollowengine.common.models.modelRotation
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -32,8 +33,8 @@ class BlockBenchRigTests {
     private fun convert(file: BlockBenchModel): Model =
         BlockBenchModelLoader.convert(file, "test:models/rig.bbmodel".rl, ModelSide.SERVER)
 
-    private fun skeleton(model: Model): Map<Int, RuntimeNode> =
-        model.scenes[0].nodes.map { RuntimeNode(it, null) }.onEach(RuntimeNode::updateHierarchyMatrices)
+    private fun skeleton(model: Model): Map<Int, RenderModelNode> =
+        model.scenes[0].nodes.map { renderModelNode(it, null) }.onEach(RenderModelNode::updateHierarchyMatrices)
             .flatMap { it.walk() }.associateBy { it.definition.index }
 
     private fun triangle(id: String) = BBElement(

@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.scene
 
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import java.util.UUID
 import kotlin.reflect.KClass
 
@@ -9,6 +10,12 @@ import kotlin.reflect.KClass
 interface SceneContext {
     val side: LogicalSide
     fun <T : Any> capability(type: KClass<T>): T? = null
+}
+
+/** A scene may be placed under a transform supplied by its owner. */
+interface SceneTransformParent {
+    val matrix: Mat4f
+    val version: Int
 }
 
 /** One imported child, numbered among siblings with the same name in source order. */
@@ -26,13 +33,15 @@ data class SceneAddress(val instanceId: UUID, val importedPath: List<ScenePathSe
  * An in-memory hierarchy confined to its host's thread. Closing it removes children before owner components.
  * Persistence, synchronization, and attachment to Minecraft owners are provided by later integrations.
  */
-class Scene(val context: SceneContext) : SceneComponentOwner, AutoCloseable {
+class Scene(val context: SceneContext, internal val transformParent: SceneTransformParent? = null) : SceneComponentOwner, AutoCloseable {
     private val roots = mutableListOf<SceneObject>()
     private var rootSnapshot: List<SceneObject>? = null
     private val created = mutableMapOf<UUID, SceneObject>()
     private val componentTypes = mutableMapOf<ResourceLocation, SceneComponentType<*>>()
     private val componentSet = SceneComponentSet(this)
     private var mutating = false
+    internal var revision: Int = 0
+        private set
     var isClosed: Boolean = false
         private set
     val children: List<SceneObject> get() = rootSnapshot ?: buildList { addAll(roots) }.also { rootSnapshot = it }
@@ -54,6 +63,7 @@ class Scene(val context: SceneContext) : SceneComponentOwner, AutoCloseable {
         createObject(null, name, id).also {
             roots.add(it)
             rootSnapshot = null
+            markChanged()
         }
     }
 
@@ -68,6 +78,7 @@ class Scene(val context: SceneContext) : SceneComponentOwner, AutoCloseable {
     override fun close() = mutate {
         if (!isClosed) {
             isClosed = true
+            markChanged()
             val failures = SceneFailures()
             roots.toList().asReversed().forEach { it.removeInternal(failures) }
             roots.clear()
@@ -91,10 +102,16 @@ class Scene(val context: SceneContext) : SceneComponentOwner, AutoCloseable {
 
     internal fun forget(node: SceneObject) {
         node.createdId?.let(created::remove)
-        if (node.physicalParent == null) {
-            if (roots.remove(node)) rootSnapshot = null
-        } else node.physicalParent.forgetChild(node)
+        val parent = node.physicalParent
+        if (parent == null) {
+            if (roots.remove(node)) {
+                rootSnapshot = null
+                markChanged()
+            }
+        } else parent.forgetChild(node)
     }
+
+    internal fun markChanged() { revision++ }
 
     internal fun checkOpen() = check(!isClosed) { "Scene is closed" }
 

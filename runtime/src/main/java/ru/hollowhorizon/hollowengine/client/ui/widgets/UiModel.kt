@@ -27,7 +27,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelLoader
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.*
 import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
@@ -112,7 +112,7 @@ class ModelViewerState(model: String) : OrbitCamera {
     internal fun advanceZoom(frameNanos: Long) = zoomSpring.advance(frameNanos)
 
     /** The model's runtime node hierarchy (roots), for inspection UIs. */
-    val nodes: List<RuntimeNode>
+    val nodes: List<RenderModelNode>
         get() {
             attachment.ensureReady()
             return attachment.nodes
@@ -197,7 +197,7 @@ class ModelViewerState(model: String) : OrbitCamera {
     }
 
     /** Toggles a node's visibility (cascades to its children) and refreshes any tree UI. */
-    fun toggleNodeVisibility(node: RuntimeNode) {
+    fun toggleNodeVisibility(node: RenderModelNode) {
         node.isVisible = !node.isVisible
         nodeVisibilityRevision++
     }
@@ -210,7 +210,7 @@ class ModelViewerState(model: String) : OrbitCamera {
     /**
      * The bones under the pointer, nearest first.
      */
-    fun bonesAt(x: Float, y: Float, radius: Float = PICK_RADIUS): List<RuntimeNode> {
+    fun bonesAt(x: Float, y: Float, radius: Float = PICK_RADIUS): List<RenderModelNode> {
         val matrix = viewMatrix()
         val head = MutableVec3f()
         val tail = MutableVec3f()

@@ -8,8 +8,7 @@ import ru.hollowhorizon.hollowengine.addons.physics.world.PhysicsWorld
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -60,7 +59,7 @@ class RagdollFromRigTests {
                 "head" to body("head", Vec3f(0.52f, 0.52f, 0.52f), center = Vec3f(0f, 0.25f, 0f), parent = "body"),
             ) + eyes.associate { eye -> eye.name!! to body(eye.name!!, Vec3f(0.06f, 0.04f, 0.02f), parent = "head") },
         )
-        return PoseTarget(listOf(RuntimeNode(body, parent = null)).byIndex(), emptyMap(), rig = rig)
+        return PoseTarget(listOf(renderModelNode(body)).byIndex(), emptyMap(), rig = rig)
     }
 
     @Test
@@ -126,7 +125,7 @@ class RagdollFromRigTests {
                 "shin" to body("shin", leg, joint = JointAttachmentSpec(parent = "thigh", limits = JointLimits.hinge(min = -120f, max = 0f))),
             ),
         )
-        val target = PoseTarget(listOf(RuntimeNode(thigh, parent = null)).byIndex(), emptyMap(), rig = rig)
+        val target = PoseTarget(listOf(renderModelNode(thigh)).byIndex(), emptyMap(), rig = rig)
 
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
         val system = PhysicsWorld.createSystem()

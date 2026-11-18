@@ -5,13 +5,18 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 import kotlin.math.sqrt
 
@@ -38,7 +43,17 @@ fun ModelRig.hasColliders(modes: (ColliderModes) -> Boolean = { true }): Boolean
  * world around [origin], the entity's position, which is added last to stay precise far from spawn.
  */
 internal fun ModelRig.placeColliders(
-    roots: List<RuntimeNode>,
+    roots: List<RenderModelNode>,
+    toEntity: Mat4f,
+    origin: Vec3,
+    modelMatrix: Mat4f? = null,
+): List<EntityCollider> {
+    if (!hasColliders()) return emptyList()
+    return placeCollidersOnPose(roots.flatMap { it.walk() }, toEntity, origin, modelMatrix)
+}
+
+internal fun ModelRig.placeCollidersOnPose(
+    pose: Collection<ModelPoseNode>,
     toEntity: Mat4f,
     origin: Vec3,
     modelMatrix: Mat4f? = null,
@@ -46,12 +61,13 @@ internal fun ModelRig.placeColliders(
     val placed = colliders
     if (placed.isEmpty()) return emptyList()
 
-    val nodes = roots.flatMap { it.walk() }.associateBy { it.name }
+    val nodes = pose.associateBy { it.poseName }
     val onModel = modelMatrix?.let { toEntity.mul(it, MutableMat4f()) } ?: toEntity
     return placed.mapNotNull { (bone, spec) ->
         val holder = if (bone == null) onModel else {
             val node = nodes[bone] ?: return@mapNotNull null
-            toEntity.mul(node.globalMatrix, MutableMat4f())
+            if (!node.acceptsPose) return@mapNotNull null
+            toEntity.mul(node.poseGlobalMatrix, MutableMat4f())
         }
         EntityCollider(spec.id, bone, spec, spec.place(holder, toEntity, origin))
     }
@@ -75,16 +91,17 @@ private fun ColliderAttachmentSpec.frame(holder: Mat4f, toEntity: Mat4f, origin:
     )
 }
 
-/** The skeleton of [model] standing in its rest pose, with its matrices worked out. */
-internal fun restPose(model: Model): List<RuntimeNode> =
-    model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, null) }.onEach { root ->
-            root.walk().forEach(RuntimeNode::resetPose)
-            root.updateHierarchyMatrices()
-        }
-
 /** [fitEntityBox] around the colliders [rig] hangs on [model] standing at rest, placed by [modelMatrix]. */
-internal fun fitEntityBox(model: Model, rig: ModelRig, modelMatrix: Mat4f): Pair<Float, Float>? =
-    fitEntityBox(rig.placeColliders(restPose(model), modelMatrix, Vec3.ZERO))
+internal fun fitEntityBox(model: Model, rig: ModelRig, modelMatrix: Mat4f): Pair<Float, Float>? {
+    if (!rig.hasColliders()) return null
+    val scene = Scene(object : SceneContext {
+        override val side = LogicalSide.CLIENT
+    })
+    return scene.use {
+        val instance = ModelSceneInstance.create(scene.create("owner"), "model", model)
+        fitEntityBox(rig.placeCollidersOnPose(instance.poseNodes, modelMatrix, Vec3.ZERO))
+    }
+}
 
 /**
  * A square entity box, width to height, around [colliders] placed relative to the entity's feet. The

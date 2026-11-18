@@ -1,3 +1,4 @@
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
@@ -5,7 +6,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.Animation
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.sounds.LowPassFilter
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
@@ -19,10 +19,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MontageTests {
-    private val arm = RuntimeNode(
+    private val arm = renderModelNode(
         NodeDefinition(index = 1, name = "arm", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )
-    private val leg = RuntimeNode(
+    private val leg = renderModelNode(
         NodeDefinition(index = 0, name = "leg", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )
     private val target = PoseTarget(

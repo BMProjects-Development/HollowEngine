@@ -68,6 +68,16 @@ class SyncedSound(private val id: String = UUID.randomUUID().toString()) : AutoC
         ClientSounds.stop(id, fade)
     }
 
+    fun pause() {
+        ClientSounds.find(id)?.pause()
+        lastNanos = 0L
+    }
+
+    fun resume() {
+        ClientSounds.find(id)?.resume()
+        lastNanos = 0L
+    }
+
     override fun close() = stop(0f)
 
     private companion object {

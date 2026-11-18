@@ -5,10 +5,10 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.BaseAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
@@ -22,9 +22,9 @@ import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
  */
 class SoundBoneAttachment(
     override var spec: SoundBoneAttachmentSpec,
-    private val node: RuntimeNode,
+    private val node: RenderModelNode,
     private val model: ModelAttachment?,
-) : Attachment(node), RespecAttachment {
+) : BaseAttachment(node), RespecAttachment {
     private var binding: SoundAttachments.Binding? = null
     private val sound = SyncedSound()
     private var parsed: Pair<String, SoundSource?>? = null
@@ -37,6 +37,10 @@ class SoundBoneAttachment(
     }
 
     override val followsWorldPose: Boolean get() = true
+
+    override fun onSceneActiveChanged(active: Boolean) {
+        if (active) sound.resume() else sound.pause()
+    }
 
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
         if (entity.isRemoved) return

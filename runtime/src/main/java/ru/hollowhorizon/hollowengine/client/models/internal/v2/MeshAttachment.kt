@@ -11,9 +11,9 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
  */
 class MeshAttachment(
     val primitive: Primitive,
-    private val node: RuntimeNode,
+    private val node: RenderModelNode,
     val material: Material,
-) : Attachment(node) {
+) : BaseAttachment(node) {
     val matrix: Mat4f get() = globalMatrix
     val morphWeights: FloatArray get() = node.morphWeights
     internal var replaced = false
@@ -23,7 +23,7 @@ class MeshAttachment(
 
     fun skinMatrices(): Array<Mat4f> {
         val pose = skinPose ?: checkNotNull(node.definition.skin).pose().also { skinPose = it }
-        return pose.compute(globalMatrix, node.jointGetter)
+        return pose.compute(globalMatrix, node.modelPoseNodes)
     }
 
     /** Only a skinned or morphed primitive draws itself; the model draws its static ones together. */

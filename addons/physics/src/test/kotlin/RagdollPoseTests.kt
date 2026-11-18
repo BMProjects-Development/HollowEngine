@@ -7,12 +7,13 @@ import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.BoneMask
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -37,7 +38,7 @@ class RagdollPoseTests {
         leaf.parent = middle
         middle.parent = root
 
-        val node = RuntimeNode(root, parent = null)
+        val node = renderModelNode(root)
         return PoseTarget(listOf(node).byIndex(), emptyMap())
     }
 
@@ -45,20 +46,20 @@ class RagdollPoseTests {
 
     private fun globalsOf(target: PoseTarget): Map<Int, Mat4f> {
         val globals = HashMap<Int, Mat4f>()
-        target.nodesByIndex.values.sortedBy { depthOf(it) }.forEach { node ->
+        target.poseNodesByIndex.values.filterIsInstance<RenderModelNode>().sortedBy { depthOf(it) }.forEach { node ->
             val local = node.transform.matrixF
-            val parent = (node.parent as? RuntimeNode)?.let { globals[it.definition.index] }
+            val parent = (node.attachmentParent as? RenderModelNode)?.let { globals[it.definition.index] }
             globals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: MutableMat4f().set(local)
         }
         return globals
     }
 
-    private fun depthOf(node: RuntimeNode): Int {
+    private fun depthOf(node: ModelPoseNode): Int {
         var depth = 0
-        var current: RuntimeNode? = node.parent as? RuntimeNode
+        var current = node.poseParent
         while (current != null) {
             depth++
-            current = current.parent as? RuntimeNode
+            current = current.poseParent
         }
         return depth
     }
@@ -82,7 +83,7 @@ class RagdollPoseTests {
         assertEquals(3, pose.entries.size, "The pose left bones out")
 
         target.apply(pose, LayerBlendMode.Override, weight = 1f)
-        target.nodesByIndex.values.forEach { it.updateHierarchyMatrices() }
+        target.poseNodesByIndex.values.filterIsInstance<RenderModelNode>().forEach { it.updateHierarchyMatrices() }
 
         val posed = globalsOf(target)
         plan.bones.forEach { bone ->
@@ -110,7 +111,7 @@ class RagdollPoseTests {
 
         val pose = RagdollPose.write(plan, target, simulated, animated)
         target.apply(pose, LayerBlendMode.Override, weight = 0.5f)
-        target.nodesByIndex.values.forEach { it.updateHierarchyMatrices() }
+        target.poseNodesByIndex.values.filterIsInstance<RenderModelNode>().forEach { it.updateHierarchyMatrices() }
 
         val root = MutableVec3f()
         requireNotNull(globalsOf(target)[0]).decompose(root, null, null)
@@ -174,7 +175,7 @@ class RagdollPoseTests {
                 "head" to RigBone(attachments = listOf(collider, RigidBodyAttachmentSpec(), JointAttachmentSpec(parent = "chest"))),
             ),
         )
-        val target = PoseTarget(listOf(RuntimeNode(chest, parent = null)).byIndex(), emptyMap(), rig = rig)
+        val target = PoseTarget(listOf(renderModelNode(chest)).byIndex(), emptyMap(), rig = rig)
 
         val plan = requireNotNull(RagdollPlan.build(target, spec, target.mask(BoneMask.full())))
         assertEquals(listOf("chest", "head"), plan.bones.map { it.name })
@@ -187,7 +188,7 @@ class RagdollPoseTests {
 
         val pose = RagdollPose.write(plan, target, simulated, animated)
         target.apply(pose, LayerBlendMode.Override, weight = 1f)
-        target.nodesByIndex.values.forEach { it.updateHierarchyMatrices() }
+        target.poseNodesByIndex.values.filterIsInstance<RenderModelNode>().forEach { it.updateHierarchyMatrices() }
 
         val drawn = globalsOf(target)
         plan.bones.forEach { bone ->

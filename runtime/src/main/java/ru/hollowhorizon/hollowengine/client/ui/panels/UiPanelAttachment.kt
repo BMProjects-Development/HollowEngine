@@ -9,10 +9,10 @@ import net.minecraft.world.entity.Entity
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.BaseAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFactories
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
@@ -26,9 +26,9 @@ import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
  */
 class UiPanelAttachment(
     spec: UiPanelAttachmentSpec,
-    private val node: RuntimeNode,
+    private val node: RenderModelNode,
     private val carrier: () -> Entity?,
-) : Attachment(node), RespecAttachment {
+) : BaseAttachment(node), RespecAttachment {
     override var spec: UiPanelAttachmentSpec = spec
         private set
 

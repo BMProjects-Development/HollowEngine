@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
@@ -8,6 +9,7 @@ import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
@@ -16,9 +18,12 @@ import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
  * A model hung on a bone of another. It stands still in its rest pose and is drawn as part of the model it
  * hangs on, whose draw commands take its meshes in, so it is placed by the same matrices the bone moves by.
  */
-class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigAttachmentContext) : Attachment(context.node), RespecAttachment {
+class NestedModelAttachment(spec: ModelAttachmentSpec, private var context: RigAttachmentContext) : BaseAttachment(context.node), RespecAttachment {
     override var spec: ModelAttachmentSpec = spec
         private set
+
+    internal val sceneHolder: SceneObject = context.node.sceneObject.mountModel(spec)
+    override val transform: TrsTransformF get() = sceneHolder.localTransform
 
     /** The nested model itself, posed in the space of the model it hangs on. */
     val model = ModelAttachment(spec.model, parent = this)
@@ -35,13 +40,20 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
         model.rig = RigAssets.of(model.location).overlay(spec.rig)
     }
 
+    internal fun rebind(context: RigAttachmentContext, spec: ModelAttachmentSpec) {
+        require(sceneHolder.physicalParent === context.node.sceneObject) { "Nested model owner changed" }
+        this.context = context
+        reparentAttachment(context.node)
+        respec(spec)
+    }
+
     /** Follows the bone, and swaps in the nested model once it has loaded. */
     override fun updateGlobalMatrix() {
         super.updateGlobalMatrix()
         model.entity = context.entity()
         model.carrier = context.carrier()
         model.beginPose()
-        applyRigPose(model.nodes, model.rig)
+        model.applyRigPose()
         model.endPose()
     }
 
@@ -50,7 +62,13 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
         model.collectCommands(pipeline)
     }
 
-    override fun close() = model.close()
+    override fun close() {
+        try {
+            model.close()
+        } finally {
+            if (!sceneHolder.isRemoved && !sceneHolder.scene.isClosed) sceneHolder.remove()
+        }
+    }
     override val followsWorldPose: Boolean get() = true
     override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = model.updateWorldPose(modelToWorld, entity)
 
@@ -60,7 +78,7 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private val context: RigA
          * [MAX_NESTING] nothing more is built, as the colliders stop there too.
          */
         private fun nesting(owner: ModelAttachment?): Int =
-            generateSequence<Attachment>(owner) { it.parent }.count { it is NestedModelAttachment }
+            generateSequence<Attachment>(owner) { it.attachmentParent }.count { it is NestedModelAttachment }
 
         fun register() {
             RigAttachmentFactories.register("hollowengine:rig/model") { spec, context ->

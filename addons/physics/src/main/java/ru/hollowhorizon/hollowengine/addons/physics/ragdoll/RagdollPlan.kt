@@ -4,7 +4,7 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.addons.physics.rig.*
 import ru.hollowhorizon.hollowengine.addons.physics.rotatedInverse
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 /**
@@ -35,7 +35,7 @@ class RagdollBone(
 class RagdollPlan(
     val bones: List<RagdollBone>,
     /** Every node of the model, parents first. */
-    val order: List<RuntimeNode>,
+    val order: List<ModelPoseNode>,
 ) {
     companion object {
         /**
@@ -54,28 +54,28 @@ class RagdollPlan(
             if (order.none { target.bodyOf(it) != null }) return fromSkeleton(target, spec, order, bindGlobals, allowed)
 
             order.filter { target.bodyOf(it) != null && target.bodyShapeOf(it) == null }.takeIf { it.isNotEmpty() }?.let { bare ->
-                HollowEngine.LOGGER.warn("Bodies on {} have no colliders to be made of and are left out", bare.joinToString { it.name })
+                HollowEngine.LOGGER.warn("Bodies on {} have no colliders to be made of and are left out", bare.joinToString { it.poseName })
             }
             return fromRig(target, order, bindGlobals, allowed)
         }
 
         private fun fromRig(
             target: PoseTarget,
-            order: List<RuntimeNode>,
+            order: List<ModelPoseNode>,
             bindGlobals: Map<Int, Mat4f>,
             allowed: Set<Int>,
         ): RagdollPlan? {
-            val shapes = order.filter { it.definition.index in allowed }
+            val shapes = order.filter { it.poseIndex in allowed }
                 .mapNotNull { node -> target.bodyShapeOf(node)?.let { node to it } }.toMap()
             val bodies = order.filter { it in shapes }
             if (bodies.isEmpty()) return null
 
-            val byName = bodies.associateBy { it.name }
+            val byName = bodies.associateBy { it.poseName }
             val parents = bodies.associateWith { node -> node.physicalParent(target.jointOf(node), byName, bodies.toSet()) }
             val sorted = parentsFirst(bodies, parents)
 
             val positionByNode = HashMap<Int, Int>(sorted.size)
-            sorted.forEachIndexed { position, node -> positionByNode[node.definition.index] = position }
+            sorted.forEachIndexed { position, node -> positionByNode[node.poseIndex] = position }
 
             val bones = sorted.mapIndexed { position, node ->
                 val body = requireNotNull(target.bodyOf(node))
@@ -83,10 +83,10 @@ class RagdollPlan(
                 val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
 
                 RagdollBone(
-                    nodeIndex = node.definition.index,
-                    name = node.name,
-                    parent = parents[node]?.let { positionByNode[it.definition.index] ?: -1 } ?: -1,
-                    modelParent = node.parentNode()?.definition?.index,
+                    nodeIndex = node.poseIndex,
+                    name = node.poseName,
+                    parent = parents[node]?.let { positionByNode[it.poseIndex] ?: -1 } ?: -1,
+                    modelParent = node.poseParent?.poseIndex,
                     bindPosition = bindPosition,
                     bindRotation = bindRotation,
                     shape = shapes.getValue(node),
@@ -102,45 +102,47 @@ class RagdollPlan(
         private fun fromSkeleton(
             target: PoseTarget,
             spec: RagdollStateSpec,
-            order: List<RuntimeNode>,
+            order: List<ModelPoseNode>,
             bindGlobals: Map<Int, Mat4f>,
             allowed: Set<Int>,
         ): RagdollPlan? {
             val root = spec.rootBone?.let { target.node(it) }
             if (spec.rootBone != null && root == null) return null
 
-            val chosenByHand = root != null || allowed.size < target.nodesByIndex.size
-            val candidates = if (chosenByHand) target.nodesByIndex.keys else boneNodes(target)
+            val children = order.groupBy { it.poseParent?.poseIndex }
+            val chosenByHand = root != null || allowed.size < target.poseNodesByIndex.size
+            val candidates = if (chosenByHand) target.poseNodesByIndex.keys else boneNodes(target, children)
             val simulated = order.filter { node ->
-                val index = node.definition.index
-                index in candidates && index in allowed && (root == null || node.isUnder(root)) && spec.boneSpec(node.name)?.simulated != false
+                val index = node.poseIndex
+                index in candidates && index in allowed && (root == null || node.isUnder(root)) && spec.boneSpec(node.poseName)?.simulated != false
             }
             if (simulated.isEmpty()) return null
 
             val boneByNode = HashMap<Int, Int>(simulated.size)
-            simulated.forEachIndexed { position, node -> boneByNode[node.definition.index] = position }
+            simulated.forEachIndexed { position, node -> boneByNode[node.poseIndex] = position }
 
             val bones = simulated.mapIndexed { position, node ->
-                buildBone(node, position, spec, bindGlobals, boneByNode)
+                buildBone(node, position, spec, bindGlobals, boneByNode, children)
             }
             return RagdollPlan(bones, order)
         }
 
         private fun buildBone(
-            node: RuntimeNode,
+            node: ModelPoseNode,
             position: Int,
             spec: RagdollStateSpec,
             bindGlobals: Map<Int, Mat4f>,
             boneByNode: Map<Int, Int>,
+            childrenByParent: Map<Int?, List<ModelPoseNode>>,
         ): RagdollBone {
-            val overrides = spec.boneSpec(node.name)
+            val overrides = spec.boneSpec(node.poseName)
             val (bindPosition, bindRotation) = bindGlobals.decomposeOf(node)
 
-            val children =
-                node.children.filter { boneByNode.containsKey(it.definition.index) }.ifEmpty { node.children }
+            val allChildren = childrenByParent[node.poseIndex].orEmpty()
+            val children = allChildren.filter { boneByNode.containsKey(it.poseIndex) }.ifEmpty { allChildren }
             val towards = MutableVec3f()
             children.forEach { child ->
-                val childGlobal = bindGlobals[child.definition.index] ?: return@forEach
+                val childGlobal = bindGlobals[child.poseIndex] ?: return@forEach
                 val childPosition = MutableVec3f()
                 childGlobal.decompose(childPosition, null, null)
                 towards.add(childPosition.subtract(bindPosition))
@@ -156,10 +158,10 @@ class RagdollPlan(
                 overrides?.radius ?: (length * spec.boneRadiusRatio).coerceIn(spec.minBoneRadius, spec.maxBoneRadius)
 
             return RagdollBone(
-                nodeIndex = node.definition.index,
-                name = node.name,
+                nodeIndex = node.poseIndex,
+                name = node.poseName,
                 parent = node.simulatedAncestor(boneByNode),
-                modelParent = node.parentNode()?.definition?.index,
+                modelParent = node.poseParent?.poseIndex,
                 bindPosition = bindPosition,
                 bindRotation = bindRotation,
                 shape = RagdollShape.alongBone(axis, length, radius.coerceAtLeast(spec.minBoneRadius)),
@@ -174,57 +176,57 @@ class RagdollPlan(
             ).also { check(it.parent < position) { "Bone ${it.name} is ordered before its parent" } }
         }
 
-        private fun boneNodes(target: PoseTarget): Set<Int> {
-            val joints = target.nodesByIndex.values.mapNotNull { it.definition.skin }.flatMap { it.jointsIds }.toSet()
+        private fun boneNodes(target: PoseTarget, children: Map<Int?, List<ModelPoseNode>>): Set<Int> {
+            val joints = target.poseNodesByIndex.values.flatMap { it.source.skinJoints }.toSet()
             if (joints.isNotEmpty()) return joints
 
-            val hierarchy = target.nodesByIndex.values.filter { it.definition.index >= MODEL_ROOT }
-            val jointsWithoutGeometry = hierarchy.filter { it.definition.mesh == null && it.children.isNotEmpty() }
-                .mapTo(HashSet()) { it.definition.index }
+            val hierarchy = target.poseNodesByIndex.values.filter { it.poseIndex >= MODEL_ROOT }
+            val jointsWithoutGeometry = hierarchy.filter { !it.source.hasMesh && !children[it.poseIndex].isNullOrEmpty() }
+                .mapTo(HashSet()) { it.poseIndex }
             if (jointsWithoutGeometry.isNotEmpty()) return jointsWithoutGeometry
 
-            return hierarchy.mapTo(HashSet()) { it.definition.index }
+            return hierarchy.mapTo(HashSet()) { it.poseIndex }
         }
 
         private const val MODEL_ROOT = 0
 
-        private fun bindGlobalsOf(order: List<RuntimeNode>): Map<Int, Mat4f> {
+        private fun bindGlobalsOf(order: List<ModelPoseNode>): Map<Int, Mat4f> {
             val bindGlobals = HashMap<Int, Mat4f>(order.size)
             order.forEach { node ->
-                val local = node.definition.baseTransform.matrixF
-                val parent = node.parentNode()?.let { bindGlobals[it.definition.index] }
-                bindGlobals[node.definition.index] = parent?.mul(local, MutableMat4f()) ?: local
+                val local = node.restTransform.matrixF
+                val parent = node.poseParent?.let { bindGlobals[it.poseIndex] }
+                bindGlobals[node.poseIndex] = parent?.mul(local, MutableMat4f()) ?: local
             }
             return bindGlobals
         }
 
-        private fun Map<Int, Mat4f>.decomposeOf(node: RuntimeNode): Pair<Vec3f, QuatF> {
+        private fun Map<Int, Mat4f>.decomposeOf(node: ModelPoseNode): Pair<Vec3f, QuatF> {
             val position = MutableVec3f()
             val rotation = MutableQuatF()
-            getValue(node.definition.index).decompose(position, rotation, null)
+            getValue(node.poseIndex).decompose(position, rotation, null)
             return Vec3f(position) to QuatF(rotation)
         }
 
-        private fun walkParentsFirst(target: PoseTarget): List<RuntimeNode> {
-            val nodes = target.nodesByIndex.values
+        private fun walkParentsFirst(target: PoseTarget): List<ModelPoseNode> {
+            val nodes = target.poseNodesByIndex.values
             val depths = HashMap<Int, Int>(nodes.size)
 
-            fun depth(node: RuntimeNode): Int = depths.getOrPut(node.definition.index) {
-                node.parentNode()?.let { depth(it) + 1 } ?: 0
+            fun depth(node: ModelPoseNode): Int = depths.getOrPut(node.poseIndex) {
+                node.poseParent?.let { depth(it) + 1 } ?: 0
             }
 
             return nodes.sortedBy(::depth)
         }
 
         private fun parentsFirst(
-            bodies: List<RuntimeNode>,
-            parents: Map<RuntimeNode, RuntimeNode?>,
-        ): List<RuntimeNode> {
-            val sorted = ArrayList<RuntimeNode>(bodies.size)
-            val placed = HashSet<RuntimeNode>(bodies.size)
-            val visiting = HashSet<RuntimeNode>()
+            bodies: List<ModelPoseNode>,
+            parents: Map<ModelPoseNode, ModelPoseNode?>,
+        ): List<ModelPoseNode> {
+            val sorted = ArrayList<ModelPoseNode>(bodies.size)
+            val placed = HashSet<ModelPoseNode>(bodies.size)
+            val visiting = HashSet<ModelPoseNode>()
 
-            fun place(node: RuntimeNode) {
+            fun place(node: ModelPoseNode) {
                 if (node in placed || node in visiting) return
                 visiting += node
                 parents[node]?.let(::place)
@@ -240,52 +242,50 @@ class RagdollPlan(
     }
 }
 
-private fun RuntimeNode.parentNode(): RuntimeNode? = parent as? RuntimeNode
-
 /**
  * The body the rig puts on [node]. It is read from the rig itself, so the server, which builds no attachments
  * for the nodes it poses, plans the same skeleton the client does.
  */
-private fun PoseTarget.bodyOf(node: RuntimeNode): RigidBodyAttachmentSpec? =
-    rig.bone(node.name)?.attachments?.firstNotNullOfOrNull { it as? RigidBodyAttachmentSpec }
+private fun PoseTarget.bodyOf(node: ModelPoseNode): RigidBodyAttachmentSpec? =
+    rig.bone(node.poseName)?.attachments?.firstNotNullOfOrNull { it as? RigidBodyAttachmentSpec }
 
-private fun PoseTarget.jointOf(node: RuntimeNode): JointAttachmentSpec? =
-    rig.bone(node.name)?.attachments?.firstNotNullOfOrNull { it as? JointAttachmentSpec }
+private fun PoseTarget.jointOf(node: ModelPoseNode): JointAttachmentSpec? =
+    rig.bone(node.poseName)?.attachments?.firstNotNullOfOrNull { it as? JointAttachmentSpec }
 
 /** What the body on [node] is made of: the colliders it takes from its bone. Null with no body, or none to make it of. */
-private fun PoseTarget.bodyShapeOf(node: RuntimeNode): RagdollShape? {
+private fun PoseTarget.bodyShapeOf(node: ModelPoseNode): RagdollShape? {
     val body = bodyOf(node) ?: return null
-    val parts = body.partsOn(rig.bone(node.name)?.attachments.orEmpty()).map(RagdollPart::of)
+    val parts = body.partsOn(rig.bone(node.poseName)?.attachments.orEmpty()).map(RagdollPart::of)
     return parts.takeIf { it.isNotEmpty() }?.let(::RagdollShape)
 }
 
-private fun RuntimeNode.physicalParent(joint: JointAttachmentSpec?, byName: Map<String, RuntimeNode>, bodies: Set<RuntimeNode>): RuntimeNode? {
+private fun ModelPoseNode.physicalParent(joint: JointAttachmentSpec?, byName: Map<String, ModelPoseNode>, bodies: Set<ModelPoseNode>): ModelPoseNode? {
     joint?.parent?.takeIf { it.isNotBlank() }?.let { named ->
         return byName[named]?.takeIf { it !== this }
     }
 
-    var current = parentNode()
+    var current = poseParent
     while (current != null) {
         if (current in bodies) return current
-        current = current.parentNode()
+        current = current.poseParent
     }
     return null
 }
 
-private fun RuntimeNode.isUnder(ancestor: RuntimeNode): Boolean {
-    var current: RuntimeNode? = this
+private fun ModelPoseNode.isUnder(ancestor: ModelPoseNode): Boolean {
+    var current: ModelPoseNode? = this
     while (current != null) {
         if (current === ancestor) return true
-        current = current.parentNode()
+        current = current.poseParent
     }
     return false
 }
 
-private fun RuntimeNode.simulatedAncestor(boneByNode: Map<Int, Int>): Int {
-    var current = parentNode()
+private fun ModelPoseNode.simulatedAncestor(boneByNode: Map<Int, Int>): Int {
+    var current = poseParent
     while (current != null) {
-        boneByNode[current.definition.index]?.let { return it }
-        current = current.parentNode()
+        boneByNode[current.poseIndex]?.let { return it }
+        current = current.poseParent
     }
     return -1
 }

@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.render
 
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
@@ -13,7 +13,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
  * One bone as it is drawn. From a joint to wherever the bone reaches.
  */
 class SkeletonBone(
-    val node: RuntimeNode,
+    val node: RenderModelNode,
     val head: Vec3f,
     val tail: Vec3f,
     val roll: Vec3f,
@@ -32,7 +32,7 @@ object SkeletonLayout {
         val bones = boneNodes(attachment)
         val layout = ArrayList<SkeletonBone>()
         attachment.nodes.forEach { root ->
-            trace(root, root.parent?.globalMatrix ?: Mat4f.IDENTITY, parent = null, bones, layout)
+            trace(root, root.attachmentParent?.globalMatrix ?: Mat4f.IDENTITY, parent = null, bones, layout)
         }
         return layout
     }
@@ -51,7 +51,7 @@ object SkeletonLayout {
     private class RestBone(val direction: Vec3f, val length: Float)
 
     private fun trace(
-        node: RuntimeNode,
+        node: RenderModelNode,
         parentRest: Mat4f,
         parent: RestBone?,
         bones: Set<Int>?,
@@ -85,7 +85,7 @@ object SkeletonLayout {
     }
 
     /** Where [restPoint], held by this node in the bind pose, is now. */
-    private fun RuntimeNode.posed(restPoint: Vec3f, rest: Mat4f): Vec3f {
+    private fun RenderModelNode.posed(restPoint: Vec3f, rest: Mat4f): Vec3f {
         val inverse = MutableMat4f()
         if (!rest.invert(inverse)) return restPoint
         val local = inverse.transform(restPoint, 1f, MutableVec3f())
@@ -95,7 +95,7 @@ object SkeletonLayout {
     private fun stubLength(parent: RestBone?): Float =
         (parent?.length ?: DEFAULT_LENGTH).coerceIn(MIN_STUB_LENGTH, MAX_STUB_LENGTH)
 
-    private fun List<Pair<RuntimeNode, Vec3f>>.chainChild(head: Vec3f, heading: Vec3f): Pair<RuntimeNode, Vec3f>? {
+    private fun List<Pair<RenderModelNode, Vec3f>>.chainChild(head: Vec3f, heading: Vec3f): Pair<RenderModelNode, Vec3f>? {
         if (isEmpty()) return null
 
         val aligned = mapNotNull { child ->

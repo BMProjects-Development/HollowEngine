@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.extrusion
 import com.mojang.blaze3d.systems.RenderSystem
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.Attachment
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.BaseAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentContext
@@ -15,7 +15,7 @@ internal class MeshExtrusionAttachment private constructor(
     override var spec: MeshExtrusionSpec,
     private val context: RigAttachmentContext,
     meshes: List<MeshAttachment>,
-) : Attachment(context.node), RespecAttachment {
+) : BaseAttachment(context.node), RespecAttachment {
     private val layers = meshes.map(::Layer)
     val boundsMargin: Float get() = abs(spec.thickness) * ExtrusionMesh.MITER_LIMIT
 

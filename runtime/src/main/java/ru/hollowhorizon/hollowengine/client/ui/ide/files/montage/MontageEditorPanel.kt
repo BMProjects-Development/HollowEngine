@@ -6,7 +6,7 @@ import kotlinx.coroutines.isActive
 import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -108,7 +108,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
         session.select(bone, attachments + listOfNotNull(part), selectedAttachment = part)
     }
 
-    val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
+    val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RenderModelNode::name) } }
     val timelineHasSelection = session.timeline.hasInspectableSelection()
     PublishInspector(
         source = "montage-${file.path}",

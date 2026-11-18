@@ -2,11 +2,11 @@ package ru.hollowhorizon.hollowengine.client.models.internal.rig
 
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -39,15 +39,22 @@ object ColliderRigGenerator : RigGenerator {
     /** Bones smaller than this hold a finger or an eye, not something worth aiming at. */
     private const val MIN_SIZE = 0.04f
 
-    override fun generate(model: ModelAttachment, current: ModelRig): ModelRig {
+    override fun generate(source: RigGenerationSource, current: ModelRig): ModelRig =
+        generate(source.nodes, source.model.boneBounds, current)
+
+    private fun generate(
+        nodes: Collection<ModelPoseNode>,
+        geometry: Map<Int, Pair<Vec3f, Vec3f>>,
+        current: ModelRig,
+    ): ModelRig {
         val taken = current.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
         var rig = current
-        BoneGeometry.cornersPerBone(model).forEach { (bone, corners) ->
-            val existing = rig.bone(bone.name) ?: RigBone.EMPTY
+        BoneGeometry.cornersPerBone(nodes, geometry).forEach { (bone, corners) ->
+            val existing = rig.bone(bone.poseName) ?: RigBone.EMPTY
             if (existing.attachments.any { it is ColliderAttachmentSpec }) return@forEach
-            val collider = fit(freeName(bone.name, taken), corners) ?: return@forEach
+            val collider = fit(freeName(bone.poseName, taken), corners) ?: return@forEach
             taken += collider.id
-            rig = rig.withBone(bone.name, existing.withAttachment(collider))
+            rig = rig.withBone(bone.poseName, existing.withAttachment(collider))
         }
         return rig
     }

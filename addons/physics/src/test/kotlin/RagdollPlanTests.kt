@@ -6,8 +6,7 @@ import ru.hollowhorizon.hollowengine.addons.physics.rig.RigidBodyAttachmentSpec
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.Skin
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.byIndex
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.byIndex
 import ru.hollowhorizon.hollowengine.common.colliders.BoxShapeSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeSpec
@@ -41,7 +40,7 @@ class RagdollPlanTests {
         lower.parent = upper
         upper.parent = correction
 
-        return PoseTarget(listOf(RuntimeNode(correction, parent = null)).byIndex(), emptyMap())
+        return PoseTarget(listOf(renderModelNode(correction)).byIndex(), emptyMap())
     }
 
     private fun up(y: Float) = TrsTransformF().apply { translate(Vec3f(0f, y, 0f)) }
@@ -73,7 +72,7 @@ class RagdollPlanTests {
         listOf(handCubes to hand, hand to arm, armCubes to arm).forEach { (child, parent) -> child.parent = parent }
         arm.parent = null
 
-        val target = PoseTarget(listOf(RuntimeNode(arm, parent = null)).byIndex(), emptyMap())
+        val target = PoseTarget(listOf(renderModelNode(arm)).byIndex(), emptyMap())
         val plan = requireNotNull(RagdollPlan.build(target, RagdollStateSpec(), target.everyBone()))
 
         assertEquals(listOf("arm", "hand"), plan.bones.map { it.name })
@@ -162,5 +161,5 @@ class RagdollPlanTests {
         RigBone(attachments = listOfNotNull(ColliderAttachmentSpec(id = collider, size = size, shape = shape), RigidBodyAttachmentSpec(), joint))
 
     private fun rigged(root: NodeDefinition, vararg bones: Pair<String, RigBone>) =
-        PoseTarget(listOf(RuntimeNode(root, parent = null)).byIndex(), emptyMap(), rig = ModelRig(bones = mapOf(*bones)))
+        PoseTarget(listOf(renderModelNode(root)).byIndex(), emptyMap(), rig = ModelRig(bones = mapOf(*bones)))
 }

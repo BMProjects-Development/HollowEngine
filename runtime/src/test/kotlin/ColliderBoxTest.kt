@@ -2,9 +2,15 @@ import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
+import ru.hollowhorizon.hollowengine.client.models.internal.Scene
 import ru.hollowhorizon.hollowengine.common.colliders.*
+import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.deg
 import kotlin.math.abs
@@ -14,6 +20,24 @@ import kotlin.test.*
 class ColliderBoxTest {
     /** A unit cube turned 45 degrees about Y: its corner, not its face, faces the ray. */
     private val diamond = ColliderBox.of(MutableMat4f().rotate(45f.deg, Vec3f.Y_AXIS), Vec3.ZERO)
+
+    @Test
+    fun `model fit uses authored bones beneath synthetic transforms`() {
+        val bone = NodeDefinition(1, "bone", mutableListOf(), TrsTransformF().translate(0f, 2f, 0f))
+        val pivot = NodeDefinition(0, null, mutableListOf(bone), TrsTransformF().translate(1f, 0f, 0f)).also {
+            it.isSynthetic = true
+            bone.parent = it
+        }
+        val model = Model(0, listOf(Scene(listOf(pivot))), emptySet())
+        val rig = ModelRig(bones = mapOf("bone" to RigBone(attachments = listOf(
+            ColliderAttachmentSpec(size = Vec3f(1f, 1f, 1f))
+        ))))
+
+        val (width, height) = assertNotNull(fitEntityBox(model, rig, MutableMat4f()))
+
+        assertEquals(sqrt(10f), width, 1e-4f)
+        assertEquals(2.5f, height, 1e-4f)
+    }
 
     @Test
     fun `ray meets a turned box at its corner`() {

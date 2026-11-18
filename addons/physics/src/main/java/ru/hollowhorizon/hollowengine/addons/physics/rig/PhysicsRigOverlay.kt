@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.addons.physics.rig
 import ru.hollowhorizon.hollowengine.addons.physics.rotated
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigOverlay
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
@@ -38,7 +38,7 @@ object PhysicsRigOverlay : RigOverlay {
         }
     }
 
-    private fun drawLimits(lines: DebugLines.Batch, node: RuntimeNode, limits: JointLimits, rotation: QuatF) {
+    private fun drawLimits(lines: DebugLines.Batch, node: RenderModelNode, limits: JointLimits, rotation: QuatF) {
         val origin = node.origin()
         val radius = node.children.firstOrNull()?.let { (it.origin() - origin).length() * LIMIT_REACH }
             ?.takeIf { it > MIN_LIMIT_RADIUS } ?: DEFAULT_LIMIT_RADIUS
@@ -59,13 +59,13 @@ object PhysicsRigOverlay : RigOverlay {
         }
     }
 
-    private fun RuntimeNode.origin(): Vec3f = MutableVec3f().also { globalMatrix.transform(Vec3f.ZERO, 1f, it) }
+    private fun RenderModelNode.origin(): Vec3f = MutableVec3f().also { globalMatrix.transform(Vec3f.ZERO, 1f, it) }
 
-    private fun RuntimeNode.bodyAncestor(bodies: Set<RuntimeNode>): RuntimeNode? {
-        var current = parent as? RuntimeNode
+    private fun RenderModelNode.bodyAncestor(bodies: Set<RenderModelNode>): RenderModelNode? {
+        var current = attachmentParent as? RenderModelNode
         while (current != null) {
             if (current in bodies) return current
-            current = current.parent as? RuntimeNode
+            current = current.attachmentParent as? RenderModelNode
         }
         return null
     }

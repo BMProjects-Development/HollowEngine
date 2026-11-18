@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.addons.physics.ragdoll
 
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPose
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
 /**
@@ -15,23 +15,26 @@ internal object RagdollPose {
      * @param order all model nodes, with parent nodes before child nodes.
      */
     fun globals(
-        order: List<RuntimeNode>,
+        order: List<ModelPoseNode>,
         pose: AnimationPose,
         into: MutableMap<Int, MutableMat4f>,
     ): MutableMap<Int, MutableMat4f> {
-        into.clear()
+        if (into.isNotEmpty() && (into.size != order.size || order.any { it.poseIndex !in into })) {
+            val indices = order.mapTo(HashSet(order.size)) { it.poseIndex }
+            into.keys.retainAll(indices)
+        }
         val local = MutableMat4f()
 
         order.forEach { node ->
-            val index = node.definition.index
-            val base = node.definition.baseTransform
+            val index = node.poseIndex
+            val base = node.restTransform
             val bone = pose[index]
 
             local.setIdentity().translate(base.translation.add(bone?.translation ?: Vec3f.ZERO, MutableVec3f()))
                 .rotate(MutableQuatF(base.rotation).mul(bone?.rotation ?: QuatF.IDENTITY).norm())
                 .scale(base.scale.mul(bone?.scale ?: Vec3f.ONES, MutableVec3f()))
 
-            val parent = (node.parent as? RuntimeNode)?.let { into[it.definition.index] }
+            val parent = node.poseParent?.let { into[it.poseIndex] }
             val global = into.getOrPut(index) { MutableMat4f() }
             if (parent == null) global.set(local) else parent.mul(local, global)
         }
@@ -56,11 +59,11 @@ internal object RagdollPose {
 
         plan.bones.forEach { bone ->
             val global = simulated[bone.nodeIndex] ?: return@forEach
-            val node = target.nodesByIndex[bone.nodeIndex] ?: return@forEach
+            val node = target.poseNodesByIndex[bone.nodeIndex] ?: return@forEach
             val local = localOf(bone, global, drawn) ?: return@forEach
             local.decompose(translation, rotation, null)
 
-            val base = node.definition.baseTransform
+            val base = node.restTransform
             val bonePose = pose.bone(bone.nodeIndex)
             bonePose.translation = Vec3f(translation).subtract(base.translation, MutableVec3f())
             bonePose.rotation = MutableQuatF(base.rotation).invert().mul(rotation).norm()
@@ -79,23 +82,23 @@ internal object RagdollPose {
         val drawn = HashMap<Int, Mat4f>(plan.order.size)
 
         plan.order.forEach { node ->
-            val index = node.definition.index
+            val index = node.poseIndex
             simulated[index]?.let { drawn[index] = it; return@forEach }
 
-            val parent = node.parent as? RuntimeNode
-            val parentDrawn = parent?.definition?.index?.let { drawn[it] }
+            val parent = node.poseParent
+            val parentDrawn = parent?.poseIndex?.let { drawn[it] }
             val local = localInPose(node, parent, animated)
             drawn[index] = parentDrawn?.mul(local, MutableMat4f()) ?: local
         }
         return drawn
     }
 
-    private fun localInPose(node: RuntimeNode, parent: RuntimeNode?, animated: Map<Int, Mat4f>): Mat4f {
-        val global = animated[node.definition.index] ?: return node.definition.baseTransform.matrixF
-        val parentGlobal = parent?.definition?.index?.let { animated[it] } ?: return global
+    private fun localInPose(node: ModelPoseNode, parent: ModelPoseNode?, animated: Map<Int, Mat4f>): Mat4f {
+        val global = animated[node.poseIndex] ?: return node.restTransform.matrixF
+        val parentGlobal = parent?.poseIndex?.let { animated[it] } ?: return global
 
         val inverse = MutableMat4f().set(parentGlobal)
-        if (!inverse.invert()) return node.definition.baseTransform.matrixF
+        if (!inverse.invert()) return node.restTransform.matrixF
         return inverse.mul(global, MutableMat4f())
     }
 

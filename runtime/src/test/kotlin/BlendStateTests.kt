@@ -1,3 +1,4 @@
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
@@ -8,7 +9,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimationPo
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.BlendState
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.PoseTarget
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
 import ru.hollowhorizon.hollowengine.common.models.BlendMotion
 import ru.hollowhorizon.hollowengine.common.models.BlendStateSpec
@@ -55,7 +55,7 @@ class BlendStateTests {
 
     @Test
     fun `clips of different lengths play in step`() {
-        val node = RuntimeNode(NodeDefinition(index = 0, name = "Bone", children = mutableListOf(), transform = TrsTransformF()), parent = null)
+        val node = renderModelNode(NodeDefinition(index = 0, name = "Bone", children = mutableListOf(), transform = TrsTransformF()), parent = null)
         val target = PoseTarget(
             mapOf(0 to node),
             mapOf("walk" to timeClip("walk", 1f), "run" to timeClip("run", 0.5f)),

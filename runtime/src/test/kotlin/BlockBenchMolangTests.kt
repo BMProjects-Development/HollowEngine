@@ -1,3 +1,4 @@
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
@@ -8,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.models.bedrock.Query
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationClip
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.ModelSide
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -16,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BlockBenchMolangTests {
-    private data class Fixture(val clip: AnimationClip, val node: RuntimeNode) {
+    private data class Fixture(val clip: AnimationClip, val node: RenderModelNode) {
         val target = PoseTarget(mapOf(node.definition.index to node), mapOf(clip.name to clip))
         val allowed = setOf(node.definition.index)
     }
@@ -42,7 +43,7 @@ class BlockBenchMolangTests {
             )
         )
         val model = BlockBenchModelLoader.convert(file, "test:models/molang.bbmodel".rl, ModelSide.SERVER)
-        return Fixture(model.animations.single(), RuntimeNode(model.findNodeByName("bone")!!, null))
+        return Fixture(model.animations.single(), renderModelNode(model.findNodeByName("bone")!!, null))
     }
 
     private fun context(ticks: Float = 100f) = AnimatorEvaluationContext().also {

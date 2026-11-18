@@ -4,12 +4,11 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rig.BoneBounds
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.BoneGeometry
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.ColliderRigGenerator
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigGenerator
+import ru.hollowhorizon.hollowengine.client.models.internal.rig.RigGenerationSource
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.boneAncestor
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -32,11 +31,11 @@ object RagdollRigGenerator : RigGenerator {
     /** Geometry thinner than this on any side is a lid, a brow or a decal, which rides on the bone above it. */
     private const val MIN_THICKNESS = 0.05f
 
-    override fun generate(model: ModelAttachment, current: ModelRig): ModelRig =
-        generate(model.nodes.flatMap { it.walk() }, model.model.boneBounds, current)
+    override fun generate(source: RigGenerationSource, current: ModelRig): ModelRig =
+        generate(source.nodes, source.model.boneBounds, current)
 
     internal fun generate(
-        nodes: List<RuntimeNode>,
+        nodes: Collection<ModelPoseNode>,
         geometry: Map<Int, Pair<Vec3f, Vec3f>>,
         current: ModelRig,
     ): ModelRig {
@@ -48,24 +47,24 @@ object RagdollRigGenerator : RigGenerator {
 
         var rig = current
         bodies.keys.forEach { bone ->
-            var holder = rig.bone(bone.name) ?: RigBone.EMPTY
+            var holder = rig.bone(bone.poseName) ?: RigBone.EMPTY
             // A body already on the bone was set up by hand, its joint and limits with it, and is left as it is.
             if (holder.attachments.any { it is RigidBodyAttachmentSpec }) return@forEach
             if (holder.attachments.none { it is ColliderAttachmentSpec }) {
-                val name = ColliderRigGenerator.freeName(bone.name, takenNames).also(takenNames::add)
+                val name = ColliderRigGenerator.freeName(bone.poseName, takenNames).also(takenNames::add)
                 ColliderRigGenerator.fit(name, corners.getValue(bone))?.let { holder = holder.withAttachment(it) }
             }
             holder = holder.withAttachment(RigidBodyAttachmentSpec(id = BODY_ID))
-            parents[bone]?.let { parent -> holder = holder.withAttachment(JointAttachmentSpec(id = JOINT_ID, parent = parent.name)) }
-            rig = rig.withBone(bone.name, holder)
+            parents[bone]?.let { parent -> holder = holder.withAttachment(JointAttachmentSpec(id = JOINT_ID, parent = parent.poseName)) }
+            rig = rig.withBone(bone.poseName, holder)
         }
         return rig
     }
 
 
-    private fun jointParents(bodies: Map<RuntimeNode, BoneBounds>, globals: Map<Int, Mat4f>): Map<RuntimeNode, RuntimeNode> {
-        val parents = HashMap<RuntimeNode, RuntimeNode>()
-        val tops = ArrayList<RuntimeNode>()
+    private fun jointParents(bodies: Map<ModelPoseNode, BoneBounds>, globals: Map<Int, Mat4f>): Map<ModelPoseNode, ModelPoseNode> {
+        val parents = HashMap<ModelPoseNode, ModelPoseNode>()
+        val tops = ArrayList<ModelPoseNode>()
         bodies.keys.forEach { bone ->
             val above = bone.boneAncestor(bodies.keys)
             if (above == null) tops += bone else parents[bone] = above
@@ -76,7 +75,7 @@ object RagdollRigGenerator : RigGenerator {
         val waiting = tops.filterTo(ArrayList()) { it !== main }
         while (waiting.isNotEmpty()) {
             val (top, nearest) = waiting.flatMap { top ->
-                val pivot = globals[top.definition.index]?.origin() ?: return@flatMap emptyList()
+                val pivot = globals[top.poseIndex]?.origin() ?: return@flatMap emptyList()
                 joined.map { body -> Triple(top, body, distance(pivot, body, bodies.getValue(body), globals)) }
             }.minByOrNull { it.third } ?: break
             parents[top] = nearest
@@ -87,8 +86,8 @@ object RagdollRigGenerator : RigGenerator {
     }
 
     /** How far [point], in model space, is from the geometry of [bone]. */
-    private fun distance(point: Vec3f, bone: RuntimeNode, box: BoneBounds, globals: Map<Int, Mat4f>): Float {
-        val inverse = MutableMat4f().set(globals[bone.definition.index] ?: return Float.MAX_VALUE)
+    private fun distance(point: Vec3f, bone: ModelPoseNode, box: BoneBounds, globals: Map<Int, Mat4f>): Float {
+        val inverse = MutableMat4f().set(globals[bone.poseIndex] ?: return Float.MAX_VALUE)
         if (!inverse.invert()) return Float.MAX_VALUE
         val local = inverse.transform(point, 1f, MutableVec3f())
         val x = maxOf(box.min.x - local.x, 0f, local.x - box.max.x)
@@ -101,11 +100,11 @@ object RagdollRigGenerator : RigGenerator {
 
     private fun Mat4f.origin(): Vec3f = Vec3f(transform(Vec3f.ZERO, 1f, MutableVec3f()))
 
-    private fun RuntimeNode.isUnder(ancestor: RuntimeNode): Boolean {
-        var current: RuntimeNode? = this
+    private fun ModelPoseNode.isUnder(ancestor: ModelPoseNode): Boolean {
+        var current: ModelPoseNode? = this
         while (current != null) {
             if (current === ancestor) return true
-            current = current.parent as? RuntimeNode
+            current = current.poseParent
         }
         return false
     }

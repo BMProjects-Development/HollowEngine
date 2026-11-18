@@ -10,6 +10,9 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.modelNodes
 import ru.hollowhorizon.hollowengine.common.models.Animator
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.withMontages
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 
 /** What a side poses a model's colliders from: the model's rig file, the animator it wears, and the model. */
 class ColliderPoseAssets(val rig: ModelRig, val animator: Animator?, val model: Model)
@@ -24,11 +27,12 @@ internal class ColliderPoseTrack(
     val own: ModelRig,
     private val historyTicks: Int,
     private val assetsOf: (String) -> ColliderPoseAssets?,
-) {
+    private val logicalSide: LogicalSide,
+) : AutoCloseable {
     /** The rig before montages; what they hang on it and animate is laid over it tick by tick. */
     private val rig = assets.rig.overlay(own)
-    private var posed = PosedModel(assets.model, rig, null, assetsOf)
-    private var target = targetOf(posed)
+    private var current = buildScene(rig)
+    private val posed: PosedModel get() = current.posed
 
     /** Which attachments the montages hung on the model as it was last built; see [MontageRig.key]. */
     private var montageKey: List<Any> = emptyList()
@@ -51,13 +55,15 @@ internal class ColliderPoseTrack(
         animator.configure(assets.animator, node.animations)
         fillAnimationVariables(context, entity, 1f)
         context.modelToWorld = resolveNodeWorldTransform(entity, node.transform, 1f)
-        animator.applyTo(target, context)
+        animator.applyTo(current.target, context)
         val laid = rig.withMontages(context.montages)
         if (laid.key != montageKey) {
+            val replacement = buildScene(laid.rig)
+            val previous = current
+            current = replacement
             montageKey = laid.key
-            posed = PosedModel(assets.model, laid.rig, null, assetsOf)
-            target = targetOf(posed)
-            animator.applyTo(target, context)
+            previous.close()
+            animator.applyTo(current.target, context)
         } else {
             posed.rig = laid.rig
         }
@@ -71,8 +77,26 @@ internal class ColliderPoseTrack(
         while (history.size > historyTicks) history.removeLast()
     }
 
-    private fun targetOf(posed: PosedModel) =
-        PoseTarget(posed.roots.byIndex(), assets.model.animationsByName, posed.rig.boneByAlias, posed.rig, assets.model.molangDefaults)
+    private fun buildScene(rig: ModelRig): PosedScene {
+        val scene = Scene(object : SceneContext { override val side = logicalSide })
+        try {
+            return PosedScene(scene, PosedModel(assets.model, rig, scene.create("colliders"), "model", assetsOf))
+        } catch (exception: Exception) {
+            try {
+                scene.close()
+            } catch (cleanup: Exception) {
+                if (cleanup !== exception) exception.addSuppressed(cleanup)
+            }
+            throw exception
+        }
+    }
+
+    override fun close() = current.close()
+
+    private class PosedScene(val scene: Scene, val posed: PosedModel) : AutoCloseable {
+        val target = posed.poseTarget()
+        override fun close() = scene.close()
+    }
 }
 
 /**
@@ -102,7 +126,9 @@ internal class ColliderPoseTracks(
         var track = runtime.getOrNull<ColliderPoseTrack>(this)
         if (track == null || track.assets !== assets || track.own != own) {
             runtime.remove(this)
-            track = runtime.getOrPut(this) { ColliderPoseTrack(assets, own, historyTicks, assetsOf) }
+            track = runtime.getOrPut(this) {
+                ColliderPoseTrack(assets, own, historyTicks, assetsOf, if (entity.level().isClientSide) LogicalSide.CLIENT else LogicalSide.SERVER)
+            }
         }
         if (advance || track.history.isEmpty()) track.advance(entity, node)
         return track

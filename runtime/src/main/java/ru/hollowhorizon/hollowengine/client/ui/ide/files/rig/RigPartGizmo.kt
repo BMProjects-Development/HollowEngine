@@ -4,7 +4,7 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.client.editor.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -207,9 +207,9 @@ internal class BoneOriginFrame(private val bone: String, private val origin: Rig
  * taken once, when the frame is: drag events come faster than frames, and the drawn bone lags a step behind
  * the pose being written.
  */
-internal class BonePoseFrame(private val bone: String, private val node: RuntimeNode, private val pose: RigPose?) :
+internal class BonePoseFrame(private val bone: String, private val node: RenderModelNode, private val pose: RigPose?) :
     RigGizmoFrame {
-    private val parent: Mat4f = MutableMat4f((node.parent as? RuntimeNode)?.globalMatrix ?: Mat4f.IDENTITY)
+    private val parent: Mat4f = MutableMat4f((node.attachmentParent as? RenderModelNode)?.globalMatrix ?: Mat4f.IDENTITY)
     private val current = pose ?: RigPose.IDENTITY
     private val animatedTranslation = Vec3f(node.transform.translation) - current.position
     private val animatedRotation = MutableQuatF(node.transform.rotation).mul(current.rotation.inverted()).norm()

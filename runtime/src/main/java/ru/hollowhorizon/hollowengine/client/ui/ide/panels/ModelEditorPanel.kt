@@ -1,7 +1,7 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.panels
 
 import androidx.compose.runtime.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.inspector.CollapsibleSection
@@ -198,7 +198,7 @@ private fun ModelSidebar(viewer: ModelViewerState, width: Float, loaded: Any?) {
 private fun ModelNodeTree(viewer: ModelViewerState, loaded: Any?) {
     val expandedIds = remember(viewer) { mutableStateListOf<String>() }
     val items = remember(loaded, expandedIds.toList(), viewer.nodeVisibilityRevision) {
-        buildList<UiTreeItem<RuntimeNode>> { appendNodeItems(viewer.nodes, expandedIds) }
+        buildList<UiTreeItem<RenderModelNode>> { appendNodeItems(viewer.nodes, expandedIds) }
     }
 
     if (items.isEmpty()) {
@@ -206,7 +206,7 @@ private fun ModelNodeTree(viewer: ModelViewerState, loaded: Any?) {
         return
     }
 
-    fun toggleExpand(item: UiTreeItem<RuntimeNode>) {
+    fun toggleExpand(item: UiTreeItem<RenderModelNode>) {
         if (item.id in expandedIds) expandedIds.remove(item.id) else expandedIds.add(item.id)
     }
 
@@ -221,8 +221,8 @@ private fun ModelNodeTree(viewer: ModelViewerState, loaded: Any?) {
     )
 }
 
-private fun MutableList<UiTreeItem<RuntimeNode>>.appendNodeItems(
-    nodes: List<RuntimeNode>,
+private fun MutableList<UiTreeItem<RenderModelNode>>.appendNodeItems(
+    nodes: List<RenderModelNode>,
     expandedIds: List<String>,
     depth: Int = 0,
 ) {

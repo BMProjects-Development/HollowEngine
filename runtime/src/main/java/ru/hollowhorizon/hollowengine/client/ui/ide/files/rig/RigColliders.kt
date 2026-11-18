@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.colliders.ColliderDebugRenderer
 import ru.hollowhorizon.hollowengine.client.editor.GizmoEditMode
 import ru.hollowhorizon.hollowengine.client.editor.GizmoTransformValues
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.colliders.*
@@ -31,11 +31,11 @@ internal fun publishRig(modelId: String, rig: ModelRig) {
 }
 
 /** The colliders of [rig] on the preview's current pose, in model space. */
-internal fun previewColliders(rig: ModelRig, roots: List<RuntimeNode>): List<EntityCollider> =
+internal fun previewColliders(rig: ModelRig, roots: List<RenderModelNode>): List<EntityCollider> =
     rig.placeColliders(roots, IDENTITY, Vec3.ZERO)
 
 /** The matrix of what a collider hangs on, in model space; the model itself is the identity. */
-internal fun holderMatrix(roots: List<RuntimeNode>, bone: String?): Mat4f? {
+internal fun holderMatrix(roots: List<RenderModelNode>, bone: String?): Mat4f? {
     if (bone == null) return IDENTITY
     return roots.firstNotNullOfOrNull { root -> root.walk().firstOrNull { it.name == bone } }?.globalMatrix
 }

@@ -3,12 +3,16 @@ package ru.hollowhorizon.hollowengine.common.colliders
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
+import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraintsToPose
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.models.*
+import ru.hollowhorizon.hollowengine.common.scene.SceneModelPose
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 
 /**
@@ -16,8 +20,9 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
  * hung on it, which carry colliders of their own.
  */
 internal interface ColliderScope {
-    val roots: List<RuntimeNode>
+    val poseNodes: Collection<ModelPoseNode>
     val rig: ModelRig
+    val isActive: Boolean get() = true
 
     /** Where this model stands in the outermost model's space; null for the outermost model. */
     val modelMatrix: Mat4f?
@@ -25,8 +30,11 @@ internal interface ColliderScope {
 }
 
 /** Every collider of this model and of the models nested in it. */
-internal fun ColliderScope.placeColliders(toEntity: Mat4f, origin: Vec3): List<EntityCollider> =
-    rig.placeColliders(roots, toEntity, origin, modelMatrix) + nested.flatMap { it.placeColliders(toEntity, origin) }
+internal fun ColliderScope.placeColliders(toEntity: Mat4f, origin: Vec3): List<EntityCollider> {
+    if (!isActive) return emptyList()
+    val own = if (rig.hasColliders()) rig.placeCollidersOnPose(poseNodes, toEntity, origin, modelMatrix) else emptyList()
+    return own + nested.flatMap { it.placeColliders(toEntity, origin) }
+}
 
 /**
  * This rig with the colliders of every model nested in it gathered onto the model itself: all an entity's
@@ -72,42 +80,40 @@ internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
  * puts it, with what the rigs pose on top.
  */
 internal class PosedModel(
-    private val model: Model,
+    model: Model,
     override var rig: ModelRig,
-    private val holder: Attachment?,
+    parent: SceneObject,
+    name: String,
     assetsOf: (String) -> ColliderPoseAssets?,
     depth: Int = 0,
-) : ColliderScope {
-    override val roots: List<RuntimeNode> =
-        addRigBones(model.scenes.getOrNull(model.scene)?.nodes.orEmpty().map { RuntimeNode(it, holder) }, rig, holder)
-    private val nodes = roots.flatMap { it.walk() }
-    private val nodesByIndex = nodes.associateBy { it.definition.index }
-    private var authoredConstraintsApplied = false
+) : ColliderScope, AutoCloseable {
+    private val instance = ModelSceneInstance.create(parent, name, model).also { it.setRigBones(rig) }
+    override val poseNodes: Collection<ModelPoseNode> get() = instance.poseNodes
+    private val childrenByParent by lazy(LazyThreadSafetyMode.NONE) { poseNodes.groupBy { it.poseParent } }
+    private val poseChildren: (ModelPoseNode) -> List<ModelPoseNode> = { childrenByParent[it].orEmpty() }
+    fun poseTarget() = instance.poseTarget(rig)
 
-    /** The models hung on this model itself, which no bone carries. */
-    private val onModel = ArrayList<NestHolder>()
-
-    override val modelMatrix: Mat4f? get() = holder?.globalMatrix
+    override val modelMatrix: Mat4f get() = instance.root.worldTransform
+    override val isActive: Boolean get() = instance.root.isActive
 
     override val nested: List<PosedModel> = if (depth >= MAX_NESTING) emptyList() else rig.allAttachments().mapNotNull { (bone, spec) ->
         val attachment = spec as? ModelAttachmentSpec ?: return@mapNotNull null
         val assets = assetsOf(attachment.model) ?: return@mapNotNull null
-        val host = bone?.let { name -> nodes.firstOrNull { it.name == name } ?: return@mapNotNull null }
-        val nest = NestHolder(host ?: holder, attachment)
-        if (host != null) host.attachments += nest else onModel += nest
-        PosedModel(assets.model, assets.rig.overlay(attachment.rig), nest, assetsOf, depth + 1).also { nest.model = it }
+        val host = bone?.let { name -> poseNodes.firstOrNull { it.poseName == name } as? SceneModelPose ?: return@mapNotNull null }
+        val owner = host?.sceneObject ?: instance.root
+        val holder = owner.mountModel(attachment)
+        PosedModel(assets.model, assets.rig.overlay(attachment.rig), holder, holder.name, assetsOf, depth + 1)
     }
 
     /** Puts every node of this model and of the models nested in it back at rest. */
     fun resetPose() {
-        authoredConstraintsApplied = false
-        nodes.forEach(RuntimeNode::resetPose)
+        instance.resetPose()
         nested.forEach(PosedModel::resetPose)
     }
 
     /** Lays what the rigs pose over whatever the animator left, here and in every nested model. */
     fun applyRigPoses() {
-        applyRigPose(roots, rig)
+        instance.applyRigPose(rig)
         nested.forEach(PosedModel::applyRigPoses)
     }
 
@@ -116,33 +122,15 @@ internal class PosedModel(
      * one, which the animator moves, has anything to bend.
      */
     fun applyRigConstraints(context: AnimatorEvaluationContext) {
-        applyAuthoredConstraints()
-        applyRigConstraints(roots, rig, context)
-    }
-
-    private fun applyAuthoredConstraints() {
-        if (authoredConstraintsApplied) return
-        model.constraints.forEach { it.apply(nodesByIndex) }
-        authoredConstraintsApplied = true
+        instance.applyAuthoredConstraints()
+        applyRigConstraintsToPose(poseNodes, rig, context, childrenOf = poseChildren)
     }
 
     /** Turns the posed nodes into matrices, the nested models' with them. */
     fun updateMatrices() {
-        applyAuthoredConstraints()
-        roots.forEach(RuntimeNode::updateHierarchyMatrices)
-        onModel.forEach(Attachment::updateGlobalMatrix)
+        instance.applyAuthoredConstraints()
+        nested.forEach(PosedModel::updateMatrices)
     }
 
-    private class NestHolder(parent: Attachment?, spec: ModelAttachmentSpec) : Attachment(parent) {
-        lateinit var model: PosedModel
-
-        init {
-            transform.set(spec.localTransform())
-        }
-
-        override fun updateGlobalMatrix() {
-            super.updateGlobalMatrix()
-            model.updateMatrices()
-        }
-    }
+    override fun close() = instance.close()
 }

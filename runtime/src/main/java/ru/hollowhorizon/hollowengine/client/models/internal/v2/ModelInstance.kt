@@ -85,12 +85,12 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
     }
 
     /** The bones montages hid or showed last frame, with whether each was drawn before they did. */
-    private val shownBones = HashMap<RuntimeNode, Boolean>()
+    private val shownBones = HashMap<RenderModelNode, Boolean>()
 
     /** Shows or hides the bones the montages playing key, and gives the ones they let go of back. */
     private fun showBones(context: AnimatorEvaluationContext) {
         if (context.montages.isEmpty() && shownBones.isEmpty()) return
-        val keyed = HashMap<RuntimeNode, Boolean>()
+        val keyed = HashMap<RenderModelNode, Boolean>()
         context.montages.forEach { moment ->
             moment.montage.bones.forEach { track ->
                 if (track.property != MontageBoneProperty.VISIBLE) return@forEach
@@ -110,9 +110,17 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
      * Advances the animation and leaves the nodes ready to draw, once per frame.
      */
     fun update(context: AnimatorEvaluationContext, frame: Long = TickHandler.renderFrame) {
+        if (attachment.sceneRoot.isRemoved) return
         if (posedFrame == frame) return
         posedFrame = frame
-        if (isSettled()) return
+        if (isSettled()) {
+            if (settledSceneRevision != attachment.sceneRevision || settledParentRevision != attachment.parentRevision) {
+                attachment.refreshScenePose()
+                settledSceneRevision = attachment.sceneRevision
+                settledParentRevision = attachment.parentRevision
+            }
+            return
+        }
 
         pendingRig?.let { rig ->
             pendingRig = null
@@ -122,7 +130,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         animator.applyTo(attachment, context)
         layMontages(context)
         attachment.evaluateConditions(context)
-        applyRigPose(attachment.nodes, attachment.rig)
+        attachment.applyRigPose()
         attachment.applyAuthoredConstraints()
         applyRigConstraints(attachment.nodes, attachment.rig, context, grounding)
         attachment.endPose()
@@ -130,11 +138,15 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         val still = animator.isEmpty && !attachment.carriesEffects && attachment.rig.ikChains().isEmpty()
         settledRig = if (still) attachment.rig else null
         settledModel = attachment.model
+        settledSceneRevision = attachment.sceneRevision
+        settledParentRevision = attachment.parentRevision
     }
 
     /** The rig and model of the last pose, when nothing in it moves by itself; see [isSettled]. */
     private var settledRig: ModelRig? = null
     private var settledModel: Model? = null
+    private var settledSceneRevision = 0
+    private var settledParentRevision = 0
 
     /**
      * Whether the last pose is the one the next would give: no animation plays, nothing reads the entity or the world,
@@ -142,7 +154,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
      */
     private fun isSettled(): Boolean =
         settledRig != null && pendingRig == null && animator.isEmpty &&
-            settledRig === attachment.rig && settledModel === attachment.model
+            settledRig === attachment.rig && settledModel === attachment.flow.value
 
     private fun dress() = attachment.applyMaterials(materials?.materials ?: emptyMap())
 }

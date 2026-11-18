@@ -5,7 +5,7 @@ import ru.hollowhorizon.hollowengine.client.decals.DecalExtents
 import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.decals.DecalGuidePart
 import ru.hollowhorizon.hollowengine.client.decals.DecalShapes
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
@@ -16,7 +16,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
  * Shows how the decals of [rig] are cast, where their attachments are in the preview: what each reaches, and for the
  * one [selected] also the face it is cast from, the top of its picture and the way it is cast.
  */
-internal fun DebugLines.Batch.decalShapes(rig: ModelRig, roots: List<RuntimeNode>, selected: RigPartSelection?) {
+internal fun DebugLines.Batch.decalShapes(rig: ModelRig, roots: List<RenderModelNode>, selected: RigPartSelection?) {
     rig.allAttachments().forEach { (bone, spec) ->
         if (spec !is DecalAttachmentSpec) return@forEach
         val holder = holderMatrix(roots, bone) ?: return@forEach

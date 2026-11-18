@@ -1,4 +1,5 @@
 
+import ru.hollowhorizon.hollowengine.client.models.renderModelNode
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.client.models.bedrock.BedrockContext
@@ -7,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.Animation
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
@@ -514,7 +515,7 @@ class AnimatorRuntimeTests {
         val baseTransform = TrsTransformF().apply {
             translate(Vec3f(0f, 10f, 0f))
         }
-        val node = RuntimeNode(
+        val node = renderModelNode(
             NodeDefinition(
                 index = 0,
                 name = "Bone",
@@ -554,8 +555,8 @@ class AnimatorRuntimeTests {
         playMode = playMode,
     )
 
-    private fun testNode(): RuntimeNode =
-        RuntimeNode(
+    private fun testNode(): RenderModelNode =
+        renderModelNode(
             NodeDefinition(
                 index = 0,
                 name = "Bone",
@@ -637,7 +638,7 @@ private fun animationContext(
  * Two calls because the animator takes its step from the clock rather than from a delta handed to it:
  * the first one only sets the clock, the second one is the frame being tested.
  */
-private fun ModelAnimator.step(node: RuntimeNode, seconds: Float) {
+private fun ModelAnimator.step(node: RenderModelNode, seconds: Float) {
     val target = PoseTarget(mapOf(node.definition.index to node), mapOf("wave" to waveAnimation()))
     node.resetPose()
     applyTo(target, animationContext(time = clockTicks))

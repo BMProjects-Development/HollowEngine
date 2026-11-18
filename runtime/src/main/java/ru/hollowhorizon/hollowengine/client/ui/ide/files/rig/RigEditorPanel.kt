@@ -5,7 +5,7 @@ import kotlinx.coroutines.delay
 import ru.hollowhorizon.hollowengine.client.editor.GizmoTarget
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.rig.*
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.render.DebugSkeletonRenderer
 import ru.hollowhorizon.hollowengine.client.ui.*
@@ -81,7 +81,7 @@ internal fun RigEditorPanel(file: HollowIdeOpenFile) {
         }
     }
 
-    val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RuntimeNode::name) } }
+    val bones = remember(model) { viewer.nodes.flatMap { node -> node.walk().map(RenderModelNode::name) } }
 
     PublishInspector(source = "rig-${file.path}", key = Triple(state.selected, state.selectedPart, bones)) {
         rigInspectorTarget(document, state, bones)
@@ -152,7 +152,9 @@ private fun GenerateButton(document: HollowIdeRigDocument, viewer: ModelViewerSt
         items = generators.map { entry ->
             UiDropdownItem(entry.titleKey.lang, mark = UiMenuParts.icon(entry.icon)) {
                 viewer.attachment.ensureReady()
-                document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(viewer.attachment, it) }
+                val attachment = viewer.attachment
+                val source = RigGenerationSource(attachment.model, attachment.nodes.flatMap { it.walk() })
+                document.edit(label = UndoLabel(entry.titleKey)) { entry.generator.generate(source, it) }
             }
         },
         onExpandedChange = { if (!it) open = false },
@@ -228,7 +230,7 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
         path.dropLast(1).forEach { name -> if (name !in expanded) expanded += name }
     }
 
-    private fun pathTo(node: RuntimeNode, bone: String): List<String>? {
+    private fun pathTo(node: RenderModelNode, bone: String): List<String>? {
         if (node.name == bone) return listOf(node.name)
         return node.children.firstNotNullOfOrNull { child -> pathTo(child, bone) }?.let { listOf(node.name) + it }
     }

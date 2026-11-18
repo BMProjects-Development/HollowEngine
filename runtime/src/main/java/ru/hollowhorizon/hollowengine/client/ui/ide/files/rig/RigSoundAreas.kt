@@ -1,6 +1,6 @@
 package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.RuntimeNode
+import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
@@ -11,7 +11,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
  * Outlines the areas the sounds of [rig] fill, where their attachments are in the preview; the one [selected] stands
  * out.
  */
-internal fun DebugLines.Batch.soundAreas(rig: ModelRig, roots: List<RuntimeNode>, selected: RigPartSelection?) {
+internal fun DebugLines.Batch.soundAreas(rig: ModelRig, roots: List<RenderModelNode>, selected: RigPartSelection?) {
     rig.allAttachments().forEach { (bone, spec) ->
         if (spec !is SoundBoneAttachmentSpec || spec.areas.isEmpty()) return@forEach
         val holder = holderMatrix(roots, bone) ?: return@forEach

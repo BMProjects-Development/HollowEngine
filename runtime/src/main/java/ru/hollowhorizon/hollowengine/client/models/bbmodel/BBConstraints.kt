@@ -1,11 +1,10 @@
 package ru.hollowhorizon.hollowengine.client.models.bbmodel
 
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelPoseConstraint
-import ru.hollowhorizon.hollowengine.client.models.internal.SharedModelPoseConstraint
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelMatrix
-import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelRotation
 import ru.hollowhorizon.hollowengine.common.models.IkSolver
 import ru.hollowhorizon.hollowengine.common.models.ModelPoseNode
+import ru.hollowhorizon.hollowengine.common.models.modelMatrix
+import ru.hollowhorizon.hollowengine.common.models.modelRotation
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableQuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
@@ -42,8 +41,8 @@ private class BBIKConstraint(
     private val chain: List<Int>,
     private val pole: Int?,
     private val lockEndRotation: Boolean,
-) : SharedModelPoseConstraint {
-    override fun applyPose(nodes: Map<Int, ModelPoseNode>) {
+) : ModelPoseConstraint {
+    override fun apply(nodes: Map<Int, ModelPoseNode>) {
         val control = nodes[controller] ?: return
         // Blockbench enables an IK controller only while its animation has keys.
         if (!control.acceptsPose || !control.isAnimated || chain.size < 2) return

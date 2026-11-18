@@ -11,7 +11,7 @@ import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix3f
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat3f
 
-class ItemNode(val entity: () -> LivingEntity?, val slot: EquipmentSlot, parent: Attachment?): Attachment(parent) {
+class ItemNode(val entity: () -> LivingEntity?, val slot: EquipmentSlot, parent: Attachment?): BaseAttachment(parent) {
     override fun collectCommands(pipeline: RenderPipeline) {
         super.collectCommands(pipeline)
         pipeline.addBatchedRenderable {
