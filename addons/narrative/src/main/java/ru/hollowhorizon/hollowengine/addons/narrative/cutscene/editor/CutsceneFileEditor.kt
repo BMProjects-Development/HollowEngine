@@ -33,13 +33,12 @@ internal val CutsceneFileType = HollowIdeFileType(
     tracksDocumentChanges = true,
 )
 
-internal val CreateCutscene = WorldSceneAction { ide ->
+private fun createCutsceneItem(ide: HollowIdeContext): UiDropdownItem =
     UiDropdownItem(
         CutsceneLang.CREATE.lang,
         mark = UiMenuParts.icon(CutsceneIcon),
         enabled = Minecraft.getInstance().player != null,
     ) { createCutscene(ide) }
-}
 
 private fun createCutscene(ide: HollowIdeContext) {
     ide.createFile(
@@ -111,7 +110,7 @@ private fun CutsceneScene(file: HollowIdeOpenFile, ide: HollowIdeContext?, sessi
             onSelect = { selected = it },
             onToggle = {},
             menu = { id ->
-                if (id == null && ide != null) listOf(CreateCutscene.item(ide))
+                if (id == null && ide != null) listOf(createCutsceneItem(ide))
                 else listOf(
                     UiDropdownItem(
                         CutsceneLang.INSERT_CAMERA_KEY.lang,

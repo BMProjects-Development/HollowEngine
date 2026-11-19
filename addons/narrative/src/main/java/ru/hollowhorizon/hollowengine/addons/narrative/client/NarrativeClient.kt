@@ -1,7 +1,6 @@
 package ru.hollowhorizon.hollowengine.addons.narrative.client
 
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.CutsceneCameraSystem
-import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CreateCutscene
 import ru.hollowhorizon.hollowengine.addons.narrative.cutscene.editor.CutsceneFileType
 import ru.hollowhorizon.hollowengine.addons.narrative.ide.graph.StoryGraphFilePreview
 import ru.hollowhorizon.hollowengine.client.camera.CameraDirector
@@ -25,7 +24,6 @@ internal object NarrativeClient {
         extensions.register(CameraDirector.sources, "cutscene", CutsceneCameraSystem, CUTSCENE_CAMERA_PRIORITY)
         extensions.register(CameraDirector.sources, "story", StoryCameraSystem)
         extensions.registerIdeFileType(CutsceneFileType)
-        extensions.register(HollowIdeExtensionPoints.WORLD_SCENE_ACTIONS, "cutscene", CreateCutscene)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "speech", DialogueOverlays.speech)
         extensions.register(UiDefinitionRegistry.builtInOverlays, "choice", DialogueOverlays.choice)
         extensions.registerIdePreview(StoryGraphFilePreview)
