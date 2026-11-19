@@ -16,7 +16,7 @@ class SceneObject internal constructor(
     val createdId: UUID?,
     occurrence: Int,
     internal val isSynthetic: Boolean = false,
-) : SceneComponentOwner {
+) : ComponentOwner {
     internal var physicalParent: SceneObject? = physicalParent
         private set
     private var ownChildren: MutableList<SceneObject>? = null
@@ -25,17 +25,18 @@ class SceneObject internal constructor(
         private set
     private var visibleChildren: List<SceneObject>? = null
     private var childIndex: ChildIndex? = null
-    private var componentState: SceneComponentSet? = null
+    private var componentState: SceneComponentStore? = null
     internal var observer: SceneObjectObserver? = null
         private set
-    private val componentSet: SceneComponentSet
-        get() = componentState ?: SceneComponentSet(this).also { componentState = it }
+    private val componentSet: SceneComponentStore
+        get() = componentState ?: SceneComponentStore(this).also { componentState = it }
     /** Authored children; the snapshot is reused until the relevant subtree changes. */
     val children: List<SceneObject>
         get() = visibleChildren ?: buildList { collectVisibleChildren(this) }.also { visibleChildren = it }
     /** Moves between synthetic transforms preserve this logical parent. */
     val parent: SceneObject? = if (physicalParent?.isSynthetic == true) physicalParent.parent else physicalParent
-    override val components: List<SceneComponent<*>> get() = componentState?.components ?: emptyList()
+    override val components: Map<UUID, Any> get() = componentState?.components ?: emptyMap()
+    override fun component(id: UUID): Any? = componentState?.component(id)
     var name: String = name
         private set
     private var occurrence: Int = occurrence
@@ -215,14 +216,12 @@ class SceneObject internal constructor(
         }
     }
 
-    override fun <T : Any> addComponent(type: SceneComponentType<T>, data: T, id: UUID): SceneComponent<T> =
-        componentSet.add(type, data, id)
-
-    override fun component(id: UUID): SceneComponent<*>? = componentState?.component(id)
-    override fun <T : Any> components(type: SceneComponentType<T>): List<SceneComponent<T>> =
-        componentState?.components(type) ?: emptyList()
-    override fun <T : Any> component(type: SceneComponentType<T>): SceneComponent<T>? = componentState?.component(type)
-    override fun removeComponent(id: UUID): Boolean = componentSet.remove(id)
+    override fun attach(value: Any, id: UUID, enabled: Boolean): UUID = componentSet.add(value, id, enabled)
+    internal fun restoreUnknown(value: Any, id: UUID) = componentSet.restoreUnknown(value, id)
+    override fun setComponent(id: UUID, value: Any) = componentSet.set(id, value)
+    override fun componentEnabled(id: UUID): Boolean = componentState?.enabled(id) == true
+    override fun setComponentEnabled(id: UUID, enabled: Boolean) = componentSet.setEnabled(id, enabled)
+    override fun detach(id: UUID): Boolean = componentState?.remove(id) == true
 
     internal fun observe(value: SceneObjectObserver) {
         checkAttached()

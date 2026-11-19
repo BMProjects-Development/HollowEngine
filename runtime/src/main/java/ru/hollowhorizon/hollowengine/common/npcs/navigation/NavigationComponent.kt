@@ -7,6 +7,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.ai.attributes.Attributes
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
@@ -21,6 +22,7 @@ private const val LANG = "hollowengine.component.hollowengine.entity.navigation"
  * the NPC move and needs nothing of this.
  */
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:entity/navigation")
 @EditorIcon("hollowengine:textures/gui/icons/curve.svg")

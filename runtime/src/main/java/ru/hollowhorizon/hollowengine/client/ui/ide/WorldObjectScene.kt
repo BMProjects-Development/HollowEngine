@@ -21,7 +21,6 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 import java.util.*
 
 /** One loaded object as scene window lists it, read off entity on game thread. */
@@ -31,6 +30,7 @@ private data class WorldObjectRow(
     val parent: UUID?,
     val label: String,
     val icon: String,
+    val hasParts: Boolean,
     val parts: ObjectParts?,
     /** Whether the object itself falls within the chosen [WorldSceneScope]. */
     val inScope: Boolean,
@@ -62,7 +62,6 @@ internal object WorldObjectScene {
     private const val SCOPE_REFRESH_TICKS = 10
 
     private const val MODEL_ICON = "hollowengine:textures/gui/icons/files/model.svg"
-    private const val EFFECT_ICON = "hollowengine:textures/gui/icons/files/effect.svg"
 
     /** Rebuilt on the game thread after a change, read by the scene window's composition. */
     private var rows by mutableStateOf<List<WorldObjectRow>>(emptyList())
@@ -104,15 +103,17 @@ internal object WorldObjectScene {
 
     private fun rowOf(entity: WorldObjectEntity): WorldObjectRow {
         val model = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelOrNull()
-        val icon = when {
-            model == null -> WorldObjectEditing.EMPTY_ICON
-            !model.isEmpty -> MODEL_ICON
-            model.rig.allAttachments().any { it.second is VfxBoneAttachmentSpec } -> EFFECT_ICON
-            else -> WorldObjectEditing.EMPTY_ICON
-        }
+        val components = entity.sceneObjectOrNull?.components.orEmpty()
+        val icon = if (model?.isEmpty == false) MODEL_ICON else
+            components.values.firstOrNull()?.let(::componentIcon)
+                ?: model?.rig?.attachments?.firstOrNull()?.let(::attachmentIcon)
+                ?: WorldObjectEditing.EMPTY_ICON
         val parts = if (entity.uuid.toString() in expanded) WorldObjectParts.of(entity) else null
         if (parts?.loading == true) dirty = true
-        return WorldObjectRow(entity.id, entity.uuid, entity.parentId, entity.name.string, icon, parts, inScope(entity))
+        return WorldObjectRow(
+            entity.id, entity.uuid, entity.parentId, entity.name.string, icon, model != null || components.isNotEmpty(),
+            parts, inScope(entity),
+        )
     }
 
     private fun inScope(entity: WorldObjectEntity): Boolean {
@@ -231,7 +232,7 @@ internal object WorldObjectScene {
                     depth = depth,
                     payload = row.entityId,
                     icon = row.icon,
-                    hasChildren = true,
+                    hasChildren = row.hasParts || !children[row.uuid].isNullOrEmpty(),
                     expanded = open(id),
                     selected = row.entityId == selected && WorldObjectParts.selected == null,
                 )
@@ -285,15 +286,14 @@ internal object WorldObjectScene {
         WorldObjectEditing.select(target.id)
     }
 
-    /** The parts of the object with [uuid], as last read; null while its row is closed. */
-    fun partsOf(uuid: UUID): ObjectParts? = rows.firstOrNull { it.uuid == uuid }?.parts
-
     /** Opens the row [id], so what was just put under it shows. */
     fun expand(id: String) {
         if (id in expanded) return
         expanded += id
         dirty = true
     }
+
+    fun partsOf(uuid: UUID): ObjectParts? = rows.firstOrNull { it.uuid == uuid }?.parts
 
     /** The part a row stands for, with the parts of its object as last read. */
     private fun partOf(id: String?): Pair<PartRef, ObjectParts>? {

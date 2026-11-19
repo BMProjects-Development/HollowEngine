@@ -104,7 +104,7 @@ internal fun MontageEditorPanel(file: HollowIdeOpenFile) {
         if (bone == null && rigState.selectedPart == null && state.sceneLane != null) return@LaunchedEffect
         state.sceneLane = null
         val part = rigState.selectedPart?.takeIf { state.rigs.rig.holder(bone).attachment(it) != null }
-        val attachments = document.montage.attachments.filter { it.bone == bone }.map { it.spec.id }
+        val attachments = document.montage.attachments.filter { it.bone == bone }.map { it.spec.rigId }
         session.select(bone, attachments + listOfNotNull(part), selectedAttachment = part)
     }
 
@@ -266,8 +266,8 @@ internal class MontageEditorState(val document: HollowIdeMontageDocument, privat
         state.viewer.playsSounds = true
         state.viewer.effectEmitting = { bone, id, seconds ->
             val montage = document.montage
-            val own = montage.attachments.firstOrNull { it.bone == bone && it.spec.id == id }
-                ?: montage.attachments.firstOrNull { it.bone == null && it.spec.id == id }
+            val own = montage.attachments.firstOrNull { it.bone == bone && it.spec.rigId == id }
+                ?: montage.attachments.firstOrNull { it.bone == null && it.spec.rigId == id }
             own?.isActive(seconds) ?: true
         }
     }

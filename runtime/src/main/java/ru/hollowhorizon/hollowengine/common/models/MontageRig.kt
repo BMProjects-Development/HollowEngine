@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.elementDescriptors
@@ -8,7 +9,11 @@ import kotlinx.serialization.descriptors.getPolymorphicDescriptors
 import kotlinx.serialization.json.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
+import ru.hollowhorizon.hollowengine.common.sounds.Sound
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
+import ru.hollowhorizon.hollowengine.common.vfx.VfxTrackCurve
 
 /** One montage as it plays this frame: where in it, and how much it counts. */
 class MontageMoment(val montage: Montage, val time: Float, val weight: Float)
@@ -28,29 +33,51 @@ fun ModelRig.withMontages(moments: List<MontageMoment>): MontageRig {
 
 /** What [MontageRig.key] is for [moments], without laying them over anything. */
 fun montageKey(moments: List<MontageMoment>): List<Any> =
-    moments.map { moment -> moment.montage to moment.present().map { it.bone to it.spec.id } }
+    moments.map { moment ->
+        moment.montage to moment.montage.attachments.mapNotNull {
+            if (it.spec.keepsRuntimeBetweenWindows || it.windows.any { window -> window.contains(moment.time) }) {
+                it.bone to it.spec.rigId
+            } else null
+        }
+    }
 
 /**
- * What the montage hangs on the model at its moment: what is in one of its stretches, and what stays between
- * them as [RigAttachmentSpec.held] says, so taking it out of a stretch does not build the model again.
+ * Legacy montage windows retain sound and effect runtimes between stretches so playback can stop
+ * without dropping the instance or its remaining particles.
  */
 private fun MontageMoment.present(): List<MontageAttachment> = montage.attachments.mapNotNull { attachment ->
     val stretch = attachment.windows.firstOrNull { it.contains(time) }
-    if (stretch != null) attachment.copy(spec = attachment.spec.inStretch(time - stretch.start))
-    else attachment.spec.held()?.let { attachment.copy(spec = it) }
+    when (val spec = attachment.spec) {
+        is Sound -> {
+            val playing = if (stretch == null) spec.copy(playing = false, clock = null)
+            else spec.copy(clock = time - stretch.start)
+            attachment.copy(spec = playing)
+        }
+        is VfxComponent -> if (stretch == null) attachment.copy(spec = spec.copy(emitting = false)) else attachment
+        else -> attachment.takeIf { stretch != null }
+    }
 }
 
+private val Any.keepsRuntimeBetweenWindows: Boolean get() = this is Sound || this is VfxComponent
+
 private fun ModelRig.withMontage(moment: MontageMoment, present: List<MontageAttachment>): ModelRig {
-    var rig = if (present.isEmpty()) this else overlay(
-        ModelRig(
-            bones = present.filter { it.bone != null }.groupBy { it.bone!! }
-                .mapValues { (_, hung) -> RigBone(attachments = hung.map { it.spec }) },
-            attachments = present.filter { it.bone == null }.map { it.spec },
-        )
-    )
-    return rig.withTracks(moment.montage.tracks, moment.time) { bone, id ->
-        if (present.any { it.bone == bone && it.spec.id == id }) 1f else moment.weight
+    val rig = overlay(moment.montage.attachmentRig(present)).withOriginTracks(moment.montage.bones, moment.time) { bone ->
+        if (bone in moment.montage.createdNodes) 1f else moment.weight
     }
+    return rig.withTracks(moment.montage.tracks, moment.time) { bone, id ->
+        if (present.any { it.bone == bone && it.spec.rigId == id }) 1f else moment.weight
+    }
+}
+
+internal fun Montage.attachmentRig(entries: List<MontageAttachment> = attachments): ModelRig {
+    if (entries.isEmpty() && createdNodes.isEmpty()) return ModelRig.EMPTY
+    val bones = createdNodes.mapValuesTo(LinkedHashMap()) { (_, origin) -> RigBone(origin = origin) }
+    val roots = ArrayList<Any>()
+    for ((bone, spec) in entries) {
+        if (bone == null) roots.add(spec)
+        else bones[bone] = (bones[bone] ?: RigBone.EMPTY).withAttachment(spec)
+    }
+    return ModelRig(bones, roots)
 }
 
 /**
@@ -62,11 +89,65 @@ fun ModelRig.withTracks(
     time: Float,
     weight: (bone: String?, id: String) -> Float = { _, _ -> 1f },
 ): ModelRig = tracks.fold(this) { rig, track ->
-    val holder = rig.holder(track.bone)
-    val spec = holder.attachment(track.attachment) ?: return@fold rig
+    val direct = rig.holder(track.bone)
+    val spec = direct.attachment(track.attachment)
+    if (spec == null) {
+        val bone = track.migratedNode
+        val child = rig.bone(bone) ?: return@fold rig
+        val origin = child.origin ?: return@fold rig
+        val property = legacyPlacementProperty(track.property)
+        if (property != null) {
+            val curves = if (property == MontageBoneProperty.SCALE) {
+                track.curves.firstOrNull { it.channel == 0 }?.let { curve -> List(3) { curve.copy(channel = it) } }.orEmpty()
+            } else track.curves
+            return@fold rig.withBone(bone, child.copy(origin = origin.applyTrack(property, curves, time, weight(track.bone, track.attachment))))
+        }
+        val existing = child.attachment(track.attachment) ?: return@fold rig
+        val driven = RigFields.drive(existing, track.property, time, track, weight(track.bone, track.attachment)) ?: return@fold rig
+        return@fold rig.withBone(bone, child.withAttachment(driven))
+    }
     val driven =
         RigFields.drive(spec, track.property, time, track, weight(track.bone, track.attachment)) ?: return@fold rig
-    rig.withHolder(track.bone, holder.withAttachment(driven))
+    rig.withHolder(track.bone, direct.withAttachment(driven))
+}
+
+internal fun legacyPlacementProperty(name: String): MontageBoneProperty? = when (name) {
+    "offset" -> MontageBoneProperty.POSITION
+    "rotation" -> MontageBoneProperty.ROTATION
+    "scale" -> MontageBoneProperty.SCALE
+    else -> null
+}
+
+internal fun ModelRig.withOriginTracks(
+    tracks: List<MontageBoneTrack>,
+    time: Float,
+    weight: (String) -> Float = { 1f },
+): ModelRig = tracks.fold(this) { rig, track ->
+    if (!track.absoluteOrigin) return@fold rig
+    val node = rig.bone(track.bone) ?: return@fold rig
+    val origin = node.origin ?: return@fold rig
+    rig.withBone(track.bone, node.copy(origin = origin.applyTrack(track.property, track.curves, time, weight(track.bone))))
+}
+
+private fun RigBoneOrigin.applyTrack(
+    property: MontageBoneProperty,
+    curves: List<VfxTrackCurve>,
+    time: Float,
+    weight: Float,
+): RigBoneOrigin {
+    fun drive(base: Vec3f): Vec3f {
+        fun value(axis: Int, rest: Float): Float {
+            val curve = curves.firstOrNull { it.channel == axis && it.visible && it.keys.isNotEmpty() } ?: return rest
+            return rest + (VfxCurve(curve.keys).valueAt(time) - rest) * weight.coerceIn(0f, 1f)
+        }
+        return Vec3f(value(0, base.x), value(1, base.y), value(2, base.z))
+    }
+    return when (property) {
+        MontageBoneProperty.POSITION -> copy(offset = drive(offset))
+        MontageBoneProperty.ROTATION -> copy(rotation = drive(rotation))
+        MontageBoneProperty.SCALE -> copy(scale = drive(scale))
+        MontageBoneProperty.VISIBLE -> this
+    }
 }
 
 /**
@@ -82,13 +163,13 @@ object RigFields {
     class Field(val name: String, val kind: Kind, val values: FloatArray)
 
     /** The numbers [property] of [spec] holds, or null when it is no such field or holds no plain numbers. */
-    fun read(spec: RigAttachmentSpec, property: String): FloatArray? = tree(spec)?.at(property)?.numbers()
+    fun read(spec: Any, property: String): FloatArray? = tree(spec)?.at(property)?.numbers()
 
     /**
      * Every field of [spec] a montage can animate, as it is stored; its id and kind are never among them. Fields of
      * nested objects and lists are named by their path, as `playback.volume` or `playback.filters.0.cutoff`.
      */
-    fun animatable(spec: RigAttachmentSpec): List<Field> {
+    fun animatable(spec: Any): List<Field> {
         val tree = tree(spec) ?: return emptyList()
         val descriptor = RigAttachmentTypes.of(spec)?.serializer?.descriptor
         return buildList { collect(tree, descriptor, "", this) }
@@ -151,13 +232,14 @@ object RigFields {
      * Null when it has no such field or the result does not read back as that kind of attachment.
      */
     fun drive(
-        spec: RigAttachmentSpec,
+        spec: Any,
         property: String,
         time: Float,
         track: MontageTrack,
         weight: Float,
-    ): RigAttachmentSpec? {
-        val tree = tree(spec) ?: return null
+    ): Any? {
+        val serializer = serializerOf(spec) ?: return null
+        val tree = tree(spec, serializer) ?: return null
         val authored = tree.at(property) ?: return null
         val from = authored.numbers()
         val channels = from?.size ?: ((track.curves.maxOfOrNull { it.channel } ?: 0) + 1)
@@ -169,21 +251,17 @@ object RigFields {
             if (start == null) value else start + (value - start) * weight.coerceIn(0f, 1f)
         }
         val replaced = tree.with(property.split('.'), authored.withNumbers(values)) as? JsonObject ?: return null
-        return runCatching {
-            MontageFormat.fields.decodeFromJsonElement(
-                RigAttachmentSpec.serializer(),
-                replaced
-            )
-        }.getOrNull()
+        return runCatching { MontageFormat.fields.decodeFromJsonElement(serializer, replaced) }.getOrNull()
     }
 
     /**
      * The fields [after] holds otherwise than [before], by their paths: as deep as both hold the same shape, so an
      * edit of one number in a nested object names that number.
      */
-    fun changed(before: RigAttachmentSpec, after: RigAttachmentSpec): List<String> {
+    fun changed(before: Any, after: Any): List<String> {
         val from = tree(before) ?: return emptyList()
         val to = tree(after) ?: return emptyList()
+        if (before::class != after::class) return listOf("")
         return buildList { diff(from, to, "", this) }
     }
 
@@ -203,28 +281,26 @@ object RigFields {
     private fun join(path: String, name: String) = if (path.isEmpty()) name else "$path.$name"
 
     /** [into] with the fields at [names] taken from [from]; null when that does not read back. */
-    fun copy(from: RigAttachmentSpec, into: RigAttachmentSpec, names: Collection<String>): RigAttachmentSpec? {
+    fun copy(from: Any, into: Any, names: Collection<String>): Any? {
         if (names.isEmpty()) return into
         val source = tree(from) ?: return null
-        val target = tree(into) ?: return null
+        val serializer = serializerOf(into) ?: return null
+        val target = tree(into, serializer) ?: return null
         val merged = names.fold(target as JsonElement) { tree, name ->
             val value = source.at(name) ?: return@fold tree
             if (tree.at(name) == null) tree.withNew(name, value) else tree.with(name.split('.'), value)
         }
-        return runCatching {
-            MontageFormat.fields.decodeFromJsonElement(
-                RigAttachmentSpec.serializer(),
-                merged
-            )
-        }.getOrNull()
+        return runCatching { MontageFormat.fields.decodeFromJsonElement(serializer, merged) }.getOrNull()
     }
 
-    private fun tree(spec: RigAttachmentSpec): JsonObject? = runCatching {
-        MontageFormat.fields.encodeToJsonElement(
-            RigAttachmentSpec.serializer(),
-            spec
-        ) as? JsonObject
-    }.getOrNull()
+    @Suppress("UNCHECKED_CAST")
+    private fun serializerOf(spec: Any): KSerializer<Any>? =
+        RigAttachmentTypes.of(spec)?.serializer as? KSerializer<Any>
+
+    private fun tree(spec: Any): JsonObject? = serializerOf(spec)?.let { tree(spec, it) }
+
+    private fun tree(spec: Any, serializer: KSerializer<Any>): JsonObject? =
+        runCatching { MontageFormat.fields.encodeToJsonElement(serializer, spec) as? JsonObject }.getOrNull()
 
     /** What lies at [path], its steps names of fields or indices of lists. */
     private fun JsonElement.at(path: String): JsonElement? = path.split('.').fold(this as JsonElement?) { element, name ->

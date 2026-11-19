@@ -16,6 +16,7 @@ import ru.hollowhorizon.hollowengine.client.keymap.HollowKeys
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNull
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
 import ru.hollowhorizon.hollowengine.client.ui.entity.EntityEditorClient
+import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
 import ru.hollowhorizon.hollowengine.client.ui.notification.HollowNotifications
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
@@ -168,6 +169,7 @@ object WorldObjectEditing {
      * makes sense from a list, like going to an object that is not in view.
      */
     fun menu(target: WorldObjectEntity, inScene: Boolean): List<UiDropdownItem> = buildList {
+        addAll(WorldObjectParts.rootMenu(target))
         add(
             UiDropdownItem(
                 "$LANG.duplicate".lang,

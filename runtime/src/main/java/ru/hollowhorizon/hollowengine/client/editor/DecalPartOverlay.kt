@@ -26,10 +26,9 @@ internal object DecalPartOverlay {
     @SubscribeEvent
     fun onRenderLevel(event: RenderLevelStageEvent) {
         if (WorldCameraPreviewRenderer.isRendering || event.stage != RenderStage.AFTER_ENTITIES) return
-        val part = WorldObjectParts.selectedPart() as? AttachmentGizmo ?: return
-        val decal = part.decal ?: return
+        val (decal, matrix) = WorldObjectParts.selectedDecal(event.partialTick) ?: return
         val camera = event.camera.position
-        val world = part.worldMatrix(event.partialTick).asMatrix4f()
+        val world = matrix.asMatrix4f()
         val placement = Matrix4f(world).setTranslation(
             (world.m30() - camera.x).toFloat(),
             (world.m31() - camera.y).toFloat(),
@@ -38,10 +37,10 @@ internal object DecalPartOverlay {
         Decals.submit(DecalDraw(decal, placement, overlay = true))
     }
 
-    /** Draws the guide of the decal [part] is over the frame, in the space of [WorldToScreenProjector]. */
-    fun drawGuide(scope: UiCanvasDrawScope, part: AttachmentGizmo) {
-        val decal = part.decal ?: return
-        val placement = part.worldMatrix(TickHandler.partialTick).asMatrix4f()
+    /** Draws the selected decal in the space of [WorldToScreenProjector]. */
+    fun drawGuide(scope: UiCanvasDrawScope) {
+        val (decal, matrix) = WorldObjectParts.selectedDecal(TickHandler.partialTick) ?: return
+        val placement = matrix.asMatrix4f()
         val extent = DecalExtents.of(decal, placement, DecalGround.world(Vec3.ZERO))
         val shape = Matrix4f(placement).mul(DecalShapes.unitCube(decal, extent))
         DecalShapes.guide(shape) { start, end, kind ->

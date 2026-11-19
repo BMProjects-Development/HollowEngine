@@ -15,7 +15,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentFact
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.ui.UiDefinitionRegistry
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 
@@ -34,7 +33,7 @@ class UiPanelAttachment(
 
     private var panel: UiPanelInstance? = null
 
-    override fun respec(spec: RigAttachmentSpec) {
+    override fun respec(spec: Any) {
         if (spec is UiPanelAttachmentSpec) this.spec = spec
     }
 
@@ -70,7 +69,6 @@ class UiPanelAttachment(
             val height = width * definition.height / definition.width
             val placement = Matrix4f(stack.last().pose())
                 .mul(globalMatrix.asMatrix4f())
-                .mul(spec.localTransform().matrixF.asMatrix4f())
                 .scale(width, height, 1f)
 
             shown.seenFrame = TickHandler.renderFrame

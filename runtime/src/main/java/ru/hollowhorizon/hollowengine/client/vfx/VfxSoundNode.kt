@@ -41,7 +41,7 @@ class VfxSoundNode(private val spec: VfxSoundSpec, private val node: VfxNodeRunt
     private var since = Float.NaN
     private var lastFrame = Long.MIN_VALUE
 
-    /** When the effect was last drawn, so the sound falls silent once nobody draws it. */
+    /** Last playback update. The sound falls silent once its effect stops updating. */
     private var lastSeen = 0L
 
     override fun update(dt: Float) {
@@ -96,7 +96,7 @@ class VfxSoundNode(private val spec: VfxSoundSpec, private val node: VfxNodeRunt
     private companion object {
         const val MIN_PITCH = 0.01f
 
-        /** How long, in nanoseconds, the sound outlives the last frame its effect was drawn in. */
+        /** How long, in nanoseconds, the sound outlives the last update of its effect. */
         const val TIMEOUT = 250_000_000L
     }
 }

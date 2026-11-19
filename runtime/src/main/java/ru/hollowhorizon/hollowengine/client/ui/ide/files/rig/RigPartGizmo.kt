@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.ModelViewerState
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.math.*
-import kotlin.math.abs
 
 /**
  * The gizmo over the rig preview, moving the selected part, a collider or anything placed by an offset such as an IK
@@ -113,81 +112,36 @@ internal interface RigGizmoFrame {
 
 /** Something hung on a bone, the attachment [selection] names, as it was: [spec]. */
 internal abstract class AttachmentFrame(private val selection: RigPartSelection) : RigGizmoFrame {
-    abstract val spec: RigAttachmentSpec
+    abstract val spec: Any
 
     /** The attachment moved to [values]. */
-    abstract fun with(values: GizmoTransformValues): RigAttachmentSpec
+    abstract fun with(values: GizmoTransformValues): Any
 
     override fun placed(rig: ModelRig, values: GizmoTransformValues): ModelRig = write(rig, with(values))
 
     override fun restored(rig: ModelRig): ModelRig = write(rig, spec)
 
     /** The attachment with [mode]'s part of its placement at rest, or null when it has nothing there to reset. */
-    protected open fun resting(mode: GizmoEditMode): RigAttachmentSpec? = null
+    protected open fun resting(mode: GizmoEditMode): Any? = null
 
     override fun reset(rig: ModelRig, mode: GizmoEditMode): ModelRig? = resting(mode)?.let { write(rig, it) }
 
-    private fun write(rig: ModelRig, attachment: RigAttachmentSpec): ModelRig =
+    private fun write(rig: ModelRig, attachment: Any): ModelRig =
         rig.withHolder(selection.bone, rig.holder(selection.bone).withAttachment(selection.id, attachment))
 }
 
-/** Anything placed by an offset, a turn and an even scale on what it hangs on: a target, an effect, a model. */
-internal class PlacedFrame(selection: RigPartSelection, override val spec: RigAttachmentSpec, holder: Mat4f) :
-    AttachmentFrame(selection) {
-    private val placed = spec as PlacedAttachmentSpec
-    private val holder = MutableMat4f(holder)
-    private val holderRotation: QuatF = holder.getRotation(MutableQuatF()).norm()
-
-    override val values: GizmoTransformValues = GizmoTransformValues(
-        translation = holder.transform(placed.offset, 1f, MutableVec3f()),
-        rotation = holderRotation * eulerRotationXyz(placed.rotation),
-        scale = Vec3f(placed.scale, placed.scale, placed.scale),
-    )
-
-    override fun with(values: GizmoTransformValues): RigAttachmentSpec {
-        val inverse = MutableMat4f(holder)
-        if (!inverse.invert()) return spec
-        // A drag along one axis scales evenly: the axis that moved furthest is the one the drag was on.
-        val scale = listOf(values.scale.x, values.scale.y, values.scale.z).maxBy { abs(it - placed.scale) }
-        return placed.placedAt(
-            offset = inverse.transform(values.translation, 1f, MutableVec3f()),
-            rotation = (holderRotation.inverted() * values.rotation).eulerDegreesXyz(),
-            scale = abs(scale).coerceAtLeast(MIN_SCALE),
-        )
-    }
-
-    override fun resting(mode: GizmoEditMode): RigAttachmentSpec = when (mode) {
-        GizmoEditMode.TRANSLATE -> placed.placedAt(Vec3f.ZERO, placed.rotation, placed.scale)
-        GizmoEditMode.ROTATE -> placed.placedAt(placed.offset, Vec3f.ZERO, placed.scale)
-        GizmoEditMode.SCALE -> placed.placedAt(placed.offset, placed.rotation, 1f)
-    }
-
-    private companion object {
-        const val MIN_SCALE = 0.01f
-    }
-}
-
-/** Where a bone the rig adds stands under its parent, at [parent] in model space. It has no size to scale. */
+/** The local transform of a bone the rig adds under its parent. */
 internal class BoneOriginFrame(private val bone: String, private val origin: RigBoneOrigin, parent: Mat4f) :
     RigGizmoFrame {
     private val parent = MutableMat4f(parent)
-    private val parentRotation: QuatF = parent.getRotation(MutableQuatF()).norm()
-
-    override val values: GizmoTransformValues = GizmoTransformValues(
-        translation = parent.transform(origin.offset, 1f, MutableVec3f()),
-        rotation = parentRotation * eulerRotationXyz(origin.rotation),
-        scale = Vec3f.ONES,
-    )
+    override val values: GizmoTransformValues = decompose(parent.mul(origin.localTransform().matrixF, MutableMat4f()))
 
     override fun placed(rig: ModelRig, values: GizmoTransformValues): ModelRig {
         val inverse = MutableMat4f(parent)
         if (!inverse.invert()) return rig
-        return write(
-            rig, origin.copy(
-                offset = inverse.transform(values.translation, 1f, MutableVec3f()),
-                rotation = (parentRotation.inverted() * values.rotation).eulerDegreesXyz(),
-            )
-        )
+        val world = TrsTransformF().setCompositionOf(values.translation, values.rotation, values.scale).matrixF
+        val local = decompose(inverse.mul(world, MutableMat4f()))
+        return write(rig, origin.copy(offset = local.translation, rotation = local.rotation.eulerDegreesXyz(), scale = local.scale))
     }
 
     override fun restored(rig: ModelRig): ModelRig = write(rig, origin)
@@ -195,7 +149,7 @@ internal class BoneOriginFrame(private val bone: String, private val origin: Rig
     override fun reset(rig: ModelRig, mode: GizmoEditMode): ModelRig? = when (mode) {
         GizmoEditMode.TRANSLATE -> write(rig, origin.copy(offset = Vec3f.ZERO))
         GizmoEditMode.ROTATE -> write(rig, origin.copy(rotation = Vec3f.ZERO))
-        GizmoEditMode.SCALE -> null
+        GizmoEditMode.SCALE -> write(rig, origin.copy(scale = Vec3f.ONES))
     }
 
     private fun write(rig: ModelRig, moved: RigBoneOrigin): ModelRig =
@@ -260,13 +214,14 @@ internal class BonePoseFrame(private val bone: String, private val node: RenderM
     private fun write(rig: ModelRig, next: RigPose): ModelRig =
         rig.withBone(bone, rig.holder(bone).copy(pose = next.takeUnless(RigPose::isIdentity)))
 
-    private fun decompose(matrix: Mat4f): GizmoTransformValues {
-        val translation = MutableVec3f()
-        val rotation = MutableQuatF()
-        val scale = MutableVec3f()
-        matrix.decompose(translation, rotation, scale)
-        return GizmoTransformValues(translation, rotation.norm(), scale)
-    }
+}
+
+private fun decompose(matrix: Mat4f): GizmoTransformValues {
+    val translation = MutableVec3f()
+    val rotation = MutableQuatF()
+    val scale = MutableVec3f()
+    matrix.decompose(translation, rotation, scale)
+    return GizmoTransformValues(translation, rotation.norm(), scale)
 }
 
 /** The part id that stands for the pose of a bone of the model itself, rather than anything hung on it. */
@@ -276,12 +231,11 @@ internal const val BONE_POSE_PART = "#pose"
 internal const val BONE_ORIGIN_PART = "#origin"
 
 /** The gizmo's view of [spec], which [selection] names, hanging on [holder]; null for a part the gizmo does not move. */
-internal fun gizmoFrame(selection: RigPartSelection, spec: RigAttachmentSpec, holder: Mat4f): RigGizmoFrame? =
+internal fun gizmoFrame(selection: RigPartSelection, spec: Any, holder: Mat4f): RigGizmoFrame? =
     when (spec) {
         is ColliderAttachmentSpec -> ColliderFrame(selection, spec, holder)
-        is PlacedAttachmentSpec -> PlacedFrame(selection, spec, holder)
         else -> null
     }
 
 /** Whether the gizmo moves [spec], so selecting it in the preview makes sense. */
-internal fun hasGizmo(spec: RigAttachmentSpec): Boolean = spec is ColliderAttachmentSpec || spec is PlacedAttachmentSpec
+internal fun hasGizmo(spec: Any): Boolean = spec is ColliderAttachmentSpec

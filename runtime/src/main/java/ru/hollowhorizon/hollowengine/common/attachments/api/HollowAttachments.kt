@@ -88,7 +88,7 @@ class HollowAttachments internal constructor(entity: MCEntity) {
     var syncVersion: Long = 0L
 
     /** What the clients tracking this entity were last told, so a batch can carry only the difference. */
-    var lastSyncedComponents: Map<ResourceLocation, Component> = emptyMap()
+    var lastSyncedComponents: Map<ResourceLocation, Any> = emptyMap()
 
     /** The [Sync.TRACKING] data every tracking client was last told, for the same reason. */
     var lastSyncedData: CompoundTag = CompoundTag()

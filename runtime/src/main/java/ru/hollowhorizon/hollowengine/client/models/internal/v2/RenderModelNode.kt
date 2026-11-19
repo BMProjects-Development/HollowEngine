@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
@@ -18,10 +17,6 @@ interface Attachment : AutoCloseable {
     val globalVersion: Int
 
     override fun close() = Unit
-    fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = Unit
-
-    /** Whether [updateWorldPose] does anything: a model asks only such attachments, every frame. */
-    val followsWorldPose: Boolean get() = false
     fun updateGlobalMatrix()
     fun collectCommands(pipeline: RenderPipeline) = Unit
     fun onSceneActiveChanged(active: Boolean) = Unit

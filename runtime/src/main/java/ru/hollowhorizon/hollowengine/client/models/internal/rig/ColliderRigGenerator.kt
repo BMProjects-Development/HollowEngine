@@ -47,7 +47,7 @@ object ColliderRigGenerator : RigGenerator {
         geometry: Map<Int, Pair<Vec3f, Vec3f>>,
         current: ModelRig,
     ): ModelRig {
-        val taken = current.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
+        val taken = current.allAttachments().mapNotNullTo(HashSet()) { (_, spec) -> (spec as? ColliderAttachmentSpec)?.id }
         var rig = current
         BoneGeometry.cornersPerBone(nodes, geometry).forEach { (bone, corners) ->
             val existing = rig.bone(bone.poseName) ?: RigBone.EMPTY

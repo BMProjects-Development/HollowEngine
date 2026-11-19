@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.utils.math.*
 
@@ -74,7 +73,7 @@ enum class ColliderContact {
 data class ColliderAttachmentSpec(
     @EditorName("$LANG.name")
     @EditorDescription("$LANG.name.hint")
-    override val id: String = "collider",
+    val id: String = "collider",
     @EditorName("$LANG.alignment")
     @EditorDescription("$LANG.alignment.hint")
     val alignment: ColliderAlignment = ColliderAlignment.ORIENTED,
@@ -91,12 +90,8 @@ data class ColliderAttachmentSpec(
     val shape: ColliderShapeSpec = BoxShapeSpec,
     @EditorName("$LANG.modes")
     val modes: ColliderModes = ColliderModes(),
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
-
+) {
     /** A collider builds nothing on the drawn model, so moving or resizing one never rebuilds it. */
-    override fun structure() = ColliderAttachmentSpec(id = id)
-
     val orientation: QuatF get() = eulerRotation(rotation)
 
     /** The unit cube placed in the space of what the collider hangs on. */
@@ -109,6 +104,7 @@ data class ColliderAttachmentSpec(
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = ColliderAttachmentSpec::class,
+            rigId = ColliderAttachmentSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_collider",
             createDefault = { id -> ColliderAttachmentSpec(id = id) },

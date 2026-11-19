@@ -4,7 +4,7 @@ import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditing
 import ru.hollowhorizon.hollowengine.client.vfx.played
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 
 /**
@@ -15,10 +15,10 @@ class AttachedVfxEditing(
     private val bone: String?,
     private val attachmentId: String,
 ) : VfxEditing {
-    private fun ModelRig.spec(): VfxBoneAttachmentSpec? =
-        holder(bone).attachment(attachmentId) as? VfxBoneAttachmentSpec
+    private fun ModelRig.spec(): VfxComponent? =
+        holder(bone).attachment(attachmentId) as? VfxComponent
 
-    private val spec: VfxBoneAttachmentSpec? get() = parent.occupied.spec()
+    private val spec: VfxComponent? get() = parent.occupied.spec()
 
     override val history get() = parent.history
 
@@ -33,7 +33,7 @@ class AttachedVfxEditing(
     /** Drops the copy, so the attachment plays the file again. */
     fun reset() = rewrite(null, null) { it.copy(ownEffect = null) }
 
-    private fun rewrite(mergeKey: String?, label: UndoLabel?, change: (VfxBoneAttachmentSpec) -> VfxBoneAttachmentSpec) {
+    private fun rewrite(mergeKey: String?, label: UndoLabel?, change: (VfxComponent) -> VfxComponent) {
         val inherited = parent.occupied.spec()
         parent.edit(mergeKey, label) { outer ->
             val current = outer.spec() ?: inherited ?: return@edit outer

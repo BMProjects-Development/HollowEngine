@@ -8,7 +8,6 @@ import net.minecraft.server.Bootstrap
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiFrame
 import ru.hollowhorizon.hollowengine.client.ui.HollowUiSurface
 import ru.hollowhorizon.hollowengine.client.ui.style.compileHss
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.editor.BuiltinVirtualComponents
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EntityAttributes
 import ru.hollowhorizon.hollowengine.common.utils.rl
@@ -88,7 +87,7 @@ class EntityAttributesEditorTest {
         val values = EntityAttributes(attributes = mapOf("minecraft:generic.movement_speed" to 0.23),
             defaults = mapOf("minecraft:generic.movement_speed" to 0.23))
         val serializer = EntityAttributes.serializer()
-        val entry = ComponentEntry("hollowengine:editor/attributes".rl, values, serializer as KSerializer<Component>, true)
+        val entry = ComponentEntry("hollowengine:editor/attributes".rl, values, serializer as KSerializer<Any>, true)
         val scope = ComponentEditorScope(entry, Json.encodeToJsonElement(serializer, values).jsonObject) {
             onChange(Json.decodeFromJsonElement(serializer, it))
         }

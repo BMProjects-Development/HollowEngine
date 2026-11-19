@@ -5,7 +5,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipe
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.*
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 
 /**
  * A decal hung on a bone: each time the model is drawn, it hands [Decals] where it stands then and the light the
@@ -21,7 +20,7 @@ class DecalAttachment(
     /** How an editor finds this decal: `bone/id`, the bone blank when it hangs on the model itself. */
     private val key = "${node.name.takeUnless { it == ModelAttachment.MODEL_ROOT }.orEmpty()}/${spec.id}"
 
-    override fun respec(spec: RigAttachmentSpec) {
+    override fun respec(spec: Any) {
         if (spec is DecalAttachmentSpec) this.spec = spec
     }
 
@@ -31,7 +30,6 @@ class DecalAttachment(
             Decals.submitAttachment(this@DecalAttachment) {
                 val placement = Matrix4f(stack.last().pose())
                     .mul(globalMatrix.asMatrix4f())
-                    .mul(spec.localTransform().matrixF.asMatrix4f())
                 DecalDraw(spec.decal, placement, light, key = key)
             }
         }

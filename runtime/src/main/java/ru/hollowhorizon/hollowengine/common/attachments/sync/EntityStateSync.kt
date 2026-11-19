@@ -9,7 +9,6 @@ import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
@@ -237,7 +236,7 @@ object EntityStateSync {
         fun drain(): List<EntityStateSyncPacket> = packets.toList().also { packets.clear() }
     }
 
-    private fun syncableOf(entity: Entity): Map<ResourceLocation, Component> =
+    private fun syncableOf(entity: Entity): Map<ResourceLocation, Any> =
         AttachmentRegistry.syncableComponents(entity)
 
     private fun storeOf(entity: Entity): NbtDataStore? = AttachmentRegistry.entityDataOrNull(entity)
@@ -252,8 +251,8 @@ object EntityStateSync {
 
     /** What a delta has to carry to turn [previous] into [current] on the client. */
     internal fun batchOf(
-        current: Map<ResourceLocation, Component>,
-        previous: Map<ResourceLocation, Component>,
+        current: Map<ResourceLocation, Any>,
+        previous: Map<ResourceLocation, Any>,
     ): ComponentBatch = ComponentBatch(
         changed = current.filter { (id, component) -> previous[id] != component },
         removed = previous.keys.filterNot { it in current },
@@ -279,7 +278,7 @@ object EntityStateSync {
         if (full) version >= applied else version > applied
 
     internal data class ComponentBatch(
-        val changed: Map<ResourceLocation, Component>,
+        val changed: Map<ResourceLocation, Any>,
         val removed: List<ResourceLocation>,
     ) {
         val isEmpty: Boolean get() = changed.isEmpty() && removed.isEmpty()
@@ -292,7 +291,7 @@ object EntityStateSync {
         val isEmpty: Boolean get() = changed.isEmpty && removed.isEmpty()
     }
 
-    private fun idOf(component: Component): ResourceLocation =
+    private fun idOf(component: Any): ResourceLocation =
         ComponentDescriptorRegistry.idFor(component::class)
             ?: error("Component descriptor not found for ${component::class.qualifiedName}")
 

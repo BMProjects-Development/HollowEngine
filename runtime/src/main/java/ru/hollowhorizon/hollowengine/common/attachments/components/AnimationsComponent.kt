@@ -3,14 +3,17 @@ package ru.hollowhorizon.hollowengine.common.attachments.components
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.models.MontageLayerSpec
 
 /**
  * The animations gameplay asked this entity to play.
  */
 @Registerable
+@Attach(Entity::class)
 @Syncable
 @Serializable
 @SerialName("hollowengine:animations")

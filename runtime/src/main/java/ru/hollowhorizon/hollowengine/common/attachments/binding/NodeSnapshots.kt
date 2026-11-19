@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.common.attachments.binding
 
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
@@ -21,7 +20,7 @@ data class NodeMaterializedRecord(
 
 data class SnapshotComponentView(
     val id: UUID = ROOT_COMPONENT_ID,
-    val components: List<Component>,
+    val components: List<Any>,
 )
 
 data class ModelNodeEntry(
@@ -61,11 +60,11 @@ fun Snapshot.modelNodes(): List<ModelNodeEntry> {
     return listOf(ModelNodeEntry(ROOT_COMPONENT_ID, model, transform, animations, materials))
 }
 
-fun <T : Snapshot> T.withOrReplace(component: Component, nodeId: UUID? = null): T {
+fun <T : Snapshot> T.withOrReplace(component: Any, nodeId: UUID? = null): T {
     if (nodeId != null && nodeId != ROOT_COMPONENT_ID) return this
     val id = ComponentDescriptorRegistry.idFor(component::class)
         ?: error("Component descriptor not found for ${component::class.qualifiedName}")
-    val merged = LinkedHashMap<ResourceLocation, Component>()
+    val merged = LinkedHashMap<ResourceLocation, Any>()
     components.forEach { existing ->
         val existingId = ComponentDescriptorRegistry.idFor(existing::class)
             ?: error("Component descriptor not found for ${existing::class.qualifiedName}")
@@ -75,13 +74,13 @@ fun <T : Snapshot> T.withOrReplace(component: Component, nodeId: UUID? = null): 
     return withComponents(merged.values.toList())
 }
 
-fun <T : Snapshot> T.removeComponents(predicate: (Component) -> Boolean, nodeId: UUID? = null): T {
+fun <T : Snapshot> T.removeComponents(predicate: (Any) -> Boolean, nodeId: UUID? = null): T {
     if (nodeId != null && nodeId != ROOT_COMPONENT_ID) return this
     return withComponents(components.filterNot(predicate))
 }
 
 @Suppress("UNCHECKED_CAST")
-fun <T : Snapshot> T.withComponents(updatedComponents: List<Component>): T =
+fun <T : Snapshot> T.withComponents(updatedComponents: List<Any>): T =
     when (this) {
         is EntitySnapshot -> copy(components = updatedComponents).also { it.entity = entity }
     } as T

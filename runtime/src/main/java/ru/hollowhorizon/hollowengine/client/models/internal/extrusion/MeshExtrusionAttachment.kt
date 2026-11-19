@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.MeshAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RespecAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigAttachmentContext
 import ru.hollowhorizon.hollowengine.common.models.MeshExtrusionSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import kotlin.math.abs
 
 internal class MeshExtrusionAttachment private constructor(
@@ -19,7 +18,7 @@ internal class MeshExtrusionAttachment private constructor(
     private val layers = meshes.map(::Layer)
     val boundsMargin: Float get() = abs(spec.thickness) * ExtrusionMesh.MITER_LIMIT
 
-    override fun respec(spec: RigAttachmentSpec) {
+    override fun respec(spec: Any) {
         this.spec = spec as MeshExtrusionSpec
     }
 

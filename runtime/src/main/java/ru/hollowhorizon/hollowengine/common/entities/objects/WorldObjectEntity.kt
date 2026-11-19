@@ -17,9 +17,15 @@ import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import org.joml.Vector3d
 import org.joml.Vector3f
+import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.components.bodyComponent
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneTreeData
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import java.util.Optional
 import java.util.UUID
 import kotlin.collections.ArrayDeque
@@ -59,6 +65,18 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     private var parentChangedTick = -1
 
     private var shownName: String? = null
+    private var objectRoot: SceneObject? = null
+    private var syncedSceneRevision = 0
+
+    val sceneObjectOrNull: SceneObject? get() = objectRoot
+
+    val sceneObject: SceneObject
+        get() {
+            objectRoot?.let { return it }
+            check(!isRemoved) { "Cannot create a scene for a removed world object" }
+            val context = if (level().isClientSide) clientSceneContext() else ServerSceneContext
+            return Scene(context).create("object", id = uuid).also { objectRoot = it }
+        }
 
     init {
         noPhysics = true
@@ -183,6 +201,13 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         drift()
         followParent()
         if (parent != null) updateWorldCache()
+        if (!level().isClientSide) {
+            val root = objectRoot
+            if (root != null && root.scene.revision != syncedSceneRevision) {
+                entityData.set(SCENE_COMPONENTS, SceneTreeData.write(root, syncOnly = true))
+                syncedSceneRevision = root.scene.revision
+            }
+        }
         firstTick = false
     }
 
@@ -252,6 +277,12 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
     override fun onSyncedDataUpdated(accessor: EntityDataAccessor<*>) {
         super.onSyncedDataUpdated(accessor)
         when (accessor) {
+            SCENE_COMPONENTS -> if (level().isClientSide) {
+                val data = entityData.get(SCENE_COMPONENTS)
+                if (!data.isEmpty || objectRoot != null) SceneTreeData.apply(sceneObject, data, syncOnly = true)
+                onComponentsChanged()
+            }
+
             OFFSET, ROTATION, SCALE -> when {
                 !level().isClientSide || snapping || firstTick || tickCount == parentChangedTick -> {
                     shown = localData()
@@ -288,6 +319,7 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
 
     override fun defineSynchedData(builder: SynchedEntityData.Builder) {
         builder.define(PARENT, Optional.empty())
+        builder.define(SCENE_COMPONENTS, CompoundTag())
         builder.define(OFFSET, Vector3f())
         builder.define(ROTATION, Quaternionf())
         builder.define(SCALE, Vector3f(1f))
@@ -319,6 +351,8 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         data.readVector("WorldScale")?.let { entityData.set(WORLD_SCALE, it) }
         shown = localData()
         shownBefore = shown
+        val components = data.getCompound(SCENE_COMPONENTS_KEY)
+        if (!components.isEmpty || objectRoot != null) SceneTreeData.apply(sceneObject, components, syncOnly = false)
     }
 
     override fun addAdditionalSaveData(tag: CompoundTag) {
@@ -329,13 +363,28 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         data.put("Scale", entityData.get(SCALE).let { newFloatList(it.x, it.y, it.z) })
         data.put("WorldRotation", entityData.get(WORLD_ROTATION).let { newFloatList(it.x, it.y, it.z, it.w) })
         data.put("WorldScale", entityData.get(WORLD_SCALE).let { newFloatList(it.x, it.y, it.z) })
+        objectRoot?.let { root ->
+            val components = SceneTreeData.write(root, syncOnly = false)
+            if (!components.isEmpty) data.put(SCENE_COMPONENTS_KEY, components)
+        }
         tag.put(SAVE_KEY, data)
         if (!level().isClientSide) WorldObjectFavorites.refresh(this)
     }
 
     override fun remove(reason: RemovalReason) {
         super.remove(reason)
+        closeScene()
         if (!level().isClientSide && reason.shouldDestroy()) WorldObjectFavorites.forget(this)
+    }
+
+    internal fun closeScene() {
+        val root = objectRoot ?: return
+        objectRoot = null
+        try {
+            root.scene.close()
+        } catch (exception: Exception) {
+            HollowEngine.LOGGER.error("Could not close scene for world object {}", uuid, exception)
+        }
     }
 
     private fun CompoundTag.readVector(key: String): Vector3f? {
@@ -352,6 +401,12 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
         getList(key, Tag.TAG_FLOAT.toInt()).takeIf { it.size == size }
 
     companion object {
+        private object ServerSceneContext : SceneContext { override val side = LogicalSide.SERVER }
+        internal var clientSceneContext: () -> SceneContext = {
+            object : SceneContext { override val side = LogicalSide.CLIENT }
+        }
+
+        private val SCENE_COMPONENTS = SynchedEntityData.defineId(WorldObjectEntity::class.java, EntityDataSerializers.COMPOUND_TAG)
         private val PARENT: EntityDataAccessor<Optional<UUID>> =
             SynchedEntityData.defineId(WorldObjectEntity::class.java, EntityDataSerializers.OPTIONAL_UUID)
         private val OFFSET: EntityDataAccessor<Vector3f> =
@@ -366,6 +421,7 @@ class WorldObjectEntity(type: EntityType<WorldObjectEntity>, level: Level) : Ent
             SynchedEntityData.defineId(WorldObjectEntity::class.java, EntityDataSerializers.VECTOR3)
 
         private const val SAVE_KEY = "HollowObject"
+        private const val SCENE_COMPONENTS_KEY = "SceneComponents"
 
         /** How deep a hierarchy is followed; deeper parents are treated as missing. */
         private const val MAX_DEPTH = 64

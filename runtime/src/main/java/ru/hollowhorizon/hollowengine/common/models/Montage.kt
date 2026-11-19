@@ -1,8 +1,15 @@
+@file:UseSerializers(RigComponentSerializer::class)
+
 package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
@@ -19,6 +26,7 @@ import ru.hollowhorizon.hollowengine.common.vfx.*
  * One authored action laid out on a timeline: clips of the model it plays on, things it hangs on the
  * model's rig for a while, fields of what hangs there it animates, and named events.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class Montage(
     val previewModel: String = "",
@@ -29,6 +37,9 @@ data class Montage(
     val bones: List<MontageBoneTrack> = emptyList(),
     val events: List<MontageEvent> = emptyList(),
     val sections: List<PlaybackSection> = emptyList(),
+    val createdNodes: Map<String, RigBoneOrigin> = emptyMap(),
+    @EncodeDefault
+    private val formatVersion: Int = 1,
 ) {
     /** Every condition of its sections, to compile before playback asks them. */
     fun conditions(): List<String> = sections.flatMap(PlaybackSection::conditions).distinct()
@@ -75,7 +86,7 @@ data class MontageClip(
 @Serializable
 data class MontageAttachment(
     val bone: String? = null,
-    val spec: RigAttachmentSpec,
+    val spec: Any,
     val windows: List<MontageWindow> = listOf(MontageWindow()),
 ) {
     fun isActive(time: Float): Boolean = windows.any { it.contains(time) }
@@ -111,6 +122,7 @@ data class MontageBoneTrack(
     val bone: String,
     val property: MontageBoneProperty,
     val curves: List<VfxTrackCurve> = emptyList(),
+    val absoluteOrigin: Boolean = false,
 ) {
     /** The value of the track at [time], one number per axis. */
     fun valueAt(time: Float): Vec3f {
@@ -132,7 +144,9 @@ data class MontageTrack(
     val attachment: String,
     val property: String,
     val curves: List<VfxTrackCurve> = emptyList(),
-)
+) {
+    internal val migratedNode by lazy(LazyThreadSafetyMode.PUBLICATION) { legacyPlacementNode(bone, attachment) }
+}
 
 /** A named moment of the montage, for scripts to act on and for its sections to jump to. */
 typealias MontageEvent = TimelineEvent
@@ -235,7 +249,6 @@ object MontageFormat {
             val revision = TagModuleRevision.current
             cached?.takeIf { it.revision == revision }?.let { return it }
             val module = SerializersModule {
-                RigAttachmentTypes.registerInto(this)
                 ColliderShapeTypes.registerInto(this)
                 VfxNodeTypes.registerInto(this)
                 VfxModuleTypes.registerInto(this)
@@ -265,8 +278,38 @@ object MontageFormat {
     /** Every field of an attachment, defaults too, for animating them by name; see [RigFields]. */
     internal val fields: Json get() = built.fields
 
-    fun read(text: String): Montage =
-        if (text.isBlank()) Montage.EMPTY else json.decodeFromString(Montage.serializer(), text)
+    fun read(text: String): Montage {
+        if (text.isBlank()) return Montage.EMPTY
+        val format = json
+        val data = format.parseToJsonElement(text)
+        val montage = format.decodeFromJsonElement(Montage.serializer(), data)
+        if (data !is JsonObject || "formatVersion" in data) return montage
+        val stored = data["attachments"] as? JsonArray ?: return montage
+        val nodes = LinkedHashMap(montage.createdNodes)
+        val renamed = HashMap<Pair<String?, String>, String>()
+        val attachments = montage.attachments.mapIndexed { index, attachment ->
+            if (!attachment.spec.hadLegacyPlacement()) return@mapIndexed attachment
+            val key = attachment.bone to attachment.spec.rigId
+            val name = legacyPlacementNode(key.first, key.second)
+            val spec = (stored.getOrNull(index) as? JsonObject)?.get("spec")
+            val placement = spec?.let { format.decodeFromJsonElement(LegacyNodePlacement.serializer(), it) }
+                ?: LegacyNodePlacement()
+            nodes[name] = placement.origin(attachment.bone)
+            renamed[key] = name
+            attachment.copy(bone = name)
+        }
+        val bones = montage.bones.toMutableList()
+        val tracks = montage.tracks.mapNotNull { track ->
+            val bone = renamed[track.bone to track.attachment] ?: return@mapNotNull track
+            val property = legacyPlacementProperty(track.property) ?: return@mapNotNull track.copy(bone = bone)
+            val curves = if (property == MontageBoneProperty.SCALE) {
+                track.curves.firstOrNull { it.channel == 0 }?.let { curve -> List(3) { curve.copy(channel = it) } }.orEmpty()
+            } else track.curves
+            bones += MontageBoneTrack(bone, property, curves, absoluteOrigin = true)
+            null
+        }
+        return montage.copy(attachments = attachments, tracks = tracks, bones = bones, createdNodes = nodes)
+    }
 
     fun write(montage: Montage): String = json.encodeToString(Montage.serializer(), montage)
 }

@@ -293,9 +293,12 @@ class ModelSceneInstanceTest {
         val instance = ModelSceneInstance.create(scene.create("owner"), "model", model)
         val goal = Vec3f(0.3f, -1.5f, 0.4f)
         val rig = ModelRig(
-            bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step")))),
-            attachments = listOf(IkTargetSpec(id = "step", offset = goal)),
+            bones = mapOf(
+                "foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step"))),
+                "step" to RigBone(origin = RigBoneOrigin(offset = goal), attachments = listOf(IkTargetSpec("step"))),
+            ),
         )
+        instance.setRigBones(rig)
         val footObject = instance.node(listOf(ScenePathSegment("hip"), ScenePathSegment("knee"), ScenePathSegment("foot")))!!
 
         applyRigConstraintsToPose(instance.poseNodes, rig, AnimatorEvaluationContext())

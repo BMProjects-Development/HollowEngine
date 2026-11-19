@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpola
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.sounds.LowPassFilter
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxInterpolation
@@ -139,7 +139,11 @@ class MontageTests {
 
         val during = rig.withMontages(listOf(MontageMoment(montage, 1f, 0.5f)))
         // What the montage brought takes its track as it is, whatever the montage's weight.
-        assertEquals(Vec3f(0f, 1f, 0f), (during.rig.bone("hand")!!.attachment("cup") as IkTargetSpec).offset)
+        val target = during.rig.bones.values.single { it.attachment("cup") is IkTargetSpec }
+        assertEquals("hand", target.origin!!.parent)
+        assertEquals(Vec3f(0f, 1f, 0f), target.origin.offset)
+        val loaded = MontageFormat.read(MontageFormat.write(montage))
+        assertEquals(during.rig, rig.withMontages(listOf(MontageMoment(loaded, 1f, 0.5f))).rig)
         assertTrue(during.key != before.key)
     }
 
@@ -164,7 +168,7 @@ class MontageTests {
 
         fun sound(time: Float) =
             ModelRig.EMPTY.withMontages(listOf(MontageMoment(montage, time, 1f))).rig.bone("hand")!!
-                .attachment("hum") as SoundBoneAttachmentSpec
+                .attachment("hum") as Sound
 
         val playing = sound(1.5f)
         assertEquals(0.5f, playing.clock!!, 1e-5f)

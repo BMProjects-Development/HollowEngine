@@ -43,7 +43,7 @@ object RagdollRigGenerator : RigGenerator {
         val bodies = corners.mapValues { (_, points) -> BoneBounds.around(points) }.filterValues { it.thinnestSide >= MIN_THICKNESS }
         if (bodies.isEmpty()) return current
         val parents = jointParents(bodies, BoneGeometry.bindGlobalsOf(nodes))
-        val takenNames = current.allAttachments().filter { it.second is ColliderAttachmentSpec }.mapTo(HashSet()) { it.second.id }
+        val takenNames = current.allAttachments().mapNotNullTo(HashSet()) { (_, spec) -> (spec as? ColliderAttachmentSpec)?.id }
 
         var rig = current
         bodies.keys.forEach { bone ->

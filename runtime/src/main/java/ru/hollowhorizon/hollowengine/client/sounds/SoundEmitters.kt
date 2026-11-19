@@ -87,6 +87,8 @@ object SoundAttachments {
         /** Moves the binding; an owner dropped by a later [register] keeps calling this, and is not heard. */
         fun update(position: Vec3, velocity: Vec3 = Vec3.ZERO, shape: SoundShape? = null) {
             if (closed) return
+            val previous = state as? SoundEmitterState.Available
+            if (previous != null && previous.position == position && previous.velocity == velocity && previous.shape === shape) return
             require(position.isFinite() && velocity.isFinite())
             state = SoundEmitterState.Available(position, velocity, shape)
         }
@@ -162,7 +164,9 @@ fun SoundEmitterSpec.createEmitter(): SoundEmitter = when (this) {
  * as gravity pulls it into the floor, which would bend the pitch of what it plays.
  */
 internal fun Entity.soundVelocity(): Vec3 {
-    val motion = deltaMovement.scale(TICKS_PER_SECOND)
+    val movement = deltaMovement
+    if (movement == Vec3.ZERO) return Vec3.ZERO
+    val motion = movement.scale(TICKS_PER_SECOND)
     return if (onGround()) Vec3(motion.x, 0.0, motion.z) else motion
 }
 

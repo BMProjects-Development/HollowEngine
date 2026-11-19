@@ -12,28 +12,16 @@ private const val LANG = "hollowengine.gui.rig_editor.ik"
 data class IkTargetSpec(
     @EditorName("$LANG.target_name")
     @EditorDescription("$LANG.target_name.hint")
-    override val id: String = "target",
-    @EditorName("$LANG.offset")
-    override val offset: Vec3f = Vec3f.ZERO,
-    @EditorName("$LANG.rotation")
-    @EditorDescription("$LANG.rotation.hint")
-    override val rotation: Vec3f = Vec3f.ZERO,
-    @EditorHidden
-    override val scale: Float = 1f,
-) : RigAttachmentSpec(), PlacedAttachmentSpec {
-    override fun withId(id: String) = copy(id = id)
-
-    override fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float) = copy(offset = offset, rotation = rotation)
-
+    val id: String = "target",
+) {
     /** A target builds nothing on the drawn model. */
-    override fun structure() = IkTargetSpec(id = id)
-
     companion object {
         const val TYPE_ID = "hollowengine:rig/ik_target"
 
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = IkTargetSpec::class,
+            rigId = IkTargetSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_ik_target",
             createDefault = { id -> IkTargetSpec(id = id) },
@@ -48,7 +36,7 @@ data class IkTargetSpec(
 @SerialName(IkChainSpec.TYPE_ID)
 data class IkChainSpec(
     @EditorHidden
-    override val id: String = "ik",
+    val id: String = "ik",
     @EditorName("$LANG.bones")
     @EditorDescription("$LANG.bones.hint")
     @EditorRange(min = 1.0, max = MAX_BONES.toDouble())
@@ -86,11 +74,7 @@ data class IkChainSpec(
     @EditorName("$LANG.end")
     @EditorDescription("$LANG.end.hint")
     val end: IkEndRotation = IkEndRotation.KEEP,
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
-
-    override fun structure() = IkChainSpec(id = id)
-
+) {
     companion object {
         const val TYPE_ID = "hollowengine:rig/ik_chain"
 
@@ -99,6 +83,7 @@ data class IkChainSpec(
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = IkChainSpec::class,
+            rigId = IkChainSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_ik_chain",
             createDefault = { id -> IkChainSpec(id = id) },

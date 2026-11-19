@@ -21,7 +21,7 @@ internal fun DebugLines.Batch.decalShapes(rig: ModelRig, roots: List<RenderModel
         if (spec !is DecalAttachmentSpec) return@forEach
         val holder = holderMatrix(roots, bone) ?: return@forEach
         val isSelected = selected != null && selected.bone == bone && selected.id == spec.id
-        val placement = Matrix4f(holder.asMatrix4f()).mul(spec.localTransform().matrixF.asMatrix4f())
+        val placement = Matrix4f(holder.asMatrix4f())
         val extent = DecalExtents.of(spec.decal, placement, DecalGround.floor())
         val shape = Matrix4f(placement).mul(DecalShapes.unitCube(spec.decal, extent))
         if (!isSelected) {

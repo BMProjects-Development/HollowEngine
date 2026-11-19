@@ -8,11 +8,9 @@ import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import net.minecraft.resources.ResourceLocation
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.VirtualComponentRegistry
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderShapeTypes
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.sounds.SoundFilterTypes
 import ru.hollowhorizon.hollowengine.common.utils.math.VectorDescriptors
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -43,7 +41,6 @@ internal object ComponentJson {
                 explicitNulls = true
                 allowSpecialFloatingPointValues = true
                 serializersModule = SerializersModule {
-                    RigAttachmentTypes.registerInto(this)
                     ColliderShapeTypes.registerInto(this)
                     VfxNodeTypes.registerInto(this)
                     VfxModuleTypes.registerInto(this)
@@ -56,22 +53,22 @@ internal object ComponentJson {
         }
 
     @Suppress("UNCHECKED_CAST")
-    fun serializerOf(type: KClass<*>): KSerializer<Component>? =
+    fun serializerOf(type: KClass<*>): KSerializer<Any>? =
         (ComponentDescriptorRegistry.descriptorOrNull(type)?.serializer
-            ?: VirtualComponentRegistry.descriptor(type)?.serializer) as KSerializer<Component>?
+            ?: VirtualComponentRegistry.descriptor(type)?.serializer) as KSerializer<Any>?
 
-    fun serializerOf(component: Component): KSerializer<Component>? = serializerOf(component::class)
+    fun serializerOf(component: Any): KSerializer<Any>? = serializerOf(component::class)
 
-    fun idOf(component: Component): ResourceLocation? =
+    fun idOf(component: Any): ResourceLocation? =
         ComponentDescriptorRegistry.idFor(component::class)
             ?: VirtualComponentRegistry.descriptor(component::class)?.id
 
-    fun encode(component: Component): JsonObject? {
+    fun encode(component: Any): JsonObject? {
         val serializer = serializerOf(component) ?: return null
         return runCatching { format.encodeToJsonElement(serializer, component) as? JsonObject }.getOrNull()
     }
 
-    fun decode(serializer: KSerializer<Component>, json: JsonElement): Component? =
+    fun decode(serializer: KSerializer<Any>, json: JsonElement): Any? =
         runCatching { format.decodeFromJsonElement(serializer, json) }.getOrNull()
 
     /**
@@ -79,7 +76,7 @@ internal object ComponentJson {
      * the constructor defaults; the descriptor walk is the fallback for components that declare fields
      * without one.
      */
-    fun defaultOf(serializer: KSerializer<Component>): Component? =
+    fun defaultOf(serializer: KSerializer<Any>): Any? =
         decode(serializer, JsonObject(emptyMap()))
             ?: decode(serializer, defaultJson(serializer.descriptor))
 

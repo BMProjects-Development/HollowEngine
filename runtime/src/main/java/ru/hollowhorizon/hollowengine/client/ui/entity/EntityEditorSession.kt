@@ -14,10 +14,10 @@ import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
 import ru.hollowhorizon.hollowengine.client.ui.inspector.EditorAssetSources
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorAssetRequest
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorHost
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
+import ru.hollowhorizon.hollowengine.common.scene.acceptsComponentOwner
 import ru.hollowhorizon.hollowengine.common.ui.net.CloseUiPacket
 
 internal enum class EntityEditorTab { COMPONENTS, SCRIPTS }
@@ -25,8 +25,8 @@ internal enum class EntityEditorTab { COMPONENTS, SCRIPTS }
 /** One editable component: its identity, its value, and the serializer the fields are built from. */
 internal data class ComponentEntry(
     val id: ResourceLocation,
-    val value: Component,
-    val serializer: KSerializer<Component>,
+    val value: Any,
+    val serializer: KSerializer<Any>,
     val virtual: Boolean,
 ) {
     val json: JsonObject? get() = ComponentJson.encode(value)
@@ -72,7 +72,10 @@ internal class EntityEditorSession(initial: EntityEditorSnapshot) : InspectorHos
     val addable: List<ComponentDescriptor<*>>
         get() {
             val present = snapshot.stored.mapNotNull(ComponentJson::idOf).toSet()
-            return ComponentDescriptorRegistry.map { it.value }.filter { it.id !in present }
+            val ownerType = entity?.javaClass ?: Entity::class.java
+            return ComponentDescriptorRegistry.map { it.value }.filter {
+                it.id !in present && it.value.acceptsComponentOwner(ownerType)
+            }
                 .sortedBy { it.id.toString() }
         }
 
@@ -111,7 +114,7 @@ internal class EntityEditorSession(initial: EntityEditorSnapshot) : InspectorHos
         RequestEntityEditorPacket(entityId).send()
     }
 
-    fun update(entry: ComponentEntry, value: Component) {
+    fun update(entry: ComponentEntry, value: Any) {
         snapshot = if (entry.virtual) {
             snapshot.copy(virtual = snapshot.virtual.replacing(entry.id, value))
         } else {
@@ -121,7 +124,7 @@ internal class EntityEditorSession(initial: EntityEditorSnapshot) : InspectorHos
     }
 
     fun add(descriptor: ComponentDescriptor<*>) {
-        @Suppress("UNCHECKED_CAST") val serializer = descriptor.serializer as KSerializer<Component>
+        @Suppress("UNCHECKED_CAST") val serializer = descriptor.serializer as KSerializer<Any>
         val value = ComponentJson.defaultOf(serializer) ?: return
         snapshot = snapshot.copy(stored = snapshot.stored + value)
         SetEntityComponentsPacket(entityId, listOf(value)).send()
@@ -165,12 +168,12 @@ internal class EntityEditorSession(initial: EntityEditorSnapshot) : InspectorHos
 
     val hasSlots: Boolean get() = snapshot.hasSlots
 
-    private fun entryOf(component: Component, virtual: Boolean): ComponentEntry? {
+    private fun entryOf(component: Any, virtual: Boolean): ComponentEntry? {
         val id = ComponentJson.idOf(component) ?: return null
         val serializer = ComponentJson.serializerOf(component) ?: return null
         return ComponentEntry(id, component, serializer, virtual)
     }
 
-    private fun List<Component>.replacing(id: ResourceLocation, value: Component): List<Component> =
+    private fun List<Any>.replacing(id: ResourceLocation, value: Any): List<Any> =
         map { if (ComponentJson.idOf(it) == id) value else it }
 }

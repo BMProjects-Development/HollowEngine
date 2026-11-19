@@ -3,13 +3,16 @@ package ru.hollowhorizon.hollowengine.common.attachments.components
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.api.Syncable
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 
 /**
  * What this entity looks like, per named material.
  */
 @Registerable
+@Attach(Entity::class)
 @Syncable
 @Serializable
 @SerialName("hollowengine:materials")

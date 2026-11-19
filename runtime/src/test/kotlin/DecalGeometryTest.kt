@@ -7,7 +7,8 @@ import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.decals.DecalShapes
 import ru.hollowhorizon.hollowengine.common.decals.DecalProjection
 import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
-import ru.hollowhorizon.hollowengine.common.entities.objects.decalOf
+import ru.hollowhorizon.hollowengine.common.entities.objects.decalRigOf
+import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import kotlin.math.abs
 import kotlin.test.Test
@@ -68,7 +69,7 @@ class DecalGeometryTest {
     @Test
     fun `a decal dropped on a face looks out of it, its top up on walls and north on floors`() {
         fun turned(face: Direction, local: Vector3f): Vector3f {
-            val turn = eulerRotationXyz(decalOf("ns:textures/a.png", face).rotation)
+            val turn = eulerRotationXyz(decalRigOf("ns:textures/a.png", face).addedBones.values.single().rotation)
             return Quaternionf(turn.x, turn.y, turn.z, turn.w).transform(Vector3f(local))
         }
         Direction.entries.forEach { face ->

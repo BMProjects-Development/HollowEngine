@@ -339,13 +339,13 @@ object TransformGizmoEditor {
 
     /** A drag or a keyboard transform of [entry] starts: whatever it ends up doing goes back in one step. */
     private fun beginEdit(entry: GizmoEntry) {
-        entry.part?.editing?.beginGesture()
+        entry.part?.beginGesture()
         entry.worldObject?.let(WorldObjectHistory::beginGizmo)
     }
 
     /** A drag or a keyboard transform of [entry] is over: what shows it reads it again. */
     private fun finishEdit(entry: GizmoEntry) {
-        entry.part?.editing?.endGesture()
+        entry.part?.endGesture()
         refreshFromRuntime(entry)
         entry.worldObject?.let(WorldObjectEditing::finishGizmo)
     }
@@ -487,7 +487,7 @@ object TransformGizmoEditor {
         }
 
         val active = activeKey?.let(entries::get)?.takeIf { it.visible } ?: return
-        (active.part as? AttachmentGizmo)?.let { DecalPartOverlay.drawGuide(scope, it) }
+        DecalPartOverlay.drawGuide(scope)
         session.draw(scope, if (active.working != null) EntryTarget(active) else null)
     }
 

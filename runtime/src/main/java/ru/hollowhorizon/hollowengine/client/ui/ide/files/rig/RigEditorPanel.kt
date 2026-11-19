@@ -175,7 +175,7 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
     var selected by mutableStateOf<String?>(null)
         private set
 
-    /** The selected part on [selected], if any: a collider, a target or anything else the gizmo moves. */
+    /** The selected part on [selected], if any. */
     var selectedPart by mutableStateOf<String?>(null)
         private set
 
@@ -221,6 +221,10 @@ internal class RigEditorState(private val document: RigEditing, modelId: String)
             else -> BONE_POSE_PART
         }
         bone?.let(::reveal)
+        if (part != null) {
+            rootExpanded = true
+            if (bone != null && bone !in expanded) expanded += bone
+        }
     }
 
     /** Opens the bones above [bone] in the scene window, so a bone picked in the preview shows there too. */

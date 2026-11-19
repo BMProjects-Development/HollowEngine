@@ -184,24 +184,24 @@ private fun ClipFields(document: HollowIdeMontageDocument, state: MontageEditorS
 
 /** The fields of an attachment the montage animates, and the stretch of time the montage hangs it for. */
 private class MontageAttachmentAnimation(private val state: MontageEditorState) : AttachmentAnimation {
-    override fun fields(bone: String?, attachment: RigAttachmentSpec): AnimatedFields {
+    override fun fields(bone: String?, attachment: Any): AnimatedFields {
         val names = RigFields.animatable(attachment).mapTo(HashSet()) { it.name }
         return object : AnimatedFields {
             override fun isAnimated(name: String): Boolean? =
-                if (name in names) state.session.isAnimated(bone, attachment.id, name) else null
+                if (name in names) state.session.isAnimated(bone, attachment.rigId, name) else null
 
-            override fun toggle(name: String) = state.session.toggle(bone, attachment.id, name)
+            override fun toggle(name: String) = state.session.toggle(bone, attachment.rigId, name)
         }
     }
 
     @Composable
-    override fun Header(bone: String?, attachment: RigAttachmentSpec) {
+    override fun Header(bone: String?, attachment: Any) {
         val document = state.rigs
-        if (!document.owns(bone, attachment.id)) return FieldLabel(
+        if (!document.owns(bone, attachment.rigId)) return FieldLabel(
             montageText("model_attachment"), montageText("model_attachment_hint")
         )
         val owned =
-            state.document.montage.attachments.firstOrNull { it.bone == bone && it.spec.id == attachment.id } ?: return
+            state.document.montage.attachments.firstOrNull { it.bone == bone && it.spec.rigId == attachment.rigId } ?: return
         val duration = state.document.montage.duration
         val session = state.session
         FieldLabel(montageText("windows"), montageText("windows_hint"))
@@ -214,13 +214,13 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
                         id = "window-$index-start",
                         min = 0f
                     ) { value ->
-                        session.editWindow(bone, attachment.id, index) { it.copy(start = value) }
+                        session.editWindow(bone, attachment.rigId, index) { it.copy(start = value) }
                     }
                     NumberRow(
                         montageText("window_end"), window.end ?: duration, id = "window-$index-end", min = 0f
                     ) { value ->
                         session.editWindow(
-                            bone, attachment.id, index
+                            bone, attachment.rigId, index
                         ) { it.copy(end = value.takeIf { end -> end < duration }) }
                     }
                 }
@@ -228,7 +228,7 @@ private class MontageAttachmentAnimation(private val state: MontageEditorState) 
         }
         InspectorButton(montageText("add_window")) {
             session.addWindow(
-                bone, attachment.id, session.timeline.currentTime
+                bone, attachment.rigId, session.timeline.currentTime
             )
         }
     }

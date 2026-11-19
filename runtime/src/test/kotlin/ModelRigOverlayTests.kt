@@ -1,3 +1,5 @@
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 import org.junit.jupiter.api.Test
 import ru.hollowhorizon.hollowengine.common.models.*
@@ -7,13 +9,13 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.serialization.deserialize
 import ru.hollowhorizon.hollowengine.common.utils.serialization.serialize
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEmitterSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxPlaneSpec
 import ru.hollowhorizon.hollowengine.common.vfx.modules.VfxNoiseSpec
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -24,10 +26,10 @@ import kotlin.test.assertTrue
 class ModelRigOverlayTests {
     private val asset = ModelRig(
         bones = mapOf(
-            "Hand" to RigBone(alias = "right_hand", attachments = listOf(ItemSlotAttachmentSpec("item"), VfxBoneAttachmentSpec("glow", effect = "a:vfx/glow.vfx"))),
+            "Hand" to RigBone(alias = "right_hand", attachments = listOf(ItemSlotAttachmentSpec("item"), VfxComponent("glow", effect = "a:vfx/glow.vfx"))),
             "Head" to RigBone(hidden = true),
         ),
-        attachments = listOf(VfxBoneAttachmentSpec("aura", effect = "a:vfx/aura.vfx")),
+        attachments = listOf(VfxComponent("aura", effect = "a:vfx/aura.vfx")),
     )
 
     @Test
@@ -39,12 +41,12 @@ class ModelRigOverlayTests {
     fun `an attachment with a taken id replaces the file's in its place, a new one goes last`() {
         val instance = ModelRig(
             bones = mapOf(
-                "Hand" to RigBone(attachments = listOf(VfxBoneAttachmentSpec("glow", effect = "b:vfx/fire.vfx"), ModelAttachmentSpec("sword", model = "b:models/sword.glb"))),
+                "Hand" to RigBone(attachments = listOf(VfxComponent("glow", effect = "b:vfx/fire.vfx"), ModelAttachmentSpec("sword", model = "b:models/sword.glb"))),
             ),
         )
         val hand = asset.overlay(instance).bone("Hand")!!
-        assertEquals(listOf("item", "glow", "sword"), hand.attachments.map { it.id })
-        assertEquals("b:vfx/fire.vfx", (hand.attachments[1] as VfxBoneAttachmentSpec).effect)
+        assertEquals(listOf("item", "glow", "sword"), hand.attachments.map { it.rigId })
+        assertEquals("b:vfx/fire.vfx", (hand.attachments[1] as VfxComponent).effect)
         assertEquals(RigItemSlot.MAINHAND, (hand.attachments[0] as ItemSlotAttachmentSpec).slot)
         assertEquals("right_hand", hand.alias)
     }
@@ -57,7 +59,7 @@ class ModelRigOverlayTests {
         )
         val merged = asset.overlay(instance)
         assertEquals(setOf("Hand", "Head", "Tail"), merged.bones.keys)
-        assertEquals(listOf("aura", "lamp"), merged.attachments.map { it.id })
+        assertEquals(listOf("aura", "lamp"), merged.attachments.map { it.rigId })
         assertTrue(merged.bone("Head")!!.hidden, "a bone hidden by the file stays hidden")
         assertEquals("skull", merged.bone("Head")!!.alias)
     }
@@ -68,7 +70,7 @@ class ModelRigOverlayTests {
         val effect = VfxEffect(nodes = listOf(emitter))
         val rig = ModelRig(
             bones = mapOf("Head" to RigBone(pose = RigPose(Vec3f(0f, 1f, 0f), QuatF(0f, 0.38268343f, 0f, 0.9238795f), Vec3f(1f, 2f, 1f)))),
-            attachments = listOf(VfxBoneAttachmentSpec("aura", effect = "a:vfx/aura.vfx", ownEffect = effect)),
+            attachments = listOf(VfxComponent("aura", effect = "a:vfx/aura.vfx", ownEffect = effect)),
         )
 
         val stored = NBTFormat.deserialize<ModelRig, Tag>(NBTFormat.serialize(rig))
@@ -79,27 +81,38 @@ class ModelRigOverlayTests {
     }
 
     @Test
-    fun `what attachments take in place leaves the structure as it was`() {
-        val moved = ModelRig(
-            bones = mapOf(
-                "Hand" to RigBone(
-                    attachments = listOf(
-                        VfxBoneAttachmentSpec("glow", effect = "a:vfx/other.vfx", offset = Vec3f(1f, 0f, 0f), ownEffect = VfxEffect()),
-                        ModelAttachmentSpec("sword", model = "b:models/sword.glb", scale = 2f),
-                    ),
-                ),
-            ),
-        )
-        val placed = ModelRig(
-            bones = mapOf(
-                "Hand" to RigBone(
-                    attachments = listOf(VfxBoneAttachmentSpec("glow"), ModelAttachmentSpec("sword", model = "b:models/sword.glb")),
-                ),
-            ),
-        )
-        assertEquals(placed.structure(), moved.structure())
+    fun `an unavailable legacy rig component preserves its name and data`() {
+        val payload = CompoundTag().apply {
+            putString("id", "constraint")
+            putFloat("weight", 0.5f)
+        }
+        val entry = CompoundTag().apply { put("test:rig/missing", payload) }
+        val stored = CompoundTag().apply { put("attachments", ListTag().apply { add(entry) }) }
 
-        val swapped = placed.withBone("Hand", RigBone(attachments = listOf(ModelAttachmentSpec("sword", model = "b:models/axe.glb"))))
-        assertNotEquals(placed.structure(), swapped.structure(), "another nested model has to be built")
+        val rig = NBTFormat.deserialize<ModelRig, Tag>(stored)
+        val unknown = assertIs<UnknownRigComponent>(rig.holder(null).attachment("constraint"))
+        assertEquals(payload, unknown.payload)
+        val written = assertIs<CompoundTag>(NBTFormat.serialize(rig))
+        assertEquals(entry, written.getList("attachments", Tag.TAG_COMPOUND.toInt()).single())
+    }
+
+    @Test
+    fun `a legacy placement is saved as a child bone and migrated only once`() {
+        val position = Vec3f(1f, 2f, 3f)
+        val placement = LegacyNodePlacement(offset = position, rotation = Vec3f(0f, 45f, 0f), scale = 2f)
+        val spec = (NBTFormat.serialize(LegacyNodePlacement.serializer(), placement) as CompoundTag).apply {
+            putString("id", "glow")
+            putString("effect", "test:glow")
+        }
+        val entry = CompoundTag().apply { put("hollowengine:rig/vfx", spec) }
+        val hand = CompoundTag().apply { put("attachments", ListTag().apply { add(entry) }) }
+        val old = CompoundTag().apply { put("bones", CompoundTag().apply { put("hand", hand) }) }
+
+        val rig = NBTFormat.deserialize<ModelRig, Tag>(old)
+        val child = rig.bones.values.single { it.origin != null }
+        assertEquals(placement.origin("hand"), child.origin)
+        assertEquals(VfxComponent(id = "glow", effect = "test:glow"), child.attachments.single())
+        assertTrue(rig.holder("hand").attachments.isEmpty())
+        assertEquals(rig, NBTFormat.deserialize<ModelRig, Tag>(NBTFormat.serialize(rig)))
     }
 }

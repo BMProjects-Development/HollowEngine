@@ -49,9 +49,8 @@ fun IkChainSpec.links(end: SceneObject): List<SceneObject> {
 /** Where the target named [id] stands in model space, turned as it is turned; null when the rig has none. */
 fun ModelRig.ikTargetMatrix(id: String, nodes: (String) -> SceneObject?): Mat4f? {
     if (id.isBlank()) return null
-    val (bone, spec) = ikTarget(id) ?: return null
-    val holder = if (bone == null) Mat4f.IDENTITY else nodes(bone)?.modelMatrix() ?: return null
-    return holder.mul(spec.localTransform().matrixF, MutableMat4f())
+    val (bone, _) = ikTarget(id) ?: return null
+    return if (bone == null) Mat4f.IDENTITY else nodes(bone)?.modelMatrix()
 }
 
 private fun solveChain(

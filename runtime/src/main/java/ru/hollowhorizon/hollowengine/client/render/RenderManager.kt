@@ -11,6 +11,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
+import org.joml.Matrix4d
 import org.joml.Quaternionf
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
@@ -21,10 +22,12 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.InstanceBa
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderContext
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstance
+import ru.hollowhorizon.hollowengine.client.scene.WorldObjectComponents
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
 import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
 import ru.hollowhorizon.hollowengine.common.colliders.hostScale
+import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
@@ -58,6 +61,8 @@ object RenderManager {
     private var frameNanosOf = Long.MIN_VALUE
 
     private val modelCullingBounds = IdentityHashMap<Entity, AABB>()
+    private val componentPlacement = Matrix4d()
+    private val componentRotation = Quaternionf()
     private val frustumCullingDisabledHosts = Collections.newSetFromMap(IdentityHashMap<Entity, Boolean>())
 
     fun onInitialize() {
@@ -83,6 +88,15 @@ object RenderManager {
     @SubscribeEvent
     fun onTrackWorldPass(event: RenderLevelStageEvent) {
         isLevelStage = event.stage != RenderStage.AFTER_LEVEL
+    }
+
+    @SubscribeEvent(10)
+    fun onDrawWorldObjectComponents(event: RenderLevelStageEvent) {
+        when (event.stage) {
+            RenderStage.AFTER_SKY -> WorldObjectComponents.update(event)
+            RenderStage.AFTER_WEATHER -> WorldObjectComponents.collect(event)
+            else -> Unit
+        }
     }
 
     @SubscribeEvent
@@ -135,8 +149,19 @@ object RenderManager {
             if (!hidden && posesThisFrame(instance, host, culled)) {
                 instance.update(animationContext(host, partialTick, worldTransform))
             }
-
-            instance.attachment.updateWorldPose(worldTransform, host)
+            if (instance.attachment.hasComponentUpdates) {
+                val position = hostPosition(host, partialTick)
+                val rotation = hostRotation(host, partialTick)
+                val scale = hostScale(host, partialTick)
+                val local = node.transform.transform
+                componentPlacement.translation(position.x, position.y, position.z)
+                    .rotate(componentRotation.set(rotation.x, rotation.y, rotation.z, rotation.w))
+                    .scale(scale.x.toDouble(), scale.y.toDouble(), scale.z.toDouble())
+                    .translate(local.translation.x.toDouble(), local.translation.y.toDouble(), local.translation.z.toDouble())
+                    .rotate(componentRotation.set(local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w))
+                    .scale(local.scale.x.toDouble(), local.scale.y.toDouble(), local.scale.z.toDouble())
+                instance.attachment.updateWorldComponents(componentPlacement, host, event.camera.position, instance.componentAnimation)
+            }
 
             if (!culled) {
                 frustumCullingDisabledHosts.add(host)

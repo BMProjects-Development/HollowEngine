@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
-import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
@@ -8,11 +7,9 @@ import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
 
 /**
  * A model hung on a bone of another. It stands still in its rest pose and is drawn as part of the model it
@@ -32,11 +29,12 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private var context: RigA
         respec(spec)
     }
 
+    override fun canRespec(spec: Any): Boolean = spec is ModelAttachmentSpec && this.spec.model == spec.model
+
     /** Takes the attachment as it now is, after a change that only moved, posed or redressed the nested model. */
-    override fun respec(spec: RigAttachmentSpec) {
+    override fun respec(spec: Any) {
         if (spec !is ModelAttachmentSpec) return
         this.spec = spec
-        transform.set(spec.localTransform())
         model.rig = RigAssets.of(model.location).overlay(spec.rig)
     }
 
@@ -69,8 +67,6 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private var context: RigA
             if (!sceneHolder.isRemoved && !sceneHolder.scene.isClosed) sceneHolder.remove()
         }
     }
-    override val followsWorldPose: Boolean get() = true
-    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) = model.updateWorldPose(modelToWorld, entity)
 
     companion object {
         /**
@@ -88,7 +84,9 @@ class NestedModelAttachment(spec: ModelAttachmentSpec, private var context: RigA
     }
 }
 
-/** Whether an effect hangs anywhere on this rig, models nested in it included. */
-internal fun ModelRig.carriesEffects(): Boolean = allAttachments().any { (_, spec) ->
-    spec is VfxBoneAttachmentSpec || spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesEffects()
-}
+/** Whether a legacy draw extends beyond the rig's geometry, including nested rigs. */
+internal fun ModelRig.carriesLegacyEffects(): Boolean =
+    attachments.any(::carriesLegacyEffects) || bones.values.any { it.attachments.any(::carriesLegacyEffects) }
+
+private fun carriesLegacyEffects(spec: Any): Boolean =
+    spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesLegacyEffects()

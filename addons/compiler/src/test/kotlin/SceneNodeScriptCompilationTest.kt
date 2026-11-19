@@ -21,13 +21,12 @@ class SceneNodeScriptCompilationTest {
             val script = environment.compiler.compile(
                 "scene.node.kts",
                 """
-                    import kotlinx.serialization.builtins.serializer
-                    import ru.hollowhorizon.hollowengine.common.scene.SceneComponentType
+                    import ru.hollowhorizon.hollowengine.common.sounds.Sound
 
                     val root = serverScene.create("example")
-                    val type = SceneComponentType("test:sound".rl, String::class, String.serializer())
-                    val component = root.addComponent(type, "before")
-                    component.setData("after")
+                    val sound = Sound()
+                    val id = root.attach(sound)
+                    root.setComponent(id, sound.copy(autoPlay = false))
                     onStop { root.remove() }
                 """.trimIndent(),
             ).getOrThrow()

@@ -60,6 +60,7 @@ class VfxPlayback(
         instance.partialTick = partialTick
         instance.gameTime = gameTime
         instance.update(dt)
+        instance.updateFrame()
     }
 }
 

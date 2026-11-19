@@ -9,7 +9,7 @@ import ru.hollowhorizon.hollowengine.client.decals.Decals
 import ru.hollowhorizon.hollowengine.client.render.CameraSetupEvent
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
 import ru.hollowhorizon.hollowengine.client.utils.shouldOverrideShaders
-import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBindings
+import ru.hollowhorizon.hollowengine.client.vfx.SceneVfxBindings
 import ru.hollowhorizon.hollowengine.client.vfx.VfxInstance
 import ru.hollowhorizon.hollowengine.client.vfx.VfxScenes
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -38,8 +38,9 @@ object VfxWorldRenderer {
     fun onRenderLevel(event: RenderLevelStageEvent) {
         when (event.stage) {
             RenderStage.AFTER_SKY -> {
-                VfxBoneBindings.clear()
+                SceneVfxBindings.clear()
                 Decals.clear()
+                if (!WorldCameraPreviewRenderer.isRendering) VfxScenes.current()?.update(event.camera.position)
             }
             RenderStage.AFTER_WEATHER -> drawEffects(event)
             else -> Unit
@@ -77,23 +78,21 @@ object VfxWorldRenderer {
     private fun drawEffects(event: RenderLevelStageEvent) {
         val camera = event.camera.position
         val scene = VfxScenes.current()
-        val bones = VfxBoneBindings.drain(camera)
+        val boundEffects = SceneVfxBindings.drain()
         val decals = Decals.drain()
         frame.clear()
         deferred = null
         frameView = null
-        if (scene == null && bones.isEmpty() && decals.isEmpty()) {
+        if (scene == null && boundEffects.isEmpty() && decals.isEmpty()) {
             if (!WorldCameraPreviewRenderer.isRendering) shake.fill(0f)
             return
         }
-
-        if (!WorldCameraPreviewRenderer.isRendering) scene?.update(camera)
 
         val levelPose = event.poseStack.last().pose()
         scene?.forEachInstance { instance, _ ->
             instance.collectInWorld(frame, placeInWorld(instance, levelPose, camera.x, camera.y, camera.z), camera)
         }
-        bones.forEach { binding -> binding.instance.collectInWorld(frame, binding.placement, camera) }
+        boundEffects.forEach { binding -> binding.instance.collectInWorld(frame, binding.placement, camera) }
         frame.decals += decals
         if (!WorldCameraPreviewRenderer.isRendering) frame.shake.copyInto(shake)
         if (frame.isEmpty) return

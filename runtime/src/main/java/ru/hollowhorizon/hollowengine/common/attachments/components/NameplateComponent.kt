@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 
@@ -15,6 +16,7 @@ enum class NameplateMode {
 }
 
 @Registerable
+@Attach(Entity::class)
 @Syncable
 @Serializable
 @SerialName("hollowengine:entity/nameplate")

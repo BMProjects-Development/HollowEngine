@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.sounds.outline
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 
@@ -13,7 +13,7 @@ import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
  */
 internal fun DebugLines.Batch.soundAreas(rig: ModelRig, roots: List<RenderModelNode>, selected: RigPartSelection?) {
     rig.allAttachments().forEach { (bone, spec) ->
-        if (spec !is SoundBoneAttachmentSpec || spec.areas.isEmpty()) return@forEach
+        if (spec !is Sound || spec.areas.isEmpty()) return@forEach
         val holder = holderMatrix(roots, bone) ?: return@forEach
         val isSelected = selected != null && selected.bone == bone && selected.id == spec.id
         val color = if (isSelected) SELECTED_COLOR else AREA_COLOR

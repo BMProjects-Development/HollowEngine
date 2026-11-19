@@ -16,6 +16,7 @@ import ru.hollowhorizon.hollowengine.common.scene.SceneFailures
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import java.util.*
 
 /** A model's mutable pose and hierarchy under one scene object; the model asset remains shared. */
@@ -41,9 +42,25 @@ class ModelSceneInstance private constructor(
         target = null
     }
 
-    internal fun updateRigBoneRestTransforms(rig: ModelRig) {
-        for ((name, origin) in rig.addedBones) {
-            rigBones[name]?.restTransform?.set(origin.localTransform())
+    internal fun updateRigBoneRestTransforms(previous: ModelRig, rig: ModelRig) {
+        for ((name, node) in rigBones) {
+            val origin = rig.bone(name)?.origin ?: continue
+            if (origin == previous.bone(name)?.origin) continue
+            val rest = node.restTransform
+            val next = origin.localTransform()
+            val pose = node.localTransform
+            fun scale(value: Float, before: Float, after: Float): Float =
+                if (before == 0f) after else (value / before) * after
+            pose.setCompositionOf(
+                Vec3f(pose.translation) + (origin.offset - rest.translation),
+                QuatF(next.rotation) * QuatF(rest.rotation).inverted() * QuatF(pose.rotation),
+                Vec3f(
+                    scale(pose.scale.x, rest.scale.x, next.scale.x),
+                    scale(pose.scale.y, rest.scale.y, next.scale.y),
+                    scale(pose.scale.z, rest.scale.z, next.scale.z),
+                ),
+            )
+            rest.set(next)
         }
     }
 
@@ -242,5 +259,5 @@ internal fun SceneObject.mountModel(spec: ModelAttachmentSpec): SceneObject {
     var name = baseName
     var suffix = 2
     while (names.any { it.name == name }) name = "$baseName (${suffix++})"
-    return importSynthetic(name).also { it.localTransform.set(spec.localTransform()) }
+    return importSynthetic(name)
 }

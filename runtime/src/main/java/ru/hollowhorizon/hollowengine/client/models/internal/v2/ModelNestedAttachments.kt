@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 
 /** Retains nested model scenes whose owners survive a model or rig rebuild. */
 internal class ModelNestedAttachments(nodes: List<RenderModelNode>, modelRoot: RenderModelNode?) : AutoCloseable {
@@ -21,7 +20,7 @@ internal class ModelNestedAttachments(nodes: List<RenderModelNode>, modelRoot: R
         modelRoot?.let(::retain)
     }
 
-    fun reuse(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment? {
+    fun reuse(spec: Any, context: RigAttachmentContext): Attachment? {
         if (spec !is ModelAttachmentSpec) return null
         val index = retained.indexOfFirst { existing ->
             existing.spec.id == spec.id && existing.spec.model == spec.model &&

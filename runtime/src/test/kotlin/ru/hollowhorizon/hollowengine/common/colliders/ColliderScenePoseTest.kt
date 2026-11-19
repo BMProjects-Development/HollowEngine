@@ -38,8 +38,9 @@ class ColliderScenePoseTest {
         val innerNode = NodeDefinition(0, "blade", mutableListOf(), TrsTransformF().translate(0f, 0f, 1f))
         val outer = Model(0, listOf(ModelScene(listOf(outerNode))), emptySet())
         val inner = Model(0, listOf(ModelScene(listOf(innerNode))), emptySet())
-        val spec = ModelAttachmentSpec(id = "sword", model = "test:sword", offset = Vec3f(1f, 0f, 0f), rotation = Vec3f(0f, 45f, 0f), scale = 1.5f)
-        val rig = ModelRig(bones = mapOf("hand" to RigBone(attachments = listOf(spec))))
+        val spec = ModelAttachmentSpec(id = "sword", model = "test:sword")
+        val placement = RigBoneOrigin("hand", Vec3f(1f, 0f, 0f), Vec3f(0f, 45f, 0f), Vec3f(1.5f, 1.5f, 1.5f))
+        val rig = ModelRig(bones = mapOf("sword" to RigBone(attachments = listOf(spec), origin = placement)))
         val innerRig = ModelRig(bones = mapOf("blade" to RigBone(attachments = listOf(ColliderAttachmentSpec(id = "blade")))))
         val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
         val posed = PosedModel(outer, rig, scene.create("entity"), "model", { ColliderPoseAssets(innerRig, null, inner) })
@@ -47,7 +48,7 @@ class ColliderScenePoseTest {
         val legacy = renderModelNode(outerNode, null)
         legacy.updateGlobalMatrix()
         val holder = object : BaseAttachment(legacy) {}
-        holder.transform.set(spec.localTransform())
+        holder.transform.set(placement.localTransform())
         holder.updateGlobalMatrix()
         val blade = renderModelNode(innerNode, holder)
         blade.updateGlobalMatrix()
@@ -73,8 +74,10 @@ class ColliderScenePoseTest {
         tip.parent = hip
         val model = Model(0, listOf(ModelScene(listOf(hip))), emptySet())
         val rig = ModelRig(
-            bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step", stretch = 2f)))),
-            attachments = listOf(IkTargetSpec(id = "step", offset = Vec3f(0f, -3f, 0f))),
+            bones = mapOf(
+                "foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step", stretch = 2f))),
+                "step" to RigBone(origin = RigBoneOrigin(offset = Vec3f(0f, -3f, 0f)), attachments = listOf(IkTargetSpec("step"))),
+            ),
         )
         val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
         val posed = PosedModel(model, rig, scene.create("entity"), "model", { null })
@@ -83,7 +86,7 @@ class ColliderScenePoseTest {
         drawn.applyRigConstraints(AnimatorEvaluationContext())
 
         val sceneNodes = posed.poseNodes.associateBy { it.poseName }
-        drawn.nodes.single().walk().forEach { node ->
+        drawn.nodes.flatMap { it.walk() }.forEach { node ->
             val actual = sceneNodes.getValue(node.name).localTransform
             assertTrue(Vec3f(node.transform.translation).distance(Vec3f(actual.translation)) < 1e-4f, node.name)
             assertTrue(Vec3f(node.transform.scale).distance(Vec3f(actual.scale)) < 1e-4f, node.name)
@@ -103,10 +106,10 @@ class ColliderScenePoseTest {
         val model = Model(0, listOf(ModelScene(listOf(hip))), emptySet())
         val goal = Vec3f(0.3f, -1.5f, 0.4f)
         val rig = ModelRig(
-            bones = mapOf("foot" to RigBone(attachments = listOf(
-                ColliderAttachmentSpec(id = "foot"), IkChainSpec(id = "leg", target = "step")
-            ))),
-            attachments = listOf(IkTargetSpec(id = "step", offset = goal)),
+            bones = mapOf(
+                "foot" to RigBone(attachments = listOf(ColliderAttachmentSpec(id = "foot"), IkChainSpec(id = "leg", target = "step"))),
+                "step" to RigBone(origin = RigBoneOrigin(offset = goal), attachments = listOf(IkTargetSpec("step"))),
+            ),
         )
         val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
         val posed = PosedModel(model, rig, scene.create("entity"), "model", { null })
@@ -131,13 +134,16 @@ class ColliderScenePoseTest {
         val outer = model("arm", Vec3f(1f, 1f, 0f))
         val inner = model("blade", Vec3f(0f, 0f, 1f))
         val innerRig = ModelRig(bones = mapOf("blade" to RigBone(attachments = listOf(ColliderAttachmentSpec(id = "blade")))))
-        val rig = ModelRig(bones = mapOf("hand" to RigBone(
-            origin = RigBoneOrigin("arm", offset = Vec3f(1f, 0f, 0f)),
-            attachments = listOf(
-                ColliderAttachmentSpec(id = "hand"),
-                ModelAttachmentSpec(id = "sword", model = "test:sword", offset = Vec3f(0f, 1f, 0f)),
+        val rig = ModelRig(bones = mapOf(
+            "hand" to RigBone(
+                origin = RigBoneOrigin("arm", offset = Vec3f(1f, 0f, 0f)),
+                attachments = listOf(ColliderAttachmentSpec(id = "hand")),
             ),
-        )))
+            "sword" to RigBone(
+                origin = RigBoneOrigin("hand", offset = Vec3f(0f, 1f, 0f)),
+                attachments = listOf(ModelAttachmentSpec(id = "sword", model = "test:sword")),
+            ),
+        ))
         val scene = Scene(object : SceneContext { override val side = LogicalSide.SERVER })
         val owner = scene.create("entity")
         val posed = PosedModel(outer, rig, owner, "model", { ColliderPoseAssets(innerRig, null, inner) })

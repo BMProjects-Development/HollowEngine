@@ -10,11 +10,11 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.Entity
+import ru.hollowhorizon.hollowengine.common.scene.acceptsComponentOwner
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import ru.hollowhorizon.hollowengine.client.ui.entity.EntityEditorClient
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
@@ -40,8 +40,8 @@ data class EntityEditorSnapshot(
     val title: String = "",
     val typeId: String = "",
     val isPlayer: Boolean = false,
-    val stored: List<@Polymorphic Component> = emptyList(),
-    val virtual: List<@Polymorphic Component> = emptyList(),
+    val stored: List<@Polymorphic Any> = emptyList(),
+    val virtual: List<@Polymorphic Any> = emptyList(),
     val attachedScripts: List<ScriptEditorInfo> = emptyList(),
     val availableScripts: List<String> = emptyList(),
     val scriptFiles: List<String> = emptyList(),
@@ -77,7 +77,8 @@ object EntityEditorService {
         EntityEditorStatePacket(snapshot(entity)).send(player)
     }
 
-    fun apply(entity: Entity, component: Component) {
+    fun apply(entity: Entity, component: Any) {
+        if (!component::class.acceptsComponentOwner(entity.javaClass)) return
         if (VirtualComponentRegistry.apply(entity, component)) return
         val id = ComponentDescriptorRegistry.idFor(component::class) ?: return
         AttachmentRegistry.componentsById(entity)[id] = component
@@ -109,7 +110,7 @@ class EntityEditorStatePacket(val state: EntityEditorSnapshot) : HollowPacket {
 @Serializable
 class SetEntityComponentsPacket(
     val entityId: Int,
-    val components: List<@Polymorphic Component> = emptyList(),
+    val components: List<@Polymorphic Any> = emptyList(),
 ) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.canEditEntities()) return

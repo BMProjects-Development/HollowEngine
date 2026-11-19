@@ -8,6 +8,8 @@ import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
+import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentIcon
+import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentLabel
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.onPlaced
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
@@ -35,16 +37,17 @@ internal fun rigInspectorTarget(
     bones: List<String>,
 ): InspectorTarget {
     val bone = state.selected
-    val collider = state.selectedPart
+    val part = state.selectedPart
+    val attachment = part?.let { document.rig.holder(bone).attachment(it) }
     return InspectorTarget(
         id = "rig-bone-${bone ?: ""}",
-        title = bone ?: rigText("model"),
-        icon = if (bone == null) ModelIcon else BoneIcon,
-        subtitle = rigText(if (bone == null) "section_model" else "section_bone"),
+        title = attachment?.let(::attachmentLabel) ?: bone ?: rigText("model"),
+        icon = attachment?.let(::attachmentIcon) ?: if (bone == null) ModelIcon else BoneIcon,
+        subtitle = if (attachment == null) rigText(if (bone == null) "section_model" else "section_bone") else null,
     ) {
         val info = state.viewer.attachment.rigModelInfo()
         CompositionLocalProvider(LocalEditorBones provides bones, LocalRigModelInfo provides info) {
-            key(bone) { HolderFields(document, bone, collider, onSelectBone = state::select) }
+            key(bone) { HolderFields(document, bone, part, onSelectBone = state::select) }
         }
     }
 }
@@ -81,7 +84,7 @@ internal fun HolderFields(
         val targets = document.occupied.allAttachments().mapNotNull { (_, spec) -> (spec as? IkTargetSpec)?.id }
         CompositionLocalProvider(LocalEditorRigTargets provides targets) {
             current.attachments.forEachIndexed { index, attachment ->
-                key(index) { AttachmentSection(document, bone, current, index, attachment, attachment.id == selectedPart) }
+                key(index) { AttachmentSection(document, bone, current, index, attachment, attachment.rigId == selectedPart) }
             }
         }
 
@@ -147,11 +150,11 @@ private fun AttachmentSection(
     bone: String?,
     current: RigBone,
     index: Int,
-    attachment: RigAttachmentSpec,
+    attachment: Any,
     selected: Boolean,
 ) {
     val type = RigAttachmentTypes.of(attachment)
-    val title = if (type?.namedAcrossRig == true) "${type.title()} (${attachment.id})" else type.title()
+    val title = if (type?.namedAcrossRig == true) "${type.title()} (${attachment.rigId})" else type.title()
     val path = "/${bone ?: ""}/#$index"
 
     Section(if (selected) "◆ $title" else title) {
@@ -166,9 +169,9 @@ private fun AttachmentSection(
                 LocalAnimatedFields provides animation?.fields(bone, attachment),
             ) {
                 AttachmentFields(type, attachment, path) { changed ->
-                    document.edit(mergeKey = path, label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.id)) { rig ->
-                        val placed = rig.withHolder(bone, rig.holder(bone).withAttachment(attachment.id, changed))
-                        if (attachment is IkTargetSpec && changed.id != attachment.id) placed.withIkTargetRenamed(attachment.id, changed.id)
+                    document.edit(mergeKey = path, label = UndoLabel("${UndoLabel.LANG}.rig.attachment", attachment.rigId)) { rig ->
+                        val placed = rig.withHolder(bone, rig.holder(bone).withAttachment(attachment.rigId, changed))
+                        if (attachment is IkTargetSpec && changed.rigId != attachment.rigId) placed.withIkTargetRenamed(attachment.rigId, changed.rigId)
                         else placed
                     }
                 }
@@ -176,7 +179,7 @@ private fun AttachmentSection(
         }
 
         InspectorButton(rigText("remove_attachment"), tags = listOf("danger")) {
-            document.edit { it.withHolder(bone, current.withoutAttachment(attachment.id)) }
+            document.edit { it.withHolder(bone, current.withoutAttachment(attachment.rigId)) }
         }
     }
 }
@@ -187,11 +190,11 @@ private fun AttachmentSection(
 @Composable
 private fun AttachmentFields(
     type: RigAttachmentType<*>,
-    attachment: RigAttachmentSpec,
+    attachment: Any,
     path: String,
-    onChange: (RigAttachmentSpec) -> Unit,
+    onChange: (Any) -> Unit,
 ) {
-    @Suppress("UNCHECKED_CAST") val serializer = type.serializer as KSerializer<RigAttachmentSpec>
+    @Suppress("UNCHECKED_CAST") val serializer = type.serializer as KSerializer<Any>
     val encoded = remember(attachment) {
         runCatching {
             ComponentJson.format.encodeToJsonElement(
@@ -245,10 +248,10 @@ private fun AddAttachment(document: RigEditing, bone: String?, current: RigBone,
  * timeline can drive, and anything it puts above them, as the stretch of time a montage hangs it for.
  */
 internal interface AttachmentAnimation {
-    fun fields(bone: String?, attachment: RigAttachmentSpec): AnimatedFields?
+    fun fields(bone: String?, attachment: Any): AnimatedFields?
 
     @Composable
-    fun Header(bone: String?, attachment: RigAttachmentSpec)
+    fun Header(bone: String?, attachment: Any)
 }
 
 internal val LocalAttachmentAnimation = compositionLocalOf<AttachmentAnimation?> { null }
@@ -268,9 +271,9 @@ internal fun List<RigAttachmentType<*>>.availableOn(holder: RigBone): List<RigAt
  */
 internal fun freeAttachmentId(rig: ModelRig, bone: String?, type: RigAttachmentType<*>): String {
     val taken = if (type.namedAcrossRig) {
-        rig.allAttachments().filter { type.specClass.isInstance(it.second) }.mapTo(HashSet()) { it.second.id }
+        rig.allAttachments().filter { type.specClass.isInstance(it.second) }.mapTo(HashSet()) { it.second.rigId }
     } else {
-        rig.holder(bone).attachments.mapTo(HashSet()) { it.id }
+        rig.holder(bone).attachments.mapTo(HashSet()) { it.rigId }
     }
     val base = type.id.substringAfterLast('/')
     if (base !in taken) return base

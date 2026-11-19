@@ -10,8 +10,9 @@ data class RigBoneOrigin(
     val parent: String? = null,
     val offset: Vec3f = Vec3f.ZERO,
     val rotation: Vec3f = Vec3f.ZERO,
+    val scale: Vec3f = Vec3f.ONES,
 ) {
-    fun localTransform(): TrsTransformF = TrsTransformF().setCompositionOf(offset, eulerRotationXyz(rotation), Vec3f.ONES)
+    fun localTransform(): TrsTransformF = TrsTransformF().setCompositionOf(offset, eulerRotationXyz(rotation), scale)
 }
 
 /** The bones the rig adds, by name. */

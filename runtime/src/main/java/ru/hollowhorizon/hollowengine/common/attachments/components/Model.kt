@@ -3,11 +3,13 @@ package ru.hollowhorizon.hollowengine.common.attachments.components
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
+import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
 /**
@@ -16,6 +18,7 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
  * nothing and only carries what hangs on the model itself.
  */
 @Registerable
+@Attach(Entity::class)
 @Syncable
 @Serializable
 @EditorIcon("hollowengine:textures/gui/icons/file_model.svg")

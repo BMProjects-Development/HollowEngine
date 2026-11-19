@@ -1,11 +1,18 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.rl
+import java.util.UUID
 import kotlin.test.*
 
 class SceneTest {
@@ -31,15 +38,33 @@ class SceneTest {
         override val side = side
     })
 
-    private fun type(
-        multiple: Boolean = false,
-        accepts: (SceneComponentOwner) -> Boolean = { true },
-        sides: Set<LogicalSide> = LogicalSide.entries.toSet(),
-        runtime: (SceneComponent<String>) -> SceneComponentRuntime<String>? = { null },
-    ) = SceneComponentType(
-        "test:sound".rl, String::class, String.serializer(), multiple = multiple,
-        accepts = accepts, sides = sides, createRuntime = runtime,
-    )
+    @Serializable
+    private data class TestComponent(
+        val value: String,
+        @Transient val makeLifecycle: (ComponentOwner) -> ComponentLifecycle? = { null },
+    ) : ComponentBehavior {
+        override fun bind(owner: ComponentOwner, id: UUID) = makeLifecycle(owner)
+    }
+
+    @Attach(Scene::class)
+    @Serializable
+    private class RootComponent
+
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun registerComponents() {
+            ComponentDescriptorRegistry.register(ComponentDescriptor("test:scene_fixture".rl, TestComponent::class, TestComponent.serializer()))
+            ComponentDescriptorRegistry.register(ComponentDescriptor("test:scene_root_only".rl, RootComponent::class, RootComponent.serializer()))
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun unregisterComponents() {
+            ComponentDescriptorRegistry.unregisterDescriptor("test:scene_fixture".rl)
+            ComponentDescriptorRegistry.unregisterDescriptor("test:scene_root_only".rl)
+        }
+    }
 
     @Test
     fun `world matrix version follows parent changes without reallocating`() {
@@ -162,7 +187,8 @@ class SceneTest {
         oldPivot.localTransform.translate(2f, 0f, 0f)
         val hand = oldPivot.importModelChild(ScenePathSegment("hand"))
         val sword = hand.create("sword")
-        val component = hand.addComponent(type(), "sound")
+        val value = TestComponent("sound")
+        val id = hand.attach(value)
         val address = hand.address
         assertEquals(2f, hand.worldTransform.getTranslation().x)
 
@@ -174,7 +200,7 @@ class SceneTest {
         assertSame(hand, scene.resolve(address))
         assertSame(root, hand.parent)
         assertSame(sword, hand.children.single())
-        assertSame(component, hand.components.single())
+        assertSame(value, hand.components[id])
         assertEquals(5f, hand.worldTransform.getTranslation().x)
         assertFailsWith<IllegalArgumentException> { hand.moveWithinLogicalParent(sword) }
         assertSame(hand, scene.resolve(address))
@@ -190,17 +216,17 @@ class SceneTest {
         disabled.setEnabled(false)
         val node = active.importModelChild(ScenePathSegment("bone"))
         val events = mutableListOf<String>()
-        val component = node.addComponent(type(runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onActivate(component: SceneComponent<String>) { events += "activate" }
-                override fun onSuspend(component: SceneComponent<String>) { events += "suspend" }
+        node.attach(TestComponent("value") {
+            object : ComponentLifecycle {
+                override fun activate() { events += "activate" }
+                override fun suspend() { events += "suspend" }
             }
-        }), "value")
+        })
 
         node.moveWithinLogicalParent(disabled)
-        assertFalse(component.isActive)
+        assertFalse(node.isActive)
         node.moveWithinLogicalParent(active)
-        assertTrue(component.isActive)
+        assertTrue(node.isActive)
         assertEquals(listOf("activate", "suspend", "activate"), events)
         scene.close()
     }
@@ -208,35 +234,30 @@ class SceneTest {
     @Test
     fun `component snapshots are reused and invalidated on mutation and rollback`() {
         val node = scene().create("owner")
-        val many = type(multiple = true)
         val empty = node.components
-        val first = node.addComponent(many, "first")
+        val first = TestComponent("first")
+        val id = node.attach(first)
         val all = node.components
-        val typed = node.components(many)
         assertSame(all, node.components)
-        assertSame(typed, node.components(many))
-        assertSame(first, node.component(many))
-        val second = node.addComponent(many, "second")
+        assertSame(first, node.components[id])
+        val second = TestComponent("second")
+        val secondId = node.attach(second)
         assertTrue(empty.isEmpty())
-        assertEquals(listOf(first), all)
-        assertEquals(listOf(first), typed)
-        assertEquals(listOf(first, second), node.components(many))
-        first.remove()
-        assertEquals(listOf(second), node.components)
+        assertEquals(mapOf(id to first), all)
+        assertEquals(listOf(first, second), node.componentsOfType<TestComponent>())
+        node.detach(id)
+        assertEquals(mapOf(secondId to second), node.components)
 
-        val failing = SceneComponentType(
-            "test:failing".rl, String::class, String.serializer(), createRuntime = {
-                object : SceneComponentRuntime<String> {
-                    override fun onAttach(component: SceneComponent<String>) {
-                        assertEquals(2, component.owner.components.size)
-                        error("failed")
-                    }
+        val failing = TestComponent("bad") { owner ->
+            object : ComponentLifecycle {
+                override fun attach() {
+                    assertEquals(2, owner.components.size)
+                    error("failed")
                 }
-            },
-        )
-        assertFailsWith<IllegalStateException> { node.addComponent(failing, "bad") }
-        assertEquals(listOf(second), node.components)
-        assertTrue(node.components(failing).isEmpty())
+            }
+        }
+        assertFailsWith<IllegalStateException> { node.attach(failing) }
+        assertEquals(mapOf(secondId to second), node.components)
     }
 
     @Test
@@ -287,80 +308,61 @@ class SceneTest {
     }
 
     @Test
-    fun `component type restrictions IDs and typed lookup are enforced`() {
+    fun `components enforce owner restrictions and unique IDs`() {
         val scene = scene()
         val node = scene.create("root")
-        val many = type(
-            multiple = true,
-            accepts = { it is SceneObject && it.parent == null },
-            sides = setOf(LogicalSide.SERVER)
-        )
-        val first = node.addComponent(many, "first")
-        val second = node.addComponent(many, "second")
-        assertSame(first, node.component(many))
-        assertEquals(listOf(first, second), node.components(many))
-        assertSame(second, node.component(second.id))
-        first.setData("updated")
-        assertEquals("updated", first.data)
-        assertFailsWith<IllegalArgumentException> { node.addComponent(many, "duplicate", first.id) }
-        assertFailsWith<IllegalArgumentException> { node.create("child").addComponent(many, "invalid") }
-        assertFailsWith<IllegalArgumentException> {
-            scene(LogicalSide.CLIENT).create("client").addComponent(many, "invalid")
-        }
-        assertFailsWith<IllegalArgumentException> { node.create("other").addComponent(type(), "conflicting") }
+        val sound = TestComponent("first")
+        val id = node.attach(sound)
+        val second = TestComponent("second")
+        node.attach(second)
+        assertEquals(listOf(sound, second), node.componentsOfType<TestComponent>())
+        node.setComponent(id, sound.copy(value = "updated"))
+        assertEquals("updated", (node.components[id] as TestComponent).value)
+        assertFailsWith<IllegalArgumentException> { node.attach(sound, id) }
 
-        val singleScene = scene()
-        val single = singleScene.create("single")
-        val once = type()
-        single.addComponent(once, "one")
-        assertFailsWith<IllegalArgumentException> { single.addComponent(once, "two") }
+        val rootOnly = RootComponent()
+        assertFailsWith<IllegalArgumentException> { node.attach(rootOnly) }
+        val rootId = scene.attach(rootOnly)
+        assertSame(rootOnly, scene.components[rootId])
+        assertTrue(scene.detach(rootId))
     }
 
     @Test
     fun `disabling branch preserves own states and invokes ordered lifecycle exactly once`() {
         val events = mutableListOf<String>()
-        val type = type(multiple = true, runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onAttach(component: SceneComponent<String>) {
-                    events += "attach ${component.data}"
-                }
-
-                override fun onActivate(component: SceneComponent<String>) {
-                    events += "activate ${component.data}"
-                }
-
-                override fun onSuspend(component: SceneComponent<String>) {
-                    events += "suspend ${component.data}"
-                }
-
-                override fun onRemove(component: SceneComponent<String>) {
-                    events += "remove ${component.data}"
-                }
+        fun component(value: String) = TestComponent(value) {
+            object : ComponentLifecycle {
+                override fun attach() { events += "attach $value" }
+                override fun activate() { events += "activate $value" }
+                override fun suspend() { events += "suspend $value" }
+                override fun remove() { events += "remove $value" }
             }
-        })
+        }
         val scene = scene()
         val root = scene.create("root")
         val child = root.create("child")
-        val rootComponent = root.addComponent(type, "root")
-        val childComponent = child.addComponent(type, "child")
+        root.attach(component("root"))
+        val childId = child.attach(component("child"))
         events.clear()
+
         root.setEnabled(false)
         assertEquals(listOf("suspend child", "suspend root"), events)
         assertTrue(child.enabled)
         assertFalse(child.isActive)
-        childComponent.setEnabled(false)
+        child.setComponentEnabled(childId, false)
         root.setEnabled(true)
         assertEquals(listOf("suspend child", "suspend root", "activate root"), events)
-        assertFalse(childComponent.isActive)
-        childComponent.setEnabled(true)
-        assertTrue(childComponent.isActive)
+        assertFalse(child.componentEnabled(childId))
+        child.setComponentEnabled(childId, true)
+        assertTrue(child.componentEnabled(childId))
+
         scene.close()
         scene.close()
         root.remove()
-        assertTrue(rootComponent.isRemoved)
+        assertTrue(root.components.isEmpty())
         assertEquals(1, events.count { it == "remove root" })
         assertEquals(1, events.count { it == "remove child" })
-        assertFailsWith<IllegalStateException> { childComponent.setData("late") }
+        assertFailsWith<IllegalStateException> { child.setComponent(childId, component("late")) }
     }
 
     @Test
@@ -369,20 +371,15 @@ class SceneTest {
         val first = root.create("first")
         val second = root.create("second")
         val observations = mutableListOf<List<Boolean>>()
-        val type = type(multiple = true, runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onActivate(component: SceneComponent<String>) {
-                    observations += listOf(root.isActive, first.isActive, second.isActive)
-                }
-
-                override fun onSuspend(component: SceneComponent<String>) {
-                    observations += listOf(root.isActive, first.isActive, second.isActive)
-                }
+        val component = TestComponent("observe") {
+            object : ComponentLifecycle {
+                override fun activate() { observations += listOf(root.isActive, first.isActive, second.isActive) }
+                override fun suspend() { observations += listOf(root.isActive, first.isActive, second.isActive) }
             }
-        })
-        root.addComponent(type, "root")
-        first.addComponent(type, "first")
-        second.addComponent(type, "second")
+        }
+        root.attach(component)
+        first.attach(component)
+        second.attach(component)
         observations.clear()
 
         root.setEnabled(false)
@@ -395,117 +392,86 @@ class SceneTest {
     @Test
     fun `cleanup continues after callback failures and cannot be reentered`() {
         val events = mutableListOf<String>()
-        val type = type(multiple = true, runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onRemove(component: SceneComponent<String>) {
-                    events += component.data
-                    if (component.data == "bad") {
-                        assertFailsWith<IllegalStateException> { component.owner.scene.create("reentrant") }
+        fun component(value: String) = TestComponent(value) { owner ->
+            object : ComponentLifecycle {
+                override fun remove() {
+                    events += value
+                    if (value == "bad") {
+                        assertFailsWith<IllegalStateException> { owner.scene.create("reentrant") }
                         error("cleanup failed")
                     }
                 }
             }
-        })
+        }
         val scene = scene()
         val root = scene.create("root")
-        val good = root.addComponent(type, "good")
-        val bad = root.addComponent(type, "bad")
+        root.attach(component("good"))
+        root.attach(component("bad"))
         assertFailsWith<IllegalStateException> { scene.close() }
         assertEquals(listOf("bad", "good"), events)
         assertTrue(scene.isClosed)
         assertTrue(root.isRemoved)
-        assertTrue(good.isRemoved)
-        assertTrue(bad.isRemoved)
+        assertTrue(root.components.isEmpty())
         scene.close()
     }
 
     @Test
-    fun `failed activation cleans up the component and leaves its owner usable`() {
+    fun `failed activation rolls back addition and leaves its owner usable`() {
         var removed = 0
-        val badType = type(runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onActivate(component: SceneComponent<String>) {
-                    error("failed")
-                }
-
-                override fun onRemove(component: SceneComponent<String>) {
-                    removed++
-                }
+        val failed = TestComponent("bad") {
+            object : ComponentLifecycle {
+                override fun activate() { error("failed") }
+                override fun remove() { removed++ }
             }
-        })
+        }
         val node = scene().create("root")
-        assertFailsWith<IllegalStateException> { node.addComponent(badType, "bad") }
+        assertFailsWith<IllegalStateException> { node.attach(failed) }
         assertTrue(node.components.isEmpty())
         assertEquals(1, removed)
         node.create("still usable")
     }
 
     @Test
-    fun `owner components need no transform and dependencies prevent premature removal`() {
-        val scene = scene()
-        val dependency = SceneComponentType("test:base".rl, String::class, String.serializer())
-        val dependent = SceneComponentType(
-            "test:dependent".rl, String::class, String.serializer(), requires = setOf(dependency.id),
-            accepts = { it is Scene },
-        )
-        assertFailsWith<IllegalArgumentException> { scene.addComponent(dependent, "missing") }
-        val base = scene.addComponent(dependency, "base")
-        val value = scene.addComponent(dependent, "dependent")
-        assertSame(value, scene.component(dependent))
-        assertFailsWith<IllegalArgumentException> { base.remove() }
-        value.remove()
-        base.remove()
-        assertTrue(scene.components.isEmpty())
-    }
-
-    @Test
     fun `activation failure disables component cleans partial runtime and allows retry`() {
         val events = mutableListOf<String>()
         var fail = false
-        val type = type(runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onActivate(component: SceneComponent<String>) {
+        val component = TestComponent("data") {
+            object : ComponentLifecycle {
+                override fun activate() {
                     events += "activate"
                     if (fail) error("failed")
                 }
 
-                override fun onSuspend(component: SceneComponent<String>) {
-                    events += "suspend"
-                }
+                override fun suspend() { events += "suspend" }
             }
-        })
+        }
         val root = scene().create("root")
-        val component = root.addComponent(type, "data")
+        val id = root.attach(component)
         root.setEnabled(false)
         fail = true
         assertFailsWith<IllegalStateException> { root.setEnabled(true) }
-        assertFalse(component.enabled)
-        assertFalse(component.isActive)
+        assertFalse(root.componentEnabled(id))
         fail = false
-        component.setEnabled(true)
-        assertTrue(component.isActive)
+        root.setComponentEnabled(id, true)
+        assertTrue(root.componentEnabled(id))
         assertEquals(listOf("activate", "suspend", "activate", "suspend", "activate"), events)
     }
 
     @Test
-    fun `failed data change preserves data and suspends the component`() {
+    fun `failed data change keeps updated data and suspends the component`() {
         var suspensions = 0
-        val type = type(runtime = {
-            object : SceneComponentRuntime<String> {
-                override fun onChange(component: SceneComponent<String>, previous: String) {
-                    error("failed")
-                }
-
-                override fun onSuspend(component: SceneComponent<String>) {
-                    suspensions++
-                }
+        val component = TestComponent("old") {
+            object : ComponentLifecycle {
+                override fun change(value: Any) { error("failed") }
+                override fun suspend() { suspensions++ }
             }
-        })
-        val component = scene().create("root").addComponent(type, "old")
-        assertFailsWith<IllegalStateException> { component.setData("new") }
-        assertEquals("new", component.data)
-        assertFalse(component.enabled)
-        assertFalse(component.isActive)
+        }
+        val owner = scene().create("root")
+        val id = owner.attach(component)
+        val edited = component.copy(value = "new")
+        assertFailsWith<IllegalStateException> { owner.setComponent(id, edited) }
+        assertSame(edited, owner.components[id])
+        assertFalse(owner.componentEnabled(id))
         assertEquals(1, suspensions)
     }
 }

@@ -3,8 +3,6 @@ package ru.hollowhorizon.hollowengine.common.decals
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
-import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -87,26 +85,14 @@ data class DecalSpec(
 @SerialName("hollowengine:rig/decal")
 data class DecalAttachmentSpec(
     @EditorHidden
-    override val id: String = "decal",
-    @EditorName("$LANG.offset")
-    override val offset: Vec3f = Vec3f.ZERO,
-    @EditorName("$LANG.rotation")
-    override val rotation: Vec3f = Vec3f.ZERO,
-    @EditorName("$LANG.scale")
-    override val scale: Float = 1f,
+    val id: String = "decal",
     @EditorName("$LANG.decal")
     val decal: DecalSpec = DecalSpec(),
-) : RigAttachmentSpec(), PlacedAttachmentSpec {
-    override fun withId(id: String) = copy(id = id)
-
-    override fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float) = copy(offset = offset, rotation = rotation, scale = scale)
-
+) {
     /** The running decal takes every change in place. */
-    override fun structure() = DecalAttachmentSpec(id)
-
     companion object {
         val TYPE = RigAttachmentType(
-            "hollowengine:rig/decal", DecalAttachmentSpec::class, serializer(),
+            "hollowengine:rig/decal", DecalAttachmentSpec::class, DecalAttachmentSpec::id, serializer(),
             "hollowengine.gui.rig_editor.kind_decal", { DecalAttachmentSpec(id = it) },
             allowedOnModel = true, editorColor = 0xC77DDB,
         )

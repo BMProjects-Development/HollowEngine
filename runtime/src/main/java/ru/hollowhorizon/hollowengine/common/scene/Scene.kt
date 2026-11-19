@@ -1,6 +1,5 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
-import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import java.util.UUID
@@ -10,6 +9,9 @@ import kotlin.reflect.KClass
 interface SceneContext {
     val side: LogicalSide
     fun <T : Any> capability(type: KClass<T>): T? = null
+    fun createLifecycle(owner: ComponentOwner, id: UUID, value: Any): ComponentLifecycle? =
+        (value as? ComponentBehavior)?.bind(owner, id)
+    fun onLifecycleActivityChanged(lifecycle: ComponentLifecycle, active: Boolean) = Unit
 }
 
 /** A scene may be placed under a transform supplied by its owner. */
@@ -33,12 +35,11 @@ data class SceneAddress(val instanceId: UUID, val importedPath: List<ScenePathSe
  * An in-memory hierarchy confined to its host's thread. Closing it removes children before owner components.
  * Persistence, synchronization, and attachment to Minecraft owners are provided by later integrations.
  */
-class Scene(val context: SceneContext, internal val transformParent: SceneTransformParent? = null) : SceneComponentOwner, AutoCloseable {
+class Scene(val context: SceneContext, internal val transformParent: SceneTransformParent? = null) : ComponentOwner, AutoCloseable {
     private val roots = mutableListOf<SceneObject>()
     private var rootSnapshot: List<SceneObject>? = null
     private val created = mutableMapOf<UUID, SceneObject>()
-    private val componentTypes = mutableMapOf<ResourceLocation, SceneComponentType<*>>()
-    private val componentSet = SceneComponentSet(this)
+    private val componentSet = SceneComponentStore(this)
     private var mutating = false
     internal var revision: Int = 0
         private set
@@ -48,14 +49,15 @@ class Scene(val context: SceneContext, internal val transformParent: SceneTransf
     override val scene: Scene get() = this
     override val isActive: Boolean get() = !isClosed
     override val isRemoved: Boolean get() = isClosed
-    override val components: List<SceneComponent<*>> get() = componentSet.components
+    override val components: Map<UUID, Any> get() = componentSet.components
+    override fun component(id: UUID): Any? = componentSet.component(id)
 
-    override fun <T : Any> addComponent(type: SceneComponentType<T>, data: T, id: UUID): SceneComponent<T> =
-        componentSet.add(type, data, id)
-    override fun component(id: UUID): SceneComponent<*>? = componentSet.component(id)
-    override fun <T : Any> components(type: SceneComponentType<T>): List<SceneComponent<T>> = componentSet.components(type)
-    override fun <T : Any> component(type: SceneComponentType<T>): SceneComponent<T>? = componentSet.component(type)
-    override fun removeComponent(id: UUID): Boolean = componentSet.remove(id)
+    override fun attach(value: Any, id: UUID, enabled: Boolean): UUID = componentSet.add(value, id, enabled)
+    internal fun restoreUnknown(value: Any, id: UUID) = componentSet.restoreUnknown(value, id)
+    override fun setComponent(id: UUID, value: Any) = componentSet.set(id, value)
+    override fun componentEnabled(id: UUID): Boolean = componentSet.enabled(id)
+    override fun setComponentEnabled(id: UUID, enabled: Boolean) = componentSet.setEnabled(id, enabled)
+    override fun detach(id: UUID): Boolean = componentSet.remove(id)
 
     fun create(name: String, id: UUID = UUID.randomUUID()): SceneObject = mutate {
         checkOpen()
@@ -84,7 +86,6 @@ class Scene(val context: SceneContext, internal val transformParent: SceneTransf
             roots.clear()
             rootSnapshot = null
             componentSet.finish(failures)
-            componentTypes.clear()
             failures.throwIfAny()
         }
     }
@@ -115,11 +116,6 @@ class Scene(val context: SceneContext, internal val transformParent: SceneTransf
 
     internal fun checkOpen() = check(!isClosed) { "Scene is closed" }
 
-    internal fun registerType(type: SceneComponentType<*>) {
-        val existing = componentTypes[type.id]
-        require(existing == null || existing === type) { "Conflicting component descriptors for ${type.id}" }
-        componentTypes[type.id] = type
-    }
 
     internal inline fun <T> mutate(action: () -> T): T {
         check(!mutating) { "Scene cannot be mutated from a lifecycle callback" }

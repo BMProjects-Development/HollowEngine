@@ -2,17 +2,22 @@ package ru.hollowhorizon.hollowengine.client.ui.ide.files.rig
 
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
+import ru.hollowhorizon.hollowengine.client.ui.ide.PartIcons
+import ru.hollowhorizon.hollowengine.client.ui.ide.PartPath
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
+import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentIcon
+import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentLabel
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.freeBoneName
 import ru.hollowhorizon.hollowengine.common.models.withAddedBone
+import ru.hollowhorizon.hollowengine.common.models.rigId
 
 /** The id of the row that stands for the model itself, above its bones. */
 private const val RigRootId = "rig-root"
+private const val PartRowPrefix = '\u001D'
 
 private const val RigIcon = "hollowengine:textures/gui/icons/files/rig.svg"
 private const val VisibleIcon = "hollowengine:textures/gui/icons/visible.svg"
@@ -32,24 +37,33 @@ internal fun rigSceneTarget(
     sceneId: String = "rig-bones",
 ): SceneTarget {
     val nodes = state.viewer.nodes
+    val rig = document.rig
+    val selectedPart = state.partSelection?.takeIf { rig.holder(it.bone).attachment(it.id) != null }
     return SceneTarget(
         id = sceneId,
         items = buildList {
             add(
                 UiTreeItem(
                     id = RigRootId,
-                    label = document.rig.attachments.size.takeIf { it > 0 }?.let { "$title  ●$it" } ?: title,
+                    label = title,
                     depth = 0,
                     payload = null,
                     icon = RigIcon,
-                    hasChildren = nodes.isNotEmpty(),
+                    hasChildren = nodes.isNotEmpty() || rig.attachments.isNotEmpty(),
                     expanded = state.rootExpanded,
-                    selected = state.selected == null,
+                    selected = state.selected == null && selectedPart == null,
                 )
             )
-            if (state.rootExpanded) appendBones(nodes, document.rig, state.expanded, state.selected, depth = 1)
+            if (state.rootExpanded) {
+                appendAttachments(rig.attachments, null, selectedPart, depth = 1)
+                appendBones(nodes, rig, state.expanded, state.selected, selectedPart, depth = 1)
+            }
         },
-        onSelect = { id -> state.select(id.takeUnless { it == RigRootId }) },
+        onSelect = { id ->
+            val part = id?.rigPart()
+            if (part == null) state.select(id.takeUnless { it == RigRootId })
+            else state.select(part.bone, part.id)
+        },
         onToggle = { id ->
             when (id) {
                 RigRootId -> state.rootExpanded = !state.rootExpanded
@@ -57,8 +71,18 @@ internal fun rigSceneTarget(
                 else -> state.expanded.add(id)
             }
         },
-        hint = rigText("no_bones").takeIf { nodes.isEmpty() },
-        menu = { id -> if (id == null) emptyList() else boneMenu(document, state, id.takeUnless { it == RigRootId }, addsBones) },
+        hint = rigText("no_bones").takeIf { nodes.isEmpty() && rig.attachments.isEmpty() },
+        menu = { id ->
+            val part = id?.rigPart()
+            when {
+                id == null -> emptyList()
+                part == null -> boneMenu(document, state, id.takeUnless { it == RigRootId }, addsBones)
+                else -> listOf(UiDropdownItem(rigText("remove_attachment"), mark = UiMenuParts.icon(PartIcons.REMOVE)) {
+                    document.edit { it.withHolder(part.bone, it.holder(part.bone).withoutAttachment(part.id)) }
+                    if (state.partSelection == part) state.select(part.bone)
+                })
+            }
+        },
         onIconClick = { id -> nodes.findBone(id)?.let(state.viewer::toggleNodeVisibility) },
         history = document.history,
     )
@@ -69,12 +93,12 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
     rig: ModelRig,
     expanded: List<String>,
     selected: String?,
+    selectedPart: RigPartSelection?,
     depth: Int,
 ) {
     nodes.forEach { node ->
         val bone = rig.bone(node.name)
         val marks = listOfNotNull(
-            bone?.attachments?.size?.takeIf { it > 0 }?.let { "●$it" },
             bone?.alias?.takeIf { it.isNotBlank() }?.let { "→$it" },
             "+".takeIf { bone?.origin != null },
         ).joinToString(" ")
@@ -86,15 +110,40 @@ private fun MutableList<UiTreeItem<Any?>>.appendBones(
                 depth = depth,
                 payload = null,
                 icon = if (node.isVisible) VisibleIcon else InvisibleIcon,
-                hasChildren = node.children.isNotEmpty(),
+                hasChildren = node.children.isNotEmpty() || !bone?.attachments.isNullOrEmpty(),
                 expanded = node.name in expanded,
-                selected = node.name == selected,
+                selected = node.name == selected && selectedPart == null,
             )
         )
-        if (node.children.isNotEmpty() && node.name in expanded) {
-            appendBones(node.children, rig, expanded, selected, depth + 1)
+        if (node.name in expanded) {
+            appendAttachments(bone?.attachments.orEmpty(), node.name, selectedPart, depth + 1)
+            appendBones(node.children, rig, expanded, selected, selectedPart, depth + 1)
         }
     }
+}
+
+private fun MutableList<UiTreeItem<Any?>>.appendAttachments(
+    attachments: List<Any>,
+    bone: String?,
+    selected: RigPartSelection?,
+    depth: Int,
+) {
+    for (spec in attachments) {
+        add(UiTreeItem(
+            id = PartRowPrefix + PartPath(bone = bone, attachment = spec.rigId).encode(),
+            label = attachmentLabel(spec),
+            icon = attachmentIcon(spec),
+            payload = null,
+            depth = depth,
+            selected = selected?.bone == bone && selected?.id == spec.rigId,
+        ))
+    }
+}
+
+private fun String.rigPart(): RigPartSelection? {
+    if (!startsWith(PartRowPrefix)) return null
+    val path = PartPath.decode(substring(1)) ?: return null
+    return RigPartSelection(path.bone, path.attachment ?: return null)
 }
 
 /**
@@ -118,12 +167,12 @@ private fun boneMenu(document: RigEditing, state: RigEditorState, bone: String?,
             children = kinds.map { type ->
                 val create = requireNotNull(type.createDefault)
                 UiDropdownItem(type.title()) {
-                    var added: RigAttachmentSpec? = null
+                    var added: Any? = null
                     document.edit { rig ->
                         val spec = create(freeAttachmentId(document.occupied, bone, type)).also { added = it }
                         rig.withHolder(bone, rig.holder(bone).withAttachment(spec))
                     }
-                    state.select(bone, added?.takeIf(::hasGizmo)?.id)
+                    state.select(bone, added?.rigId)
                 }
             },
         ).takeIf { kinds.isNotEmpty() },

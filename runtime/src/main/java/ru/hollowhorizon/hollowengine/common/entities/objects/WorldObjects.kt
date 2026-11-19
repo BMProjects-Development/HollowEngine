@@ -46,7 +46,8 @@ object WorldObjects {
     }
 
     internal fun forget(level: Level) {
-        side(level).remove(level) ?: return
+        val objects = side(level).remove(level) ?: return
+        objects.values.forEach(WorldObjectEntity::closeScene)
         changed(level)
     }
 }

@@ -2,9 +2,11 @@ package ru.hollowhorizon.hollowengine.common.sounds
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 
 private const val LANG = "hollowengine.gui.sound_attachment"
 
@@ -13,9 +15,14 @@ private const val LANG = "hollowengine.gui.sound_attachment"
  * house and fades out past its walls.
  */
 @Serializable
+@Registerable
+@Syncable
 @SerialName("hollowengine:rig/sound")
-data class SoundBoneAttachmentSpec(
-    @EditorHidden override val id: String = "sound",
+@EditorName("hollowengine.gui.rig_editor.kind_sound")
+@EditorIcon("hollowengine:textures/gui/icons/vfx/node_sound.svg")
+@Attach(SceneObject::class)
+data class Sound(
+    @EditorHidden val id: String = "sound",
     @EditorName("$LANG.source")
     @EditorWidget(EditorWidgets.SOUND_SOURCE)
     @EditorNotAnimated
@@ -34,20 +41,5 @@ data class SoundBoneAttachmentSpec(
     @EditorHidden
     @EditorNotAnimated
     val playing: Boolean = true,
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
+)
 
-    override fun structure() = SoundBoneAttachmentSpec(id)
-
-    override fun held() = copy(playing = false, clock = null)
-
-    override fun inStretch(seconds: Float) = copy(clock = seconds)
-
-    companion object {
-        val TYPE = RigAttachmentType(
-            "hollowengine:rig/sound", SoundBoneAttachmentSpec::class, serializer(),
-            "hollowengine.gui.rig_editor.kind_sound", { SoundBoneAttachmentSpec(id = it) },
-            allowedOnModel = true, namedAcrossRig = true, editorColor = 0x70BCD8,
-        )
-    }
-}

@@ -5,15 +5,11 @@ import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.extrusion.MeshExtrusionAttachment
-import ru.hollowhorizon.hollowengine.client.sounds.SoundBoneAttachment
 import ru.hollowhorizon.hollowengine.common.models.ItemSlotAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MeshExtrusionSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.RigItemSlot
-import ru.hollowhorizon.hollowengine.common.sounds.SoundBoneAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.rl
 
 /** What one bone of the model this attachment is being built for is, and whose model it is. */
@@ -29,32 +25,24 @@ class RigAttachmentContext(
  * Turns one kind of rig attachment spec into the thing that hangs on the bone.
  */
 fun interface RigAttachmentFactory {
-    fun create(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment?
+    fun create(spec: Any, context: RigAttachmentContext): Attachment?
 }
 
 /**
- * An attachment that takes a changed spec while it keeps running, as long as [RigAttachmentSpec.structure]
- * stays the same; the model it hangs on is then not built again.
+ * A running attachment that can take a changed component without being recreated.
  */
 interface RespecAttachment {
-    val spec: RigAttachmentSpec
+    val spec: Any
 
-    fun respec(spec: RigAttachmentSpec)
-}
+    fun canRespec(spec: Any): Boolean = this.spec::class == spec::class
 
-/** An attachment that works only while a condition of its entity holds; see [ConditionalAttachmentSpec]. */
-interface ConditionalAttachment {
-    /** Asks the condition of [context]'s entity, once a frame after the animator. */
-    fun evaluate(context: AnimatorEvaluationContext)
+    fun respec(spec: Any)
 }
 
 object RigAttachmentFactories {
     val point = ExtensionPoints.create<RigAttachmentFactory>("hollowengine:rig/attachment_factories".rl)
 
     init {
-        register("hollowengine:rig/sound") { spec, context ->
-            SoundBoneAttachment(spec as SoundBoneAttachmentSpec, context.node, context.owner)
-        }
         register("hollowengine:rig/item") { spec, context ->
             ItemNode(context.entity, (spec as ItemSlotAttachmentSpec).slot.vanilla(), context.node)
         }
@@ -65,10 +53,12 @@ object RigAttachmentFactories {
 
     fun register(typeId: String, factory: RigAttachmentFactory): ExtensionHandle = point.register(typeId.rl, factory)
 
-    fun create(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment? {
-        val type = RigAttachmentTypes.of(spec) ?: return null
-        return point.find(type.key)?.create(spec, context)
-    }
+    internal fun canCreate(spec: Any): Boolean = factory(spec) != null
+
+    fun create(spec: Any, context: RigAttachmentContext): Attachment? = factory(spec)?.create(spec, context)
+
+    private fun factory(spec: Any): RigAttachmentFactory? =
+        RigAttachmentTypes.of(spec)?.let { point.find(it.key) }
 }
 
 private fun RigItemSlot.vanilla(): EquipmentSlot = when (this) {

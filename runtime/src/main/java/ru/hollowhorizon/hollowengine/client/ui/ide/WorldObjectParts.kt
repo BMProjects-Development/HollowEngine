@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.client.ui.ide
 import androidx.compose.runtime.*
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.client.editor.AttachmentGizmo
 import ru.hollowhorizon.hollowengine.client.editor.BoneGizmo
 import ru.hollowhorizon.hollowengine.client.editor.PartGizmo
 import ru.hollowhorizon.hollowengine.client.editor.WorldHistory
@@ -28,13 +27,17 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.transformOrNull
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
+import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
-import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
 import java.util.*
@@ -58,12 +61,14 @@ internal object WorldObjectParts {
     /** Which sections of an effect node are open, shared by every effect in the scene. */
     private val effectInspector by lazy { VfxInspectorState() }
 
-    /** The model of [entity] with everything on it; null when it has no model. */
-    fun of(entity: WorldObjectEntity): ObjectParts? {
-        val model = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelOrNull() ?: return null
-        val instance = entity.modelInstanceOrNull(ROOT_COMPONENT_ID, model.model)?.attachment
-        return PartsReader().read(model, instance)
+    fun of(entity: WorldObjectEntity): ObjectParts {
+        val model = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid)?.modelOrNull()
+        val instance = model?.let { entity.modelInstanceOrNull(ROOT_COMPONENT_ID, it.model)?.attachment }
+        val root = entity.sceneObjectOrNull
+        return PartsReader().read(model, instance, root?.components.orEmpty(), root)
     }
+
+    fun rootMenu(entity: WorldObjectEntity): List<UiDropdownItem> = WorldSceneComponentEditor.addMenu(entity)
 
     fun rowId(uuid: UUID, path: PartPath) = "$uuid$ROW${path.encode()}"
 
@@ -98,7 +103,7 @@ internal object WorldObjectParts {
             )
             if (open(id)) node.children.forEach { add(it, level + 1) }
         }
-        add(parts.root, depth)
+        parts.roots.forEach { add(it, depth) }
     }
 
     /**
@@ -106,11 +111,15 @@ internal object WorldObjectParts {
      * before the scene has read it, since it may have been added a moment ago.
      */
     fun select(ref: PartRef, parts: ObjectParts) {
-        val editing = editing(ref, parts.model)
-        val target = if (ref.path.effectNode != null) {
-            effectTarget(ref, effectEditing(ref, editing) ?: return)
+        val target = if (ref.path.componentId != null) {
+            if (ref.path.effectNode != null) effectTarget(ref, WorldSceneComponentEditor.effectEditing(ref) ?: return)
+            else WorldSceneComponentEditor.target(ref) ?: return
+        } else if (ref.path.sceneNodeId != null) {
+            WorldSceneComponentEditor.nodeTarget(ref) ?: return
         } else {
-            target(editing, ref, parts.find(ref.path) ?: return, parts)
+            val editing = editing(ref, parts.model ?: return)
+            if (ref.path.effectNode != null) effectTarget(ref, effectEditing(ref, editing) ?: return)
+            else target(editing, ref, parts.find(ref.path) ?: return, parts)
         }
         selected = ref
         InspectorSelection.publish(SOURCE, target)
@@ -149,7 +158,17 @@ internal object WorldObjectParts {
     /** What a right click on a part offers. */
     fun menu(ref: PartRef, parts: ObjectParts): List<UiDropdownItem> {
         val node = parts.find(ref.path) ?: return emptyList()
-        val editing = editing(ref, parts.model)
+        if (ref.path.componentId != null) {
+            val effect = WorldSceneComponentEditor.effectEditing(ref)
+            val effectMenu = effect?.let { vfxNodeMenu(it, EffectNodes(ref), ref.path.effectNode) }.orEmpty()
+            return if (ref.path.effectNode != null) effectMenu else {
+                effectMenu + UiDropdownItem(rigText("remove_attachment"), mark = UiMenuParts.icon(PartIcons.REMOVE)) {
+                    if (WorldSceneComponentEditor.remove(ref) && selected == ref) clear()
+                }
+            }
+        }
+        if (ref.path.sceneNodeId != null) return WorldSceneComponentEditor.nodeMenu(ref)
+        val editing = editing(ref, parts.model ?: return emptyList())
         val path = ref.path
         return when (node.kind) {
             PartKind.MODEL, PartKind.BONE -> listOfNotNull(
@@ -196,7 +215,7 @@ internal object WorldObjectParts {
                 )
             }
 
-            PartKind.MATERIALS -> emptyList()
+            PartKind.MATERIALS, PartKind.COMPONENT, PartKind.SCENE_NODE -> emptyList()
         }
     }
 
@@ -224,7 +243,7 @@ internal object WorldObjectParts {
      * of its own that needs no file. The new part comes up selected.
      */
     private fun effectPartMenu(ref: PartRef, editing: RigEditing, bone: String?): UiDropdownItem? {
-        val type = attachableKinds(bone, hasMesh = false).firstOrNull { it.specClass == VfxBoneAttachmentSpec::class } ?: return null
+        val type = attachableKinds(bone, hasMesh = false).firstOrNull { it.specClass == VfxComponent::class } ?: return null
         return UiDropdownItem(
             rigText("attach_effect_part"),
             mark = UiMenuParts.icon(PartIcons.EFFECT),
@@ -232,7 +251,7 @@ internal object WorldObjectParts {
                 val create = nodeType.createDefault ?: return@mapNotNull null
                 UiDropdownItem(nodeType.titleKey.lang, mark = UiMenuParts.icon(nodeType.icon)) {
                     val part = create()
-                    val spec = VfxBoneAttachmentSpec(
+                    val spec = VfxComponent(
                         freeAttachmentId(editing.occupied, bone, type), ownEffect = VfxEffect(nodes = listOf(part))
                     )
                     editing.edit { rig -> rig.withHolder(bone, rig.holder(bone).withAttachment(spec)) }
@@ -267,7 +286,21 @@ internal object WorldObjectParts {
     fun handleKey(key: Int, modifiers: Int, parts: (UUID) -> ObjectParts?): Boolean {
         val ref = selected ?: return false
         val objectParts = parts(ref.uuid) ?: return false
-        val editing = editing(ref, objectParts.model)
+        if (ref.path.componentId != null) {
+            if (ref.path.effectNode == null) {
+                if (!HollowKeys.DELETE.matches(key, modifiers) || !WorldSceneComponentEditor.remove(ref)) return false
+                clear()
+                return true
+            }
+            val effect = WorldSceneComponentEditor.effectEditing(ref) ?: return false
+            return handleVfxNodeKey(effect, EffectNodes(ref), key, modifiers, repeat = false)
+        }
+        if (ref.path.sceneNodeId != null) {
+            if (!HollowKeys.DELETE.matches(key, modifiers) || !WorldSceneComponentEditor.removeNode(ref)) return false
+            clear()
+            return true
+        }
+        val editing = editing(ref, objectParts.model ?: return false)
         if (ref.path.effectNode != null) {
             val effect = effectEditing(ref, editing) ?: return false
             return handleVfxNodeKey(effect, EffectNodes(ref), key, modifiers, repeat = false)
@@ -287,17 +320,35 @@ internal object WorldObjectParts {
     fun selectedPart(): PartGizmo? {
         val ref = selected?.takeIf { it.path.material == null && it.path.effectNode == null } ?: return null
         val path = ref.path
-        if (path.bone == null && path.attachment == null) return null
+        if (path.componentId != null || path.attachment != null) return null
+        if (path.sceneNodeId != null) return WorldSceneComponentEditor.nodeGizmo(ref)
+        if (path.bone == null) return null
         val entity = Minecraft.getInstance().level?.getEntity(ref.entityId) as? WorldObjectEntity ?: return null
         val snapshot = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid) ?: return null
         val model = snapshot.modelOrNull() ?: return null
         val drawn = drawnScope(entity, model, path.steps) ?: return null
         val transform = snapshot.transformOrNull() ?: TransformComponent()
         val editing = editing(ref, model)
-        val holder = (if (path.bone == null) drawn.modelRoot else drawn.findNode(path.bone)) ?: return null
-        val attachment = path.attachment ?: return BoneGizmo(entity, drawn, holder, transform, editing, path.encode())
-        if (editing.occupied.holder(path.bone).attachment(attachment) !is PlacedAttachmentSpec) return null
-        return AttachmentGizmo(entity, holder, transform, editing, path.bone, attachment, path.encode())
+        val bone = drawn.findNode(path.bone) ?: return null
+        return BoneGizmo(entity, drawn, bone, transform, editing, path.encode())
+    }
+
+    fun selectedDecal(partialTick: Float): Pair<DecalSpec, Mat4f>? {
+        val ref = selected?.takeIf { it.path.material == null && it.path.effectNode == null } ?: return null
+        val path = ref.path
+        if (path.componentId != null || path.sceneNodeId != null) return null
+        val entity = Minecraft.getInstance().level?.getEntity(ref.entityId) as? WorldObjectEntity ?: return null
+        val snapshot = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid) ?: return null
+        val model = snapshot.modelOrNull() ?: return null
+        val drawn = drawnScope(entity, model, path.steps) ?: return null
+        val holder = drawn.rig.holder(path.bone)
+        val spec = if (path.attachment != null) holder.attachment(path.attachment) as? DecalAttachmentSpec
+        else holder.attachments.firstOrNull { it is DecalAttachmentSpec } as? DecalAttachmentSpec
+        spec ?: return null
+        val node = if (path.bone == null) drawn.sceneRoot else drawn.findNode(path.bone)?.sceneObject ?: return null
+        val transform = snapshot.transformOrNull() ?: TransformComponent()
+        val world = resolveNodeWorldTransform(entity, transform, partialTick).matrixF.mul(node.worldTransform, MutableMat4f())
+        return spec.decal to world
     }
 
     /** The drawn model a part belongs to, found through the models nested on the way. */
@@ -322,7 +373,7 @@ internal object WorldObjectParts {
     /** The effect the part's attachment plays; null when the attachment is not an effect. */
     private fun effectEditing(ref: PartRef, editing: RigEditing): AttachedVfxEditing? {
         val id = ref.path.attachment ?: return null
-        if (editing.occupied.holder(ref.path.bone).attachment(id) !is VfxBoneAttachmentSpec) return null
+        if (editing.occupied.holder(ref.path.bone).attachment(id) !is VfxComponent) return null
         return AttachedVfxEditing(editing, ref.path.bone, id)
     }
 
@@ -364,7 +415,7 @@ internal object WorldObjectParts {
     }
 
     /** A node of an effect, with the same fields the effect editor gives it. */
-    private fun effectTarget(ref: PartRef, effect: AttachedVfxEditing): InspectorTarget {
+    private fun effectTarget(ref: PartRef, effect: VfxEditing): InspectorTarget {
         val nodeId = ref.path.effectNode.orEmpty()
         val node = effect.effect.node(nodeId)
         val type = node?.let(VfxNodeTypes::of)

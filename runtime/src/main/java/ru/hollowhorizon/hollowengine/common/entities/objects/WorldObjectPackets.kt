@@ -25,15 +25,21 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
 import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
+import ru.hollowhorizon.hollowengine.common.scene.SceneComponentData
+import ru.hollowhorizon.hollowengine.common.scene.SceneAddress
+import ru.hollowhorizon.hollowengine.common.scene.SceneTreeData
 import ru.hollowhorizon.hollowengine.common.sounds.*
 import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import java.util.*
 
 /** What a new object starts out showing. */
@@ -50,7 +56,7 @@ enum class WorldObjectKind {
 }
 
 /** What an object made from a dragged sound plays, and where: a box on the ground it stands on, faded out past. */
-private fun soundOf(asset: String) = SoundBoneAttachmentSpec(
+private fun soundOf(asset: String) = Sound(
     id = "sound",
     source = asset,
     playback = SoundPlayback(repeat = SoundRepeat.Forever, falloff = SoundFalloff(distance = 4f)),
@@ -60,17 +66,17 @@ private fun soundOf(asset: String) = SoundBoneAttachmentSpec(
 /** How far off the face a dropped decal is cast from, in blocks. */
 private const val DECAL_LIFT = 0.25f
 
-internal fun decalOf(asset: String, face: Direction): DecalAttachmentSpec {
+internal fun decalRigOf(asset: String, face: Direction): ModelRig {
     val normal = face.normal.let { Vector3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
     val toBottom = if (face.axis == Direction.Axis.Y) Vector3f(0f, 0f, 1f) else Vector3f(0f, -1f, 0f)
     val right = Vector3f(normal).cross(toBottom)
     val turn = Quaternionf().setFromNormalized(Matrix3f(right, normal, toBottom))
-    return DecalAttachmentSpec(
-        id = "decal",
+    val origin = RigBoneOrigin(
         offset = Vec3f(normal.x, normal.y, normal.z) * DECAL_LIFT,
         rotation = QuatF(turn.x, turn.y, turn.z, turn.w).eulerDegreesXyz(),
-        decal = DecalSpec(texture = asset),
     )
+    val decal = DecalAttachmentSpec(decal = DecalSpec(texture = asset))
+    return ModelRig(bones = mapOf(decal.id to RigBone(attachments = listOf(decal), origin = origin)))
 }
 
 /** Places a new object at a point, showing [asset], and selects it for the player who placed it. */
@@ -95,12 +101,12 @@ class SpawnWorldObjectPacket(
 
         val created = WorldObjectEntity(level)
         created.moveTo(x, y, z, 0f, 0f)
-        created set when (kind) {
-            WorldObjectKind.MODEL -> Model(asset)
-            WorldObjectKind.VFX -> Model("", ModelRig(attachments = listOf(VfxBoneAttachmentSpec(id = "effect", effect = asset))))
-            WorldObjectKind.SOUND -> Model("", ModelRig(attachments = listOf(soundOf(asset))))
-            WorldObjectKind.DECAL -> Model("", ModelRig(attachments = listOf(decalOf(asset, Direction.from3DDataValue(face)))))
-            WorldObjectKind.EMPTY -> Model("")
+        when (kind) {
+            WorldObjectKind.MODEL -> created set Model(asset)
+            WorldObjectKind.VFX -> created.sceneObject.attach(VfxComponent(id = "effect", effect = asset))
+            WorldObjectKind.SOUND -> created.sceneObject.attach(soundOf(asset))
+            WorldObjectKind.DECAL -> created set Model("", decalRigOf(asset, Direction.from3DDataValue(face)))
+            WorldObjectKind.EMPTY -> Unit
         }
         if (kind != WorldObjectKind.EMPTY) created.customName = asset.substringAfterLast('/').substringBefore('.').literal
         if (!level.addFreshEntity(created)) return
@@ -113,6 +119,66 @@ class SpawnWorldObjectPacket(
 @Serializable
 class WorldObjectSpawnedPacket(val entityId: Int) : HollowPacket {
     override fun handle(player: Player) = WorldObjectEditing.select(entityId)
+}
+
+/** The editor changes one component on the object. The normal entity tracker publishes the result. */
+@HollowPacketHandler(HollowPacketHandler.Direction.TO_SERVER)
+@Serializable
+class EditWorldObjectComponentPacket(
+    val entityId: Int,
+    val entityUuid: @Serializable(ForUuid::class) UUID,
+    val componentId: @Serializable(ForUuid::class) UUID,
+    val data: @Serializable(ForCompoundNBT::class) CompoundTag? = null,
+    val nodeId: @Serializable(ForUuid::class) UUID? = null,
+) : HollowPacket {
+    override fun handle(player: Player) {
+        if (!player.canEditEntities()) return
+        val entity = player.level().getEntity(entityId) as? WorldObjectEntity ?: return
+        if (entity.uuid != entityUuid) return
+        val root = entity.sceneObject
+        val owner = if (nodeId == null) root else root.scene.resolve(SceneAddress(nodeId)) ?: return
+        val current = owner.component(componentId)
+        if (current != null && !SceneComponentData.synced(current)) return
+        if (data == null) owner.detach(componentId)
+        else SceneComponentData.set(owner, componentId, data, syncOnly = true)
+    }
+}
+
+/** Creates or edits an authored child of a world object's scene root. */
+@HollowPacketHandler(HollowPacketHandler.Direction.TO_SERVER)
+@Serializable
+class EditWorldObjectNodePacket(
+    val entityId: Int,
+    val entityUuid: @Serializable(ForUuid::class) UUID,
+    val nodeId: @Serializable(ForUuid::class) UUID,
+    val parentId: @Serializable(ForUuid::class) UUID? = null,
+    val name: String? = null,
+    val pose: @Serializable(ForCompoundNBT::class) CompoundTag? = null,
+    val contents: @Serializable(ForCompoundNBT::class) CompoundTag? = null,
+) : HollowPacket {
+    override fun handle(player: Player) {
+        if (!player.canEditEntities()) return
+        val entity = player.level().getEntity(entityId) as? WorldObjectEntity ?: return
+        if (entity.uuid != entityUuid) return
+        val root = entity.sceneObject
+        val node = root.scene.resolve(SceneAddress(nodeId))
+        if (node === root) return
+        when {
+            name != null -> {
+                if (node != null || name.isBlank()) return
+                val parent = if (parentId == null) root else root.scene.resolve(SceneAddress(parentId)) ?: return
+                if (parent.children.any { it.name == name }) return
+                val child = parent.create(name, nodeId)
+                if (pose != null) SceneTreeData.applyPose(child, pose)
+                if (contents != null) {
+                    child.setEnabled(contents.getBoolean("enabled"))
+                    SceneTreeData.apply(child, contents, syncOnly = true)
+                }
+            }
+            pose != null -> node?.let { SceneTreeData.applyPose(it, pose) }
+            else -> node?.remove()
+        }
+    }
 }
 
 /** Puts an object where the editor dragged it, in world space; the object keeps its parent. */

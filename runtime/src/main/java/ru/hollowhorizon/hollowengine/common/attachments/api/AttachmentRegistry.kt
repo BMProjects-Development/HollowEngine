@@ -21,6 +21,8 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentSync
 import ru.hollowhorizon.hollowengine.common.attachments.components.NoAi
 import ru.hollowhorizon.hollowengine.common.attachments.components.NoAiRuntime
 import ru.hollowhorizon.hollowengine.common.attachments.components.ai.AIComponentSystems
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.entities.objects.migrateStandaloneRig
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
@@ -35,7 +37,7 @@ private data class LevelEntityState(
 
 /** The pieces of a [HollowAttachments] that outlive the entity instance they were attached to. */
 private class PendingTransfer(
-    val components: Map<ResourceLocation, Component>?,
+    val components: Map<ResourceLocation, Any>?,
     val data: NbtDataStore?,
 )
 
@@ -140,7 +142,7 @@ object AttachmentRegistry {
     fun componentsById(entity: MCEntity): MutableMap<ResourceLocation, Any> = state(entity).components.asMutableMap()
 
     /** The components that are allowed over the network, i.e. the ones whose descriptor is `@Syncable`. */
-    fun syncableComponents(entity: Entity): Map<ResourceLocation, Component> {
+    fun syncableComponents(entity: Entity): Map<ResourceLocation, Any> {
         val state = existingState(entity) ?: return emptyMap()
         return state.components.readOnly.filterKeys { id ->
             ComponentDescriptorRegistry.descriptorOrNull(id)?.syncPolicy == ComponentSyncPolicy.SYNC
@@ -155,10 +157,10 @@ object AttachmentRegistry {
 
     fun nextSyncVersion(entity: Entity): Long = state(entity).let { ++it.syncVersion }
 
-    fun lastSyncedComponents(entity: Entity): Map<ResourceLocation, Component> =
+    fun lastSyncedComponents(entity: Entity): Map<ResourceLocation, Any> =
         existingState(entity)?.lastSyncedComponents ?: emptyMap()
 
-    fun setLastSyncedComponents(entity: Entity, components: Map<ResourceLocation, Component>) {
+    fun setLastSyncedComponents(entity: Entity, components: Map<ResourceLocation, Any>) {
         state(entity).lastSyncedComponents = components
     }
 
@@ -240,7 +242,10 @@ object AttachmentRegistry {
         if (components == null && data == null && nodes == null) return
 
         val state = state(entity)
-        components?.let { state.components.replaceAll(EntitySerialization.deserializeFromNbt(it).components) }
+        components?.let {
+            val saved = EntitySerialization.deserializeFromNbt(it).components
+            state.components.replaceAll(if (entity is WorldObjectEntity) entity.migrateStandaloneRig(saved) else saved)
+        }
         data?.let {
             state.data.load(it)
             state.data.loadSyncPolicies(readSyncPolicies(dataSync))

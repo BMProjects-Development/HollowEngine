@@ -68,6 +68,7 @@ internal class VfxPreviewRenderer {
 
             val eye = preview.cameraBasis().eye
             instance.camera.set(eye.x, eye.y, eye.z)
+            instance.updateFrame()
             frame.clear()
             instance.collect(frame, Matrix4f())
             frame.shake.copyInto(shake)

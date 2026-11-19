@@ -32,7 +32,7 @@ internal interface MontageRigTimeline {
     fun keyField(bone: String?, id: String, field: String, value: FloatArray, shown: FloatArray)
 
     /** Holds [names] of the attachment [spec] on [bone] at the playhead, at the values [spec] has. */
-    fun holdFields(bone: String?, spec: RigAttachmentSpec, names: Collection<String>)
+    fun holdFields(bone: String?, spec: Any, names: Collection<String>)
 
     /** [rig] with the fields held at the playhead written over its tracks. */
     fun withHeldFields(rig: ModelRig): ModelRig
@@ -67,7 +67,15 @@ internal class MontageRigEditing(
             if (timeline.isRecording) timeline.keyPose(name, pose) else timeline.holdBone(name, pose)
         }
         val resolved = resolve(authored, before, after, keyed(authored))
-        document.edit(mergeKey, label = label) { montage -> montage.withAttachments(base, resolved) }
+        val origins = buildMap {
+            for ((name, bone) in resolved.bones) {
+                val origin = if (bone.origin == before.bone(name)?.origin) authored.bone(name)?.origin else bone.origin
+                if (origin != null && origin != base.bone(name)?.origin) put(name, origin)
+            }
+        }
+        document.edit(mergeKey, label = label) { montage ->
+            montage.withAttachments(base, resolved).copy(createdNodes = origins)
+        }
     }
 
     private fun authored(): ModelRig = modelRig().overlay(document.montage.ownRig())
@@ -76,7 +84,10 @@ internal class MontageRigEditing(
     private fun shown(authored: ModelRig): ModelRig = timeline.withHeldFields(keyed(authored))
 
     /** [authored] as the keys have it at the playhead, without what is held over them. */
-    private fun keyed(authored: ModelRig): ModelRig = posed(authored.withTracks(document.montage.tracks, timeline.time))
+    private fun keyed(authored: ModelRig): ModelRig = posed(
+        authored.withTracks(document.montage.tracks, timeline.time)
+            .withOriginTracks(timeline.withHeldBones(document.montage).bones, timeline.time),
+    )
 
     /**
      * [after] as it is authored. While keys are recorded, what an edit changed in a field the timeline can animate
@@ -85,15 +96,15 @@ internal class MontageRigEditing(
      */
     private fun resolve(authored: ModelRig, before: ModelRig, after: ModelRig, keyed: ModelRig): ModelRig =
         after.allAttachments().fold(after) { rig, (bone, spec) ->
-            val shown = before.holder(bone).attachment(spec.id) ?: return@fold rig
-            val own = authored.holder(bone).attachment(spec.id) ?: return@fold rig
+            val shown = before.holder(bone).attachment(spec.rigId) ?: return@fold rig
+            val own = authored.holder(bone).attachment(spec.rigId) ?: return@fold rig
             val changed = if (spec == shown) emptyList() else RigFields.changed(shown, spec)
             val animatable = RigFields.animatable(shown).mapTo(HashSet()) { it.name }
-            val timed = changed.filter { it in animatable && (timeline.isRecording || timeline.isAnimated(bone, spec.id, it)) }
+            val timed = changed.filter { it in animatable && (timeline.isRecording || timeline.isAnimated(bone, spec.rigId, it)) }
             if (timeline.isRecording) timed.forEach { field ->
                 val value = RigFields.read(spec, field) ?: return@forEach
-                val was = RigFields.read(keyed.holder(bone).attachment(spec.id) ?: shown, field) ?: return@forEach
-                timeline.keyField(bone, spec.id, field, value, was)
+                val was = RigFields.read(keyed.holder(bone).attachment(spec.rigId) ?: shown, field) ?: return@forEach
+                timeline.keyField(bone, spec.rigId, field, value, was)
             } else if (timed.isNotEmpty()) {
                 timeline.holdFields(bone, spec, timed)
             }
@@ -103,7 +114,7 @@ internal class MontageRigEditing(
 
     /** [rig] with the bones the montage moves posed where it has them now. */
     private fun posed(rig: ModelRig): ModelRig =
-        timeline.withHeldBones(document.montage).bones.map { it.bone }.distinct().fold(rig) { posed, bone ->
+        timeline.withHeldBones(document.montage).bones.filterNot { it.absoluteOrigin }.map { it.bone }.distinct().fold(rig) { posed, bone ->
             posed.withBone(bone, (posed.bone(bone) ?: RigBone.EMPTY).copy(pose = timeline.bonePose(bone)))
         }
 
@@ -113,28 +124,24 @@ internal class MontageRigEditing(
 
     /** Whether the montage itself brings [id] on [bone], rather than the model's rig. */
     fun owns(bone: String?, id: String): Boolean =
-        document.montage.attachments.any { it.bone == bone && it.spec.id == id }
+        document.montage.attachments.any { it.bone == bone && it.spec.rigId == id }
 }
 
 /** What the montage hangs on the model, as a rig. */
-internal fun Montage.ownRig(): ModelRig = ModelRig(
-    bones = attachments.filter { it.bone != null }.groupBy { it.bone!! }
-        .mapValues { (_, hung) -> RigBone(attachments = hung.map { it.spec }) },
-    attachments = attachments.filter { it.bone == null }.map { it.spec },
-)
+internal fun Montage.ownRig(): ModelRig = attachmentRig()
 
 private fun Montage.withAttachments(base: ModelRig, edited: ModelRig): Montage {
-    val kept = edited.allAttachments().filter { (bone, spec) -> base.holder(bone).attachment(spec.id) != spec }
+    val kept = edited.allAttachments().filter { (bone, spec) -> base.holder(bone).attachment(spec.rigId) != spec }
     val next = kept.map { (bone, spec) ->
-        attachments.firstOrNull { it.bone == bone && it.spec.id == spec.id }?.copy(spec = spec) ?: MontageAttachment(
+        attachments.firstOrNull { it.bone == bone && it.spec.rigId == spec.rigId }?.copy(spec = spec) ?: MontageAttachment(
             bone = bone,
             spec = spec
         )
     }
     val ordered =
-        attachments.mapNotNull { old -> next.firstOrNull { it.bone == old.bone && it.spec.id == old.spec.id } } + next.filter { added -> attachments.none { it.bone == added.bone && it.spec.id == added.spec.id } }
-    val gone = attachments.filter { old -> ordered.none { it.bone == old.bone && it.spec.id == old.spec.id } }
-        .filter { old -> base.holder(old.bone).attachment(old.spec.id) == null }.map { it.bone to it.spec.id }
+        attachments.mapNotNull { old -> next.firstOrNull { it.bone == old.bone && it.spec.rigId == old.spec.rigId } } + next.filter { added -> attachments.none { it.bone == added.bone && it.spec.rigId == added.spec.rigId } }
+    val gone = attachments.filter { old -> ordered.none { it.bone == old.bone && it.spec.rigId == old.spec.rigId } }
+        .filter { old -> base.holder(old.bone).attachment(old.spec.rigId) == null }.map { it.bone to it.spec.rigId }
     return copy(attachments = ordered, tracks = tracks.filterNot { (it.bone to it.attachment) in gone })
 }
 

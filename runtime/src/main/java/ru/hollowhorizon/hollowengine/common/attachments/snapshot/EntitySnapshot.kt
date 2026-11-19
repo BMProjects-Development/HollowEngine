@@ -10,7 +10,6 @@ import kotlinx.serialization.encoding.encodeCollection
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
@@ -18,10 +17,10 @@ import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
 
 @Serializable
 sealed class Snapshot {
-    abstract val components: List<@Polymorphic Component>
+    abstract val components: List<@Polymorphic Any>
 
-    fun componentById(): LinkedHashMap<ResourceLocation, Component> =
-        LinkedHashMap<ResourceLocation, Component>().apply {
+    fun componentById(): LinkedHashMap<ResourceLocation, Any> =
+        LinkedHashMap<ResourceLocation, Any>().apply {
             components.forEach { component ->
                 val id = ComponentDescriptorRegistry.idFor(component::class)
                     ?: error("Component descriptor not found for ${component::class.qualifiedName}")
@@ -33,7 +32,7 @@ sealed class Snapshot {
 @Serializable
 data class EntitySnapshot(
     @Serializable(with = ComponentListSerializer::class)
-    override val components: List<@Polymorphic Component> = emptyList(),
+    override val components: List<@Polymorphic Any> = emptyList(),
 ) : Snapshot() {
     @Transient
     var entity: Entity? = null
@@ -47,13 +46,13 @@ data class EntitySnapshot(
     )
 }
 
-object ComponentListSerializer : KSerializer<List<Component>> {
-    private val componentSerializer = PolymorphicSerializer(Component::class)
+object ComponentListSerializer : KSerializer<List<Any>> {
+    private val componentSerializer = PolymorphicSerializer(Any::class)
 
     override val descriptor: SerialDescriptor =
         ListSerializer(componentSerializer).descriptor
 
-    override fun serialize(encoder: Encoder, value: List<Component>) {
+    override fun serialize(encoder: Encoder, value: List<Any>) {
         val buffer = (encoder as? FriendlyByteBufEncoder)?.buf
         encoder.encodeCollection(descriptor, value.size) {
             value.forEachIndexed { index, component ->
@@ -71,8 +70,8 @@ object ComponentListSerializer : KSerializer<List<Component>> {
         }
     }
 
-    override fun deserialize(decoder: Decoder): List<Component> {
-        val result = mutableListOf<Component>()
+    override fun deserialize(decoder: Decoder): List<Any> {
+        val result = mutableListOf<Any>()
         val composite = decoder.beginStructure(descriptor)
         val buffer = (composite as? FriendlyByteBufDecoder)?.input
 
@@ -82,7 +81,7 @@ object ComponentListSerializer : KSerializer<List<Component>> {
                 val component = composite.decodeSerializableElement(
                     descriptor,
                     index,
-                    PolymorphicSerializer(Component::class)
+                    PolymorphicSerializer(Any::class)
                 )
                 result += component
             } catch (e: Exception) {

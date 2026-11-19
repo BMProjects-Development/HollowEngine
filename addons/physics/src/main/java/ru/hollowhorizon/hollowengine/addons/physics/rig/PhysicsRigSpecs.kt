@@ -9,7 +9,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import kotlin.math.abs
@@ -54,7 +53,7 @@ data class BodyCollision(
 @Serializable
 @SerialName(RigidBodyAttachmentSpec.TYPE_ID)
 data class RigidBodyAttachmentSpec(
-    @EditorHidden override val id: String = "body",
+    @EditorHidden val id: String = "body",
 
     @EditorWidget(EditorWidgets.COLLIDERS)
     @EditorName("$LANG.body.colliders")
@@ -80,11 +79,9 @@ data class RigidBodyAttachmentSpec(
     val restitution: Float = 0f,
     @EditorName("$LANG.body.collision")
     val collision: BodyCollision = BodyCollision(),
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
-
+) {
     /** The colliders of [bone] this body is made of: those it names, or every one when it names none. */
-    fun partsOn(bone: List<RigAttachmentSpec>): List<ColliderAttachmentSpec> =
+    fun partsOn(bone: List<Any>): List<ColliderAttachmentSpec> =
         bone.filterIsInstance<ColliderAttachmentSpec>().filter { colliders.isEmpty() || it.id in colliders }
 
     companion object {
@@ -93,6 +90,7 @@ data class RigidBodyAttachmentSpec(
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = RigidBodyAttachmentSpec::class,
+            rigId = RigidBodyAttachmentSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_rigid_body",
             createDefault = { id -> RigidBodyAttachmentSpec(id = id) },
@@ -160,7 +158,7 @@ data class JointLimits(
 @SerialName(JointAttachmentSpec.TYPE_ID)
 data class JointAttachmentSpec(
     @EditorHidden
-    override val id: String = "joint",
+    val id: String = "joint",
     @EditorBone
     @EditorName("$LANG.joint.parent")
     @EditorDescription("$LANG.joint.parent.hint")
@@ -170,15 +168,14 @@ data class JointAttachmentSpec(
     @EditorName("$LANG.joint.pivot")
     @EditorDescription("$LANG.joint.pivot.hint")
     val pivot: RigVector = RigVector.ZERO,
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
-
+) {
     companion object {
         const val TYPE_ID = "hollowengine:physics/joint"
 
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = JointAttachmentSpec::class,
+            rigId = JointAttachmentSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_joint",
             createDefault = { id -> JointAttachmentSpec(id = id) },

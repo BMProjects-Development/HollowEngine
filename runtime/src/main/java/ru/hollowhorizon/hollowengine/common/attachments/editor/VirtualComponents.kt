@@ -6,7 +6,6 @@ import kotlinx.serialization.modules.SerializersModuleBuilder
 import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import kotlin.reflect.KClass
 
 /**
@@ -23,7 +22,7 @@ class VirtualComponentDescriptor<T : Any>(
 ) {
     fun read(entity: Entity): T? = if (supports(entity)) reader(entity) else null
 
-    fun write(entity: Entity, value: Component): Boolean {
+    fun write(entity: Entity, value: Any): Boolean {
         if (!supports(entity) || !type.isInstance(value)) return false
         @Suppress("UNCHECKED_CAST") writer(entity, value as T)
         return true
@@ -59,20 +58,20 @@ object VirtualComponentRegistry {
 
     fun isVirtual(id: ResourceLocation): Boolean = id in descriptors
 
-    fun isVirtual(component: Component): Boolean = descriptor(component::class) != null
+    fun isVirtual(component: Any): Boolean = descriptor(component::class) != null
 
-    fun read(entity: Entity): List<Component> = descriptors.values.mapNotNull { it.read(entity) }
+    fun read(entity: Entity): List<Any> = descriptors.values.mapNotNull { it.read(entity) }
 
-    fun apply(entity: Entity, component: Component): Boolean =
+    fun apply(entity: Entity, component: Any): Boolean =
         descriptor(component::class)?.write(entity, component) ?: false
 
     @Suppress("UNCHECKED_CAST")
     fun registerSerializers(builder: SerializersModuleBuilder) {
-        builder.polymorphic(Component::class) {
+        builder.polymorphic(Any::class) {
             descriptors.values.forEach { descriptor ->
                 subclass(
-                    descriptor.type as KClass<Component>,
-                    descriptor.serializer as KSerializer<Component>,
+                    descriptor.type as KClass<Any>,
+                    descriptor.serializer as KSerializer<Any>,
                 )
             }
         }

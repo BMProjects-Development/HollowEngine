@@ -79,13 +79,18 @@ internal class EntityRigs(private val fileRigOf: (String) -> ModelRig) {
  */
 internal class PosedModel(
     model: Model,
-    override var rig: ModelRig,
+    rig: ModelRig,
     parent: SceneObject,
     name: String,
     assetsOf: (String) -> ColliderPoseAssets?,
     depth: Int = 0,
 ) : ColliderScope, AutoCloseable {
     private val instance = ModelSceneInstance.create(parent, name, model).also { it.setRigBones(rig) }
+    override var rig: ModelRig = rig
+        set(value) {
+            instance.updateRigBoneRestTransforms(field, value)
+            field = value
+        }
     override val poseNodes: Collection<SceneObject> get() = instance.poseNodes
     fun poseTarget() = instance.poseTarget(rig)
 

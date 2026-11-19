@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3d
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.vfx.VfxBoneAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import kotlin.test.assertEquals
 
 /**
@@ -21,8 +21,8 @@ class VectorSerializationTests {
         val placement = ObjectPlacement(Vec3d(1.5, -64.0, 1.0e6), Vec3f(10f, 20f, 30f), Vec3f(0.5f, 2f, 1f))
         assertEquals(placement, throughBuffer(ObjectPlacement.serializer(), placement))
 
-        val effect = VfxBoneAttachmentSpec("fire", "hollowengine:vfx/fire.vfx", Vec3f(0f, 1.25f, -0.5f), Vec3f(90f, 0f, 0f), scale = 2f)
-        assertEquals(effect, throughBuffer(VfxBoneAttachmentSpec.serializer(), effect))
+        val effect = VfxComponent("fire", "hollowengine:vfx/fire.vfx", autoPlay = false)
+        assertEquals(effect, throughBuffer(VfxComponent.serializer(), effect))
     }
 
     private fun <T> throughBuffer(serializer: KSerializer<T>, value: T): T {

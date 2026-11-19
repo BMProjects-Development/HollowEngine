@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
 import net.minecraft.server.MinecraftServer
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
+import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -25,6 +26,8 @@ abstract class NodeScript(
 
     /** Shared server scene, held in memory until the server runtime is stopped. */
     val serverScene get() = server.runtimeContext.scene
+
+    val sceneObject get() = ((host as? NodeHost.OfEntity)?.entity as? WorldObjectEntity)?.sceneObject
 
     internal val onSaveHandlers = mutableListOf<(SerializationContext) -> Unit>()
     internal val onLoadHandlers = mutableListOf<(SerializationContext) -> Unit>()

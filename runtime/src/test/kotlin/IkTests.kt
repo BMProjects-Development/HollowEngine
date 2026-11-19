@@ -88,10 +88,13 @@ class IkTests {
 
         val goal = Vec3f(0.3f, -1.5f, 0.4f)
         val rig = ModelRig(
-            bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step", weight = AnimationExpression.ONE)))),
-            attachments = listOf(IkTargetSpec(id = "step", offset = goal)),
+            bones = mapOf(
+                "foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", target = "step", weight = AnimationExpression.ONE))),
+                "step" to RigBone(attachments = listOf(IkTargetSpec(id = "step"))),
+            ),
         )
-        applyRigConstraintsToPose(hip.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext())
+        val step = renderModelNode(definition(3, "step", goal), null)
+        applyRigConstraintsToPose(hip.walk().map { it.sceneObject } + step.sceneObject, rig, AnimatorEvaluationContext())
 
         assertClose(goal, nodes.getValue("foot").sceneObject.modelMatrix().getTranslation(), tolerance = 1e-3f)
         assertEquals(1f, abs(footTurn.dot(nodes.getValue("foot").sceneObject.modelRotation())), 1e-4f)
@@ -108,15 +111,15 @@ class IkTests {
                     attachments = listOf(IkChainSpec(id = "reach", bones = 2, target = "spot")),
                 ),
                 "orphan" to RigBone(origin = RigBoneOrigin("missing")),
+                "spot" to RigBone(origin = RigBoneOrigin(offset = Vec3f(0.5f, -0.5f, 0f)), attachments = listOf(IkTargetSpec("spot"))),
             ),
-            attachments = listOf(IkTargetSpec(id = "spot", offset = Vec3f(0.5f, -0.5f, 0f))),
         )
 
         val model = ModelAttachment(MutableStateFlow(Model(0, listOf(Scene(listOf(leg))), emptySet())), null)
         model.rig = rig
         val roots = model.nodes
         val names = roots.flatMap { it.walk() }.map { it.name }
-        assertEquals(listOf("leg", "foot", "toe"), names)
+        assertEquals(setOf("leg", "foot", "toe", "spot"), names.toSet())
 
         model.applyRigConstraints(AnimatorEvaluationContext())
         val toe = roots.flatMap { it.walk() }.single { it.name == "toe" }
@@ -157,10 +160,13 @@ class IkTests {
             transform.markDirty()
         }
         val rig = ModelRig(
-            bones = mapOf("foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", ground = true, pole = "front")))),
-            attachments = listOf(IkTargetSpec(id = "front", offset = Vec3f(0f, -1f, 3f))),
+            bones = mapOf(
+                "foot" to RigBone(attachments = listOf(IkChainSpec(id = "leg", ground = true, pole = "front"))),
+                "front" to RigBone(attachments = listOf(IkTargetSpec(id = "front"))),
+            ),
         )
-        applyRigConstraintsToPose(hip.walk().map { it.sceneObject }, rig, AnimatorEvaluationContext(), RigGroundingState())
+        val pole = renderModelNode(definition(3, "front", Vec3f(0f, -1f, 3f)), null)
+        applyRigConstraintsToPose(hip.walk().map { it.sceneObject } + pole.sceneObject, rig, AnimatorEvaluationContext(), RigGroundingState())
 
         val nodes = hip.walk().associateBy { it.name }
         val placedFoot = nodes.getValue("foot").sceneObject.modelMatrix().getTranslation()

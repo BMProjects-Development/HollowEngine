@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.client.ui.inspector.withField
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 
 internal val LocalEntityEditorSession: ProvidableCompositionLocal<EntityEditorSession?> = compositionLocalOf { null }
 
@@ -16,7 +15,7 @@ class ComponentEditorScope internal constructor(
     private val document: JsonObject,
     private val apply: (JsonObject) -> Unit,
 ) {
-    val component: Component get() = entry.value
+    val component: Any get() = entry.value
     val id: ResourceLocation get() = entry.id
     val json: JsonObject get() = document
 

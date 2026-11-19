@@ -16,27 +16,24 @@ private const val MAX_THICKNESS = 1.0
 @Serializable
 @SerialName(TYPE_ID)
 data class MeshExtrusionSpec(
-    @EditorHidden override val id: String = "mesh_extrusion",
+    @EditorHidden val id: String = "mesh_extrusion",
     @EditorName("hollowengine.gui.rig_editor.extrusion_thickness")
     @EditorDescription("hollowengine.gui.rig_editor.extrusion_thickness_hint")
     @EditorRange(-MAX_THICKNESS, MAX_THICKNESS)
     @EditorNotAnimated
     val thickness: Float = DEFAULT_THICKNESS,
-) : RigAttachmentSpec() {
+) {
     init {
         require(thickness in -MAX_THICKNESS.toFloat()..MAX_THICKNESS.toFloat()) {
             "Invalid mesh extrusion thickness: $thickness"
         }
     }
 
-    override fun withId(id: String) = copy(id = id)
-
-    override fun structure() = copy(thickness = DEFAULT_THICKNESS)
-
     companion object {
         val TYPE = RigAttachmentType(
             id = TYPE_ID,
             specClass = MeshExtrusionSpec::class,
+            rigId = MeshExtrusionSpec::id,
             serializer = serializer(),
             titleKey = "hollowengine.gui.rig_editor.kind_mesh_extrusion",
             createDefault = { id -> MeshExtrusionSpec(id) },

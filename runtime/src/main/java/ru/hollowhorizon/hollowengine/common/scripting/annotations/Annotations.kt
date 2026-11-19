@@ -25,9 +25,9 @@ annotation class SharedScript
  * (`onInteract`, `onHurt`, `onDie`, ...) become available. Such a node must be started via
  * `/he scripting attach <entity> ...`.
  *
- * [value] is the host class.
+ * [value] is the host class. On component data, it restricts the component's owner type.
  */
-@Target(AnnotationTarget.FILE)
+@Target(AnnotationTarget.FILE, AnnotationTarget.CLASS)
 annotation class Attach(val value: KClass<*>)
 
 /**

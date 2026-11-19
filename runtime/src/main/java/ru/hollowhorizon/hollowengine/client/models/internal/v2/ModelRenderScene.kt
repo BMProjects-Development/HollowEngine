@@ -5,11 +5,14 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
-import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
+import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.Scene
-import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scene.accepts
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 /** Scene-owned spatial state for a rendered model and its rig-added bones. */
 internal class ModelRenderScene private constructor(
@@ -20,6 +23,55 @@ internal class ModelRenderScene private constructor(
 ) : AutoCloseable {
     val instance = ModelSceneInstance.create(parent, name, model)
     val root: SceneObject get() = instance.root
+    val clientContext: ClientSceneContext? get() = ownedScene?.context as? ClientSceneContext
+    private var imported: Map<SceneObject, Map<String, UUID>> = emptyMap()
+
+    /** Imports migrated rig entries into the same component store scripts and editors use. */
+    fun bindComponents(rig: ModelRig) {
+        val retained = buildMap {
+            for ((node, specs) in sequenceOf(root to rig.attachments) + instance.poseNodesByIndex.values.asSequence().map {
+                it to rig.bone(it.poseName)?.attachments.orEmpty()
+            }) {
+                if (specs.isEmpty()) continue
+                val ids = buildMap {
+                    for (spec in specs) {
+                        if (!node.accepts(spec)) continue
+                        val name = spec.rigId
+                        val id = imported[node]?.get(name)
+                            ?: UUID.nameUUIDFromBytes(name.toByteArray(StandardCharsets.UTF_8))
+                        val previous = node.component(id)
+                        if (previous != null && imported[node]?.get(name) != id) continue
+                        if (previous == null) node.attach(spec, id)
+                        else if (previous::class == spec::class) node.setComponent(id, spec)
+                        else {
+                            node.detach(id)
+                            node.attach(spec, id)
+                        }
+                        put(name, id)
+                    }
+                }
+                put(node, ids)
+            }
+        }
+        for ((node, ids) in imported) {
+            if (!node.isRemoved) for ((name, id) in ids) {
+                if (name !in retained[node].orEmpty()) node.detach(id)
+            }
+        }
+        imported = retained
+    }
+
+    fun respecComponents(rig: ModelRig) {
+        for ((node, ids) in imported) {
+            if (node.isRemoved) continue
+            val specs = if (node === root) rig.attachments else rig.bone(node.poseName)?.attachments.orEmpty()
+            for (spec in specs) {
+                val id = ids[spec.rigId] ?: continue
+                val previous = node.component(id)
+                if (previous != null && previous::class == spec::class) node.setComponent(id, spec)
+            }
+        }
+    }
 
     fun prepare(model: Model, rig: ModelRig) {
         if (instance.model !== model) {
@@ -48,7 +100,7 @@ internal class ModelRenderScene private constructor(
             val nested = parent as? NestedModelAttachment
             val holder = nested?.sceneHolder
             val scene = if (holder == null) Scene(
-                object : SceneContext { override val side = LogicalSide.CLIENT },
+                ClientSceneContext(),
                 parent?.let(::AttachmentSceneTransform),
             ) else null
             try {

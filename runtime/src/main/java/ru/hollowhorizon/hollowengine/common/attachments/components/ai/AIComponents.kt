@@ -10,6 +10,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForResourceLocation
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForVec3
@@ -44,6 +45,7 @@ enum class LookTargetMode {
 }
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:look_at_target")
 data class LookAtTargetComponent(
@@ -62,6 +64,7 @@ data class LookAtTargetComponent(
 )
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:follow_target")
 data class FollowTargetComponent(
@@ -78,6 +81,7 @@ data class FollowTargetComponent(
 )
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:move_to_position")
 data class MoveToPositionComponent(
@@ -94,6 +98,7 @@ data class MoveToPositionComponent(
 )
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:attack_target")
 data class AttackTargetComponent(
@@ -112,6 +117,7 @@ data class AttackTargetComponent(
 )
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:pickup_loot")
 data class PickupLootComponent(
@@ -134,6 +140,7 @@ data class PatrolPoint(
 )
 
 @Registerable
+@Attach(Entity::class)
 @Serializable
 @SerialName("hollowengine:patrol_path")
 data class PatrolPathComponent(

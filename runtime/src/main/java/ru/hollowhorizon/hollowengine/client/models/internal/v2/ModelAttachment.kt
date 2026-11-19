@@ -7,6 +7,8 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.phys.Vec3
+import org.joml.Matrix4dc
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.models.internal.Material
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
@@ -22,10 +24,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRender
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticSubmissions
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.submitStatic
-import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
@@ -71,23 +72,11 @@ class ModelAttachment(
 
     /** The entity that carries this model, living or not, for what hangs on it and talks to it, as a panel does. */
     var carrier: Entity? = null
-    val soundScope: String
-        get() {
-            val lineage = generateSequence<Attachment>(this) { it.attachmentParent }.toList()
-            val root = lineage.filterIsInstance<ModelAttachment>().last()
-            val nested = lineage.filterIsInstance<NestedModelAttachment>().asReversed().flatMap {
-                listOf((it.attachmentParent as RenderModelNode).name, it.spec.id)
-            }
-            return (listOf(root.instanceId) + nested).joinToString("/")
-        }
     private var builtFor: Model? = null
     private var runtimeNodes: List<RenderModelNode> = emptyList()
 
     /** Every node of [runtimeNodes], parents first; the hierarchy only changes when the model is built again. */
     private var allNodes: List<RenderModelNode> = emptyList()
-
-    /** What hangs on the model and follows it through the world, as sounds on bones; see [Attachment.followsWorldPose]. */
-    private var worldPoseAttachments: List<Attachment> = emptyList()
 
     /**
      * Holds what hangs on the model itself rather than on a bone. It is not one of the model's nodes, so
@@ -130,12 +119,13 @@ class ModelAttachment(
             if (sceneRoot.isRemoved) return
             if (currentRig == value) return
 
-            val sameStructure = currentRig.structure() == value.structure()
             val materialsChanged = currentRig.materials != value.materials
-            if (sameStructure) {
+            if (canUpdateRig(currentRig, value, allNodes, modelRoot)) {
+                renderScene.instance.updateRigBoneRestTransforms(currentRig, value)
                 currentRig = value
+                rigCarriesEffects = value.carriesLegacyEffects()
                 respecAttachments()
-                renderScene.instance.updateRigBoneRestTransforms(value)
+                renderScene.respecComponents(value)
                 if (materialsChanged) dress()
                 cachedBounds = null
                 keptCullingBounds = null
@@ -144,31 +134,19 @@ class ModelAttachment(
             }
         }
 
-    /** Asks the conditions of the attachments that have one; see [ConditionalAttachment]. */
-    fun evaluateConditions(context: AnimatorEvaluationContext) {
-        if (conditionsOf !== currentRig) {
-            conditionsOf = currentRig
-            hasConditions = currentRig.allAttachments().any { (_, spec) ->
-                (spec as? ConditionalAttachmentSpec)?.activeWhile?.source?.isNotBlank() == true
-            }
-        }
-        if (!hasConditions) return
-        allNodes.forEach { node -> if (node.isVisible) node.attachments.forEach { (it as? ConditionalAttachment)?.evaluate(context) } }
-        modelRoot?.takeIf { it.isVisible }?.attachments?.forEach { (it as? ConditionalAttachment)?.evaluate(context) }
-    }
-
-    /** Whether any attachment of [conditionsOf] works only while a condition holds, so a frame asks nothing otherwise. */
-    private var hasConditions = false
-    private var conditionsOf: ModelRig? = null
-
-    /** Hands the running attachments their specs again, after a change that left the rig's structure as it was. */
     private fun respecAttachments() {
-        val holders = allNodes.map { it.name to it } + listOfNotNull(modelRoot?.let { null to it })
-        holders.forEach { (bone, node) ->
-            node.attachments.filterIsInstance<RespecAttachment>().forEach { running ->
-                currentRig.holder(bone).attachment(running.spec.id)?.let(running::respec)
+        fun update(node: RenderModelNode, specs: List<Any>) {
+            for (running in node.attachments) {
+                if (running !is RespecAttachment) continue
+                val spec = specs.firstOrNull { it.rigId == running.spec.rigId } ?: continue
+                if (running.spec != spec) running.respec(spec)
             }
         }
+        for (node in allNodes) {
+            val specs = currentRig.bone(node.name)?.attachments ?: continue
+            update(node, specs)
+        }
+        modelRoot?.let { update(it, currentRig.attachments) }
     }
 
     private var currentRig: ModelRig = RigAssets.of(location)
@@ -179,8 +157,14 @@ class ModelAttachment(
     private var dressedBy: Map<String, MaterialSource> = emptyMap()
 
     /** Whether any effect hangs on this model, here or on a model nested in it; effects reach past any box. */
-    var carriesEffects: Boolean = false
-        private set
+    private var rigCarriesEffects = false
+    val carriesEffects: Boolean get() = renderScene.clientContext?.hasDraws == true || rigCarriesEffects
+
+    internal fun updatePreviewComponents(
+        playSounds: Boolean, effectTime: Float?, effectEmitting: ((String?, String, Float) -> Boolean)?,
+    ) {
+        renderScene.clientContext?.updatePreview(playSounds, effectTime, effectEmitting)
+    }
 
     val triangles get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.positionsCount / 3 } ?: 0 }
     val shapekeys get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.morphTargets.size } ?: 0 }
@@ -297,19 +281,15 @@ class ModelAttachment(
         allNodes.asReversed().forEach(RenderModelNode::close)
         modelRoot?.close()
         currentRig = nextRig
+        rigCarriesEffects = nextRig.carriesLegacyEffects()
         builtFor = model
         runtimeMaterials = ModelInstanceMaterials(model)
         runtimeNodes = renderScene.bindNodes(this, runtimeMaterials::resolve)
         allNodes = runtimeNodes.flatMap { it.walk() }
         nodesByIndex = allNodes.associateBy { it.definition.index }
         nodesByIndex.values.forEach(::customizeNode)
-        val rootDefinition = NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF())
-        modelRoot = RenderModelNode(sceneRoot, rootDefinition, this) { it }.also { root ->
-            val context = RigAttachmentContext(root, { entity }, this) { carrier }
-            currentRig.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(root.attachments::add) }
-        }
-        carriesEffects = currentRig.carriesEffects()
-        worldPoseAttachments = (allNodes.flatMap { it.attachments } + modelRoot?.attachments.orEmpty()).filter { it.followsWorldPose }
+        modelRoot = bindLegacyRoot()
+        renderScene.bindComponents(nextRig)
         dress()
         invalidatePipeline()
         cachedBounds = null
@@ -324,7 +304,6 @@ class ModelAttachment(
         } finally {
             runtimeNodes = emptyList()
             allNodes = emptyList()
-            worldPoseAttachments = emptyList()
             modelRoot = null
             renderPipeline = null
             nodesByIndex = emptyMap()
@@ -339,7 +318,6 @@ class ModelAttachment(
         if (wasModelRoot || allNodes.any { it === node }) {
             allNodes = allNodes.filterNot { it === node }
             if (nodesByIndex[node.definition.index] === node) nodesByIndex = nodesByIndex - node.definition.index
-            worldPoseAttachments = worldPoseAttachments.filterNot { it.attachmentParent === node }
             renderScene.instance.forgetPose(node.definition.index, node.sceneObject)
             cachedBounds = null
             keptCullingBounds = null
@@ -347,10 +325,11 @@ class ModelAttachment(
         }
     }
 
-    override fun updateWorldPose(modelToWorld: TrsTransformF, entity: Entity) {
-        worldPoseAttachments.forEach { attachment ->
-            if ((attachment.attachmentParent as? RenderModelNode)?.isVisible != false) attachment.updateWorldPose(modelToWorld, entity)
-        }
+    internal val hasComponentUpdates: Boolean get() = renderScene.clientContext?.hasUpdates == true
+    internal val readsComponentAnimation: Boolean get() = renderScene.clientContext?.needsAnimationVariables == true
+
+    internal fun updateWorldComponents(modelToWorld: Matrix4dc, entity: Entity, camera: Vec3, animation: AnimatorEvaluationContext?) {
+        renderScene.clientContext?.updateWorld(modelToWorld, entity, instanceId, camera, animation)
     }
 
     /**
@@ -376,8 +355,17 @@ class ModelAttachment(
         bone.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(node.attachments::add) }
     }
 
-    private fun createRigAttachment(spec: RigAttachmentSpec, context: RigAttachmentContext): Attachment? =
+    private fun createRigAttachment(spec: Any, context: RigAttachmentContext): Attachment? =
         rebuildingNested?.reuse(spec, context) ?: RigAttachmentFactories.create(spec, context)
+
+    private fun bindLegacyRoot(): RenderModelNode? {
+        if (currentRig.attachments.none(RigAttachmentFactories::canCreate)) return null
+        val definition = NodeDefinition(MODEL_ROOT_INDEX, MODEL_ROOT, mutableListOf(), TrsTransformF())
+        val root = RenderModelNode(sceneRoot, definition, this) { it }
+        val context = RigAttachmentContext(root, { entity }, this) { carrier }
+        currentRig.attachments.forEach { spec -> createRigAttachment(spec, context)?.let(root.attachments::add) }
+        return root
+    }
 
 
     override fun collectCommands(pipeline: RenderPipeline) {
@@ -385,6 +373,8 @@ class ModelAttachment(
         collectStaticMeshes(pipeline)
         allNodes.forEach { it.collectCommands(pipeline) }
         modelRoot?.collectCommands(pipeline)
+        val context = renderScene.clientContext
+        if (context != null) pipeline.addBatchedRenderable { context.collect(stack.last().pose()) }
     }
 
     /** Hands the unskinned meshes of this instance to the model's merged geometry, to be drawn as one. */
@@ -485,3 +475,39 @@ class ModelAttachment(
         return Vec3f(minX, minY, minZ) to Vec3f(maxX, maxY, maxZ)
     }
 }
+
+private fun canUpdateRig(
+    current: ModelRig,
+    next: ModelRig,
+    nodes: List<RenderModelNode>,
+    root: RenderModelNode?,
+): Boolean {
+    if (current.bones.keys != next.bones.keys) return false
+    if (!canUpdateAttachments(current.attachments, next.attachments)) return false
+    for ((name, before) in current.bones) {
+        val after = next.bones.getValue(name)
+        if (before.alias != after.alias || before.hidden != after.hidden || before.material != after.material) return false
+        if ((before.origin == null) != (after.origin == null) || before.origin?.parent != after.origin?.parent) return false
+        if (!canUpdateAttachments(before.attachments, after.attachments)) return false
+    }
+    return (root == null || root.canUpdateAttachments(current.attachments, next.attachments)) &&
+        nodes.all { node ->
+            val oldBone = current.bone(node.name)
+            oldBone == null || node.canUpdateAttachments(oldBone.attachments, next.bones.getValue(node.name).attachments)
+        }
+}
+
+private fun canUpdateAttachments(current: List<Any>, next: List<Any>): Boolean =
+    current.size == next.size && current.indices.all { index ->
+        val before = current[index]
+        val after = next[index]
+        before === after || (before::class == after::class && before.rigId == after.rigId)
+    }
+
+private fun RenderModelNode.canUpdateAttachments(current: List<Any>, next: List<Any>): Boolean =
+    current.indices.all { index ->
+        val before = current[index]
+        val after = next[index]
+        before == after || !RigAttachmentFactories.canCreate(after) ||
+            attachments.any { it is RespecAttachment && it.spec.rigId == after.rigId && it.canRespec(after) }
+    }

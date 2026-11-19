@@ -25,6 +25,7 @@ import ru.hollowhorizon.hollowengine.common.models.MontageBoneTrack
 import ru.hollowhorizon.hollowengine.common.models.MontageLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
+import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
@@ -149,9 +150,20 @@ class ModelInstanceIsolationTests {
         val sword = ModelAttachmentSpec(id = "sword")
         val rig = ModelRig(bones = mapOf("hand" to RigBone(attachments = listOf(sword))))
         attachment.rig = rig
-        val first = attachment.findNode("hand")!!.attachments.filterIsInstance<NestedModelAttachment>().single()
+        val hand = attachment.findNode("hand")!!
+        val first = hand.attachments.filterIsInstance<NestedModelAttachment>().single()
         val nestedRoot = first.model.sceneRoot
         val addition = nestedRoot.create("added")
+        val moved = RigPose(position = Vec3f(0f, 2f, 0f))
+        attachment.rig = rig.withBone("hand", RigBone(attachments = listOf(sword), pose = moved))
+        attachment.beginPose()
+        attachment.applyRigPose()
+        attachment.endPose()
+
+        assertSame(hand, attachment.findNode("hand"))
+        assertSame(first, hand.attachments.filterIsInstance<NestedModelAttachment>().single())
+        assertEquals(2f, nestedRoot.worldTransform.getTranslation().y)
+
         flow.value = model(3f)
 
         attachment.ensureReady()

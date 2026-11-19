@@ -86,7 +86,7 @@ internal class MontageTimelineSession(
      */
     private val heldBones = mutableStateMapOf<String, RigPose>()
     private val heldVisibility = mutableStateMapOf<String, Boolean>()
-    private val heldFields = mutableStateMapOf<Pair<String?, String>, Pair<RigAttachmentSpec, Set<String>>>()
+    private val heldFields = mutableStateMapOf<Pair<String?, String>, Pair<Any, Set<String>>>()
     private var heldAt by mutableStateOf(Float.NaN)
 
     private val holding: Boolean get() = !timeline.isPlaying && abs(timeline.currentTime - heldAt) <= EPSILON
@@ -108,7 +108,7 @@ internal class MontageTimelineSession(
     private data class Held(
         val bones: Map<String, RigPose>,
         val visibility: Map<String, Boolean>,
-        val fields: Map<Pair<String?, String>, Pair<RigAttachmentSpec, Set<String>>>,
+        val fields: Map<Pair<String?, String>, Pair<Any, Set<String>>>,
     )
 
     private var suppressCommit = false
@@ -174,13 +174,13 @@ internal class MontageTimelineSession(
         rigs.rig.allAttachments().forEach { (bone, spec) ->
             val path = listOf(attachmentLabel(bone, spec))
             val group = timeline.group(path)
-            groupKeys[group] = attachmentKey(bone, spec.id)
-            if (rigs.owns(bone, spec.id)) group.lanes += windowLane(bone, spec.id)
+            groupKeys[group] = attachmentKey(bone, spec.rigId)
+            if (rigs.owns(bone, spec.rigId)) group.lanes += windowLane(bone, spec.rigId)
             RigFields.animatable(spec).forEach { field ->
-                val property = timeline.addProperty(path, buildProperty(bone, spec.id, field))
+                val property = timeline.addProperty(path, buildProperty(bone, spec.rigId, field))
                 fill(
                     property,
-                    montage.tracks.firstOrNull { it.bone == bone && it.attachment == spec.id && it.property == field.name }?.curves
+                    montage.tracks.firstOrNull { it.bone == bone && it.attachment == spec.rigId && it.property == field.name }?.curves
                 )
             }
         }
@@ -415,10 +415,10 @@ internal class MontageTimelineSession(
     }
 
     /** Holds [names] of the attachment [spec] on [bone] at the values [spec] has, over what the tracks write. */
-    override fun holdFields(bone: String?, spec: RigAttachmentSpec, names: Collection<String>) {
-        touchAttachment(bone, spec.id)
+    override fun holdFields(bone: String?, spec: Any, names: Collection<String>) {
+        touchAttachment(bone, spec.rigId)
         beginHold()
-        val key = bone to spec.id
+        val key = bone to spec.rigId
         heldEdits.record { heldFields[key] = spec to (heldFields[key]?.second.orEmpty() + names) }
     }
 
@@ -515,11 +515,11 @@ internal class MontageTimelineSession(
         val spec = part?.let { rigs.rig.holder(bone).attachment(it) }
         val keys: List<Pair<AnimProperty<*>, FloatArray?>> = when {
             spec != null -> {
-                touchAttachment(bone, spec.id)
+                touchAttachment(bone, spec.rigId)
                 RigFields.animatable(spec)
-                    .filter { field -> parts.covers(field.name, keyed = isAnimated(bone, spec.id, field.name)) }
+                    .filter { field -> parts.covers(field.name, keyed = isAnimated(bone, spec.rigId, field.name)) }
                     .mapNotNull { field ->
-                        propertyOf(fieldId(bone, spec.id, field.name))?.let {
+                        propertyOf(fieldId(bone, spec.rigId, field.name))?.let {
                             it to RigFields.read(
                                 spec,
                                 field.name
@@ -596,7 +596,8 @@ internal class MontageTimelineSession(
         }
         val bones = properties.mapNotNull { property ->
             val (bone, kind) = parseBone(property.id) ?: return@mapNotNull null
-            property.stored()?.let { MontageBoneTrack(bone, kind, it) }
+            val current = montage.bones.firstOrNull { it.bone == bone && it.property == kind }
+            property.stored()?.let { current?.copy(curves = it) ?: MontageBoneTrack(bone, kind, it) }
         }
         val weights = properties.mapNotNull { property ->
             val clip = property.id.takeIf { it.startsWith(WEIGHT) }?.removePrefix(WEIGHT) ?: return@mapNotNull null
@@ -629,7 +630,7 @@ internal class MontageTimelineSession(
         playback.refresh()
         windows.forEach { (key, lane) ->
             val attachment =
-                montage.attachments.firstOrNull { it.bone == key.first && it.spec.id == key.second } ?: return@forEach
+                montage.attachments.firstOrNull { it.bone == key.first && it.spec.rigId == key.second } ?: return@forEach
             lane.segments.clear()
             attachment.windows.forEachIndexed { index, window ->
                 val end = window.end ?: montage.duration
@@ -726,7 +727,7 @@ internal class MontageTimelineSession(
 
     private fun windowMenu(bone: String?, id: String, time: Float, segment: TimelineSegment?): List<UiDropdownItem> {
         val index = segment?.index()
-        val attachment = montage.attachments.firstOrNull { it.bone == bone && it.spec.id == id } ?: return emptyList()
+        val attachment = montage.attachments.firstOrNull { it.bone == bone && it.spec.rigId == id } ?: return emptyList()
         return listOfNotNull(
             UiDropdownItem(montageText("add_window")) { addWindow(bone, id, time) }.takeIf { index == null },
             UiDropdownItem(montageText("split_window")) {
@@ -747,7 +748,7 @@ internal class MontageTimelineSession(
             UiDropdownItem(montageText("remove_attachment"), separatorBefore = true) {
                 document.edit(label = UndoLabel(montageKey("remove_attachment"))) { montage ->
                     montage.copy(
-                        attachments = montage.attachments.filterNot { it.bone == bone && it.spec.id == id },
+                        attachments = montage.attachments.filterNot { it.bone == bone && it.spec.rigId == id },
                         tracks = montage.tracks.filterNot { it.bone == bone && it.attachment == id },
                     )
                 }
@@ -768,7 +769,7 @@ internal class MontageTimelineSession(
 
     private fun editAttachment(bone: String?, id: String, change: (MontageAttachment) -> MontageAttachment) {
         document.edit(label = UndoLabel(montageKey("edit_window"))) { montage ->
-            montage.copy(attachments = montage.attachments.map { if (it.bone == bone && it.spec.id == id) change(it) else it })
+            montage.copy(attachments = montage.attachments.map { if (it.bone == bone && it.spec.rigId == id) change(it) else it })
         }
     }
 
@@ -801,8 +802,8 @@ internal class MontageTimelineSession(
         rigs.rig.allAttachments().map { (bone, spec) ->
             listOf(
                 bone.orEmpty(),
-                spec.id,
-                rigs.owns(bone, spec.id),
+                spec.rigId,
+                rigs.owns(bone, spec.rigId),
                 RigFields.animatable(spec).map { it.name to it.kind })
         },
         montage.clips.map { it.id to it.start },
@@ -866,9 +867,9 @@ internal class MontageTimelineSession(
         return bone to property
     }
 
-    private fun attachmentLabel(bone: String?, spec: RigAttachmentSpec) = "${bone ?: montageText("model")} (${spec.id})"
+    private fun attachmentLabel(bone: String?, spec: Any) = "${bone ?: montageText("model")} (${spec.rigId})"
 
-    private fun windowColor(spec: RigAttachmentSpec): Color =
+    private fun windowColor(spec: Any): Color =
         RigAttachmentTypes.of(spec)?.editorColor?.let { Color(String.format("%06X", it)) } ?: EventColor
 
     private companion object {

@@ -1,22 +1,30 @@
+@file:UseSerializers(RigComponentSerializer::class)
+
 package ru.hollowhorizon.hollowengine.common.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
-import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForQuatF
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = ModelRigSerializer::class)
 data class ModelRig(
     val bones: Map<String, RigBone> = emptyMap(),
-    val attachments: List<RigAttachmentSpec> = emptyList(),
+    val attachments: List<Any> = emptyList(),
     /** What the named materials of the model look like here, over how the model authored them. */
     val materials: Map<String, MaterialSource> = emptyMap(),
+    @EncodeDefault
+    private val formatVersion: Int = 1,
 ) {
     val boneByAlias: Map<String, String> by lazy {
         buildMap {
@@ -41,7 +49,7 @@ data class ModelRig(
         if (bone == null) copy(attachments = holder.attachments) else withBone(bone, holder)
 
     /** Every attachment of the rig with the bone it hangs on, null for the model itself. */
-    fun allAttachments(): List<Pair<String?, RigAttachmentSpec>> =
+    fun allAttachments(): List<Pair<String?, Any>> =
         attachments.map { null to it } + bones.flatMap { (name, bone) -> bone.attachments.map { name to it } }
 
     /**
@@ -55,31 +63,16 @@ data class ModelRig(
         return ModelRig(merged, attachments.overlay(instance.attachments), materials + instance.materials)
     }
 
-    /**
-     * What has to be built to show this rig: everything but bone poses, material looks and what attachments
-     * take in place, here and in the models nested in it. Two rigs with the same structure show the same nodes.
-     */
-    fun structure(): ModelRig = ModelRig(
-        bones.mapValues { (_, bone) ->
-            bone.copy(
-                pose = null,
-                origin = bone.origin?.let { RigBoneOrigin(parent = it.parent) },
-                attachments = bone.attachments.map(RigAttachmentSpec::structure),
-            )
-        },
-        attachments.map(RigAttachmentSpec::structure),
-    )
-
     companion object {
         val EMPTY = ModelRig()
     }
 }
 
 /** These attachments with [instance]'s laid over them: one with a taken id takes its place, a new one goes last. */
-private fun List<RigAttachmentSpec>.overlay(instance: List<RigAttachmentSpec>): List<RigAttachmentSpec> {
+private fun List<Any>.overlay(instance: List<Any>): List<Any> {
     if (instance.isEmpty()) return this
-    val byId = instance.associateBy { it.id }
-    return map { byId[it.id] ?: it } + instance.filter { added -> none { it.id == added.id } }
+    val byId = instance.associateBy { it.rigId }
+    return map { byId[it.rigId] ?: it } + instance.filter { added -> none { it.rigId == added.rigId } }
 }
 
 /**
@@ -104,24 +97,24 @@ data class RigBone(
     val alias: String? = null,
     val hidden: Boolean = false,
 
-    val attachments: List<RigAttachmentSpec> = emptyList(),
+    val attachments: List<Any> = emptyList(),
     val material: String? = null,
     val pose: RigPose? = null,
     val origin: RigBoneOrigin? = null,
 ) {
-    fun attachment(id: String): RigAttachmentSpec? = attachments.firstOrNull { it.id == id }
+    fun attachment(id: String): Any? = attachments.firstOrNull { it.rigId == id }
 
-    fun withAttachment(attachment: RigAttachmentSpec): RigBone = withAttachment(attachment.id, attachment)
+    fun withAttachment(attachment: Any): RigBone = withAttachment(attachment.rigId, attachment)
 
-    fun withAttachment(replacing: String, attachment: RigAttachmentSpec): RigBone {
-        val index = attachments.indexOfFirst { it.id == replacing }
+    fun withAttachment(replacing: String, attachment: Any): RigBone {
+        val index = attachments.indexOfFirst { it.rigId == replacing }
         if (index < 0) return copy(attachments = attachments + attachment)
 
         val rest = attachments.toMutableList().also { it[index] = attachment }
-        return copy(attachments = rest.filterIndexed { at, other -> at == index || other.id != attachment.id })
+        return copy(attachments = rest.filterIndexed { at, other -> at == index || other.rigId != attachment.rigId })
     }
 
-    fun withoutAttachment(id: String): RigBone = copy(attachments = attachments.filterNot { it.id == id })
+    fun withoutAttachment(id: String): RigBone = copy(attachments = attachments.filterNot { it.rigId == id })
 
     /** This bone with [instance] laid over it; a bone hidden by either stays hidden. */
     fun overlay(instance: RigBone): RigBone = RigBone(
@@ -144,43 +137,13 @@ data class RigBone(
  */
 const val MAX_NESTING = 8
 
-/**
- * Something hung on a bone or on the whole model: an item in a hand, a physics body, a collider.
- */
-@Serializable
-abstract class RigAttachmentSpec {
-    abstract val id: String
-
-    abstract fun withId(id: String): RigAttachmentSpec
-
-    /**
-     * What of this attachment the drawn model is built from. A change that leaves it the same is taken in place
-     * by the running attachment; any other builds the model again.
-     */
-    open fun structure(): RigAttachmentSpec = this
-
-    /**
-     * What stays of this attachment between the stretches of time a montage hangs it for, or null when it comes
-     * off: an effect stays and only stops making particles, so what it made does not vanish at once.
-     */
-    open fun held(): RigAttachmentSpec? = null
-
-    /**
-     * This attachment [seconds] into the stretch of a montage that hangs it, for one that keeps time with it, as
-     * a sound does that plays from where the playhead is.
-     */
-    open fun inStretch(seconds: Float): RigAttachmentSpec = this
-}
-
 /** Draws whatever the entity wears in [slot] at this bone. */
 @Serializable
 @SerialName("hollowengine:rig/item")
 data class ItemSlotAttachmentSpec(
-    override val id: String = "item",
+    val id: String = "item",
     val slot: RigItemSlot = RigItemSlot.MAINHAND,
-) : RigAttachmentSpec() {
-    override fun withId(id: String) = copy(id = id)
-}
+)
 
 /**
  * Another model hung on a bone, or on the model itself: a sword in a hand, a lamp on a post. It brings its
@@ -190,49 +153,13 @@ data class ItemSlotAttachmentSpec(
 @SerialName("hollowengine:rig/model")
 data class ModelAttachmentSpec(
     @EditorHidden
-    override val id: String = "model",
+    val id: String = "model",
     @EditorName("hollowengine.gui.rig_editor.kind_model")
     @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel")
     val model: String = "",
-    @EditorName("hollowengine.gui.vfx.spawn_offset")
-    override val offset: Vec3f = Vec3f.ZERO,
-    @EditorName("hollowengine.gui.vfx.rotation")
-    override val rotation: Vec3f = Vec3f.ZERO,
-    @EditorName("hollowengine.gui.vfx.scale")
-    override val scale: Float = 1f,
     @EditorHidden
     val rig: ModelRig = ModelRig.EMPTY,
-) : RigAttachmentSpec(), PlacedAttachmentSpec {
-    override fun withId(id: String) = copy(id = id)
-
-    override fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float) = copy(offset = offset, rotation = rotation, scale = scale)
-
-    override fun structure() = ModelAttachmentSpec(id, model, rig = rig.structure())
-}
-
-/**
- * An attachment placed by hand relative to what it hangs on: shifted, turned by [rotation] in Euler degrees
- * (see [eulerRotationXyz]) and scaled evenly. The gizmo moves anything that is placed this way.
- */
-interface PlacedAttachmentSpec {
-    val offset: Vec3f
-    val rotation: Vec3f
-    val scale: Float
-
-    fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float): RigAttachmentSpec
-
-    /** Where the attachment stands relative to what it hangs on. */
-    fun localTransform(): TrsTransformF =
-        TrsTransformF().setCompositionOf(offset, eulerRotationXyz(rotation), Vec3f(scale, scale, scale))
-}
-
-/**
- * An attachment that works only while [activeWhile] holds for the entity it is on, a blank condition always; the
- * client asks every frame. Without an entity, as in a preview, it always works.
- */
-interface ConditionalAttachmentSpec {
-    val activeWhile: AnimationExpression
-}
+)
 
 @Serializable
 enum class RigItemSlot {

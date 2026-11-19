@@ -125,7 +125,9 @@ val Vec3.xy: Vec2d
 val Vec3.yz: Vec2d
     get() = Vec2d(y, z)
 
-fun Mat4f.asMatrix4f(): Matrix4f = Matrix4f(
+fun Mat4f.asMatrix4f(): Matrix4f = copyTo(Matrix4f())
+
+fun Mat4f.copyTo(dest: Matrix4f): Matrix4f = dest.set(
     m00, m01, m02, m03,
     m10, m11, m12, m13,
     m20, m21, m22, m23,

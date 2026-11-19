@@ -2,51 +2,46 @@ package ru.hollowhorizon.hollowengine.common.vfx
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
-import ru.hollowhorizon.hollowengine.common.models.ConditionalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
  * An effect attached to bone, authored in the rig editor.
  */
 @Serializable
+@Registerable
+@Syncable
 @SerialName("hollowengine:rig/vfx")
-data class VfxBoneAttachmentSpec(
+@EditorName("hollowengine.gui.rig_editor.kind_vfx")
+@EditorIcon("hollowengine:textures/gui/icons/files/effect.svg")
+@Attach(SceneObject::class)
+data class VfxComponent(
     @EditorHidden
-    override val id: String = "vfx",
+    val id: String = "vfx",
     @EditorName("hollowengine.gui.vfx.effect")
     @EditorAsset(".vfx")
     val effect: String = "",
-    @EditorName("hollowengine.gui.vfx.spawn_offset")
-    override val offset: Vec3f = Vec3f.ZERO,
-    @EditorName("hollowengine.gui.vfx.rotation")
-    override val rotation: Vec3f = Vec3f.ZERO,
-    @EditorName("hollowengine.gui.vfx.scale")
-    override val scale: Float = 1f,
     /** Whether it starts as soon as the model is drawn; otherwise a script starts it. */
     @EditorName("hollowengine.gui.vfx.auto_play")
     @EditorNotAnimated
     val autoPlay: Boolean = true,
+    /** A blank condition always emits. Conditions are evaluated against the host when it exists. */
     @EditorName("hollowengine.gui.vfx.active_while")
     @EditorDescription("hollowengine.gui.vfx.active_while.hint")
     @EditorWidget(EditorWidgets.ANIMATION_EXPRESSION)
     @EditorNotAnimated
-    override val activeWhile: AnimationExpression = AnimationExpression(""),
+    val activeWhile: AnimationExpression = AnimationExpression(""),
     @EditorHidden
     val ownEffect: VfxEffect? = null,
     @EditorHidden
     @EditorNotAnimated
     val emitting: Boolean = true,
-) : RigAttachmentSpec(), PlacedAttachmentSpec, ConditionalAttachmentSpec {
-    override fun withId(id: String) = copy(id = id)
+)
 
-    override fun placedAt(offset: Vec3f, rotation: Vec3f, scale: Float) = copy(offset = offset, rotation = rotation, scale = scale)
-
-    /** The running effect takes every change in place. */
-    override fun structure() = VfxBoneAttachmentSpec(id)
-
-    override fun held() = copy(emitting = false)
-}
+@Deprecated("Use VfxComponent")
+typealias VfxBoneAttachmentSpec = VfxComponent

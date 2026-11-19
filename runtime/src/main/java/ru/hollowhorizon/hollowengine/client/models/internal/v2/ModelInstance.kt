@@ -29,6 +29,8 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
     val animator = ModelAnimator()
     private val grounding = RigGroundingState()
     private var posedFrame = Long.MIN_VALUE
+    internal var componentAnimation: AnimatorEvaluationContext? = null
+        private set
 
     /** Whether the model has been posed at least once, so its nodes and bounds mean something. */
     val hasPose: Boolean get() = posedFrame != Long.MIN_VALUE
@@ -121,12 +123,14 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         if (attachment.sceneRoot.isRemoved) return
         if (posedFrame == frame) return
         posedFrame = frame
+        componentAnimation = null
         if (isSettled()) {
             if (settledSceneRevision != attachment.sceneRevision || settledParentRevision != attachment.parentRevision) {
                 attachment.refreshScenePose()
                 settledSceneRevision = attachment.sceneRevision
                 settledParentRevision = attachment.parentRevision
             }
+            if (attachment.readsComponentAnimation) componentAnimation = context
             return
         }
 
@@ -137,7 +141,7 @@ class ModelInstance(val attachment: ModelAttachment, private val valid: () -> Bo
         attachment.beginPose()
         animator.applyTo(attachment, context)
         layMontages(context)
-        attachment.evaluateConditions(context)
+        if (attachment.readsComponentAnimation) componentAnimation = context
         attachment.applyRigPose()
         attachment.applyRigConstraints(context, grounding)
         attachment.endPose()

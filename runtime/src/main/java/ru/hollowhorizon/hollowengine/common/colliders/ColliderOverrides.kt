@@ -6,6 +6,7 @@ import net.minecraft.world.damagesource.DamageSource
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.HitResult
 import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.api.Syncable
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
@@ -23,6 +24,7 @@ private const val RIG_LANG = "hollowengine.gui.rig_editor.collider"
  * and sent to the clients, which aim at the colliders and bump into them themselves.
  */
 @Registerable
+@Attach(Entity::class)
 @Syncable
 @Serializable
 @SerialName("hollowengine:entity/colliders")

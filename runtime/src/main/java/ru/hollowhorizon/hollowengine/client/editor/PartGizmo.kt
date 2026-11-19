@@ -7,12 +7,9 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
-import ru.hollowhorizon.hollowengine.common.models.PlacedAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.RigPose
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.*
-import kotlin.math.abs
 
 /**
  * A part of an entity's model under the gizmo: a bone, or something placed on one.
@@ -20,10 +17,18 @@ import kotlin.math.abs
 internal sealed class PartGizmo(
     val entity: Entity,
     private val modelTransform: TransformComponent,
-    val editing: RigEditing,
+    private val editing: RigEditing?,
     val key: String,
 ) {
     abstract val label: String
+
+    fun beginGesture() {
+        if (editing != null) editing.beginGesture() else WorldHistory.history.begin()
+    }
+
+    fun endGesture() {
+        if (editing != null) editing.endGesture() else WorldHistory.history.commit()
+    }
 
     /** The part in the world, [partialTick] into the tick. */
     fun worldTransform(partialTick: Float): TrsTransformF = decompose(worldMatrix(partialTick))
@@ -66,9 +71,9 @@ internal class BoneGizmo(
     private val model: ModelAttachment,
     private val node: RenderModelNode,
     modelTransform: TransformComponent,
-    editing: RigEditing,
+    private val rigEditing: RigEditing,
     key: String,
-) : PartGizmo(entity, modelTransform, editing, key) {
+) : PartGizmo(entity, modelTransform, rigEditing, key) {
     val bone: String get() = node.name
 
     override val label: String get() = bone
@@ -89,45 +94,18 @@ internal class BoneGizmo(
             rotation = MutableQuatF(animatedRotation.inverted()).mul(relative.rotation).norm(),
             scale = Vec3f(relative.scale) / animatedScale,
         )
-        editing.edit(mergeKey = "pose:$bone", label = UndoLabel("${UndoLabel.LANG}.rig.pose", bone)) { rig -> rig.withBone(bone, rig.holder(bone).copy(pose = pose.takeUnless(RigPose::isIdentity))) }
+        rigEditing.edit(mergeKey = "pose:$bone", label = UndoLabel("${UndoLabel.LANG}.rig.pose", bone)) { rig -> rig.withBone(bone, rig.holder(bone).copy(pose = pose.takeUnless(RigPose::isIdentity))) }
     }
 }
 
-/**
- * A nested model or an effect hung as [attachmentId] on [bone], null being the model itself; [holder] is the
- * node it hangs on as drawn. Its scale is one number, so a drag along one axis scales it evenly.
- */
-internal class AttachmentGizmo(
+internal class SceneNodeGizmo(
     entity: Entity,
-    private val holder: RenderModelNode,
-    modelTransform: TransformComponent,
-    editing: RigEditing,
-    private val bone: String?,
-    private val attachmentId: String,
+    private val node: SceneObject,
+    private val write: (TrsTransformF) -> Unit,
     key: String,
-) : PartGizmo(entity, modelTransform, editing, key) {
-    override val label: String get() = attachmentId
-
-    private val spec: PlacedAttachmentSpec?
-        get() = editing.occupied.holder(bone).attachment(attachmentId) as? PlacedAttachmentSpec
-
-    /** The decal this part is, or null when it is something else. */
-    val decal: DecalSpec? get() = (spec as? DecalAttachmentSpec)?.decal
-
-    override fun local(): Mat4f {
-        val placed = spec?.localTransform() ?: return holder.globalMatrix
-        return holder.globalMatrix.mul(placed.matrixF, MutableMat4f())
-    }
-
-    override fun parent(): Mat4f = holder.globalMatrix
-
-    override fun place(relative: TrsTransformF) {
-        val current = spec ?: return
-        val scale = Vec3f(relative.scale)
-        val uniform = listOf(scale.x, scale.y, scale.z).maxBy { abs(it - current.scale) }
-        val placed = current.placedAt(Vec3f(relative.translation), QuatF(relative.rotation).eulerDegreesXyz(), uniform)
-        editing.edit(mergeKey = "place:${bone.orEmpty()}/$attachmentId", label = UndoLabel("${UndoLabel.LANG}.rig.place", attachmentId)) { rig ->
-            rig.withHolder(bone, rig.holder(bone).withAttachment(placed))
-        }
-    }
+) : PartGizmo(entity, TransformComponent(), null, key) {
+    override val label: String get() = node.name
+    override fun local(): Mat4f = node.worldTransform
+    override fun parent(): Mat4f = node.parent?.worldTransform ?: Mat4f.IDENTITY
+    override fun place(relative: TrsTransformF) = write(relative)
 }

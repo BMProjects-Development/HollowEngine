@@ -4,7 +4,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import net.minecraft.resources.ResourceLocation
-import ru.hollowhorizon.hollowengine.common.attachments.api.Component
 import ru.hollowhorizon.hollowengine.common.registry.system.MutableRegistry
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryManager
 import ru.hollowhorizon.hollowengine.common.registry.system.RegistryState
@@ -96,12 +95,12 @@ object ComponentDescriptorRegistry :
         descriptorOrNull(component::class)?.persistencePolicy == ComponentPersistencePolicy.LOOSE_ON_DEATH
 
     fun serializersModule(): SerializersModule = SerializersModule {
-        polymorphic(Component::class) {
+        polymorphic(Any::class) {
             ComponentDescriptorRegistry.map { it.value }.forEach { descriptor ->
                 @Suppress("UNCHECKED_CAST")
                 subclass(
-                    descriptor.value as KClass<Component>,
-                    descriptor.serializer as KSerializer<Component>
+                    descriptor.value as KClass<Any>,
+                    descriptor.serializer as KSerializer<Any>
                 )
             }
         }
