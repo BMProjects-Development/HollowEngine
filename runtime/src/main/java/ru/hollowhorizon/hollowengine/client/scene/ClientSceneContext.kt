@@ -1,105 +1,42 @@
 package ru.hollowhorizon.hollowengine.client.scene
 
 import net.minecraft.client.renderer.LightTexture
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.phys.Vec3
-import org.joml.Matrix4dc
 import org.joml.Matrix4fc
-import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
-import ru.hollowhorizon.hollowengine.common.scene.ComponentLifecycle
 import ru.hollowhorizon.hollowengine.common.scene.ComponentActivity
 import ru.hollowhorizon.hollowengine.common.scene.ComponentOwner
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
-import java.util.*
+import java.util.UUID
 import kotlin.reflect.KClass
 
-/** Submits draw data for the current view. Collection leaves the component's playback state unchanged. */
-fun interface RenderComponent {
-    fun collect(sceneToView: Matrix4fc)
+/** One client-side system instance handles all bindings of its registered type in a scene. */
+fun interface SceneComponentSystem {
+    /**
+     * Starts work on activation, pauses on suspension and releases resources on removal.
+     * The system reads current component data from [binding] when it needs it.
+     */
+    fun onStateChanged(binding: SceneComponentKey, state: ComponentActivity)
 }
 
-internal fun interface SceneComponentSystem {
-    fun activity(owner: SceneObject, id: UUID, activity: ComponentActivity)
-}
-
-internal interface SceneDrawSystem : SceneComponentSystem {
+/** Submits draw data without advancing simulation. A frame may collect several views. */
+interface SceneDrawSystem : SceneComponentSystem {
     val hasDraws: Boolean
     fun collect(sceneToView: Matrix4fc, light: Int)
 }
 
-/** Optional client update, run after the scene has applied its pose. */
-interface ClientComponent : ComponentLifecycle {
-    val requiresAnimationVariables: Boolean get() = false
-    fun update(frame: ComponentUpdate)
-}
-
-/** Inputs borrowed from the host for the duration of one update. */
-sealed interface ComponentUpdate {
-    class World internal constructor() : ComponentUpdate {
-        lateinit var sceneToWorld: Matrix4dc
-            internal set
-        lateinit var entity: Entity
-            internal set
-        lateinit var camera: Vec3
-            internal set
-        var animation: AnimatorEvaluationContext? = null
-            internal set
-    }
-
-    class Preview internal constructor() : ComponentUpdate {
-        var effectTime: Float? = null
-            internal set
-        var effectEmitting: ((bone: String?, id: String, time: Float) -> Boolean)? = null
-            internal set
-    }
-}
-
 class ClientSceneContext : SceneContext {
     override val side = LogicalSide.CLIENT
-    private var renderers: MutableSet<RenderComponent>? = null
-    private var updates: MutableSet<ClientComponent>? = null
-    private var world: ComponentUpdate.World? = null
-    private var preview: ComponentUpdate.Preview? = null
     private var systems: MutableMap<KClass<*>, SceneComponentSystem>? = null
     private var drawSystems: MutableList<SceneDrawSystem>? = null
 
-    internal val hasDrawSystems: Boolean get() = drawSystems?.any { it.hasDraws } == true
-    val hasDraws: Boolean get() = !renderers.isNullOrEmpty() || hasDrawSystems
-    val hasUpdates: Boolean get() = !updates.isNullOrEmpty()
-    val needsAnimationVariables: Boolean get() = updates?.any { it.requiresAnimationVariables } == true
+    val hasDraws: Boolean get() = drawSystems?.any { it.hasDraws } == true
 
-    override fun createLifecycle(owner: ComponentOwner, id: UUID, value: Any): ComponentLifecycle? =
-        super.createLifecycle(owner, id, value) ?: (owner as? SceneObject)?.let {
-            factories[value::class]?.invoke(
-                it,
-                id,
-                value
-            )
-        }
-
-    override fun onLifecycleActivityChanged(lifecycle: ComponentLifecycle, active: Boolean) {
-        if (active) {
-            if (lifecycle is RenderComponent) {
-                val draws = renderers ?: LinkedHashSet<RenderComponent>().also { renderers = it }
-                draws.add(lifecycle)
-            }
-            if (lifecycle is ClientComponent) {
-                val updatables = updates ?: LinkedHashSet<ClientComponent>().also { updates = it }
-                updatables.add(lifecycle)
-            }
-        } else {
-            if (lifecycle is RenderComponent) renderers?.remove(lifecycle)
-            if (lifecycle is ClientComponent) updates?.remove(lifecycle)
-        }
-    }
-
-    override fun onComponentActivity(owner: ComponentOwner, id: UUID, value: Any, activity: ComponentActivity) {
+    override fun onComponentStateChanged(owner: ComponentOwner, id: UUID, value: Any, state: ComponentActivity) {
         if (owner !is SceneObject) return
         val type = value::class
         val system = systems?.get(type) ?: run {
-            if (activity != ComponentActivity.ACTIVE) return
+            if (state != ComponentActivity.ACTIVE) return
             val create = systemFactories[type] ?: return
             val entries = systems ?: HashMap<KClass<*>, SceneComponentSystem>().also { systems = it }
             create().also {
@@ -110,66 +47,28 @@ class ClientSceneContext : SceneContext {
                 }
             }
         }
-        system.activity(owner, id, activity)
+        system.onStateChanged(SceneComponentKey(owner, id), state)
     }
 
-    internal fun systemFor(type: KClass<*>): SceneComponentSystem? = systems?.get(type)
-
-    fun updateWorld(
-        sceneToWorld: Matrix4dc,
-        entity: Entity,
-        camera: Vec3,
-        animation: AnimatorEvaluationContext?,
-    ) {
-        if (!hasUpdates) return
-        val frame = world ?: ComponentUpdate.World().also { world = it }
-        frame.sceneToWorld = sceneToWorld
-        frame.entity = entity
-        frame.camera = camera
-        frame.animation = animation
-        try {
-            for (component in updates.orEmpty()) component.update(frame)
-        } finally {
-            frame.animation = null
-        }
-    }
+    /** Returns the system initialized for [type] in this scene, if any binding has activated it. */
+    fun systemFor(type: KClass<*>): SceneComponentSystem? = systems?.get(type)
 
     fun collect(sceneToView: Matrix4fc, light: Int = LightTexture.FULL_BRIGHT) {
-        for (renderer in renderers.orEmpty()) renderer.collect(sceneToView)
-        for (system in drawSystems.orEmpty()) system.collect(sceneToView, light)
-    }
-
-    fun updatePreview(
-        effectTime: Float?,
-        effectEmitting: ((bone: String?, id: String, time: Float) -> Boolean)?,
-    ) {
-        if (!hasUpdates) return
-        val frame = preview ?: ComponentUpdate.Preview().also { preview = it }
-        frame.effectTime = effectTime
-        frame.effectEmitting = effectEmitting
-        try {
-            for (component in updates.orEmpty()) component.update(frame)
-        } finally {
-            frame.effectEmitting = null
+        for (system in drawSystems.orEmpty()) {
+            if (system.hasDraws) system.collect(sceneToView, light)
         }
     }
 
     companion object {
-        private val factories = HashMap<KClass<*>, (SceneObject, UUID, Any) -> ComponentLifecycle>()
         private val systemFactories = HashMap<KClass<*>, () -> SceneComponentSystem>()
 
-        internal fun registerSystem(type: KClass<*>, create: () -> SceneComponentSystem): AutoCloseable {
+        /**
+         * Registers a factory on the client thread before creating scenes that use [type].
+         * Closing the registration removes the factory. Existing scenes retain their systems until they close.
+         */
+        fun registerSystem(type: KClass<*>, create: () -> SceneComponentSystem): AutoCloseable {
             require(systemFactories.putIfAbsent(type, create) == null) { "Duplicate scene system for ${type.simpleName}" }
             return AutoCloseable { systemFactories.remove(type, create) }
-        }
-
-        fun <T : Any> register(type: KClass<T>, create: (SceneObject, UUID, T) -> ComponentLifecycle): AutoCloseable {
-            require(type !in factories) { "Duplicate client runtime for ${type.simpleName}" }
-            val factory: (SceneObject, UUID, Any) -> ComponentLifecycle = { owner, id, value ->
-                create(owner, id, type.java.cast(value))
-            }
-            factories[type] = factory
-            return AutoCloseable { factories.remove(type, factory) }
         }
     }
 }

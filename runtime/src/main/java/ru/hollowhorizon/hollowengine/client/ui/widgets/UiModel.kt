@@ -312,7 +312,7 @@ class ModelViewerState(model: String) : OrbitCamera {
             animationContext.variables[animationWeightVariables[index]] = animationWeights[animations[index].name] ?: 0f
         }
         instance.update(animationContext)
-        attachment.updatePreviewComponents(playsSounds, effectClock?.invoke(), effectEmitting)
+        attachment.updatePreviewSystems(playsSounds, effectClock?.invoke(), effectEmitting)
 
         GL33.glDepthFunc(GL33.GL_LEQUAL)
 

@@ -7,8 +7,6 @@ import ru.hollowhorizon.hollowengine.client.scene.SceneDrawSystem
 import ru.hollowhorizon.hollowengine.client.utils.math.copyTo
 import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.scene.ComponentActivity
-import ru.hollowhorizon.hollowengine.common.scene.SceneObject
-import java.util.UUID
 
 /** Collects decal data from active bindings. Projection and textures belong to the renderer. */
 internal class SceneDecals : SceneDrawSystem {
@@ -16,16 +14,15 @@ internal class SceneDecals : SceneDrawSystem {
 
     override val hasDraws: Boolean get() = active.isNotEmpty()
 
-    override fun activity(owner: SceneObject, id: UUID, activity: ComponentActivity) {
-        val binding = SceneComponentKey(owner, id)
-        if (activity == ComponentActivity.ACTIVE) active.add(binding) else active.remove(binding)
+    override fun onStateChanged(binding: SceneComponentKey, state: ComponentActivity) {
+        if (state == ComponentActivity.ACTIVE) active.add(binding) else active.remove(binding)
     }
 
     override fun collect(sceneToView: Matrix4fc, light: Int) {
         for (binding in active) {
             val node = binding.owner
             if (!node.modelVisible) continue
-            val decal = node.component(binding.id) as? Decal ?: continue
+            val decal = binding.value as? Decal ?: continue
             Decals.submitComponent(binding) { capturing ->
                 val placement = node.worldTransform.copyTo(Matrix4f()).mulLocal(sceneToView)
                 val key = if (capturing) {

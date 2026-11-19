@@ -25,6 +25,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipe
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticSubmissions
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.submitStatic
 import ru.hollowhorizon.hollowengine.client.sounds.sounds
+import ru.hollowhorizon.hollowengine.client.vfx.vfx
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.rigId
@@ -161,12 +162,12 @@ class ModelAttachment(
     private var rigCarriesEffects = false
     val carriesEffects: Boolean get() = renderScene.clientContext?.hasDraws == true || rigCarriesEffects
 
-    internal fun updatePreviewComponents(
+    internal fun updatePreviewSystems(
         playSounds: Boolean, effectTime: Float?, effectEmitting: ((String?, String, Float) -> Boolean)?,
     ) {
         val context = renderScene.clientContext ?: return
         context.sounds?.updateAudition(playSounds)
-        context.updatePreview(effectTime, effectEmitting)
+        context.vfx?.updatePreview(effectTime, effectEmitting)
     }
 
     val triangles get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.positionsCount / 3 } ?: 0 }
@@ -328,16 +329,16 @@ class ModelAttachment(
         }
     }
 
-    internal val hasComponentUpdates: Boolean
-        get() = renderScene.clientContext?.let { it.hasUpdates || it.sounds?.hasActive == true } == true
-    internal val readsComponentAnimation: Boolean get() = renderScene.clientContext?.needsAnimationVariables == true
+    internal val hasWorldSystemUpdates: Boolean
+        get() = renderScene.clientContext?.let { it.vfx?.hasDraws == true || it.sounds?.hasActive == true } == true
+    internal val readsEffectAnimation: Boolean get() = renderScene.clientContext?.vfx?.needsAnimationVariables == true
 
     internal fun updateSpatialAudio(modelToWorld: Matrix4dc, entity: Entity, frame: Long) {
         renderScene.clientContext?.sounds?.updateSpatial(modelToWorld, entity, instanceId, frame)
     }
 
-    internal fun updateWorldComponents(modelToWorld: Matrix4dc, entity: Entity, camera: Vec3, animation: AnimatorEvaluationContext?) {
-        renderScene.clientContext?.updateWorld(modelToWorld, entity, camera, animation)
+    internal fun updateWorldEffects(modelToWorld: Matrix4dc, camera: Vec3, animation: AnimatorEvaluationContext?) {
+        renderScene.clientContext?.vfx?.updateWorld(modelToWorld, camera, animation)
     }
 
     /**

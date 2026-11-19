@@ -10,27 +10,68 @@ import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorExpressionEvaluator
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
-import ru.hollowhorizon.hollowengine.client.scene.ClientComponent
-import ru.hollowhorizon.hollowengine.client.scene.ComponentUpdate
-import ru.hollowhorizon.hollowengine.client.scene.RenderComponent
+import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
+import ru.hollowhorizon.hollowengine.client.scene.SceneComponentKey
+import ru.hollowhorizon.hollowengine.client.scene.SceneDrawSystem
 import ru.hollowhorizon.hollowengine.client.utils.math.copyTo
-import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scene.ComponentActivity
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
 
-/**
- * Playback state for one attached effect.
- */
-private class VfxBoundEffect(private var asset: String, private var own: VfxEffect? = null) {
+internal val ClientSceneContext.vfx: SceneVfx?
+    get() = systemFor(VfxComponent::class) as? SceneVfx
+
+/** Owns playback for all VFX bindings in a scene. */
+internal class SceneVfx : SceneDrawSystem {
+    private val effects = HashMap<SceneComponentKey, VfxBoundEffect>()
+    private val active = LinkedHashSet<VfxBoundEffect>()
+
+    override val hasDraws: Boolean get() = active.isNotEmpty()
+    val needsAnimationVariables: Boolean get() = active.any { it.needsAnimationVariables }
+
+    override fun onStateChanged(binding: SceneComponentKey, state: ComponentActivity) {
+        when (state) {
+            ComponentActivity.ACTIVE -> active.add(effects.getOrPut(binding) { VfxBoundEffect(binding) })
+            ComponentActivity.SUSPENDED -> effects[binding]?.let {
+                active.remove(it)
+                it.pause()
+            }
+
+            ComponentActivity.REMOVED -> effects.remove(binding)?.let { active.remove(it) }
+        }
+    }
+
+    fun updateWorld(sceneToWorld: Matrix4dc, camera: Vec3, animation: AnimatorEvaluationContext?) {
+        for (effect in active) effect.updateWorld(sceneToWorld, camera, animation)
+    }
+
+    fun updatePreview(seconds: Float?, emittingAt: ((bone: String?, id: String, time: Float) -> Boolean)?) {
+        for (effect in active) effect.updatePreview(seconds, emittingAt)
+    }
+
+    override fun collect(sceneToView: Matrix4fc, light: Int) {
+        for (effect in active) effect.collect(sceneToView)
+    }
+}
+
+private class VfxBoundEffect(private val key: SceneComponentKey) {
+    private val node get() = key.owner
+    private val value get() = key.value as? VfxComponent
+    private var asset = ""
+    private var own: VfxEffect? = null
+    private val local = Matrix4f()
+    private var worldPlacement: Matrix4d? = null
 
     private var lastGameTime = Float.NaN
     private var simulationFrame = Long.MIN_VALUE
 
-    var binding: VfxBoneBinding? = null
-        private set
+    private var binding: VfxBoneBinding? = null
 
-    /** Whether the effect makes particles; otherwise it is held, and what it made lives out its lifetime. */
-    var emitting: Boolean = true
+    private var emitting = true
+    private var conditionMet = true
+
+    val needsAnimationVariables: Boolean
+        get() = node.modelVisible && value?.activeWhile?.source?.isNotBlank() == true
 
     fun pause() {
         lastGameTime = Float.NaN
@@ -38,14 +79,53 @@ private class VfxBoundEffect(private var asset: String, private var own: VfxEffe
     }
 
     /** Advance once even if the level prepares several views of the same scene in a frame. */
-    fun advanceWorld(cameraPosition: Vec3, transform: Matrix4dc) {
+    fun updateWorld(sceneToWorld: Matrix4dc, camera: Vec3, animation: AnimatorEvaluationContext?) {
+        val spec = playableValue() ?: return pause()
         val frame = TickHandler.renderFrame
         if (simulationFrame == frame) return
         simulationFrame = frame
-        advance(cameraPosition, Vec3(transform.m30(), transform.m31(), transform.m32()), null, TickHandler.gameTime)
+
+        use(spec.effect, spec.ownEffect)
+        val condition = spec.activeWhile.source
+        if (condition.isBlank()) conditionMet = true
+        else if (animation != null) {
+            conditionMet = animation.entity == null || AnimatorExpressionEvaluator.condition(condition, animation)
+        }
+        emitting = spec.emitting && conditionMet
+        val placement = worldPlacement ?: Matrix4d().also { worldPlacement = it }
+        placement.set(sceneToWorld).mul(node.worldTransform.copyTo(local))
+        val origin = Vec3(placement.m30(), placement.m31(), placement.m32())
+        advance(camera, origin, null, TickHandler.gameTime)
     }
 
-    fun advance(
+    fun updatePreview(seconds: Float?, emittingAt: ((bone: String?, id: String, time: Float) -> Boolean)?) {
+        val spec = playableValue() ?: return pause()
+        use(spec.effect, spec.ownEffect)
+        emitting = spec.emitting
+        node.worldTransform.copyTo(local)
+        val origin = Vec3(local.m30().toDouble(), local.m31().toDouble(), local.m32().toDouble())
+        if (seconds == null) {
+            val now = (System.nanoTime() - PreviewEpoch) / NANOS_PER_TICK
+            advance(Vec3.ZERO, origin, PreviewFloor, now)
+        } else {
+            val bone = node.modelSource?.let { node.poseName }
+            seek(origin, PreviewFloor, seconds) { at -> emittingAt?.invoke(bone, spec.id, at) ?: spec.emitting }
+        }
+    }
+
+    fun collect(sceneToView: Matrix4fc) {
+        val playing = binding ?: return
+        val spec = playableValue() ?: return
+        if (spec.effect != asset || spec.ownEffect != own) return
+        val placement = SceneVfxBindings.submit(playing) ?: return
+        node.worldTransform.copyTo(placement).mulLocal(sceneToView)
+    }
+
+    private fun playableValue() = value?.takeIf {
+        node.modelVisible && it.autoPlay && (it.effect.isNotBlank() || it.ownEffect != null)
+    }
+
+    private fun advance(
         cameraPosition: Vec3,
         origin: Vec3,
         environment: VfxEnvironment?,
@@ -72,7 +152,7 @@ private class VfxBoundEffect(private var asset: String, private var own: VfxEffe
      * Puts the effect where it is [seconds] into a clock it does not keep, as a preview does that follows a
      * timeline; see [VfxInstance.seek]. [emittingAt] says when on that clock the effect makes particles.
      */
-    fun seek(origin: Vec3, environment: VfxEnvironment, seconds: Float, emittingAt: (Float) -> Boolean) {
+    private fun seek(origin: Vec3, environment: VfxEnvironment, seconds: Float, emittingAt: (Float) -> Boolean) {
         val playing = binding?.instance ?: create(environment)?.also { played = 0f } ?: return
         val now = seconds * TICKS_PER_SECOND
         place(playing, Vec3.ZERO, origin, now, now.mod(1f))
@@ -97,7 +177,7 @@ private class VfxBoundEffect(private var asset: String, private var own: VfxEffe
      * Plays [asset], or [own] in its place, from now on. A change that only moves or switches nodes keeps the
      * running effect; any other starts it over.
      */
-    fun use(asset: String, own: VfxEffect?) {
+    private fun use(asset: String, own: VfxEffect?) {
         if (asset == this.asset && own == this.own) return
         val playing = binding?.instance
         val next = own ?: VfxAssets[asset]
@@ -120,80 +200,6 @@ private class VfxBoundEffect(private var asset: String, private var own: VfxEffe
     }
 }
 
-/** An effect attached to a spatial object. */
-internal class SceneVfx(
-    private val node: SceneObject,
-    private var spec: VfxComponent,
-) : ClientComponent, RenderComponent {
-    private var enabled = false
-
-    private val effect = VfxBoundEffect(spec.effect, spec.ownEffect).also { it.emitting = spec.emitting }
-    private val local = Matrix4f()
-    private var worldPlacement: Matrix4d? = null
-
-    /** Whether the condition of the attachment held at the last frame; see [VfxComponent.activeWhile]. */
-    private var active = true
-
-    override fun activate() { enabled = true }
-
-    override fun suspend() {
-        enabled = false
-        effect.pause()
-    }
-
-    override fun change(value: Any) {
-        spec = value as VfxComponent
-        effect.use(spec.effect, spec.ownEffect)
-        if (spec.activeWhile.source.isBlank()) active = true
-        effect.emitting = spec.emitting && active
-        if (!spec.autoPlay) effect.pause()
-    }
-
-    override val requiresAnimationVariables: Boolean
-        get() = enabled && node.modelVisible && spec.activeWhile.source.isNotBlank()
-
-    private fun evaluate(context: AnimatorEvaluationContext) {
-        active = context.entity == null || AnimatorExpressionEvaluator.condition(spec.activeWhile.source, context)
-        effect.emitting = spec.emitting && active
-    }
-
-    override fun update(frame: ComponentUpdate) {
-        if (!isPlaying()) {
-            effect.pause()
-            return
-        }
-        val transform = node.worldTransform.copyTo(local)
-        when (frame) {
-            is ComponentUpdate.World -> {
-                if (requiresAnimationVariables) frame.animation?.let(::evaluate)
-                val placement = worldPlacement ?: Matrix4d().also { worldPlacement = it }
-                effect.advanceWorld(frame.camera, placement.set(frame.sceneToWorld).mul(transform))
-            }
-            is ComponentUpdate.Preview -> {
-                effect.emitting = spec.emitting
-                val origin = Vec3(transform.m30().toDouble(), transform.m31().toDouble(), transform.m32().toDouble())
-                val seconds = frame.effectTime
-                if (seconds == null) {
-                    val now = (System.nanoTime() - PreviewEpoch) / NANOS_PER_TICK
-                    effect.advance(Vec3.ZERO, origin, PreviewFloor, now)
-                } else effect.seek(origin, PreviewFloor, seconds) { at ->
-                    frame.effectEmitting?.invoke(node.modelSource?.let { node.poseName }, spec.id, at) ?: spec.emitting
-                }
-            }
-        }
-    }
-
-    override fun collect(sceneToView: Matrix4fc) {
-        if (!isPlaying()) return
-        val binding = effect.binding ?: return
-        if (SceneVfxBindings.submit(binding)) {
-            node.worldTransform.copyTo(binding.placement).mulLocal(sceneToView)
-        }
-    }
-
-    private fun isPlaying() = enabled && node.modelVisible && spec.autoPlay && (spec.effect.isNotBlank() || spec.ownEffect != null)
-}
-
 /** One placed effect, already advanced, with the matrix that places it in front of the camera. */
 class VfxBoneBinding(val instance: VfxInstance, val placement: Matrix4f)
 
@@ -204,20 +210,32 @@ internal object SceneVfxBindings {
     private val submitted = LinkedHashSet<VfxBoneBinding>()
     private val bindings = ArrayList<VfxBoneBinding>()
 
-    /** Where effects go while a preview draws a model, instead of to the world. */
-    private var captured: MutableList<VfxBoneBinding>? = null
+    private class Capture(val draws: MutableList<VfxBoneBinding>) {
+        val submitted = HashSet<VfxBoneBinding>()
+    }
 
-    fun submit(source: VfxBoneBinding): Boolean {
+    private var captured: Capture? = null
+
+    /** Returns the matrix for this submission, or null when this view already has the effect. */
+    fun submit(source: VfxBoneBinding): Matrix4f? {
         val into = captured
-        return if (into != null) {
-            if (source in into) false else into.add(source)
-        } else RenderManager.isWorldPass && !RenderManager.isShadowPass && submitted.add(source)
+        if (into != null) {
+            if (!into.submitted.add(source)) return null
+            val placement = Matrix4f()
+            into.draws += VfxBoneBinding(source.instance, placement)
+            return placement
+        }
+        return source.placement.takeIf {
+            RenderManager.isWorldPass && !RenderManager.isShadowPass && submitted.add(
+                source
+            )
+        }
     }
 
     /** Runs [draw], keeping the effects submitted meanwhile in [into], for a preview that draws them itself. */
     fun <T> capturing(into: MutableList<VfxBoneBinding>, draw: () -> T): T {
         val previous = captured
-        captured = into
+        captured = Capture(into)
         try {
             return draw()
         } finally {

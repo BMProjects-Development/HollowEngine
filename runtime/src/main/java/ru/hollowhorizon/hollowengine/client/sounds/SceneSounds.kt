@@ -11,9 +11,7 @@ import ru.hollowhorizon.hollowengine.client.scene.SceneComponentKey
 import ru.hollowhorizon.hollowengine.client.scene.SceneComponentSystem
 import ru.hollowhorizon.hollowengine.client.utils.math.copyTo
 import ru.hollowhorizon.hollowengine.common.scene.ComponentActivity
-import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.sounds.*
-import java.util.*
 
 internal val ClientSceneContext.sounds: SceneSounds?
     get() = systemFor(Sound::class) as? SceneSounds
@@ -26,16 +24,15 @@ internal class SceneSounds : SceneComponentSystem {
 
     val hasActive: Boolean get() = active.isNotEmpty()
 
-    override fun activity(owner: SceneObject, id: UUID, activity: ComponentActivity) {
-        val key = SceneComponentKey(owner, id)
-        when (activity) {
-            ComponentActivity.ACTIVE -> active.add(voices.getOrPut(key) { Voice(key) })
-            ComponentActivity.SUSPENDED -> voices[key]?.let {
+    override fun onStateChanged(binding: SceneComponentKey, state: ComponentActivity) {
+        when (state) {
+            ComponentActivity.ACTIVE -> active.add(voices.getOrPut(binding) { Voice(binding) })
+            ComponentActivity.SUSPENDED -> voices[binding]?.let {
                 active.remove(it)
                 it.pause()
             }
 
-            ComponentActivity.REMOVED -> voices.remove(key)?.let {
+            ComponentActivity.REMOVED -> voices.remove(binding)?.let {
                 active.remove(it)
                 it.close()
             }
@@ -73,7 +70,7 @@ internal class SceneSounds : SceneComponentSystem {
     }
 
     private class Voice(val key: SceneComponentKey) : AutoCloseable {
-        val value: Sound? get() = key.owner.component(key.id) as? Sound
+        val value: Sound? get() = key.value as? Sound
         private val sound = SyncedSound()
         private var parsed: Pair<String, SoundSource?>? = null
         private var positional: SoundAttachments.Binding? = null

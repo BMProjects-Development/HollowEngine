@@ -2,7 +2,6 @@ package ru.hollowhorizon.hollowengine.client.scene
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.LevelRenderer
-import net.minecraft.client.renderer.LightTexture
 import org.joml.Matrix4d
 import org.joml.Matrix4f
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
@@ -11,6 +10,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animator.fillAnimati
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.sounds.sounds
 import ru.hollowhorizon.hollowengine.client.ui.ide.preview.WorldCameraPreviewRenderer
+import ru.hollowhorizon.hollowengine.client.vfx.vfx
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjects
 import ru.hollowhorizon.hollowengine.common.events.client.render.RenderLevelStageEvent
 
@@ -26,16 +26,17 @@ internal object WorldObjectComponents {
             val root = entity.sceneObjectOrNull ?: continue
             val context = root.scene.context as? ClientSceneContext ?: continue
             val sounds = if (updateAudio) context.sounds else null
-            if (!context.hasUpdates && sounds?.hasActive != true) continue
+            val vfx = context.vfx
+            if (vfx?.hasDraws != true && sounds?.hasActive != true) continue
             val pose = entity.pose(event.partialTick)
             val position = pose.position
             sceneToWorld.translation(position.x, position.y, position.z).rotate(pose.rotation)
                 .scale(pose.scale.x.toDouble(), pose.scale.y.toDouble(), pose.scale.z.toDouble())
-            val variables = if (context.needsAnimationVariables) {
+            val variables = if (vfx?.needsAnimationVariables == true) {
                 animation.also { fillAnimationVariables(it, entity, event.partialTick) }
             } else null
             sounds?.updateSpatial(sceneToWorld, entity, "object", TickHandler.renderFrame)
-            context.updateWorld(sceneToWorld, entity, event.camera.position, variables)
+            vfx?.updateWorld(sceneToWorld, event.camera.position, variables)
         }
     }
 
@@ -53,9 +54,7 @@ internal object WorldObjectComponents {
                 (position.y - camera.y).toFloat(),
                 (position.z - camera.z).toFloat(),
             ).rotate(pose.rotation).scale(pose.scale).mulLocal(view)
-            val light = if (context.hasDrawSystems) LevelRenderer.getLightColor(level, entity.blockPosition())
-            else LightTexture.FULL_BRIGHT
-            context.collect(placement, light)
+            context.collect(placement, LevelRenderer.getLightColor(level, entity.blockPosition()))
         }
     }
 }

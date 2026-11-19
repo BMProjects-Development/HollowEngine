@@ -45,11 +45,8 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
             if (!next) {
                 suspend(owner, id, context, failures)
             } else if (!failures.capture {
-                lifecycle?.let {
-                    it.activate()
-                    context.onLifecycleActivityChanged(it, true)
-                }
-                context.onComponentActivity(owner, id, data, ComponentActivity.ACTIVE)
+                lifecycle?.activate()
+                context.onComponentStateChanged(owner, id, data, ComponentActivity.ACTIVE)
             }) {
                 active = false
                 enabled = false
@@ -58,17 +55,14 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
         }
 
         private fun suspend(owner: ComponentOwner, id: UUID, context: SceneContext, failures: SceneFailures) {
-            lifecycle?.let { runtime ->
-                failures.capture { context.onLifecycleActivityChanged(runtime, false) }
-                failures.capture { runtime.suspend() }
-            }
-            failures.capture { context.onComponentActivity(owner, id, data, ComponentActivity.SUSPENDED) }
+            failures.capture { lifecycle?.suspend() }
+            failures.capture { context.onComponentStateChanged(owner, id, data, ComponentActivity.SUSPENDED) }
         }
 
         fun finish(owner: ComponentOwner, id: UUID, failures: SceneFailures) {
             refresh(owner, id, false, failures)
             failures.capture { lifecycle?.remove() }
-            failures.capture { owner.scene.context.onComponentActivity(owner, id, data, ComponentActivity.REMOVED) }
+            failures.capture { owner.scene.context.onComponentStateChanged(owner, id, data, ComponentActivity.REMOVED) }
         }
     }
 

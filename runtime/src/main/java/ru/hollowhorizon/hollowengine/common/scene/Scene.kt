@@ -12,8 +12,7 @@ interface SceneContext {
     fun <T : Any> capability(type: KClass<T>): T? = null
     fun createLifecycle(owner: ComponentOwner, id: UUID, value: Any): ComponentLifecycle? =
         (value as? ComponentBehavior)?.bind(owner, id)
-    fun onLifecycleActivityChanged(lifecycle: ComponentLifecycle, active: Boolean) = Unit
-    fun onComponentActivity(owner: ComponentOwner, id: UUID, value: Any, activity: ComponentActivity) = Unit
+    fun onComponentStateChanged(owner: ComponentOwner, id: UUID, value: Any, state: ComponentActivity) = Unit
 }
 
 enum class ComponentActivity { ACTIVE, SUSPENDED, REMOVED }

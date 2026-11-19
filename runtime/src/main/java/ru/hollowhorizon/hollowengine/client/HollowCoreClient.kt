@@ -42,7 +42,7 @@ object HollowCoreClient {
         RenderSystem.recordRenderCall(RenderManager::onInitialize)
         WorldObjectEntity.clientSceneContext = ::ClientSceneContext
         ClientSceneContext.registerSystem(Sound::class, ::SceneSounds)
-        ClientSceneContext.register(VfxComponent::class) { owner, _, value -> SceneVfx(owner, value) }
+        ClientSceneContext.registerSystem(VfxComponent::class, ::SceneVfx)
         ClientSceneContext.registerSystem(Decal::class, ::SceneDecals)
         UiPanelAttachment.register()
         NestedModelAttachment.register()

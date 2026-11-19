@@ -150,7 +150,7 @@ object RenderManager {
             if (!hidden && posesThisFrame(instance, host, culled)) {
                 instance.update(animationContext(host, partialTick, worldTransform))
             }
-            if (instance.attachment.hasComponentUpdates) {
+            if (instance.attachment.hasWorldSystemUpdates) {
                 val position = hostPosition(host, partialTick)
                 val rotation = hostRotation(host, partialTick)
                 val scale = hostScale(host, partialTick)
@@ -162,7 +162,7 @@ object RenderManager {
                     .rotate(componentRotation.set(local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w))
                     .scale(local.scale.x.toDouble(), local.scale.y.toDouble(), local.scale.z.toDouble())
                 if (updateAudio) instance.attachment.updateSpatialAudio(componentPlacement, host, TickHandler.renderFrame)
-                instance.attachment.updateWorldComponents(componentPlacement, host, event.camera.position, instance.componentAnimation)
+                instance.attachment.updateWorldEffects(componentPlacement, event.camera.position, instance.effectAnimation)
             }
 
             if (!culled) {

@@ -7,19 +7,20 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import ru.hollowhorizon.hollowengine.client.models.internal.NodeDefinition
 import ru.hollowhorizon.hollowengine.client.models.renderModel
-import ru.hollowhorizon.hollowengine.client.scene.ClientComponent
 import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
-import ru.hollowhorizon.hollowengine.client.scene.ComponentUpdate
-import ru.hollowhorizon.hollowengine.client.scene.RenderComponent
+import ru.hollowhorizon.hollowengine.client.scene.SceneComponentKey
+import ru.hollowhorizon.hollowengine.client.scene.SceneDrawSystem
 import ru.hollowhorizon.hollowengine.client.sounds.SceneSounds
 import ru.hollowhorizon.hollowengine.client.vfx.SceneVfx
 import ru.hollowhorizon.hollowengine.client.vfx.SceneVfxBindings
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBinding
+import ru.hollowhorizon.hollowengine.client.vfx.vfx
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptor
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigBone
+import ru.hollowhorizon.hollowengine.common.scene.ComponentActivity
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
@@ -54,25 +55,20 @@ class WorldObjectPartTreeTest {
     }
 
     @Test
-    fun `an independently registered component participates in rendering and the hierarchy`() {
+    fun `a registered draw system reads current bindings independently of the owner hierarchy`() {
         val events = mutableListOf<String>()
-        ClientSceneContext.register(Marker::class) { _, _, value ->
-            object : ClientComponent, RenderComponent {
-                private var frame = 0
-                override fun activate() {
-                    events += value.label
+        ClientSceneContext.registerSystem(Marker::class) {
+            object : SceneDrawSystem {
+                private val active = linkedSetOf<SceneComponentKey>()
+                override val hasDraws: Boolean get() = active.isNotEmpty()
+
+                override fun onStateChanged(binding: SceneComponentKey, state: ComponentActivity) {
+                    if (state == ComponentActivity.ACTIVE) active.add(binding) else active.remove(binding)
+                    events += "${binding.owner.name} $state"
                 }
 
-                override fun remove() {
-                    events += "removed"
-                }
-
-                override fun update(frame: ComponentUpdate) {
-                    this.frame++
-                }
-
-                override fun collect(sceneToView: Matrix4fc) {
-                    events += "draw $frame"
+                override fun collect(sceneToView: Matrix4fc, light: Int) {
+                    for (binding in active) events += "draw ${(binding.value as Marker).label} $light"
                 }
             }
         }.use {
@@ -80,34 +76,42 @@ class WorldObjectPartTreeTest {
             Scene(context).use { scene ->
                 val owner = scene.create("empty")
                 val id = owner.attach(Marker("active"))
+                val other = scene.create("other")
+                other.attach(Marker("second"), id = id)
                 assertTrue(context.hasDraws)
                 assertEquals(id, PartsReader().read(null, null, owner.components).roots.single().path.componentId)
-                context.updatePreview(effectTime = null, effectEmitting = null)
-                context.collect(Matrix4f())
-                context.collect(Matrix4f().translate(1f, 0f, 0f))
+                owner.setComponent(id, Marker("edited"))
+                context.collect(Matrix4f(), 1)
                 owner.setEnabled(false)
-                context.updatePreview(effectTime = null, effectEmitting = null)
-                context.collect(Matrix4f())
-                assertFalse(context.hasDraws)
+                context.collect(Matrix4f(), 2)
                 owner.detach(id)
+                other.detach(id)
                 assertFalse(context.hasDraws)
-                assertFalse(context.hasUpdates)
             }
         }
-        assertEquals(listOf("active", "draw 1", "draw 1", "removed"), events)
+        assertEquals(
+            listOf("empty ACTIVE", "other ACTIVE", "draw edited 1", "draw second 1", "empty SUSPENDED",
+                "draw second 2", "empty REMOVED", "other SUSPENDED", "other REMOVED"),
+            events,
+        )
     }
 
     @Test
     fun `effect collection uses the same playback state for several views`() {
-        ClientSceneContext.register(VfxComponent::class) { node, _, value -> SceneVfx(node, value) }.use {
+        ClientSceneContext.registerSystem(VfxComponent::class, ::SceneVfx).use {
             val context = ClientSceneContext()
             Scene(context).use { scene ->
                 val node = scene.create("effect")
                 node.localTransform.translate(2f, 0f, 0f)
-                node.attach(VfxComponent(ownEffect = VfxEffect()))
-                context.updatePreview(effectTime = 0.25f, effectEmitting = null)
+                val spec = VfxComponent(ownEffect = VfxEffect())
+                val id = node.attach(spec)
+                val system = checkNotNull(context.vfx)
+                system.updatePreview(0.25f, null)
                 val draws = ArrayList<VfxBoneBinding>()
-                SceneVfxBindings.capturing(draws) { context.collect(Matrix4f()) }
+                SceneVfxBindings.capturing(draws) {
+                    context.collect(Matrix4f())
+                    context.collect(Matrix4f())
+                }
                 val first = draws.single()
                 assertEquals(0.25f, first.instance.time, 0.001f)
                 assertEquals(2f, first.placement.m30())
@@ -118,6 +122,21 @@ class WorldObjectPartTreeTest {
                 assertSame(first.instance, second.instance)
                 assertEquals(0.25f, second.instance.time, 0.001f)
                 assertEquals(7f, second.placement.m30())
+                assertEquals(2f, first.placement.m30())
+
+                node.setComponent(id, spec.copy(autoPlay = false))
+                draws.clear()
+                SceneVfxBindings.capturing(draws) { context.collect(Matrix4f()) }
+                assertTrue(draws.isEmpty())
+                node.setComponent(id, spec)
+                node.setEnabled(false)
+                assertFalse(context.hasDraws)
+                node.setEnabled(true)
+                system.updatePreview(0.25f, null)
+                SceneVfxBindings.capturing(draws) { context.collect(Matrix4f()) }
+                assertSame(first.instance, draws.single().instance)
+                node.detach(id)
+                assertFalse(context.hasDraws)
             }
         }
     }
@@ -143,7 +162,7 @@ class WorldObjectPartTreeTest {
         val rig = ModelRig(attachments = listOf(sound), bones = mapOf("speaker" to RigBone(attachments = listOf(vfx))))
         val model = Model("test:models/speaker.gltf", rig)
         ClientSceneContext.registerSystem(Sound::class, ::SceneSounds).use {
-            ClientSceneContext.register(VfxComponent::class) { node, _, value -> SceneVfx(node, value) }.use {
+            ClientSceneContext.registerSystem(VfxComponent::class, ::SceneVfx).use {
                 renderModel(NodeDefinition(0, "speaker", mutableListOf(), TrsTransformF())).use { instance ->
                     instance.rig = rig
                     val bone = instance.sceneRoot.children.single()
