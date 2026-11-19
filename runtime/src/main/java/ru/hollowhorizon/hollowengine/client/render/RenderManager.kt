@@ -132,6 +132,7 @@ object RenderManager {
         val level = Minecraft.getInstance().level ?: return
         val partialTick = event.partialTick
         val frustum = event.frustum
+        val updateAudio = !isShadowPass && !WorldCameraPreviewRenderer.isRendering
 
         NodeRuntimeState.service(level).forEachModelNodeRecord { record, node ->
             val host = record.hostEntity ?: return@forEachModelNodeRecord
@@ -160,6 +161,7 @@ object RenderManager {
                     .translate(local.translation.x.toDouble(), local.translation.y.toDouble(), local.translation.z.toDouble())
                     .rotate(componentRotation.set(local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w))
                     .scale(local.scale.x.toDouble(), local.scale.y.toDouble(), local.scale.z.toDouble())
+                if (updateAudio) instance.attachment.updateSpatialAudio(componentPlacement, host, TickHandler.renderFrame)
                 instance.attachment.updateWorldComponents(componentPlacement, host, event.camera.position, instance.componentAnimation)
             }
 

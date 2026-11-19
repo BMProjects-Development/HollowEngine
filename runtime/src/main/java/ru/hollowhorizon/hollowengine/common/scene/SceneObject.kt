@@ -70,7 +70,7 @@ class SceneObject internal constructor(
         set(value) { checkNotNull(modelState).isAnimated = value }
     val baseMorphWeights: FloatArray get() = modelState?.baseWeights ?: EMPTY_WEIGHTS
     val morphWeights: FloatArray get() = modelState?.weights ?: EMPTY_WEIGHTS
-    internal val modelVisible: Boolean get() = modelState?.visible ?: true
+    internal val modelVisible: Boolean get() = modelState?.visible ?: (physicalParent?.modelVisible != false)
 
     internal fun setModelSource(source: ModelNodeSource, weights: FloatArray? = null) {
         checkAttached()

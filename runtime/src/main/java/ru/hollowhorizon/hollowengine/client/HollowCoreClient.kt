@@ -3,13 +3,13 @@ package ru.hollowhorizon.hollowengine.client
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.KeyMapping
 import org.lwjgl.glfw.GLFW
-import ru.hollowhorizon.hollowengine.client.decals.DecalAttachment
+import ru.hollowhorizon.hollowengine.client.decals.SceneDecals
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.NestedModelAttachment
 import ru.hollowhorizon.hollowengine.client.particles.BedrockParticles
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
 import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
-import ru.hollowhorizon.hollowengine.client.sounds.SoundPlaybackRuntime
+import ru.hollowhorizon.hollowengine.client.sounds.SceneSounds
 import ru.hollowhorizon.hollowengine.client.render.entity.EmptyEntityRenderer
 import ru.hollowhorizon.hollowengine.client.shadergraph.ShaderNodeReloadListener
 import ru.hollowhorizon.hollowengine.client.ui.ide.recipe.RecipeEditorsReloadListener
@@ -31,6 +31,7 @@ import ru.hollowhorizon.hollowengine.common.events.registry.RegisterResourcePack
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.registry.ModEntities
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 
@@ -40,9 +41,9 @@ object HollowCoreClient {
     init {
         RenderSystem.recordRenderCall(RenderManager::onInitialize)
         WorldObjectEntity.clientSceneContext = ::ClientSceneContext
-        ClientSceneContext.register(Sound::class, ::SoundPlaybackRuntime)
+        ClientSceneContext.registerSystem(Sound::class, ::SceneSounds)
         ClientSceneContext.register(VfxComponent::class) { owner, _, value -> SceneVfx(owner, value) }
-        DecalAttachment.register()
+        ClientSceneContext.registerSystem(Decal::class, ::SceneDecals)
         UiPanelAttachment.register()
         NestedModelAttachment.register()
     }

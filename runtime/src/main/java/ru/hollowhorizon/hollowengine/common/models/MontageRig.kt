@@ -10,6 +10,7 @@ import kotlinx.serialization.json.*
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNotAnimated
 import ru.hollowhorizon.hollowengine.common.sounds.Sound
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxCurve
@@ -163,7 +164,10 @@ object RigFields {
     class Field(val name: String, val kind: Kind, val values: FloatArray)
 
     /** The numbers [property] of [spec] holds, or null when it is no such field or holds no plain numbers. */
-    fun read(spec: Any, property: String): FloatArray? = tree(spec)?.at(property)?.numbers()
+    fun read(spec: Any, property: String): FloatArray? = tree(spec)?.at(fieldName(spec, property))?.numbers()
+
+    internal fun fieldName(spec: Any, stored: String): String =
+        if (spec is Decal) stored.removePrefix("decal.") else stored
 
     /**
      * Every field of [spec] a montage can animate, as it is stored; its id and kind are never among them. Fields of
@@ -240,7 +244,8 @@ object RigFields {
     ): Any? {
         val serializer = serializerOf(spec) ?: return null
         val tree = tree(spec, serializer) ?: return null
-        val authored = tree.at(property) ?: return null
+        val name = fieldName(spec, property)
+        val authored = tree.at(name) ?: return null
         val from = authored.numbers()
         val channels = from?.size ?: ((track.curves.maxOfOrNull { it.channel } ?: 0) + 1)
         val values = FloatArray(channels) { channel ->
@@ -250,7 +255,7 @@ object RigFields {
             val value = curve?.let { VfxCurve(it).valueAt(time) } ?: start ?: 0f
             if (start == null) value else start + (value - start) * weight.coerceIn(0f, 1f)
         }
-        val replaced = tree.with(property.split('.'), authored.withNumbers(values)) as? JsonObject ?: return null
+        val replaced = tree.with(name.split('.'), authored.withNumbers(values)) as? JsonObject ?: return null
         return runCatching { MontageFormat.fields.decodeFromJsonElement(serializer, replaced) }.getOrNull()
     }
 

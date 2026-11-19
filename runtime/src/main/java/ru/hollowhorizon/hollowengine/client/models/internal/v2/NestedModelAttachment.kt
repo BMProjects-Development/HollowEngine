@@ -3,7 +3,6 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.RigAssets
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.MAX_NESTING
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
@@ -89,4 +88,4 @@ internal fun ModelRig.carriesLegacyEffects(): Boolean =
     attachments.any(::carriesLegacyEffects) || bones.values.any { it.attachments.any(::carriesLegacyEffects) }
 
 private fun carriesLegacyEffects(spec: Any): Boolean =
-    spec is DecalAttachmentSpec || spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesLegacyEffects()
+    spec is UiPanelAttachmentSpec || spec is ModelAttachmentSpec && spec.rig.carriesLegacyEffects()

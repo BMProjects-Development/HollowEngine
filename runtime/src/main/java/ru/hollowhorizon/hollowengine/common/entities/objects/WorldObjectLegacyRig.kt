@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.common.entities.objects
 
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.models.legacyPlacementNode
 import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.SceneComponentData
@@ -17,8 +18,10 @@ internal fun WorldObjectEntity.migrateStandaloneRig(components: List<Any>): List
     val placed = rig.bones.map { (name, bone) ->
         val origin = bone.origin ?: return components
         val spec = bone.attachments.singleOrNull() ?: return components
-        if (origin.parent != null || name != legacyPlacementNode(null, spec.rigId) || bone.hidden ||
-            bone.pose != null || bone.material != null
+        val generatedPlacement = name == legacyPlacementNode(null, spec.rigId)
+        val droppedDecal = spec is Decal && name == spec.id
+        if (origin.parent != null || !(generatedPlacement || droppedDecal) || bone.hidden ||
+            bone.alias != null || bone.pose != null || bone.material != null
         ) return components
         Triple(name, origin, spec)
     }
@@ -26,6 +29,7 @@ internal fun WorldObjectEntity.migrateStandaloneRig(components: List<Any>): List
     if (specs.isEmpty() || specs.any { !SceneComponentData.synced(it) }) return components
     val owner = sceneObject
     if (specs.any { !owner.accepts(it) }) return components
+    if (placed.any { (name) -> owner.children.any { it.name == name } }) return components
     rig.attachments.forEach { owner.attach(it) }
     for ((name, origin, spec) in placed) {
         val child = owner.create(name)

@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.editor.*
 import ru.hollowhorizon.hollowengine.common.models.AnimationExpression
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /**
  * An effect attached to bone, authored in the rig editor.
@@ -42,6 +41,3 @@ data class VfxComponent(
     @EditorNotAnimated
     val emitting: Boolean = true,
 )
-
-@Deprecated("Use VfxComponent")
-typealias VfxBoneAttachmentSpec = VfxComponent

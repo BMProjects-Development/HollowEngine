@@ -6,6 +6,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.animations.Animation
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.AnimationData
 import ru.hollowhorizon.hollowengine.client.models.internal.animations.interpolations.Interpolator
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.*
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.sounds.LowPassFilter
 import ru.hollowhorizon.hollowengine.common.sounds.Sound
@@ -19,6 +20,25 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MontageTests {
+    @Test
+    fun `legacy wrapped decal fields remain animated in montage`() {
+        val montage = MontageFormat.read(
+            """
+            {
+              "attachments": [
+                { "spec": { "type": "hollowengine:rig/decal", "id": "sticker", "decal": { "width": 2 } } }
+              ],
+              "tracks": [
+                { "attachment": "sticker", "property": "decal.width",
+                  "curves": [{"keys": [{"time": 0, "value": 3, "interpolation": "LINEAR"}]}] }
+              ]
+            }
+            """.trimIndent(),
+        )
+        val (_, component) = ModelRig.EMPTY.withMontages(listOf(MontageMoment(montage, 0f, 1f))).rig.allAttachments().single()
+        assertEquals(Decal(id = "sticker", width = 3f), component)
+    }
+
     private val arm = renderModelNode(
         NodeDefinition(index = 1, name = "arm", children = mutableListOf(), transform = TrsTransformF()), parent = null
     )

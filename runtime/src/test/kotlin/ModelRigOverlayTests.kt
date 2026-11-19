@@ -2,6 +2,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 import org.junit.jupiter.api.Test
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.ByteBufFormat
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
@@ -24,6 +25,25 @@ import kotlin.test.assertTrue
  * entity's winning, without dropping anything the file has that the entity does not touch.
  */
 class ModelRigOverlayTests {
+    @Test
+    fun `a wrapped decal from a legacy rig loads as component data on its placed node`() {
+        val raw = CompoundTag().apply {
+            putString("id", "sticker")
+            put("decal", CompoundTag().apply {
+                putString("texture", "test:sticker.png")
+                putFloat("width", 2.5f)
+            })
+        }
+        val entry = CompoundTag().apply { put(Decal.TYPE_ID, raw) }
+        val stored = CompoundTag().apply { put("attachments", ListTag().apply { add(entry) }) }
+
+        val rig = NBTFormat.deserialize<ModelRig, Tag>(stored)
+        val (bone, component) = rig.allAttachments().single()
+        assertEquals(Decal(id = "sticker", texture = "test:sticker.png", width = 2.5f), component)
+        assertEquals(RigBoneOrigin(), rig.bone(bone!!)?.origin)
+        assertEquals(rig, NBTFormat.deserialize<ModelRig, Tag>(NBTFormat.serialize(rig)))
+    }
+
     private val asset = ModelRig(
         bones = mapOf(
             "Hand" to RigBone(alias = "right_hand", attachments = listOf(ItemSlotAttachmentSpec("item"), VfxComponent("glow", effect = "a:vfx/glow.vfx"))),

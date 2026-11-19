@@ -8,7 +8,10 @@ import ru.hollowhorizon.hollowengine.api.VideoApi
 import ru.hollowhorizon.hollowengine.api.VideoPlaybackOptions
 import ru.hollowhorizon.hollowengine.api.VideoPlayer
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
+import ru.hollowhorizon.hollowengine.common.events.ClientOnly
+import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
+import ru.hollowhorizon.hollowengine.common.events.client.render.RenderTickEvent
 import ru.hollowhorizon.hollowengine.common.sounds.MediaSource
 import java.nio.ByteBuffer
 
@@ -16,6 +19,7 @@ import java.nio.ByteBuffer
  * What decals draw with: a texture of the loaded packs, or the frame a video is on. A video plays on and on, without
  * sound, for as long as some decal shows it, and is let go of a little after the last one stops.
  */
+@ClientOnly
 internal object DecalTextures {
     private class Playing(val player: VideoPlayer, var usedAt: Long)
 
@@ -28,7 +32,7 @@ internal object DecalTextures {
      * The texture [spec] draws with this frame: the missing texture when there is none to show, or null while a video
      * has not shown its first frame yet.
      */
-    fun of(spec: DecalSpec): Int? {
+    fun of(spec: Decal): Int? {
         if (spec.texture.isBlank()) return missing()
         if (spec.isVideo) return if (spec.texture in broken) missing() else video(spec.texture)
         val location = ResourceLocation.tryParse(spec.texture) ?: return missing()
@@ -73,7 +77,7 @@ internal object DecalTextures {
     }
 
     /** Height over width of the picture [spec] shows, one while it is not known yet. */
-    fun aspect(spec: DecalSpec): Float {
+    fun aspect(spec: Decal): Float {
         if (spec.texture.isBlank()) return 1f
         if (spec.isVideo) {
             val player = videos[spec.texture]?.player ?: return 1f
@@ -105,8 +109,9 @@ internal object DecalTextures {
         broken.clear()
     }
 
-    /** Lets go of the videos no decal has shown for a while; once a frame. */
-    fun release() {
+    /** Releases idle players even after the last decal has stopped drawing. */
+    @SubscribeEvent
+    fun releaseIdleVideos(event: RenderTickEvent.Post) {
         if (videos.isEmpty()) return
         val frame = TickHandler.renderFrame
         videos.entries.removeIf { (_, playing) ->

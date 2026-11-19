@@ -37,28 +37,38 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
     private class Entry(var data: Any, val lifecycle: ComponentLifecycle?, var enabled: Boolean) {
         var active = false
 
-        fun refresh(context: SceneContext, ownerActive: Boolean, failures: SceneFailures) {
+        fun refresh(owner: ComponentOwner, id: UUID, ownerActive: Boolean, failures: SceneFailures) {
             val next = enabled && ownerActive
             if (active == next) return
             active = next
-            val runtime = lifecycle ?: return
+            val context = owner.scene.context
             if (!next) {
-                failures.capture { context.onLifecycleActivityChanged(runtime, false) }
-                failures.capture { runtime.suspend() }
+                suspend(owner, id, context, failures)
             } else if (!failures.capture {
-                runtime.activate()
-                context.onLifecycleActivityChanged(runtime, true)
+                lifecycle?.let {
+                    it.activate()
+                    context.onLifecycleActivityChanged(it, true)
+                }
+                context.onComponentActivity(owner, id, data, ComponentActivity.ACTIVE)
             }) {
                 active = false
                 enabled = false
-                failures.capture { context.onLifecycleActivityChanged(runtime, false) }
-                failures.capture { runtime.suspend() }
+                suspend(owner, id, context, failures)
             }
         }
 
-        fun finish(context: SceneContext, failures: SceneFailures) {
-            refresh(context, false, failures)
+        private fun suspend(owner: ComponentOwner, id: UUID, context: SceneContext, failures: SceneFailures) {
+            lifecycle?.let { runtime ->
+                failures.capture { context.onLifecycleActivityChanged(runtime, false) }
+                failures.capture { runtime.suspend() }
+            }
+            failures.capture { context.onComponentActivity(owner, id, data, ComponentActivity.SUSPENDED) }
+        }
+
+        fun finish(owner: ComponentOwner, id: UUID, failures: SceneFailures) {
+            refresh(owner, id, false, failures)
             failures.capture { lifecycle?.remove() }
+            failures.capture { owner.scene.context.onComponentActivity(owner, id, data, ComponentActivity.REMOVED) }
         }
     }
 
@@ -87,13 +97,13 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
         entries[id] = entry
         val failures = SceneFailures()
         changed()
-        if (failures.capture { entry.lifecycle?.attach() }) entry.refresh(owner.scene.context, owner.isActive, failures)
+        if (failures.capture { entry.lifecycle?.attach() }) entry.refresh(owner, id, owner.isActive, failures)
         try {
             failures.throwIfAny()
         } catch (exception: Exception) {
             entries.remove(id)
             changed()
-            entry.finish(owner.scene.context, failures)
+            entry.finish(owner, id, failures)
             failures.throwIfAny()
         }
         id
@@ -109,7 +119,7 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
         val failures = SceneFailures()
         if (!failures.capture { entry.lifecycle?.change(value) }) {
             entry.enabled = false
-            entry.refresh(owner.scene.context, owner.isActive, failures)
+            entry.refresh(owner, id, owner.isActive, failures)
             failures.throwIfAny()
         }
     }
@@ -122,7 +132,7 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
         if (entry.enabled == enabled) return@mutate
         entry.enabled = enabled
         val failures = SceneFailures()
-        entry.refresh(owner.scene.context, owner.isActive, failures)
+        entry.refresh(owner, id, owner.isActive, failures)
         changed()
         failures.throwIfAny()
     }
@@ -132,18 +142,18 @@ internal class SceneComponentStore(private val owner: ComponentOwner) {
         val entry = entries.remove(id) ?: return@mutate false
         changed()
         val failures = SceneFailures()
-        entry.finish(owner.scene.context, failures)
+        entry.finish(owner, id, failures)
         failures.throwIfAny()
         true
     }
 
     fun refresh(failures: SceneFailures, active: Boolean) {
-        val ordered = if (active) entries.values else entries.values.toList().asReversed()
-        ordered.forEach { it.refresh(owner.scene.context, active, failures) }
+        val ordered = if (active) entries.entries else entries.entries.toList().asReversed()
+        ordered.forEach { (id, entry) -> entry.refresh(owner, id, active, failures) }
     }
 
     fun finish(failures: SceneFailures) {
-        entries.values.toList().asReversed().forEach { it.finish(owner.scene.context, failures) }
+        entries.entries.toList().asReversed().forEach { (id, entry) -> entry.finish(owner, id, failures) }
         entries.clear()
         snapshot = null
     }

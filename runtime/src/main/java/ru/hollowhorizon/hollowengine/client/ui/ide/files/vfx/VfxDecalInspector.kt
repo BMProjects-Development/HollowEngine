@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import kotlinx.serialization.json.JsonObject
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AutoFields
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.vfx.VfxDecalSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxProperty
 
@@ -17,9 +17,9 @@ internal fun DecalFields(document: VfxEditing, state: VfxInspectorState, node: V
         }
         VfxColorRow(vfxText("tint"), node.tint, VfxProperty.TINT) { document.replace(node.copy(tint = it)) }
         val format = ComponentJson.format
-        val json = format.encodeToJsonElement(DecalSpec.serializer(), node.decal) as JsonObject
-        AutoFields(null, DecalSpec.serializer().descriptor, json, "/vfx-decal-${node.id}") { edited ->
-            runCatching { format.decodeFromJsonElement(DecalSpec.serializer(), edited) }.getOrNull()
+        val json = format.encodeToJsonElement(Decal.serializer(), node.decal) as JsonObject
+        AutoFields(null, Decal.serializer().descriptor, json, "/vfx-decal-${node.id}") { edited ->
+            runCatching { format.decodeFromJsonElement(Decal.serializer(), edited) }.getOrNull()
                 ?.let { document.replace(node.copy(decal = it)) }
         }
     }

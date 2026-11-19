@@ -12,13 +12,14 @@ import org.lwjgl.opengl.GL33
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
 import ru.hollowhorizon.hollowengine.client.render.RenderManager
+import ru.hollowhorizon.hollowengine.client.scene.SceneComponentKey
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxMaterialStates
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxShaders
 import ru.hollowhorizon.hollowengine.client.vfx.render.VfxView
 import ru.hollowhorizon.hollowengine.client.vfx.render.drawImmediate
 import ru.hollowhorizon.hollowengine.common.decals.DecalBlend
 import ru.hollowhorizon.hollowengine.common.decals.DecalProjection
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import kotlin.math.cos
 
 /**
@@ -28,15 +29,14 @@ import kotlin.math.cos
  * the decal lands instead of its picture.
  */
 class DecalDraw(
-    val spec: DecalSpec,
+    val spec: Decal,
     val placement: Matrix4f,
     val light: Int = LightTexture.FULL_BRIGHT,
-    val tint: FloatArray = floatArrayOf(1f, 1f, 1f, 1f),
+    val tint: FloatArray? = null,
     val key: String? = null,
     val overlay: Boolean = false,
     val carried: Boolean = true,
 ) {
-    /** The same decal shown as where it lands. */
     fun asOverlay() = DecalDraw(spec, placement, light, tint, key, overlay = true, carried = carried)
 }
 
@@ -46,7 +46,7 @@ class DecalDraw(
  */
 object Decals {
     private class Draws(val items: MutableList<DecalDraw> = ArrayList()) {
-        val attachments = HashSet<DecalAttachment>()
+        val components = HashSet<SceneComponentKey>()
     }
 
     private val submitted = Draws()
@@ -57,9 +57,9 @@ object Decals {
         queue()?.items?.add(draw)
     }
 
-    internal fun submitAttachment(attachment: DecalAttachment, draw: () -> DecalDraw) {
+    internal fun submitComponent(binding: SceneComponentKey, draw: (capturing: Boolean) -> DecalDraw) {
         val into = queue() ?: return
-        if (into.attachments.add(attachment)) into.items += draw()
+        if (into.components.add(binding)) into.items += draw(into === captured)
     }
 
     private fun queue(): Draws? =
@@ -84,7 +84,7 @@ object Decals {
 
     internal fun clear() {
         submitted.items.clear()
-        submitted.attachments.clear()
+        submitted.components.clear()
     }
 }
 
@@ -113,7 +113,9 @@ object DecalRenderer {
         RenderSystem.enableCull()
         try {
             draws.forEach { draw ->
-                if (!draw.overlay && draw.spec.opacity * draw.tint[3] <= 0f) return@forEach
+                val tint = draw.tint
+                val opacity = draw.spec.opacity * (tint?.get(3) ?: 1f)
+                if (!draw.overlay && opacity <= 0f) return@forEach
                 val texture = if (draw.overlay) 0 else DecalTextures.of(draw.spec) ?: return@forEach
                 val extent = DecalExtents.of(draw.spec, draw.placement, view.decalGround)
                 val cube = Matrix4f(draw.placement).mul(DecalShapes.unitCube(draw.spec, extent))
@@ -134,9 +136,9 @@ object DecalRenderer {
                     bound.safeGetUniform("DecalInverse").set(inverse)
                     bound.safeGetUniform("DecalUp").set(up.x, up.y, up.z)
                     val color = draw.spec.color
-                    val tint = draw.tint
                     bound.safeGetUniform("DecalColor").set(
-                        color.x * tint[0], color.y * tint[1], color.z * tint[2], draw.spec.opacity * tint[3],
+                        color.x * (tint?.get(0) ?: 1f), color.y * (tint?.get(1) ?: 1f),
+                        color.z * (tint?.get(2) ?: 1f), opacity,
                     )
                     bound.safeGetUniform("AngleFade").set(cos(Math.toRadians(draw.spec.angleFade.toDouble())).toFloat())
                     val lit = !draw.spec.emissive && draw.light != LightTexture.FULL_BRIGHT
@@ -165,7 +167,6 @@ object DecalRenderer {
             GL33.glCullFace(GL33.GL_BACK)
             VfxMaterialStates.restore()
         }
-        DecalTextures.release()
     }
 
     /** The twelve triangles of the unit cube taken through [cube], each face wound outward before it. */

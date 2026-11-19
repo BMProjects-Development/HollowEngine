@@ -2,7 +2,7 @@ package ru.hollowhorizon.hollowengine.common.vfx
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.vfx.VfxAnimatables.color
 import ru.hollowhorizon.hollowengine.common.vfx.VfxAnimatables.scalar
 
@@ -20,7 +20,7 @@ data class VfxDecalSpec(
     override val enabled: Boolean = true,
     override val transform: VfxTransform = VfxTransform.IDENTITY,
     override val children: List<VfxNodeSpec> = emptyList(),
-    val decal: DecalSpec = DecalSpec(),
+    val decal: Decal = Decal(),
     val opacity: VfxValue = VfxValue.ONE,
     val tint: VfxColorValue = VfxColorValue.WHITE,
     override val particle: VfxAppearance = VfxAppearance(size = VfxVec3Value.all(1f)),

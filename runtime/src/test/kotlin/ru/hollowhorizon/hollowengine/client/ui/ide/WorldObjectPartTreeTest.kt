@@ -11,7 +11,7 @@ import ru.hollowhorizon.hollowengine.client.scene.ClientComponent
 import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
 import ru.hollowhorizon.hollowengine.client.scene.ComponentUpdate
 import ru.hollowhorizon.hollowengine.client.scene.RenderComponent
-import ru.hollowhorizon.hollowengine.client.sounds.SoundPlaybackRuntime
+import ru.hollowhorizon.hollowengine.client.sounds.SceneSounds
 import ru.hollowhorizon.hollowengine.client.vfx.SceneVfx
 import ru.hollowhorizon.hollowengine.client.vfx.SceneVfxBindings
 import ru.hollowhorizon.hollowengine.client.vfx.VfxBoneBinding
@@ -82,11 +82,11 @@ class WorldObjectPartTreeTest {
                 val id = owner.attach(Marker("active"))
                 assertTrue(context.hasDraws)
                 assertEquals(id, PartsReader().read(null, null, owner.components).roots.single().path.componentId)
-                context.updatePreview(playSounds = false, effectTime = null, effectEmitting = null)
+                context.updatePreview(effectTime = null, effectEmitting = null)
                 context.collect(Matrix4f())
                 context.collect(Matrix4f().translate(1f, 0f, 0f))
                 owner.setEnabled(false)
-                context.updatePreview(playSounds = false, effectTime = null, effectEmitting = null)
+                context.updatePreview(effectTime = null, effectEmitting = null)
                 context.collect(Matrix4f())
                 assertFalse(context.hasDraws)
                 owner.detach(id)
@@ -105,7 +105,7 @@ class WorldObjectPartTreeTest {
                 val node = scene.create("effect")
                 node.localTransform.translate(2f, 0f, 0f)
                 node.attach(VfxComponent(ownEffect = VfxEffect()))
-                context.updatePreview(playSounds = false, effectTime = 0.25f, effectEmitting = null)
+                context.updatePreview(effectTime = 0.25f, effectEmitting = null)
                 val draws = ArrayList<VfxBoneBinding>()
                 SceneVfxBindings.capturing(draws) { context.collect(Matrix4f()) }
                 val first = draws.single()
@@ -142,7 +142,7 @@ class WorldObjectPartTreeTest {
         val vfx = VfxComponent()
         val rig = ModelRig(attachments = listOf(sound), bones = mapOf("speaker" to RigBone(attachments = listOf(vfx))))
         val model = Model("test:models/speaker.gltf", rig)
-        ClientSceneContext.register(Sound::class, ::SoundPlaybackRuntime).use {
+        ClientSceneContext.registerSystem(Sound::class, ::SceneSounds).use {
             ClientSceneContext.register(VfxComponent::class) { node, _, value -> SceneVfx(node, value) }.use {
                 renderModel(NodeDefinition(0, "speaker", mutableListOf(), TrsTransformF())).use { instance ->
                     instance.rig = rig

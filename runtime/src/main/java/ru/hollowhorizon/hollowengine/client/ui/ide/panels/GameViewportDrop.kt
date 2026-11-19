@@ -19,7 +19,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.sounds.AudioFileExtensi
 import ru.hollowhorizon.hollowengine.client.ui.ide.projectPathReference
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.common.colliders.EntityColliders
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectKind
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
 import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
@@ -38,7 +38,7 @@ internal object GameViewportDrop {
     private const val MISS_DISTANCE = 8.0
 
     /** What becomes a decal: pictures, and videos when the Media addon plays them. */
-    private val DecalExtensions = listOf(".png") + DecalSpec.VideoExtensions
+    private val DecalExtensions = listOf(".png") + Decal.VideoExtensions
 
     private const val MARKER_RADIUS = 0.4
     private const val MARKER_SEGMENTS = 32

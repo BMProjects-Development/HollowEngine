@@ -123,9 +123,8 @@ private class VfxBoundEffect(private var asset: String, private var own: VfxEffe
 /** An effect attached to a spatial object. */
 internal class SceneVfx(
     private val node: SceneObject,
-    spec: VfxComponent,
+    private var spec: VfxComponent,
 ) : ClientComponent, RenderComponent {
-    private var spec = spec
     private var enabled = false
 
     private val effect = VfxBoundEffect(spec.effect, spec.ownEffect).also { it.emitting = spec.emitting }

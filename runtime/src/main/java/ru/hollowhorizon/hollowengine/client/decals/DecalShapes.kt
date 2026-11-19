@@ -3,7 +3,7 @@ package ru.hollowhorizon.hollowengine.client.decals
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import ru.hollowhorizon.hollowengine.common.decals.DecalProjection
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 
 /** The parts of a decal guide, each drawn its own way. */
 enum class DecalGuidePart {
@@ -27,7 +27,7 @@ object DecalShapes {
      * z = -1 on the place of the decal. A box reaches from there straight down its depth; a projector casts from
      * there, its cone opening with the field of view as far as its range.
      */
-    fun unitCube(spec: DecalSpec, extent: DecalExtent): Matrix4f {
+    fun unitCube(spec: Decal, extent: DecalExtent): Matrix4f {
         val width = extent.width
         val length = extent.length
         val reach = extent.reach

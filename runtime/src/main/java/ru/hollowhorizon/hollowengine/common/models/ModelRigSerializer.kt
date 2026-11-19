@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.Tag
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ICanDecodeCompoundNBT
@@ -28,7 +28,7 @@ internal data class LegacyNodePlacement(
 }
 
 internal fun Any.hadLegacyPlacement(): Boolean = when (this) {
-    is ModelAttachmentSpec, is VfxComponent, is DecalAttachmentSpec, is UiPanelAttachmentSpec, is IkTargetSpec -> true
+    is ModelAttachmentSpec, is VfxComponent, is Decal, is UiPanelAttachmentSpec, is IkTargetSpec -> true
     else -> false
 }
 

@@ -7,7 +7,7 @@ import net.minecraft.world.phys.Vec3
 import net.minecraft.world.phys.shapes.CollisionContext
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 
 /** How big a decal is as it is drawn: its own sizes, with the picture's proportions and the reach to a surface filled in. */
 class DecalExtent(val width: Float, val length: Float, val reach: Float)
@@ -72,7 +72,7 @@ object DecalExtents {
      * The extent of [spec] placed by [placement], whose down axis it reaches along, looking for the surface on
      * [ground]; lengths are in the units of the decal frame, as its shape is.
      */
-    fun of(spec: DecalSpec, placement: Matrix4f, ground: DecalGround?): DecalExtent {
+    fun of(spec: Decal, placement: Matrix4f, ground: DecalGround?): DecalExtent {
         val width = spec.width
         val length = spec.length ?: (width * DecalTextures.aspect(spec))
         val reach = spec.reach ?: autoReach(spec, placement, DecalExtent(width, length, DecalGround.SEARCH), ground)
@@ -84,7 +84,7 @@ object DecalExtents {
      * box and through the cone for a projector, the deepest surface any of them meets setting it, measured down the
      * axis, and a little past it for steps.
      */
-    private fun autoReach(spec: DecalSpec, placement: Matrix4f, search: DecalExtent, ground: DecalGround?): Float {
+    private fun autoReach(spec: Decal, placement: Matrix4f, search: DecalExtent, ground: DecalGround?): Float {
         val down = placement.transformDirection(Vector3f(0f, -1f, 0f))
         val scale = down.length()
         if (scale <= 1e-6f) return FALLBACK_REACH

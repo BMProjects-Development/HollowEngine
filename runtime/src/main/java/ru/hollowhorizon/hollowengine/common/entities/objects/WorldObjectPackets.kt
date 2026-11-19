@@ -22,11 +22,7 @@ import ru.hollowhorizon.hollowengine.client.editor.WorldObjectEditing
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.editor.canEditEntities
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
-import ru.hollowhorizon.hollowengine.common.models.ModelRig
-import ru.hollowhorizon.hollowengine.common.models.RigBone
-import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
 import ru.hollowhorizon.hollowengine.common.scene.SceneComponentData
@@ -35,8 +31,8 @@ import ru.hollowhorizon.hollowengine.common.scene.SceneTreeData
 import ru.hollowhorizon.hollowengine.common.sounds.*
 import ru.hollowhorizon.hollowengine.common.utils.literal
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerDegreesXyz
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForCompoundNBT
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
@@ -66,17 +62,16 @@ private fun soundOf(asset: String) = Sound(
 /** How far off the face a dropped decal is cast from, in blocks. */
 private const val DECAL_LIFT = 0.25f
 
-internal fun decalRigOf(asset: String, face: Direction): ModelRig {
+internal fun decalPoseOf(face: Direction): TrsTransformF {
     val normal = face.normal.let { Vector3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
     val toBottom = if (face.axis == Direction.Axis.Y) Vector3f(0f, 0f, 1f) else Vector3f(0f, -1f, 0f)
     val right = Vector3f(normal).cross(toBottom)
     val turn = Quaternionf().setFromNormalized(Matrix3f(right, normal, toBottom))
-    val origin = RigBoneOrigin(
-        offset = Vec3f(normal.x, normal.y, normal.z) * DECAL_LIFT,
-        rotation = QuatF(turn.x, turn.y, turn.z, turn.w).eulerDegreesXyz(),
+    return TrsTransformF().setCompositionOf(
+        Vec3f(normal.x, normal.y, normal.z) * DECAL_LIFT,
+        QuatF(turn.x, turn.y, turn.z, turn.w),
+        Vec3f.ONES,
     )
-    val decal = DecalAttachmentSpec(decal = DecalSpec(texture = asset))
-    return ModelRig(bones = mapOf(decal.id to RigBone(attachments = listOf(decal), origin = origin)))
 }
 
 /** Places a new object at a point, showing [asset], and selects it for the player who placed it. */
@@ -105,7 +100,10 @@ class SpawnWorldObjectPacket(
             WorldObjectKind.MODEL -> created set Model(asset)
             WorldObjectKind.VFX -> created.sceneObject.attach(VfxComponent(id = "effect", effect = asset))
             WorldObjectKind.SOUND -> created.sceneObject.attach(soundOf(asset))
-            WorldObjectKind.DECAL -> created set Model("", decalRigOf(asset, Direction.from3DDataValue(face)))
+            WorldObjectKind.DECAL -> created.sceneObject.create("decal").apply {
+                localTransform.set(decalPoseOf(Direction.from3DDataValue(face)))
+                attach(Decal(texture = asset))
+            }
             WorldObjectKind.EMPTY -> Unit
         }
         if (kind != WorldObjectKind.EMPTY) created.customName = asset.substringAfterLast('/').substringBefore('.').literal

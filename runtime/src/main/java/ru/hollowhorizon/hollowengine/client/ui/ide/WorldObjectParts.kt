@@ -28,10 +28,10 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
+import ru.hollowhorizon.hollowengine.common.scene.SceneAddress
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
@@ -333,22 +333,32 @@ internal object WorldObjectParts {
         return BoneGizmo(entity, drawn, bone, transform, editing, path.encode())
     }
 
-    fun selectedDecal(partialTick: Float): Pair<DecalSpec, Mat4f>? {
+    fun selectedDecal(partialTick: Float): Pair<Decal, Mat4f>? {
         val ref = selected?.takeIf { it.path.material == null && it.path.effectNode == null } ?: return null
         val path = ref.path
-        if (path.componentId != null || path.sceneNodeId != null) return null
-        val entity = Minecraft.getInstance().level?.getEntity(ref.entityId) as? WorldObjectEntity ?: return null
+        val entity = (Minecraft.getInstance().level?.getEntity(ref.entityId) as? WorldObjectEntity)
+            ?.takeIf { it.uuid == ref.uuid } ?: return null
+        if (path.componentId != null || path.sceneNodeId != null) {
+            val root = entity.sceneObjectOrNull ?: return null
+            val owner = if (path.sceneNodeId == null) root else root.scene.resolve(SceneAddress(path.sceneNodeId)) ?: return null
+            val decal = if (path.componentId != null) owner.component(path.componentId) as? Decal
+            else owner.components.values.firstOrNull { it is Decal } as? Decal
+            decal ?: return null
+            val world = resolveNodeWorldTransform(entity, TransformComponent(), partialTick).matrixF
+                .mul(owner.worldTransform, MutableMat4f())
+            return decal to world
+        }
         val snapshot = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid) ?: return null
         val model = snapshot.modelOrNull() ?: return null
         val drawn = drawnScope(entity, model, path.steps) ?: return null
         val holder = drawn.rig.holder(path.bone)
-        val spec = if (path.attachment != null) holder.attachment(path.attachment) as? DecalAttachmentSpec
-        else holder.attachments.firstOrNull { it is DecalAttachmentSpec } as? DecalAttachmentSpec
+        val spec = if (path.attachment != null) holder.attachment(path.attachment) as? Decal
+        else holder.attachments.firstOrNull { it is Decal } as? Decal
         spec ?: return null
         val node = if (path.bone == null) drawn.sceneRoot else drawn.findNode(path.bone)?.sceneObject ?: return null
         val transform = snapshot.transformOrNull() ?: TransformComponent()
         val world = resolveNodeWorldTransform(entity, transform, partialTick).matrixF.mul(node.worldTransform, MutableMat4f())
-        return spec.decal to world
+        return spec to world
     }
 
     /** The drawn model a part belongs to, found through the models nested on the way. */

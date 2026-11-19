@@ -13,7 +13,7 @@ import net.minecraft.resources.ResourceLocation
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionHandle
 import ru.hollowhorizon.hollowengine.api.extensions.ExtensionPoints
 import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.ui.panels.UiPanelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.utils.nbt.TagModuleRevision
@@ -109,7 +109,11 @@ object RigAttachmentTypes {
                 allowedOnModel = true, namedAcrossRig = true, editorColor = 0x70BCD8,
             )
         )
-        register(DecalAttachmentSpec.TYPE)
+        register(RigAttachmentType(
+            Decal.TYPE_ID, Decal::class, Decal::id, RigDecalSerializer,
+            "hollowengine.gui.rig_editor.kind_decal", { Decal(id = it) },
+            allowedOnModel = true, editorColor = 0xC77DDB,
+        ))
         register(UiPanelAttachmentSpec.TYPE)
         register(IkTargetSpec.TYPE)
         register(IkChainSpec.TYPE)

@@ -180,7 +180,9 @@ internal class MontageTimelineSession(
                 val property = timeline.addProperty(path, buildProperty(bone, spec.rigId, field))
                 fill(
                     property,
-                    montage.tracks.firstOrNull { it.bone == bone && it.attachment == spec.rigId && it.property == field.name }?.curves
+                    montage.tracks.firstOrNull {
+                        it.bone == bone && it.attachment == spec.rigId && RigFields.fieldName(spec, it.property) == field.name
+                    }?.curves
                 )
             }
         }

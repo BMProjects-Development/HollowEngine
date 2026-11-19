@@ -24,6 +24,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.rendering.ListRender
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.RenderPipeline
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.StaticSubmissions
 import ru.hollowhorizon.hollowengine.client.models.internal.rendering.submitStatic
+import ru.hollowhorizon.hollowengine.client.sounds.sounds
 import ru.hollowhorizon.hollowengine.common.models.MaterialSource
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.rigId
@@ -163,7 +164,9 @@ class ModelAttachment(
     internal fun updatePreviewComponents(
         playSounds: Boolean, effectTime: Float?, effectEmitting: ((String?, String, Float) -> Boolean)?,
     ) {
-        renderScene.clientContext?.updatePreview(playSounds, effectTime, effectEmitting)
+        val context = renderScene.clientContext ?: return
+        context.sounds?.updateAudition(playSounds)
+        context.updatePreview(effectTime, effectEmitting)
     }
 
     val triangles get() = model.nodes.sumOf { it.mesh?.primitives?.sumOf { p -> p.positionsCount / 3 } ?: 0 }
@@ -325,11 +328,16 @@ class ModelAttachment(
         }
     }
 
-    internal val hasComponentUpdates: Boolean get() = renderScene.clientContext?.hasUpdates == true
+    internal val hasComponentUpdates: Boolean
+        get() = renderScene.clientContext?.let { it.hasUpdates || it.sounds?.hasActive == true } == true
     internal val readsComponentAnimation: Boolean get() = renderScene.clientContext?.needsAnimationVariables == true
 
+    internal fun updateSpatialAudio(modelToWorld: Matrix4dc, entity: Entity, frame: Long) {
+        renderScene.clientContext?.sounds?.updateSpatial(modelToWorld, entity, instanceId, frame)
+    }
+
     internal fun updateWorldComponents(modelToWorld: Matrix4dc, entity: Entity, camera: Vec3, animation: AnimatorEvaluationContext?) {
-        renderScene.clientContext?.updateWorld(modelToWorld, entity, instanceId, camera, animation)
+        renderScene.clientContext?.updateWorld(modelToWorld, entity, camera, animation)
     }
 
     /**
@@ -374,7 +382,7 @@ class ModelAttachment(
         allNodes.forEach { it.collectCommands(pipeline) }
         modelRoot?.collectCommands(pipeline)
         val context = renderScene.clientContext
-        if (context != null) pipeline.addBatchedRenderable { context.collect(stack.last().pose()) }
+        if (context != null) pipeline.addBatchedRenderable { context.collect(stack.last().pose(), light) }
     }
 
     /** Hands the unskinned meshes of this instance to the model's merged geometry, to be drawn as one. */

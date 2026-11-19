@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.decals.DecalShapes
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.render.DebugLines
 import ru.hollowhorizon.hollowengine.client.utils.math.asMatrix4f
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
@@ -18,12 +18,12 @@ import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
  */
 internal fun DebugLines.Batch.decalShapes(rig: ModelRig, roots: List<RenderModelNode>, selected: RigPartSelection?) {
     rig.allAttachments().forEach { (bone, spec) ->
-        if (spec !is DecalAttachmentSpec) return@forEach
+        if (spec !is Decal) return@forEach
         val holder = holderMatrix(roots, bone) ?: return@forEach
         val isSelected = selected != null && selected.bone == bone && selected.id == spec.id
         val placement = Matrix4f(holder.asMatrix4f())
-        val extent = DecalExtents.of(spec.decal, placement, DecalGround.floor())
-        val shape = Matrix4f(placement).mul(DecalShapes.unitCube(spec.decal, extent))
+        val extent = DecalExtents.of(spec, placement, DecalGround.floor())
+        val shape = Matrix4f(placement).mul(DecalShapes.unitCube(spec, extent))
         if (!isSelected) {
             DecalShapes.edges(shape) { start, end -> line(Vec3f(start.x, start.y, start.z), Vec3f(end.x, end.y, end.z), DECAL_COLOR) }
             return@forEach

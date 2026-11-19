@@ -8,7 +8,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.*
 import ru.hollowhorizon.hollowengine.client.utils.IconHelper
 import ru.hollowhorizon.hollowengine.client.vfx.VfxAssets
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
+import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.sounds.SoundSource
 import ru.hollowhorizon.hollowengine.common.vfx.VfxFormat
 
@@ -152,7 +152,7 @@ object EditorAssetSources {
             extension.endsWith("png") -> "textures"
             extension.endsWith("ogg") || extension.endsWith("wav") -> "sounds"
             extension.removePrefix(".") in SoundSource.fileExtensions -> "sounds"
-            extension in DecalSpec.VideoExtensions -> "videos"
+            extension in Decal.VideoExtensions -> "videos"
             else -> "models"
         }
         return runCatching {

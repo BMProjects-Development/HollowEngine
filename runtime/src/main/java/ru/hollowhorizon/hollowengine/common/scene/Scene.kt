@@ -13,7 +13,10 @@ interface SceneContext {
     fun createLifecycle(owner: ComponentOwner, id: UUID, value: Any): ComponentLifecycle? =
         (value as? ComponentBehavior)?.bind(owner, id)
     fun onLifecycleActivityChanged(lifecycle: ComponentLifecycle, active: Boolean) = Unit
+    fun onComponentActivity(owner: ComponentOwner, id: UUID, value: Any, activity: ComponentActivity) = Unit
 }
+
+enum class ComponentActivity { ACTIVE, SUSPENDED, REMOVED }
 
 /** A scene may be placed under a transform supplied by its owner. */
 interface SceneTransformParent {

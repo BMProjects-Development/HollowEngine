@@ -3,7 +3,10 @@ package ru.hollowhorizon.hollowengine.common.decals
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
-import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
+import ru.hollowhorizon.hollowengine.api.Registerable
+import ru.hollowhorizon.hollowengine.api.Syncable
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scripting.annotations.Attach
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
 
 /** How a decal casts its picture onto what is under it. */
@@ -27,7 +30,13 @@ private const val LANG = "hollowengine.gui.decal"
  * projector says what it reaches, and everything in there wears the picture, whatever it is.
  */
 @Serializable
-data class DecalSpec(
+@SerialName(Decal.TYPE_ID)
+@Registerable
+@Syncable
+@Attach(SceneObject::class)
+@EditorName("hollowengine.gui.rig_editor.kind_decal")
+@EditorIcon("hollowengine:textures/gui/icons/vfx/node_decal.svg")
+data class Decal(
     /** A texture, or a video when the Media addon can play one. */
     @EditorName("$LANG.texture")
     @EditorDescription("$LANG.texture.hint")
@@ -72,31 +81,16 @@ data class DecalSpec(
     /** Whether the picture shines on its own rather than being lit by the world where it lies. */
     @EditorName("$LANG.emissive")
     val emissive: Boolean = false,
+    @EditorHidden
+    val id: String = "decal",
 ) {
     val isVideo: Boolean get() = VideoExtensions.any { texture.endsWith(it, ignoreCase = true) }
 
     companion object {
+        const val TYPE_ID = "hollowengine:rig/decal"
         val VideoExtensions = listOf(".mp4", ".webm", ".mkv", ".mov", ".avi")
     }
 }
 
-/** A decal hung on a bone or the whole model, placed by hand; it projects along the down axis of its place. */
-@Serializable
-@SerialName("hollowengine:rig/decal")
-@EditorName("hollowengine.gui.rig_editor.kind_decal")
-@EditorIcon("hollowengine:textures/gui/icons/vfx/node_decal.svg")
-data class DecalAttachmentSpec(
-    @EditorHidden
-    val id: String = "decal",
-    @EditorName("$LANG.decal")
-    val decal: DecalSpec = DecalSpec(),
-) {
-    /** The running decal takes every change in place. */
-    companion object {
-        val TYPE = RigAttachmentType(
-            "hollowengine:rig/decal", DecalAttachmentSpec::class, DecalAttachmentSpec::id, serializer(),
-            "hollowengine.gui.rig_editor.kind_decal", { DecalAttachmentSpec(id = it) },
-            allowedOnModel = true, editorColor = 0xC77DDB,
-        )
-    }
-}
+@Deprecated("Use Decal")
+typealias DecalSpec = Decal

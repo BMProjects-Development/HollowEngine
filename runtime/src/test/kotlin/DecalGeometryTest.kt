@@ -6,10 +6,8 @@ import ru.hollowhorizon.hollowengine.client.decals.DecalExtent
 import ru.hollowhorizon.hollowengine.client.decals.DecalGround
 import ru.hollowhorizon.hollowengine.client.decals.DecalShapes
 import ru.hollowhorizon.hollowengine.common.decals.DecalProjection
-import ru.hollowhorizon.hollowengine.common.decals.DecalSpec
-import ru.hollowhorizon.hollowengine.common.entities.objects.decalRigOf
-import ru.hollowhorizon.hollowengine.common.models.addedBones
-import ru.hollowhorizon.hollowengine.common.utils.math.eulerRotationXyz
+import ru.hollowhorizon.hollowengine.common.decals.Decal
+import ru.hollowhorizon.hollowengine.common.entities.objects.decalPoseOf
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +15,7 @@ import kotlin.test.assertTrue
 
 class DecalGeometryTest {
     /** Where [point] of the decal frame lies in the unit cube, as the shader finds it. */
-    private fun cubeOf(spec: DecalSpec, point: Vector3f): Vector3f {
+    private fun cubeOf(spec: Decal, point: Vector3f): Vector3f {
         val extent = DecalExtent(spec.width, spec.length ?: spec.width, spec.reach ?: 1f)
         return Matrix4f(DecalShapes.unitCube(spec, extent)).invert().transformProject(Vector3f(point))
     }
@@ -27,7 +25,7 @@ class DecalGeometryTest {
 
     @Test
     fun `a box lays the picture down onto the floor, its top to the north`() {
-        val spec = DecalSpec(width = 2f, length = 2f, reach = 1f)
+        val spec = Decal(width = 2f, length = 2f, reach = 1f)
         val center = cubeOf(spec, Vector3f(0f, -0.25f, 0f))
         assertTrue(center.lengthSquared() < 1f && abs(center.x) < 1e-4f && abs(center.y) < 1e-4f)
 
@@ -39,7 +37,7 @@ class DecalGeometryTest {
 
     @Test
     fun `a box reaches from its place straight down its depth`() {
-        val spec = DecalSpec(width = 1f, length = 1f, reach = 1f)
+        val spec = Decal(width = 1f, length = 1f, reach = 1f)
         fun inside(y: Float) = cubeOf(spec, Vector3f(0f, y, 0f)).let { abs(it.z) <= 1f }
         assertTrue(!inside(0.1f), "above its place is outside")
         assertTrue(inside(-0.05f) && inside(-0.95f), "down to its depth is inside")
@@ -48,7 +46,7 @@ class DecalGeometryTest {
 
     @Test
     fun `a projector reaches down to its range, widening with distance`() {
-        val spec = DecalSpec(projection = DecalProjection.PROJECTOR, width = 1f, length = 1f, reach = 10f, fieldOfView = 90f)
+        val spec = Decal(projection = DecalProjection.PROJECTOR, width = 1f, length = 1f, reach = 10f, fieldOfView = 90f)
         val near = cubeOf(spec, Vector3f(0.4f, -1f, 0f))
         val far = cubeOf(spec, Vector3f(0.4f, -8f, 0f))
         assertTrue(near.x > far.x && far.x > 0f, "the same offset is a smaller share of the picture further away")
@@ -69,7 +67,7 @@ class DecalGeometryTest {
     @Test
     fun `a decal dropped on a face looks out of it, its top up on walls and north on floors`() {
         fun turned(face: Direction, local: Vector3f): Vector3f {
-            val turn = eulerRotationXyz(decalRigOf("ns:textures/a.png", face).addedBones.values.single().rotation)
+            val turn = decalPoseOf(face).rotation
             return Quaternionf(turn.x, turn.y, turn.z, turn.w).transform(Vector3f(local))
         }
         Direction.entries.forEach { face ->
