@@ -23,6 +23,8 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.NoAiRuntime
 import ru.hollowhorizon.hollowengine.common.attachments.components.ai.AIComponentSystems
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.entities.objects.migrateStandaloneRig
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
@@ -39,6 +41,7 @@ private data class LevelEntityState(
 private class PendingTransfer(
     val components: Map<ResourceLocation, Any>?,
     val data: NbtDataStore?,
+    val modelPose: TrsTransformF?,
 )
 
 private data class SideTransferState(
@@ -99,6 +102,7 @@ object AttachmentRegistry {
             val components = state.components.readOnly
             NoAiRuntime.apply(entity, components.containsKey(noAiId))
             AIComponentSystems.tickEntity(entity, components)
+            if (!level.isClientSide && state.observeModelTransformChange()) EntityStateSync.markDirty(entity)
         }
     }
 
@@ -193,7 +197,7 @@ object AttachmentRegistry {
             val root = CompoundTag()
             root.putInt(VERSION_NBT, CURRENT_VERSION)
 
-            state.components.snapshot(entity)?.let { root.put(COMPONENTS_NBT, EntitySerialization.serializeToNbt(it)) }
+            state.snapshot()?.let { root.put(COMPONENTS_NBT, EntitySerialization.serializeToNbt(it)) }
 
             state.dataOrNull?.takeUnless { it.isEmpty() }?.let {
                     root.put(DATA_NBT, it.save())
@@ -243,8 +247,11 @@ object AttachmentRegistry {
 
         val state = state(entity)
         components?.let {
-            val saved = EntitySerialization.deserializeFromNbt(it).components
-            state.components.replaceAll(if (entity is WorldObjectEntity) entity.migrateStandaloneRig(saved) else saved)
+            val saved = EntitySerialization.deserializeFromNbt(it)
+            state.setModelPose(saved.modelPose)
+            state.components.replaceAll(
+                if (entity is WorldObjectEntity) entity.migrateStandaloneRig(saved.components, saved.modelPose) else saved.components,
+            )
         }
         data?.let {
             state.data.load(it)
@@ -298,6 +305,7 @@ object AttachmentRegistry {
         val data = source?.dataOrNull ?: cached?.data
 
         val target = state(new)
+        target.setModelPose(source?.modelTransformOrNull ?: cached?.modelPose)
         target.components.clear()
         target.components.putAll(if (dropLooseOnDeath) components.withoutLooseOnDeath() else components)
         data?.takeUnless { it.isEmpty() }?.let(target::adoptData)
@@ -305,28 +313,31 @@ object AttachmentRegistry {
 
     fun entitySnapshot(level: Level, entityUuid: UUID): EntitySnapshot? {
         val state = stateOrNull(level, entityUuid) ?: return null
-        return state.components.snapshot(state.entity)
+        return state.snapshot()
     }
 
     fun entitySnapshots(level: Level): List<Pair<Entity, EntitySnapshot>> = synchronized(levelStates) {
         levelStates[level]?.byUuid?.values?.mapNotNull { state ->
             val entity = state.entity
-            val snapshot = state.components.snapshot(entity) ?: return@mapNotNull null
+            val snapshot = state.snapshot() ?: return@mapNotNull null
             entity to snapshot
         }.orEmpty()
     }
 
     fun updateEntitySnapshot(entity: Entity, snapshot: EntitySnapshot) {
-        state(entity).components.replaceAll(snapshot.components)
+        val state = state(entity)
+        state.setModelPose(snapshot.modelPose)
+        state.components.replaceAll(snapshot.components)
     }
 
     fun removeEntitySnapshot(level: Level, entityUuid: UUID): Entity? {
         val pending = sideState(level).pendingByEntityUuid
         pending[entityUuid]?.let { cached ->
             if (cached.data == null) pending.remove(entityUuid)
-            else pending[entityUuid] = PendingTransfer(null, cached.data)
+            else pending[entityUuid] = PendingTransfer(null, cached.data, null)
         }
         val state = stateOrNull(level, entityUuid) ?: return null
+        state.setModelPose(null)
         state.components.clear()
         return state.entity
     }
@@ -350,8 +361,9 @@ object AttachmentRegistry {
     private fun cacheForTransfer(level: Level, uuid: UUID, state: HollowAttachments) {
         val components = state.components.copyOf().takeUnless { it.isEmpty() }
         val data = state.dataOrNull?.takeUnless { it.isEmpty() }
-        if (components == null && data == null) sideState(level).pendingByEntityUuid.remove(uuid)
-        else sideState(level).pendingByEntityUuid[uuid] = PendingTransfer(components, data)
+        val pose = state.modelTransformOrNull?.takeUnless { it.hasIdentityPose() }?.let { TrsTransformF().set(it) }
+        if (components == null && data == null && pose == null) sideState(level).pendingByEntityUuid.remove(uuid)
+        else sideState(level).pendingByEntityUuid[uuid] = PendingTransfer(components, data, pose)
     }
 
     /** Takes what [cacheForTransfer] left for [uuid], so only one instance can claim it. */
@@ -360,6 +372,7 @@ object AttachmentRegistry {
 
     private fun restoreFromTransfer(level: Level, uuid: UUID, target: HollowAttachments) {
         takePendingTransfer(level, uuid)?.let { cached ->
+            target.setModelPose(cached.modelPose)
             cached.components?.let {
                 target.components.clear()
                 target.components.putAll(it)
@@ -438,9 +451,10 @@ object AttachmentRegistry {
 
     private fun rebind(source: HollowAttachments, entity: MCEntity): HollowAttachments {
         val nodes = source.nodesNbt
+        val pose = source.modelTransformOrNull?.let { TrsTransformF().set(it) }
         source.scope.cancel()
         source.closeRuntime()
-        return source.rebindTo(entity, nodes)
+        return source.rebindTo(entity, nodes, pose)
     }
 
     private fun levelState(level: Level): LevelEntityState = synchronized(levelStates) {

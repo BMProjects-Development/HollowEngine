@@ -24,8 +24,6 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ROOT_COMPONENT_ID
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelOrNull
-import ru.hollowhorizon.hollowengine.common.attachments.binding.transformOrNull
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.entities.objects.*
 import ru.hollowhorizon.hollowengine.common.events.ClientOnly
@@ -243,8 +241,7 @@ object WorldObjectEditing {
             val position = target.pose(partialTick).position
             return target.boundingBox.move(position.x - target.x, position.y - target.y, position.z - target.z)
         }
-        val transform = snapshot.transformOrNull() ?: TransformComponent()
-        return buildNodeRenderBounds(local, resolveNodeWorldTransform(target, transform, partialTick))
+        return buildNodeRenderBounds(local, resolveNodeWorldTransform(target, partialTick))
     }
 
     /** Moves the object to where the gizmo left it. */

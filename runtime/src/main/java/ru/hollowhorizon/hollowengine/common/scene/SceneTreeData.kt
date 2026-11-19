@@ -1,28 +1,17 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
 import ru.hollowhorizon.hollowengine.common.models.LegacyNodePlacement
-import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
-import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
-import ru.hollowhorizon.hollowengine.common.utils.nbt.ForQuatF
 import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import java.util.UUID
 
 /** Saves the authored branch of a world object or sends it to tracked clients. */
 internal object SceneTreeData {
     val importedPathSerializer = ListSerializer(ScenePathSegment.serializer())
-
-    @Serializable
-    private data class Pose(
-        val position: Vec3f,
-        @Serializable(with = ForQuatF::class) val rotation: QuatF,
-        val scale: Vec3f,
-    )
 
     fun write(root: SceneObject, syncOnly: Boolean, includeImported: Boolean = false): CompoundTag {
         val components = SceneComponentData.write(root, syncOnly)
@@ -95,18 +84,12 @@ internal object SceneTreeData {
     }
 
     fun writePose(transform: TrsTransformF): CompoundTag = NBTFormat.serialize(
-        Pose.serializer(), Pose(Vec3f(transform.translation), QuatF(transform.rotation), Vec3f(transform.scale)),
+        SceneTransformSerializer, transform,
     ) as CompoundTag
 
     fun readPose(tag: CompoundTag, destination: TrsTransformF = TrsTransformF()): TrsTransformF? {
-        val pose = runCatching { NBTFormat.deserialize(Pose.serializer(), tag) }.getOrNull() ?: return null
-        val (x, y, z) = pose.position
-        if (!(x.isFinite() && y.isFinite() && z.isFinite() && pose.rotation.x.isFinite() &&
-                    pose.rotation.y.isFinite() && pose.rotation.z.isFinite() && pose.rotation.w.isFinite() &&
-                    pose.scale.x.isFinite() && pose.scale.y.isFinite() && pose.scale.z.isFinite())) return null
-        val norm = pose.rotation.dot(pose.rotation)
-        if (!norm.isFinite() || norm == 0f) return null
-        return destination.setCompositionOf(pose.position, pose.rotation.normed(), pose.scale)
+        val pose = runCatching { NBTFormat.deserialize(SceneTransformSerializer, tag) }.getOrNull() ?: return null
+        return pose.copyValidatedPoseTo(destination)
     }
 
     fun applyPose(node: SceneObject, tag: CompoundTag): Boolean = readPose(tag, node.localTransform) != null

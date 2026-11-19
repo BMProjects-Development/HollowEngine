@@ -1,19 +1,19 @@
 package ru.hollowhorizon.hollowengine.common.entities.objects
 
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.decals.Decal
 import ru.hollowhorizon.hollowengine.common.models.legacyPlacementNode
 import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.SceneComponentData
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.scene.accepts
 
 /** A saved blank model used to be required for root attachments. Lift it when its transform is redundant. */
-internal fun WorldObjectEntity.migrateStandaloneRig(components: List<Any>): List<Any> {
+internal fun WorldObjectEntity.migrateStandaloneRig(components: List<Any>, modelPose: TrsTransformF?): List<Any> {
     val model = components.filterIsInstance<Model>().singleOrNull() ?: return components
     if (!model.isEmpty || model.rig.materials.isNotEmpty()) return components
-    val transform = components.filterIsInstance<TransformComponent>().firstOrNull()
-    if (transform != null && transform != TransformComponent()) return components
+    if (modelPose != null && !modelPose.hasIdentityPose()) return components
     val rig = model.rig
     val placed = rig.bones.map { (name, bone) ->
         val origin = bone.origin ?: return components

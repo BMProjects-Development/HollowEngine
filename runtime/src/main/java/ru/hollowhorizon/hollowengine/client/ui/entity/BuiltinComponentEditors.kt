@@ -15,6 +15,7 @@ import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.widgets.tooltipOnHover
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.*
 import ru.hollowhorizon.hollowengine.common.colliders.fitEntityBox
 import ru.hollowhorizon.hollowengine.common.files.DirectoryManager.fromReadablePath
@@ -22,6 +23,7 @@ import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
 import ru.hollowhorizon.hollowengine.common.models.PlayerSkinPart
 import ru.hollowhorizon.hollowengine.common.utils.isValidRL
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import java.util.*
 
@@ -78,8 +80,9 @@ private fun BodyExtras(scope: ComponentEditorScope) {
     val modelPath = session.entries.firstNotNullOfOrNull { (it.value as? Model)?.model } ?: return
     val location = remember(modelPath) { ResourceLocation.tryParse(modelPath) } ?: return
     val model by remember(location) { HollowModelManager.getOrCreate(location) }.collectAsState()
-    val transform = session.entries.firstNotNullOfOrNull { it.value as? TransformComponent } ?: TransformComponent()
-    val fit = remember(model, transform) { fitEntityBox(model, RigAssets.of(location), transform.transform.matrixF) } ?: return
+    val pose = session.entity?.let { AttachmentRegistry.attachmentsOrNull(it)?.modelTransformOrNull }
+    val fit = remember(model, pose, pose?.modCount) { fitEntityBox(model, RigAssets.of(location), pose?.matrixF ?: Mat4f.IDENTITY) }
+        ?: return
 
     InspectorButton(
         label = "${EntityEditorComponentLang.fitBody}  ${formatSize(fit.first)} × ${formatSize(fit.second)}",

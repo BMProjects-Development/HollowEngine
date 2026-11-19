@@ -10,7 +10,6 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.colliders.hostPosition
 import ru.hollowhorizon.hollowengine.common.colliders.hostRotation
@@ -38,14 +37,14 @@ data class ResolvedNodeTransform(
 fun resolveNodeTransform(
     level: Level,
     hostEntityUuid: UUID?,
-    transform: TransformComponent,
+    pose: TrsTransformF?,
     partialTick: Float,
 ): ResolvedNodeTransform? {
     val worldTransform = if (hostEntityUuid == null) {
-        TrsTransformF().set(transform.transform)
+        TrsTransformF().also { transform -> pose?.let(transform::set) }
     } else {
         val host = findNodeHostEntity(level, hostEntityUuid) ?: return null
-        resolveNodeWorldTransform(host, transform, partialTick)
+        resolveNodeWorldTransform(host, partialTick, pose)
     }
 
     return ResolvedNodeTransform(
@@ -132,17 +131,17 @@ fun buildNodeRenderBounds(localBounds: Pair<Vec3f, Vec3f>?, transform: TrsTransf
     )
 }
 
-fun worldTransformToComponent(
+fun worldToLocalPose(
     level: Level,
     hostEntityUuid: UUID?,
     worldPosition: Vec3,
     worldRotation: QuatF,
     worldScale: Vec3f,
     partialTick: Float,
-): TransformComponent? {
+): TrsTransformF? {
     val normalizedScale = sanitizeScale(worldScale)
     return if (hostEntityUuid == null) {
-        TransformComponent(
+        TrsTransformF().setCompositionOf(
             translation = Vec3f(worldPosition.x.toFloat(), worldPosition.y.toFloat(), worldPosition.z.toFloat()),
             rotation = QuatF(worldRotation),
             scale = normalizedScale,
@@ -159,7 +158,7 @@ fun worldTransformToComponent(
             (worldPosition.z - hostPosition.z).toFloat(),
         ).rotateBy(inverseHostRotation) / hostScale
         val localRotation = MutableQuatF(inverseHostRotation).mul(worldRotation).norm()
-        TransformComponent(
+        TrsTransformF().setCompositionOf(
             translation = localTranslation,
             rotation = localRotation,
             scale = sanitizeScale(normalizedScale / hostScale),

@@ -13,6 +13,10 @@ import ru.hollowhorizon.hollowengine.common.models.withMontages
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.scene.Scene
 import ru.hollowhorizon.hollowengine.common.scene.SceneContext
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
 /** What a side poses a model's colliders from: the model's rig file, the animator it wears, and the model. */
 class ColliderPoseAssets(val rig: ModelRig, val animator: Animator?, val model: Model)
@@ -51,14 +55,17 @@ internal class ColliderPoseTrack(
         if (posedAt == now) return
         posedAt = now
 
+        val local = AttachmentRegistry.attachmentsOrNull(entity)?.modelTransformOrNull
+        current.place(local)
         posed.resetPose()
         animator.configure(assets.animator, node.animations)
         fillAnimationVariables(context, entity, 1f)
-        context.modelToWorld = resolveNodeWorldTransform(entity, node.transform, 1f)
+        context.modelToWorld = resolveNodeWorldTransform(entity, 1f)
         animator.applyTo(current.target, context)
         val laid = rig.withMontages(context.montages)
         if (laid.key != montageKey) {
             val replacement = buildScene(laid.rig)
+            replacement.place(local)
             val previous = current
             current = replacement
             montageKey = laid.key
@@ -71,7 +78,7 @@ internal class ColliderPoseTrack(
         posed.applyRigConstraints(context)
         posed.updateMatrices()
 
-        val placed = applyOverrides(entity, posed.placeColliders(entityModelMatrix(entity, node.transform, 1f), hostPosition(entity, 1f)))
+        val placed = applyOverrides(entity, posed.placeColliders(hostLinearMatrix(entity, 1f), hostPosition(entity, 1f)))
         bounds = placed.map { it.volume.bounds }.reduceOrNull(AABB::minmax)
         history.addFirst(placed)
         while (history.size > historyTicks) history.removeLast()
@@ -80,7 +87,8 @@ internal class ColliderPoseTrack(
     private fun buildScene(rig: ModelRig): PosedScene {
         val scene = Scene(object : SceneContext { override val side = logicalSide })
         try {
-            return PosedScene(scene, PosedModel(assets.model, rig, scene.create("colliders"), "model", assetsOf))
+            val root = scene.create("colliders")
+            return PosedScene(root, PosedModel(assets.model, rig, root, "model", assetsOf))
         } catch (exception: Exception) {
             try {
                 scene.close()
@@ -93,9 +101,18 @@ internal class ColliderPoseTrack(
 
     override fun close() = current.close()
 
-    private class PosedScene(val scene: Scene, val posed: PosedModel) : AutoCloseable {
+    private class PosedScene(val root: SceneObject, val posed: PosedModel) : AutoCloseable {
         val target = posed.poseTarget()
-        override fun close() = scene.close()
+        fun place(value: TrsTransformF?) {
+            val local = root.localTransform
+            if (value == null) {
+                if (!local.hasIdentityPose()) local.setIdentity()
+            } else if (!local.hasSamePoseAs(value)) {
+                local.set(value)
+            }
+        }
+
+        override fun close() = root.scene.close()
     }
 }
 

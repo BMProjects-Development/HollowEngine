@@ -1,6 +1,9 @@
 package ru.hollowhorizon.hollowengine.common.attachments.snapshot
 
 import io.netty.buffer.Unpooled
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.plus
+import kotlinx.serialization.modules.polymorphic
 import net.minecraft.nbt.Tag
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.world.entity.Entity
@@ -15,6 +18,9 @@ import ru.hollowhorizon.hollowengine.common.utils.yaml.YamlFormat
 
 object EntitySerialization {
     private val LOGGER: Logger = LogManager.getLogger(EntitySerialization::class.java)
+    private val legacy = SerializersModule {
+        polymorphic(Any::class) { subclass(LegacyModelPose::class, LegacyModelPose.serializer()) }
+    }
 
     fun serializersModule() = ComponentDescriptorRegistry.serializersModule()
     fun nbtFormat() = NBTFormat(serializersModule())
@@ -24,7 +30,8 @@ object EntitySerialization {
     fun apply(target: MCEntity, snapshot: EntitySnapshot) = applySnapshot(target, snapshot)
 
     fun serializeToNbt(snapshot: EntitySnapshot): Tag = nbtFormat().serialize(EntitySnapshot.serializer(), snapshot)
-    fun deserializeFromNbt(tag: Tag): EntitySnapshot = nbtFormat().deserialize(EntitySnapshot.serializer(), tag)
+    fun deserializeFromNbt(tag: Tag): EntitySnapshot =
+        NBTFormat(serializersModule() + legacy).deserialize(EntitySnapshot.serializer(), tag).migratePose()
 
     fun serializeToByteBuf(snapshot: EntitySnapshot, buf: FriendlyByteBuf = FriendlyByteBuf(Unpooled.buffer())): FriendlyByteBuf =
         byteBufFormat().serialize(EntitySnapshot.serializer(), snapshot, buf)
@@ -35,7 +42,7 @@ object EntitySerialization {
     fun serializeToYaml(snapshot: EntitySnapshot): String =
         YamlFormat.encodeToString(EntitySnapshot.serializer(), snapshot, serializersModule())
     fun deserializeFromYaml(text: String): EntitySnapshot =
-        YamlFormat.decodeFromString(EntitySnapshot.serializer(), text, serializersModule())
+        YamlFormat.decodeFromString(EntitySnapshot.serializer(), text, serializersModule() + legacy).migratePose()
     fun tryDeserializeFromYaml(text: String, source: String = "YAML entity snapshot"): EntitySnapshot? =
         softDeserialize(source) { deserializeFromYaml(text) }
 
@@ -43,6 +50,14 @@ object EntitySerialization {
         return runCatching(decode).onFailure { throwable ->
             LOGGER.error("Failed to deserialize $source", throwable)
         }.getOrNull()
+    }
+
+    private fun EntitySnapshot.migratePose(): EntitySnapshot {
+        val previous = components.filterIsInstance<LegacyModelPose>().firstOrNull() ?: return this
+        return copy(
+            components = components.filterNot { it is LegacyModelPose },
+            modelPose = modelPose ?: previous.transform,
+        )
     }
 }
 
@@ -54,6 +69,7 @@ fun snapshotOf(entity: Entity): EntitySnapshot =
     AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid) ?: EntitySnapshot().withEntity(entity)
 
 fun applySnapshot(target: Entity, snapshot: EntitySnapshot) {
+    AttachmentRegistry.attachments(target).setModelPose(snapshot.modelPose)
     val desired = snapshot.componentById()
     val all = AttachmentRegistry.componentsById(target)
     all.keys.removeIf { it !in desired.keys }

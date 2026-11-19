@@ -4,7 +4,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
-import ru.hollowhorizon.hollowengine.client.models.internal.mountModel
+import ru.hollowhorizon.hollowengine.client.models.internal.createModelRoot
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.EntityConditions
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.ModelNodeEntry
 import ru.hollowhorizon.hollowengine.common.models.*
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
+import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 
 /**
  * One model of an entity as its colliders see it: the nodes as posed, the rig laid over them, and the models
@@ -22,16 +23,26 @@ internal interface ColliderScope {
     val rig: ModelRig
     val isActive: Boolean get() = true
 
-    /** Where this model stands in the outermost model's space; null for the outermost model. */
+    /** Placement of the model root in the same space as [poseNodes]. */
     val modelMatrix: Mat4f?
     val nested: List<ColliderScope>
 }
 
 /** Every collider of this model and of the models nested in it. */
 internal fun ColliderScope.placeColliders(toEntity: Mat4f, origin: Vec3): List<EntityCollider> {
+    val alignedScaleMatrix = modelMatrix?.let { toEntity.mul(it, MutableMat4f()) } ?: toEntity
+    return placeColliders(toEntity, origin, alignedScaleMatrix)
+}
+
+private fun ColliderScope.placeColliders(
+    toEntity: Mat4f,
+    origin: Vec3,
+    alignedScaleMatrix: Mat4f,
+): List<EntityCollider> {
     if (!isActive) return emptyList()
-    val own = if (rig.hasColliders()) rig.placeCollidersOnPose(poseNodes, toEntity, origin, modelMatrix) else emptyList()
-    return own + nested.flatMap { it.placeColliders(toEntity, origin) }
+    val own = if (rig.hasColliders()) rig.placeCollidersOnPose(poseNodes, toEntity, origin, modelMatrix, alignedScaleMatrix)
+    else emptyList()
+    return own + nested.flatMap { it.placeColliders(toEntity, origin, alignedScaleMatrix) }
 }
 
 /**
@@ -85,7 +96,7 @@ internal class PosedModel(
     assetsOf: (String) -> ColliderPoseAssets?,
     depth: Int = 0,
 ) : ColliderScope, AutoCloseable {
-    private val instance = ModelSceneInstance.create(parent, name, model).also { it.setRigBones(rig) }
+    private val instance = ModelSceneInstance.mount(parent.createModelRoot(name), model).also { it.setRigBones(rig) }
     override var rig: ModelRig = rig
         set(value) {
             instance.updateRigBoneRestTransforms(field, value)
@@ -103,8 +114,7 @@ internal class PosedModel(
         val owner = if (bone == null) instance.root else {
             instance.poseNodesByIndex.values.firstOrNull { it.poseName == bone } ?: return@mapNotNull null
         }
-        val holder = owner.mountModel(attachment)
-        PosedModel(assets.model, assets.rig.overlay(attachment.rig), holder, holder.name, assetsOf, depth + 1)
+        PosedModel(assets.model, assets.rig.overlay(attachment.rig), owner, attachment.id.ifBlank { attachment.model }, assetsOf, depth + 1)
     }
 
     /** Puts every node of this model and of the models nested in it back at rest. */

@@ -4,6 +4,9 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
 /**
  * The components attached to one entity.
@@ -28,10 +31,14 @@ class ComponentStore internal constructor() {
     /** Mutable view. Every mutating path drops the cached snapshot. */
     fun asMutableMap(): MutableMap<ResourceLocation, Any> = View()
 
-    fun snapshot(entity: Entity): EntitySnapshot? {
-        if (components.isEmpty()) return null
-        cachedSnapshot?.let { if (it.entity === entity) return it }
-        return EntitySnapshot(components = components.values.toList())
+    fun snapshot(entity: Entity, modelTransform: TrsTransformF? = null): EntitySnapshot? {
+        val pose = modelTransform?.takeUnless { it.hasIdentityPose() }
+        if (pose == null && components.isEmpty()) {
+            cachedSnapshot = null
+            return null
+        }
+        cachedSnapshot?.let { if (it.entity === entity && (it.modelPose === pose || pose?.hasSamePoseAs(it.modelPose) == true)) return it }
+        return EntitySnapshot(components = components.values.toList(), modelPose = pose?.let { TrsTransformF().set(it) })
             .withEntity(entity)
             .also { cachedSnapshot = it }
     }

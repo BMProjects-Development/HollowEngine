@@ -4,6 +4,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import kotlinx.coroutines.CoroutineScope
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.common.attachments.binding.ROOT_COMPONENT_ID
+import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
 import ru.hollowhorizon.hollowengine.common.attachments.tracking.MCEntity
 import ru.hollowhorizon.hollowengine.common.coroutines.EntityScope
@@ -11,7 +13,15 @@ import ru.hollowhorizon.hollowengine.common.data.NbtDataStore
 import ru.hollowhorizon.hollowengine.common.data.Sync
 import ru.hollowhorizon.hollowengine.common.entities.EntityBodies
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.events.LogicalSide
+import ru.hollowhorizon.hollowengine.common.scene.Scene
+import ru.hollowhorizon.hollowengine.common.scene.SceneContext
+import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.scene.copyValidatedPoseTo
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
 import ru.hollowhorizon.hollowengine.common.scripting.nodes.EntityNodeManager
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 
 /**
  * Everything attached to one entity, under one owner.
@@ -34,6 +44,48 @@ class HollowAttachments internal constructor(entity: MCEntity) {
     private var dataStore: NbtDataStore? = null
     private var nodeManager: EntityNodeManager? = null
     private var runtimeState: RuntimeAttachments? = null
+    private var modelRoot: SceneObject? = null
+    private var observedModelTransform = 0
+    private var modelTransformPending = false
+
+    internal val modelTransformOrNull: TrsTransformF?
+        get() = modelRoot?.takeUnless { it.isRemoved }?.localTransform
+
+    /** The node that places the entity's model relative to the Minecraft entity. */
+    val modelNode: SceneObject
+        get() {
+            modelRoot?.takeUnless { it.isRemoved }?.let { return it }
+            observeModelTransformChange()
+            val context = if (entity.level().isClientSide) WorldObjectEntity.clientSceneContext() else ServerModelContext
+            return Scene(context).create("model", ROOT_COMPONENT_ID).also { modelRoot = it }
+        }
+
+    internal fun setModelPose(pose: TrsTransformF?) {
+        val current = modelTransformOrNull
+        if (pose == null || pose.hasIdentityPose()) {
+            if (current != null && !current.hasIdentityPose()) current.setIdentity()
+        } else if (!pose.hasSamePoseAs(current)) {
+            pose.copyValidatedPoseTo(modelNode.localTransform)
+        }
+    }
+
+    /** Called during the entity tick and before building a batch, since scripts may edit the node directly. */
+    internal fun observeModelTransformChange(): Boolean {
+        val version = modelTransformOrNull?.modCount ?: 0
+        if (version != observedModelTransform) {
+            observedModelTransform = version
+            modelTransformPending = true
+        }
+        return modelTransformPending
+    }
+
+    internal fun takeModelTransformChange(): TrsTransformF? {
+        if (!observeModelTransformChange()) return null
+        modelTransformPending = false
+        return TrsTransformF().also { copy -> modelTransformOrNull?.let(copy::set) }
+    }
+
+    internal fun snapshot(): EntitySnapshot? = components.snapshot(entity, modelTransformOrNull)
 
     /**
      * Nodes that this entity was saved with, held it until entity actually joins a level.
@@ -54,7 +106,13 @@ class HollowAttachments internal constructor(entity: MCEntity) {
     internal fun closeRuntime() {
         val previous = runtimeState
         runtimeState = null
-        previous?.close()
+        try {
+            previous?.close()
+        } finally {
+            val scene = modelRoot?.scene
+            modelRoot = null
+            scene?.close()
+        }
     }
 
     /** The node scripts attached to this entity, or null when none were ever attached. */
@@ -122,14 +180,20 @@ class HollowAttachments internal constructor(entity: MCEntity) {
      * the old one is canceled by the caller, which hands [nodes] over as the state the new instance
      * re-attaches them from once it joins a level.
      */
-    internal fun rebindTo(newEntity: MCEntity, nodes: CompoundTag?): HollowAttachments =
+    internal fun rebindTo(newEntity: MCEntity, nodes: CompoundTag?, pose: TrsTransformF?): HollowAttachments =
         HollowAttachments(newEntity).also { target ->
             target.pendingNodes = nodes
             target.components.putAll(components.copyOf())
+            target.setModelPose(pose)
             target.adoptData(dataStore)
             target.syncVersion = syncVersion
             target.lastSyncedComponents = lastSyncedComponents
             target.lastSyncedData = lastSyncedData
             target.lastSyncedOwnerData = lastSyncedOwnerData
         }
+
+    private object ServerModelContext : SceneContext { override val side = LogicalSide.SERVER }
 }
+
+/** The model's local pose lives on this node. Entity position still comes from Minecraft. */
+val MCEntity.modelNode: SceneObject get() = AttachmentRegistry.attachments(this).modelNode

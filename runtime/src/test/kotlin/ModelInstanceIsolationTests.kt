@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelInstanceMaterials
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.NestedModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.BaseAttachment
+import ru.hollowhorizon.hollowengine.client.scene.ClientSceneContext
 import ru.hollowhorizon.hollowengine.common.attachments.components.AnimationsComponent
 import ru.hollowhorizon.hollowengine.common.models.AnimationPlayMode
 import ru.hollowhorizon.hollowengine.common.models.ClipAnimationLayerSpec
@@ -27,6 +28,7 @@ import ru.hollowhorizon.hollowengine.common.models.RigBone
 import ru.hollowhorizon.hollowengine.common.models.RigBoneOrigin
 import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
+import ru.hollowhorizon.hollowengine.common.scene.Scene as ObjectScene
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableMat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
@@ -44,6 +46,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ModelInstanceIsolationTests {
+    @Test
+    fun `moving the node carrying a model refreshes its render bounds before posing`() {
+        val material = Material()
+        val mesh = Mesh(listOf(Primitive(positions = arrayOf(Vec3f.ZERO, Vec3f.ONES), material = material)), floatArrayOf())
+        val bone = NodeDefinition(0, "bone", mutableListOf(), TrsTransformF().translate(2f, 0f, 0f), mesh)
+        val model = Model(0, listOf(Scene(listOf(bone))), setOf(material))
+
+        ObjectScene(ClientSceneContext()).use { scene ->
+            val owner = scene.create("owner")
+            ModelAttachment(MutableStateFlow(model), null, root = owner.create("model")).use { attachment ->
+                assertEquals(2f, attachment.cullingBounds()?.first?.x)
+                owner.localTransform.translate(9f, 0f, 0f)
+                assertEquals(11f, attachment.nodes.single().globalMatrix.getTranslation().x)
+                assertEquals(11f, attachment.cullingBounds()?.first?.x)
+                assertEquals(12f, attachment.calculateBounds()?.second?.x)
+            }
+            assertFalse(owner.isRemoved)
+        }
+    }
+
     @Test
     fun `montage changes scene visibility and restores it after the layer ends`() {
         val attachment = ModelAttachment(MutableStateFlow(modelWith(Material(), floatArrayOf())), null)
@@ -153,6 +175,8 @@ class ModelInstanceIsolationTests {
         val hand = attachment.findNode("hand")!!
         val first = hand.attachments.filterIsInstance<NestedModelAttachment>().single()
         val nestedRoot = first.model.sceneRoot
+        assertSame(hand.sceneObject, nestedRoot.physicalParent)
+        first.transform.translate(0f, 1f, 0f)
         val addition = nestedRoot.create("added")
         val moved = RigPose(position = Vec3f(0f, 2f, 0f))
         attachment.rig = rig.withBone("hand", RigBone(attachments = listOf(sword), pose = moved))
@@ -162,7 +186,8 @@ class ModelInstanceIsolationTests {
 
         assertSame(hand, attachment.findNode("hand"))
         assertSame(first, hand.attachments.filterIsInstance<NestedModelAttachment>().single())
-        assertEquals(2f, nestedRoot.worldTransform.getTranslation().y)
+        assertEquals(3f, nestedRoot.worldTransform.getTranslation().y)
+        assertSame(nestedRoot.worldTransform, first.model.globalMatrix)
 
         flow.value = model(3f)
 

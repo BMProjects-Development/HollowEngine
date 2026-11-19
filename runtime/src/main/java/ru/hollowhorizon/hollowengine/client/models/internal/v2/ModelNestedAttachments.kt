@@ -24,7 +24,7 @@ internal class ModelNestedAttachments(nodes: List<RenderModelNode>, modelRoot: R
         if (spec !is ModelAttachmentSpec) return null
         val index = retained.indexOfFirst { existing ->
             existing.spec.id == spec.id && existing.spec.model == spec.model &&
-                !existing.sceneHolder.isRemoved && existing.sceneHolder.physicalParent === context.node.sceneObject
+                !existing.model.sceneRoot.isRemoved && existing.model.sceneRoot.physicalParent === context.node.sceneObject
         }
         if (index < 0) return null
         val attachment = retained.removeAt(index)

@@ -17,13 +17,10 @@ import java.util.UUID
 /** Scene-owned spatial state for a rendered model and its rig-added bones. */
 internal class ModelRenderScene private constructor(
     private val ownedScene: Scene?,
-    parent: SceneObject,
-    name: String,
-    model: Model,
+    val instance: ModelSceneInstance,
+    val clientContext: ClientSceneContext?,
 ) : AutoCloseable {
-    val instance = ModelSceneInstance.create(parent, name, model)
     val root: SceneObject get() = instance.root
-    val clientContext: ClientSceneContext? get() = ownedScene?.context as? ClientSceneContext
     private var imported: Map<SceneObject, Map<String, UUID>> = emptyMap()
 
     /** Imports migrated rig entries into the same component store scripts and editors use. */
@@ -96,16 +93,15 @@ internal class ModelRenderScene private constructor(
     }
 
     companion object {
-        fun create(parent: Attachment?, model: Model): ModelRenderScene {
-            val nested = parent as? NestedModelAttachment
-            val holder = nested?.sceneHolder
-            val scene = if (holder == null) Scene(
+        fun create(parent: Attachment?, model: Model, root: SceneObject?): ModelRenderScene {
+            val scene = if (root == null) Scene(
                 ClientSceneContext(),
                 parent?.let(::AttachmentSceneTransform),
             ) else null
             try {
-                val owner = holder ?: checkNotNull(scene).create("owner")
-                return ModelRenderScene(scene, owner, holder?.name ?: "model", model)
+                val mount = root ?: checkNotNull(scene).create("model")
+                val context = if (scene != null || parent == null) mount.scene.context as? ClientSceneContext else null
+                return ModelRenderScene(scene, ModelSceneInstance.mount(mount, model), context)
             } catch (exception: Exception) {
                 try {
                     scene?.close()

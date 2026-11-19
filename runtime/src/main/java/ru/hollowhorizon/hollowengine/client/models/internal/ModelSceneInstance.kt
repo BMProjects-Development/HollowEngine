@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.applyRigConstraintsToPose
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RigGroundingState
 import ru.hollowhorizon.hollowengine.common.models.LayerBlendMode
-import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.addedBones
 import ru.hollowhorizon.hollowengine.common.scene.SceneAddress
@@ -236,8 +235,10 @@ class ModelSceneInstance private constructor(
 
     companion object {
         /** Constructs an independent instance below [parent], rolling back if the asset is invalid. */
-        fun create(parent: SceneObject, name: String, model: Model, id: UUID = UUID.randomUUID()): ModelSceneInstance {
-            val root = parent.create(name, id)
+        fun create(parent: SceneObject, name: String, model: Model, id: UUID = UUID.randomUUID()): ModelSceneInstance =
+            mount(parent.create(name, id), model)
+
+        internal fun mount(root: SceneObject, model: Model): ModelSceneInstance {
             try {
                 return ModelSceneInstance(root).also { it.reload(model) }
             } catch (exception: Exception) {
@@ -252,12 +253,12 @@ class ModelSceneInstance private constructor(
     }
 }
 
-/** Mount for a nested model. Its placement stays separate from the placed model's own local pose. */
-internal fun SceneObject.mountModel(spec: ModelAttachmentSpec): SceneObject {
-    val baseName = spec.id.ifBlank { spec.model.ifBlank { "model" } }
-    val names = if (isSynthetic) checkNotNull(parent).children else children
+/** Creates an addressable model root directly below the node carrying it. */
+internal fun SceneObject.createModelRoot(preferredName: String): SceneObject {
+    val baseName = preferredName.ifBlank { "model" }
     var name = baseName
     var suffix = 2
-    while (names.any { it.name == name }) name = "$baseName (${suffix++})"
-    return importSynthetic(name)
+    val siblings = if (isSynthetic) checkNotNull(parent).children else children
+    while (siblings.any { it.name == name }) name = "$baseName (${suffix++})"
+    return create(name)
 }

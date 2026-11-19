@@ -19,7 +19,7 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.modelInstanceOrNu
 import ru.hollowhorizon.hollowengine.client.render.ResolvedNodeTransform
 import ru.hollowhorizon.hollowengine.client.render.buildNodeRenderBounds
 import ru.hollowhorizon.hollowengine.client.render.resolveNodeTransform
-import ru.hollowhorizon.hollowengine.client.render.worldTransformToComponent
+import ru.hollowhorizon.hollowengine.client.render.worldToLocalPose
 import ru.hollowhorizon.hollowengine.client.ui.*
 import ru.hollowhorizon.hollowengine.client.ui.ide.HollowIdeOverlay
 import ru.hollowhorizon.hollowengine.client.ui.ide.WorldObjectParts
@@ -32,7 +32,9 @@ import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.common.attachments.binding.*
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
+import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import ru.hollowhorizon.hollowengine.common.config.HollowEngineConfig
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
@@ -548,17 +550,18 @@ object TransformGizmoEditor {
     private fun computeTargetBounds(
         target: TransformGizmoTarget,
         resolved: ResolvedNodeTransform,
-        localBounds: Pair<Vec3f, Vec3f>?,
+        worldBounds: AABB?,
     ): AABB = when (target.type) {
-        TransformGizmoTargetType.MODEL -> buildNodeRenderBounds(localBounds, resolved.transform)
+        TransformGizmoTargetType.MODEL -> worldBounds ?: buildNodeRenderBounds(null, resolved.transform)
         TransformGizmoTargetType.TRANSFORM -> buildGenericBounds(resolved.transform)
     }
 
-    /** The local box of what is drawn for a node, or null while nothing has drawn it yet. */
-    private fun localBoundsOf(entity: Entity?, nodeId: UUID, model: Model?): Pair<Vec3f, Vec3f>? {
+    /** Model bounds already include the pose of the node that carries its geometry. */
+    private fun worldBoundsOf(entity: Entity?, nodeId: UUID, model: Model?, partialTick: Float): AABB? {
         val host = entity ?: return null
         val name = model?.model ?: return null
-        return host.modelInstanceOrNull(nodeId, name)?.attachment?.calculateBounds()
+        val bounds = host.modelInstanceOrNull(nodeId, name)?.attachment?.calculateBounds() ?: return null
+        return buildNodeRenderBounds(bounds, resolveNodeWorldTransform(host, partialTick))
     }
 
     /**
@@ -587,11 +590,13 @@ object TransformGizmoEditor {
             if (record.hostEntity is WorldObjectEntity) return@forEach
             val snapshot = service.snapshot(record.snapshotId) ?: return@forEach
             val hostEntityUuid = snapshot.hostEntityUuidOrNull() ?: record.hostEntityUuid
+            val host = record.hostEntity
+            val pose = if (host == null) snapshot.modelPose else AttachmentRegistry.attachmentsOrNull(host)?.modelTransformOrNull
             val claimedNodes = hashSetOf<UUID>()
 
             snapshot.modelNodes().forEach modelNode@{ modelNode ->
                 val resolved =
-                    resolveNodeTransform(level, hostEntityUuid, modelNode.transform, partialTick) ?: return@modelNode
+                    resolveNodeTransform(level, hostEntityUuid, pose, partialTick) ?: return@modelNode
                 val entryId = GizmoEntryId(record.snapshotId, modelNode.nodeId)
                 val entry = entries.getOrPut(entryId) { GizmoEntry(entryId) }
                 val target = resolveTarget(modelNode.model)
@@ -603,7 +608,7 @@ object TransformGizmoEditor {
                 entry.modelComponent = modelNode.model
                 val dragging = draggingKey == entryId
                 val display = displayResolved(entry, resolved, dragging)
-                val bounds = localBoundsOf(record.hostEntity, modelNode.nodeId, modelNode.model)
+                val bounds = worldBoundsOf(record.hostEntity, modelNode.nodeId, modelNode.model, partialTick)
                 entry.updateFromResolved(display, computeTargetBounds(target, display, bounds), dragging)
                 seen += entryId
                 claimedNodes += modelNode.nodeId
@@ -675,19 +680,18 @@ object TransformGizmoEditor {
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
         val nodeSnapshot = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
-        val transform =
-            nodeSnapshot.components.filterIsInstance<TransformComponent>().firstOrNull() ?: TransformComponent()
+        val host = entry.entityId?.let(level::getEntity)
+        val pose = if (host == null) snapshot.modelPose else AttachmentRegistry.attachmentsOrNull(host)?.modelTransformOrNull
         val model = nodeSnapshot.components.filterIsInstance<Model>().firstOrNull()
         val target = resolveTarget(model)
         val hostEntityUuid = snapshot.hostEntityUuidOrNull() ?: entry.hostEntityUuid
-        val resolved = resolveNodeTransform(level, hostEntityUuid, transform, TickHandler.partialTick) ?: return
+        val resolved = resolveNodeTransform(level, hostEntityUuid, pose, TickHandler.partialTick) ?: return
         entry.hostEntityUuid = hostEntityUuid
         entry.snapshot = snapshot
         entry.target = target
         entry.modelComponent = model
-        entry.lastAppliedTransform = transform
-        val host = entry.entityId?.let(level::getEntity)
-        val bounds = localBoundsOf(host, entry.nodeId, model)
+        entry.lastAppliedTransform = pose?.let { TrsTransformF().set(it) }
+        val bounds = worldBoundsOf(host, entry.nodeId, model, TickHandler.partialTick)
         entry.updateFromResolved(resolved, computeTargetBounds(target, resolved, bounds), dragging = false)
     }
 
@@ -749,7 +753,7 @@ object TransformGizmoEditor {
         val level = Minecraft.getInstance().level ?: return
         val worldPosition =
             Vec3(values.translation.x.toDouble(), values.translation.y.toDouble(), values.translation.z.toDouble())
-        val updatedTransform = worldTransformToComponent(
+        val updatedTransform = worldToLocalPose(
             level = level,
             hostEntityUuid = entry.hostEntityUuid,
             worldPosition = worldPosition,
@@ -757,20 +761,17 @@ object TransformGizmoEditor {
             worldScale = values.scale,
             partialTick = TickHandler.partialTick,
         ) ?: return
-        if (updatedTransform == entry.lastAppliedTransform) return
+        if (updatedTransform.hasSamePoseAs(entry.lastAppliedTransform)) return
         commitLocalTransform(entry, updatedTransform)
     }
 
-    /** Writes [transform] as the node's local transform: updates the snapshot, materializes and syncs. */
-    private fun commitLocalTransform(entry: GizmoEntry, transform: TransformComponent) {
+    /** Applies the node's local pose immediately and sends the edit to its server owner. */
+    private fun commitLocalTransform(entry: GizmoEntry, pose: TrsTransformF) {
         val level = Minecraft.getInstance().level ?: return
-        entry.lastAppliedTransform = transform
         val service = NodeRuntimeState.service(level)
-        val snapshot = service.snapshot(entry.snapshotId) ?: return
-        val updatedSnapshot = snapshot.withOrReplace(transform, entry.nodeId)
-        entry.snapshot = updatedSnapshot
-        service.materialize(updatedSnapshot)
-        NodeTransformUpdatePacket(entry.snapshotId, entry.nodeId, transform).send()
+        if (!service.updateTransform(entry.snapshotId, pose, entry.nodeId)) return
+        entry.lastAppliedTransform = pose
+        NodeTransformUpdatePacket(entry.snapshotId, entry.nodeId, pose).send()
     }
 
     private fun resetTransform(entryId: GizmoEntryId) {
@@ -783,13 +784,8 @@ object TransformGizmoEditor {
         }
         val level = Minecraft.getInstance().level ?: return
         val snapshot = NodeRuntimeState.service(level).snapshot(entry.snapshotId) ?: return
-        val node = snapshot.nodeByIdOrNull(entry.nodeId) ?: return
-        val current = node.components.filterIsInstance<TransformComponent>().firstOrNull() ?: TransformComponent()
-        val reset = if (entry.hostEntityUuid != null) {
-            TransformComponent()
-        } else {
-            TransformComponent(translation = current.translation, rotation = QuatF.IDENTITY, scale = Vec3f(1f, 1f, 1f))
-        }
+        val reset = TrsTransformF()
+        if (entry.hostEntityUuid == null) snapshot.modelPose?.let { reset.translate(it.translation) }
         commitLocalTransform(entry, reset)
         refreshFromRuntime(entry)
         contextMenuState = null
@@ -814,7 +810,7 @@ object TransformGizmoEditor {
         var visible: Boolean = false
         var lastResolved: ResolvedNodeTransform? = null
         var lastBounds: AABB? = null
-        var lastAppliedTransform: TransformComponent? = null
+        var lastAppliedTransform: TrsTransformF? = null
         var working: GizmoTransformValues? = null
 
         fun updateFromResolved(resolved: ResolvedNodeTransform, bounds: AABB, dragging: Boolean) {

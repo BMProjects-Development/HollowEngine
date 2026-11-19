@@ -23,9 +23,7 @@ import ru.hollowhorizon.hollowengine.client.utils.lang
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.binding.ROOT_COMPONENT_ID
 import ru.hollowhorizon.hollowengine.common.attachments.binding.modelOrNull
-import ru.hollowhorizon.hollowengine.common.attachments.binding.transformOrNull
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.sync.EntityStateSync
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.decals.Decal
@@ -327,10 +325,9 @@ internal object WorldObjectParts {
         val snapshot = AttachmentRegistry.entitySnapshot(entity.level(), entity.uuid) ?: return null
         val model = snapshot.modelOrNull() ?: return null
         val drawn = drawnScope(entity, model, path.steps) ?: return null
-        val transform = snapshot.transformOrNull() ?: TransformComponent()
         val editing = editing(ref, model)
         val bone = drawn.findNode(path.bone) ?: return null
-        return BoneGizmo(entity, drawn, bone, transform, editing, path.encode())
+        return BoneGizmo(entity, drawn, bone, editing, path.encode())
     }
 
     fun selectedDecal(partialTick: Float): Pair<Decal, Mat4f>? {
@@ -344,7 +341,7 @@ internal object WorldObjectParts {
             val decal = if (path.componentId != null) owner.component(path.componentId) as? Decal
             else owner.components.values.firstOrNull { it is Decal } as? Decal
             decal ?: return null
-            val world = resolveNodeWorldTransform(entity, TransformComponent(), partialTick).matrixF
+            val world = resolveNodeWorldTransform(entity, partialTick).matrixF
                 .mul(owner.worldTransform, MutableMat4f())
             return decal to world
         }
@@ -356,8 +353,7 @@ internal object WorldObjectParts {
         else holder.attachments.firstOrNull { it is Decal } as? Decal
         spec ?: return null
         val node = if (path.bone == null) drawn.sceneRoot else drawn.findNode(path.bone)?.sceneObject ?: return null
-        val transform = snapshot.transformOrNull() ?: TransformComponent()
-        val world = resolveNodeWorldTransform(entity, transform, partialTick).matrixF.mul(node.worldTransform, MutableMat4f())
+        val world = resolveNodeWorldTransform(entity, partialTick).matrixF.mul(node.worldTransform, MutableMat4f())
         return spec to world
     }
 

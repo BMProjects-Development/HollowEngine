@@ -50,15 +50,23 @@ fun npc(
 | `rotation` | `Vec2` | `rotation(0, 0)` | Initial yaw/pitch. |
 | `world` | `String` | `"minecraft:overworld"` | Dimension id where the NPC is added. |
 | `attributes` | `Map<String, Float>` | `emptyMap()` | Base attribute values by registry id. |
-| `transform` | `TrsTransformF` | `TrsTransformF()` | Model translation, rotation, and scale relative to the NPC; passed to `TransformComponent`. |
+| `transform` | `TrsTransformF` | `TrsTransformF()` | Initial translation, rotation, and scale of the model node relative to the NPC. |
 | `nameplateMode` | `NameplateMode` | `NameplateMode.SHOW` | Initial nameplate visibility mode. |
 | `inverseHeadRotation` | `Boolean` | `false` | Not applied by the current implementation. Configure head rotation in model metadata. |
 | `inventorySize` | `Int` | `36` | Number of slots in [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Can also be changed later with `npc.inventory.resize(...)`. |
 | `id` | `String?` | `null` | The NPC's own id, such as `"village:blacksmith"`. When a living NPC already has it, `npc()` returns that NPC and ignores the other arguments, see [NPCs Outside the World](/docs/hollowengine/scripting/npc/registry#ids-one-npc-per-name). |
 
 :::warning
-The `inverseHeadRotation` parameter is not applied yet. `transform` is passed to `TransformComponent`. The selected model’s metadata defines its animator and head rotation, so configure a custom model separately. The [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component controls how the NPC pushes and blocks others.
+The `inverseHeadRotation` parameter is not applied yet. The selected model’s metadata defines its animator and head rotation, so configure a custom model separately. The [Body](/docs/hollowengine/world/colliders#the-body-of-an-entity) component controls how the NPC pushes and blocks others.
 :::
+
+To move or resize the model after spawning the NPC, edit the model node's local pose. Put the import at the top of the script.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.modelNode
+
+guide.modelNode.localTransform.translate(0f, 0.25f, 0f)
+```
 
 ---
 
@@ -129,7 +137,7 @@ After creation, the NPC receives:
 
 - `Model(model)` - the model component;
 - the selected model’s animator from its `.hemeta`; the built-in model uses `hollowengine:standard_player` for idle and walking;
-- `TransformComponent(...)` - base model transform;
+- the initial pose of `npc.modelNode`;
 - a nameplate initialized from `name` and `nameplateMode`;
 - a record in the [NPC registry](/docs/hollowengine/scripting/npc/registry), and its body in the selected world.
 

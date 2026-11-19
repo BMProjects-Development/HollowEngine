@@ -7,7 +7,7 @@ import net.minecraft.world.phys.Vec3
 import ru.hollowhorizon.hollowengine.common.attachments.api.set
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
 import ru.hollowhorizon.hollowengine.common.attachments.components.NameplateMode
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
+import ru.hollowhorizon.hollowengine.common.attachments.api.modelNode
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorModel
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorNpcId
 import ru.hollowhorizon.hollowengine.common.entities.NpcEntity
@@ -81,7 +81,7 @@ fun npc(
         yBodyRot = rotation.x
 
         set(Model(model))
-        set(TransformComponent(transform))
+        modelNode.localTransform.set(transform)
 
         if (attributes.isNotEmpty()) {
             setAttributes(attributes)
@@ -111,7 +111,7 @@ fun ServerLevel.npc(
 fun ServerLevel.buildNpc(pos: Vec3, builder: NpcEntity.() -> Unit = {}): NpcEntity = NpcEntity(this).apply {
     moveTo(pos.x, pos.y, pos.z, 0f, 0f)
     set(Model())
-    set(TransformComponent())
+    modelNode.localTransform.setIdentity()
     setNameplate("NPC")
 
     builder()

@@ -30,7 +30,6 @@ import ru.hollowhorizon.hollowengine.common.attachments.binding.NodeRuntimeState
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.HideVanillaEntityModelComponent
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.commands.arguments.ScriptPathArgument
 import ru.hollowhorizon.hollowengine.common.coroutines.runtimeContext
@@ -705,10 +704,7 @@ private fun attachNodeModel(
     val snapshotId = host.uuid
     val service = NodeRuntimeState.service(host.level())
     val snapshot = EntitySnapshot(
-        components = listOf(
-            Model(modelName),
-            TransformComponent(),
-        ) + extraComponents
+        components = listOf(Model(modelName)) + extraComponents
     ).withEntity(host)
     service.materialize(snapshot)
 

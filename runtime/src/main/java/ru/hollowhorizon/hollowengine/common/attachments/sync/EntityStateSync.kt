@@ -17,6 +17,8 @@ import ru.hollowhorizon.hollowengine.common.events.ClientOnly
 import ru.hollowhorizon.hollowengine.common.events.SubscribeEvent
 import ru.hollowhorizon.hollowengine.common.events.entity.EntityTrackingEvent
 import ru.hollowhorizon.hollowengine.common.events.tick.TickEvent
+import ru.hollowhorizon.hollowengine.common.scene.hasIdentityPose
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntity
 import java.lang.ref.WeakReference
 import java.util.*
@@ -76,13 +78,16 @@ object EntityStateSync {
     private fun sendBaseline(player: ServerPlayer, entity: Entity) {
         val components = syncableOf(entity)
         val data = dataOf(entity, owner = player === entity)
-        if (components.isEmpty() && data.isEmpty) return
+        val attachments = AttachmentRegistry.attachmentsOrNull(entity)
+        if (attachments?.observeModelTransformChange() == true) markDirty(entity)
+        val pose = attachments?.modelTransformOrNull?.takeUnless { it.hasIdentityPose() }?.let { TrsTransformF().set(it) }
+        if (components.isEmpty() && data.isEmpty && pose == null) return
 
         EntityStateSyncPacket(
             entityId = entity.id,
             version = AttachmentRegistry.syncVersion(entity),
             full = true,
-            changed = EntitySnapshot(components.values.toList()),
+            changed = EntitySnapshot(components.values.toList(), pose),
             dataChanged = data,
         ).send(player)
     }
@@ -101,8 +106,10 @@ object EntityStateSync {
     }
 
     private fun flushEntity(entity: Entity) {
+        val attachments = AttachmentRegistry.attachmentsOrNull(entity) ?: return
         val components = syncableOf(entity)
         val batch = batchOf(components, AttachmentRegistry.lastSyncedComponents(entity))
+        val poseChange = attachments.takeModelTransformChange()
 
         val tracked = dataOf(entity, owner = false)
         val trackedBatch = dataBatchOf(tracked, AttachmentRegistry.lastSyncedData(entity))
@@ -111,15 +118,15 @@ object EntityStateSync {
         val owned = if (owner == null) CompoundTag() else ownerDataOf(entity)
         val ownedBatch = dataBatchOf(owned, AttachmentRegistry.lastSyncedOwnerData(entity))
 
-        if (batch.isEmpty && trackedBatch.isEmpty && ownedBatch.isEmpty) return
+        if (batch.isEmpty && trackedBatch.isEmpty && ownedBatch.isEmpty && poseChange == null) return
 
         val version = AttachmentRegistry.nextSyncVersion(entity)
         AttachmentRegistry.setLastSyncedComponents(entity, components)
         AttachmentRegistry.setLastSyncedData(entity, tracked)
         AttachmentRegistry.setLastSyncedOwnerData(entity, owned)
 
-        val snapshot = EntitySnapshot(batch.changed.values.toList())
-        if (!batch.isEmpty || !trackedBatch.isEmpty) {
+        val snapshot = EntitySnapshot(batch.changed.values.toList(), poseChange)
+        if (!batch.isEmpty || !trackedBatch.isEmpty || poseChange != null) {
             EntityStateSyncPacket(
                 entityId = entity.id,
                 version = version,
@@ -157,6 +164,8 @@ object EntityStateSync {
         if (!shouldApply(packet.version, AttachmentRegistry.syncVersion(entity), packet.full)) return
         AttachmentRegistry.setSyncVersion(entity, packet.version)
 
+        val pose = packet.changed.modelPose
+        if (packet.full || pose != null) AttachmentRegistry.attachments(entity).setModelPose(pose)
         val components = AttachmentRegistry.componentsById(entity)
         if (packet.full) {
             components.clear()

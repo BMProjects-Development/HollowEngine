@@ -7,10 +7,10 @@ import net.minecraft.world.level.Level
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.api.findEntityByUuid
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.Snapshot
 import ru.hollowhorizon.hollowengine.common.network.sendTrackingEntityAndSelf
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import java.util.*
 
 /**
@@ -61,13 +61,13 @@ class NodeRuntimeService(
         return true
     }
 
-    fun updateTransform(id: UUID, transform: TransformComponent, nodeId: UUID? = null): Boolean {
-        val current = snapshot(id)
-        if (current == null) {
-            HollowEngine.LOGGER.warn("Cannot update transform for snapshot {}: snapshot not found", id)
-            return false
-        }
-        return updateSnapshot(id, current.withOrReplace(transform, nodeId))
+    fun updateTransform(id: UUID, pose: TrsTransformF, nodeId: UUID? = null): Boolean {
+        if (nodeId != null && nodeId != ROOT_COMPONENT_ID) return false
+        val entity = level.findEntityByUuid(id) ?: return false
+        val attachments = AttachmentRegistry.attachmentsOrNull(entity) ?: return false
+        if (attachments.snapshot()?.modelOrNull() == null) return false
+        attachments.setModelPose(pose)
+        return true
     }
 
     /**

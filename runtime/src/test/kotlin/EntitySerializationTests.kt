@@ -1,5 +1,8 @@
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.phys.Vec3
 import org.junit.jupiter.api.AfterEach
@@ -10,11 +13,20 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPers
 import ru.hollowhorizon.hollowengine.common.attachments.components.ai.*
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySerialization
 import ru.hollowhorizon.hollowengine.common.attachments.snapshot.EntitySnapshot
+import ru.hollowhorizon.hollowengine.common.attachments.snapshot.LegacyModelPose
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
+import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
+import ru.hollowhorizon.hollowengine.common.utils.math.deg
+import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
+import ru.hollowhorizon.hollowengine.common.utils.nbt.ForQuatF
+import ru.hollowhorizon.hollowengine.common.utils.nbt.NBTFormat
 import ru.hollowhorizon.hollowengine.common.utils.rl
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class EntitySerializationTests {
     private val basicId = "test:basic_component".rl
@@ -43,6 +55,49 @@ class EntitySerializationTests {
 
         assertEquals(snapshot, yamlDecoded)
         assertEquals(snapshot, nbtDecoded)
+    }
+
+    @Test
+    fun `saved model transform migrates into the node pose`() {
+        registerDescriptors()
+        val transform = TrsTransformF().translate(1f, 2f, 3f).rotate(30f.deg, Vec3f.Y_AXIS).scale(Vec3f(2f, 3f, 4f))
+        val marker = BasicComponent("keep")
+        val oldFormat = NBTFormat(SerializersModule {
+            include(EntitySerialization.serializersModule())
+            polymorphic(Any::class) { subclass(LegacyModelPose::class, LegacyModelPose.serializer()) }
+        })
+        val old = oldFormat.serialize(EntitySnapshot.serializer(), EntitySnapshot(listOf(marker, LegacyModelPose(transform))))
+
+        val snapshot = EntitySerialization.deserializeFromNbt(old)
+        assertEquals(listOf(marker), snapshot.components)
+        assertTrue(transform.hasSamePoseAs(snapshot.modelPose))
+        assertEquals(snapshot, EntitySerialization.deserializeFromNbt(EntitySerialization.serializeToNbt(snapshot)))
+        assertEquals(snapshot, EntitySerialization.deserializeFromByteBuf(EntitySerialization.serializeToByteBuf(snapshot)))
+        assertNull(ComponentDescriptorRegistry.descriptorOrNull("hollowengine:transform".rl))
+    }
+
+    @Test
+    fun `model pose reads the existing snapshot fields`() {
+        val position = Vec3f(1f, 2f, 3f)
+        val pose = CompoundTag().apply {
+            put("position", NBTFormat.serialize(Vec3f.serializer(), position))
+            put("rotation", NBTFormat.serialize(ForQuatF, QuatF.IDENTITY))
+        }
+        val saved = CompoundTag().apply { put("modelPose", pose) }
+        val decoded = EntitySerialization.deserializeFromNbt(saved)
+
+        assertEquals<Vec3f?>(position, decoded.modelPose?.translation)
+        assertEquals<Vec3f?>(Vec3f.ONES, decoded.modelPose?.scale)
+    }
+
+    @Test
+    fun `pose reset survives serialization separately from an absent pose`() {
+        val reset = EntitySnapshot(modelPose = TrsTransformF())
+        val resetReceived = EntitySerialization.deserializeFromByteBuf(EntitySerialization.serializeToByteBuf(reset))
+        val absentReceived = EntitySerialization.deserializeFromByteBuf(EntitySerialization.serializeToByteBuf(EntitySnapshot()))
+
+        assertEquals(reset, resetReceived)
+        assertNull(absentReceived.modelPose)
     }
 
     @Test

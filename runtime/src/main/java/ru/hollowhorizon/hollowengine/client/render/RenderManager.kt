@@ -141,7 +141,7 @@ object RenderManager {
             instance.attachment.entity = host as? LivingEntity
             instance.attachment.carrier = host
             instance.configure(node.animations, node.materials, node.model.rig)
-            val worldTransform = resolveNodeWorldTransform(host, node.transform, partialTick)
+            val worldTransform = resolveNodeWorldTransform(host, partialTick)
             val culled = instance.attachment.isFrustumCullingEnabled && !instance.attachment.carriesEffects
 
             val lastBounds = if (culled && instance.hasPose) instance.attachment.cullingBounds() else null
@@ -154,13 +154,9 @@ object RenderManager {
                 val position = hostPosition(host, partialTick)
                 val rotation = hostRotation(host, partialTick)
                 val scale = hostScale(host, partialTick)
-                val local = node.transform.transform
                 componentPlacement.translation(position.x, position.y, position.z)
                     .rotate(componentRotation.set(rotation.x, rotation.y, rotation.z, rotation.w))
                     .scale(scale.x.toDouble(), scale.y.toDouble(), scale.z.toDouble())
-                    .translate(local.translation.x.toDouble(), local.translation.y.toDouble(), local.translation.z.toDouble())
-                    .rotate(componentRotation.set(local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w))
-                    .scale(local.scale.x.toDouble(), local.scale.y.toDouble(), local.scale.z.toDouble())
                 if (updateAudio) instance.attachment.updateSpatialAudio(componentPlacement, host, TickHandler.renderFrame)
                 instance.attachment.updateWorldEffects(componentPlacement, event.camera.position, instance.effectAnimation)
             }
@@ -244,15 +240,16 @@ object RenderManager {
             attachment.entity = entity as? LivingEntity
             attachment.carrier = entity
             instance.configure(node.animations, node.materials, node.model.rig)
-            val worldTransform = resolveNodeWorldTransform(entity, node.transform, partialTick)
+            val worldTransform = resolveNodeWorldTransform(entity, partialTick)
             val thinned = isWorldPass && attachment.isFrustumCullingEnabled && !attachment.carriesEffects
             if (posesThisFrame(instance, entity, thinned)) instance.update(animationContext(entity, partialTick, worldTransform))
-            val light =
-                if (isWorldPass) lightAt(level, entity, worldTransform, packedLight) else packedLight
+            val light = if (isWorldPass) {
+                val pose = attachment.sceneRoot.parent?.localTransform
+                lightAt(level, entity, resolveNodeWorldTransform(entity, partialTick, pose), packedLight)
+            } else packedLight
 
             val hostRotation = hostRotation(entity, partialTick)
             val hostScale = hostScale(entity, partialTick)
-            val local = node.transform.transform
             poseStack.pushPose()
             if (isWorldPass) {
                 val shift = hostRenderShift(entity, partialTick)
@@ -260,13 +257,6 @@ object RenderManager {
             }
             poseStack.mulPose(Quaternionf(hostRotation.x, hostRotation.y, hostRotation.z, hostRotation.w))
             poseStack.scale(hostScale.x, hostScale.y, hostScale.z)
-            poseStack.translate(
-                local.translation.x.toDouble(),
-                local.translation.y.toDouble(),
-                local.translation.z.toDouble(),
-            )
-            poseStack.mulPose(Quaternionf(local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w))
-            poseStack.scale(local.scale.x, local.scale.y, local.scale.z)
             attachment.pipeline.render(
                 RenderContext(
                     poseStack,

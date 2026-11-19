@@ -50,15 +50,23 @@ fun npc(
 | `rotation`            | `Vec2`               | `rotation(0, 0)`                                 | Начальный yaw/pitch.                                                                                                                       |
 | `world`               | `String`             | `"minecraft:overworld"`                          | ID измерения, куда будет добавлен NPC.                                                                                                     |
 | `attributes`          | `Map<String, Float>` | `emptyMap()`                                     | Базовые значения атрибутов через registry id.                                                                                              |
-| `transform`           | `TrsTransformF`      | `TrsTransformF()`                                | Сдвиг, поворот и масштаб модели относительно NPC; передаются в `TransformComponent`.                           |
+| `transform`           | `TrsTransformF`      | `TrsTransformF()`                                | Начальный сдвиг, поворот и масштаб узла модели относительно NPC. |
 | `nameplateMode`       | `NameplateMode`      | `NameplateMode.SHOW`                             | Начальный режим отображения неймплейта.                                                                                                    |
 | `inverseHeadRotation` | `Boolean`            | `false`                                          | В текущей реализации не применяется. Настройку поворота головы задавайте в метаданных модели.                                                                                   |
 | `inventorySize`       | `Int`                | `36`                                             | Количество слотов в [`npc.inventory`](/docs/hollowengine/scripting/npc/inventory). Можно изменить позже через `npc.inventory.resize(...)`. |
 | `id` | `String?` | `null` | Собственный id NPC, например `"village:blacksmith"`. Если живой NPC с таким id уже есть, `npc()` возвращает его и игнорирует остальные аргументы, см. [NPC вне мира](/docs/hollowengine/scripting/npc/registry#ids-one-npc-per-name). |
 
 :::warning
-Параметр `inverseHeadRotation` пока не применяется. `transform` передаётся в компонент `TransformComponent`. Аниматор и поворот головы определяются метаданными выбранной модели, поэтому своя модель должна быть настроена отдельно. То, как NPC толкает и блокирует других, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity).
+Параметр `inverseHeadRotation` пока не применяется. Аниматор и поворот головы определяются метаданными выбранной модели, поэтому своя модель должна быть настроена отдельно. То, как NPC толкает и блокирует других, задаёт компонент [Тело](/docs/hollowengine/world/colliders#the-body-of-an-entity).
 :::
+
+Чтобы сдвинуть модель или изменить её масштаб после создания NPC, измените локальную позу узла модели. Добавьте импорт в начало скрипта.
+
+```kotlin
+import ru.hollowhorizon.hollowengine.common.attachments.api.modelNode
+
+guide.modelNode.localTransform.translate(0f, 0.25f, 0f)
+```
 
 ---
 
@@ -129,7 +137,7 @@ val guard = npc(
 
 - `Model(model)` - компонент модели;
 - аниматор выбранной модели из её `.hemeta`; у встроенной модели это `hollowengine:standard_player` для покоя и ходьбы;
-- `TransformComponent(...)` - базовую трансформацию модели;
+- начальную позу `npc.modelNode`;
 - `customName` и `isCustomNameVisible`;
 - запись в [реестре NPC](/docs/hollowengine/scripting/npc/registry) и тело в выбранном мире.
 

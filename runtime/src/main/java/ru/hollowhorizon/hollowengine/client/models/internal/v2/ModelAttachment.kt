@@ -31,6 +31,7 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.ScenePathSegment
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
+import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import ru.hollowhorizon.hollowengine.common.utils.math.MutableVec3f
 import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -42,13 +43,16 @@ import kotlin.math.min
  * The model at [model] or fallback; a blank path is a model with no geometry, which only carries what
  * hangs on the model itself.
  */
-fun ModelAttachment(model: String, parent: Attachment? = null): ModelAttachment {
-    if (model.isBlank()) return ModelAttachment(MutableStateFlow(Model.EMPTY), parent)
+fun ModelAttachment(model: String, parent: Attachment? = null): ModelAttachment =
+    loadModelAttachment(model, parent)
+
+internal fun loadModelAttachment(model: String, parent: Attachment? = null, root: SceneObject? = null): ModelAttachment {
+    if (model.isBlank()) return ModelAttachment(MutableStateFlow(Model.EMPTY), parent, root = root)
     val location = ResourceLocation.tryParse(model) ?: run {
         HollowEngine.LOGGER.warn("Model path '{}' is not a valid resource location, using the fallback", model)
         ModelLoader.FALLBACK_MODEL
     }
-    return ModelAttachment(location, parent)
+    return ModelAttachment(HollowModelManager.getOrCreate(location), parent, location = location, root = root)
 }
 
 fun ModelAttachment(location: ResourceLocation, parent: Attachment? = null): ModelAttachment {
@@ -63,13 +67,17 @@ class ModelAttachment(
     parent: Attachment?,
     var entity: LivingEntity? = null,
     val location: ResourceLocation? = null,
-) : BaseAttachment(parent) {
-    private val renderScene = ModelRenderScene.create(parent, flow.value)
+    root: SceneObject? = null,
+) : Attachment {
+    private val renderScene = ModelRenderScene.create(parent, flow.value, root)
     private var rebuildingNested: ModelNestedAttachments? = null
     val sceneRoot: SceneObject get() = renderScene.root
     internal val sceneRevision: Int get() = sceneRoot.scene.revision
     internal val parentRevision: Int get() = attachmentParent?.globalVersion ?: 0
+    override val attachmentParent: Attachment? = parent
     override val transform: TrsTransformF get() = sceneRoot.localTransform
+    override val globalMatrix: Mat4f get() = sceneRoot.worldTransform
+    override val globalVersion: Int get() = sceneRoot.worldVersion
     var instanceId: String = UUID.randomUUID().toString()
 
     /** The entity that carries this model, living or not, for what hangs on it and talks to it, as a panel does. */
@@ -92,6 +100,7 @@ class ModelAttachment(
     private var renderPipeline: ListRenderPipeline? = null
     private var cachedBounds: Pair<Vec3f, Vec3f>? = null
     private var keptCullingBounds: Pair<Vec3f, Vec3f>? = null
+    private var boundsPlacementVersion = 0
     private var posesSinceCullingBounds = 0
 
     /** Changes with every pose, so what is worked out from one can be kept until the next. */
@@ -212,6 +221,10 @@ class ModelAttachment(
 
     internal fun applyRigConstraints(context: AnimatorEvaluationContext, grounding: RigGroundingState? = null) =
         renderScene.instance.applyRigConstraints(rig, context, grounding, scaleMeshes)
+
+    override fun updateGlobalMatrix() {
+        sceneRoot.worldTransform
+    }
 
     /** Turns the posed nodes into the matrices the renderer draws from. */
     fun endPose() {
@@ -378,7 +391,6 @@ class ModelAttachment(
 
 
     override fun collectCommands(pipeline: RenderPipeline) {
-        super.collectCommands(pipeline)
         collectStaticMeshes(pipeline)
         allNodes.forEach { it.collectCommands(pipeline) }
         modelRoot?.collectCommands(pipeline)
@@ -426,16 +438,29 @@ class ModelAttachment(
     }
 
     /** The instance's bounds in its own space, recomputed after every pose. */
-    fun calculateBounds(): Pair<Vec3f, Vec3f>? = cachedBounds ?: calculateBoundsInternal().also { cachedBounds = it }
+    fun calculateBounds(): Pair<Vec3f, Vec3f>? {
+        invalidateBoundsOnPlacementChange()
+        return cachedBounds ?: calculateBoundsInternal().also { cachedBounds = it }
+    }
 
     /**
      * The bounds a renderer culls the instance by: [calculateBounds] of a pose a few poses old at most, as a pose
      * moves little from one frame to the next and working them out takes every corner of every mesh.
      */
     fun cullingBounds(): Pair<Vec3f, Vec3f>? {
+        invalidateBoundsOnPlacementChange()
         keptCullingBounds?.takeIf { posesSinceCullingBounds < CULLING_BOUNDS_POSES }?.let { return it }
         posesSinceCullingBounds = 0
         return calculateBounds().also { keptCullingBounds = it }
+    }
+
+    private fun invalidateBoundsOnPlacementChange() {
+        val version = globalVersion
+        if (boundsPlacementVersion != version) {
+            boundsPlacementVersion = version
+            cachedBounds = null
+            keptCullingBounds = null
+        }
     }
 
     private fun calculateBoundsInternal(): Pair<Vec3f, Vec3f>? {

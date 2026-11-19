@@ -2,6 +2,7 @@ package ru.hollowhorizon.hollowengine.client.models.internal.v2
 
 import ru.hollowhorizon.hollowengine.client.handlers.TickHandler
 import ru.hollowhorizon.hollowengine.client.models.internal.Model
+import ru.hollowhorizon.hollowengine.client.models.internal.createModelRoot
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.AnimatorEvaluationContext
 import ru.hollowhorizon.hollowengine.client.models.internal.animator.ModelAnimator
 import ru.hollowhorizon.hollowengine.client.models.internal.manager.HollowModelManager
@@ -176,13 +177,18 @@ private data class ModelInstanceKey(val nodeId: UUID, val model: String)
 /**
  * The instance of [model] on [nodeId], created on first use.
  */
-fun MCEntity.modelInstance(nodeId: UUID, model: String): ModelInstance =
-    AttachmentRegistry.attachments(this).runtime.getOrPut(ModelInstanceKey(nodeId, model)) {
-        ModelInstance(ModelAttachment(model).apply { instanceId = nodeId.toString() }) {
+fun MCEntity.modelInstance(nodeId: UUID, model: String): ModelInstance {
+    val state = AttachmentRegistry.attachments(this)
+    val key = ModelInstanceKey(nodeId, model)
+    if (state.runtime.getOrNull<ModelInstance>(key)?.attachment?.sceneRoot?.isRemoved == true) state.runtime.remove(key)
+    return state.runtime.getOrPut(key) {
+        val attachment = loadModelAttachment(model, root = state.modelNode.createModelRoot("geometry"))
+        ModelInstance(attachment.apply { instanceId = nodeId.toString() }) {
             AttachmentRegistry.entitySnapshot(level(), uuid)?.modelNodes()
                 ?.any { it.nodeId == nodeId && it.model.model == model } == true
         }
     }
+}
 
 /** The instance already drawn for this node, or null when nothing has drawn it yet. */
 fun MCEntity.modelInstanceOrNull(nodeId: UUID, model: String): ModelInstance? =

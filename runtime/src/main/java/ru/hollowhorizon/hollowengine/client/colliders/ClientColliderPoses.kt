@@ -31,8 +31,10 @@ object ClientColliderPoses {
 
         val instance = entity.modelInstanceOrNull(node.nodeId, node.model.model) ?: return emptyList()
         val partialTick = Minecraft.getInstance().timer.getGameTimeDeltaPartialTick(false)
-        val placed = DrawnScope(instance.attachment, null, 0).placeColliders(
-            entityModelMatrix(entity, node.transform, partialTick),
+        val host = hostLinearMatrix(entity, partialTick)
+        val root = instance.attachment.globalMatrix
+        val placed = DrawnScope(instance.attachment, root, 0).placeColliders(
+            host,
             hostPosition(entity, partialTick),
         )
         return applyOverrides(entity, placed)

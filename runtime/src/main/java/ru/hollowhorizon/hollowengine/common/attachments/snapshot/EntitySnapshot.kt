@@ -12,12 +12,16 @@ import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentPersistencePolicy
+import ru.hollowhorizon.hollowengine.common.scene.SceneTransformSerializer
+import ru.hollowhorizon.hollowengine.common.scene.hasSamePoseAs
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufDecoder
 import ru.hollowhorizon.hollowengine.common.utils.bytebuf.FriendlyByteBufEncoder
 
 @Serializable
 sealed class Snapshot {
     abstract val components: List<@Polymorphic Any>
+    abstract val modelPose: TrsTransformF?
 
     fun componentById(): LinkedHashMap<ResourceLocation, Any> =
         LinkedHashMap<ResourceLocation, Any>().apply {
@@ -33,6 +37,8 @@ sealed class Snapshot {
 data class EntitySnapshot(
     @Serializable(with = ComponentListSerializer::class)
     override val components: List<@Polymorphic Any> = emptyList(),
+    @Serializable(with = SceneTransformSerializer::class)
+    override val modelPose: TrsTransformF? = null,
 ) : Snapshot() {
     @Transient
     var entity: Entity? = null
@@ -44,6 +50,17 @@ data class EntitySnapshot(
             ComponentDescriptorRegistry.descriptorOrNull(component::class)?.persistencePolicy == ComponentPersistencePolicy.LOOSE_ON_DEATH
         },
     )
+
+    override fun equals(other: Any?): Boolean =
+        this === other || other is EntitySnapshot && components == other.components &&
+                (modelPose === other.modelPose || modelPose?.hasSamePoseAs(other.modelPose) == true)
+
+    override fun hashCode(): Int {
+        val pose = modelPose
+        if (pose == null) return 31 * components.hashCode()
+        val poseHash = (pose.translation.hashCode() * 31 + pose.rotation.hashCode()) * 31 + pose.scale.hashCode()
+        return 31 * components.hashCode() + poseHash
+    }
 }
 
 object ComponentListSerializer : KSerializer<List<Any>> {

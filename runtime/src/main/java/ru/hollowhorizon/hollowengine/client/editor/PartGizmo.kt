@@ -5,7 +5,6 @@ import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.ModelAttachment
 import ru.hollowhorizon.hollowengine.client.models.internal.v2.RenderModelNode
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigEditing
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.colliders.resolveNodeWorldTransform
 import ru.hollowhorizon.hollowengine.common.models.RigPose
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
@@ -16,7 +15,6 @@ import ru.hollowhorizon.hollowengine.common.utils.math.*
  */
 internal sealed class PartGizmo(
     val entity: Entity,
-    private val modelTransform: TransformComponent,
     private val editing: RigEditing?,
     val key: String,
 ) {
@@ -54,7 +52,7 @@ internal sealed class PartGizmo(
     /** Writes where the part now is relative to [parent]. */
     protected abstract fun place(relative: TrsTransformF)
 
-    private fun toWorld(partialTick: Float): Mat4f = resolveNodeWorldTransform(entity, modelTransform, partialTick).matrixF
+    private fun toWorld(partialTick: Float): Mat4f = resolveNodeWorldTransform(entity, partialTick).matrixF
 
     private fun decompose(matrix: Mat4f): TrsTransformF {
         val translation = MutableVec3f()
@@ -70,10 +68,9 @@ internal class BoneGizmo(
     entity: Entity,
     private val model: ModelAttachment,
     private val node: RenderModelNode,
-    modelTransform: TransformComponent,
     private val rigEditing: RigEditing,
     key: String,
-) : PartGizmo(entity, modelTransform, rigEditing, key) {
+) : PartGizmo(entity, rigEditing, key) {
     val bone: String get() = node.name
 
     override val label: String get() = bone
@@ -103,7 +100,7 @@ internal class SceneNodeGizmo(
     private val node: SceneObject,
     private val write: (TrsTransformF) -> Unit,
     key: String,
-) : PartGizmo(entity, TransformComponent(), null, key) {
+) : PartGizmo(entity, null, key) {
     override val label: String get() = node.name
     override fun local(): Mat4f = node.worldTransform
     override fun parent(): Mat4f = node.parent?.worldTransform ?: Mat4f.IDENTITY

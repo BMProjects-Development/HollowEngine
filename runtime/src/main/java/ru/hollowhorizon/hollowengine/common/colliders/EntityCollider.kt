@@ -8,7 +8,6 @@ import ru.hollowhorizon.hollowengine.client.models.internal.Model
 import ru.hollowhorizon.hollowengine.client.models.internal.ModelSceneInstance
 import ru.hollowhorizon.hollowengine.client.models.internal.hostYawDegrees
 import ru.hollowhorizon.hollowengine.client.utils.math.rotateBy
-import ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
@@ -45,6 +44,7 @@ internal fun ModelRig.placeCollidersOnPose(
     toEntity: Mat4f,
     origin: Vec3,
     modelMatrix: Mat4f? = null,
+    alignedScaleMatrix: Mat4f = toEntity,
 ): List<EntityCollider> {
     val placed = colliders
     if (placed.isEmpty()) return emptyList()
@@ -57,7 +57,7 @@ internal fun ModelRig.placeCollidersOnPose(
             if (!node.acceptsPose) return@mapNotNull null
             toEntity.mul(node.worldTransform, MutableMat4f())
         }
-        EntityCollider(spec.id, bone, spec, spec.place(holder, toEntity, origin))
+        EntityCollider(spec.id, bone, spec, spec.place(holder, alignedScaleMatrix, origin))
     }
 }
 
@@ -113,19 +113,18 @@ fun fitEntityBox(colliders: List<EntityCollider>): Pair<Float, Float>? {
  * Model space to the world around the entity: the node's own transform, turned with the entity's body.
  * The entity's position is left out; colliders add it in double precision.
  */
-internal fun entityModelMatrix(host: Entity, transform: TransformComponent, partialTick: Float): Mat4f =
+internal fun hostLinearMatrix(host: Entity, partialTick: Float): MutableMat4f =
     MutableMat4f().rotate(hostRotation(host, partialTick)).scale(hostScale(host, partialTick))
-        .mul(transform.transform.matrixF)
 
 /** Where a model node carried by [host] stands in the world: its own transform, then the host's. */
-fun resolveNodeWorldTransform(host: Entity, transform: TransformComponent, partialTick: Float): TrsTransformF {
+fun resolveNodeWorldTransform(host: Entity, partialTick: Float, local: TrsTransformF? = null): TrsTransformF {
     val hostPosition = hostPosition(host, partialTick).let { Vec3f(it.x.toFloat(), it.y.toFloat(), it.z.toFloat()) }
     val hostRotation = hostRotation(host, partialTick)
     val hostScale = hostScale(host, partialTick)
-    val local = transform.transform
-    val worldTranslation = (Vec3f(local.translation) * hostScale).rotateBy(hostRotation) + hostPosition
+    if (local == null) return TrsTransformF().setCompositionOf(hostPosition, hostRotation, hostScale)
+    val worldTranslation = (local.translation * hostScale).rotateBy(hostRotation) + hostPosition
     val worldRotation = MutableQuatF(hostRotation).mul(local.rotation).norm()
-    return TrsTransformF().setCompositionOf(worldTranslation, worldRotation, Vec3f(local.scale) * hostScale)
+    return TrsTransformF().setCompositionOf(worldTranslation, worldRotation, local.scale * hostScale)
 }
 
 /** How the host turns what it carries: a world object turns freely, any other entity with its body's yaw. */

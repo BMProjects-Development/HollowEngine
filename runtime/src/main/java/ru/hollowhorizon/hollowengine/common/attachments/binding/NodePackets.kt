@@ -6,6 +6,8 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.common.attachments.api.AttachmentRegistry
 import ru.hollowhorizon.hollowengine.common.network.HollowPacket
 import ru.hollowhorizon.hollowengine.common.network.HollowPacketHandler
+import ru.hollowhorizon.hollowengine.common.scene.SceneTransformSerializer
+import ru.hollowhorizon.hollowengine.common.utils.math.TrsTransformF
 import ru.hollowhorizon.hollowengine.common.utils.PlayerPermissions
 import ru.hollowhorizon.hollowengine.common.utils.nbt.ForUuid
 import java.util.*
@@ -17,7 +19,7 @@ data class EntitySnapshotRemovePacket(
 ) : HollowPacket {
     override fun handle(player: Player) {
         val entity = player.level().getEntity(entityId) ?: return
-        AttachmentRegistry.componentsById(entity).clear()
+        AttachmentRegistry.removeEntitySnapshot(player.level(), entity.uuid)
     }
 }
 
@@ -26,14 +28,15 @@ data class EntitySnapshotRemovePacket(
 data class NodeTransformUpdatePacket(
     val snapshotId: @Serializable(ForUuid::class) UUID,
     val nodeId: @Serializable(ForUuid::class) UUID? = null,
-    val transform: ru.hollowhorizon.hollowengine.common.attachments.components.TransformComponent,
+    @Serializable(with = SceneTransformSerializer::class)
+    val pose: TrsTransformF,
 ) : HollowPacket {
     override fun handle(player: Player) {
         if (!player.hasPermissions(PlayerPermissions.GAMEMASTER)) return
         val server = player.server ?: return
         for (level in server.allLevels) {
             if (NodeRuntimeState.service(level)
-                    .updateTransform(snapshotId, transform, nodeId = nodeId)
+                    .updateTransform(snapshotId, pose, nodeId = nodeId)
             ) {
                 return
             }

@@ -13,9 +13,9 @@ import net.minecraft.world.entity.Entity
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 
 /**
- * Which model an entity or node shows, and what this entity alone hangs on it: [rig] is laid over the
- * model's own rig file, so an effect on one lamp's bulb does not light every lamp. A blank [model] shows
- * nothing and only carries what hangs on the model itself.
+ * Model, that can be attached to the bone or entity.
+ *
+ * [rig] allows to customize model with special components or decorations.
  */
 @Registerable
 @Attach(Entity::class)
@@ -24,16 +24,15 @@ import ru.hollowhorizon.hollowengine.common.models.ModelRig
 @EditorIcon("hollowengine:textures/gui/icons/file_model.svg")
 @SerialName("hollowengine:model")
 data class Model(
-    @EditorModel(DEFAULT) @EditorAsset(
-        "gltf", "glb", "geo.json", "fbx", "obj", "bbmodel"
-    ) val model: String = DEFAULT,
+    @EditorModel(DEFAULT)
+    @EditorAsset("gltf", "glb", "geo.json", "fbx", "obj", "bbmodel")
+    val model: String = DEFAULT,
     @EditorHidden
     val rig: ModelRig = ModelRig.EMPTY,
 ) {
     val isEmpty: Boolean get() = model.isBlank()
 
     companion object {
-        /** The model an entity shows when nothing says which. */
         const val DEFAULT = "hollowengine:models/entity/player_model.gltf"
     }
 }
