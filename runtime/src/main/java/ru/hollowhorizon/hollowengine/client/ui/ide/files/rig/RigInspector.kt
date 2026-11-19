@@ -7,9 +7,9 @@ import ru.hollowhorizon.hollowengine.HollowEngine
 import ru.hollowhorizon.hollowengine.client.history.UndoLabel
 import ru.hollowhorizon.hollowengine.client.ui.Column
 import ru.hollowhorizon.hollowengine.client.ui.Modifier
-import ru.hollowhorizon.hollowengine.client.ui.inspector.*
-import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentIcon
 import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentLabel
+import ru.hollowhorizon.hollowengine.client.ui.ide.componentIcon
+import ru.hollowhorizon.hollowengine.client.ui.inspector.*
 import ru.hollowhorizon.hollowengine.client.ui.layout.UiRect
 import ru.hollowhorizon.hollowengine.client.ui.onPlaced
 import ru.hollowhorizon.hollowengine.client.ui.widgets.ContextMenu
@@ -42,7 +42,7 @@ internal fun rigInspectorTarget(
     return InspectorTarget(
         id = "rig-bone-${bone ?: ""}",
         title = attachment?.let(::attachmentLabel) ?: bone ?: rigText("model"),
-        icon = attachment?.let(::attachmentIcon) ?: if (bone == null) ModelIcon else BoneIcon,
+        icon = attachment?.let(::componentIcon) ?: if (bone == null) ModelIcon else BoneIcon,
         subtitle = if (attachment == null) rigText(if (bone == null) "section_model" else "section_bone") else null,
     ) {
         val info = state.viewer.attachment.rigModelInfo()
@@ -203,6 +203,7 @@ private fun AttachmentFields(
             ) as JsonObject
         }.onFailure { HollowEngine.LOGGER.warn("Could not show attachment '{}': {}", type.id, it.message) }.getOrNull()
     } ?: return Hint(rigText("no_attachment_editor"))
+    ComponentLabels.componentDescription(serializer.descriptor)?.let { Hint(it) }
 
     AutoFields(
         owner = null,
@@ -285,8 +286,7 @@ internal fun freeAttachmentId(rig: ModelRig, bone: String?, type: RigAttachmentT
 
 internal fun RigAttachmentType<*>?.title(): String {
     if (this == null) return rigText("unknown_kind")
-    val translated = titleKey.lang
-    return if (translated == titleKey) id.substringAfterLast('/') else translated
+    return ComponentLabels.componentName(key, serializer.descriptor, fallbackKey = titleKey)
 }
 
 /** A degree a step, for the angles of a pose. */

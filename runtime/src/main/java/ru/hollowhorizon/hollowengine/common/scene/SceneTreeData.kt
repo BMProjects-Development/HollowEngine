@@ -1,6 +1,7 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 import net.minecraft.nbt.Tag
@@ -14,6 +15,8 @@ import java.util.UUID
 
 /** Saves the authored branch of a world object or sends it to tracked clients. */
 internal object SceneTreeData {
+    val importedPathSerializer = ListSerializer(ScenePathSegment.serializer())
+
     @Serializable
     private data class Pose(
         val position: Vec3f,
@@ -21,27 +24,42 @@ internal object SceneTreeData {
         val scale: Vec3f,
     )
 
-    fun write(root: SceneObject, syncOnly: Boolean): CompoundTag {
+    fun write(root: SceneObject, syncOnly: Boolean, includeImported: Boolean = false): CompoundTag {
         val components = SceneComponentData.write(root, syncOnly)
         val children = ListTag()
+        val overrides = if (includeImported) ListTag() else null
         for (child in root.children) {
-            val id = child.createdId ?: continue
-            children.add(writeNode(child, syncOnly).apply { putUUID("id", id) })
+            val id = child.createdId
+            if (id != null) {
+                children.add(writeNode(child, syncOnly, includeImported).apply { putUUID("id", id) })
+            } else if (overrides != null) {
+                val data = write(child, syncOnly, includeImported)
+                if (!child.enabled) data.putBoolean("enabled", false)
+                child.importedRestTransform?.let { data.put("pose", writePose(it)) }
+                if (!data.isEmpty) {
+                    val segment = ScenePathSegment(child.name, checkNotNull(child.importedOccurrence))
+                    data.put("path", NBTFormat.serialize(importedPathSerializer, listOf(segment)))
+                    overrides.add(data)
+                }
+            }
         }
         return CompoundTag().apply {
             if (!components.isEmpty || children.isNotEmpty()) {
                 put("components", components)
                 if (children.isNotEmpty()) put("children", children)
             }
+            if (overrides != null && overrides.isNotEmpty()) put("overrides", overrides)
         }
     }
 
-    fun writeNode(node: SceneObject, syncOnly: Boolean): CompoundTag = write(node, syncOnly).apply {
-        if (!contains("components")) put("components", CompoundTag())
-        putString("name", node.name)
-        putBoolean("enabled", node.enabled)
-        put("pose", writePose(node.localTransform))
-    }
+    fun writeNode(node: SceneObject, syncOnly: Boolean, includeImported: Boolean = false): CompoundTag =
+        write(node, syncOnly, includeImported).apply {
+            if (!contains("components")) put("components", CompoundTag())
+            putString("name", node.name)
+            putBoolean("enabled", node.enabled)
+            val pose = if (includeImported && node.modelSource != null) node.restTransform else node.localTransform
+            put("pose", writePose(pose))
+        }
 
     fun apply(root: SceneObject, data: CompoundTag, syncOnly: Boolean) {
         if (!data.contains("components") && !data.contains("children")) {
@@ -80,17 +98,18 @@ internal object SceneTreeData {
         Pose.serializer(), Pose(Vec3f(transform.translation), QuatF(transform.rotation), Vec3f(transform.scale)),
     ) as CompoundTag
 
-    fun applyPose(node: SceneObject, tag: CompoundTag): Boolean {
-        val pose = runCatching { NBTFormat.deserialize(Pose.serializer(), tag) }.getOrNull() ?: return false
+    fun readPose(tag: CompoundTag, destination: TrsTransformF = TrsTransformF()): TrsTransformF? {
+        val pose = runCatching { NBTFormat.deserialize(Pose.serializer(), tag) }.getOrNull() ?: return null
         val (x, y, z) = pose.position
         if (!(x.isFinite() && y.isFinite() && z.isFinite() && pose.rotation.x.isFinite() &&
                     pose.rotation.y.isFinite() && pose.rotation.z.isFinite() && pose.rotation.w.isFinite() &&
-                    pose.scale.x.isFinite() && pose.scale.y.isFinite() && pose.scale.z.isFinite())) return false
+                    pose.scale.x.isFinite() && pose.scale.y.isFinite() && pose.scale.z.isFinite())) return null
         val norm = pose.rotation.dot(pose.rotation)
-        if (!norm.isFinite() || norm == 0f) return false
-        node.localTransform.setCompositionOf(pose.position, pose.rotation.normed(), pose.scale)
-        return true
+        if (!norm.isFinite() || norm == 0f) return null
+        return destination.setCompositionOf(pose.position, pose.rotation.normed(), pose.scale)
     }
+
+    fun applyPose(node: SceneObject, tag: CompoundTag): Boolean = readPose(tag, node.localTransform) != null
 
     private fun applyLegacy(root: SceneObject, data: CompoundTag, syncOnly: Boolean) {
         val direct = data.copy()

@@ -5,8 +5,8 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.PartIcons
 import ru.hollowhorizon.hollowengine.client.ui.ide.PartPath
 import ru.hollowhorizon.hollowengine.client.ui.ide.SceneTarget
-import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentIcon
 import ru.hollowhorizon.hollowengine.client.ui.ide.attachmentLabel
+import ru.hollowhorizon.hollowengine.client.ui.ide.componentIcon
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiTreeItem
@@ -132,7 +132,7 @@ private fun MutableList<UiTreeItem<Any?>>.appendAttachments(
         add(UiTreeItem(
             id = PartRowPrefix + PartPath(bone = bone, attachment = spec.rigId).encode(),
             label = attachmentLabel(spec),
-            icon = attachmentIcon(spec),
+            icon = componentIcon(spec),
             payload = null,
             depth = depth,
             selected = selected?.bone == bone && selected?.id == spec.rigId,

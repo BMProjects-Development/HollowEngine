@@ -21,13 +21,19 @@ class SceneNodeScriptCompilationTest {
             val script = environment.compiler.compile(
                 "scene.node.kts",
                 """
+                    import ru.hollowhorizon.hollowengine.common.scene.ScenePrefab
                     import ru.hollowhorizon.hollowengine.common.sounds.Sound
 
                     val root = serverScene.create("example")
                     val sound = Sound()
                     val id = root.attach(sound)
                     root.setComponent(id, sound.copy(autoPlay = false))
-                    onStop { root.remove() }
+                    val copy = serverScene.create("copy")
+                    ScenePrefab.capture(root).applyTo(copy)
+                    onStop {
+                        copy.remove()
+                        root.remove()
+                    }
                 """.trimIndent(),
             ).getOrThrow()
             assertEquals(1, script.implicitReceiverCount)

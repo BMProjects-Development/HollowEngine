@@ -7,18 +7,14 @@ import ru.hollowhorizon.hollowengine.client.models.internal.v2.walk
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.RigModelInfo
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.rigText
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.rig.title
-import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxIcons
 import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.treeLabel
 import ru.hollowhorizon.hollowengine.client.vfx.played
 import ru.hollowhorizon.hollowengine.common.attachments.components.Model
-import ru.hollowhorizon.hollowengine.common.colliders.ColliderAttachmentSpec
-import ru.hollowhorizon.hollowengine.common.decals.DecalAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelAttachmentSpec
 import ru.hollowhorizon.hollowengine.common.models.ModelRig
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.models.rigId
 import ru.hollowhorizon.hollowengine.common.scene.SceneObject
-import ru.hollowhorizon.hollowengine.common.sounds.Sound
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeSpec
 import ru.hollowhorizon.hollowengine.common.vfx.VfxNodeTypes
@@ -126,9 +122,7 @@ internal object PartIcons {
     const val MODEL = "hollowengine:textures/gui/icons/files/rig.svg"
     const val BONE = "hollowengine:textures/gui/icons/graph.svg"
     const val MESH = "hollowengine:textures/gui/icons/box.svg"
-    const val NESTED_MODEL = "hollowengine:textures/gui/icons/files/model.svg"
     const val EFFECT = "hollowengine:textures/gui/icons/files/effect.svg"
-    const val COLLIDER = "hollowengine:textures/gui/icons/rig/colliders.svg"
     const val ATTACHMENT = "hollowengine:textures/gui/icons/link.svg"
     const val MATERIALS = "hollowengine:textures/gui/icons/files/image.svg"
     const val MATERIAL = "hollowengine:textures/gui/icons/file_image.svg"
@@ -273,7 +267,7 @@ internal class PartsReader {
         return PartNode(
             path = path,
             label = attachmentLabel(spec),
-            icon = attachmentIcon(spec),
+            icon = componentIcon(spec),
             kind = PartKind.ATTACHMENT,
             children = children,
             inherited = inherited,
@@ -296,15 +290,6 @@ internal fun attachmentLabel(spec: Any): String = when (spec) {
     is VfxComponent -> fileName(spec.effect)?.let { if (spec.ownEffect != null) "$it *" else it }
         ?: spec.id
     else -> "${RigAttachmentTypes.of(spec).title()} (${spec.rigId})"
-}
-
-internal fun attachmentIcon(spec: Any): String = when (spec) {
-    is ModelAttachmentSpec -> PartIcons.NESTED_MODEL
-    is VfxComponent -> PartIcons.EFFECT
-    is Sound -> VfxIcons.SOUND
-    is ColliderAttachmentSpec -> PartIcons.COLLIDER
-    is DecalAttachmentSpec -> VfxIcons.DECAL
-    else -> PartIcons.ATTACHMENT
 }
 
 private fun fileName(path: String): String? = path.substringAfterLast('/').substringBeforeLast('.').ifBlank { null }

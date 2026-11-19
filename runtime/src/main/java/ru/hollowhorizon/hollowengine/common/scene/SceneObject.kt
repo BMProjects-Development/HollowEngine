@@ -50,12 +50,14 @@ class SceneObject internal constructor(
     override val isActive: Boolean get() = !isRemoved && !scene.isClosed && effectiveActive
 
     private var modelState: ModelState? = null
+    internal var importedRestTransform: TrsTransformF? = null
+        private set
     val modelSource: ModelNodeSource? get() = modelState?.source
     val source: ModelNodeSource get() = checkNotNull(modelSource) { "Scene object '$name' has no model source" }
     val poseIndex: Int get() = source.index
     val poseName: String get() = source.name ?: "Node_$poseIndex"
     val poseParent: SceneObject? get() = physicalParent?.takeIf { it.modelState != null }
-    val restTransform: TrsTransformF get() = source.restTransform
+    val restTransform: TrsTransformF get() = importedRestTransform ?: source.restTransform
     val acceptsPose: Boolean
         get() {
             val state = modelState ?: return false
@@ -74,6 +76,15 @@ class SceneObject internal constructor(
         checkAttached()
         require(source.restTransform !== localTransform) { "The rest transform must not alias the scene object's pose" }
         modelState = ModelState(source, weights)
+        importedRestTransform?.let(localTransform::set)
+    }
+
+    /** Overrides the rest pose of an imported node in this instance. */
+    fun setImportedRestTransform(transform: TrsTransformF?) = scene.mutate {
+        checkAttached()
+        require(createdId == null && !isSynthetic) { "Rest overrides require an imported scene object" }
+        importedRestTransform = transform?.let { TrsTransformF().set(it) }
+        (importedRestTransform ?: modelSource?.restTransform)?.let(localTransform::set)
     }
 
     internal fun includeSyntheticGeometry() {
@@ -92,7 +103,7 @@ class SceneObject internal constructor(
 
     fun resetPose() {
         val state = modelState ?: return
-        if (acceptsPose) state.reset(localTransform)
+        if (acceptsPose) state.reset(localTransform, restTransform)
     }
 
     private class ModelState(val source: ModelNodeSource, initialWeights: FloatArray?) {
@@ -104,9 +115,8 @@ class SceneObject internal constructor(
         private var resetVersion = -1
         private var restVersion = -1
 
-        fun reset(current: TrsTransformF) {
+        fun reset(current: TrsTransformF, rest: TrsTransformF) {
             isAnimated = false
-            val rest = source.restTransform
             if (current.modCount != resetVersion || rest.modCount != restVersion) {
                 if (current.translation != rest.translation || current.rotation != rest.rotation || current.scale != rest.scale) {
                     current.set(rest)

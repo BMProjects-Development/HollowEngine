@@ -83,6 +83,8 @@ data class DecalSpec(
 /** A decal hung on a bone or the whole model, placed by hand; it projects along the down axis of its place. */
 @Serializable
 @SerialName("hollowengine:rig/decal")
+@EditorName("hollowengine.gui.rig_editor.kind_decal")
+@EditorIcon("hollowengine:textures/gui/icons/vfx/node_decal.svg")
 data class DecalAttachmentSpec(
     @EditorHidden
     val id: String = "decal",

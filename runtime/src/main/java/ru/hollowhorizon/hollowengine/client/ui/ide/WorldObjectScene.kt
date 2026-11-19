@@ -106,7 +106,7 @@ internal object WorldObjectScene {
         val components = entity.sceneObjectOrNull?.components.orEmpty()
         val icon = if (model?.isEmpty == false) MODEL_ICON else
             components.values.firstOrNull()?.let(::componentIcon)
-                ?: model?.rig?.attachments?.firstOrNull()?.let(::attachmentIcon)
+                ?: model?.rig?.attachments?.firstOrNull()?.let(::componentIcon)
                 ?: WorldObjectEditing.EMPTY_ICON
         val parts = if (entity.uuid.toString() in expanded) WorldObjectParts.of(entity) else null
         if (parts?.loading == true) dirty = true

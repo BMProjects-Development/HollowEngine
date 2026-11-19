@@ -3,6 +3,7 @@ package ru.hollowhorizon.hollowengine.common.colliders
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorDescription
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorRange
 import ru.hollowhorizon.hollowengine.common.models.RigAttachmentType
@@ -70,6 +71,8 @@ enum class ColliderContact {
  */
 @Serializable
 @SerialName(ColliderAttachmentSpec.TYPE_ID)
+@EditorName("hollowengine.gui.rig_editor.kind_collider")
+@EditorIcon("hollowengine:textures/gui/icons/rig/colliders.svg")
 data class ColliderAttachmentSpec(
     @EditorName("$LANG.name")
     @EditorDescription("$LANG.name.hint")

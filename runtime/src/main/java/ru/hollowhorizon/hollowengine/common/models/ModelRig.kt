@@ -10,6 +10,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorAsset
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorHidden
+import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorIcon
 import ru.hollowhorizon.hollowengine.common.attachments.editor.EditorName
 import ru.hollowhorizon.hollowengine.common.utils.math.QuatF
 import ru.hollowhorizon.hollowengine.common.utils.math.Vec3f
@@ -151,6 +152,8 @@ data class ItemSlotAttachmentSpec(
  */
 @Serializable
 @SerialName("hollowengine:rig/model")
+@EditorName("hollowengine.gui.rig_editor.kind_model")
+@EditorIcon("hollowengine:textures/gui/icons/files/model.svg")
 data class ModelAttachmentSpec(
     @EditorHidden
     val id: String = "model",

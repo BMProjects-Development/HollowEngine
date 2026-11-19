@@ -12,6 +12,7 @@ import ru.hollowhorizon.hollowengine.client.ui.ide.files.vfx.VfxEditing
 import ru.hollowhorizon.hollowengine.client.ui.inspector.AutoFields
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentJson
 import ru.hollowhorizon.hollowengine.client.ui.inspector.ComponentLabels
+import ru.hollowhorizon.hollowengine.client.ui.inspector.Hint
 import ru.hollowhorizon.hollowengine.client.ui.inspector.InspectorTarget
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiDropdownItem
 import ru.hollowhorizon.hollowengine.client.ui.widgets.UiMenuParts
@@ -21,6 +22,7 @@ import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentSync
 import ru.hollowhorizon.hollowengine.common.entities.objects.EditWorldObjectComponentPacket
 import ru.hollowhorizon.hollowengine.common.entities.objects.EditWorldObjectNodePacket
 import ru.hollowhorizon.hollowengine.common.entities.objects.WorldObjectEntity
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 import ru.hollowhorizon.hollowengine.common.scene.*
 import ru.hollowhorizon.hollowengine.common.vfx.VfxComponent
 import ru.hollowhorizon.hollowengine.common.vfx.VfxEffect
@@ -33,8 +35,9 @@ internal fun componentLabel(value: Any): String {
 }
 
 internal fun componentIcon(value: Any): String {
-    val type = ComponentDescriptorRegistry.descriptorOrNull(value::class)
-    return type?.serializer?.descriptor?.let(ComponentLabels::componentIcon) ?: PartIcons.ATTACHMENT
+    val serializer = ComponentDescriptorRegistry.descriptorOrNull(value::class)?.serializer
+        ?: RigAttachmentTypes.of(value)?.serializer
+    return serializer?.descriptor?.let(::componentIcon) ?: PartIcons.ATTACHMENT
 }
 
 internal object WorldSceneComponentEditor {
@@ -116,6 +119,7 @@ internal object WorldSceneComponentEditor {
                 WorldObjectScene.partsOf(ref.uuid)?.component(ref.path) ?: owner.component(id) ?: return@InspectorTarget
             val json = ComponentJson.encode(current) ?: return@InspectorTarget
             Column(tags = listOf("insp-body")) {
+                ComponentLabels.componentDescription(serializer.descriptor)?.let { Hint(it) }
                 AutoFields(descriptor.id, serializer.descriptor, json, "/$id") { changed ->
                     val next = ComponentJson.decode(serializer, changed) ?: return@AutoFields
                     rewrite(entity, owner, id, next, "component")

@@ -1,5 +1,6 @@
 package ru.hollowhorizon.hollowengine.common.scene
 
+import kotlinx.serialization.Serializable
 import ru.hollowhorizon.hollowengine.common.events.LogicalSide
 import ru.hollowhorizon.hollowengine.common.utils.math.Mat4f
 import java.util.UUID
@@ -21,6 +22,7 @@ interface SceneTransformParent {
 }
 
 /** One imported child, numbered among siblings with the same name in source order. */
+@Serializable
 data class ScenePathSegment(val name: String, val occurrence: Int = 1) {
     init {
         require(name.isNotBlank()) { "Scene path segment cannot be blank" }

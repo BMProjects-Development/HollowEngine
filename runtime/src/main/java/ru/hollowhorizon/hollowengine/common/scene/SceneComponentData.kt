@@ -13,6 +13,8 @@ import java.util.UUID
 internal object SceneComponentData {
     private data class Unresolved(val raw: CompoundTag)
 
+    data class Value(val data: Any, val enabled: Boolean)
+
     fun write(owner: ComponentOwner, syncOnly: Boolean = false) = CompoundTag().apply {
         for ((id, value) in owner.components) {
             encode(value, owner.componentEnabled(id), syncOnly)?.let { put(id.toString(), it) }
@@ -46,18 +48,49 @@ internal object SceneComponentData {
         val current = owner.component(id)
         if (syncOnly && current != null && !synced(current)) return false
         val enabled = tag.getBoolean("enabled")
-        if (current == null) owner.attach(value, id, enabled)
-        else {
-            if (current::class != value::class) {
-                if (!replace) return false
-                owner.detach(id)
-                owner.attach(value, id, enabled)
-            } else {
-                owner.setComponent(id, value)
-                owner.setComponentEnabled(id, enabled)
+        if (!replace && current != null && current::class != value::class) return false
+        put(owner, id, Value(value, enabled))
+        return true
+    }
+
+    fun readPrefab(tag: CompoundTag): Value {
+        val key = requireNotNull(ResourceLocation.tryParse(tag.getString("type"))) { "Invalid component type" }
+        val data = requireNotNull(tag.get("data")) { "Missing data for component '$key'" }
+        val type = ComponentDescriptorRegistry.descriptorOrNull(key)
+            ?: return Value(Unresolved(tag.copy()), false)
+        return Value(NBTFormat.deserialize(type.serializer, data.copy()), tag.getBoolean("enabled"))
+    }
+
+    fun validatePrefab(owner: SceneObject?, id: UUID, value: Value) {
+        if (value.data !is Unresolved) {
+            require(value.data::class.acceptsComponentOwner(SceneObject::class.java)) {
+                "Component ${value.data::class.simpleName} cannot be attached to a scene object"
             }
         }
-        return true
+        val current = owner?.component(id) ?: return
+        require(typeOf(current) == typeOf(value.data)) { "Prefab component '$id' has a different type on '${owner.name}'" }
+    }
+
+    private fun typeOf(value: Any): ResourceLocation? =
+        if (value is Unresolved) ResourceLocation.tryParse(value.raw.getString("type"))
+        else ComponentDescriptorRegistry.idFor(value::class)
+
+    fun put(owner: ComponentOwner, id: UUID, value: Value) {
+        val data = value.data
+        val current = owner.component(id)
+        if (current != null && current::class == data::class && data !is Unresolved) {
+            owner.setComponent(id, data)
+            owner.setComponentEnabled(id, value.enabled)
+        } else {
+            if (current == data && data is Unresolved) return
+            if (current != null) owner.detach(id)
+            if (data is Unresolved) {
+                when (owner) {
+                    is Scene -> owner.restoreUnknown(data, id)
+                    is SceneObject -> owner.restoreUnknown(data, id)
+                }
+            } else owner.attach(data, id, value.enabled)
+        }
     }
 
     fun synced(value: Any): Boolean =

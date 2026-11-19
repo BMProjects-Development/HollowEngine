@@ -6,7 +6,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.descriptors.SerialDescriptor
 import net.minecraft.locale.Language
 import net.minecraft.resources.ResourceLocation
+import ru.hollowhorizon.hollowengine.client.ui.ide.PartIcons
+import ru.hollowhorizon.hollowengine.common.attachments.components.ComponentDescriptorRegistry
 import ru.hollowhorizon.hollowengine.common.attachments.editor.*
+import ru.hollowhorizon.hollowengine.common.models.RigAttachmentTypes
 
 /**
  * What a field or a component is called, and how it wants to be edited.
@@ -15,9 +18,10 @@ internal object ComponentLabels {
     fun componentKey(id: ResourceLocation): String =
         "hollowengine.component.${id.namespace}.${id.path.replace('/', '.')}"
 
-    fun componentName(id: ResourceLocation, descriptor: SerialDescriptor): String {
+    fun componentName(id: ResourceLocation, descriptor: SerialDescriptor, fallbackKey: String? = null): String {
         descriptor.annotations.filterIsInstance<EditorName>().firstOrNull()?.let { return translate(it.name) }
-        return translateOrNull(componentKey(id)) ?: prettify(id.path.substringAfterLast('/'))
+        return translateOrNull(componentKey(id)) ?: fallbackKey?.let(::translateOrNull)
+            ?: prettify(id.path.substringAfterLast('/'))
     }
 
     fun componentDescription(descriptor: SerialDescriptor): String? =
